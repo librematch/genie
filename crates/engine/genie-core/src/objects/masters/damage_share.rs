@@ -1,5 +1,7 @@
 //! A master's share of a damage: resisted, reflected, dealt to its own or by its blast.
 
+use std::ops::{AddAssign, MulAssign};
+
 /// A share of a damage (a float the `.dat` holds and the effects set, add to and scale): the
 /// bonus damage a master resists (`bonus_damage_resistance`, `+0x824`), the damage it reflects
 /// on its attacker (`damage_reflection`, `+0x864`), its own side takes of its blasts
@@ -25,14 +27,14 @@ impl DamageShare {
     }
 }
 
-impl std::ops::AddAssign for DamageShare {
+impl AddAssign for DamageShare {
     /// An effect's add (`f32`).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for DamageShare {
+impl MulAssign<f32> for DamageShare {
     /// An effect's multiply (`f32`).
     fn mul_assign(&mut self, factor: f32) {
         self.0 *= factor;

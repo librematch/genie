@@ -2,6 +2,8 @@
 //! it and its repair.
 
 use crate::GenieError;
+use crate::construction::repair::REPAIR;
+use crate::garrison::ENTER;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::objects::ObjectState;
@@ -12,6 +14,7 @@ use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Task};
+use crate::orders::GARRISON;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Actor;
@@ -152,16 +155,14 @@ pub(super) fn garrison_into<'m>(
         && t.master.object_flags.contains(ObjectFlags::GARRISON)
         && (t.master.class == class::TRANSPORT
             || own.class != class::VILLAGER
-            || filter == Some(crate::garrison::ENTER))
+            || filter == Some(ENTER))
     {
         if let Some(task) = first(list, |task| {
-            task.action_type == crate::orders::GARRISON
-                && task.for_class(t.master.class)
-                && wanted(filter, task)
+            task.action_type == GARRISON && task.for_class(t.master.class) && wanted(filter, task)
         }) {
             return (Finding::Answer(Some(task)), false);
         }
-        if filter == Some(crate::garrison::ENTER) {
+        if filter == Some(ENTER) {
             return (Finding::Answer(None), false);
         }
         return (Finding::Next, filter.is_none());
@@ -203,7 +204,7 @@ pub(super) fn repair_finding<'m>(
         let mut any = None;
         let mut by_class = None;
         for task in &list.tasks {
-            if task.action_type != crate::construction::repair::REPAIR || !wanted(filter, task) {
+            if task.action_type != REPAIR || !wanted(filter, task) {
                 continue;
             }
             if task.object_group.is_none() && task.object_id.is_none() {
@@ -221,7 +222,7 @@ pub(super) fn repair_finding<'m>(
             Some(task) if task.work_val1.positive() => return Finding::Answer(Some(task)),
             _ => {}
         }
-        if filter == Some(crate::construction::repair::REPAIR) {
+        if filter == Some(REPAIR) {
             return Finding::Answer(None);
         }
     }

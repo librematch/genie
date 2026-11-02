@@ -20,7 +20,11 @@ use std::collections::BTreeMap;
 
 use crate::GenieError;
 
+use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
+use crate::math::image::build::{
+    CLEARING_REACH as BUILD_CLEARING_REACH, STUMP_HP as BUILD_STUMP_HP,
+};
 
 /// What the footprint clearing (`FUN_1415c3620`) reads of the new building: its owner
 /// (`param_2`), its master's id (`param_3`), class and radii, its place (`param_4`,
@@ -88,9 +92,9 @@ pub(super) const FLAG_MASTERS: [MasterId; 3] = [
     MasterId::named(0x6f9),
 ];
 /// The tiles the footprint clearing scans each way of the building's place (`DAT_142eb0f48`).
-pub(crate) const CLEARING_REACH: f32 = crate::math::image::build::CLEARING_REACH;
+pub(crate) const CLEARING_REACH: f32 = BUILD_CLEARING_REACH;
 /// The hit points a tree at most has that the builder's clearing takes (`DAT_14330eb8c`).
-pub(super) const STUMP_HP: f32 = crate::math::image::build::STUMP_HP;
+pub(super) const STUMP_HP: f32 = BUILD_STUMP_HP;
 
 /// `FUN_1415c3620` with `param_7` 0, its choice: the objects whose centre is on the tiles from 4
 /// before the building's place to 4 past it (CVTTSS2SI to 16 bits, held on the map), rows then
@@ -196,7 +200,7 @@ pub(super) fn clearing_tiles(at: Point, map: GridSize) -> Option<([i16; 2], [i16
 pub(super) fn clearing_takes(
     site: &ClearingSite,
     id: ObjectId,
-    o: &crate::map::spatial::Placed,
+    o: &Placed,
     looks: &BTreeMap<ObjectId, ClearLook>,
 ) -> Result<Option<Cleared>, GenieError> {
     use crate::math::fmath::below_or_unordered;

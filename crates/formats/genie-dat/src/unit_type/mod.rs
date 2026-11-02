@@ -23,6 +23,7 @@ pub use self::movers::{
 };
 pub use self::statics::{DamageSprite, StaticUnitTypeAttributes, UnitAttribute};
 pub use self::unit::UnitType;
+use std::result::Result as StdResult;
 
 /// The base class of a unit indicates which data is available for that unit type.
 ///
@@ -113,7 +114,7 @@ pub struct ParseUnitBaseClassError(u8);
 impl TryFrom<u8> for UnitBaseClass {
     type Error = ParseUnitBaseClassError;
 
-    fn try_from(n: u8) -> std::result::Result<Self, Self::Error> {
+    fn try_from(n: u8) -> StdResult<Self, Self::Error> {
         match n {
             10 => Ok(Self::Static),
             20 => Ok(Self::Animated),
@@ -160,6 +161,8 @@ impl From<ParseUnitBaseClassError> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -173,6 +176,6 @@ mod genie_error_tests {
                 "a unit base class this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 }

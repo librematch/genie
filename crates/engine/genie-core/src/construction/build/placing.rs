@@ -14,18 +14,23 @@ use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Placed;
+use crate::math::image::build::EPSILON as BUILD_EPSILON;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
+use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
 /// The radius a part of a building must pass to count as an annex the builder stands on
 /// (`0x140aae200` case 7).
-const EPSILON: f32 = crate::math::image::build::EPSILON;
+const EPSILON: f32 = BUILD_EPSILON;
 
 impl BuildAction {
     /// `set_state(7)` (`0x140aae200` case 7) on a foundation no builder started: clear the
@@ -51,7 +56,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         let desolid =
@@ -152,7 +157,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         (site, cleared): (ObjectId, &[ObjectId]),
         reads: &BuildReads,
     ) -> Result<PartTests, GenieError> {
@@ -264,7 +269,7 @@ impl BuildAction {
     ) -> Result<(), GenieError> {
         Self::stand(c, builder)?;
         let target = self.target.take();
-        crate::world::lets::release(c, builder, target, reads.by)?;
+        release(c, builder, target, reads.by)?;
         self.point = Position::from([-1.0; 3]);
         self.state = BuildState::Halted;
         Ok(())
@@ -327,7 +332,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
@@ -373,12 +378,7 @@ impl BuildAction {
         builder: &Unit,
         footprint: ObjectId,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
@@ -398,7 +398,7 @@ impl BuildAction {
         self.state = BuildState::Clear { move_to: None };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,

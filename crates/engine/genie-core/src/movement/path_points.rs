@@ -1,5 +1,6 @@
 //! Path points, the gaps between footprints and the position setter's tests.
 
+use crate::groups::UnitGroups;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -9,11 +10,17 @@ use crate::map::spatial::Placed;
 use crate::math::Angle;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
+use crate::math::image::movement::{
+    ALLY_PAUSE as MOVEMENT_ALLY_PAUSE, FAST_TURN as MOVEMENT_FAST_TURN,
+    OTHER_PAUSE as MOVEMENT_OTHER_PAUSE, STUCK_PAUSE as MOVEMENT_STUCK_PAUSE,
+    TWO_PI as MOVEMENT_TWO_PI,
+};
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::WaypointIndex;
 use crate::movement::{EPSILON, Motion, PathData, RANGE_FLOOR, SHORTEST};
+use crate::objects::FacetCount;
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use crate::pathing::tile_path::Path;
@@ -93,14 +100,14 @@ pub(super) fn short_range(near: bool, range: Distance) -> Distance {
 
 /// A master whose object flags have bit 1 turns as if dt were this many times longer
 /// (`DAT_14330ebcc`).
-pub(super) const FAST_TURN: f32 = crate::math::image::movement::FAST_TURN;
+pub(super) const FAST_TURN: f32 = MOVEMENT_FAST_TURN;
 /// The pause a kept hit's ranking gives a unit the walker outranks: 0.1 for an ally
 /// (`DAT_142eb5690`), 0.5 for another (`DAT_142e7f384`).
-pub(super) const ALLY_PAUSE: Seconds = Seconds::new(crate::math::image::movement::ALLY_PAUSE);
-pub(super) const OTHER_PAUSE: Seconds = Seconds::new(crate::math::image::movement::OTHER_PAUSE);
+pub(super) const ALLY_PAUSE: Seconds = Seconds::new(MOVEMENT_ALLY_PAUSE);
+pub(super) const OTHER_PAUSE: Seconds = Seconds::new(MOVEMENT_OTHER_PAUSE);
 /// The pause a level at its last waypoint without a path gives its own unit while it may still
 /// try (`DAT_142eb5690`).
-pub(super) const STUCK_PAUSE: Seconds = Seconds::new(crate::math::image::movement::STUCK_PAUSE);
+pub(super) const STUCK_PAUSE: Seconds = Seconds::new(MOVEMENT_STUCK_PAUSE);
 /// What [`Mover::avoid`] makes of the walk's hits: the hits it keeps and the pauses it gives.
 ///
 /// [`Mover::avoid`]: crate::movement::Mover::avoid
@@ -111,7 +118,7 @@ pub(super) struct Avoided {
     pub(super) at_target: bool,
 }
 /// 2π (`DAT_142eb56ac`): over a revolution's time, the most a unit turns per second.
-pub(super) const TWO_PI: f32 = crate::math::image::movement::TWO_PI;
+pub(super) const TWO_PI: f32 = MOVEMENT_TWO_PI;
 
 /// The most a unit of a moving master turns per second (`+0x774`) as every copy of the master
 /// sets it (master slot 0x80, `FUN_1410e3a70`, which also leaves the turn radius 0 and its
@@ -120,10 +127,7 @@ pub(super) const TWO_PI: f32 = crate::math::image::movement::TWO_PI;
 /// `FUN_1410e39e0`), and 2π over that is the rate (`+0x77c`, copied to `+0x774`); without either
 /// the largest float. The `.dat`'s own turning values do not survive the copy.
 #[must_use]
-pub fn turn_rate(
-    turn_speed: Seconds,
-    walking_facets: Option<crate::objects::FacetCount>,
-) -> TurnRate {
+pub fn turn_rate(turn_speed: Seconds, walking_facets: Option<FacetCount>) -> TurnRate {
     turning(turn_speed, walking_facets, Turning::PRESET).0.rate
 }
 
@@ -164,7 +168,7 @@ impl Turning {
 #[must_use]
 pub fn turning(
     turn_speed: Seconds,
-    walking_facets: Option<crate::objects::FacetCount>,
+    walking_facets: Option<FacetCount>,
     before: Turning,
 ) -> (Turning, bool) {
     if turn_speed == Seconds::ZERO {
@@ -242,7 +246,7 @@ pub struct Planning<'a> {
     pub object: &'a mut Well512,
     /// The world's unit groups as they are now, which the long pather reads for a unit in a
     /// group (its group's differentiator units, `FUN_140f9eb70`).
-    pub groups: &'a crate::groups::UnitGroups,
+    pub groups: &'a UnitGroups,
 }
 
 impl Planning<'_> {

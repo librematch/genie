@@ -1,5 +1,7 @@
 //! A master's occlusion mode (`+0x650`): how its objects show behind others.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's occlusion mode (`occlusion_flag`, `+0x650`; the `.dat`'s `occlusion_mode`): how the
 /// renderer shows its objects behind others. The simulation only keeps it; every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -28,8 +30,8 @@ impl Occlusion {
     }
 }
 
-impl std::fmt::Display for Occlusion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Occlusion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

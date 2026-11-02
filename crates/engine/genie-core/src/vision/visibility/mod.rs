@@ -50,6 +50,10 @@ mod object_events;
 mod sight;
 
 pub use self::object_events::sight_taker;
+use crate::math::fmath::{at_most_or_unordered, sqrt};
+use crate::math::image::visibility::EDGE as VISIBILITY_EDGE;
+use crate::objects::{IdTable, ObjectState};
+use std::mem::take;
 
 /// The map tile's `+0x19` bit of a building's tile that is not its anchor (`FUN_140f73900`).
 const LINKED: u8 = 0x20;
@@ -67,7 +71,7 @@ const MOST: i16 = 0x7ffe;
 const CIRCLE_MASTER: MasterId = MasterId::named(112);
 
 /// `DAT_142eb99cc`: a footprint's high edge, less this, is its last tile.
-const EDGE: f32 = crate::math::image::visibility::EDGE;
+const EDGE: f32 = VISIBILITY_EDGE;
 
 /// One player's `RGE_Visible_Map` (player `+0x70`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -99,7 +103,7 @@ pub struct Seer {
     /// The master's `line_of_sight` (`+0x5d0`); slot 0x210 adds the object's powerup (`+0xad4`).
     pub los: Distance,
     /// `object_state` (`+0x640`): only state 2 sees from a new tile.
-    pub state: crate::objects::ObjectState,
+    pub state: ObjectState,
     /// `+0x684`: the object explored since it was made (unsaved; a load sets it, `FUN_14116a500`,
     /// and a foundation made in the game has it clear until its construction starts). Only a
     /// building's slot 0x1d8 reads it.
@@ -200,7 +204,7 @@ impl VisibleResources {
         let (x, y) = (at.x(), at.y());
         // COMISS r, p; JBE: a record at or below the point (or NaN) measures p - r
         let gap = |r: f32, p: f32| {
-            if crate::math::fmath::at_most_or_unordered(r, p) {
+            if at_most_or_unordered(r, p) {
                 p - r
             } else {
                 r - p
@@ -217,7 +221,7 @@ impl VisibleResources {
             }
         }
         if let Some(i) = best {
-            list.get_mut(i)?.distance = Distance::new(crate::math::fmath::sqrt(nearest));
+            list.get_mut(i)?.distance = Distance::new(sqrt(nearest));
         }
         best
     }
@@ -246,7 +250,7 @@ pub struct Visibility {
     /// The tiles a computer player's map explored that its AI module has not heard of yet, in
     /// order ([`Visibility::take_ai_tiles`]).
     ai_tiles: Vec<(PlayerId, Tile)>,
-    seers: crate::objects::IdTable<Seer>,
+    seers: IdTable<Seer>,
     /// The objects-in-sight registry, when the slice holds it (the save does not).
     pub registry: Option<Registry>,
     /// Each player's tile list (`RGE_Tile_List`, player `+0x180`, not saved): the tiles its map
@@ -328,7 +332,7 @@ impl Visibility {
             extents_capacity,
             player_types,
             ai_tiles: Vec::new(),
-            seers: crate::objects::IdTable::new(),
+            seers: IdTable::new(),
             registry: None,
             new_tiles: vec![Vec::new(); players],
             resources: vec![VisibleResources::default(); players],
@@ -348,7 +352,7 @@ impl Visibility {
 
     /// The tiles a computer player's map explored since the last call, as (player, tile).
     pub fn take_ai_tiles(&mut self) -> Vec<(PlayerId, Tile)> {
-        std::mem::take(&mut self.ai_tiles)
+        take(&mut self.ai_tiles)
     }
 
     fn unsupported(&mut self, what: &'static str) {

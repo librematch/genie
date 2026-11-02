@@ -5,6 +5,7 @@ use crate::map::Point;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
+use std::iter::from_fn;
 
 #[test]
 fn search_leaves_the_grid_as_it_was() {
@@ -493,7 +494,7 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
     for id in ids {
         open.push(id, &nodes);
     }
-    let order: Vec<NodeIndex> = std::iter::from_fn(|| open.pop(&nodes).unwrap()).collect();
+    let order: Vec<NodeIndex> = from_fn(|| open.pop(&nodes).unwrap()).collect();
     assert_eq!(order, [1, 2, 0, 4, 3].map(|i| ids[i]));
     assert!(open.is_empty());
 }

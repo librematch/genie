@@ -1,6 +1,8 @@
 //! The unit AI's state, gates, the auto scout and the STOP, EXPLORE and standing commands.
 
 use crate::GenieError;
+use crate::commands::UnloadPick;
+use crate::groups::common_group;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -11,10 +13,13 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
+use crate::objects::sprite::new_sprite;
 use crate::orders::{lock_gate, set_stance};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::task_finder::allied as task_finder_allied;
+use crate::unit_ai::{Issuer, OrderPriority, UnitStance};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
@@ -29,7 +34,7 @@ impl World {
         &mut self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-        state: crate::unit_ai::UnitStance,
+        state: UnitStance,
     ) -> Result<(), GenieError> {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
@@ -164,13 +169,13 @@ impl World {
                 .get(unit.id)
                 .is_some_and(|ai| ai.current_action == Some(ActionKind::AutoScout));
             let order = QueuedOrder {
-                issuer: Some(crate::unit_ai::Issuer::Player(p)),
+                issuer: Some(Issuer::Player(p)),
                 order: if scouts {
                     OrderKind::Stop
                 } else {
                     OrderKind::AutoScout
                 },
-                priority: crate::unit_ai::OrderPriority::COMMAND,
+                priority: OrderPriority::COMMAND,
                 target: None,
                 target_owner: None,
                 point: Position::new(-1.0, -1.0, position.z()),
@@ -226,8 +231,7 @@ impl World {
             }
         }
         if 1 < list.len() {
-            let group =
-                crate::groups::common_group(&list, |id| self.object(id).map(|(_, u)| u.group));
+            let group = common_group(&list, |id| self.object(id).map(|(_, u)| u.group));
             if group
                 .and_then(|id| self.groups.get(id))
                 .is_some_and(|g| g.members.len() == list.len())
@@ -320,7 +324,7 @@ impl World {
         &self,
         player: PlayerId,
         ids: &[Option<ObjectId>],
-        pick: crate::commands::UnloadPick,
+        pick: UnloadPick,
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
         let player_type = self.players.player(player)?.kind;
         let mut ids: Vec<Option<ObjectId>> = ids
@@ -331,18 +335,14 @@ impl World {
         let tied = |owner: PlayerId| {
             self.mutual_allies(owner, player)
                 && match pick {
-                    crate::commands::UnloadPick::Player(number) => {
-                        usize::try_from(number) == Ok(player.index())
-                    }
-                    crate::commands::UnloadPick::Object(o)
-                    | crate::commands::UnloadPick::SameMaster(o)
-                    | crate::commands::UnloadPick::AllBut(o)
-                    | crate::commands::UnloadPick::OtherMasters(o) => {
+                    UnloadPick::Player(number) => usize::try_from(number) == Ok(player.index()),
+                    UnloadPick::Object(o)
+                    | UnloadPick::SameMaster(o)
+                    | UnloadPick::AllBut(o)
+                    | UnloadPick::OtherMasters(o) => {
                         self.place(o).is_some_and(|p| p.player() == player)
                     }
-                    crate::commands::UnloadPick::All(_)
-                    | crate::commands::UnloadPick::Group(_)
-                    | crate::commands::UnloadPick::Other(..) => false,
+                    UnloadPick::All(_) | UnloadPick::Group(_) | UnloadPick::Other(..) => false,
                 }
         };
         let mut dropped = 0;
@@ -368,7 +368,7 @@ impl World {
         let allied = |from: PlayerId, to: PlayerId| {
             self.players
                 .get(from.index())
-                .is_some_and(|p| crate::unit_ai::task_finder::allied(&p.relations, from, to, true))
+                .is_some_and(|p| task_finder_allied(&p.relations, from, to, true))
         };
         allied(a, b) && allied(b, a)
     }
@@ -402,7 +402,7 @@ impl World {
         ))?;
         let rng = self.streams.get(Stream::Sprite);
         let u = self.players.live_mut(p, idx)?;
-        crate::objects::sprite::new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
+        new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
         Ok(())
     }
 }

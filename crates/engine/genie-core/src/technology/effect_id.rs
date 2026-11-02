@@ -1,5 +1,7 @@
 //! An effect's id (a technology's `+0x3a`, a player's effect override `+0x62`).
 
+use std::fmt::{Display, Error, Formatter};
+
 /// An effect's id: its place in the world's effect table (`+0x128`), as a technology (`+0x3a`) and
 /// a player's effect override (`+0x62`) hold it, −1 for none. Every short is kept.
 /// The default is 0, as a zeroed record holds it.
@@ -23,8 +25,8 @@ impl EffectId {
     }
 }
 
-impl std::fmt::Display for EffectId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for EffectId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

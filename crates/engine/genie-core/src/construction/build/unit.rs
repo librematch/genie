@@ -16,17 +16,23 @@ use crate::world::Seconds;
 use std::collections::BTreeMap;
 
 use crate::GenieError;
+use crate::construction::FoundationId;
+use crate::construction::build::CLEARING_REACH;
+use crate::construction::build::world_side::NOT_HELD;
 use crate::construction::build::{BuildAction, BuildReads, ClearLook, DROPPED_ORDERS};
 use crate::gathering::hunt::DropOff;
 use crate::map::spatial::Spatial;
 use crate::movement::{Me, footprint_gap_squared};
+use crate::objects::layers::Action;
 use crate::objects::lifecycle::death_parts::clear_look_of;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -39,7 +45,7 @@ impl Unit {
     /// it; its code (the end's 1). Nothing without a Build.
     pub(crate) fn build_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -77,7 +83,7 @@ impl Unit {
             })
         {
             let (fx, fy) = (f.position().x(), f.position().y());
-            let reach = crate::construction::build::CLEARING_REACH + 1.0;
+            let reach = CLEARING_REACH + 1.0;
             for (id, _) in c.w.spatial.objects_within(Rect::new(
                 fx - reach,
                 fy - reach,
@@ -94,10 +100,7 @@ impl Unit {
                 let l = clear_look_of(
                     u,
                     c.w.parts.building_of(id),
-                    crate::objects::masters::OwnerMasters::new(
-                        &c.w.parts.own_master,
-                        c.w.masters.of(owner),
-                    ),
+                    OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(owner)),
                 )?;
                 let _ = looks.insert(id, l);
             }
@@ -116,7 +119,7 @@ impl Unit {
         let foundation = others.own(target);
         let site = foundation
             .filter(|u| c.w.parts.building_of(u.id).construction.is_some())
-            .map(|u| crate::construction::FoundationId::new(u.id));
+            .map(|u| FoundationId::new(u.id));
         let built = foundation.map(|u| u.life.master_id);
         let stack_made = foundation.and_then(|u| c.w.parts.building_of(u.id).stack_made);
         let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> =
@@ -189,7 +192,7 @@ impl Unit {
         };
         Ok(state_of(site.map(DropSiteId::id), others).map(|state| {
             let drop = DropOff {
-                takes: crate::unit_ai::task_finder::drops_at(&c.w.drop_sites, s.master, &actor),
+                takes: drops_at(&c.w.drop_sites, s.master, &actor),
                 gap_squared: footprint_gap_squared(
                     me_at.position,
                     me_at.radius,
@@ -236,7 +239,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         if let Some(b) = actions.list.build_mut() {
@@ -262,12 +265,10 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         rate: Seconds,
     ) -> Result<bool, GenieError> {
-        let target = self
-            .target
-            .ok_or(crate::construction::build::world_side::NOT_HELD)?;
+        let target = self.target.ok_or(NOT_HELD)?;
         self.lend(c, builder, actions, |w, _, _| w.work_building(target, rate))
     }
 }

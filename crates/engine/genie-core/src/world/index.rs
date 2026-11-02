@@ -10,18 +10,32 @@
 //! again with [`World::reindex`].
 
 use crate::GenieError;
+use crate::construction::{Annexes, MainBuildingId};
+use crate::map::spatial::{Gait, RecordId};
+use crate::movement::Mover;
+#[cfg(test)]
+use crate::movement::tests::unit_with_gait;
 use crate::objects::IdTable;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
+use crate::objects::layers::{Action, Building, Combat, Motion};
 use crate::objects::masters::Master;
+use crate::objects::masters::{MasterTables, Masters};
 use crate::objects::object_list::ObjectList;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
+use crate::world::Unread;
 use crate::world::World;
+use crate::world::motions::Lent;
 use crate::world::parts::Object;
+#[cfg(test)]
+use crate::world::parts::no_parts;
+use crate::world::parts::{PartTable, Parts};
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
+#[cfg(test)]
+use std::sync::LazyLock;
 
 /// Where an object is: its player and its index in the live or the sleeping list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,11 +115,10 @@ impl ObjectIndex {
     /// (a test's).
     #[cfg(test)]
     pub(crate) fn scanning() -> &'static Self {
-        static SCANNING: std::sync::LazyLock<ObjectIndex> =
-            std::sync::LazyLock::new(|| ObjectIndex {
-                places: IdTable::new(),
-                twice: true,
-            });
+        static SCANNING: LazyLock<ObjectIndex> = LazyLock::new(|| ObjectIndex {
+            places: IdTable::new(),
+            twice: true,
+        });
         &SCANNING
     }
 
@@ -256,11 +269,11 @@ impl ObjectIndex {
 /// The part tables [`ObjectsRef::of_tables`] reads: the building, combat and action layers, the
 /// objects the load could not read whole and the motion layers (one of them lent out).
 pub type PartTables<'a> = (
-    &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
-    &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
-    &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
-    &'a crate::world::parts::PartTable<crate::world::Unread>,
-    crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
+    &'a PartTable<Building>,
+    &'a PartTable<Combat>,
+    &'a PartTable<Action>,
+    &'a PartTable<Unread>,
+    Lent<'a, Motion>,
 );
 
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
@@ -270,12 +283,12 @@ pub type PartTables<'a> = (
 pub struct ObjectsRef<'a> {
     players: &'a [Player],
     index: &'a ObjectIndex,
-    masters: crate::objects::masters::MasterTables<'a>,
-    buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
-    combats: &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
-    actions: &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
-    unread: &'a crate::world::parts::PartTable<crate::world::Unread>,
-    motions: crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
+    masters: MasterTables<'a>,
+    buildings: &'a PartTable<Building>,
+    combats: &'a PartTable<Combat>,
+    actions: &'a PartTable<Action>,
+    unread: &'a PartTable<Unread>,
+    motions: Lent<'a, Motion>,
 }
 
 impl<'a> ObjectsRef<'a> {
@@ -286,13 +299,13 @@ impl<'a> ObjectsRef<'a> {
     pub fn new(
         players: &'a [Player],
         index: &'a ObjectIndex,
-        masters: &'a [crate::objects::masters::Masters],
-        parts: &'a crate::world::parts::Parts,
+        masters: &'a [Masters],
+        parts: &'a Parts,
     ) -> Self {
         Self::of_tables(
             players,
             index,
-            crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+            MasterTables::new(masters, &parts.own_master),
             (
                 &parts.building,
                 &parts.combat,
@@ -313,7 +326,7 @@ impl<'a> ObjectsRef<'a> {
     pub const fn of_tables(
         players: &'a [Player],
         index: &'a ObjectIndex,
-        masters: crate::objects::masters::MasterTables<'a>,
+        masters: MasterTables<'a>,
         (buildings, combats, actions, unread, motions): PartTables<'a>,
     ) -> Self {
         Self {
@@ -331,35 +344,28 @@ impl<'a> ObjectsRef<'a> {
     /// Object `id`'s mover; none for an object that does not move, one the world does not hold
     /// or one out for its update.
     #[must_use]
-    pub fn mover_of(&self, id: impl ObjectKey) -> Option<&'a crate::movement::Mover> {
+    pub fn mover_of(&self, id: impl ObjectKey) -> Option<&'a Mover> {
         let u = self.get(id)?;
-        self.motions
-            .get(u.id)
-            .and_then(crate::objects::layers::Motion::mover)
+        self.motions.get(u.id).and_then(Motion::mover)
     }
 
     /// Object `id`'s combat layer, an object out for its update's too: a new object's where
     /// the table holds none ([`crate::world::parts::Parts::combat_of`]).
     #[must_use]
-    pub fn combat_of(&self, id: ObjectId) -> &'a crate::objects::layers::Combat {
+    pub fn combat_of(&self, id: ObjectId) -> &'a Combat {
         self.combats.of(id)
     }
 
     /// The world's masters these objects read: the players' tables and the objects' own.
     #[must_use]
-    pub const fn masters(&self) -> crate::objects::masters::MasterTables<'a> {
+    pub const fn masters(&self) -> MasterTables<'a> {
         self.masters
     }
 
     /// No objects: a test's walk that meets none by id.
     #[cfg(test)]
     pub(crate) fn empty() -> ObjectsRef<'static> {
-        ObjectsRef::new(
-            &[],
-            ObjectIndex::scanning(),
-            &[],
-            crate::world::parts::no_parts(),
-        )
+        ObjectsRef::new(&[], ObjectIndex::scanning(), &[], no_parts())
     }
 
     /// Object `id`, live or sleeping.
@@ -387,65 +393,59 @@ impl<'a> ObjectsRef<'a> {
     /// What a walk reads of the moving object `id` ([`Unit::gait`]); none for an object without
     /// movement state, one the world does not hold or one out for its update.
     #[must_use]
-    pub fn gait(&self, id: impl ObjectKey) -> Option<crate::map::spatial::Gait> {
+    pub fn gait(&self, id: impl ObjectKey) -> Option<Gait> {
         let u = self.get(id)?;
         u.gait(
             self.actions.of(u.id),
-            self.motions
-                .get(u.id)
-                .and_then(crate::objects::layers::Motion::mover),
+            self.motions.get(u.id).and_then(Motion::mover),
         )
     }
 
     /// The building layer of object `id` ([`crate::world::parts::Parts::building_of`]); none
     /// for an object the world does not hold or one out for its update.
     #[must_use]
-    pub fn building(&self, id: impl ObjectKey) -> Option<&'a crate::objects::layers::Building> {
+    pub fn building(&self, id: impl ObjectKey) -> Option<&'a Building> {
         Some(self.buildings.of(self.get(id)?.id))
     }
 
     /// The action layer of object `id` ([`crate::world::parts::Parts::actions_of`]); none for
     /// an object the world does not hold or one out for its update.
     #[must_use]
-    pub fn actions(&self, id: impl ObjectKey) -> Option<&'a crate::objects::layers::Action> {
+    pub fn actions(&self, id: impl ObjectKey) -> Option<&'a Action> {
         Some(self.actions.of(self.get(id)?.id))
     }
 
     /// Why the load could not read object `id` whole ([`crate::world::Unread`]), none for one it
     /// read. The updating object's too: its entry stays in the table while its row is out.
     #[must_use]
-    pub fn unread(&self, id: ObjectId) -> Option<&'a crate::world::Unread> {
+    pub fn unread(&self, id: ObjectId) -> Option<&'a Unread> {
         self.unread.get(id)
     }
 
     /// The main building of the annex `id` (its `+0xbb8`); none for an object that is no annex,
     /// one the world does not hold or one out for its update.
     #[must_use]
-    pub fn annex_of(&self, id: impl ObjectKey) -> Option<crate::construction::MainBuildingId> {
+    pub fn annex_of(&self, id: impl ObjectKey) -> Option<MainBuildingId> {
         self.buildings.get(self.get(id)?.id)?.annex_of
     }
 
     /// The annexes of the building `main` ([`crate::construction::Annexes`]): none for an
     /// object the world does not hold or one out for its update, which reads its own.
     #[must_use]
-    pub fn annexes(&self, main: impl ObjectKey) -> crate::construction::Annexes {
+    pub fn annexes(&self, main: impl ObjectKey) -> Annexes {
         self.get(main)
             .and_then(|u| self.buildings.get(u.id))
-            .map_or(crate::construction::Annexes::NONE, |b| b.annexes)
+            .map_or(Annexes::NONE, |b| b.annexes)
     }
 
     /// The obstruction query's ignore list for `ids` (−1 for none), as `FUN_14114e8a0` adds each
     /// object: its id, then a building's annexes (`+0xbc0`..`+0xbd8`, in slot order).
     #[must_use]
-    pub fn query_ignore(&self, ids: &[Option<ObjectId>]) -> Vec<crate::map::spatial::RecordId> {
+    pub fn query_ignore(&self, ids: &[Option<ObjectId>]) -> Vec<RecordId> {
         let mut ignore = Vec::new();
         for &id in ids.iter().flatten() {
-            ignore.push(crate::map::spatial::RecordId::from(id));
-            ignore.extend(
-                self.annexes(id)
-                    .ids()
-                    .map(crate::map::spatial::RecordId::from),
-            );
+            ignore.push(RecordId::from(id));
+            ignore.extend(self.annexes(id).ids().map(RecordId::from));
         }
         ignore
     }
@@ -464,15 +464,15 @@ impl<'a> ObjectsRef<'a> {
 pub(crate) struct TestObjects {
     players: Vec<Player>,
     index: ObjectIndex,
-    masters: Vec<crate::objects::masters::Masters>,
-    parts: crate::world::parts::Parts,
+    masters: Vec<Masters>,
+    parts: Parts,
 }
 
 #[cfg(test)]
 impl TestObjects {
     /// Unit `id` gives `gait` ([`crate::movement::tests::unit_with_gait`]), its building layer
     /// kept; none leaves no unit of the id (nor its layer).
-    pub(crate) fn set_gait(&mut self, id: ObjectId, gait: Option<crate::map::spatial::Gait>) {
+    pub(crate) fn set_gait(&mut self, id: ObjectId, gait: Option<Gait>) {
         if self.players.is_empty() {
             self.players.push(Player::default());
         }
@@ -480,7 +480,7 @@ impl TestObjects {
             return;
         };
         let made = gait.map(|g| {
-            let o = crate::movement::tests::unit_with_gait(id, g);
+            let o = unit_with_gait(id, g);
             let _ = self
                 .parts
                 .motion
@@ -522,7 +522,7 @@ impl TestObjects {
             .parts
             .building_mut(annex)
             .expect("a test's annex layer");
-        annexed.annex_of = Some(crate::construction::MainBuildingId::new(main));
+        annexed.annex_of = Some(MainBuildingId::new(main));
         let building = self
             .parts
             .building_mut(main)
@@ -544,7 +544,7 @@ impl World {
     /// first empty slot, as far as the world holds each.
     pub(crate) fn link_test_annex(&mut self, annex: ObjectId, main: ObjectId) {
         if let Ok(Some((_, a))) = self.object_and_layer_mut(annex) {
-            a.annex_of = Some(crate::construction::MainBuildingId::new(main));
+            a.annex_of = Some(MainBuildingId::new(main));
         }
         if let Ok(Some((_, m))) = self.object_and_layer_mut(main) {
             let slot = m.annexes.ids().count();
@@ -788,10 +788,7 @@ mod tests {
         };
         let p = PlayerId::new(0);
         let _ = t
-            .push_live(
-                p,
-                crate::movement::tests::unit_with_gait(object_id(3), walking),
-            )
+            .push_live(p, unit_with_gait(object_id(3), walking))
             .unwrap();
         assert_eq!(t.objects().gait(object_id(3)), Some(walking));
         assert!(t.objects().moving(object_id(3)));

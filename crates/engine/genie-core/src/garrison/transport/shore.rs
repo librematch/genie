@@ -11,12 +11,16 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
+use crate::map::spatial::{Spatial, Tiles};
 use crate::map::terrain::Terrain;
 use crate::math::conversions::cvttss2si;
 use crate::math::rng::Well512;
+use crate::pathing::Pathing;
 use crate::pathing::zones::ZoneId;
+use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneMap, Zones};
 
 /// `FUN_140aa3ba0`'s new point once no unit went ashore: from the old point (x, y), draws of the
 /// Action stream ("Unload": x, then y), each `r / 0xccc` tiles plus the old coordinate less
@@ -168,7 +172,7 @@ impl<'a> DropDraws<'a> {
 pub(crate) fn in_zone(
     at: Point,
     zone: Option<ZoneId>,
-    zone_map: Option<&crate::pathing::zones::ZoneMap>,
+    zone_map: Option<&ZoneMap>,
 ) -> Result<bool, GenieError> {
     let (x, y) = (at.x(), at.y());
     let Some(zone) = zone else {
@@ -197,11 +201,11 @@ pub(crate) fn in_zone(
 /// planners, the unit's terrain restriction (its master's `+0x606`; none below 0) and its tile.
 pub(crate) struct MapShore<'a> {
     pub(super) terrain: &'a Terrain,
-    pub(super) zones: &'a mut crate::pathing::zones::Zones,
-    pub(super) pathing: &'a mut crate::pathing::Pathing,
-    pub(super) tiles: &'a crate::map::spatial::Tiles,
+    pub(super) zones: &'a mut Zones,
+    pub(super) pathing: &'a mut Pathing,
+    pub(super) tiles: &'a Tiles,
     pub(super) map: GridSize,
-    pub(super) restriction: Option<crate::map::RestrictionId>,
+    pub(super) restriction: Option<RestrictionId>,
     pub(super) tile: Tile,
 }
 
@@ -212,16 +216,13 @@ impl<'a> MapShore<'a> {
     ///
     /// A map without its terrain.
     pub(crate) fn new(
-        spatial: &'a crate::map::spatial::Spatial,
-        zones: &'a mut crate::pathing::zones::Zones,
-        pathing: &'a mut crate::pathing::Pathing,
-        restriction: Option<crate::map::RestrictionId>,
+        spatial: &'a Spatial,
+        zones: &'a mut Zones,
+        pathing: &'a mut Pathing,
+        restriction: Option<RestrictionId>,
         position: Position,
     ) -> Result<Self, GenieError> {
-        let terrain = spatial
-            .terrain
-            .as_ref()
-            .ok_or(crate::pathing::zones::NO_TERRAIN)?;
+        let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         Ok(Self {
             terrain,
             zones,
@@ -234,16 +235,11 @@ impl<'a> MapShore<'a> {
     }
 
     /// The unit's zone map (`FUN_1411931c0`: the map's for its restriction, `FUN_1414138d0`).
-    pub(super) fn zone_map(
-        &mut self,
-    ) -> Result<Option<&crate::pathing::zones::ZoneMap>, GenieError> {
+    pub(super) fn zone_map(&mut self) -> Result<Option<&ZoneMap>, GenieError> {
         let Some(r) = self.restriction else {
             return Ok(None);
         };
-        let values = self
-            .terrain
-            .restriction(r)
-            .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+        let values = self.terrain.restriction(r).ok_or(UNKNOWN_RESTRICTION)?;
         let (w, h) = (self.map.width(), self.map.height());
         Ok(Some(self.zones.of(
             GridSize::new(w, h),

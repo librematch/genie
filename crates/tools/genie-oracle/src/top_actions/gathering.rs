@@ -4,7 +4,11 @@
 use crate::top_actions::{Saved, TaskAt, first_action, saved_move_to};
 use crate::{saved_attack, saved_reload};
 use genie_core::GenieError;
+use genie_core::combat::attack::{ATTACK, Attack, AttackState};
 use genie_core::gathering::DropSiteId;
+use genie_core::gathering::hunt::{HuntTask, Lead};
+use genie_core::gathering::make::{MakeAction, MakeState};
+use genie_core::gathering::{FarmStops, GatherTargetId, HuntTargetId, StopIndex};
 use genie_core::map::Point;
 use genie_core::movement::move_to::MOVE_TO;
 use genie_core::objects::Voice;
@@ -30,20 +34,18 @@ pub(super) fn import_make(
     if base.sub_actions.entries().next().is_some() {
         return Err(GenieError::unsupported("a saved Make with a sub-action"));
     }
-    actions
-        .list
-        .set_make(Some(genie_core::gathering::make::MakeAction {
-            state: genie_core::gathering::make::MakeState::of_byte(base.state)?,
-            remaining: Amount::new(base.timer),
-            total: Amount::new(make.work_timer),
-            task: saved.task(task_at)?,
-        }));
+    actions.list.set_make(Some(MakeAction {
+        state: MakeState::of_byte(base.state)?,
+        remaining: Amount::new(base.timer),
+        total: Amount::new(make.work_timer),
+        task: saved.task(task_at)?,
+    }));
     Ok(())
 }
 
 /// A Hunt's or a Gather's task.
-const fn hunt_task(t: &Task) -> genie_core::gathering::hunt::HuntTask {
-    genie_core::gathering::hunt::HuntTask {
+const fn hunt_task(t: &Task) -> HuntTask {
+    HuntTask {
         id: t.id,
         range: t.work_range,
         resource: t.attribute_type,
@@ -92,7 +94,7 @@ pub(super) fn import_hunt(
     let target_class = ClassId::of_param(part.target_type)?;
     let (walk, attack) = match first_action(&base.sub_actions)? {
         None => (None, None),
-        Some((genie_core::combat::attack::ATTACK, sub)) => (None, Some(hunt_attack(saved, sub)?)),
+        Some((ATTACK, sub)) => (None, Some(hunt_attack(saved, sub)?)),
         // every MoveTo of the Hunt is quiet (`FUN_140a7a170` with 1)
         Some((MOVE_TO, sub)) => (
             Some(saved_move_to(sub, saved.graphics, Voice::Quiet)?),
@@ -105,7 +107,7 @@ pub(super) fn import_hunt(
         }
     };
     let hunt = HuntAction {
-        target: genie_core::gathering::HuntTargetId::of_field(base.target_id),
+        target: HuntTargetId::of_field(base.target_id),
         state: HuntState::of_byte(base.state, walk, attack)?,
         point: saved.point(),
         target_class,
@@ -113,7 +115,7 @@ pub(super) fn import_hunt(
         drop_site: DropSiteId::of_field(part.sheep_drop_site_id as i32),
         carry_to: DropSiteId::of_field(base.target2_id),
         timer: Seconds::new(base.timer),
-        lead: genie_core::gathering::hunt::Lead {
+        lead: Lead {
             moved: part.moved_sheep != 0,
             still_time: part.sheep_still_time as i16,
             start: Point::new(
@@ -128,12 +130,9 @@ pub(super) fn import_hunt(
 
 /// A Hunt's Attack. A swing past its hit: the swing's times (`+0xb0`, `+0xb4`, unsaved) are
 /// what the hit left, the reload less the attack sprite's length.
-fn hunt_attack(
-    saved: &Saved<'_>,
-    sub: &Action,
-) -> Result<genie_core::combat::attack::Attack, GenieError> {
+fn hunt_attack(saved: &Saved<'_>, sub: &Action) -> Result<Attack, GenieError> {
     let mut attack = saved_attack(sub, saved.graphics)?;
-    if attack.state == genie_core::combat::attack::AttackState::Swing && !attack.pending {
+    if attack.state == AttackState::Swing && !attack.pending {
         let reload = saved_reload(saved.object, saved.s, saved.objects).ok_or(
             GenieError::unsupported("a saved swing without its unit's reload"),
         )?;
@@ -193,15 +192,15 @@ pub(super) fn import_gather(
     let state = GatherState::of_byte(base.state, walk)?;
     let task = hunt_task(&saved.task(task_at)?);
     let gather = GatherAction {
-        target: genie_core::gathering::GatherTargetId::of_field(base.target_id),
+        target: GatherTargetId::of_field(base.target_id),
         carry_to: DropSiteId::of_field(base.target2_id),
         state,
         point: saved.point(),
         timer: Seconds::new(base.timer),
         task,
         target_class: ClassId::of_param(part.target_type)?,
-        stops: genie_core::gathering::FarmStops::of_data(part.number_stops),
-        current_stop: genie_core::gathering::StopIndex::of_data(part.current_stop),
+        stops: FarmStops::of_data(part.number_stops),
+        current_stop: StopIndex::of_data(part.current_stop),
         time_per_stop: Seconds::new(part.time_per_stop),
         time_at_stop: Seconds::new(part.time_at_current_stop),
         last_stop: Point::new(part.last_stop_x, part.last_stop_y),

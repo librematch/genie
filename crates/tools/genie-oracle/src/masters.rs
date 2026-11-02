@@ -32,6 +32,23 @@ mod dat_work;
 
 pub(crate) use self::dat_work::attributes;
 use self::dat_work::dat_work;
+use genie_core::map::terrain::{TerrainKind, terrain_class};
+use genie_core::map::{Restriction, TerrainMask};
+use genie_core::objects::lines::UnitLine;
+use genie_core::objects::sprite::Graphic;
+use genie_core::objects::{Graphics, SpriteFlags};
+use genie_core::players::history::HistoryUpdates;
+use genie_core::technology::{Cost, EffectCommand, Linked, TechDef, TechMode, TechType};
+use genie_core::unit_ai::task_finder::DropSite;
+use genie_core::world::HISTORY_PERIOD;
+use genie_dat::de::{Effect, Error, ResearchResourceCost, Sound, Tech, Unit};
+use std::collections::BTreeMap;
+use std::error::Error as StdError;
+use std::fmt::{Display, Error as FmtError, Formatter};
+use std::fs::{File, read_to_string};
+#[cfg(test)]
+use std::iter::once;
+use std::path::Path;
 
 /// The action an action object's first update starts from its master's default task
 /// (`RGE_Action_Object::update`, 0x14106ac90).
@@ -97,11 +114,7 @@ fn dat_rows(dat: &DatFile) -> Result<Vec<KeyedRow>, GenieError> {
 /// # Errors
 ///
 /// A task or a cost slot that holds no type or attribute.
-fn dat_row(
-    id: MasterId,
-    unit: &genie_dat::de::Unit,
-    sounds: &[genie_dat::de::Sound],
-) -> Result<Row, GenieError> {
+fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieError> {
     let default_action = match unit.bird.as_ref() {
         None => DefaultAction::None,
         Some(b) => {
@@ -165,10 +178,10 @@ pub struct Turning {
 pub struct TerrainTable {
     classes: Vec<u8>,
     /// Each terrain's record as the map's terrain reads see it.
-    kinds: Vec<genie_core::map::terrain::TerrainKind>,
-    masks: Vec<genie_core::map::TerrainMask>,
+    kinds: Vec<TerrainKind>,
+    masks: Vec<TerrainMask>,
     /// Each terrain restriction's value per terrain (`passable_buildable_dmg_multiplier`).
-    passable: Vec<genie_core::map::Restriction>,
+    passable: Vec<Restriction>,
 }
 
 impl TerrainTable {
@@ -179,17 +192,14 @@ impl TerrainTable {
             .terrain_block
             .terrains
             .iter()
-            .map(|t| {
-                genie_core::map::terrain::terrain_class(TerrainFlags::from_bits_retain(t.is_water))
-                    .bits()
-            })
+            .map(|t| terrain_class(TerrainFlags::from_bits_retain(t.is_water)).bits())
             .collect();
         let masks = dat
             .terrain_restrictions
             .iter()
             .map(|r| {
                 let passable = r.passable_buildable_dmg_multiplier.iter().enumerate();
-                genie_core::map::TerrainMask::of_bits(
+                TerrainMask::of_bits(
                     passable
                         .filter(|&(_, &v)| 0.0 < v)
                         .fold(0, |m, (t, _)| m | classes.get(t).copied().unwrap_or(0)),
@@ -199,7 +209,7 @@ impl TerrainTable {
         let passable = dat
             .terrain_restrictions
             .iter()
-            .map(|r| genie_core::map::Restriction::new(r.passable_buildable_dmg_multiplier.clone()))
+            .map(|r| Restriction::new(r.passable_buildable_dmg_multiplier.clone()))
             .collect();
         let kinds = dat
             .terrain_block
@@ -223,7 +233,7 @@ impl TerrainTable {
                     })
                     .map(|(_, &d)| i32::from(d))
                     .sum();
-                genie_core::map::terrain::TerrainKind {
+                TerrainKind {
                     shown: t.enabled != 0 || 0 <= t.terrain_to_draw,
                     flags: TerrainFlags::from_bits_retain(t.is_water),
                     forest: 249 < trees,
@@ -246,19 +256,19 @@ impl TerrainTable {
 
     /// Each terrain restriction's mask, by restriction id.
     #[must_use]
-    pub fn masks(&self) -> &[genie_core::map::TerrainMask] {
+    pub fn masks(&self) -> &[TerrainMask] {
         &self.masks
     }
 
     /// Each terrain restriction's value per terrain, by restriction id.
     #[must_use]
-    pub fn passable(&self) -> &[genie_core::map::Restriction] {
+    pub fn passable(&self) -> &[Restriction] {
         &self.passable
     }
 
     /// Each terrain's record as the map's terrain reads see it.
     #[must_use]
-    pub fn kinds(&self) -> &[genie_core::map::terrain::TerrainKind] {
+    pub fn kinds(&self) -> &[TerrainKind] {
         &self.kinds
     }
 }
@@ -270,46 +280,43 @@ pub struct MasterTable {
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
     sprite_speed: HashMap<SpriteId, SpeedMultiplier>,
     /// What the sprite clock reads of each graphic.
-    pub graphics: genie_core::objects::Graphics,
+    pub graphics: Graphics,
     /// The terrain table.
     pub terrain: TerrainTable,
     /// The drop-site table (`dropsites.json` beside the `.dat`, [`crate::drop_sites`]); empty
     /// when not loaded.
-    pub drop_sites: Vec<genie_core::unit_ai::task_finder::DropSite>,
+    pub drop_sites: Vec<DropSite>,
     /// The linked technologies (`linkedTechs.json` beside the `.dat`, [`crate::linked_techs`]);
     /// empty when not loaded.
-    pub linked_techs: std::collections::BTreeMap<TechId, genie_core::technology::Linked>,
+    pub linked_techs: BTreeMap<TechId, Linked>,
     /// The unit lines (`unitlines.json` beside the `.dat`, [`crate::unit_lines`]) as the file
     /// holds them; empty when not loaded (the game then builds tables of no line).
-    pub unit_lines: Vec<genie_core::objects::lines::UnitLine>,
+    pub unit_lines: Vec<UnitLine>,
     /// The technologies, by id.
-    pub techs: Vec<genie_core::technology::TechDef>,
+    pub techs: Vec<TechDef>,
     /// The effects' commands, by id (the world's effect table).
-    pub effects: Vec<Vec<genie_core::technology::EffectCommand>>,
+    pub effects: Vec<Vec<EffectCommand>>,
     /// The history period (the `.dat`'s `time_slice`, which the world keeps at `+0x8b8`); the
     /// world constructor's [`genie_core::world::HISTORY_PERIOD`] without a `.dat`.
-    pub time_slice: genie_core::players::history::HistoryUpdates,
+    pub time_slice: HistoryUpdates,
 }
 
 /// A technology of the `.dat` as the tech tree holds it: its costs, its type and its effect's
 /// commands.
-fn tech_def(
-    dat: &DatFile,
-    t: &genie_dat::de::Tech,
-) -> Result<genie_core::technology::TechDef, GenieError> {
+fn tech_def(dat: &DatFile, t: &Tech) -> Result<TechDef, GenieError> {
     let effect = usize::try_from(t.effect_id)
         .ok()
         .and_then(|e| dat.effects.get(e))
         .map_or_else(|| Ok(Vec::new()), effect_commands)?;
-    Ok(genie_core::technology::TechDef {
+    Ok(TechDef {
         costs: tech_costs(t)?,
-        kind: genie_core::technology::TechType::from(t.kind),
+        kind: TechType::from(t.kind),
         effect_id: EffectId::of_data(t.effect_id),
         effect,
         required: t.required_techs.map(TechId::of_data),
         required_count: t.required_tech_count,
         civ: CivId::of_tech(t.civ)?,
-        mode: genie_core::technology::TechMode::of_data(t.full_tech_mode),
+        mode: TechMode::of_data(t.full_tech_mode),
         locations: t
             .research_locations
             .iter()
@@ -324,10 +331,10 @@ fn tech_def(
 }
 
 /// A technology's three costs: each its resource, amount and whether it is paid.
-fn tech_costs(t: &genie_dat::de::Tech) -> Result<[genie_core::technology::Cost; 3], GenieError> {
+fn tech_costs(t: &Tech) -> Result<[Cost; 3], GenieError> {
     let [c0, c1, c2] = t.resource_costs.each_ref();
-    let cost = |c: &genie_dat::de::ResearchResourceCost| -> Result<_, GenieError> {
-        Ok(genie_core::technology::Cost {
+    let cost = |c: &ResearchResourceCost| -> Result<_, GenieError> {
+        Ok(Cost {
             attribute: AttributeId::of_field(c.kind)?,
             amount: CostAmount::of_data(c.amount),
             paid: CostPaid::of_data(c.flag),
@@ -352,19 +359,14 @@ fn tech_tables(dat: &DatFile) -> Result<TechTables, GenieError> {
 }
 
 /// The technologies and the effects' commands, by id.
-type TechTables = (
-    Vec<genie_core::technology::TechDef>,
-    Vec<Vec<genie_core::technology::EffectCommand>>,
-);
+type TechTables = (Vec<TechDef>, Vec<Vec<EffectCommand>>);
 
 /// An effect's commands as the engine's effect table holds them, each parsed by its kind
 /// ([`genie_core::technology::EffectCommand::of_data`]).
-fn effect_commands(
-    e: &genie_dat::de::Effect,
-) -> Result<Vec<genie_core::technology::EffectCommand>, GenieError> {
+fn effect_commands(e: &Effect) -> Result<Vec<EffectCommand>, GenieError> {
     e.commands
         .iter()
-        .map(|c| genie_core::technology::EffectCommand::of_data(c.kind, c.a, c.b, c.c, c.d))
+        .map(|c| EffectCommand::of_data(c.kind, c.a, c.b, c.c, c.d))
         .collect()
 }
 
@@ -372,7 +374,7 @@ fn effect_commands(
 #[derive(Debug)]
 pub enum ReadError {
     /// The data file could not be opened or read.
-    Dat(genie_dat::de::Error),
+    Dat(Error),
     /// The drop-site table beside it is out of shape.
     DropSites(crate::DropSitesError),
     /// The linked technologies beside it are out of shape.
@@ -381,8 +383,8 @@ pub enum ReadError {
     UnitLines(crate::UnitLinesError),
 }
 
-impl std::fmt::Display for ReadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ReadError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         match self {
             Self::Dat(e) => write!(f, "the data file: {e}"),
             Self::DropSites(e) => write!(f, "dropsites.json: {e}"),
@@ -392,7 +394,7 @@ impl std::fmt::Display for ReadError {
     }
 }
 
-impl std::error::Error for ReadError {}
+impl StdError for ReadError {}
 
 impl MasterTable {
     /// The table of the data file at `path` (an `empires2_x2_p1.dat`), with the drop-site table
@@ -402,8 +404,8 @@ impl MasterTable {
     /// # Errors
     ///
     /// When the data file cannot be read, or a table beside it is out of shape.
-    pub fn read(path: &std::path::Path) -> Result<Self, ReadError> {
-        let file = std::fs::File::open(path).map_err(|e| {
+    pub fn read(path: &Path) -> Result<Self, ReadError> {
+        let file = File::open(path).map_err(|e| {
             ReadError::Dat(
                 GenieError::io("a data file that does not open")
                     .with("path", path.display())
@@ -418,15 +420,15 @@ impl MasterTable {
 
     /// The drop sites (`dropsites.json`), linked technologies (`linkedTechs.json`) and unit
     /// lines (`unitlines.json`) beside the data file at `path`, each where there is one.
-    fn read_tables_beside(&mut self, path: &std::path::Path) -> Result<(), ReadError> {
+    fn read_tables_beside(&mut self, path: &Path) -> Result<(), ReadError> {
         let table = self;
-        if let Ok(json) = std::fs::read_to_string(path.with_file_name("dropsites.json")) {
+        if let Ok(json) = read_to_string(path.with_file_name("dropsites.json")) {
             table.drop_sites = crate::drop_sites(&json).map_err(ReadError::DropSites)?;
         }
-        if let Ok(json) = std::fs::read_to_string(path.with_file_name("linkedTechs.json")) {
+        if let Ok(json) = read_to_string(path.with_file_name("linkedTechs.json")) {
             table.linked_techs = crate::linked_techs(&json).map_err(ReadError::LinkedTechs)?;
         }
-        if let Ok(json) = std::fs::read_to_string(path.with_file_name("unitlines.json")) {
+        if let Ok(json) = read_to_string(path.with_file_name("unitlines.json")) {
             table.unit_lines = crate::unit_lines(&json).map_err(ReadError::UnitLines)?;
         }
         Ok(())
@@ -466,20 +468,20 @@ impl MasterTable {
                 let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
                 Some((
                     id,
-                    genie_core::objects::sprite::Graphic {
+                    Graphic {
                         id,
                         frames: Frame::of_data(g.frame_count),
                         facets: FacetCount::of_data(g.angle_count),
                         speed_multiplier: SpeedMultiplier::of_data(g.speed_multiplier),
                         frame_duration: Seconds::new(g.frame_duration),
                         replay_delay: Seconds::new(g.replay_delay),
-                        flags: genie_core::objects::SpriteFlags::from_bits_retain(g.sequence_type),
+                        flags: SpriteFlags::from_bits_retain(g.sequence_type),
                     },
                 ))
             })
             .collect();
         (table.techs, table.effects) = tech_tables(dat)?;
-        table.time_slice = genie_core::players::history::HistoryUpdates::of_data(dat.time_slice);
+        table.time_slice = HistoryUpdates::of_data(dat.time_slice);
         Ok(table)
     }
 
@@ -505,14 +507,14 @@ impl MasterTable {
                 })
                 .collect(),
             sprite_speed: HashMap::new(),
-            graphics: genie_core::objects::Graphics::default(),
+            graphics: Graphics::default(),
             terrain: TerrainTable::default(),
             drop_sites: Vec::new(),
-            linked_techs: std::collections::BTreeMap::new(),
+            linked_techs: BTreeMap::new(),
             unit_lines: Vec::new(),
             techs: Vec::new(),
             effects: Vec::new(),
-            time_slice: genie_core::world::HISTORY_PERIOD,
+            time_slice: HISTORY_PERIOD,
         }
     }
 
@@ -582,7 +584,7 @@ impl MasterTable {
             fly_mode,
         };
         Self {
-            rows: std::iter::once(((civ, master), row)).collect(),
+            rows: once(((civ, master), row)).collect(),
             ..Self::default()
         }
     }
@@ -593,10 +595,10 @@ impl MasterTable {
         sprite: SpriteId,
         speed: SpeedMultiplier,
         facets: FacetCount,
-        flags: genie_core::objects::SpriteFlags,
+        flags: SpriteFlags,
     ) -> Self {
         let _ = self.sprite_speed.insert(sprite, speed);
-        let graphic = genie_core::objects::sprite::Graphic {
+        let graphic = Graphic {
             id: sprite,
             frames: Frame::ONE,
             facets,
@@ -629,10 +631,7 @@ impl MasterTable {
 
     /// The terrain restrictions' masks.
     pub(crate) fn with_masks(mut self, masks: Vec<u8>) -> Self {
-        self.terrain.masks = masks
-            .into_iter()
-            .map(genie_core::map::TerrainMask::of_bits)
-            .collect();
+        self.terrain.masks = masks.into_iter().map(TerrainMask::of_bits).collect();
         self
     }
 }
@@ -641,13 +640,31 @@ impl MasterTable {
 mod tests {
     use super::*;
     use crate::masters::dat_work::sound_event;
+    #[cfg(test)]
+    use genie_core::objects::lines::LineId;
+    #[cfg(test)]
+    use genie_core::objects::masters::action_type::HUNT_RANGE;
+    #[cfg(test)]
+    use genie_core::ownership::artifact::ARTIFACT_TYPE;
     use genie_core::players::AmountRate;
+    #[cfg(test)]
+    use genie_dat::de::{DebugString, SoundItem};
+    #[cfg(test)]
+    use std::env::temp_dir;
+    #[cfg(test)]
+    use std::fs::{create_dir_all, remove_dir_all, write};
+    #[cfg(test)]
+    use std::iter::empty;
+    #[cfg(test)]
+    use std::path::PathBuf;
+    #[cfg(test)]
+    use std::process::id;
 
     /// A directory of its own under the system's temporary one, emptied first.
-    fn scratch(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("genie-oracle-{}-{name}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+    fn scratch(name: &str) -> PathBuf {
+        let dir = temp_dir().join(format!("genie-oracle-{}-{name}", id()));
+        let _ = remove_dir_all(&dir);
+        create_dir_all(&dir).unwrap();
         dir
     }
 
@@ -658,9 +675,9 @@ mod tests {
         let dir = scratch("no-dat");
         let path = dir.join("empires2_x2_p1.dat");
         assert!(matches!(MasterTable::read(&path), Err(ReadError::Dat(_))));
-        std::fs::write(&path, b"not a dat").unwrap();
+        write(&path, b"not a dat").unwrap();
         assert!(matches!(MasterTable::read(&path), Err(ReadError::Dat(_))));
-        std::fs::remove_dir_all(dir).unwrap();
+        remove_dir_all(dir).unwrap();
     }
 
     /// The tables beside the data file are read where there are; one out of shape is its own
@@ -672,17 +689,17 @@ mod tests {
         let mut table = MasterTable::default();
         table.read_tables_beside(&path).unwrap();
         assert_eq!(table, MasterTable::default());
-        std::fs::write(dir.join("dropsites.json"), r#"{"drop_site_list": []}"#).unwrap();
-        std::fs::write(dir.join("linkedTechs.json"), r#"{"LinkedTechs": []}"#).unwrap();
-        std::fs::write(dir.join("unitlines.json"), r#"{"UnitLines": []}"#).unwrap();
+        write(dir.join("dropsites.json"), r#"{"drop_site_list": []}"#).unwrap();
+        write(dir.join("linkedTechs.json"), r#"{"LinkedTechs": []}"#).unwrap();
+        write(dir.join("unitlines.json"), r#"{"UnitLines": []}"#).unwrap();
         table.read_tables_beside(&path).unwrap();
         for (file, check) in [
             ("dropsites.json", 0),
             ("linkedTechs.json", 1),
             ("unitlines.json", 2),
         ] {
-            let good = std::fs::read_to_string(dir.join(file)).unwrap();
-            std::fs::write(dir.join(file), "[").unwrap();
+            let good = read_to_string(dir.join(file)).unwrap();
+            write(dir.join(file), "[").unwrap();
             let error = table.read_tables_beside(&path).unwrap_err();
             let kind = match error {
                 ReadError::DropSites(_) => 0,
@@ -692,9 +709,9 @@ mod tests {
             };
             assert_eq!(kind, check, "{file}");
             assert_ne!(error.to_string(), "");
-            std::fs::write(dir.join(file), good).unwrap();
+            write(dir.join(file), good).unwrap();
         }
-        std::fs::remove_dir_all(dir).unwrap();
+        remove_dir_all(dir).unwrap();
     }
 
     /// The fields' −1 is no attribute and any other value 0 or more its attribute, in their
@@ -713,15 +730,15 @@ mod tests {
         assert!(attributes([0, -2]).is_err());
     }
 
-    fn sound(files: usize) -> genie_dat::de::Sound {
-        let item = genie_dat::de::SoundItem {
-            file_name: genie_dat::de::DebugString::default(),
+    fn sound(files: usize) -> Sound {
+        let item = SoundItem {
+            file_name: DebugString::default(),
             resource_id: 0,
             probability: 100,
             civilization: -1,
             icon_set: -1,
         };
-        genie_dat::de::Sound {
+        Sound {
             id: 0,
             play_delay: 0,
             file_count: files as i16,
@@ -749,28 +766,15 @@ mod tests {
     fn the_default_action_is_the_action_type_of_the_default_task() {
         // the cow: default task 0, whose action type is 107 (the Artifact action)
         assert_eq!(
-            default_action(
-                0,
-                [
-                    (0, genie_core::ownership::artifact::ARTIFACT_TYPE),
-                    (1, genie_core::objects::masters::action_type::HUNT_RANGE)
-                ]
-                .into_iter()
-            ),
-            DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE)
+            default_action(0, [(0, ARTIFACT_TYPE), (1, HUNT_RANGE)].into_iter()),
+            DefaultAction::Type(ARTIFACT_TYPE)
         );
         assert_eq!(
-            default_action(
-                -1,
-                [(0, genie_core::ownership::artifact::ARTIFACT_TYPE)].into_iter()
-            ),
+            default_action(-1, [(0, ARTIFACT_TYPE)].into_iter()),
             DefaultAction::None
         );
         // FARMDROP and two others name task 0 but list no task
-        assert_eq!(
-            default_action(0, std::iter::empty()),
-            DefaultAction::NoSuchTask
-        );
+        assert_eq!(default_action(0, empty()), DefaultAction::NoSuchTask);
     }
 
     #[test]
@@ -790,7 +794,7 @@ mod tests {
                     decay: AmountRate::new(0.25),
                     undead: false,
                 },
-                DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE),
+                DefaultAction::Type(ARTIFACT_TYPE),
             ),
         ]);
         assert_eq!(
@@ -800,9 +804,7 @@ mod tests {
         );
         assert_eq!(
             t.default_action(CivId::new(2), MasterId::of_data(705).unwrap()),
-            Some(DefaultAction::Type(
-                genie_core::ownership::artifact::ARTIFACT_TYPE
-            ))
+            Some(DefaultAction::Type(ARTIFACT_TYPE))
         );
         assert_eq!(
             (
@@ -829,13 +831,13 @@ mod tests {
             lines,
             [
                 UnitLine {
-                    line: Some(genie_core::objects::lines::LineId::of_data(-399)),
+                    line: Some(LineId::of_data(-399)),
                     chain: Some(vec![117, 155]),
                     building: true,
                     identifiers: vec!["stone-wall-line".to_owned()],
                 },
                 UnitLine {
-                    line: Some(genie_core::objects::lines::LineId::of_data(-266)),
+                    line: Some(LineId::of_data(-266)),
                     chain: Some(vec![751, 753, 752]),
                     building: false,
                     identifiers: vec![
@@ -844,7 +846,7 @@ mod tests {
                     ],
                 },
                 UnitLine {
-                    line: Some(genie_core::objects::lines::LineId::of_data(-1)),
+                    line: Some(LineId::of_data(-1)),
                     ..UnitLine::default()
                 },
             ]

@@ -2,6 +2,7 @@
 //! `UNIT_ORDER`'s cancel of one, five or some.
 
 use crate::GenieError;
+use crate::math::fmath::below_or_unordered;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
@@ -15,13 +16,16 @@ use crate::players::game_status::ONE_UNIT_AGE;
 use crate::players::tracker::Key;
 use crate::production::QueuedUnits;
 use crate::production::UnitIndex;
+use crate::production::{Entry, Queue, QueueLength, population};
 use crate::production::{Making, refund, refund_research};
+use crate::technology::Attributes;
 use crate::technology::CostPaid;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::{GameMode, NO_ATTRIBUTE};
 
 /// A cancel finds the building without the production it cancels from.
 const NO_PRODUCTION: GenieError =
@@ -53,7 +57,7 @@ impl World {
             }
         }
         if let Some(production) = self.parts.production.get_mut(self.players.live(p, idx)?.id) {
-            production.queue.count = crate::production::QueueLength::ZERO;
+            production.queue.count = QueueLength::ZERO;
         }
         self.end_production_action(p, idx)?;
         if let Some(production) = self.parts.production.get_mut(self.players.live(p, idx)?.id) {
@@ -70,7 +74,7 @@ impl World {
     pub(super) fn cancel_units(
         &mut self,
         p: PlayerId,
-        e: &crate::production::Entry,
+        e: &Entry,
         count: QueuedUnits,
     ) -> Result<(), GenieError> {
         use crate::production::population;
@@ -104,7 +108,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        e: &crate::production::Entry,
+        e: &Entry,
         count: QueuedUnits,
     ) -> Result<(), GenieError> {
         // the entry's technology is one of the tree: RESEARCH queued it, the load read it
@@ -121,7 +125,7 @@ impl World {
         if let Some(def) = self.techs.get(t) {
             for c in def.costs.iter().filter(|c| c.paid == CostPaid::BUILDING) {
                 // a cost entry of the building's own store names an attribute
-                let attribute = c.attribute.ok_or(crate::world::NO_ATTRIBUTE)?;
+                let attribute = c.attribute.ok_or(NO_ATTRIBUTE)?;
                 match self
                     .parts
                     .combat_mut(building.id)?
@@ -222,11 +226,7 @@ impl World {
     /// `FUN_1411d66b0`'s one unit of entry `entry` given back to player `p`: its refund
     /// ([`refund`]), the tracker's counter one less and its place back, attribute 80 lower by
     /// its population (slot 0xf8).
-    pub(super) fn give_back_one(
-        &mut self,
-        p: PlayerId,
-        entry: &crate::production::Entry,
-    ) -> Result<(), GenieError> {
+    pub(super) fn give_back_one(&mut self, p: PlayerId, entry: &Entry) -> Result<(), GenieError> {
         let class = entry
             .master
             .map_or(Key::NONE, |m| self.tracker_key(p, m))
@@ -243,7 +243,7 @@ impl World {
         owner.tracker.unplace(entry.master, class);
         let pop = master
             .as_ref()
-            .map_or(Amount::ZERO, |m| crate::production::population(&m.storage));
+            .map_or(Amount::ZERO, |m| population(&m.storage));
         owner.add_attribute(QUEUED, -pop)
     }
 
@@ -263,11 +263,7 @@ impl World {
         index: UnitIndex,
         e: usize,
     ) -> Result<(), GenieError> {
-        fn queue(
-            t: &World,
-            p: PlayerId,
-            idx: ListIndex,
-        ) -> Result<&crate::production::Queue, GenieError> {
+        fn queue(t: &World, p: PlayerId, idx: ListIndex) -> Result<&Queue, GenieError> {
             Ok(&t
                 .parts
                 .production
@@ -283,7 +279,7 @@ impl World {
         let mut gone: u16 = 0;
         let mut n = queue(self, p, idx)?.count;
         loop {
-            if n == crate::production::QueueLength::ZERO {
+            if n == QueueLength::ZERO {
                 return Ok(());
             }
             let Some(slot) = usize::try_from(e)
@@ -310,7 +306,7 @@ impl World {
             if at.tech.is_some() || i32::from(n.get()) - 1 < e {
                 e -= 1;
             }
-            if crate::production::QueueLength::ZERO < n {
+            if QueueLength::ZERO < n {
                 left = QueuedUnits::of_data(5 - gone as i16);
                 // before the buffer: no master of the kind
                 master = match usize::try_from(e) {
@@ -351,7 +347,7 @@ impl World {
             return Ok(());
         };
         let q = &production.queue;
-        if q.count == crate::production::QueueLength::ZERO {
+        if q.count == QueueLength::ZERO {
             return Ok(());
         }
         let start = from.min(i32::from(q.count.get()) - 1);
@@ -377,7 +373,7 @@ impl World {
                 .tracker
                 .count_queued(take.negated());
         } else {
-            let e = crate::production::Entry { tech, ..entry };
+            let e = Entry { tech, ..entry };
             self.refund_researches(p, idx, &e, take)?;
         }
         let queue = &mut self
@@ -422,13 +418,13 @@ impl World {
         idx: ListIndex,
         index: UnitIndex,
     ) -> Result<(), GenieError> {
-        if self.settings.game_mode != crate::world::GameMode::ONE_UNIT {
+        if self.settings.game_mode != GameMode::ONE_UNIT {
             return Ok(());
         }
         let attribute =
             // The player's attribute that mode reads (6, `+0x30`).
-            crate::technology::Attributes::get(self.players.player(p)?, attribute::CURRENT_AGE)?;
-        if crate::math::fmath::below_or_unordered(ONE_UNIT_AGE, attribute.get()) {
+            Attributes::get(self.players.player(p)?, attribute::CURRENT_AGE)?;
+        if below_or_unordered(ONE_UNIT_AGE, attribute.get()) {
             return Ok(());
         }
         let master = self

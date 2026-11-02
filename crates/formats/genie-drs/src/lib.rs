@@ -37,7 +37,10 @@ use std::str;
 mod read;
 mod write;
 
+use core::str::FromStr;
 pub use read::DrsReader;
+use std::fmt::{Debug, Display, Error as FmtError, Formatter};
+use std::io::ErrorKind;
 pub use write::{DrsWriter, InMemoryStrategy, ReserveDirectoryStrategy, Strategy as WriteStrategy};
 
 /// A DRS version string.
@@ -87,8 +90,8 @@ impl AsRef<str> for ResourceType {
     }
 }
 
-impl std::fmt::Display for ResourceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ResourceType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         f.write_str(self.as_ref())
     }
 }
@@ -104,11 +107,11 @@ pub struct ParseResourceTypeError;
 
 impl From<ParseResourceTypeError> for Error {
     fn from(e: ParseResourceTypeError) -> Self {
-        Self::new(std::io::ErrorKind::InvalidData, e)
+        Self::new(ErrorKind::InvalidData, e)
     }
 }
 
-impl core::str::FromStr for ResourceType {
+impl FromStr for ResourceType {
     type Err = ParseResourceTypeError;
     /// Parse a resource type from a string, with error handling.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -236,8 +239,8 @@ impl DrsHeader {
     }
 }
 
-impl std::fmt::Debug for DrsHeader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for DrsHeader {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(
             f,
             "DRSHeader {{ banner_msg: '{}', version: '{}', password: '{}', num_resource_types: {}, directory_size: {} }}",
@@ -356,8 +359,8 @@ impl DrsTable {
     }
 }
 
-impl std::fmt::Debug for DrsTable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for DrsTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(
             f,
             "DRSTable {{ resource_type: '{}', offset: {}, num_resources: {} }}",
@@ -444,6 +447,8 @@ mod tests {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -457,6 +462,6 @@ mod genie_error_tests {
                 "a resource type that is no 4 characters"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 }

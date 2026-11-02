@@ -5,10 +5,15 @@ use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::map::Distance;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::at_most_or_unordered;
+use crate::math::image::effect::{ONE as EFFECT_ONE, ROUND as EFFECT_ROUND};
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
@@ -18,6 +23,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
+use crate::production::Production;
 use crate::technology::effect::{Change, OBJECT_GONE};
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
@@ -34,7 +40,7 @@ pub(super) const KEPT_STORAGE: u8 = 64;
 /// A hit point total a capped multiply holds an object's below (`FUN_1411962e0`: `0x46fffe00`).
 pub(super) const OBJECT_HP_CAP: f32 = 32767.0;
 /// A multiply's rounding (`DAT_142e7f384`, 0.5).
-pub(super) const ROUND: f32 = crate::math::image::effect::ROUND;
+pub(super) const ROUND: f32 = EFFECT_ROUND;
 
 impl World {
     /// What the masters' setters read of the world for player `p` ([`AttributeWorld`]): the
@@ -42,9 +48,7 @@ impl World {
     /// games probed) and the player's `+0x648` unset (not held: 0 for every player probed).
     ///
     /// [`AttributeWorld`]: crate::objects::masters::AttributeWorld
-    pub(super) fn attribute_world(
-        graphics: &crate::objects::Graphics,
-    ) -> impl Fn(i32) -> bool + '_ {
+    pub(super) fn attribute_world(graphics: &Graphics) -> impl Fn(i32) -> bool + '_ {
         move |id| {
             i16::try_from(id)
                 .ok()
@@ -171,17 +175,13 @@ impl World {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
                 let full = HitPoints::of_master(master.hit_points).get();
                 let hp = u.life.hp.get();
-                let short = |x: f32| f32::from(crate::math::conversions::cvttss2si(x) as i16);
+                let short = |x: f32| f32::from(cvttss2si(x) as i16);
                 u.life.hp = HitPoints::new(match change {
                     Change::Set => short(v * hp / full),
                     Change::Add => short((full + v) * hp / full),
                     // COMISS 32767, x; JBE: a NaN holds the cap too
                     Change::Multiply
-                        if CAPPED
-                            && crate::math::fmath::at_most_or_unordered(
-                                OBJECT_HP_CAP,
-                                v * hp + ROUND,
-                            ) =>
+                        if CAPPED && at_most_or_unordered(OBJECT_HP_CAP, v * hp + ROUND) =>
                     {
                         OBJECT_HP_CAP
                     }
@@ -351,7 +351,7 @@ impl World {
 
 /// 1.0 (`DAT_14330eb8c`): a building whose master has no build time takes the new one as its
 /// points.
-pub(super) const ONE: f32 = crate::math::image::effect::ONE;
+pub(super) const ONE: f32 = EFFECT_ONE;
 /// The player's `+0x648`, which caps an add or multiply of hit points (not held: 0 for every
 /// player probed).
 pub(super) const CAPPED: bool = false;
@@ -383,7 +383,7 @@ pub(super) fn build_points_after(
         Change::Set => v / t * points,
         Change::Add => (t + v) / t * points,
         Change::Multiply => {
-            let new = f32::from(crate::math::conversions::cvttss2si(t * v + ROUND) as i16);
+            let new = f32::from(cvttss2si(t * v + ROUND) as i16);
             if 0.0 < t { points / t * new } else { ONE * new }
         }
     })
@@ -398,8 +398,8 @@ pub(super) fn within_table(masters: &Masters, unit: MasterId) -> bool {
 /// The object has an action in its list (`+0x880`'s first node; a building producing has its
 /// Make in its `production`, a missile its own part, `missile`): the slice's top actions.
 pub(super) fn has_actions(
-    actions: &crate::objects::layers::Action,
-    production: Option<&crate::production::Production>,
+    actions: &Action,
+    production: Option<&Production>,
     missile: bool,
 ) -> bool {
     actions.list.artifact().is_some()

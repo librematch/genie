@@ -5,6 +5,7 @@
 
 use crate::GenieError;
 use genie_diff::{Diff, Differ};
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// An action type: a task's `action_type` (`+0x10`, the `.dat`'s) and an action's type (`+0x8`),
 /// one numbering. The `.dat` holds types the simulation does not run (the AI's, the scenario's),
@@ -67,8 +68,8 @@ impl TryFrom<i16> for ActionType {
     }
 }
 
-impl std::fmt::Display for ActionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ActionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

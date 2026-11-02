@@ -3,8 +3,10 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::fmath::sqrt;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
@@ -107,7 +109,7 @@ impl UnitAi {
                 relation: None,
                 state: None,
                 master: None,
-                workers: crate::objects::WorkerCount::NO_CAP,
+                workers: WorkerCount::NO_CAP,
                 spared: None,
                 reach: true,
             },
@@ -124,7 +126,7 @@ impl UnitAi {
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let dx = u.position.x() - x;
         let dy = u.position.y() - y;
-        let d = crate::math::fmath::sqrt(dy * dy + dx * dx);
+        let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
         let _ = self.evasive_move(point, (true, true), at, ai, side)?;
         Ok(true)

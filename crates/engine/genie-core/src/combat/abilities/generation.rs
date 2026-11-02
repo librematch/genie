@@ -1,6 +1,7 @@
 //! The generation tasks (action type 151): their test, what they make and the player's store.
 
 use crate::combat::abilities::{ONE, Own, WORKING, WORKING_ACTIONS};
+use crate::gathering::gather::unit::give_load;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -16,6 +17,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
+use crate::world::Unread;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 use crate::{GenieError, math::fmath};
@@ -133,12 +135,7 @@ impl World {
         let top = if short_cut || master.kind != COMBAT {
             None
         } else {
-            if let Some(e) = self
-                .parts
-                .unread
-                .get(unit.id)
-                .map(crate::world::Unread::error)
-            {
+            if let Some(e) = self.parts.unread.get(unit.id).map(Unread::error) {
                 return Err(e);
             }
             match self.parts.actions_of(unit.id).top_action() {
@@ -189,7 +186,7 @@ impl World {
         };
         let sharing = player.sharing;
         let mut adds = Vec::new();
-        crate::gathering::gather::unit::give_load(
+        give_load(
             (&self.spatial.relations, sharing),
             owner,
             &mut adds,

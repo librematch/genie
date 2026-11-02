@@ -7,6 +7,7 @@ use crate::math::rng::Well512;
 use crate::movement::explore::Area;
 use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
+use crate::pathing::zones::ZoneId;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::ai_module::search::{DEAD_END, EXPLORED, PUNTED, UNEXPLORED};
@@ -19,6 +20,8 @@ use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
+use crate::world::{FrameSeed, World};
+use std::cell::RefCell;
 
 fn module() -> AiModule {
     AiModule {
@@ -86,9 +89,9 @@ fn the_table_holds_module_by_player() {
 #[test]
 fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
     use crate::vision::visibility::{Visibility, VisibleMap};
-    let mut t = crate::world::World::new(
+    let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         Vec::new(),
@@ -157,7 +160,7 @@ struct Grid {
     other_zone: Vec<[i32; 2]>,
     blocked: Vec<[i32; 2]>,
     unreachable: Vec<[i32; 2]>,
-    visits: std::cell::RefCell<Vec<[i32; 2]>>,
+    visits: RefCell<Vec<[i32; 2]>>,
 }
 
 impl Grid {
@@ -167,7 +170,7 @@ impl Grid {
             other_zone: Vec::new(),
             blocked: Vec::new(),
             unreachable: Vec::new(),
-            visits: std::cell::RefCell::new(Vec::new()),
+            visits: RefCell::new(Vec::new()),
         }
     }
 }
@@ -176,16 +179,16 @@ impl Area for Grid {
     fn explored(&self, _: Tile) -> Result<bool, GenieError> {
         Ok(false)
     }
-    fn zone(&mut self, tile: Tile) -> crate::pathing::zones::ZoneId {
+    fn zone(&mut self, tile: Tile) -> ZoneId {
         // the byte past the zone's own one is not read
-        crate::pathing::zones::ZoneId::new(if self.other_zone.contains(&tile.get()) {
+        ZoneId::new(if self.other_zone.contains(&tile.get()) {
             0x108
         } else {
             0x207
         })
     }
-    fn own_zone(&mut self) -> crate::pathing::zones::ZoneId {
-        crate::pathing::zones::ZoneId::new(0x307)
+    fn own_zone(&mut self) -> ZoneId {
+        ZoneId::new(0x307)
     }
     fn clear(&mut self, tile: Tile) -> Result<bool, GenieError> {
         Ok(!self.blocked.contains(&tile.get()))

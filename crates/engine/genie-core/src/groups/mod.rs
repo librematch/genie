@@ -63,6 +63,7 @@ mod attack;
 mod command;
 mod create;
 
+use crate::math::fmath::{sqrt, sub};
 pub use command::MoveTo as CommandMoveTo;
 /// What `commandMoveTo` is told besides the target and the point ([`crate::world::World::command_move_to`]).
 pub use order::CommandArgs;
@@ -286,8 +287,8 @@ impl PointLine {
 
 /// The 3D distance between two stored points (`FUN_14087e560`, `FUN_14099ef70`).
 fn stretch(a: &LinePoint, b: &LinePoint) -> Distance {
-    let d = crate::math::fmath::sub(a.point, b.point);
-    Distance::new(crate::math::fmath::sqrt(
+    let d = sub(a.point, b.point);
+    Distance::new(sqrt(
         d.x() * d.x() + d.height() * d.height() + d.y() * d.y(),
     ))
 }

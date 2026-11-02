@@ -3,11 +3,14 @@
 use crate::GenieError;
 use crate::combat::abilities::{Look, ONE, Reward};
 use crate::map::TerrainFlags;
+use crate::math::conversions::cvttss2si;
 use crate::objects::ListIndex;
 use crate::objects::SpriteId;
 use crate::objects::masters::CostSlot;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskTerrain;
+use crate::objects::masters::cost_entries;
+use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -75,7 +78,7 @@ pub fn look(
 pub fn reward(
     task: &Task,
     player: PlayerId,
-    multiplier: Option<crate::players::Amount>,
+    multiplier: Option<Amount>,
     cost: &[CostSlot],
 ) -> Reward {
     let out = task.attribute_type3;
@@ -88,7 +91,7 @@ pub fn reward(
     let mut amount = rate;
     if !task.combat_level_flag.is_empty() {
         amount = 0.0;
-        for (resource, count, paid) in crate::objects::masters::cost_entries(cost) {
+        for (resource, count, paid) in cost_entries(cost) {
             if Some(resource) == out && paid {
                 amount = count.as_f32() * rate;
             }
@@ -97,7 +100,7 @@ pub fn reward(
     Reward {
         player,
         attribute: out,
-        amount: crate::math::conversions::cvttss2si(amount),
+        amount: cvttss2si(amount),
     }
 }
 

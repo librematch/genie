@@ -5,6 +5,10 @@
 //! `SeedAll` `0x140efe4f0`. The registry order is the order of the static constructors
 //! (`0x142e65cf8`); every constructor (`0x140810840`) appends its generator to it.
 
+use crate::math::image::rng::{FLOAT_MAX, FLOAT_SCALE};
+use crate::trace::draw;
+use std::array::from_fn;
+
 /// One generator. Only what the simulation reads: the 16-word state and its index, the draw count
 /// and the last `rand15` value (`currand`, which a save records).
 // not `Copy`: a stream's draws must advance the stream, never a silent copy of it
@@ -73,7 +77,7 @@ impl Well512 {
             z0 ^ ((((z2 << 10) ^ z1) << 16 ^ z0) << 2) ^ ((new1 & 0xfed2_2169) << 5) ^ new1 ^ z1;
         // the next index's word comes first
         s.rotate_right(1);
-        crate::trace::draw(self.stream, self.draws, s[0]);
+        draw(self.stream, self.draws, s[0]);
         s[0]
     }
 
@@ -100,9 +104,9 @@ impl Well512 {
     #[track_caller]
     pub fn float01(&mut self) -> f32 {
         /// The step's scale (`DAT_142ea7c48`).
-        const SCALE: f64 = crate::math::image::rng::FLOAT_SCALE;
+        const SCALE: f64 = FLOAT_SCALE;
         /// The top (`DAT_14330eb8c`).
-        const MAX: f32 = crate::math::image::rng::FLOAT_MAX;
+        const MAX: f32 = FLOAT_MAX;
         let v = (f64::from(self.raw()) * SCALE) as f32;
         if (0.0..=MAX).contains(&v) {
             v
@@ -203,7 +207,7 @@ pub struct Streams {
 impl Default for Streams {
     fn default() -> Self {
         Self {
-            rngs: std::array::from_fn(|i| Well512 {
+            rngs: from_fn(|i| Well512 {
                 stream: i as u8,
                 ..Well512::default()
             }),
@@ -280,8 +284,7 @@ mod tests {
     #[test]
     fn float01_is_the_game_get_rand_float_0_to_1() {
         // FUN_1408115a0 run in unicorn on this state (words at +0x24, index at +0x64 = 5)
-        let mut state: [u32; 16] =
-            std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
+        let mut state: [u32; 16] = from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
         state.rotate_left(5);
         let mut r = Well512 {
             state,
@@ -360,7 +363,7 @@ mod tests {
     /// the step as the game runs it), over two and a half turns.
     #[test]
     fn the_turned_ring_draws_as_the_game_indexed_ring() {
-        let words: [u32; 16] = std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
+        let words: [u32; 16] = from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
         let (mut s, mut i) = (words, 5usize);
         let game: Vec<u32> = (0..40)
             .map(|_| {

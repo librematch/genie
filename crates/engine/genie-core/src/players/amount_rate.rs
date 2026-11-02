@@ -3,6 +3,8 @@
 
 use crate::players::Amount;
 use crate::world::Seconds;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Mul, Neg};
 
 /// An amount of a player attribute per second, as the game's `f32` holds it: what a dead
 /// object's remains lose of their attribute a second (a master's `resource_decay`, `+0x620`),
@@ -29,7 +31,7 @@ impl AmountRate {
     }
 }
 
-impl std::ops::Neg for AmountRate {
+impl Neg for AmountRate {
     type Output = Self;
 
     /// The rate negated (its sign bit flipped, `XOR 0x80000000`: a stopped decay).
@@ -38,7 +40,7 @@ impl std::ops::Neg for AmountRate {
     }
 }
 
-impl std::ops::Mul<Seconds> for AmountRate {
+impl Mul<Seconds> for AmountRate {
     type Output = Amount;
 
     /// The amount in `dt` (one `f32` product, the rate first).
@@ -47,8 +49,8 @@ impl std::ops::Mul<Seconds> for AmountRate {
     }
 }
 
-impl std::fmt::Display for AmountRate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for AmountRate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

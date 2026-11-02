@@ -2,6 +2,8 @@
 //! kind ([`CellKind`]), the grid's two bytes; the grid ([`Cells`]) by a cell's place
 //! ([`CellIndex`]).
 
+use std::ops::{Index, IndexMut};
+
 bitflags::bitflags! {
     /// A cell's byte 0: the edges a unit can cross to the cells beside it and, during a search,
     /// whether a node of the cell was opened or closed. A node's edge back to its parent is one
@@ -161,7 +163,7 @@ impl Cells {
     }
 }
 
-impl std::ops::Index<CellIndex> for Cells {
+impl Index<CellIndex> for Cells {
     type Output = Cell;
 
     fn index(&self, i: CellIndex) -> &Cell {
@@ -169,7 +171,7 @@ impl std::ops::Index<CellIndex> for Cells {
     }
 }
 
-impl std::ops::IndexMut<CellIndex> for Cells {
+impl IndexMut<CellIndex> for Cells {
     fn index_mut(&mut self, i: CellIndex) -> &mut Cell {
         &mut self.0[i.0]
     }

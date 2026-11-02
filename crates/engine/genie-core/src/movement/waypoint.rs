@@ -23,8 +23,10 @@ use crate::movement::{
 };
 use crate::objects::ObjectId;
 use crate::objects::layers::Static;
+use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -47,7 +49,7 @@ impl Mover {
         pathing: Option<&mut Pathing>,
         goal: Goal<'_>,
         now: WorldTime,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let ground_radius = self.stats.radius.ground();
         if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
@@ -169,7 +171,7 @@ impl Mover {
         &mut self,
         at: Position,
         world: &Spatial,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         let level = self.paths.walked()?;
         let next = level.waypoint.next();
@@ -211,7 +213,7 @@ impl Mover {
         me: &Me,
         world: &Spatial,
         goal: Goal<'_>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let level = self.paths.walked()?;
         let created = level.created;
@@ -241,7 +243,7 @@ impl Mover {
         &mut self,
         me: &Me,
         world: &mut Spatial,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let target = self.paths.walked()?.target;
         let parent = self.paths.parent()?;
@@ -283,7 +285,7 @@ impl Mover {
         p: BVector,
         target: Option<ObjectId>,
         world: &mut Spatial,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (rx, ry, rz) = (
             self.stats.radius.x(),
@@ -329,7 +331,7 @@ impl Mover {
         p: BVector,
         target: Option<ObjectId>,
         world: &mut Spatial,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (rx, ry, rz) = (
             self.stats.radius.x(),
@@ -420,7 +422,7 @@ impl Mover {
     /// The unit shows the sprite `shown` (None: none): its top speed (slot 0x208, the master's
     /// speed times the current sprite's factor, [`crate::objects::sprite::top_speed`]) is the
     /// sprite's. The one derivation of [`MoveStats::speed`] besides [`crate::objects::sprite::new_sprite`].
-    pub(crate) fn shows(&mut self, shown: Option<&crate::objects::sprite::Graphic>) {
+    pub(crate) fn shows(&mut self, shown: Option<&Graphic>) {
         self.stats.show(shown);
     }
 

@@ -72,10 +72,22 @@ pub(crate) use self::walks::speed_of;
 pub use self::work_slots::{Mark, Wielder, Worked};
 #[cfg(test)]
 use crate::combat::damage;
+use crate::combat::volley::armed;
+use crate::combat::{AttackTargetId, MissileCount};
+use crate::math::image::attack::{
+    EPSILON as ATTACK_EPSILON, LEASH_SLACK as ATTACK_LEASH_SLACK, NONE as ATTACK_NONE,
+    RELOAD_MS as ATTACK_RELOAD_MS, SEEN_RANGE as ATTACK_SEEN_RANGE,
+    SHORT_RANGE_GAP as ATTACK_SHORT_RANGE_GAP, TOUCH as ATTACK_TOUCH,
+};
 #[cfg(test)]
 use crate::movement::Mover;
+use crate::objects::layers::Combat;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 #[cfg(test)]
 use crate::objects::sprite::ActiveSprite;
+use crate::objects::{Frame, Graphics};
+use crate::unit_ai::NotifyKind;
+use crate::world::index::ObjectsRef;
 
 /// The Attack action's type, which word 9 adds.
 pub const ATTACK: ActionType = ActionType::named(9);
@@ -90,18 +102,18 @@ const NO_RANGE: f32 = 0.1;
 const HALF: f32 = 0.5;
 /// The squared reach of an attack without a range (`DAT_142ed48e4`): `0x3c23d70b`, which is
 /// `0.1f * 0.1f`, one ULP above `0.01f`.
-const TOUCH: DistanceSquared = DistanceSquared::new(crate::math::image::attack::TOUCH);
+const TOUCH: DistanceSquared = DistanceSquared::new(ATTACK_TOUCH);
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::attack::EPSILON;
+const EPSILON: f32 = ATTACK_EPSILON;
 /// The point an attack on an object has none of (`DAT_14330ec20`).
-const NONE: f32 = crate::math::image::attack::NONE;
+const NONE: f32 = ATTACK_NONE;
 /// The milliseconds of a second the reload world time counts (`FUN_141089820`).
-const RELOAD_MS: f32 = crate::math::image::attack::RELOAD_MS;
+const RELOAD_MS: f32 = ATTACK_RELOAD_MS;
 /// The hit chance's scale (`0x7fffffff`, the low word of a 64-bit Object-stream draw).
 const DRAW_SCALE: i64 = 0x7fff_ffff;
 /// The least range of a unit that walks onto the point where it saw its target
 /// (`DAT_14330eb8c`, [`AttackState::GotoPoint`]).
-const SEEN_RANGE: f32 = crate::math::image::attack::SEEN_RANGE;
+const SEEN_RANGE: f32 = ATTACK_SEEN_RANGE;
 
 /// The sprites and frames the Attack takes from its constructor.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
@@ -125,19 +137,19 @@ pub struct Arms {
     /// (`interrupt_frame`), -1 for none.
     pub missile: Option<MasterId>,
     /// `+0x98`: the frame it fires at (`fire_missile_at_frame`).
-    pub fire_frame: crate::objects::Frame,
+    pub fire_frame: Frame,
     /// `+0x9c`: the frame that may interrupt (`interrupt_frame`), −1 for none.
-    pub interrupt_frame: crate::objects::Frame,
+    pub interrupt_frame: Frame,
 }
 
 /// The Attack action (`RGE_Action_Attack`, type 9) as the hunt's sub-action.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Attack {
     /// The target object (`+0x20`, its id at `+0x30`).
-    pub target: Option<crate::combat::AttackTargetId>,
+    pub target: Option<AttackTargetId>,
     /// The second target (`+0x28`, its id at `+0x34`): the work command's Attack takes its
     /// target as this too (`FUN_140a7a190`, slot 0x178), −1 for none.
-    pub target2: Option<crate::combat::AttackTargetId>,
+    pub target2: Option<AttackTargetId>,
     /// The action state (`+0x18`), with its walk's quiet `MoveTo` ([`AttackState`]).
     pub state: AttackState,
     /// `+0x44`: seconds in the state, the update adds dt.
@@ -178,7 +190,7 @@ pub struct Attack {
 }
 
 /// A notify an Attack's start posts to its unit's AI: its kind and three parameters.
-pub(crate) type Posted = (crate::unit_ai::NotifyKind, [i32; 3]);
+pub(crate) type Posted = (NotifyKind, [i32; 3]);
 
 /// A unit's own Attack command ([`Attack::command`]): its target, what it engages and with
 /// which arms, the target's sight and owner, and what the start's `set_state(6)` reads.
@@ -310,12 +322,9 @@ impl AttackReads {
     /// (`tables`), its unit AI `ai` (the unit's own, or the one running outside it), whether its
     /// owner is a computer player and the world's time (`now`).
     pub(crate) fn of(
-        combat: &crate::objects::layers::Combat,
+        combat: &Combat,
         master: &Master,
-        (masters, graphics): (
-            crate::objects::masters::OwnerMasters<'_>,
-            &crate::objects::Graphics,
-        ),
+        (masters, graphics): (OwnerMasters<'_>, &Graphics),
         ai: Option<&UnitAi>,
         (player_type, now): (PlayerType, WorldTime),
     ) -> Self {
@@ -327,7 +336,7 @@ impl AttackReads {
             volleys: masters.table.is_some_and(|m| volleys(master, m)),
             reload: combat.reload_stinger + (master.reload - combat.reload_powerup),
             hit_chance: master.hit_chance,
-            armed: crate::combat::volley::armed(master, combat.firepower),
+            armed: armed(master, combat.firepower),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             player_type,
             world_time: now,
@@ -338,7 +347,7 @@ impl AttackReads {
             queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),
             ai_type: ai.map(|ai| ai.ai_type),
-            volley_under_way: combat.next_volley != crate::combat::MissileCount::ZERO,
+            volley_under_way: combat.next_volley != MissileCount::ZERO,
             move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref()),
         }
     }
@@ -399,9 +408,9 @@ pub(crate) struct Ground<'a> {
     /// Where the unit's notifies go.
     pub(crate) posts: Posts<'a>,
     /// The sprites' table, which a `MoveTo` the Attack makes takes its sprite from.
-    pub(crate) graphics: &'a crate::objects::Graphics,
+    pub(crate) graphics: &'a Graphics,
     /// The objects by id: a gate's annexes, which its reach measures.
-    pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
+    pub(crate) by_id: ObjectsRef<'a>,
     /// The unit's own motion layer (its mover and animation speed), lent out of the world's
     /// table while `by_id` reads the others' (FD-045-D58).
     pub(crate) motion: MotionMut<'a>,
@@ -410,7 +419,7 @@ pub(crate) struct Ground<'a> {
 /// Where [`Ground::post`] sends the unit's notifies.
 pub(crate) enum Posts<'a> {
     /// The list the unit AI posts itself while it is out of the world's table.
-    Held(&'a mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>),
+    Held(&'a mut Vec<(NotifyKind, [i32; 3])>),
     /// The world's unit AIs: each notify goes to the unit's at once.
     Ais(&'a mut PartTable<UnitAi>),
 }
@@ -425,7 +434,7 @@ impl Ground<'_> {
     pub(crate) fn post(
         &mut self,
         unit: &Unit,
-        kind: crate::unit_ai::NotifyKind,
+        kind: NotifyKind,
         p: [i32; 3],
     ) -> Result<(), GenieError> {
         match &mut self.posts {
@@ -460,10 +469,10 @@ impl World {
             object_rng: Some(object),
             posts: Posts::Ais(&mut parts.unit_ai),
             graphics,
-            by_id: crate::world::index::ObjectsRef::of_tables(
+            by_id: ObjectsRef::of_tables(
                 players,
                 index,
-                crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+                MasterTables::new(masters, &parts.own_master),
                 (
                     &parts.building,
                     &parts.combat,
@@ -486,11 +495,11 @@ pub(crate) fn set_walker_anim(mut motion: MotionMut<'_>, speed: Speed) {
 }
 
 /// readyToAttack's gap for a range up to [`NO_RANGE`]: half a tile less (`DAT_142eb6e58`).
-const SHORT_RANGE_GAP: Distance = Distance::new(crate::math::image::attack::SHORT_RANGE_GAP);
+const SHORT_RANGE_GAP: Distance = Distance::new(ATTACK_SHORT_RANGE_GAP);
 
 /// readyToAttack's leash of stance 1 lets a target this much past the range from the unit AI's
 /// `state_position` (`DAT_14330ebb8`, read by `ADDSS` at `0x140a80051`).
-const LEASH_SLACK: Distance = Distance::new(crate::math::image::attack::LEASH_SLACK);
+const LEASH_SLACK: Distance = Distance::new(ATTACK_LEASH_SLACK);
 
 /// The masters readyToAttack does not turn to face their target (`0x6744`, `0x6746` raw).
 const MASTER_1704: MasterId = MasterId::named(1704);

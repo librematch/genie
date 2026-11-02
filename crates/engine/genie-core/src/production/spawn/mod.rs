@@ -32,9 +32,16 @@ pub use self::terrains::{BuildSite, placement_terrains};
 pub(crate) use self::world_map::WorldMap;
 #[cfg(test)]
 use crate::GenieError;
+use crate::combat::missile::grounded;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::image::spawn::{
+    GAP as SPAWN_GAP, INSIDE as SPAWN_INSIDE, NONE as SPAWN_NONE, PASSABLE as SPAWN_PASSABLE,
+    REACH as SPAWN_REACH, SIDE_SHARE as SPAWN_SIDE_SHARE, SMALL as SPAWN_SMALL,
+    START_RIGHT_Z as SPAWN_START_RIGHT_Z,
+};
+use crate::objects::Facet;
 #[cfg(test)]
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::FlyMode;
@@ -45,21 +52,21 @@ use crate::world::World;
 
 /// A unit smaller than this on both axes (`DAT_142f5d120`) steps by twice its radius plus
 /// `GAP` (`DAT_142eb5690`).
-const SMALL: f32 = crate::math::image::spawn::SMALL;
-const GAP: f32 = crate::math::image::spawn::GAP;
+const SMALL: f32 = SPAWN_SMALL;
+const GAP: f32 = SPAWN_GAP;
 /// The share of a side the first segments cover (`DAT_142eb880c`).
-const SIDE_SHARE: f32 = crate::math::image::spawn::SIDE_SHARE;
+const SIDE_SHARE: f32 = SPAWN_SIDE_SHARE;
 /// No gather point (`DAT_14330ec20`).
-const NONE: f32 = crate::math::image::spawn::NONE;
+const NONE: f32 = SPAWN_NONE;
 /// The placement test's objects lie within this many tiles of the point (`DAT_142eb9430`).
-const REACH: f32 = crate::math::image::spawn::REACH;
+const REACH: f32 = SPAWN_REACH;
 /// A tile whose terrain's restriction value is this or less is not passable (`DAT_14330eb78`).
-const PASSABLE: f32 = crate::math::image::spawn::PASSABLE;
+const PASSABLE: f32 = SPAWN_PASSABLE;
 /// How far inside its far edges a box's last tile lies (`DAT_142eb1e9c`).
-const INSIDE: f32 = crate::math::image::spawn::INSIDE;
+const INSIDE: f32 = SPAWN_INSIDE;
 
 /// A new moving object's right vector's z (`FUN_1411580a0` reads `DAT_14330ec20`).
-pub(crate) const START_RIGHT_Z: f32 = crate::math::image::spawn::START_RIGHT_Z;
+pub(crate) const START_RIGHT_Z: f32 = SPAWN_START_RIGHT_Z;
 
 /// How a new plain object ([`World::plain_object`]) that moves faces.
 ///
@@ -70,7 +77,7 @@ pub enum Facing {
     Drawn,
     /// The dead object's facet it remains of (`FUN_14119d490`, `FUN_14114d780`), None where the
     /// slice does not hold it.
-    Dead(Option<crate::objects::Facet>),
+    Dead(Option<Facet>),
 }
 
 /// The building a unit spawns from, as the search reads it.
@@ -112,11 +119,7 @@ impl World {
             .as_ref()
             .and_then(|t| t.ground(at.ground()).ok())
             .map_or(at, |g| {
-                Position::new(
-                    at.x(),
-                    at.y(),
-                    crate::combat::missile::grounded(at.z(), g, false, fly_mode),
-                )
+                Position::new(at.x(), at.y(), grounded(at.z(), g, false, fly_mode))
             })
     }
 }

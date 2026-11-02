@@ -9,6 +9,7 @@ use crate::gathering::hunt::{
     GAP, HERD_FAR, HERD_REACH, HuntAction, HuntNext, HuntReads, LAST_BIT, OWN_LIVESTOCK_RANGE,
     REMAINDER,
 };
+use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
@@ -16,6 +17,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::footprint_gap;
 use crate::movement::move_to::WalkTo;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::class;
 use crate::objects::sprite::new_sprite;
@@ -23,8 +25,10 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
+use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::step::Step;
+use std::cmp::Ordering;
 
 impl HuntAction {
     /// `set_state(4)` (`0x140ac60e0` case 4) after the target died, or for live livestock of the
@@ -62,11 +66,11 @@ impl HuntAction {
         } else {
             self.task.range.get()
         };
-        let mover = motion.mover().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = motion.mover().ok_or(HUNTER_UNMOVING)?;
         let ground = mover.stats.radius.ground();
         let gap = footprint_gap(at, ground, t.position, t.radius);
         let to = WalkTo {
-            id: self.target.map(crate::gathering::HuntTargetId::id),
+            id: self.target.map(HuntTargetId::id),
             at: t.position,
             gap,
             state: Some(victim.state),
@@ -89,7 +93,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         f: &Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
@@ -138,7 +142,7 @@ impl HuntAction {
                 c.w.parts
                     .mover_of(unit.id)
                     .map(|m| m.stats.radius.ground())
-                    .ok_or(crate::world::HUNTER_UNMOVING)?;
+                    .ok_or(HUNTER_UNMOVING)?;
             if self.task.range + Distance::new(GAP)
                 < footprint_gap(unit.place.position(), ground, t.position, t.radius)
             {
@@ -195,7 +199,7 @@ impl HuntAction {
     ) {
         self.state = HuntState::Gather;
         let kind = self.task.resource;
-        let keeps = crate::gathering::both_food(kind, unit.life.attribute_type);
+        let keeps = both_food(kind, unit.life.attribute_type);
         if unit.life.attribute_type != kind {
             unit.life.amount = if keeps {
                 unit.life.amount
@@ -236,7 +240,7 @@ impl HuntAction {
         let room = capacity - *held;
         if !matches!(
             gain.partial_cmp(&room),
-            Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+            Some(Ordering::Less | Ordering::Equal)
         ) {
             return Ok(true);
         }

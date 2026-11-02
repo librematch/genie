@@ -2,16 +2,21 @@
 //! wait, the work, a new target, a move and the halt.
 
 use crate::GenieError;
+use crate::combat::attack::face_target;
 use crate::combat::damage::ArmorPair;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::RepairState;
+use crate::construction::repair::repair_target;
 use crate::construction::repair::{
     EXTRA_REPAIRER, LEAST_HP, MOVING_REACH, ONE, REACH, RepairAction, RepairReads, RepairTask,
     Repairee, SHIP_REPAIR, SHIPS,
 };
+use crate::construction::{BuilderCount, RepairTargetId};
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
+use crate::movement::Mover;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, Sprites, TargetMoved, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, footprint_gap};
@@ -24,13 +29,18 @@ use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::{OwnerMasters, WorkValue};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
+use crate::world::lets::release;
 use crate::world::step::Step;
+use std::mem::replace;
 
 /// The work of one update (`0x140adaa20` case 6): the work `rate` times the task's
 /// `work_value` times the world's `dt`; with more than one repairer (`repairers`, `COMISS` with
@@ -38,9 +48,9 @@ use crate::world::step::Step;
 #[must_use]
 pub fn work_amount(
     rate: WorkRate,
-    work_value: crate::objects::masters::WorkValue,
+    work_value: WorkValue,
     dt: Seconds,
-    repairers: Option<crate::construction::BuilderCount>,
+    repairers: Option<BuilderCount>,
 ) -> HitPoints {
     let mut amount = rate * work_value * dt;
     if let Some(n) = repairers {
@@ -66,7 +76,7 @@ fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), Gen
 fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> Result<(), GenieError> {
     repairer.show_standing(
         c.w.parts.motion.layer_mut(repairer.id),
-        crate::objects::masters::OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+        OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
         &c.w.graphics,
         c.w.streams.get(Stream::Sprite),
     )
@@ -108,7 +118,7 @@ impl RepairAction {
         move_reads: &MoveToReads<'_>,
     ) -> Result<Self, GenieError> {
         let mut repair = Self {
-            target: to.id.map(crate::construction::RepairTargetId::new),
+            target: to.id.map(RepairTargetId::new),
             state: RepairState::Move { move_to: None },
             point: to.at,
             timer: Seconds::ZERO,
@@ -230,7 +240,7 @@ impl RepairAction {
                 .ok_or(GenieError::unreachable(
                     "a repairer without movement state (an action object always has one)",
                 ))?;
-        if crate::combat::attack::face_target(mover, at, t.position, c.w.world_time)? {
+        if face_target(mover, at, t.position, c.w.world_time)? {
             self.set_state(c, repairer, RepairState::Work, reads)?;
         }
         Ok(())
@@ -246,7 +256,7 @@ impl RepairAction {
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
         self.timer -= c.dt.seconds();
-        if crate::math::fmath::below_or_unordered(0.0, self.timer.get()) {
+        if below_or_unordered(0.0, self.timer.get()) {
             return Ok(());
         }
         if Self::reaches(repairer, reads) {
@@ -319,25 +329,15 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
     ) -> Result<bool, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let spatial = &mut c.w.spatial;
-        let terrain = spatial
-            .terrain
-            .as_ref()
-            .ok_or(crate::pathing::hull_path::NO_TERRAIN)?;
-        let r = reads
-            .restriction
-            .ok_or(crate::pathing::hull_path::NO_RESTRICTION)?;
+        let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
+        let r = reads.restriction.ok_or(NO_RESTRICTION)?;
         let mask = terrain.restriction_mask(r);
-        crate::pathing::hull_path::quick_reach(
+        quick_reach(
             (spatial, by_id),
             repairer.id,
-            self.target.map(crate::construction::RepairTargetId::id),
+            self.target.map(RepairTargetId::id),
             mask,
             Distance::new(reads.radius.x()),
             Distance::new(REACH),
@@ -377,7 +377,7 @@ impl RepairAction {
             return false;
         };
         let gap = Self::gap(repairer, reads, t);
-        !crate::math::fmath::below_or_unordered(REACH, gap.get())
+        !below_or_unordered(REACH, gap.get())
     }
 
     /// The footprints' gap less the moving target's or the scenario's margin.
@@ -418,7 +418,7 @@ impl RepairAction {
         }
         let repairers = reads.counted_in.map(|(_, n)| n);
         let amount = work_amount(reads.rate, self.task.work_value, c.dt.seconds(), repairers);
-        let (answer, kind) = crate::construction::repair::repair_target(c, self.target, amount)?;
+        let (answer, kind) = repair_target(c, self.target, amount)?;
         match answer {
             RepairOutcome::Full => {
                 if COMBAT <= kind
@@ -468,7 +468,7 @@ impl RepairAction {
         let target = self.target.take();
         if target.is_some() {
             let by = repairer.releaser(c)?;
-            crate::world::lets::release(c, repairer, target, by)?;
+            release(c, repairer, target, by)?;
         }
         Ok(())
     }
@@ -601,10 +601,7 @@ impl RepairAction {
                 c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
             ),
         )?;
-        let to = move_reads.walk_to(
-            c.w,
-            self.target.map(crate::construction::RepairTargetId::id),
-        )?;
+        let to = move_reads.walk_to(c.w, self.target.map(RepairTargetId::id))?;
         self.state = RepairState::Move {
             move_to: self.walk(&move_reads, to)?,
         };
@@ -621,7 +618,7 @@ impl RepairAction {
     pub fn walk_again(
         &mut self,
         to: WalkTo,
-        mover: Option<&mut crate::movement::Mover>,
+        mover: Option<&mut Mover>,
         move_reads: &MoveToReads<'_>,
     ) -> Result<(), GenieError> {
         let walk = self.walk(move_reads, Some(to))?;
@@ -647,12 +644,12 @@ impl RepairAction {
     pub fn take_point(
         &mut self,
         point: Position,
-        mover: Option<&mut crate::movement::Mover>,
+        mover: Option<&mut Mover>,
         move_reads: &MoveToReads<'_>,
     ) -> Result<(Option<ObjectId>, bool), GenieError> {
         let walk = self.to_point(point, move_reads)?;
         self.point = point;
-        let counted = std::mem::replace(&mut self.counted, false);
+        let counted = replace(&mut self.counted, false);
         let old = self.target.take();
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
@@ -660,7 +657,7 @@ impl RepairAction {
             m.stop()?;
         }
         self.state = RepairState::WalkPoint { move_to: walk };
-        Ok((old.map(crate::construction::RepairTargetId::id), counted))
+        Ok((old.map(RepairTargetId::id), counted))
     }
 
     /// Slot 7 (`FUN_140adaa00`) as the unit's stop calls it: `set_state(2)`. Returns whether it
@@ -670,8 +667,8 @@ impl RepairAction {
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub fn halt(&mut self, mover: Option<&mut crate::movement::Mover>) -> Result<bool, GenieError> {
-        let counted = std::mem::replace(&mut self.counted, false);
+    pub fn halt(&mut self, mover: Option<&mut Mover>) -> Result<bool, GenieError> {
+        let counted = replace(&mut self.counted, false);
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {

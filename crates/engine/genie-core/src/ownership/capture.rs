@@ -5,20 +5,28 @@
 use crate::GenieError;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::action_type::TRADE;
 use crate::objects::masters::class;
+use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
 use crate::ownership::change::change_hands;
+use crate::ownership::change::dead_master_of;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
+use crate::world::lets::{release, torn_down};
 use crate::world::others::OthersRef;
+use crate::world::parts::Part;
 use crate::world::step::Step;
 
 impl Unit {
@@ -33,7 +41,7 @@ impl Unit {
     /// statistics are not held.
     pub(crate) fn capture(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<(bool, Vec<ObjectId>), GenieError> {
@@ -75,7 +83,7 @@ impl Unit {
     /// [`Artifact::stop`]: crate::ownership::artifact::Artifact::stop
     pub(crate) fn capture_stop(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         class: ClassId,
     ) -> Result<(), GenieError> {
@@ -91,14 +99,11 @@ impl Unit {
                     .stop()?;
             }
             for t in [gone.released, released].into_iter().flatten() {
-                crate::world::lets::release(c, self, t, by)?;
+                release(c, self, t, by)?;
             }
             self.show_standing(
                 c.w.parts.motion.layer_mut(self.id),
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -113,10 +118,10 @@ impl Unit {
                 &mut leaves,
                 by,
             )?;
-            crate::world::lets::torn_down(c, self, (leaves, releases))?;
+            torn_down(c, self, (leaves, releases))?;
         }
         let trading = actions.top_action_kind() == Some(TRADE_ACTION)
-            && crate::math::fmath::below_or_unordered(0.0, self.life.amount.get())
+            && below_or_unordered(0.0, self.life.amount.get())
             && self.life.attribute_type.is_some();
         if class != class::LIVESTOCK
             && !trading
@@ -149,7 +154,7 @@ impl Unit {
     /// [`Outcome::Captured`]: crate::objects::unit::Outcome::Captured
     pub(crate) fn ai_change_owner(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         new: PlayerId,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
@@ -167,7 +172,7 @@ impl Unit {
     /// (`FUN_14120f800` with `FUN_141192d10`).
     pub(crate) fn take_by_sight(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<(), GenieError> {
@@ -189,12 +194,12 @@ impl Unit {
     /// whether or not `new` has its master.
     pub(crate) fn change_owner(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<bool, GenieError> {
         let master = self.master(c.w.master_tables(), c.player);
-        if master.is_ok_and(|m| m.kind == crate::objects::masters::master_type::BUILDING) {
+        if master.is_ok_and(|m| m.kind == BUILDING) {
             c.building_handover = true;
             return Ok(c
                 .w
@@ -203,9 +208,8 @@ impl Unit {
                 .is_some_and(|m| m.get(self.life.master_id).is_some()));
         }
         let had = c.w.parts.dead_master.contains(self.id);
-        let tables =
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master);
-        let dead = crate::ownership::change::dead_master_of(self, c.player.index(), tables, had);
+        let tables = MasterTables::new(&c.w.masters, &c.w.parts.own_master);
+        let dead = dead_master_of(self, c.player.index(), tables, had);
         let id = self.id;
         let changed = change_hands(
             (self, actions, c.w.parts.unit_ai.get_mut(id)),
@@ -217,9 +221,9 @@ impl Unit {
         let Some(own) = changed else {
             return Ok(false);
         };
-        c.w.set_part(self.id, crate::world::parts::Part::OwnMaster(own))?;
+        c.w.set_part(self.id, Part::OwnMaster(own))?;
         if let Some(d) = dead {
-            c.w.set_part(self.id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
+            c.w.set_part(self.id, Part::DeadMaster(Box::new(d)))?;
         }
         Ok(true)
     }
@@ -237,7 +241,7 @@ pub(crate) const HANDS_LEFT: GenieError = GenieError::unsupported(
 
 /// The trade action's type (slot 0x438), whose load keeps a captured unit's unit AI going
 /// (`FUN_14108c050`).
-pub(crate) const TRADE_ACTION: ActionType = crate::objects::masters::action_type::TRADE;
+pub(crate) const TRADE_ACTION: ActionType = TRADE;
 
 /// `FUN_140aab570`'s scan after a livestock's capture: Gaia's livestock in state 2 whose tile
 /// the new owner sees (`FUN_141663500`), within 3 tiles of `at` (x outer, y inner); each is taken

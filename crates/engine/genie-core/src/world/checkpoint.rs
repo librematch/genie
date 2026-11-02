@@ -8,8 +8,11 @@ use crate::map::Position;
 use crate::math::conversions::cvttss2si;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::MasterId;
 use crate::players::Amount;
+use crate::world::Millis;
 
 /// What the block reads from one object of a player's live list.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -17,9 +20,9 @@ pub struct CheckpointObject {
     /// The object's id.
     pub id: ObjectId,
     /// Its master.
-    pub main_id: crate::objects::masters::MasterId,
+    pub main_id: MasterId,
     /// Its state.
-    pub state: crate::objects::ObjectState,
+    pub state: ObjectState,
     /// What it holds.
     pub amount_held: Amount,
     /// Its place.
@@ -27,7 +30,7 @@ pub struct CheckpointObject {
     /// What word 9 reads of its actions, none without an action.
     pub top_action: Option<ActionTerm>,
     /// Its unit AI's retarget timer, None without a unit AI.
-    pub retarget_timer: Option<crate::world::Millis>,
+    pub retarget_timer: Option<Millis>,
 }
 
 /// The type (virtual slot 166) and state (virtual slot 86) of an object's top action.
@@ -105,19 +108,23 @@ fn action_checksum(o: &CheckpointObject) -> u32 {
         .map_or((-1, 0), |t| (ActionType::field(t.kind), t.state.get()));
     (i32::from(kind) as u32)
         .wrapping_add(u32::from(state))
-        .wrapping_add(o.retarget_timer.map_or(0, crate::world::Millis::get))
+        .wrapping_add(o.retarget_timer.map_or(0, Millis::get))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::gathering::gather::GATHER;
+    #[cfg(test)]
+    use crate::test_ids::master_id;
     use crate::test_ids::object_id;
 
     fn object() -> CheckpointObject {
         CheckpointObject {
             id: object_id(1),
-            main_id: crate::test_ids::master_id(4),
-            state: crate::objects::ObjectState::Alive,
+            main_id: master_id(4),
+            state: ObjectState::Alive,
             ..CheckpointObject::default()
         }
     }
@@ -159,11 +166,11 @@ mod tests {
     fn main_ids_add_as_ints() {
         let p = player(vec![
             CheckpointObject {
-                main_id: crate::test_ids::master_id(0x7fff),
+                main_id: master_id(0x7fff),
                 ..object()
             },
             CheckpointObject {
-                main_id: crate::test_ids::master_id(3),
+                main_id: master_id(3),
                 ..object()
             },
         ]);
@@ -190,10 +197,10 @@ mod tests {
     fn word_9_adds_action_type_state_byte_and_retarget_timer() {
         let o = CheckpointObject {
             top_action: Some(ActionTerm {
-                kind: Some(crate::gathering::gather::GATHER),
+                kind: Some(GATHER),
                 state: ActionState::new(3),
             }),
-            retarget_timer: Some(crate::world::Millis::new(100)),
+            retarget_timer: Some(Millis::new(100)),
             ..object()
         };
         assert_eq!(player_block(&player(vec![o]))[9], 108);

@@ -5,6 +5,7 @@ use genie_core::GenieError;
 use genie_core::combat::Firepower;
 use genie_core::combat::MissileCount;
 use genie_core::map::Distance;
+use genie_core::map::RestrictionId;
 use genie_core::map::TerrainId;
 use genie_core::map::{Footprint, GroundOffset, Radii};
 use genie_core::objects::HitPoints;
@@ -37,11 +38,15 @@ use genie_core::objects::masters::TaskIndex;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::VolleySpread;
+use genie_core::objects::masters::{BuildableOn, ClassId, MasterKind, TaskId};
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::attribute::AttributeId;
+use genie_core::production::HotkeyId;
 use genie_core::production::LocationButton;
+use genie_core::technology::TechId;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
+use genie_dat::de::{Sound, Task, Unit};
 
 /// The default event id a task's load gives a sound without one (`FUN_141062470`'s
 /// `FUN_1413af9a0` calls, an immediate of the code).
@@ -51,7 +56,7 @@ const DEFAULT_SOUND_EVENT: u32 = 0x62d4_b3ec;
 /// (`FUN_1413af9a0` with the world's sound table): an id of 0 whose sound number names a sound
 /// of the table with sample files takes the default event ([`DEFAULT_SOUND_EVENT`]); any other
 /// id stays. The id is read as an `int` (`MOVSXD`).
-pub(super) fn sound_event(event: u32, sound: i16, sounds: &[genie_dat::de::Sound]) -> i32 {
+pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
     let has_files = usize::try_from(sound)
         .ok()
         .and_then(|i| sounds.get(i))
@@ -69,10 +74,7 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[genie_dat::de::Sound
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-fn dat_task(
-    t: &genie_dat::de::Task,
-    sounds: &[genie_dat::de::Sound],
-) -> Result<work::Task, GenieError> {
+fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
     let [
         attribute_type,
         attribute_type2,
@@ -85,9 +87,9 @@ fn dat_task(
         t.unused_resource,
     ])?;
     Ok(work::Task {
-        id: genie_core::objects::masters::TaskId::of_task(t.id),
+        id: TaskId::of_task(t.id),
         action_type: ActionType::try_from(t.action_type)?,
-        object_group: genie_core::objects::masters::ClassId::of_field(t.class_id)?,
+        object_group: ClassId::of_field(t.class_id)?,
         object_id: MasterId::of_data(t.unit_id),
         combat_level: t.enable_targeting,
         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
@@ -142,22 +144,22 @@ const fn base_id(id: i16) -> i16 {
 /// A task or a cost slot that holds no type or attribute ([`dat_task`]).
 pub(super) fn dat_work(
     id: MasterId,
-    unit: &genie_dat::de::Unit,
-    sounds: &[genie_dat::de::Sound],
+    unit: &Unit,
+    sounds: &[Sound],
 ) -> Result<work::Master, GenieError> {
     Ok(work::Master {
         id,
-        kind: genie_core::objects::masters::MasterKind::of_data(unit.unit_type),
+        kind: MasterKind::of_data(unit.unit_type),
         copy_id: MasterId::of_data(unit.copy_id),
         base_id: MasterId::of_data(base_id(unit.base_id)),
-        class: genie_core::objects::masters::ClassId::of_master(unit.class),
-        terrain_restriction: genie_core::map::RestrictionId::of_field(unit.terrain_restriction)?,
+        class: ClassId::of_master(unit.class),
+        terrain_restriction: RestrictionId::of_field(unit.terrain_restriction)?,
         task_by_group: TaskGroup::of_data(unit.bird.as_ref().map_or(0, |b| b.task_swap_group)),
         radius: Radii::from(unit.collision_size).ground(),
         tall: 0.0 < Radii::from(unit.collision_size).z(),
         height: Distance::new(Radii::from(unit.collision_size).z()),
         obstruction_type: ObstructionType::from(unit.obstruction_type),
-        buildable_on: genie_core::objects::masters::BuildableOn::of_data(unit.can_be_built_on),
+        buildable_on: BuildableOn::of_data(unit.can_be_built_on),
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::of_data(unit.combat_level),
@@ -199,9 +201,7 @@ pub(super) fn dat_work(
                     location: MasterId::of_data(t.location_id),
                     time: WholeSeconds::of_data(t.queue_time),
                     button: LocationButton::of_data(t.button_id),
-                    hotkey: genie_core::production::HotkeyId::of_data(
-                        t.hot_key_id.unwrap_or_default(),
-                    ),
+                    hotkey: HotkeyId::of_data(t.hot_key_id.unwrap_or_default()),
                 })
                 .collect()
         }),
@@ -226,7 +226,7 @@ pub(super) fn dat_work(
             disappears_when_built: b.disappears_when_built != 0,
             stack_unit: MasterId::of_data(b.stack_unit_id),
             foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
-            tech: genie_core::technology::TechId::of_data(b.tech_id),
+            tech: TechId::of_data(b.tech_id),
             garrison_type: GarrisonKinds::from_bits_retain(b.garrison_type),
             garrison_heal_rate: HitPoints::new(b.garrison_heal_rate),
             garrison_repair_rate: HitPoints::new(b.garrison_repair_rate),
@@ -311,10 +311,7 @@ pub(super) fn dat_work(
 /// # Errors
 ///
 /// A task that holds no type or attribute.
-fn dat_tasks(
-    unit: &genie_dat::de::Unit,
-    sounds: &[genie_dat::de::Sound],
-) -> Result<Vec<work::Task>, GenieError> {
+fn dat_tasks(unit: &Unit, sounds: &[Sound]) -> Result<Vec<work::Task>, GenieError> {
     unit.bird.as_ref().map_or_else(
         || Ok(Vec::new()),
         |b| b.tasks.iter().map(|t| dat_task(t, sounds)).collect(),
@@ -327,7 +324,7 @@ fn dat_tasks(
 /// # Errors
 ///
 /// A slot whose attribute is below −1.
-fn dat_cost(unit: &genie_dat::de::Unit) -> Result<[CostSlot; COST_SLOTS], GenieError> {
+fn dat_cost(unit: &Unit) -> Result<[CostSlot; COST_SLOTS], GenieError> {
     let mut cost = [CostSlot::default(); COST_SLOTS];
     if let Some(c) = unit.creatable.as_ref() {
         for (slot, r) in cost.iter_mut().zip(&c.resource_costs) {

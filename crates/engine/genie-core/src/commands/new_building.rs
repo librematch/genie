@@ -3,12 +3,22 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
+use crate::combat::{AttackCount, AttackPowerup, Firepower, MissileCount};
 use crate::construction::build::Construction;
+use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
+use crate::construction::{Annexes, BuilderCount, FootprintWaits, FoundationId, MainBuildingId};
+use crate::garrison::RaiderCountdown;
+use crate::groups::GroupLink;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::map::Snow;
 use crate::map::Tile;
+use crate::map::spatial::Obstruction;
+use crate::map::terrain::{Terrain, is_rice_terrain};
 use crate::math::Angle;
+use crate::math::conversions::cvttss2si;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::objects::HitPoints;
@@ -18,24 +28,30 @@ use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::{Action, Animated, Building, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
+use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, player_master};
+use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::objects::{DamagedTimer, Frame, Regeneration, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::BUILDING_COST;
+use crate::trace::player_unsupported;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
+use crate::world::NO_ATTRIBUTE;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
@@ -53,21 +69,21 @@ impl World {
         player: PlayerId,
         master: MasterId,
         position: Position,
-    ) -> Result<(crate::construction::FoundationId, Position), GenieError> {
+    ) -> Result<(FoundationId, Position), GenieError> {
         let unit_ai = self.master(player, master)?.unit_ai_type(master);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
         let cost = self.master(player, master)?.cost;
         let owner = self.players.player_mut(player)?;
-        for (resource, amount, paid) in crate::objects::masters::cost_entries(&cost) {
+        for (resource, amount, paid) in cost_entries(&cost) {
             let slot = owner
                 .attributes
                 .get_mut(resource.index())
-                .ok_or(crate::world::NO_ATTRIBUTE)?;
+                .ok_or(NO_ATTRIBUTE)?;
             if paid {
                 *slot -= Amount::new(amount.as_f32());
             }
         }
-        Ok((crate::construction::FoundationId::new(made.0), made.1))
+        Ok((FoundationId::new(made.0), made.1))
     }
 
     /// [`World::make_building`]'s combat setup (`FUN_14121df60`): its class counters
@@ -86,7 +102,7 @@ impl World {
         if let Some(m) = player_master(&self.masters, player, master)
             .filter(|m| m.kind == BUILDING && !m.trained_at.is_empty())
         {
-            let paid: i32 = crate::objects::masters::cost_entries(&m.cost)
+            let paid: i32 = cost_entries(&m.cost)
                 .filter(|&(_, _, paid)| paid)
                 .map(|(_, amount, _)| i32::from(amount.get()))
                 .sum();
@@ -156,10 +172,8 @@ impl World {
         let position = self.on_ground(player, master, position);
         let id = self.take_object_id(player, master);
         // what its first update as a built building starts (slot 0x7f0)
-        let default_task = player_master(&self.masters, player, master).map_or(
-            crate::objects::layers::DefaultTask::Nothing,
-            Master::default_start,
-        );
+        let default_task = player_master(&self.masters, player, master)
+            .map_or(DefaultTask::Nothing, Master::default_start);
         let ai = unit_ai
             .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
             .map(|(t, new)| {
@@ -169,7 +183,7 @@ impl World {
             Ok(ai) => ai,
             Err(e) => {
                 // the constructor's draws are unknown, so the turn player's are too
-                crate::trace::player_unsupported(self.ticks, self.player_turn, &e);
+                player_unsupported(self.ticks, self.player_turn, &e);
                 let ticks = self.ticks;
                 let turn = self.players.player_mut(self.player_turn)?;
                 let at = turn.objects.next_place();
@@ -209,17 +223,11 @@ impl World {
             });
         // the constructor (FUN_1411de5f0)
         let (x, y) = (position.x(), position.y());
-        let (tx, ty) = (
-            crate::math::conversions::cvttss2si(x),
-            crate::math::conversions::cvttss2si(y),
-        );
+        let (tx, ty) = (cvttss2si(x), cvttss2si(y));
         let terrain = self.spatial.terrain.as_ref();
         let snow = constructed_snow(master, (tx, ty), terrain)?;
         // +0xcd0 (FUN_141188db0): mangrove or rice terrain under its place
-        let rice = terrain.is_some_and(|t| {
-            t.kind(Tile::new(tx, ty))
-                .is_some_and(crate::map::terrain::is_rice_terrain)
-        });
+        let rice = terrain.is_some_and(|t| t.kind(Tile::new(tx, ty)).is_some_and(is_rice_terrain));
         let foundation = !matches!(made.class, class::CLASS_51 | class::CLASS_54)
             && !matches!(master, ids::ID_357 | ids::ID_1188)
             && building.head_unit.is_none();
@@ -236,7 +244,7 @@ impl World {
                 .and_then(|s| self.graphics.get(s).copied())
                 .or(standing);
             if let Some(g) = shown {
-                crate::objects::sprite::new_sprite(
+                new_sprite(
                     &mut sprite,
                     mover.as_mut().map(|m| &mut m.stats),
                     g,
@@ -253,26 +261,26 @@ impl World {
         let desolid = WholeSeconds::ZERO < made.build_time
             && !matches!(made.class, class::CLASS_51 | class::CLASS_54)
             && progress == Seconds::ZERO;
-        let combat = crate::objects::layers::Combat {
-            builders: crate::construction::BuilderCount::of_data(0),
+        let combat = Combat {
+            builders: BuilderCount::of_data(0),
             work_rate_powerup: WorkRate::ZERO,
             capture_flag: CaptureKind::NONE,
             hp_powerup: HpPowerup::default(),
             regen_timer: Seconds::ZERO,
-            regen_powerup: crate::objects::Regeneration::ZERO,
-            regen_stinger: crate::objects::Regeneration::ZERO,
-            attack_count: crate::combat::AttackCount::ZERO,
+            regen_powerup: Regeneration::ZERO,
+            regen_stinger: Regeneration::ZERO,
+            attack_count: AttackCount::ZERO,
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
             firepower: player_master(&self.masters, player, master)
-                .map_or(crate::combat::Firepower::ZERO, |m| m.volley_fire),
-            next_volley: crate::combat::MissileCount::ZERO,
+                .map_or(Firepower::ZERO, |m| m.volley_fire),
+            next_volley: MissileCount::ZERO,
             reload_worldtime: WorldTime::ZERO,
-            raider_countdown: crate::garrison::RaiderCountdown::NONE,
+            raider_countdown: RaiderCountdown::NONE,
             attack_timer: Seconds::ZERO,
-            abilities: crate::combat::abilities::Abilities::default(),
+            abilities: Abilities::default(),
             reload_stinger: Seconds::ZERO,
             reload_powerup: Seconds::ZERO,
-            attack_powerup: crate::combat::AttackPowerup::ZERO,
+            attack_powerup: AttackPowerup::ZERO,
             range_powerup: Distance::ZERO,
             armor_powerups: ArmorPair::ZERO,
             armor_removed: ArmorPair::ZERO,
@@ -282,7 +290,7 @@ impl World {
         };
         let unit = Unit {
             id,
-            footprint_waits: crate::construction::FootprintWaits::NONE,
+            footprint_waits: FootprintWaits::NONE,
             life: Lifecycle {
                 class: Class::Animated,
                 state: ObjectState::Foundation,
@@ -295,7 +303,7 @@ impl World {
                 master: death.2,
                 ..Lifecycle::default()
             },
-            place: crate::objects::layers::Static::at(position),
+            place: Static::at(position),
             attackable: true,
             untargetable: false,
             under_attack: false,
@@ -303,23 +311,23 @@ impl World {
             pasture: None,
             my_pasture: None,
             undeletable: false,
-            group: crate::groups::GroupLink::default(),
+            group: GroupLink::default(),
             garrison: Vec::new(),
-            damaged_lately: crate::objects::DamagedTimer::OUT,
-            workers: crate::objects::WorkerCount::ZERO,
+            damaged_lately: DamagedTimer::OUT,
+            workers: WorkerCount::ZERO,
             stopped: false,
             sprite,
             idle_variant: 0,
             roo_called: false,
         };
-        let layer = crate::objects::layers::Building {
+        let layer = Building {
             construction: Some(Construction {
                 progress,
                 desolid,
-                builders: crate::construction::BuilderCount::of_data(0),
+                builders: BuilderCount::of_data(0),
                 hit_points: made.hit_points,
                 build_time: made.build_time,
-                record: crate::map::spatial::Obstruction {
+                record: Obstruction {
                     kind: made.obstruction_type,
                     class: made.obstruction_class,
                 },
@@ -327,13 +335,13 @@ impl World {
                 sprite_override: false,
             }),
             annex_of: None,
-            annexes: crate::construction::Annexes::NONE,
+            annexes: Annexes::NONE,
             garrison_time: WorldTime::ZERO,
             relics: Relics::NONE,
             livestock_summation: Amount::ZERO,
             livestock: Vec::new(),
             pasture_workers: Vec::new(),
-            build_frame: crate::objects::Frame::ZERO,
+            build_frame: Frame::ZERO,
             // every building holds a gate's lock, open
             gate: Some(Gate {
                 first_update: true,
@@ -344,7 +352,7 @@ impl World {
             attacking_units: Vec::new(),
         };
         let parts = ObjectParts {
-            actions: crate::objects::layers::Action {
+            actions: Action {
                 list: ActionList::default(),
                 default_task,
             },
@@ -352,10 +360,7 @@ impl World {
             building: layer,
             combat,
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            motion: crate::objects::layers::Motion::of(
-                Some(crate::objects::layers::Animated::default()),
-                mover,
-            ),
+            motion: Motion::of(Some(Animated::default()), mover),
             ..ObjectParts::default()
         };
         let _ = self.push_live(player, Object { unit, parts })?;
@@ -419,12 +424,12 @@ impl World {
         made: &Master,
         am: &Master,
     ) -> Result<(), GenieError> {
-        let not_held = crate::construction::build::NOT_HELD;
+        let not_held = NOT_HELD;
         if self.object(id).is_none() || self.object(aid).is_none() {
             return Err(not_held);
         }
         self.parts.building_mut(id)?.annexes.link(slot, aid)?;
-        self.parts.building_mut(aid)?.annex_of = Some(crate::construction::MainBuildingId::new(id));
+        self.parts.building_mut(aid)?.annex_of = Some(MainBuildingId::new(id));
         if made.class != class::GATE {
             self.unwatch(player, aid)?;
         }
@@ -434,7 +439,7 @@ impl World {
                 .building_mut(aid)?
                 .construction
                 .as_mut()
-                .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+                .ok_or(NO_CONSTRUCTION)?;
             if !c.desolid {
                 c.desolid = true;
                 self.pathing.removed(aid);
@@ -459,8 +464,8 @@ impl World {
 fn constructed_snow(
     master: MasterId,
     (tx, ty): (i32, i32),
-    terrain: Option<&crate::map::terrain::Terrain>,
-) -> Result<crate::map::Snow, GenieError> {
+    terrain: Option<&Terrain>,
+) -> Result<Snow, GenieError> {
     let on_snow = matches!(master, FARM | PASTURE_1889)
         && -1 < tx
         && -1 < ty
@@ -468,11 +473,7 @@ fn constructed_snow(
             .map(|t| t.snow_under(Tile::new(tx, ty)))
             .transpose()?
             .unwrap_or(false);
-    Ok(if on_snow {
-        crate::map::Snow::Kept
-    } else {
-        crate::map::Snow::None
-    })
+    Ok(if on_snow { Snow::Kept } else { Snow::None })
 }
 
 #[cfg(test)]

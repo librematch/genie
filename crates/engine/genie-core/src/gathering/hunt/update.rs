@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::{Attack, Fight, set_walker_anim};
+use crate::combat::victims::{file_kill, write_back};
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
@@ -10,10 +11,13 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
+use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::step::Step;
 
@@ -34,7 +38,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
@@ -49,10 +53,7 @@ impl HuntAction {
             // case 3: a hunt that gave up on its MoveTo waits (its timer below 0), then set_state 11
             HuntState::Walk { .. } if self.timer < Seconds::ZERO => {
                 let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
-                let mover =
-                    c.w.parts
-                        .mover_mut(unit.id)
-                        .ok_or(crate::world::HUNTER_UNMOVING)?;
+                let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.wait_then_walk(c.dt.seconds(), mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
@@ -91,7 +92,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
@@ -137,10 +138,7 @@ impl HuntAction {
                 let target = self.let_go();
                 unit.hunt_release(c, [target])?;
                 let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
-                let mover =
-                    c.w.parts
-                        .mover_mut(unit.id)
-                        .ok_or(crate::world::HUNTER_UNMOVING)?;
+                let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
@@ -157,7 +155,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
@@ -196,7 +194,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
@@ -253,10 +251,7 @@ impl HuntAction {
         self.no_tree_search(r)?;
         self.set_target(None);
         let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
-        let mover =
-            c.w.parts
-                .mover_mut(unit.id)
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)
     }
 
@@ -286,17 +281,14 @@ impl HuntAction {
     ) -> Result<(), GenieError> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let mover =
-            c.w.parts
-                .mover_mut(unit.id)
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.state = HuntState::Attack { attack: None };
         // the herd is read only on a live target
         let target = self.target.ok_or(GenieError::unreachable(
@@ -324,11 +316,11 @@ impl HuntAction {
 pub(super) fn write_target_back(
     c: &mut Step<'_>,
     hunter: &mut Unit,
-    actions: &mut crate::objects::layers::Action,
+    actions: &mut Action,
     f: &mut Fight,
 ) -> Result<(), GenieError> {
-    if let Some(k) = crate::combat::victims::write_back(c, &mut f.victim)? {
-        crate::combat::victims::file_kill(c, (hunter, actions), k)?;
+    if let Some(k) = write_back(c, &mut f.victim)? {
+        file_kill(c, (hunter, actions), k)?;
     }
     Ok(())
 }

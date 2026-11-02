@@ -3,16 +3,27 @@
 
 use crate::GenieError;
 use crate::combat::volley::same_members;
+use crate::groups::UnitGroups;
+use crate::map::Tile;
+use crate::map::spatial::Spatial;
 use crate::movement::Mover;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::forget_resource;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::game_status::GameStatus;
+use crate::technology::TechState;
+use crate::unit_ai::UnitAi;
+use crate::vision::VisionBits;
+use crate::vision::visibility::VisibleMap;
 use crate::world::World;
+use crate::world::parts::{Object, Part};
 use crate::world::slots::PlayerSlots;
+use crate::world::{FrameSeed, PlayState};
 
 /// The game's state after a tick, for the oracle's forced replay (dev only: the oracle reads it
 /// from the tick oracle's saves, genie-core never reads the game): the frame seed and every
@@ -20,9 +31,9 @@ use crate::world::slots::PlayerSlots;
 #[derive(Clone, Debug, Default)]
 pub struct GameState {
     /// `world+0x7d0`, the frame seed.
-    pub frame_seed: crate::world::FrameSeed,
+    pub frame_seed: FrameSeed,
     /// Every player's live objects.
-    pub players: Vec<Vec<crate::world::parts::Object>>,
+    pub players: Vec<Vec<Object>>,
     /// Every player's food, wood, stone and gold.
     pub resources: Vec<[f32; 4]>,
     /// Every player's attributes as saved (the first four are the resources), which the oracle
@@ -31,23 +42,20 @@ pub struct GameState {
     /// The players' pending debits and technology states.
     pub pending_debit: Vec<[Amount; 4]>,
     /// Every player's technology states.
-    pub techs: Vec<Vec<crate::technology::TechState>>,
+    pub techs: Vec<Vec<TechState>>,
     /// Every player's game status and resignation (`+0x89`, `+0x8b`).
-    pub statuses: Vec<(crate::players::game_status::GameStatus, bool)>,
+    pub statuses: Vec<(GameStatus, bool)>,
     /// The world's game state (`+0x88`).
-    pub game_state: crate::world::PlayState,
+    pub game_state: PlayState,
     /// Objects the slice modelled but got wrong this tick: they take the game's state too.
     pub resync: Vec<ObjectId>,
     /// The players' visible maps and the unified map, when the slice's differ.
-    pub sight: Option<(
-        Vec<crate::vision::visibility::VisibleMap>,
-        Vec<crate::vision::VisionBits>,
-    )>,
+    pub sight: Option<(Vec<VisibleMap>, Vec<VisionBits>)>,
     /// `next_reusable_object_id`: the fog ghosts that take reusable ids are not modelled.
     pub next_reusable_id: ObjectId,
     /// The map tiles' object lists in the game's order (`x`, `y`, ids; each tile of two objects
     /// or more), when the oracle dumped them: the order is the game's history, no save holds it.
-    pub tile_lists: Option<Vec<(crate::map::Tile, Vec<ObjectId>)>>,
+    pub tile_lists: Option<Vec<(Tile, Vec<ObjectId>)>>,
     /// The pool of recycled missiles ([`Recycling::missiles`]), when the oracle dumped it: no
     /// save holds it.
     ///
@@ -56,7 +64,7 @@ pub struct GameState {
     /// The world's pool of recycled ghosts, when the oracle dumped it.
     pub ghost_pool: Option<Vec<ObjectId>>,
     /// The world's unit groups, when the slice's differ.
-    pub groups: Option<crate::groups::UnitGroups>,
+    pub groups: Option<UnitGroups>,
 }
 
 impl World {
@@ -204,7 +212,7 @@ impl World {
     fn force_objects(
         &mut self,
         p: PlayerId,
-        theirs: &[crate::world::parts::Object],
+        theirs: &[Object],
         (game, stopped): (&GameState, bool),
         notes: &mut Vec<(PlayerId, Option<ObjectId>, GenieError)>,
     ) -> Result<(), GenieError> {
@@ -266,43 +274,25 @@ impl World {
         &mut self,
         p: PlayerId,
         i: ListIndex,
-        g: &crate::world::parts::Object,
+        g: &Object,
     ) -> Result<(), GenieError> {
         // the parts the import reads are the game's (the dead master, its gap, stays genie's)
         let id = self.players.live(p, i)?.id;
+        self.set_part(id, Part::GatherPoint(g.parts.gather_point))?;
         self.set_part(
             id,
-            crate::world::parts::Part::GatherPoint(g.parts.gather_point),
+            Part::Production(g.parts.production.clone().map(Box::new)),
         )?;
-        self.set_part(
-            id,
-            crate::world::parts::Part::Production(g.parts.production.clone().map(Box::new)),
-        )?;
-        self.set_part(id, crate::world::parts::Part::Missile(g.parts.missile))?;
-        self.set_part(id, crate::world::parts::Part::TownBell(g.parts.town_bell))?;
-        self.set_part(
-            id,
-            crate::world::parts::Part::Building(Box::new(g.parts.building.clone())),
-        )?;
-        self.set_part(
-            id,
-            crate::world::parts::Part::Combat(Box::new(g.parts.combat.clone())),
-        )?;
+        self.set_part(id, Part::Missile(g.parts.missile))?;
+        self.set_part(id, Part::TownBell(g.parts.town_bell))?;
+        self.set_part(id, Part::Building(Box::new(g.parts.building.clone())))?;
+        self.set_part(id, Part::Combat(Box::new(g.parts.combat.clone())))?;
         let mut ai = g.parts.unit_ai.clone();
         keep_unsaved_ai(self.parts.unit_ai.get(id), ai.as_mut());
-        self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;
-        self.set_part(
-            id,
-            crate::world::parts::Part::Motion(g.parts.motion.clone().map(Box::new)),
-        )?;
-        self.set_part(
-            id,
-            crate::world::parts::Part::Actions(Box::new(g.parts.actions.clone())),
-        )?;
-        self.set_part(
-            id,
-            crate::world::parts::Part::Unread(g.parts.unread.clone()),
-        )?;
+        self.set_part(id, Part::UnitAi(ai.map(Box::new)))?;
+        self.set_part(id, Part::Motion(g.parts.motion.clone().map(Box::new)))?;
+        self.set_part(id, Part::Actions(Box::new(g.parts.actions.clone())))?;
+        self.set_part(id, Part::Unread(g.parts.unread.clone()))?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
@@ -339,10 +329,8 @@ impl World {
         }
         sight_follows(&mut self.spatial, id, (before, state))?;
         if before < ObjectState::DyingSprite && ObjectState::Undead < state {
-            let master = forced.master(
-                crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
-                p,
-            )?;
+            let master =
+                forced.master(MasterTables::new(&self.masters, &self.parts.own_master), p)?;
             forget_resource(&mut self.spatial, Some(master), id, forced.position())?;
         }
         Ok(())
@@ -356,7 +344,7 @@ impl World {
 ///
 /// An object the spatial index does not hold.
 fn sight_follows(
-    spatial: &mut crate::map::spatial::Spatial,
+    spatial: &mut Spatial,
     id: ObjectId,
     (before, state): (ObjectState, ObjectState),
 ) -> Result<(), GenieError> {
@@ -379,10 +367,7 @@ fn keep_unsaved(unit: &Unit, forced: &mut Unit) {
 
 /// What the game's unit AI `forced` takes from the slice's `old` that the save does not hold: a
 /// hunted animal's origin and a boar's flag.
-const fn keep_unsaved_ai(
-    old: Option<&crate::unit_ai::UnitAi>,
-    forced: Option<&mut crate::unit_ai::UnitAi>,
-) {
+const fn keep_unsaved_ai(old: Option<&UnitAi>, forced: Option<&mut UnitAi>) {
     if let (Some(old), Some(new)) = (old, forced) {
         new.hunted = old.hunted;
         if let (Some(o), Some(n)) = (old.home, new.home.as_mut()) {
@@ -394,13 +379,31 @@ const fn keep_unsaved_ai(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::commands::{GatherPoint, GatherPointState};
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
     use crate::map::Position;
+    #[cfg(test)]
+    use crate::objects::layers::Motion;
+    #[cfg(test)]
+    use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::ids;
     use crate::players::game_status::GameStatus;
+    #[cfg(test)]
+    use crate::production::Production;
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::test_ids::{master_id, tech_id};
+    #[cfg(test)]
+    use crate::unit_ai::Hunted;
     use crate::world::parts::Object;
     use crate::world::tests::forage_world;
+    #[cfg(test)]
+    use crate::world::tests::hands_world;
+    #[cfg(test)]
+    use crate::world::{Tick, Unread};
 
     /// A forced object's sight follows its state ([`sight_follows`]): from 2 to 3 it dies; from
     /// 3 on it takes the state; from 2 past 3 it dies and takes the state.
@@ -411,11 +414,11 @@ mod tests {
         use crate::objects::masters::class;
         let id = object_id(21712);
         let world = || {
-            crate::world::tests::hands_world(
+            hands_world(
                 21712,
                 PlayerId::new(0),
                 class::CLASS_0,
-                crate::test_ids::master_id(4),
+                master_id(4),
                 Distance::new(6.0),
             )
         };
@@ -437,13 +440,13 @@ mod tests {
     fn forced_world_takes_the_game_seed_ids_and_dumped_pools() {
         let mut t = forage_world();
         t.recycling.missiles = vec![(object_id(5), false)];
-        let groups = crate::groups::UnitGroups {
+        let groups = UnitGroups {
             counter: group_id(4),
-            ..crate::groups::UnitGroups::default()
+            ..UnitGroups::default()
         };
         let game = GameState {
-            frame_seed: crate::world::FrameSeed::of_data(7),
-            game_state: crate::world::PlayState::of_data(3),
+            frame_seed: FrameSeed::of_data(7),
+            game_state: PlayState::of_data(3),
             next_reusable_id: object_id(-5),
             ghost_pool: Some(vec![object_id(-3)]),
             groups: Some(groups.clone()),
@@ -471,14 +474,14 @@ mod tests {
         let game = GameState {
             resources: vec![[0.0; 4], [1.0, 2.0, 3.0, 4.0]],
             pending_debit: vec![[Amount::ZERO; 4], [Amount::new(5.0); 4]],
-            techs: vec![vec![], vec![crate::technology::TechState::default(); 2]],
+            techs: vec![vec![], vec![TechState::default(); 2]],
             statuses: vec![(GameStatus::PLAYING, false), (GameStatus::LOST, true)],
             ..GameState::default()
         };
         let mut t = forage_world();
         let before = t.players[1].resources();
         t.players[1].unsupported = Some((
-            crate::world::Tick::new(1),
+            Tick::new(1),
             ListIndex::new(0),
             GenieError::unsupported("a part"),
         ));
@@ -513,7 +516,7 @@ mod tests {
     #[test]
     fn forced_replay_takes_the_game_frozen_objects_and_notes_what_it_cannot() {
         let mut t = forage_world();
-        let hunted = Some(crate::unit_ai::Hunted::default());
+        let hunted = Some(Hunted::default());
         let forager = &mut t.players[1].objects[ListIndex::new(0)];
         forager.stopped = true;
         t.parts.unit_ai.get_mut(forager.id).unwrap().hunted = hunted;
@@ -532,25 +535,25 @@ mod tests {
             players: vec![vec![], theirs],
             ..GameState::default()
         };
-        let gather = crate::commands::GatherPoint {
-            state: crate::commands::GatherPointState::POINT,
+        let gather = GatherPoint {
+            state: GatherPointState::POINT,
             point: Position::new(30.0, 80.0, 0.0),
             target: None,
             target_master: None,
         };
         game.players[1][0].parts.gather_point = Some(gather);
-        let production = crate::production::Production {
-            disabled_techs: vec![crate::test_ids::tech_id(22)],
-            ..crate::production::Production::default()
+        let production = Production {
+            disabled_techs: vec![tech_id(22)],
+            ..Production::default()
         };
         game.players[1][0].parts.production = Some(production.clone());
         game.players[1][0].parts.town_bell.flag = true;
-        let mut walker = crate::gathering::hunt::tests::walker();
+        let mut walker = walker();
         walker.waiting = 3;
-        let motion = crate::objects::layers::Motion::Moving(walker);
+        let motion = Motion::Moving(walker);
         game.players[1][0].parts.motion = Some(motion.clone());
         // the game's import could not read it whole: the force takes its reason
-        let unread = crate::world::Unread::new(GenieError::unsupported("a saved list"));
+        let unread = Unread::new(GenieError::unsupported("a saved list"));
         game.players[1][0].parts.unread = Some(unread.clone());
         let notes = t.force(&game);
         assert!(notes.is_empty(), "{notes:?}");
@@ -604,7 +607,7 @@ mod tests {
         changed.players[1].insert(
             0,
             Unit {
-                life: crate::objects::lifecycle::Lifecycle {
+                life: Lifecycle {
                     master_id: ids::VILLAGER_MALE,
                     ..forager.life
                 },

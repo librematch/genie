@@ -1,10 +1,12 @@
 use crate::Dumps;
+use crate::fixtures::recording;
 use crate::fixtures::{gaia, header, human};
 use crate::forced_replay::{
     command_phase, forced_run, forced_ticks, game_state, ghost_differences, group_owner,
     owned_group_differences,
 };
 use crate::setup::slice;
+use crate::test_ids::group_id;
 use crate::test_ids::object_id;
 use genie_core::groups::Differentiator;
 use genie_core::groups::{UnitGroup, UnitGroups};
@@ -13,9 +15,13 @@ use genie_core::map::Tile;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
 use genie_core::players::PlayerId;
+use genie_core::players::PlayerSet;
 use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::world::{GameState, World};
+use genie_rec::de::Op;
+use std::cell::RefCell;
+use std::sync::Mutex;
 
 /// Gaia and a player, without objects.
 fn world() -> World {
@@ -34,7 +40,7 @@ fn ghost(id: i32) -> Ghost {
         tile: Tile::new(1, 2),
         footprint: 0,
         bits: VisionBits::NONE,
-        cant_see: genie_core::players::PlayerSet::NONE,
+        cant_see: PlayerSet::NONE,
         seen: false,
         state: ObjectState::Alive,
     }
@@ -78,7 +84,7 @@ fn groups(ids: &[i32]) -> UnitGroups {
         groups: ids
             .iter()
             .map(|&id| UnitGroup {
-                id: crate::test_ids::group_id(id),
+                id: group_id(id),
                 owner: Some(PlayerId::new(1)),
                 ..UnitGroup::default()
             })
@@ -161,13 +167,13 @@ fn save_that_does_not_parse_stops_each_run() {
 
 /// Gaia and a player without objects, as a save file (one chapter, no ops).
 fn quiet() -> Vec<u8> {
-    crate::fixtures::recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[])
+    recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[])
 }
 
 /// A recording of the same save and `n` syncs of 50 ms.
 fn syncs(n: usize) -> Vec<u8> {
-    let ops: Vec<_> = (0..n).map(|_| genie_rec::de::Op::Sync { dt: 50 }).collect();
-    crate::fixtures::recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &ops)
+    let ops: Vec<_> = (0..n).map(|_| Op::Sync { dt: 50 }).collect();
+    recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &ops)
 }
 
 /// A step and a command phase against the same quiet save have nothing to report.
@@ -221,12 +227,12 @@ fn the_continuous_run_reports_each_update_and_forces_the_games_state() {
 #[test]
 fn run_from_later_update_compares_the_updates_after_it() {
     let (save, rec) = (quiet(), syncs(4));
-    let asked = std::sync::Mutex::new(Vec::new());
+    let asked = Mutex::new(Vec::new());
     let after = |u: usize| {
         asked.lock().unwrap().push(u);
         Some(quiet())
     };
-    let dumped = std::cell::RefCell::new(Vec::new());
+    let dumped = RefCell::new(Vec::new());
     let dump_after = |u: usize, what: &str| {
         dumped.borrow_mut().push((u, what.to_owned()));
         None

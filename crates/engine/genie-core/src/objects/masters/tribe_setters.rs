@@ -3,6 +3,7 @@
 
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
+use crate::combat::{Firepower, MissileCount};
 use crate::map::Distance;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
@@ -25,6 +26,7 @@ use crate::objects::masters::{
 use crate::objects::masters::{GarrisonKinds, HeroFlags};
 use crate::players::Amount;
 use crate::players::attribute as players_attribute;
+use crate::production::HotkeyId;
 use crate::production::LocationButton;
 use crate::world::WholeSeconds;
 
@@ -80,9 +82,9 @@ impl Master {
                     *c = CostAmount::of_data(low16(v));
                 }
             }
-            a::TOTAL_MISSILES => self.volley_fire = crate::combat::Firepower::new(v),
+            a::TOTAL_MISSILES => self.volley_fire = Firepower::new(v),
             a::MAXIMUM_TOTAL_MISSILES => {
-                self.max_volley = crate::combat::MissileCount::of_data(low8(v));
+                self.max_volley = MissileCount::of_data(low8(v));
             }
             a::REGENERATION_RATE => self.regeneration = Regeneration::new(v),
             a::POPULATION => {
@@ -185,7 +187,7 @@ impl Master {
             }
             a::HOTKEY_ID => {
                 if let Some(t) = self.train_location_mut() {
-                    t.hotkey = crate::production::HotkeyId::of_data(cvttss2si(v));
+                    t.hotkey = HotkeyId::of_data(cvttss2si(v));
                 }
             }
             a::TRAIN_TIME => {
@@ -249,7 +251,7 @@ impl Master {
                     t.time = t.time.plus(low16(v));
                 }
             }
-            a::TOTAL_MISSILES => self.volley_fire += crate::combat::Firepower::new(v),
+            a::TOTAL_MISSILES => self.volley_fire += Firepower::new(v),
             a::MAXIMUM_TOTAL_MISSILES => self.max_volley = self.max_volley.plus(low8(v)),
             a::REGENERATION_RATE => self.regeneration += Regeneration::new(v),
             a::MIN_CONVERSION_TIME_MODIFIER
@@ -317,9 +319,8 @@ impl Master {
             }
             a::TOTAL_MISSILES => self.volley_fire *= v,
             a::MAXIMUM_TOTAL_MISSILES => {
-                self.max_volley = crate::combat::MissileCount::of_data(low8(
-                    f32::from(self.max_volley.get()) * v + ROUND,
-                ));
+                self.max_volley =
+                    MissileCount::of_data(low8(f32::from(self.max_volley.get()) * v + ROUND));
             }
             a::REGENERATION_RATE => self.regeneration *= v,
             a::MIN_CONVERSION_TIME_MODIFIER

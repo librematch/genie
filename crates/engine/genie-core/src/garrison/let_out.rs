@@ -2,13 +2,16 @@
 //! place on the map.
 
 use crate::GenieError;
+use crate::combat::Firepower;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::garrison::RaiderCountdown;
 use crate::garrison::{
     INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, WHOLE_SHARE_CLASS, attack_rate, share,
 };
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::spatial::Obstruction;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -20,10 +23,12 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::orders::Work;
+use crate::orders::set_stance;
 use crate::players::PlayerId;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -31,7 +36,7 @@ impl World {
     /// it is.
     pub(crate) fn live_inside(&self, id: ObjectId) -> Result<(PlayerId, ListIndex), GenieError> {
         match self.place(id) {
-            Some(crate::world::index::Place::Live(p, i)) => Ok((p, i)),
+            Some(Place::Live(p, i)) => Ok((p, i)),
             _ => Err(GenieError::unsupported(
                 "a unit inside a building outside the live lists",
             )),
@@ -186,12 +191,11 @@ impl World {
                 .with("building", bid)
         })?;
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
-        placed.obstruction = (made.obstruction_type != ObstructionType::NONE && solid).then_some(
-            crate::map::spatial::Obstruction {
+        placed.obstruction =
+            (made.obstruction_type != ObstructionType::NONE && solid).then_some(Obstruction {
                 kind: made.obstruction_type,
                 class: made.obstruction_class,
-            },
-        );
+            });
         let world_time = self.world_time;
         let unit = self.players.live_mut(up, ui)?;
         let _ = unit
@@ -200,7 +204,7 @@ impl World {
         self.pathing.tiles_changed(self.spatial.take_changes());
         unit.life.inside = None;
         // a unit out of its container no longer counts down to its raid (`+0x9a0` 0)
-        self.parts.combat_mut(unit.id)?.raider_countdown = crate::garrison::RaiderCountdown::NONE;
+        self.parts.combat_mut(unit.id)?.raider_countdown = RaiderCountdown::NONE;
         // the position setter's end: a place off where it last moved to is a move
         if let Some(m) = self.parts.mover_mut(unit.id) {
             m.mark_move(at, world_time);
@@ -231,7 +235,7 @@ impl World {
         (up, ui): (PlayerId, ListIndex),
         made: &Master,
         bm: &Master,
-    ) -> Result<Option<crate::combat::Firepower>, GenieError> {
+    ) -> Result<Option<Firepower>, GenieError> {
         if made.kind != COMBAT {
             return Ok(None);
         }
@@ -303,7 +307,7 @@ impl World {
                     ai.stop_with(true, Some(place), side, rng)?;
                     ai.remove_target();
                     let stance = ai.stance;
-                    crate::orders::set_stance(ai, stance, place, side, rng)
+                    set_stance(ai, stance, place, side, rng)
                 })?;
             }
             return Ok(true);
@@ -341,12 +345,11 @@ impl World {
         self.pathing.removed(id);
         self.spatial.remove(id);
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
-        placed.obstruction = (made.obstruction_type != ObstructionType::NONE && solid).then_some(
-            crate::map::spatial::Obstruction {
+        placed.obstruction =
+            (made.obstruction_type != ObstructionType::NONE && solid).then_some(Obstruction {
                 kind: made.obstruction_type,
                 class: made.obstruction_class,
-            },
-        );
+            });
         let world_time = self.world_time;
         let unit = self.players.live_mut(up, ui)?;
         let placed = unit

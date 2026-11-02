@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
+use crate::pathing::mesh::Contact;
 use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
@@ -262,7 +263,7 @@ impl Search<'_> {
     /// contact on the same side; the sides 2 and 3 measure backwards); ties to the first.
     pub(super) fn nearest_contact(
         &self,
-        contacts: &[crate::pathing::mesh::Contact],
+        contacts: &[Contact],
         side: ShapeSide,
         u: i32,
     ) -> Option<usize> {

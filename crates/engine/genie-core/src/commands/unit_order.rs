@@ -1,6 +1,7 @@
 //! `UNIT_ORDER` (0x75): an order of the player's units by its action.
 
 use crate::GenieError;
+use crate::commands::QueueId;
 use crate::commands::UnitList;
 use crate::map::Point;
 use crate::objects::ObjectId;
@@ -81,7 +82,7 @@ pub struct UnitOrderCommand {
     /// `+0xc`, `+0x10`: the point, which the actions modelled do not read.
     pub point: Point,
     /// `+0x14`, the formatter's `qId`, which the actions modelled do not read.
-    pub queue_id: crate::commands::QueueId,
+    pub queue_id: QueueId,
     /// `+0x1d`: a garrison goes through the units' unit AIs (their slot 0x30); a cancel cancels
     /// up to five of a kind.
     pub through_ai: bool,

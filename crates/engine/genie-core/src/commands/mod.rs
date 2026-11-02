@@ -89,6 +89,7 @@ pub use self::wall::BuildWallCommand;
 
 #[cfg(test)]
 pub(crate) use self::production::least_loaded;
+use crate::math::image::turn::ONE_UNIT_AGE as TURN_ONE_UNIT_AGE;
 #[cfg(test)]
 mod tests;
 
@@ -261,7 +262,7 @@ impl Command {
     }
 }
 
-const ONE_UNIT_AGE: f32 = crate::math::image::turn::ONE_UNIT_AGE;
+const ONE_UNIT_AGE: f32 = TURN_ONE_UNIT_AGE;
 
 /// A build order on a foundation the world no longer holds.
 pub(crate) const FOUNDATION_GONE: GenieError =

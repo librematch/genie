@@ -1,5 +1,6 @@
 use byteorder::{LE, ReadBytesExt};
 use std::convert::{TryFrom, TryInto};
+use std::error::Error as StdError;
 use std::io::{self, Error, ErrorKind, Read, Result};
 
 /// Read a 2-byte integer that uses -1 as an "absent" value.
@@ -24,7 +25,7 @@ use std::io::{self, Error, ErrorKind, Read, Result};
 pub fn read_opt_u16<T, R>(input: &mut R) -> Result<Option<T>>
 where
     T: TryFrom<u16>,
-    T::Error: std::error::Error + Send + Sync + 'static,
+    T::Error: StdError + Send + Sync + 'static,
     R: Read,
 {
     let opt = match input.read_u16::<LE>()? {
@@ -59,7 +60,7 @@ where
 pub fn read_opt_u32<T, R>(input: &mut R) -> Result<Option<T>>
 where
     T: TryFrom<u32>,
-    T::Error: std::error::Error + Send + Sync + 'static,
+    T::Error: StdError + Send + Sync + 'static,
     R: Read,
 {
     let opt = match input.read_u32::<LE>()? {

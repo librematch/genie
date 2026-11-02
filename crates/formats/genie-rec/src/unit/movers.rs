@@ -6,6 +6,7 @@ use crate::reader::RecordingHeaderReader;
 use crate::unit_action::UnitAction;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::read_opt_u32;
+use std::io::Result as IoResult;
 use std::io::{Read, Write};
 
 /// A path a moving object follows.
@@ -216,7 +217,7 @@ impl MovingUnitAttributes {
         let num_waypoints = input.read_i32::<LE>()?.max(0);
         self.user_defined_waypoints = (0..num_waypoints)
             .map(|_| read_xyz(input))
-            .collect::<std::io::Result<_>>()?;
+            .collect::<IoResult<_>>()?;
         let exists = input.read_u32::<LE>()? != 0;
         let position = read_xyz(input)?;
         self.substitute_position = exists.then_some(position);

@@ -1,5 +1,6 @@
 use crate::fixtures::{combat_mut, combat_object};
 use crate::object_parts::unit_ai;
+use crate::saved_unit::object as saved_unit_object;
 use crate::test_ids::object_id;
 use genie_core::ErrorKind;
 use genie_core::unit_ai::{ActionKind, OrderKind};
@@ -156,7 +157,7 @@ fn the_saved_unit_ai_is_the_object_part() {
     use genie_core::players::CivId;
     use genie_save::generated::world::PlayerObjects;
     let whole = |object: &genie_save::Object| {
-        crate::saved_unit::object(
+        saved_unit_object(
             object,
             &PlayerObjects::default(),
             &[],

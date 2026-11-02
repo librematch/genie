@@ -31,10 +31,13 @@ use self::geometry::{Meet, RayFraction, contact_point, ray_rect, shrunk_corner, 
 use self::nodes::{Corner, Foot, cheb, clamp_to_box, clip, corner_emits, in_box};
 use self::start::Started;
 use self::token::Token;
+use crate::math::image::short_path::{
+    TO_FIXED as SHORT_PATH_TO_FIXED, TO_FLOAT as SHORT_PATH_TO_FLOAT,
+};
 
 /// `DAT_142f43b10`, `DAT_142f43a10`: fixed point to float and back.
-const TO_FLOAT: f32 = crate::math::image::short_path::TO_FLOAT;
-pub(crate) const TO_FIXED: f32 = crate::math::image::short_path::TO_FIXED;
+const TO_FLOAT: f32 = SHORT_PATH_TO_FLOAT;
+pub(crate) const TO_FIXED: f32 = SHORT_PATH_TO_FIXED;
 
 /// `(v + 0x3fffff) >> 22` for a negative `v`: the tile of a coordinate, truncated toward zero.
 const fn tile_of(v: i32) -> i32 {

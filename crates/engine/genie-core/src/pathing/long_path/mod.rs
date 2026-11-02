@@ -47,6 +47,15 @@ mod step_dir;
 
 use self::cost::{Heap, LongCost, SENTINEL, step_cost};
 use self::step_dir::{STEPS, StepDir};
+use crate::construction::gates::lets_pass;
+use crate::map::TerrainMask;
+use crate::math::fmath::sqrt;
+use crate::math::image::long_path::{
+    EDGE_GAP as LONG_PATH_EDGE_GAP, EPSILON as LONG_PATH_EPSILON, REACHED as LONG_PATH_REACHED,
+    TILE_CENTRE as LONG_PATH_TILE_CENTRE,
+};
+use crate::objects::masters::class::GATE;
+use crate::players::PlayerSet;
 
 /// The search expands at most this many tiles (`FUN_140f9eb70`: `20000 < n` breaks).
 const MOST_EXPANSIONS: i32 = 20000;
@@ -62,16 +71,16 @@ const COMPUTER_FACTOR: i32 = 25;
 
 /// The goal counts as reached within this many tiles, and a range above it ends the search
 /// before it starts when the goal lies within the range (`DAT_14330eb8c`).
-const REACHED: f32 = crate::math::image::long_path::REACHED;
+const REACHED: f32 = LONG_PATH_REACHED;
 
 /// The margin of the reached test within the range (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::long_path::EPSILON;
+const EPSILON: f32 = LONG_PATH_EPSILON;
 
 /// A target's footprint ends this short of its far edges (`DAT_142eb99cc`).
-const EDGE_GAP: f32 = crate::math::image::long_path::EDGE_GAP;
+const EDGE_GAP: f32 = LONG_PATH_EDGE_GAP;
 
 /// A path point lies at its tile's centre: the tile plus this on both axes (`DAT_142e7f384`).
-const TILE_CENTRE: f32 = crate::math::image::long_path::TILE_CENTRE;
+const TILE_CENTRE: f32 = LONG_PATH_TILE_CENTRE;
 
 /// The record class whose tiles an allied unit may pass when its gate lets it (`0x500` in the
 /// obstruction manager's word, bits 8 to 13).
@@ -110,17 +119,12 @@ pub fn gate_lets_pass(
         let Some((owner, gate, master)) = objects.with_master(id)? else {
             continue;
         };
-        if master.class == crate::objects::masters::class::GATE {
+        if master.class == GATE {
             let layer = objects.building(id).ok_or_else(|| {
                 GenieError::unreachable("a gate whose layer the view does not find")
                     .with("object", id)
             })?;
-            return Ok(crate::construction::gates::lets_pass(
-                (gate, layer, master),
-                owner,
-                player,
-                spatial,
-            ));
+            return Ok(lets_pass((gate, layer, master), owner, player, spatial));
         }
     }
     Ok(false)
@@ -178,7 +182,7 @@ pub struct LongRequest {
     /// The unit moves: its speed (slot 0x208, `FUN_141202c70`) is not 0, or its master is 42.
     pub moves: bool,
     /// The terrain classes the unit may stand on (its restriction's mask).
-    pub mask: crate::map::TerrainMask,
+    pub mask: TerrainMask,
     /// The owner's type (`player+0x10`): a computer player (`FUN_141659cf0`) has a shorter
     /// budget.
     pub player_type: PlayerType,
@@ -192,7 +196,7 @@ pub struct LongRequest {
     pub near_player: bool,
     /// The players the unit's player counts as allies (`FUN_141663dc0` with the ally flag): a
     /// gate's tile of another player is closed.
-    pub allies: crate::players::PlayerSet,
+    pub allies: PlayerSet,
 }
 
 /// How a search ended ([`search`]).
@@ -532,7 +536,7 @@ fn search(
     let start_cost = LongCost::of_gap(dx, dy);
     *front.cost.checked_mut(cell(map, req.from))? = start_cost;
     front.heap.slots = vec![(Tile::new(0, 0), SENTINEL), (req.from, start_cost)];
-    let straight = crate::math::fmath::sqrt(gap2 as f32) as i32;
+    let straight = sqrt(gap2 as f32) as i32;
     let budget = if req.player_type.is_computer() {
         straight.wrapping_mul(COMPUTER_FACTOR)
     } else {
@@ -549,8 +553,7 @@ fn search(
         let (c, _) = *front.heap.slots.checked(1)?;
         let (cx, cy) = (c.x(), c.y());
         let (gx, gy) = (x1 - cx, y1 - cy);
-        let d =
-            crate::math::fmath::sqrt(gx.wrapping_mul(gx).wrapping_add(gy.wrapping_mul(gy)) as f32);
+        let d = sqrt(gx.wrapping_mul(gx).wrapping_add(gy.wrapping_mul(gy)) as f32);
         if rect.holds(c) || search_reached(req, d) {
             return Ok(Searched::Ran {
                 reached: true,
@@ -598,6 +601,8 @@ fn search(
 mod tests {
     use super::*;
     use crate::map::TerrainMask;
+    #[cfg(test)]
+    use std::cell::RefCell;
 
     /// A map of `rows` ('#' a blocked tile, 'T' a tall object, 'G' player 4's gate record, '.'
     /// open), class 1 everywhere.
@@ -638,7 +643,7 @@ mod tests {
             lowered: Vec::new(),
             within_range: false,
             near_player: false,
-            allies: crate::players::PlayerSet::of(PlayerId::new(1)),
+            allies: PlayerSet::of(PlayerId::new(1)),
         }
     }
 
@@ -769,7 +774,7 @@ mod tests {
             ".....#....",
             ".....#....",
         ]);
-        let asked = std::cell::RefCell::new(Vec::new());
+        let asked = RefCell::new(Vec::new());
         let asked = &asked;
         let ask = |answer: bool| {
             move |tile| {
@@ -783,7 +788,7 @@ mod tests {
         );
         assert_eq!(asked.borrow().len(), 0);
         let mut req = request([1, 2], [8, 2]);
-        req.allies |= crate::players::PlayerSet::of(PlayerId::new(4));
+        req.allies |= PlayerSet::of(PlayerId::new(4));
         assert_eq!(reaches(&t, map, &req, &ask(false)), Ok(false));
         assert!(asked.borrow().iter().all(|&g| g == Tile::new(5, 2)));
         assert_eq!(reaches(&t, map, &req, &ask(true)), Ok(true));

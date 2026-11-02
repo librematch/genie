@@ -13,6 +13,7 @@ use crate::{
     Decoder, Difference, Error, MasterTable, frames, header_objects, header_slice,
     object_field_differences_in, object_rows, run,
 };
+use std::slice::from_ref;
 
 /// One field of a survey ([`header_survey`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,7 +71,7 @@ pub fn header_survey(
     let mut rows: BTreeMap<String, SurveyRow> = BTreeMap::new();
     let mut stopped = vec![false; players.len()];
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
-        run(&mut turns, &mut decoder, std::slice::from_ref(frame));
+        run(&mut turns, &mut decoder, from_ref(frame));
         let update = i + 1;
         for (k, &p) in players.iter().enumerate() {
             if let (false, Some(stop)) = (stopped[k], stop_of(&turns, p)) {

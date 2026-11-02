@@ -7,6 +7,7 @@ use crate::combat::damage::{
     bonus_damage, charge_hit, elevation_factor, facing_offset, kill_bonus, lose, shield, take,
 };
 use crate::combat::missile::ShooterId;
+use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Tile;
@@ -15,6 +16,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
+use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
@@ -24,6 +26,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
+use std::mem::replace;
 
 /// `FUN_141082e80`: the damage ([`armor_damage`]) beyond what a blast has done: an attacker of
 /// type 70 and up records whether the hit is its charge's (slot 0x2f0, `+0x8a8`), which empties
@@ -38,7 +41,7 @@ use crate::{GenieError, math::fmath};
 pub(super) fn damage(
     t: &mut Victim,
     src: &mut Victim,
-    weapons: &[crate::objects::masters::ClassAmount],
+    weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
 ) -> Result<(), GenieError> {
@@ -216,7 +219,7 @@ pub(super) fn blast_one(
     attacker: &mut Victim,
     targets: &mut [&mut Victim],
     i: usize,
-    (b, weapons): (&Blast, &[crate::objects::masters::ClassAmount]),
+    (b, weapons): (&Blast, &[ClassAmount]),
 ) -> Result<(), GenieError> {
     let a = &b.a;
     let t = &**targets.checked(i)?;
@@ -290,7 +293,7 @@ pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> Result<Option<u
                 .iter()
                 .position(|v| v.id == m.id())
                 .map(Some)
-                .ok_or(crate::construction::build::NOT_HELD)
+                .ok_or(NOT_HELD)
         },
     )
 }
@@ -446,11 +449,11 @@ pub(super) fn blast_hit(
     attacker: &mut Victim,
     targets: &mut [&mut Victim],
     i: usize,
-    (weapons, factor): (&[crate::objects::masters::ClassAmount], f32),
+    (weapons, factor): (&[ClassAmount], f32),
     (ledger, blast_taken): (Option<usize>, HitPoints),
 ) -> Result<(), GenieError> {
     let before = targets.checked(i)?.hp;
-    let mut t = std::mem::replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
+    let mut t = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
     let hit = take(&mut t, attacker, targets, weapons, factor, blast_taken);
     if hit.is_ok() {
         if !attacker.source.charge_hit {

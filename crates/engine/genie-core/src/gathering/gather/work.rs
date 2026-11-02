@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::damage::Victim;
+use crate::gathering::both_food;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::update::QUIET_CODE;
 use crate::gathering::gather::{
@@ -9,11 +10,13 @@ use crate::gathering::gather::{
     WAIT_SHIFT,
 };
 use crate::gathering::hunt::Dropped;
+use crate::gathering::hunt::{DropOff, resource_kind};
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
 use crate::objects::masters::class;
+use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -21,6 +24,7 @@ use crate::players::attribute;
 use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use std::mem::take as mem_take;
 
 impl GatherAction {
     /// `set_state(6)` (case 6) on a target: a farm, masters 357 and 1188 and a target not yet
@@ -49,10 +53,7 @@ impl GatherAction {
         if target.state < ObjectState::Alive {
             return Ok(Next::Build);
         }
-        if matches!(
-            target.master_id,
-            crate::objects::masters::ids::PASTURE_MANGROVE | crate::objects::masters::ids::PASTURE
-        ) {
+        if matches!(target.master_id, PASTURE_MANGROVE | PASTURE) {
             return Err(GenieError::unsupported(
                 "a gather's set_state 6 on master 1893 or 1897",
             ));
@@ -86,7 +87,7 @@ impl GatherAction {
         }
         let kind = self.task.resource;
         let held = unit.life.attribute_type;
-        if held != kind && !crate::gathering::both_food(kind, held) {
+        if held != kind && !both_food(kind, held) {
             unit.life.attribute_type = kind;
             unit.life.amount = Amount::ZERO;
         }
@@ -144,7 +145,7 @@ impl GatherAction {
             // The food kind a farm holds (`+0x308` 16): the food sold at once.
             && unit.life.attribute_type == Some(attribute::FARM_FOOD)
         {
-            let sold = std::mem::take(&mut unit.life.amount);
+            let sold = mem_take(&mut unit.life.amount);
             c.give_load(attribute::FOOD, sold)?;
             return Ok(Next::Stay);
         }
@@ -176,7 +177,7 @@ impl GatherAction {
         unit: &mut Unit,
         me: Me,
         r: &GatherReads,
-        site: Option<crate::gathering::hunt::DropOff>,
+        site: Option<DropOff>,
     ) -> Result<Dropped, GenieError> {
         if self.timer < Seconds::ZERO {
             self.timer += c.dt.seconds();
@@ -209,7 +210,7 @@ impl GatherAction {
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = crate::gathering::hunt::resource_kind(unit.life.attribute_type, attributes);
+        let kind = resource_kind(unit.life.attribute_type, attributes);
         let amount = unit.life.amount;
         unit.life.attribute_type = None;
         unit.life.amount = Amount::ZERO;

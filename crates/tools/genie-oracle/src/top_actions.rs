@@ -26,6 +26,26 @@ use genie_save::generated::world::{Action, PlayerObjects, RgeAction, RgeStaticOb
 mod gathering;
 
 use crate::top_actions::gathering::{import_gather, import_hunt, import_make};
+use genie_core::combat::attack::ATTACK;
+use genie_core::combat::missile::{
+    HitMode, MISSILE, MissileAction, MissileState, MissileTargetId, Origin, StrikeResult,
+};
+use genie_core::construction::build::BuildState;
+use genie_core::construction::repair::{REPAIR, RepairAction, RepairState, RepairTask};
+use genie_core::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify, WaitSolidifyState};
+use genie_core::construction::{FoundationId, RepairTargetId};
+use genie_core::garrison::ENTER;
+use genie_core::garrison::transport::{TRANSPORT, TransportAction, TransportMode, TransportState};
+use genie_core::gathering::gather::GATHER;
+use genie_core::gathering::hunt::HUNT;
+use genie_core::gathering::make::MAKE;
+use genie_core::movement::explore::{EXPLORE, ExploreAction};
+use genie_core::movement::fly::FlyState;
+use genie_core::movement::{Acceleration, Speed};
+use genie_core::objects::Graphics;
+use genie_core::objects::masters::TaskId;
+use genie_core::ownership::artifact::{Artifact, ArtifactState, ArtifactSub};
+use genie_save::generated::world::ActionList;
 
 /// A task slot's task of a master (the master, the slot).
 type TaskAt<'a> = &'a dyn Fn(i16, i16) -> Result<Task, GenieError>;
@@ -47,12 +67,12 @@ pub(super) fn saved_actions(
     work: impl Fn(i16) -> Result<BuildTask, GenieError>,
     fly_task: impl Fn(i16) -> Result<Task, GenieError>,
     task_at: impl Fn(i16, i16) -> Result<Task, GenieError>,
-    graphics: Option<&genie_core::objects::Graphics>,
+    graphics: Option<&Graphics>,
     actions: &mut layers::Action,
 ) -> Result<(), GenieError> {
     let mut entries = object
         .actions()
-        .map(genie_save::generated::world::ActionList::entries)
+        .map(ActionList::entries)
         .ok_or(NO_ACTIONS)?;
     let (kind, action) = entries.next().ok_or(NO_ACTIONS)?;
     let kind = ActionType::try_from(kind)?;
@@ -78,20 +98,18 @@ pub(super) fn saved_actions(
     match kind {
         ARTIFACT_TYPE => import_artifact(&saved, &task_at, actions),
         MOVE_TO => import_move_to(&saved, actions),
-        genie_core::combat::missile::MISSILE => import_missile(&saved, actions),
-        genie_core::gathering::make::MAKE => import_make(&saved, &task_at, actions),
+        MISSILE => import_missile(&saved, actions),
+        MAKE => import_make(&saved, &task_at, actions),
         FLY => import_fly(&saved, &fly_task, actions),
         BUILD => import_build(&saved, &work, actions),
-        genie_core::construction::repair::REPAIR => import_repair(&saved, &task_at, actions),
-        genie_core::gathering::hunt::HUNT => import_hunt(&saved, &task_at, actions),
-        genie_core::gathering::gather::GATHER => import_gather(&saved, &task_at, actions),
-        genie_core::garrison::ENTER => import_enter(&saved, &task_at, actions),
-        genie_core::garrison::transport::TRANSPORT => import_transport(&saved, actions),
-        genie_core::movement::explore::EXPLORE => import_explore(&saved, actions),
-        genie_core::combat::attack::ATTACK => import_attack(&saved, actions),
-        genie_core::construction::wait_solidify::WAIT_SOLIDIFY => {
-            import_wait_solidify(&saved, &task_at, actions)
-        }
+        REPAIR => import_repair(&saved, &task_at, actions),
+        HUNT => import_hunt(&saved, &task_at, actions),
+        GATHER => import_gather(&saved, &task_at, actions),
+        ENTER => import_enter(&saved, &task_at, actions),
+        TRANSPORT => import_transport(&saved, actions),
+        EXPLORE => import_explore(&saved, actions),
+        ATTACK => import_attack(&saved, actions),
+        WAIT_SOLIDIFY => import_wait_solidify(&saved, &task_at, actions),
         _ => Err(not_imported().with("action type", kind)),
     }
 }
@@ -109,9 +127,7 @@ const fn not_imported() -> GenieError {
 /// # Errors
 ///
 /// A negative action type.
-pub(crate) fn first_action(
-    list: &genie_save::generated::world::ActionList,
-) -> Result<Option<(ActionType, &Action)>, GenieError> {
+pub(crate) fn first_action(list: &ActionList) -> Result<Option<(ActionType, &Action)>, GenieError> {
     list.entries()
         .next()
         .map(|(kind, action)| Ok((ActionType::try_from(kind)?, action)))
@@ -121,14 +137,7 @@ pub(crate) fn first_action(
 /// The second target (+0x34): only the Hunt, the Gather and the Build (their drop site), the
 /// missile (its shooter) and the Attack hold one in the slice.
 const fn holds_second_target(kind: ActionType) -> bool {
-    matches!(
-        kind,
-        genie_core::gathering::hunt::HUNT
-            | genie_core::gathering::gather::GATHER
-            | genie_core::combat::missile::MISSILE
-            | genie_core::combat::attack::ATTACK
-            | BUILD
-    )
+    matches!(kind, HUNT | GATHER | MISSILE | ATTACK | BUILD)
 }
 
 /// What a saved top action's import reads: the object, its static part, its player's objects,
@@ -139,7 +148,7 @@ struct Saved<'a> {
     objects: &'a PlayerObjects,
     action: &'a Action,
     base: &'a RgeAction,
-    graphics: Option<&'a genie_core::objects::Graphics>,
+    graphics: Option<&'a Graphics>,
 }
 
 impl Saved<'_> {
@@ -216,23 +225,20 @@ fn import_artifact(
     let move_to = sub
         .map(|s| saved_move_to(s, saved.graphics, voice))
         .transpose()?;
-    actions
-        .list
-        .set_artifact(Some(genie_core::ownership::artifact::Artifact {
-            state: genie_core::ownership::artifact::ArtifactState::of_byte(base.state)?,
-            timer: Seconds::new(base.timer),
-            gaia: saved.s.owner == 0,
-            sub: move_to
-                .map(|move_to| genie_core::ownership::artifact::ArtifactSub::Walk { move_to }),
-            goal: if base.target_id == -1 {
-                move_to.and_then(|_| target_point(base))
-            } else {
-                // the target's place, `+0x38`
-                (base.target_x != -1.0).then_some(saved.point())
-            },
-            target: ObjectId::of_field(base.target_id),
-            moving,
-        }));
+    actions.list.set_artifact(Some(Artifact {
+        state: ArtifactState::of_byte(base.state)?,
+        timer: Seconds::new(base.timer),
+        gaia: saved.s.owner == 0,
+        sub: move_to.map(|move_to| ArtifactSub::Walk { move_to }),
+        goal: if base.target_id == -1 {
+            move_to.and_then(|_| target_point(base))
+        } else {
+            // the target's place, `+0x38`
+            (base.target_x != -1.0).then_some(saved.point())
+        },
+        target: ObjectId::of_field(base.target_id),
+        moving,
+    }));
     Ok(())
 }
 
@@ -247,7 +253,7 @@ fn import_move_to(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
 /// range, sprite and wait. The save does not hold `+0x60`: `voice` is its maker's.
 pub(crate) fn saved_move_to(
     action: &Action,
-    graphics: Option<&genie_core::objects::Graphics>,
+    graphics: Option<&Graphics>,
     voice: Voice,
 ) -> Result<MoveToAction, GenieError> {
     let base = action.base().ok_or(MOVE_TO_BASELESS)?;
@@ -273,7 +279,7 @@ const MOVE_TO_BASELESS: GenieError = GenieError::unsupported("a saved MoveTo wit
 /// A saved `MoveTo`'s sprite (`id`, none for −1) from the sprites' table.
 fn saved_move_to_sprite(
     id: Option<SpriteId>,
-    graphics: Option<&genie_core::objects::Graphics>,
+    graphics: Option<&Graphics>,
 ) -> Result<Option<Graphic>, GenieError> {
     let Some(id) = id else {
         return Ok(None);
@@ -313,28 +319,24 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
         .master(saved.s.master_obj)
         .and_then(|m| m.rge_master.as_deref())
         .and_then(|r| r.rge_master_missile_object.as_deref())
-        .map_or(genie_core::combat::missile::HitMode::TARGET_ALONE, |m| {
-            genie_core::combat::missile::HitMode::of_data(m.missile_hit_info)
+        .map_or(HitMode::TARGET_ALONE, |m| {
+            HitMode::of_data(m.missile_hit_info)
         });
-    actions
-        .list
-        .set_missile(Some(genie_core::combat::missile::MissileAction {
-            state: genie_core::combat::missile::MissileState::of_byte(base.state)?,
-            target: genie_core::combat::missile::MissileTargetId::of_field(base.target_id),
-            fired_from: ShooterId::of_field(base.target2_id),
-            point: saved.point(),
-            timer: Distance::new(base.timer),
-            direction: Offset::new(ma.velocity_x, ma.velocity_y, ma.velocity_z),
-            ballistic_velocity: genie_core::movement::Speed::new(ma.ballistic_velocity),
-            ballistic_acceleration: genie_core::movement::Acceleration::new(
-                ma.ballistic_acceleration,
-            ),
-            distance: Distance::new(ma.distance),
-            hit_mode,
-            result: genie_core::combat::missile::StrikeResult::of_data(ma.interacted_with_agility),
-            origin: genie_core::combat::missile::Origin::from_bytes(&ma.projectile_data),
-            met: Vec::new(),
-        }));
+    actions.list.set_missile(Some(MissileAction {
+        state: MissileState::of_byte(base.state)?,
+        target: MissileTargetId::of_field(base.target_id),
+        fired_from: ShooterId::of_field(base.target2_id),
+        point: saved.point(),
+        timer: Distance::new(base.timer),
+        direction: Offset::new(ma.velocity_x, ma.velocity_y, ma.velocity_z),
+        ballistic_velocity: Speed::new(ma.ballistic_velocity),
+        ballistic_acceleration: Acceleration::new(ma.ballistic_acceleration),
+        distance: Distance::new(ma.distance),
+        hit_mode,
+        result: StrikeResult::of_data(ma.interacted_with_agility),
+        origin: Origin::from_bytes(&ma.projectile_data),
+        met: Vec::new(),
+    }));
     Ok(())
 }
 
@@ -353,7 +355,7 @@ fn import_fly(
         .map(|s| saved_move_to(s, saved.graphics, Voice::Loud))
         .transpose()?;
     actions.list.set_fly(Some(Fly {
-        state: genie_core::movement::fly::FlyState::of_byte(base.state, move_to)?,
+        state: FlyState::of_byte(base.state, move_to)?,
         timer: Seconds::new(base.timer),
         home: Point::new(base.target_x, base.target_y),
         task: fly_task(saved.s.master_obj)?,
@@ -375,8 +377,8 @@ fn import_build(
         .transpose()?;
     let task = work(saved.s.master_obj)?;
     actions.list.set_build(Some(BuildAction {
-        target: genie_core::construction::FoundationId::of_field(base.target_id),
-        state: genie_core::construction::build::BuildState::of_byte(base.state, move_to)?,
+        target: FoundationId::of_field(base.target_id),
+        state: BuildState::of_byte(base.state, move_to)?,
         point: saved.point(),
         task,
         added: saved
@@ -408,22 +410,20 @@ fn import_repair(
         .map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
         .transpose()?;
     let t = saved.task(task_at)?;
-    actions
-        .list
-        .set_repair(Some(genie_core::construction::repair::RepairAction {
-            target: genie_core::construction::RepairTargetId::of_field(base.target_id),
-            state: genie_core::construction::repair::RepairState::of_byte(base.state, move_to)?,
-            point: saved.point(),
-            timer: Seconds::new(base.timer),
-            task: genie_core::construction::repair::RepairTask::of(&t),
-            range: saved
-                .objects
-                .master(saved.s.master_obj)
-                .and_then(combat_master)
-                .map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
-            counted: part.added_to_num_builders != 0,
-            voice: Voice::of_byte(base.sub_action_value),
-        }));
+    actions.list.set_repair(Some(RepairAction {
+        target: RepairTargetId::of_field(base.target_id),
+        state: RepairState::of_byte(base.state, move_to)?,
+        point: saved.point(),
+        timer: Seconds::new(base.timer),
+        task: RepairTask::of(&t),
+        range: saved
+            .objects
+            .master(saved.s.master_obj)
+            .and_then(combat_master)
+            .map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
+        counted: part.added_to_num_builders != 0,
+        voice: Voice::of_byte(base.sub_action_value),
+    }));
     Ok(())
 }
 
@@ -482,21 +482,19 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(
     let sub = saved.move_to_sub(GenieError::unreachable(
         "a saved Transport with another sub-action",
     ))?;
-    actions
-        .list
-        .set_transport(Some(genie_core::garrison::transport::TransportAction {
-            // its quiet MoveTo to the point (`0x140aa42a0`: `FUN_140a7a170` with 1)
-            state: genie_core::garrison::transport::TransportState::of_byte(
-                base.state,
-                sub.map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
-                    .transpose()?,
-            )?,
-            mode: genie_core::garrison::transport::TransportMode::of_data(base.target2_id),
-            point: saved.point(),
-            retarget: false,
-            // the save writes the task's id, −1 for none
-            task: genie_core::objects::masters::TaskId::of_field(base.short_val)?,
-        }));
+    actions.list.set_transport(Some(TransportAction {
+        // its quiet MoveTo to the point (`0x140aa42a0`: `FUN_140a7a170` with 1)
+        state: TransportState::of_byte(
+            base.state,
+            sub.map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
+                .transpose()?,
+        )?,
+        mode: TransportMode::of_data(base.target2_id),
+        point: saved.point(),
+        retarget: false,
+        // the save writes the task's id, −1 for none
+        task: TaskId::of_field(base.short_val)?,
+    }));
     Ok(())
 }
 
@@ -517,12 +515,10 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
             "a saved Explore in a state the slice does not model",
         ));
     }
-    actions
-        .list
-        .set_explore(Some(genie_core::movement::explore::ExploreAction {
-            state,
-            point: saved.point(),
-        }));
+    actions.list.set_explore(Some(ExploreAction {
+        state,
+        point: saved.point(),
+    }));
     Ok(())
 }
 
@@ -554,12 +550,9 @@ fn import_wait_solidify(
             "a saved Wait_Solidify without its own part",
         ))?
         .target_building_id;
-    let target = genie_core::construction::FoundationId::new(ObjectId::try_from(target)?);
-    let mut wait =
-        genie_core::construction::wait_solidify::WaitSolidify::new(saved.task(task_at)?, target);
-    wait.set_state(
-        genie_core::construction::wait_solidify::WaitSolidifyState::of_byte(saved.base.state)?,
-    );
+    let target = FoundationId::new(ObjectId::try_from(target)?);
+    let mut wait = WaitSolidify::new(saved.task(task_at)?, target);
+    wait.set_state(WaitSolidifyState::of_byte(saved.base.state)?);
     actions.list.set_wait_solidify(Some(wait));
     Ok(())
 }

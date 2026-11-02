@@ -34,8 +34,17 @@ use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 
+use crate::combat::missile::grounded;
+use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
+use crate::objects::layers::{Action, Combat, DefaultTask, Motion, Static};
+use crate::objects::lifecycle::death_parts::count_class;
+use crate::objects::masters::Master;
+use crate::objects::masters::action_type::ACTION_156;
+use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::technology::Attributes;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::{NewObject, Notify, UnitAi};
+use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
 
@@ -136,7 +145,7 @@ impl World {
             .master(p, now)?
             .tasks
             .iter()
-            .any(|t| t.action_type == crate::objects::masters::action_type::ACTION_156)
+            .any(|t| t.action_type == ACTION_156)
         {
             return Err(GenieError::unsupported(
                 "a new unit's task that spawns more units",
@@ -156,7 +165,7 @@ impl World {
         &mut self,
         p: PlayerId,
         new: ListIndex,
-        queue: &[crate::unit_ai::QueuedOrder],
+        queue: &[QueuedOrder],
         z: f32,
     ) -> Result<(), GenieError> {
         let master = self.players.live(p, new)?.life.master_id;
@@ -171,9 +180,8 @@ impl World {
                 let ai = self.parts.unit_ai.get(self.players.live(p, new)?.id);
                 // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`):
                 // an order whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
-                let relic_order = |q: &crate::unit_ai::QueuedOrder| {
-                    q.target_type.is_some_and(|t| t.class() == class::RELIC)
-                };
+                let relic_order =
+                    |q: &QueuedOrder| q.target_type.is_some_and(|t| t.class() == class::RELIC);
                 let keeps =
                     tm == MONASTERY && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
                 let target_master = self.master(tp, tm)?;
@@ -192,8 +200,8 @@ impl World {
             let unit = self.players.live_mut(p, new)?;
             let state = unit.life.state;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                let order = crate::unit_ai::QueuedOrder {
-                    priority: crate::unit_ai::OrderPriority::COMMAND,
+                let order = QueuedOrder {
+                    priority: OrderPriority::COMMAND,
                     point: o.point.with_z(z),
                     range: Distance::ZERO,
                     ready: true,
@@ -216,7 +224,7 @@ impl World {
         &self,
         p: PlayerId,
         master: MasterId,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         position: Position,
     ) -> Result<NewObject, GenieError> {
         let owner = self.players.player(p)?;
@@ -225,7 +233,7 @@ impl World {
             posture: owner.posture,
             // The player's attribute a new soldier's unit AI reads: the current age (`player+0x100` at
             // `+0x30`, `FUN_140c12300`).
-            age: crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)?,
+            age: Attributes::get(owner, attribute::CURRENT_AGE)?,
             ..NewObject::of(position, master, made)
         })
     }
@@ -251,21 +259,18 @@ impl World {
     /// frame and several facets draws its facet (Object stream), the sprite starts (Sprite stream,
     /// [`ActiveSprite::start`]), and one of several facets with sequence flag 2 draws the angle the
     /// object faces (Object stream, "setup" line 0x2c3). Its sprite, its facets and its angle.
-    pub(crate) fn setup_draws(
-        &mut self,
-        standing: Graphic,
-    ) -> (ActiveSprite, crate::objects::facing::SpriteFacets, Angle) {
+    pub(crate) fn setup_draws(&mut self, standing: Graphic) -> (ActiveSprite, SpriteFacets, Angle) {
         if standing.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && standing.facets.several() {
             let _ = self.streams.get(Stream::Object).rand15();
         }
         let sprite = ActiveSprite::start(standing, self.streams.get(Stream::Sprite));
-        let facets = crate::objects::facing::SpriteFacets {
+        let facets = SpriteFacets {
             count: standing.facets,
             turns: standing.flags.contains(SpriteFlags::TURNS),
         };
-        let angle = if crate::objects::facing::draws_angle(Some(facets)) {
+        let angle = if draws_angle(Some(facets)) {
             let r = self.streams.get(Stream::Object).rand15();
-            crate::objects::facing::drawn_angle(r, facets)
+            drawn_angle(r, facets)
         } else {
             Angle::ZERO
         };
@@ -276,7 +281,7 @@ impl World {
         &mut self,
         p: PlayerId,
         master: MasterId,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         position: Position,
     ) -> Result<ListIndex, GenieError> {
         if self.players.player(p)?.kind.is_computer() {
@@ -304,7 +309,7 @@ impl World {
                 Position::new(
                     position.x(),
                     position.y(),
-                    crate::combat::missile::grounded(position.z(), g, false, made.fly_mode),
+                    grounded(position.z(), g, false, made.fly_mode),
                 )
             })
         });
@@ -393,8 +398,8 @@ impl World {
             owner.add_attribute(AttributeId::numbered(248), Amount::new(1.0))?;
         }
         // the combat setup's class counters (FUN_141226060)
-        crate::objects::lifecycle::death_parts::count_class(&mut owner.attributes, made, 1.0);
-        let combat = crate::objects::layers::Combat {
+        count_class(&mut owner.attributes, made, 1.0);
+        let combat = Combat {
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
             firepower: made.volley_fire,
             ..Default::default()
@@ -415,7 +420,7 @@ impl World {
                 master_id: master,
                 master: made.life,
             },
-            place: crate::objects::layers::Static::at(position),
+            place: Static::at(position),
             attackable: true,
             pasture: None,
             my_pasture: None,
@@ -423,15 +428,15 @@ impl World {
             ..Unit::default()
         };
         let parts = ObjectParts {
-            actions: crate::objects::layers::Action {
+            actions: Action {
                 // livestock's default task, the Artifact, starts once its action list is empty
                 default_task: if made
                     .default_task()
-                    .is_some_and(|t| t.action_type == crate::ownership::artifact::ARTIFACT_TYPE)
+                    .is_some_and(|t| t.action_type == ARTIFACT_TYPE)
                 {
-                    crate::objects::layers::DefaultTask::Artifact
+                    DefaultTask::Artifact
                 } else {
-                    crate::objects::layers::DefaultTask::Nothing
+                    DefaultTask::Nothing
                 },
                 ..Default::default()
             },
@@ -439,7 +444,7 @@ impl World {
             combat,
             // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
             // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            motion: Some(crate::objects::layers::Motion::Moving(Mover::new_object(
+            motion: Some(Motion::Moving(Mover::new_object(
                 moving,
                 Some(&standing),
                 position,

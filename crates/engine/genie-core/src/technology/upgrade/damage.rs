@@ -3,7 +3,10 @@
 //! of its storage, that picks its master's damage sprite.
 
 use crate::GenieError;
+use crate::math::conversions::cvttss2si;
+use crate::math::image::upgrade::WHOLE as UPGRADE_WHOLE;
 use crate::math::rng::Well512;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
@@ -13,11 +16,12 @@ use crate::objects::masters::DamageSpriteMode;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::Master;
 use crate::objects::masters::class;
+use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
 use crate::technology::upgrade::NO_SPRITE;
 
 /// The whole of a damage share (`DAT_14330ebcc`, 100).
-const WHOLE: f32 = crate::math::image::upgrade::WHOLE;
+const WHOLE: f32 = UPGRADE_WHOLE;
 /// The resource classes whose damage share is the share of their storage left from state 3 on
 /// (`FUN_141193590`), and those whose share is it once dead (state above 2).
 const RESOURCE_CLASSES: [ClassId; 11] = [
@@ -78,7 +82,7 @@ pub(crate) fn damage_sprites(
     (u, mut motion): (&mut Unit, MotionMut<'_>),
     master: &Master,
     before: HpPercent,
-    (graphics, object, sprite): (&crate::objects::Graphics, &mut Well512, &mut Well512),
+    (graphics, object, sprite): (&Graphics, &mut Well512, &mut Well512),
 ) -> Result<HpPercent, GenieError> {
     let entries = &master.damage_graphics;
     let Some((share, hp)) = share_of(u, master) else {
@@ -113,14 +117,14 @@ pub(crate) fn damage_sprites(
             }
             SPRITE_SHOWN if !graphics.is_empty() => {
                 if u.sprite.is_some() {
-                    crate::objects::sprite::new_sprite(
+                    new_sprite(
                         &mut u.sprite,
                         motion.move_stats_mut(),
                         graphic(e.sprite)?,
                         sprite,
                     );
                 } else {
-                    let _ = crate::objects::sprite::ActiveSprite::start(graphic(e.sprite)?, sprite);
+                    let _ = ActiveSprite::start(graphic(e.sprite)?, sprite);
                 }
             }
             _ => {}
@@ -133,14 +137,9 @@ pub(crate) fn damage_sprites(
     {
         let standing = graphic(master.standing_sprite)?;
         if u.sprite.is_some() {
-            crate::objects::sprite::new_sprite(
-                &mut u.sprite,
-                motion.move_stats_mut(),
-                standing,
-                sprite,
-            );
+            new_sprite(&mut u.sprite, motion.move_stats_mut(), standing, sprite);
         } else {
-            let _ = crate::objects::sprite::ActiveSprite::start(standing, sprite);
+            let _ = ActiveSprite::start(standing, sprite);
         }
     }
     let _ = SPRITE_PLACED;
@@ -162,9 +161,7 @@ fn share_of(u: &Unit, master: &Master) -> Option<(HpPercent, f32)> {
             .take(3)
             .find(|&&(kind, _, _)| kind == u.life.attribute_type);
         let share = held.map_or(HpPercent::of_data(0), |&(_, amount, _)| {
-            HpPercent::of_data(crate::math::conversions::cvttss2si(
-                WHOLE - u.life.amount.get() * WHOLE / amount.get(),
-            ) as u8)
+            HpPercent::of_data(cvttss2si(WHOLE - u.life.amount.get() * WHOLE / amount.get()) as u8)
         });
         return Some((share, hp));
     }
@@ -179,7 +176,7 @@ fn share_of(u: &Unit, master: &Master) -> Option<(HpPercent, f32)> {
         hp = 0.0;
     }
     Some((
-        HpPercent::of_data(crate::math::conversions::cvttss2si(WHOLE - hp * WHOLE / most) as u8),
+        HpPercent::of_data(cvttss2si(WHOLE - hp * WHOLE / most) as u8),
         hp,
     ))
 }

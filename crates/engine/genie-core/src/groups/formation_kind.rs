@@ -1,6 +1,8 @@
 //! A formation's type as one type: `BFormation`'s `mType`, a group's lock, a unit AI's
 //! formation type and the `FORM_FORMATION` command's.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A formation's type (`mType`; the log names of `UpdateDesiredPositions`, `FUN_14103fd00`):
 /// the layout a group's members take. A group's lock (`mFormationLockedType`), a unit AI's
 /// formation type (`+0x1d4`, a byte) and `FORM_FORMATION`'s `+0x8` hold one too. Every value
@@ -89,8 +91,8 @@ impl From<i32> for FormationKind {
     }
 }
 
-impl std::fmt::Display for FormationKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for FormationKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

@@ -1,6 +1,7 @@
 //! `bestUnitToAttack` itself (`FUN_140c44680`): the object tests, the ranges and the choice.
 
 use crate::map::Distance;
+use crate::math::image::best_target::ONE as BEST_TARGET_ONE;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -16,9 +17,11 @@ use crate::unit_ai::best_target::{
     Ask, AttackCategory, Battlefield, EPSILON, EntryCount, STATISTICS, Searcher, Statistics, Thing,
     category,
 };
+use crate::unit_ai::{ActionKind, OrderKind};
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
+use std::mem::take;
 
 /// The boats' classes (2, 20, 21, 22, 53), which a computer player's land unit passes over.
 pub(super) const BOATS: [ClassId; 5] = [
@@ -97,7 +100,7 @@ pub(super) fn tested(
         return Ok(None);
     }
     if !t.targetable
-        || (!t.attackable && me.action == Some(crate::unit_ai::ActionKind::Attack))
+        || (!t.attackable && me.action == Some(ActionKind::Attack))
         || world.shuns(id)?
     {
         return Ok(None);
@@ -250,7 +253,7 @@ fn current_target(
 fn attacks_walls(me: &Searcher) -> bool {
     let defending =
         // Class 13 (siege), whose units keep the walls' owner flag on the attack move order (`0x2dd`).
-        matches!(me.order, Some(crate::unit_ai::OrderKind::AttackMove)) && me.class != Some(class::SIEGE);
+        matches!(me.order, Some(OrderKind::AttackMove)) && me.class != Some(class::SIEGE);
     me.target_classes
         .iter()
         .any(|c| matches!(c, Some(class::WALL | class::GATE)))
@@ -406,7 +409,7 @@ impl Walked {
         st: &mut Statistics,
         world: &mut dyn Battlefield,
     ) -> Result<(), crate::GenieError> {
-        for (id, relation) in std::mem::take(&mut self.later) {
+        for (id, relation) in take(&mut self.later) {
             let Some((t, gap, k)) = self.counted(me, ask, id, relation, me.range, world)? else {
                 continue;
             };
@@ -595,4 +598,4 @@ fn path_pick(
 
 /// 1 (`DAT_14330eb8c`): an extra object under the least range counts this much beyond the
 /// weapon range.
-pub(super) const ONE: f32 = crate::math::image::best_target::ONE;
+pub(super) const ONE: f32 = BEST_TARGET_ONE;

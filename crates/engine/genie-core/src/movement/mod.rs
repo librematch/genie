@@ -88,14 +88,32 @@ pub use self::path_points::{
     Planning, Turning, footprint_gap, footprint_gap_squared, turn_rate, turning,
 };
 use self::request::LongAsk;
+use crate::groups::{GroupId, UnitGroups};
+use crate::map::{RestrictionId, TerrainMask};
+use crate::math::image::movement::{
+    CLOSE as MOVEMENT_CLOSE, EDGE_GAP as MOVEMENT_EDGE_GAP,
+    EDGE_POSITION_GAP as MOVEMENT_EDGE_POSITION_GAP, EPSILON as MOVEMENT_EPSILON,
+    FAR as MOVEMENT_FAR, LONG_PATH_GROW as MOVEMENT_LONG_PATH_GROW,
+    LOOK_AHEAD as MOVEMENT_LOOK_AHEAD, NEW_PATHER_RADIUS as MOVEMENT_NEW_PATHER_RADIUS,
+    PUSHED as MOVEMENT_PUSHED, RANGE_FLOOR as MOVEMENT_RANGE_FLOOR,
+    REACH_NEAR as MOVEMENT_REACH_NEAR, REACH_SHORT as MOVEMENT_REACH_SHORT,
+    SHORT_REACH as MOVEMENT_SHORT_REACH, SHORTEST as MOVEMENT_SHORTEST, SPLIT as MOVEMENT_SPLIT,
+    STRAIGHT_GROW as MOVEMENT_STRAIGHT_GROW, TARGET_SHORT_REACH as MOVEMENT_TARGET_SHORT_REACH,
+    USER_WAYPOINT_MIDDLE as MOVEMENT_USER_WAYPOINT_MIDDLE, WIDE_RANGE as MOVEMENT_WIDE_RANGE,
+};
 #[cfg(test)]
 use crate::math::rng::Well512;
+use crate::objects::facing::SpriteFacets;
+use crate::objects::masters::FlyMode;
+use crate::objects::sprite::{Graphic, top_speed};
 #[cfg(test)]
 use crate::pathing::hull_path::HullPather;
 #[cfg(test)]
 use crate::pathing::tile_path::Path;
 #[cfg(test)]
 use crate::pathing::{Pathing, PlanBudget};
+use crate::world::WALKER_UNMOVING;
+use crate::world::index::ObjectsRef;
 
 /// The velocity data (`+0x868`): velocity and acceleration in the unit's own frame; component 2 is
 /// along the forward vector.
@@ -191,7 +209,7 @@ pub struct PathData {
 pub struct MoveStats {
     /// The master's `fly_mode` (`+0x608`): how its place takes the ground's height
     /// ([`Mover::grounded`]).
-    pub fly_mode: crate::objects::masters::FlyMode,
+    pub fly_mode: FlyMode,
     /// The top speed (object slot 65, `maximumSpeed`, `0x141202c70` -> `FUN_14114d1d0`): the
     /// master's speed ([`MoveStats::base`]), times the current sprite's speed factor when that is
     /// above 0. A column derived from the two: the sprite's one transform writes it
@@ -211,9 +229,9 @@ pub struct MoveStats {
     pub radius: Radii,
     /// The master's terrain restriction (`+0x606`) and the terrain classes it lets the unit stand
     /// on (its mask).
-    pub restriction: crate::map::RestrictionId,
+    pub restriction: RestrictionId,
     /// The terrain classes the restriction lets it stand on (its mask).
-    pub restriction_mask: crate::map::TerrainMask,
+    pub restriction_mask: TerrainMask,
     /// The master's turn time (`+0x758`, the `.dat`'s `rotation_speed`): the seconds between the
     /// facet steps of a unit facing a target; 0 faces at once (`FUN_141162db0`).
     pub turn_time: Seconds,
@@ -226,7 +244,7 @@ pub struct MoveStats {
     pub fast_turn: bool,
     /// The facets the facing routines read of the unit's current sprite: the master's, when
     /// every sprite it shows has the same count and bit 1 (None otherwise, or without sprites).
-    pub facets: Option<crate::objects::facing::SpriteFacets>,
+    pub facets: Option<SpriteFacets>,
     /// The master's weapon range (slot 0x230, `+0x828`; 0 for an object without combat values),
     /// which the drop-off walker's start test reads (`FUN_140fa0110`).
     pub weapon_range: Distance,
@@ -237,8 +255,8 @@ impl MoveStats {
     /// times the sprite's factor ([`crate::objects::sprite::top_speed`]). The one writer of
     /// [`MoveStats::speed`] for a unit: a new sprite ([`crate::objects::sprite::new_sprite`]), a
     /// standing show ([`Mover::shows`]) and a change of the base call it.
-    pub(crate) fn show(&mut self, shown: Option<&crate::objects::sprite::Graphic>) {
-        self.speed = crate::objects::sprite::top_speed(self.base, shown);
+    pub(crate) fn show(&mut self, shown: Option<&Graphic>) {
+        self.speed = top_speed(self.base, shown);
     }
 }
 
@@ -299,7 +317,7 @@ pub struct Mover {
     /// starts ([`crate::objects::unit::Unit`]'s), or a new unit's standing sprite; None for neither (the
     /// master's [`MoveStats::facets`] then). Not saved: the update's copy of its sprite's.
     #[diff(unsaved)]
-    pub sprite_facets: Option<crate::objects::facing::SpriteFacets>,
+    pub sprite_facets: Option<SpriteFacets>,
 }
 
 /// The moving unit, as the motion step needs it besides its [`Mover`], whose place it walks
@@ -314,7 +332,7 @@ pub struct Me {
     pub action_state: ActionState,
     /// Its group (`mGroupID`, `+0x6d0`; -1 for none), whose differentiator units the long pather
     /// lowers (`FUN_140f9eb70`).
-    pub group: Option<crate::groups::GroupId>,
+    pub group: Option<GroupId>,
     /// `+0x650`, `mLastHumanOrderTime`: its rank against a unit it meets (the walk's pause and
     /// the path end's keep), as the walk starts.
     pub human_order: WorldTime,
@@ -332,30 +350,30 @@ pub enum Motion {
 }
 
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::movement::EPSILON;
+const EPSILON: f32 = MOVEMENT_EPSILON;
 /// The world's up axis (`DAT_143cc2f30`), the yaw's axis.
 const UP: BVector = BVector::new(0.0, 1.0, 0.0);
 /// How far inside the map's edge a moving unit's footprint stays (`DAT_142eb99cc`), and how far
 /// below the edge a position stays (`DAT_142eb1e9c`).
-const EDGE_GAP: f32 = crate::math::image::movement::EDGE_GAP;
-const EDGE_POSITION_GAP: f32 = crate::math::image::movement::EDGE_POSITION_GAP;
+const EDGE_GAP: f32 = MOVEMENT_EDGE_GAP;
+const EDGE_POSITION_GAP: f32 = MOVEMENT_EDGE_POSITION_GAP;
 /// A walk to a point checks its range only above this (`DAT_142eb5690`).
-const RANGE_FLOOR: f32 = crate::math::image::movement::RANGE_FLOOR;
+const RANGE_FLOOR: f32 = MOVEMENT_RANGE_FLOOR;
 /// A point within this many tiles is the short pather's to reach (`FUN_140fa0370`,
 /// `DAT_142eb0f4c`).
-const REACH_SHORT: f32 = crate::math::image::movement::REACH_SHORT;
+const REACH_SHORT: f32 = MOVEMENT_REACH_SHORT;
 /// A point whose squared gap to the unit's footprint is below this is not reached when the
 /// short pather did not reach it (`FUN_140fa0370`, `DAT_14330eb8c`).
-const REACH_NEAR: DistanceSquared = DistanceSquared::new(crate::math::image::movement::REACH_NEAR);
+const REACH_NEAR: DistanceSquared = DistanceSquared::new(MOVEMENT_REACH_NEAR);
 /// The master the long pather lets move without a speed (`FUN_140f9eb70`, raw id `0x2a`).
 pub(crate) const LONG_PATH_MOVER: MasterId = MasterId::named(42);
 const WIDE_CLASS: ClassId = class::CLASS_33;
-const WIDE_RANGE: Distance = Distance::new(crate::math::image::movement::WIDE_RANGE);
+const WIDE_RANGE: Distance = Distance::new(MOVEMENT_WIDE_RANGE);
 /// A long path's stretch is checked for walls with the unit's radius times this
 /// (`DAT_142e85190`).
-const LONG_PATH_GROW: f32 = crate::math::image::movement::LONG_PATH_GROW;
+const LONG_PATH_GROW: f32 = MOVEMENT_LONG_PATH_GROW;
 /// No distance (`DAT_14330ebf4`).
-const FAR: f32 = crate::math::image::movement::FAR;
+const FAR: f32 = MOVEMENT_FAR;
 /// The motion step's switches (`DAT_1439e3cc0`, `DAT_1439e3cc4`, `DAT_1439e3cc8`): the short
 /// pather, the tile pathfinder and the long pather run; all three are 1 at run time.
 const SHORT_PATHER: bool = true;
@@ -363,12 +381,12 @@ const TILE_PATHER: bool = true;
 const LONG_PATHER: bool = true;
 /// The short pather serves a waypoint this near (`DAT_142ec9ec0`), and one this near a target
 /// before the tile pathfinder (`DAT_142eb0f4c`).
-const SHORT_REACH: f32 = crate::math::image::movement::SHORT_REACH;
-const TARGET_SHORT_REACH: f32 = crate::math::image::movement::TARGET_SHORT_REACH;
+const SHORT_REACH: f32 = MOVEMENT_SHORT_REACH;
+const TARGET_SHORT_REACH: f32 = MOVEMENT_TARGET_SHORT_REACH;
 /// A waypoint or target nearer than this takes the close-in path (`DAT_14330eb8c`).
-const CLOSE: f32 = crate::math::image::movement::CLOSE;
+const CLOSE: f32 = MOVEMENT_CLOSE;
 /// A unit pushed into a met object counts beyond its radius times this (`DAT_142eb880c`).
-const PUSHED: f32 = crate::math::image::movement::PUSHED;
+const PUSHED: f32 = MOVEMENT_PUSHED;
 
 /// `FUN_1411615a0`: how deep two boxes (centre, radii on the ground) overlap, the lesser of the
 /// two axes; 0 when they do not.
@@ -387,13 +405,13 @@ fn overlap(a: BVector, radius_a: Footprint, b: BVector, radius_b: Footprint) -> 
 
 /// A unit's own waypoint on a tile's edge moves this far into the tile (`FUN_14114e920`,
 /// `DAT_142e7f384`).
-const USER_WAYPOINT_MIDDLE: f32 = crate::math::image::movement::USER_WAYPOINT_MIDDLE;
+const USER_WAYPOINT_MIDDLE: f32 = MOVEMENT_USER_WAYPOINT_MIDDLE;
 /// How far level 0's look ahead reaches on its parent's path, squared (`DAT_14330ebcc`).
-const LOOK_AHEAD: f32 = crate::math::image::movement::LOOK_AHEAD;
+const LOOK_AHEAD: f32 = MOVEMENT_LOOK_AHEAD;
 /// `FUN_141142750` grows the walk's query by the unit's radius times `DAT_142e7f384`.
-const STRAIGHT_GROW: f32 = crate::math::image::movement::STRAIGHT_GROW;
+const STRAIGHT_GROW: f32 = MOVEMENT_STRAIGHT_GROW;
 /// A path shorter than this is too short (`DAT_142eb99cc`).
-const SHORTEST: Distance = Distance::new(crate::math::image::movement::SHORTEST);
+const SHORTEST: Distance = Distance::new(MOVEMENT_SHORTEST);
 /// The point `FUN_140f9bcd0` returns outside a path: `DAT_143f0dc88`, in `.bss` (zero at the
 /// load; probed zero in records/425906646 with no write in the update after).
 pub(crate) const OUTSIDE_PATH: BVector = BVector::ZERO;
@@ -403,15 +421,15 @@ pub(crate) const OUTSIDE_PATH: BVector = BVector::ZERO;
 const LONG: Distance = Distance::new(5.0);
 const DETOUR: f32 = 1.25;
 /// A new level's stretches longer than this squared get a midpoint (`DAT_142ed6f20`).
-const SPLIT: f32 = crate::math::image::movement::SPLIT;
+const SPLIT: f32 = MOVEMENT_SPLIT;
 /// How many plans one motion step makes at most.
 const PLANS: StepPlans = StepPlans::new(3);
 /// What a gate's annex's gap loses against the gate's own (`XMM14`, the motion step's load at
 /// 0x1411510e7, the same as [`RANGE_FLOOR`]'s).
-const ANNEX_GAP: Distance = Distance::new(crate::math::image::movement::RANGE_FLOOR);
+const ANNEX_GAP: Distance = Distance::new(MOVEMENT_RANGE_FLOOR);
 /// The widest unit the new short pather takes (`DAT_142e7f384`, `FUN_140f9e540`'s load at
 /// 0x140f9e713).
-const NEW_PATHER_RADIUS: f32 = crate::math::image::movement::NEW_PATHER_RADIUS;
+const NEW_PATHER_RADIUS: f32 = MOVEMENT_NEW_PATHER_RADIUS;
 /// The motion step's include list (`DAT_143f4a000`, its count `local_19bc`) holds at most 0x100
 /// kept hits (`CMP RCX, 0x100; JGE` at 0x1411547cc).
 const INCLUDED: usize = 0x100;
@@ -559,7 +577,7 @@ pub(crate) fn gate_gap(
     (id, target): (ObjectId, &Placed),
     own: Distance,
     annex: impl Fn(Distance) -> Distance,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Distance {
     // The class the motion step measures by its annexes (`-0xe85` encoded).
     if target.class != class::GATE {
@@ -586,8 +604,8 @@ fn pause_rank(
     me: &Me,
     (player, player_type): (PlayerId, PlayerType),
     (id, other): (ObjectId, &Placed),
-    groups: Option<&crate::groups::UnitGroups>,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    groups: Option<&UnitGroups>,
+    by_id: ObjectsRef<'_>,
 ) -> Option<bool> {
     let mine = me.human_order;
     let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
@@ -641,7 +659,7 @@ fn remove_point(points: &mut Vec<BVector>, i: WaypointIndex) -> bool {
 ///
 /// A unit that does not move ([`crate::world::WALKER_UNMOVING`]), and the stop's.
 pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
-    mover.ok_or(crate::world::WALKER_UNMOVING)?.stop()
+    mover.ok_or(WALKER_UNMOVING)?.stop()
 }
 
 #[cfg(test)]

@@ -7,9 +7,11 @@
 
 use crate::GenieError;
 use crate::commands::GameSub;
+use crate::gathering::QueueCount;
 use crate::gathering::farm_queue::PASTURE;
 use crate::map::Distance;
 use crate::map::WholeDistance;
+use crate::math::image::turn::TREASON_COST as TURN_TREASON_COST;
 use crate::objects::masters::ids::FARM;
 use crate::players::Amount;
 use crate::players::Chance;
@@ -214,7 +216,7 @@ impl World {
     ///
     /// What the purchase and the refund do not model.
     fn game_queue(&mut self, p: PlayerId, g: &GameCommand) -> Result<(), GenieError> {
-        let count = crate::gathering::QueueCount::of_data(i32::from(g.a));
+        let count = QueueCount::of_data(i32::from(g.a));
         match g.sub {
             GameSub::FARM_QUEUE => {
                 let _ = self.queue_farms(p, count, FARM)?;
@@ -296,7 +298,7 @@ impl World {
 
 /// What Treason's command takes off the pending debit of gold (`DAT_142eb5bd4`, 400.0, read at
 /// `0x140e7c73d`).
-const TREASON_COST: Amount = Amount::new(crate::math::image::turn::TREASON_COST);
+const TREASON_COST: Amount = Amount::new(TURN_TREASON_COST);
 
 #[cfg(test)]
 mod tests {
@@ -308,9 +310,13 @@ mod tests {
     use crate::players::Amount;
     use crate::players::Posture;
     use crate::players::attribute;
+    #[cfg(test)]
+    use crate::players::{ByPlayer, PlayerType};
     use crate::test_ids::costs;
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -319,12 +325,12 @@ mod tests {
     fn world() -> World {
         let player = || Player {
             attributes: vec![Amount::ZERO; 300],
-            diplomacy: crate::players::ByPlayer::new(vec![Stance::NONE; 9]),
+            diplomacy: ByPlayer::new(vec![Stance::NONE; 9]),
             ..Player::default()
         };
         World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 4],
             vec![player(), player(), player(), player()],
@@ -535,7 +541,7 @@ mod tests {
     #[test]
     fn an_ai_setting_goes_to_computer_player_only() {
         let mut t = world();
-        t.players[2].kind = crate::players::PlayerType::COMPUTER;
+        t.players[2].kind = PlayerType::COMPUTER;
         t.settings.cheats_enabled = true;
         t.game(&game(1, GameSub::AI_SETTING, 1, 1, 30)).unwrap();
         assert_eq!(t.players[1].dodge_chance, Chance::NONE);

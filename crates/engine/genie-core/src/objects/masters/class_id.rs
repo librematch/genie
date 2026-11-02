@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use genie_diff::{Diff, Differ};
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's class (`+0x410`, the `.dat`'s `unit_class`), 0 or more, or −1 for a master that has
 /// none ([`ClassId::of_master`]). The `.dat` holds classes
@@ -89,8 +90,8 @@ impl ClassId {
     }
 }
 
-impl std::fmt::Display for ClassId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ClassId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

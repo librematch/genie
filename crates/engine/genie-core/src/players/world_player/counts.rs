@@ -3,8 +3,10 @@
 
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::class::BUILDING;
 use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::master_type::COMBAT;
@@ -202,13 +204,13 @@ impl World {
     /// it ([`World::local_player`], `FUN_140c88440`) is of class 3, disappears when built
     /// (`+0x984`) and has one (0 or more). A master without train locations trains nowhere.
     #[must_use]
-    pub fn trains_at(&self, m: &crate::objects::masters::Master, building: MasterId) -> bool {
+    pub fn trains_at(&self, m: &Master, building: MasterId) -> bool {
         if m.trained_at.is_empty() {
             return false;
         }
         let mut at = building;
         let local = player_master(&self.masters, self.local_player, building);
-        if let Some(b) = local.filter(|b| b.class == crate::objects::masters::class::BUILDING)
+        if let Some(b) = local.filter(|b| b.class == BUILDING)
             && let Some(site) = b.building.as_ref()
             && site.disappears_when_built
             && let Some(stack) = site.stack_unit

@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::objects::ObjectId;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::Relation;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::FARM_FOOD_AMOUNT;
 use crate::technology::DisabledTech;
@@ -19,20 +20,17 @@ impl World {
     pub(super) fn party(&self, p: PlayerId, party: Party) -> Vec<PlayerId> {
         let relation =
             |a: PlayerId, b: PlayerId| self.players.player(a).ok()?.relations.get(b).copied();
-        let mutual = |q: PlayerId, wanted: &[crate::players::Relation]| {
+        let mutual = |q: PlayerId, wanted: &[Relation]| {
             wanted
                 .iter()
                 .any(|&r| relation(p, q) == Some(r) && relation(q, p) == Some(r))
         };
-        let wanted: &[crate::players::Relation] = match party {
+        let wanted: &[Relation] = match party {
             Party::Own => return vec![p],
             Party::Gaia => return vec![PlayerId::GAIA],
-            Party::Allies => &[crate::players::Relation::ALLY],
-            Party::Enemies => &[
-                crate::players::Relation::ENEMY,
-                crate::players::Relation::RELATION_4,
-            ],
-            Party::Neutrals => &[crate::players::Relation::NEUTRAL],
+            Party::Allies => &[Relation::ALLY],
+            Party::Enemies => &[Relation::ENEMY, Relation::RELATION_4],
+            Party::Neutrals => &[Relation::NEUTRAL],
         };
         PlayerId::each(self.players.len())
             .skip(1)

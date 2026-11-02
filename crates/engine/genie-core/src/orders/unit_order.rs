@@ -2,12 +2,20 @@
 
 use crate::GenieError;
 use crate::commands::UnitOrderAction;
+use crate::construction::FoundationId;
+use crate::construction::build::NOT_HELD;
+use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
+use crate::gathering::hunt::asked_drop_off as hunt_asked_drop_off;
+use crate::gathering::{DropSiteId, GatherTargetId, HuntTargetId};
 use crate::map::Tile;
+use crate::math::conversions::cvttss2si;
 use crate::math::rng::Stream;
+use crate::movement::move_to::WalkTo;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::TOWN_CENTRE;
@@ -18,8 +26,11 @@ use crate::orders::{HERD_MOST, NO_POINT};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::UnitIndex;
+use crate::unit_ai::world_view::DropWorld;
+use crate::world::WALKER_UNMOVING;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -55,17 +66,15 @@ impl World {
         // what its MoveTo's constructor (FUN_140aa0df0) reads of the unit and the target
         let reads = unit.move_to_reads(
             self.parts.motion.mover(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let to = reads
-            .walk_to(self, Some(target))?
-            .ok_or(crate::construction::build::NOT_HELD)?;
-        let to = crate::movement::move_to::WalkTo { at, ..to };
+        let to = reads.walk_to(self, Some(target))?.ok_or(NOT_HELD)?;
+        let to = WalkTo { at, ..to };
         let unit = self.players.live_mut(player, idx)?;
         let (targets, gone) = match self.parts.actions_mut(unit.id)?.list.artifact_mut() {
             Some(a) => a.take_object(to, (to_building, to_town_centre), &reads)?,
@@ -84,7 +93,7 @@ impl World {
         if gone.stops {
             self.parts
                 .mover_mut(self.players.live(player, idx)?.id)
-                .ok_or(crate::world::WALKER_UNMOVING)?
+                .ok_or(WALKER_UNMOVING)?
                 .stop()?;
         }
         Ok(())
@@ -101,7 +110,7 @@ impl World {
         &mut self,
         p: PlayerId,
         sheep: ObjectId,
-        site: crate::gathering::DropSiteId,
+        site: DropSiteId,
     ) -> Result<(), GenieError> {
         self.send_to_site(p, sheep, site)?;
         let mut listed = Vec::new();
@@ -118,7 +127,7 @@ impl World {
         &mut self,
         p: PlayerId,
         sheep: ObjectId,
-        site: crate::gathering::DropSiteId,
+        site: DropSiteId,
         listed: &mut Vec<ObjectId>,
     ) -> Result<(), GenieError> {
         listed.push(sheep);
@@ -131,10 +140,7 @@ impl World {
             .ok_or_else(|| object_gone(sheep))?
             .1
             .position();
-        let (x, y) = (
-            crate::math::conversions::cvttss2si(at.x()),
-            crate::math::conversions::cvttss2si(at.y()),
-        );
+        let (x, y) = (cvttss2si(at.x()), cvttss2si(at.y()));
         let (w, h) = (self.spatial.map.width(), self.spatial.map.height());
         let (x0, x1) = ((x - 3).max(0), if x + 3 < w { x + 3 } else { w - 1 });
         let (y0, y1) = ((y - 3).max(0), if y + 3 < h { y + 3 } else { h - 1 });
@@ -176,7 +182,7 @@ impl World {
         &mut self,
         p: PlayerId,
         sheep: ObjectId,
-        site: crate::gathering::DropSiteId,
+        site: DropSiteId,
     ) -> Result<(), GenieError> {
         let Some(Place::Live(q, idx)) = self.place(sheep) else {
             return Err(GenieError::unsupported(
@@ -298,20 +304,18 @@ impl World {
             None
         };
         let found = match top {
-            Some(crate::gathering::gather::GATHER) => {
-                self.parts.actions_of(unit.id).list.gather().map(|g| {
-                    (
-                        DropOffBy::Gather,
-                        g.target.map(crate::gathering::GatherTargetId::id),
-                        g.point,
-                        g.task.resource,
-                    )
-                })
-            }
+            Some(GATHER) => self.parts.actions_of(unit.id).list.gather().map(|g| {
+                (
+                    DropOffBy::Gather,
+                    g.target.map(GatherTargetId::id),
+                    g.point,
+                    g.task.resource,
+                )
+            }),
             Some(action_type::BUILD) => self.parts.actions_of(unit.id).list.build().map(|b| {
                 (
                     DropOffBy::Build,
-                    b.target.map(crate::construction::FoundationId::id),
+                    b.target.map(FoundationId::id),
                     b.point,
                     b.task.resource,
                 )
@@ -319,7 +323,7 @@ impl World {
             Some(HUNT) => self.parts.actions_of(unit.id).list.hunt().map(|h| {
                 (
                     DropOffBy::Hunt,
-                    h.target.map(crate::gathering::HuntTargetId::id),
+                    h.target.map(HuntTargetId::id),
                     h.point,
                     h.task.resource,
                 )
@@ -331,7 +335,7 @@ impl World {
         };
         Ok(Some(DropOffAsk {
             by,
-            asked: crate::gathering::hunt::asked_drop_off(
+            asked: hunt_asked_drop_off(
                 resource,
                 unit.life.attribute_type,
                 self.players.player(p)?.attributes.len(),
@@ -386,7 +390,7 @@ impl World {
         let (mover, by_id) = self
             .parts
             .lend_mover(unit.id, (&self.players, &self.index, &self.masters));
-        let world = crate::unit_ai::world_view::DropWorld {
+        let world = DropWorld {
             masters: by_id.masters().of(p),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
@@ -396,7 +400,7 @@ impl World {
             player_type: player.kind,
             groups: &self.groups,
         };
-        let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
+        let others = OthersRef::of(&self.players, &self.index, p)?;
         let result = if by == DropOffBy::Hunt {
             unit.drop_off_in(&mut actions, mover, world, others, &self.graphics, by_id)
         } else {

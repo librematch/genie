@@ -1,4 +1,5 @@
 use crate::command_args::Frame;
+use crate::fixtures::recording;
 use crate::fixtures::{combat_object, gaia, header, human};
 use crate::map_and_sight::{SavedStep, saved_sight};
 use crate::save_runs::{
@@ -17,6 +18,9 @@ use genie_core::players::game_status::GameStatus;
 use genie_core::world::Millis;
 use genie_core::world::WorldTime;
 use genie_core::world::{GameState, World};
+use genie_core::world::{PlayState, Tick};
+use genie_rec::de::Op;
+use genie_rec::de::command::Move;
 use genie_save::Header;
 
 /// Gaia and a player with one unit (id 7).
@@ -77,10 +81,10 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
     ]);
     let mut turns = slice(&save, None);
     let mut after = same(&save, &turns);
-    turns.game_state = genie_core::world::PlayState::of_data(2);
+    turns.game_state = PlayState::of_data(2);
     after.game.statuses = vec![(GameStatus::PLAYING, false), (GameStatus::WON, false)];
     turns.players[1].freezes.push((
-        genie_core::world::Tick::new(5),
+        Tick::new(5),
         object_id(7),
         GenieError::unsupported("a test's freeze"),
     ));
@@ -116,7 +120,7 @@ fn the_world_differs_by_its_game_state() {
     let save = save();
     let turns = slice(&save, None);
     let mut after = same(&save, &turns);
-    after.game.game_state = genie_core::world::PlayState::of_data(3);
+    after.game.game_state = PlayState::of_data(3);
     let mut report = TickReport::default();
     world_differences(&turns, &after, &mut report);
     assert_eq!(
@@ -133,12 +137,12 @@ fn stops_and_freezes_are_reported_by_their_update() {
     let player = &mut turns.players[1];
     player.stopped = true;
     player.unsupported = Some((
-        genie_core::world::Tick::new(5),
+        Tick::new(5),
         ListIndex::new(0),
         GenieError::unsupported("a test's stop"),
     ));
     player.freezes.push((
-        genie_core::world::Tick::new(6),
+        Tick::new(6),
         object_id(40),
         GenieError::unsupported("a test's freeze"),
     ));
@@ -306,7 +310,7 @@ fn dump_out_of_shape_is_an_error() {
 fn priming_sets_the_update_count_and_the_last_commanded_units() {
     let save = save();
     let mut turns = slice(&save, None);
-    let moved = genie_rec::de::command::Move {
+    let moved = Move {
         commp_id: 1,
         tid: -1,
         x: 5.0,
@@ -327,7 +331,7 @@ fn priming_sets_the_update_count_and_the_last_commanded_units() {
         commands: vec![&moved[..]],
     }];
     let _ = primed(&mut turns, &frames, 3);
-    assert_eq!(turns.ticks, genie_core::world::Tick::new(3));
+    assert_eq!(turns.ticks, Tick::new(3));
     assert_eq!(turns.last_commanded, [vec![], vec![Some(object_id(7))]]);
 }
 
@@ -362,7 +366,7 @@ fn save_or_recording_that_does_not_parse_is_an_error() {
 
 /// Gaia and a player without objects, as a save file (one chapter, no ops).
 fn quiet_save() -> Vec<u8> {
-    crate::fixtures::recording(&save_of_no_objects(), &[])
+    recording(&save_of_no_objects(), &[])
 }
 
 fn save_of_no_objects() -> Header {
@@ -371,8 +375,8 @@ fn save_of_no_objects() -> Header {
 
 /// A recording of the same save and three syncs of 50 ms.
 fn three_syncs() -> Vec<u8> {
-    let sync = || genie_rec::de::Op::Sync { dt: 50 };
-    crate::fixtures::recording(&save_of_no_objects(), &[sync(), sync(), sync()])
+    let sync = || Op::Sync { dt: 50 };
+    recording(&save_of_no_objects(), &[sync(), sync(), sync()])
 }
 
 /// A run from the save after update `start` primes the decoder with the updates before and

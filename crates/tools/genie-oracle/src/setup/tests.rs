@@ -1,3 +1,4 @@
+use crate::fixtures::static_mut;
 use crate::fixtures::{
     action_list, building_mut, building_object, combat_object, gaia, header, human, human_mut,
 };
@@ -5,10 +6,13 @@ use crate::masters::MasterTable;
 use crate::setup::{slice, wonder_time};
 use crate::test_ids::action_type;
 use crate::test_ids::object_id;
+use genie_core::combat::Firepower;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::CivId;
 use genie_core::players::PlayerId;
+use genie_core::players::PlayerType;
+use genie_core::players::history::HistoryUpdates;
 use genie_core::technology::ResearchState;
 use genie_core::world::WorldTime;
 use genie_save::generated::world::{Action, Object, RgeAction, TechPlayerTree, TribeActionWonder};
@@ -99,10 +103,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         [0, 2]
     );
     let p = &turns.players[1];
-    assert_eq!(
-        (p.civ, p.kind),
-        (CivId::new(3), genie_core::players::PlayerType::HUMAN)
-    );
+    assert_eq!((p.civ, p.kind), (CivId::new(3), PlayerType::HUMAN));
     assert_eq!(
         p.resources().map(|r| r.get().to_bits()),
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)
@@ -168,13 +169,10 @@ fn the_slice_takes_the_master_tables() {
         None,
         FlyMode::of_data(0),
     );
-    table.time_slice = genie_core::players::history::HistoryUpdates::of_data(9);
+    table.time_slice = HistoryUpdates::of_data(9);
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let turns = slice(&save, Some(&table));
-    assert_eq!(
-        turns.history_period,
-        genie_core::players::history::HistoryUpdates::of_data(9)
-    );
+    assert_eq!(turns.history_period, HistoryUpdates::of_data(9));
     assert_eq!(turns.masters.len(), 2);
     assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
 }
@@ -190,7 +188,7 @@ fn unit_inside_building_is_in_its_garrison() {
         FlyMode::of_data(0),
     );
     let mut inside = combat_object(11, 83);
-    crate::fixtures::static_mut(&mut inside).inside_obj = 10;
+    static_mut(&mut inside).inside_obj = 10;
     let save = header(vec![
         gaia(Vec::new()),
         human(vec![building_object(10, 12), inside]),
@@ -204,6 +202,6 @@ fn unit_inside_building_is_in_its_garrison() {
     assert_eq!(building.garrison, [object_id(11)]);
     assert_eq!(
         turns.parts.combat_of(object_id(10)).firepower,
-        genie_core::combat::Firepower::ZERO
+        Firepower::ZERO
     );
 }

@@ -1,6 +1,7 @@
 use super::*;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::gathering::hunt::tests::walker;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
@@ -12,6 +13,7 @@ use crate::map::Tile;
 use crate::map::TileOffset;
 use crate::map::TileRect;
 use crate::movement::Speed;
+use crate::movement::move_to::TargetMoved;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
@@ -20,6 +22,8 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::facing::{SpriteFacets, angle_of_facet};
+use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
@@ -28,8 +32,12 @@ use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
+use crate::objects::masters::{Master, Masters};
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -40,10 +48,15 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
+use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::VisionBits;
+use crate::vision::VisionMasks;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::parts::Part;
+use crate::world::tests::forage_world;
+use crate::world::{FrameSeed, Player};
 
 /// records/425906646's update 1883: a TC's gather point on a tree that is gone; its new
 /// villager takes the closest tree of Gaia's (by centre) within its sight of the point,
@@ -52,7 +65,7 @@ use crate::world::WorldTime;
 fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
     let unit = |id, master, x: f32, y: f32| Unit {
         id,
-        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+        place: Static::at(Position::new(x, y, 0.0)),
         life: Lifecycle {
             master_id: master,
             ..Lifecycle::default()
@@ -61,40 +74,37 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
-            crate::world::Player {
+            Player {
                 sleeping: vec![
                     unit(object_id(10), master_id(349), 20.5, 20.5),
                     unit(object_id(11), master_id(349), 22.5, 20.5),
                 ]
                 .into(),
-                ..crate::world::Player::default()
+                ..Player::default()
             },
-            crate::world::Player {
+            Player {
                 objects: vec![unit(object_id(99), ids::VILLAGER_MALE, 18.0, 18.0)].into(),
-                ..crate::world::Player::default()
+                ..Player::default()
             },
         ],
     );
-    let tree = crate::objects::masters::Master {
+    let tree = Master {
         id: master_id(349),
         class: class::TREE,
         radius: Footprint::new(0.5, 0.5),
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     };
-    let villager = crate::objects::masters::Master {
+    let villager = Master {
         id: ids::VILLAGER_MALE,
         class: class::VILLAGER,
         line_of_sight: Distance::new(4.0),
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     };
-    t.masters = vec![
-        crate::objects::masters::Masters::new([tree.clone()]),
-        crate::objects::masters::Masters::new([villager, tree]),
-    ];
+    t.masters = vec![Masters::new([tree.clone()]), Masters::new([villager, tree])];
     let g = GatherPoint {
         state: GatherPointState::POINT,
         point: Position::new(21.0, 21.0, 0.0),
@@ -139,8 +149,8 @@ impl PlaceMap for Hill {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         true
     }
-    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
-        crate::vision::VisionMasks::default()
+    fn vision(&self, _: PlayerId) -> VisionMasks {
+        VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(self.1)
@@ -290,9 +300,9 @@ impl PlaceMap for Fogged {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         false
     }
-    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
+    fn vision(&self, _: PlayerId) -> VisionMasks {
         let [visible, explored] = self.1.map(VisionBits::from_bits_retain);
-        crate::vision::VisionMasks { visible, explored }
+        VisionMasks { visible, explored }
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)
@@ -387,8 +397,8 @@ impl PlaceMap for Flat {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         true
     }
-    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
-        crate::vision::VisionMasks::default()
+    fn vision(&self, _: PlayerId) -> VisionMasks {
+        VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)
@@ -469,7 +479,7 @@ fn the_first_object_of_tile_list_reports_the_block() {
 #[test]
 fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     let world = || {
-        let mut t = crate::world::tests::forage_world();
+        let mut t = forage_world();
         // the villager's standing sprite (a graphic of ten frames, eight facets)
         for masters in &mut t.masters {
             masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite =
@@ -477,10 +487,10 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         }
         let _ = t.graphics.insert(
             SpriteId::named(300),
-            crate::objects::sprite::Graphic {
+            Graphic {
                 id: SpriteId::named(300),
-                frames: crate::objects::Frame::of_data(10),
-                facets: crate::objects::FacetCount::of_data(8),
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(8),
                 speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -529,10 +539,10 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     assert!(completed);
     // the centre's command queue goes to the new unit
     let mut t = world();
-    let order = crate::unit_ai::QueuedOrder {
+    let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: crate::unit_ai::OrderPriority::of_data(5),
+        priority: OrderPriority::of_data(5),
         target: None,
         target_owner: None,
         point: Position::new(40.0, 80.0, 7.0),
@@ -575,7 +585,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         )]
     );
     let mut t = world();
-    t.players[1].kind = crate::players::PlayerType::COMPUTER;
+    t.players[1].kind = PlayerType::COMPUTER;
     assert!(
         t.spawn(
             PlayerId::new(1),
@@ -613,7 +623,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
 /// running sprite (the deer 9655 of MarvinBlue/426048731 ran at the running speed).
 #[test]
 fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     for masters in &mut t.masters {
         let villager = masters.get_mut(ids::VILLAGER_MALE).unwrap();
         villager.standing_sprite = Some(SpriteId::named(300));
@@ -623,10 +633,10 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
     }
     let _ = t.graphics.insert(
         SpriteId::named(300),
-        crate::objects::sprite::Graphic {
+        Graphic {
             id: SpriteId::named(300),
-            frames: crate::objects::Frame::of_data(10),
-            facets: crate::objects::FacetCount::of_data(8),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(8),
             speed_multiplier: SpeedMultiplier::of_data(0.5),
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -655,17 +665,17 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
 #[test]
 fn only_gather_point_of_state_1_sends_the_new_unit() {
     let waits = |state| {
-        let mut t = crate::world::tests::forage_world();
+        let mut t = forage_world();
         for masters in &mut t.masters {
             masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite =
                 Some(SpriteId::named(300));
         }
         let _ = t.graphics.insert(
             SpriteId::named(300),
-            crate::objects::sprite::Graphic {
+            Graphic {
                 id: SpriteId::named(300),
-                frames: crate::objects::Frame::of_data(10),
-                facets: crate::objects::FacetCount::of_data(8),
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(8),
                 speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -691,8 +701,7 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
             target: None,
             target_master: None,
         });
-        t.set_part(at, crate::world::parts::Part::GatherPoint(gather))
-            .unwrap();
+        t.set_part(at, Part::GatherPoint(gather)).unwrap();
         t.spawn(
             PlayerId::new(1),
             ListIndex::new(2),
@@ -821,11 +830,11 @@ fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
 }
 
 /// A queued move of the centre's, which a new unit's notified walk forgets.
-fn queued_move() -> crate::unit_ai::QueuedOrder {
-    crate::unit_ai::QueuedOrder {
+fn queued_move() -> QueuedOrder {
+    QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: crate::unit_ai::OrderPriority::of_data(5),
+        priority: OrderPriority::of_data(5),
         target: None,
         target_owner: None,
         point: Position::new(40.0, 80.0, 7.0),
@@ -843,7 +852,7 @@ fn queued_move() -> crate::unit_ai::QueuedOrder {
 fn gather_point_without_target_walks_the_new_unit_there() {
     use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
     let walked = |notified| {
-        let mut t = crate::world::tests::forage_world();
+        let mut t = forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
         t.parts.set_town_bell_flag(u.id, true);
         t.parts
@@ -881,7 +890,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+            on_target_moved: TargetMoved::Follows,
             wait: MoveWait::default(),
         })
     );
@@ -900,7 +909,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
 /// is not modelled.
 #[test]
 fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     t.parts
         .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
@@ -918,7 +927,7 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
     assert_eq!(t.parts.actions_of(u.id).list.move_to().copied(), None);
     assert_eq!(t.parts.unit_ai.get(u.id).unwrap().current_order, None);
     // a second walk finds the first's `MoveTo`
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     t.gather_move(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -940,7 +949,7 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
         reason(&mut t),
         "a gather point's move of a unit with an action"
     );
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
     assert_eq!(
         reason(&mut t),
@@ -953,11 +962,11 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
 /// on a random one) and 801 (moving, its standing sprite 21 of eight facets).
 fn remains_world() -> World {
     use crate::objects::masters::{Master, Masters};
-    let mut t = crate::world::tests::forage_world();
-    let graphic = |id, flags| crate::objects::sprite::Graphic {
+    let mut t = forage_world();
+    let graphic = |id, flags| Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -985,7 +994,7 @@ fn remains_world() -> World {
         id: master_id(801),
         kind: master_type::MOVING,
         standing_sprite: Some(SpriteId::named(21)),
-        moving: Some(crate::gathering::hunt::tests::walker().stats),
+        moving: Some(walker().stats),
         ..Master::default()
     };
     for masters in &mut t.masters {
@@ -1026,7 +1035,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
     );
     assert_eq!(
         (u.life.death_facets, u.sprite),
-        (Some(crate::objects::FacetCount::of_data(8)), None)
+        (Some(FacetCount::of_data(8)), None)
     );
     assert_eq!(t.players[1].attributes[4], food + Amount::new(1.0));
     let i = t
@@ -1035,22 +1044,19 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
             master_id(801),
             &made(&t, master_id(801)),
             Position::new(31.5, 85.5, 0.0),
-            Facing::Dead(Some(crate::objects::Facet::of_data(2))),
+            Facing::Dead(Some(Facet::of_data(2))),
         )
         .unwrap();
     let u = &t.players[1].objects[i];
-    let facets = crate::objects::facing::SpriteFacets {
-        count: crate::objects::FacetCount::of_data(8),
+    let facets = SpriteFacets {
+        count: FacetCount::of_data(8),
         turns: false,
     };
     assert_eq!(
         t.parts.mover_of(u.id).map(|m| m.angle),
-        Some(crate::objects::facing::angle_of_facet(
-            crate::objects::Facet::of_data(2),
-            facets
-        ))
+        Some(angle_of_facet(Facet::of_data(2), facets))
     );
-    let reason = |change: &dyn Fn(&mut crate::objects::masters::Master), facing| {
+    let reason = |change: &dyn Fn(&mut Master), facing| {
         let mut t = remains_world();
         let mut m = made(&t, master_id(801));
         change(&mut m);
@@ -1064,7 +1070,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
         .unwrap_err()
         .reason()
     };
-    let unchanged = |_: &mut crate::objects::masters::Master| {};
+    let unchanged = |_: &mut Master| {};
     assert_eq!(
         reason(&|m| m.kind = master_type::COMBAT, Facing::Drawn),
         "remains of a type other than 10 and 20 to 39"
@@ -1109,8 +1115,8 @@ impl PlaceMap for Dark {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         false
     }
-    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
-        crate::vision::VisionMasks::default()
+    fn vision(&self, _: PlayerId) -> VisionMasks {
+        VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)
@@ -1598,8 +1604,8 @@ impl PlaceMap for Terrains {
     fn visible(&self, _: PlayerId, _: Tile) -> bool {
         true
     }
-    fn vision(&self, _: PlayerId) -> crate::vision::VisionMasks {
-        crate::vision::VisionMasks::default()
+    fn vision(&self, _: PlayerId) -> VisionMasks {
+        VisionMasks::default()
     }
     fn elevation(&self, _: Tile) -> Option<u8> {
         Some(0)

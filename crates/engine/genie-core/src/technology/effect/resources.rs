@@ -2,6 +2,7 @@
 //! setters and the side effects of allied vision and the farms' food.
 
 use crate::GenieError;
+use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{master_type, player_master};
@@ -214,7 +215,7 @@ impl World {
         amount: f32,
     ) -> Result<(), GenieError> {
         let exponent = self.attribute_of(p, FARM_EXPONENT).get();
-        if crate::math::fmath::below_or_unordered(exponent, 0.0) {
+        if below_or_unordered(exponent, 0.0) {
             return Ok(());
         }
         let mut ids = Vec::new();

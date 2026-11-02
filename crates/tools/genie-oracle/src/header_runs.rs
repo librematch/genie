@@ -6,14 +6,18 @@ use crate::{Decoder, Error, Frame, frames, hunted_origins, listed, player_totals
 use genie_core::GenieError;
 use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
+use genie_core::objects::layers::Action;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::production::Production;
+use genie_core::vision::registry::{CLASSES, Registry};
 use genie_core::world::Tick;
 use genie_core::world::checkpoint::{ActionTerm, CheckpointObject, TopAction, player_block};
 use genie_core::world::parts::Parts;
 use genie_core::world::{Player, World};
 use genie_rec::de;
 use genie_save::{Header, PlayerSection};
+use std::slice::from_ref;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Commands whose handlers can create a unit group (158041 `FUN_14152efc0`): INTERACT, WORK,
 /// MOVE, `FORM_FORMATION`, `GROUP_MULTI_WAYPOINTS`, BUILD, REPAIR. More player-side callers exist and
@@ -51,18 +55,17 @@ pub struct Word9 {
 }
 
 /// Whether the runs list each decoded command with the update it runs in ([`trace_commands`]).
-pub(super) static TRACE_COMMANDS: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+pub(super) static TRACE_COMMANDS: AtomicBool = AtomicBool::new(false);
 
 /// Every run from now on lists each decoded command with the update it runs in, on standard
 /// error (`on`), or stops listing them.
 pub fn trace_commands(on: bool) {
-    TRACE_COMMANDS.store(on, std::sync::atomic::Ordering::Relaxed);
+    TRACE_COMMANDS.store(on, Ordering::Relaxed);
 }
 
 /// Run the slice over `frames`, each tick with its commands.
 pub(super) fn run(turns: &mut World, decoder: &mut Decoder, frames: &[Frame<'_>]) {
-    let trace = TRACE_COMMANDS.load(std::sync::atomic::Ordering::Relaxed);
+    let trace = TRACE_COMMANDS.load(Ordering::Relaxed);
     for frame in frames {
         let commands: Vec<Command> = frame
             .commands
@@ -169,7 +172,7 @@ pub(super) fn lane_block(
 /// `0x1411cb7e0`) prefers the state of its production list's action (`+0xbf8`): a town centre
 /// that attacks while it trains counts its Attack's type with its make action's state.
 pub(super) fn checkpoint_action(
-    actions: &genie_core::objects::layers::Action,
+    actions: &Action,
     production: Option<&Production>,
 ) -> Option<ActionTerm> {
     let making = production.and_then(|p| p.action).map(|a| a.state());
@@ -184,7 +187,7 @@ pub(super) fn checkpoint_action(
 }
 
 /// An object's top action as the slice models it, type and state, from its action layer.
-pub(super) fn top_action(actions: &genie_core::objects::layers::Action) -> Option<TopAction> {
+pub(super) fn top_action(actions: &Action) -> Option<TopAction> {
     actions.top_action()
 }
 
@@ -268,7 +271,7 @@ pub fn blocks_per_tick(
     let mut out = Vec::with_capacity(ticks);
     let mut decoder = Decoder::default();
     for frame in frames(&chapter, ticks)? {
-        run(&mut turns, &mut decoder, std::slice::from_ref(&frame));
+        run(&mut turns, &mut decoder, from_ref(&frame));
         out.push(
             ids.iter()
                 .map(|&id| {
@@ -300,10 +303,7 @@ pub fn slice_from_header(header: &Header, masters: Option<&MasterTable>) -> Worl
 pub(super) fn header_slice(header: &Header, masters: Option<&MasterTable>) -> World {
     let mut turns = slice(header, masters);
     if let Some(sight) = turns.spatial.sight.as_mut() {
-        sight.registry = Some(genie_core::vision::registry::Registry::new(
-            header.players().len(),
-            genie_core::vision::registry::CLASSES,
-        ));
+        sight.registry = Some(Registry::new(header.players().len(), CLASSES));
     }
     // the hunted animals' origins are their places in this very save
     hunted_origins(&mut turns, header);

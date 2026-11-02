@@ -4,12 +4,17 @@
 //! that has one holds it in the world's table (`Parts::actions`, FD-045-D59).
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
+use crate::garrison::ENTER;
+use crate::gathering::make::MAKE;
+use crate::movement::move_to::MOVE_TO;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::actions;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::DefaultTask;
 use crate::objects::masters::ActionType;
+use crate::ownership::artifact::{ARTIFACT_TYPE, Artifact};
 use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
 use genie_diff::Diff;
@@ -61,12 +66,9 @@ impl Action {
         }
         match self.top_action_kind() {
             None => Ok(true),
-            Some(crate::ownership::artifact::ARTIFACT_TYPE) => Ok(self
-                .list
-                .artifact()
-                .is_some_and(crate::ownership::artifact::Artifact::idle)),
+            Some(ARTIFACT_TYPE) => Ok(self.list.artifact().is_some_and(Artifact::idle)),
             // a Make has no target, but its point (`+0x38`) is the base constructor's 0.0
-            Some(crate::movement::move_to::MOVE_TO | crate::gathering::make::MAKE) => Ok(false),
+            Some(MOVE_TO | MAKE) => Ok(false),
             Some(_) => Err(GenieError::unsupported(
                 "slots 0x190 and 0x288 of an action the slice does not model",
             )),
@@ -103,7 +105,7 @@ impl Action {
         match self.list.head()? {
             actions::Action::Artifact(a) => walking(a.move_to().map(|m| m.state)).or_else(|| {
                 a.enter().map(|e| TopAction {
-                    kind: crate::garrison::ENTER,
+                    kind: ENTER,
                     state: ActionState::new(e.state.get()),
                 })
             }),
@@ -111,7 +113,7 @@ impl Action {
                 .state
                 .attack()
                 .map(|a| TopAction {
-                    kind: crate::combat::attack::ATTACK,
+                    kind: ATTACK,
                     state: ActionState::new(a.state.get()),
                 })
                 .or_else(|| walking(h.state.move_to().map(|m| m.state))),

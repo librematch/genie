@@ -9,6 +9,7 @@ use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{HuntAction, HuntTask, Lead, OWN_LIVESTOCK_RANGE, Quarry};
+use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::move_to::GiveUp;
@@ -25,6 +26,7 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
+use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::step::Step;
 
@@ -36,7 +38,7 @@ pub struct PointWalker {
     /// The unit is a villager (class 4): its `MoveTo` waits once when the motion step gives up.
     pub villager: bool,
     /// Its unit AI's stance (`+0x1a9`), 0 without one: the wait is a second below 2, else two.
-    pub stance: crate::unit_ai::UnitStance,
+    pub stance: UnitStance,
 }
 
 /// What a hunt's walk to its point did in an update ([`HuntAction::update_point_walk`]).
@@ -134,7 +136,7 @@ impl HuntAction {
             walks,
         } = start;
         let mut hunt = Self {
-            target: Some(crate::gathering::HuntTargetId::new(target.id)),
+            target: Some(HuntTargetId::new(target.id)),
             state: HuntState::New,
             point: target.position,
             target_class: Some(target.class),
@@ -146,7 +148,7 @@ impl HuntAction {
         };
         if Amount::ZERO < target.amount {
             let kind = task.resource;
-            let both_food = crate::gathering::both_food(kind, held.kind);
+            let both_food = both_food(kind, held.kind);
             let drops = player_type.is_computer() && held.amount == Amount::ZERO;
             if held.kind != kind {
                 if both_food {
@@ -271,10 +273,10 @@ impl HuntAction {
             self.set_drop(target.position, attack.gap, mover, &walks)?;
             return Ok(Some(false));
         }
-        if self.target.map(crate::gathering::HuntTargetId::id) == Some(target.id) {
+        if self.target.map(HuntTargetId::id) == Some(target.id) {
             return Ok(None);
         }
-        self.set_target(Some(crate::gathering::HuntTargetId::new(target.id)));
+        self.set_target(Some(HuntTargetId::new(target.id)));
         self.target_class = Some(target.class);
         self.carry_to = None;
         self.chase(target, player, attack, arms, mover, &walks)
@@ -439,9 +441,6 @@ impl HuntAction {
         let second = self.carry_to.take();
         self.point = Position::from([-1.0; 3]);
         self.timer = Seconds::ZERO;
-        [
-            target.map(crate::gathering::HuntTargetId::id),
-            second.map(DropSiteId::id),
-        ]
+        [target.map(HuntTargetId::id), second.map(DropSiteId::id)]
     }
 }

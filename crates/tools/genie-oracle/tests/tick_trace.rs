@@ -12,6 +12,7 @@
 
 use flate2::{Compression, write::ZlibEncoder};
 use genie_oracle::tick_trace::{TickTrace, TraceError};
+use std::array::from_fn;
 use std::io::Write;
 
 fn encode(ticks: &[(u32, Vec<[u32; 11]>)]) -> Vec<u8> {
@@ -36,7 +37,7 @@ fn encode(ticks: &[(u32, Vec<[u32; 11]>)]) -> Vec<u8> {
 
 #[test]
 fn trace_gives_each_ticks_world_time_and_lanes() {
-    let lane = |b: u32| std::array::from_fn(|i| b + i as u32);
+    let lane = |b: u32| from_fn(|i| b + i as u32);
     let ticks = vec![
         (104, vec![lane(0), lane(11)]),
         (208, vec![lane(1), lane(12)]),

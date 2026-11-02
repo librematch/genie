@@ -1,8 +1,10 @@
 use crate::fixtures::{combat_master, master_moving_mut, master_static_mut};
 use crate::masters::{MasterTable, Turning};
 use crate::saved_masters::{master_facets, moving_stats};
+use genie_core::map::{RestrictionId, TerrainMask};
 use genie_core::movement::MoveAlgorithm;
 use genie_core::objects::FacetCount;
+use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::facing::SpriteFacets;
@@ -40,19 +42,19 @@ fn table(facets: [i16; 3]) -> MasterTable {
     )
     .with_sprite(
         SpriteId::named(10),
-        genie_core::objects::SpeedMultiplier::ZERO,
+        SpeedMultiplier::ZERO,
         FacetCount::of_data(facets[0]),
         SpriteFlags::TURNS,
     )
     .with_sprite(
         SpriteId::named(11),
-        genie_core::objects::SpeedMultiplier::of_data(2.0),
+        SpeedMultiplier::of_data(2.0),
         FacetCount::of_data(facets[1]),
         SpriteFlags::TURNS,
     )
     .with_sprite(
         SpriteId::named(12),
-        genie_core::objects::SpeedMultiplier::of_data(3.0),
+        SpeedMultiplier::of_data(3.0),
         FacetCount::of_data(facets[2]),
         SpriteFlags::TURNS,
     )
@@ -102,10 +104,7 @@ fn walker_moves_by_its_sprites_speed_factors() {
     );
     assert_eq!(
         (stats.restriction, stats.restriction_mask),
-        (
-            genie_core::map::RestrictionId::named(1),
-            genie_core::map::TerrainMask::of_bits(0b101)
-        )
+        (RestrictionId::named(1), TerrainMask::of_bits(0b101))
     );
     assert_eq!(stats.radius.x().to_bits(), 0.2_f32.to_bits());
     assert!(stats.facets.is_some());

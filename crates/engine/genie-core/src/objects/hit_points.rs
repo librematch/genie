@@ -5,6 +5,14 @@
 
 use crate::GenieError;
 use crate::combat::damage::ArmorPair;
+use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp};
+use crate::math::fmath::{at_most_or_unordered, maxss};
+use crate::math::image::turn::{
+    HERO_REGENERATION as TURN_HERO_REGENERATION, HP_POWERUP_FLOOR as TURN_HP_POWERUP_FLOOR,
+    REGENERATION_EPSILON as TURN_REGENERATION_EPSILON,
+    REGENERATION_LEAST_HP as TURN_REGENERATION_LEAST_HP,
+    REGENERATION_MINUTE as TURN_REGENERATION_MINUTE, REGENERATION_POINT as TURN_REGENERATION_POINT,
+};
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
@@ -19,18 +27,17 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 /// A hero's regeneration (`DAT_142ed06a8`, a minute's hit points).
-pub(crate) const HERO_REGENERATION: Regeneration =
-    Regeneration::new(crate::math::image::turn::HERO_REGENERATION);
+pub(crate) const HERO_REGENERATION: Regeneration = Regeneration::new(TURN_HERO_REGENERATION);
 /// The regeneration's minute (`DAT_14330ebc8`).
-pub(crate) const REGENERATION_MINUTE: f32 = crate::math::image::turn::REGENERATION_MINUTE;
+pub(crate) const REGENERATION_MINUTE: f32 = TURN_REGENERATION_MINUTE;
 /// The size below which a rate or a period is none (`DAT_142f49458`).
-pub(crate) const REGENERATION_EPSILON: f32 = crate::math::image::turn::REGENERATION_EPSILON;
+pub(crate) const REGENERATION_EPSILON: f32 = TURN_REGENERATION_EPSILON;
 /// The hit points below which nothing regenerates (`DAT_14330eb8c`).
-pub(crate) const REGENERATION_LEAST_HP: f32 = crate::math::image::turn::REGENERATION_LEAST_HP;
+pub(crate) const REGENERATION_LEAST_HP: f32 = TURN_REGENERATION_LEAST_HP;
 /// A whole hit point, the `fmodf` divisor (`XMM11`, `DAT_14330eb8c`).
-pub(crate) const REGENERATION_POINT: f32 = crate::math::image::turn::REGENERATION_POINT;
+pub(crate) const REGENERATION_POINT: f32 = TURN_REGENERATION_POINT;
 /// The hit points a powerup's check leaves at least (`MAXSS` with `DAT_14330eb8c`).
-pub(crate) const HP_POWERUP_FLOOR: f32 = crate::math::image::turn::HP_POWERUP_FLOOR;
+pub(crate) const HP_POWERUP_FLOOR: f32 = TURN_HP_POWERUP_FLOOR;
 
 /// A combat object's hit point powerup, which takes a loss before its hit points: what losses
 /// took of it (`+0xa38`, `mHitpointsPowerup`) and its most (`+0xa3c`, `mHitpointsMaxPowerup`).
@@ -111,7 +118,7 @@ impl Unit {
                 "a heal at a cost (FUN_141213b10's classes)",
             ));
         }
-        let _ = crate::combat::damage::heal_hp(
+        let _ = heal_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
             hit_points,
@@ -124,7 +131,7 @@ impl Unit {
     /// its powerups' room, an overflow taken off the powerup (`+0xa38`, never below 0; the hit
     /// point transforms of `FUN_141204450`, empty in the recordings, are not held).
     pub(crate) fn gain_hp(&mut self, combat: &mut Combat, master: &Master, amount: HitPoints) {
-        crate::combat::damage::gain_hp(
+        damage_gain_hp(
             &mut self.life.hp,
             &mut combat.hp_powerup,
             master.hit_points,
@@ -221,10 +228,10 @@ impl Unit {
     /// (`MAXSS` with 1: not below 1, a NaN becomes 1) and the powerup takes the room.
     pub(crate) fn clamp_hp_powerup(&mut self, combat: &mut Combat) {
         let p = combat.hp_powerup;
-        if crate::math::fmath::at_most_or_unordered(p.taken.get(), p.max.get()) {
+        if at_most_or_unordered(p.taken.get(), p.max.get()) {
             return;
         }
-        self.life.hp = HitPoints::new(crate::math::fmath::maxss(
+        self.life.hp = HitPoints::new(maxss(
             self.life.hp.get() - p.room().get().abs(),
             HP_POWERUP_FLOOR,
         ));

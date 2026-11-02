@@ -1,5 +1,7 @@
 //! A master's fly mode (`+0x608`): where its objects' height goes on the ground.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's fly mode (`+0x608`, the `.dat`'s `fly_mode`): where an object's height goes against
 /// the ground's (`FUN_141193a10`, [`crate::combat::missile::grounded`]). Every byte is kept; one
 /// not named keeps its height.
@@ -25,8 +27,8 @@ impl FlyMode {
     }
 }
 
-impl std::fmt::Display for FlyMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for FlyMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

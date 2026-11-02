@@ -35,6 +35,9 @@ pub use self::plan_budget_values::{DelayCount, PlanCap, PlanCount};
 pub use self::shape_id::ShapeId;
 pub use self::shape_side::ShapeSide;
 pub use self::short_found::ShortFound;
+use crate::map::RestrictionId;
+use crate::objects::IdTable;
+use std::mem::take;
 
 mod fixed_distance;
 mod fixed_point;
@@ -64,15 +67,15 @@ pub struct Pathing {
     pub game_type: u8,
     /// The restrictions the world's load gave planners (`FUN_140f7d310`, [`Pathing::register`]),
     /// in their order; None builds one for any restriction (a world made without a load).
-    planned: Option<Vec<crate::map::RestrictionId>>,
-    planners: BTreeMap<crate::map::RestrictionId, Planner>,
+    planned: Option<Vec<RestrictionId>>,
+    planners: BTreeMap<RestrictionId, Planner>,
     /// Tile rectangles (x0, y0, x1, y1) whose static marks changed since the planners last saw
     /// them.
     pending: Vec<PlanRect>,
     /// The mesh, None until the slice has the game's.
     mesh: Option<Mesh>,
     /// Each object's shape (`+0x64c`).
-    shapes: crate::objects::IdTable<ShapeId>,
+    shapes: IdTable<ShapeId>,
     /// The temporary shapes of the motion step under way (its `local_1688`).
     temporary: Vec<ShapeId>,
     /// The short pather.
@@ -254,7 +257,7 @@ impl Pathing {
 
     /// The world's load gives restriction `restriction` a planner (`FUN_140f7d310`), unless the
     /// lookup finds one ([`Pathing::planned_for`]).
-    pub fn register(&mut self, restriction: crate::map::RestrictionId) {
+    pub fn register(&mut self, restriction: RestrictionId) {
         let _ = self.planned.get_or_insert_with(Vec::new);
         if self.restrictions.get(restriction.index()).is_some()
             && self.planned_for(restriction).is_none()
@@ -268,10 +271,7 @@ impl Pathing {
     /// another length than the restriction's, or none, or each equal (`==`, so a NaN never) to
     /// its value. None when none is (`0`), for a restriction the data has not got, and without
     /// the load's planners.
-    fn planned_for(
-        &self,
-        restriction: crate::map::RestrictionId,
-    ) -> Option<crate::map::RestrictionId> {
+    fn planned_for(&self, restriction: RestrictionId) -> Option<RestrictionId> {
         let values = self.restrictions.get(restriction.index())?;
         self.planned.as_ref()?.iter().copied().find(|&r| {
             let own = self
@@ -289,11 +289,7 @@ impl Pathing {
     /// the load's planners whose restriction has the same values, else none (the slice builds it
     /// from the map on first use, `FUN_140f74f90`); the planners built before see the tiles'
     /// changes first. None for a restriction the data has not got.
-    pub fn planner(
-        &mut self,
-        restriction: crate::map::RestrictionId,
-        tiles: &Tiles,
-    ) -> Option<&mut Planner> {
+    pub fn planner(&mut self, restriction: RestrictionId, tiles: &Tiles) -> Option<&mut Planner> {
         let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
         for rect in self.pending.drain(..) {
             for p in self.planners.values_mut() {
@@ -404,7 +400,7 @@ impl Pathing {
     /// The motion step's exit (`FUN_141055970` on each): the temporary shapes leave the mesh in
     /// the order they came.
     pub fn drop_temporary_shapes(&mut self) {
-        let shapes = std::mem::take(&mut self.temporary);
+        let shapes = take(&mut self.temporary);
         if let Some(mesh) = self.mesh.as_mut() {
             for s in shapes {
                 mesh.remove(s);

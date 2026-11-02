@@ -66,11 +66,8 @@ fn rec(id: i32, x: f32, y: f32) -> VisibleResource {
 #[test]
 fn the_first_other_player_that_sees_the_object_takes_it_over() {
     use crate::world::player::Player;
-    let (human, computer) = (
-        crate::players::PlayerType::HUMAN,
-        crate::players::PlayerType::COMPUTER,
-    );
-    let players = |kinds: [crate::players::PlayerType; 4]| {
+    let (human, computer) = (PlayerType::HUMAN, PlayerType::COMPUTER);
+    let players = |kinds: [PlayerType; 4]| {
         kinds.map(|kind| Player {
             kind,
             ..Player::default()

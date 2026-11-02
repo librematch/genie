@@ -2,10 +2,13 @@
 
 use crate::GenieError;
 use crate::commands::UnitList;
+use crate::commands::{QueueId, SpriteOverride};
 use crate::map::Point;
 use crate::map::Position;
+use crate::objects::Frame;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::HOUSE;
+use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -25,10 +28,10 @@ pub struct BuildCommand {
     pub position: Point,
     /// `+0x14`, the formatter's `qId`: a human player's BUILD with one other than −1 does
     /// nothing (`FUN_140e7a400`'s first test).
-    pub queue_id: crate::commands::QueueId,
+    pub queue_id: QueueId,
     /// `+0x18`: the foundation's sprite override (`+0x788`, `FUN_141189e70`), which a house
     /// (master 70) of civ 12 keeps from 0x2c9 to 0x2ce; any other is −1.
-    pub sprite_override: crate::commands::SpriteOverride,
+    pub sprite_override: SpriteOverride,
     /// The units told to build it, in packet order (the count at `+0x4`, the ids from `+0x20`).
     pub builders: UnitList,
     /// `+0x1e`: queued (a builder with a unit AI takes it as an order in its queue).
@@ -38,7 +41,7 @@ pub struct BuildCommand {
     pub commits: bool,
     /// `+0x1c`: the frame the foundation's standing sprite takes once built (its `+0xc54`,
     /// [`crate::objects::layers::Building::build_frame`]).
-    pub frame: crate::objects::Frame,
+    pub frame: Frame,
 }
 
 impl BuildCommand {
@@ -74,7 +77,7 @@ impl BuildCommand {
         let sprite_override = self.sprite_override_of(w.players.player(player)?.civ);
         if let Some((_, layer)) = w.object_and_layer_mut(id)? {
             if let Some(c) = layer.construction.as_mut() {
-                c.sprite_override = sprite_override != crate::commands::SpriteOverride::NONE;
+                c.sprite_override = sprite_override != SpriteOverride::NONE;
             }
             layer.build_frame = self.frame;
         }
@@ -91,15 +94,12 @@ impl BuildCommand {
     /// The sprite override the handler gives the foundation (`FUN_141189e70`): the packet's
     /// `+0x18` for a house (master 70) of civ 12 when it is 0x2c9 to 0x2ce, else −1.
     #[must_use]
-    pub fn sprite_override_of(
-        &self,
-        civ: crate::players::CivId,
-    ) -> crate::commands::SpriteOverride {
-        const CIV: crate::players::CivId = crate::players::CivId::new(0xc);
+    pub fn sprite_override_of(&self, civ: CivId) -> SpriteOverride {
+        const CIV: CivId = CivId::new(0xc);
         if self.sprite_override.kept() && self.master == HOUSE && civ == CIV {
             self.sprite_override
         } else {
-            crate::commands::SpriteOverride::NONE
+            SpriteOverride::NONE
         }
     }
 }

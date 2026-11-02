@@ -48,6 +48,7 @@ use binrw::io::{Read, Seek, SeekFrom};
 /// The oldest save version this reader supports (66.0).
 pub const MIN_HUNDREDTHS: u32 = 6600;
 
+use binrw::io::{Cursor, Write};
 pub use genie_error::{ErrorKind, GenieError};
 
 /// The errors of reading and writing a world save: [`GenieError`]s.
@@ -146,7 +147,7 @@ pub(crate) fn written_len<T: binrw::BinWrite>(value: &T) -> Result<usize, Error>
 where
     for<'a> T::Args<'a>: Default,
 {
-    let mut out = binrw::io::Cursor::new(Vec::new());
+    let mut out = Cursor::new(Vec::new());
     value
         .write_le(&mut out)
         .map_err(|e| GenieError::io("a value that does not write back").with("binrw", e))?;
@@ -160,7 +161,7 @@ where
 /// [`ErrorKind::InvalidInput`] for bytes that are not a save of 66.0 or later or do not end
 /// where the world does, [`ErrorKind::Unsupported`] for a part the reader does not derive yet.
 pub fn parse(save: &[u8]) -> Result<Header, Error> {
-    parse_reader(&mut binrw::io::Cursor::new(save))
+    parse_reader(&mut Cursor::new(save))
 }
 
 /// Read a world save from any seekable reader, e.g. one that logs its reads. The world reads to
@@ -238,7 +239,7 @@ pub fn parse_reader<R: Read + Seek>(r: &mut R) -> Result<Header, Error> {
 /// # Errors
 ///
 /// [`ErrorKind::Io`] when the writer fails or a value cannot be written back.
-pub fn write<W: binrw::io::Write + Seek>(h: &Header, w: &mut W) -> Result<(), Error> {
+pub fn write<W: Write + Seek>(h: &Header, w: &mut W) -> Result<(), Error> {
     use binrw::BinWrite;
     (|| {
         h.file_header.write_le(w)?;
@@ -292,7 +293,7 @@ mod tests {
     }
 
     fn bytes(h: &Header) -> Vec<u8> {
-        let mut out = binrw::io::Cursor::new(Vec::new());
+        let mut out = Cursor::new(Vec::new());
         write(h, &mut out).unwrap();
         out.into_inner()
     }

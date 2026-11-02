@@ -2,6 +2,7 @@
 //! (`Master::unit_ai_type`), the value the module's constructor takes.
 
 use genie_diff::{Diff, Differ};
+use std::fmt::{Display, Error, Formatter};
 
 /// A unit AI's factory type (`UnitAi::ai_type`), 0 to 0x13 in the game's switch
 /// (`FUN_140c5c170`'s constructor). The simulation tells some apart (the boar, the soldier, the
@@ -64,8 +65,8 @@ impl UnitAiType {
     pub const LIVESTOCK: Self = Self(0x13);
 }
 
-impl std::fmt::Display for UnitAiType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UnitAiType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

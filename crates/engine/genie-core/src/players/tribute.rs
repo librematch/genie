@@ -131,8 +131,16 @@ mod tests {
     use crate::objects::masters::ids;
     use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
+    #[cfg(test)]
+    use crate::players::PlayerType;
+    #[cfg(test)]
+    use crate::players::tracker::Key;
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    #[cfg(test)]
+    use crate::test_ids::{amounts, attributes};
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -185,12 +193,12 @@ mod tests {
     /// (master 84) when `market`.
     fn world(market: bool) -> World {
         let player = || Player {
-            attributes: crate::test_ids::attributes(600, [500.0; 4]),
+            attributes: attributes(600, [500.0; 4]),
             ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             vec![Player::default(), player(), player()],
@@ -205,7 +213,7 @@ mod tests {
         if market {
             t.players[1].tracker.add(
                 object_id(7),
-                crate::players::tracker::Key {
+                Key {
                     master: Some(ids::MARKET),
                     class: Some(class::BUILDING),
                     pending: false,
@@ -232,12 +240,9 @@ mod tests {
         let (giver, receiver) = (&t.players[1], &t.players[2]);
         assert_eq!(
             giver.resources(),
-            crate::test_ids::amounts([500.0, 500.0 - 130.0, 500.0, 500.0 - 260.0])
+            amounts([500.0, 500.0 - 130.0, 500.0, 500.0 - 260.0])
         );
-        assert_eq!(
-            receiver.resources(),
-            crate::test_ids::amounts([500.0, 600.0, 500.0, 700.0])
-        );
+        assert_eq!(receiver.resources(), amounts([500.0, 600.0, 500.0, 700.0]));
         assert_eq!(
             (
                 giver.attributes[53],
@@ -263,7 +268,7 @@ mod tests {
     #[test]
     fn computer_player_receipt_is_not_modelled() {
         let mut t = world(true);
-        t.players[2].kind = crate::players::PlayerType::COMPUTER;
+        t.players[2].kind = PlayerType::COMPUTER;
         assert!(
             t.tribute(player_id(1), player_id(2), &[gift(1, 10.0, 0.3); 4])
                 .is_err()

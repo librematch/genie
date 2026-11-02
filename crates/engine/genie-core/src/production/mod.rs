@@ -51,6 +51,7 @@ pub use self::make_obj_state::MakeObjState;
 pub use self::make_tech_state::MakeTechState;
 pub use self::queue_counts::{EntrySerial, QueueChanges, QueueLength, QueuedUnits};
 pub use self::unit_index::UnitIndex;
+use crate::world::NO_ATTRIBUTE;
 
 /// One slot of a building's queue (`+0xbe8`, 0x30 bytes; the save's `mProductionQueue[i]`). A
 /// slot the buffer's growth adds is zeroed (`calloc`), as [`Entry::default`] is.
@@ -466,12 +467,7 @@ pub fn population(storage: &[(Option<AttributeId>, Amount, u8)]) -> Amount {
 /// production and this one stays within the cap (`COMISS`, `JBE`: a NaN passes), and the
 /// headroom covers them. A building that fails it waits (housed).
 pub fn housed(attributes: &[Amount], pop: Amount) -> Result<bool, GenieError> {
-    let a = |i: AttributeId| {
-        attributes
-            .get(i.index())
-            .copied()
-            .ok_or(crate::world::NO_ATTRIBUTE)
-    };
+    let a = |i: AttributeId| attributes.get(i.index()).copied().ok_or(NO_ATTRIBUTE);
     let in_production = a(attribute::IN_PRODUCTION)?;
     Ok(
         a(attribute::POPULATION_CAP)? < a(attribute::POPULATION)? + in_production + pop
@@ -490,8 +486,12 @@ mod tests {
     use crate::objects::masters::master_type;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
+    #[cfg(test)]
+    use crate::technology::Attributes;
     use crate::technology::CostPaid;
     use crate::technology::ResearchState;
+    #[cfg(test)]
+    use crate::test_ids::amounts;
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::opt_master;
@@ -794,7 +794,7 @@ mod tests {
 
     struct Held(Vec<Amount>);
 
-    impl crate::technology::Attributes for Held {
+    impl Attributes for Held {
         fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
             Ok(self.0[i.index()])
         }
@@ -911,7 +911,7 @@ mod tests {
             &mut held,
         )
         .unwrap();
-        assert_eq!(held.0, crate::test_ids::amounts([46.0, 1.0, 1.0, 1.0, 1.0]));
+        assert_eq!(held.0, amounts([46.0, 1.0, 1.0, 1.0, 1.0]));
         let low = Master {
             kind: master_type::MISSILE,
             ..m.clone()

@@ -54,8 +54,21 @@ pub use self::setup::{quick_reach, quick_reach_from};
 use self::walk_in::WalkIn;
 #[cfg(test)]
 use self::walks::WalkOut;
+use crate::map::TerrainMask;
 #[cfg(test)]
 use crate::map::spatial::{Placed, tile_record_id};
+use crate::math::image::hull_path::{
+    DIRECTIONS as HULL_PATH_DIRECTIONS, ENTRANCE_STEP as HULL_PATH_ENTRANCE_STEP,
+    EPSILON as HULL_PATH_EPSILON, EXIT_STEP as HULL_PATH_EXIT_STEP, FAR as HULL_PATH_FAR,
+    FULL_TURN as HULL_PATH_FULL_TURN, HALF as HULL_PATH_HALF, HALF_TURN as HULL_PATH_HALF_TURN,
+    HIGH_T as HULL_PATH_HIGH_T, LOW_T as HULL_PATH_LOW_T, MOST as HULL_PATH_MOST,
+    NEAR_TARGET as HULL_PATH_NEAR_TARGET, NO_ANGLE as HULL_PATH_NO_ANGLE, NUDGE as HULL_PATH_NUDGE,
+    ONE as HULL_PATH_ONE, QUADRANT as HULL_PATH_QUADRANT, SAME_END as HULL_PATH_SAME_END,
+    SIDES as HULL_PATH_SIDES, SQRT_2 as HULL_PATH_SQRT_2, TURN as HULL_PATH_TURN,
+    UNTURN as HULL_PATH_UNTURN,
+};
+use crate::world::index::ObjectsRef;
+use std::ops::Index;
 
 /// How many records the manager's query lists before it stops (`FUN_141051900`: `0x18 < count`).
 const LINE_HITS: usize = 25;
@@ -72,46 +85,45 @@ const MOST_AREA: i32 = 100;
 const GROWTHS: i32 = 2;
 
 /// `DAT_142e7f384`: half (the buffer is half the radius; a box's middle).
-const HALF: f32 = crate::math::image::hull_path::HALF;
+const HALF: f32 = HULL_PATH_HALF;
 /// `DAT_142f43288`: the nudge toward a hull's middle, off a box's side, and the range's slack.
-const NUDGE: f32 = crate::math::image::hull_path::NUDGE;
+const NUDGE: f32 = HULL_PATH_NUDGE;
 /// `DAT_142eb0c60`: two coordinates this close are the same point.
-const EPSILON: f32 = crate::math::image::hull_path::EPSILON;
+const EPSILON: f32 = HULL_PATH_EPSILON;
 /// `DAT_14330eb8c`: one (a direction's length; the intersection's inverse).
-const ONE: f32 = crate::math::image::hull_path::ONE;
+const ONE: f32 = HULL_PATH_ONE;
 /// `DAT_142ed55d4`, `DAT_142f4328c`: the parameters within which two segments meet.
-const LOW_T: f32 = crate::math::image::hull_path::LOW_T;
-const HIGH_T: f32 = crate::math::image::hull_path::HIGH_T;
+const LOW_T: f32 = HULL_PATH_LOW_T;
+const HIGH_T: f32 = HULL_PATH_HIGH_T;
 /// `DAT_142f43298`: the intersection search's first distance.
-const FAR: f32 = crate::math::image::hull_path::FAR;
+const FAR: f32 = HULL_PATH_FAR;
 /// `DAT_14330ebf4`: the largest float, the first distance of the ray searches.
-const MOST: f32 = crate::math::image::hull_path::MOST;
+const MOST: f32 = HULL_PATH_MOST;
 /// `DAT_142eb99cc`: two exit or entrance paths ending this close end at the same point.
-const SAME_END: f32 = crate::math::image::hull_path::SAME_END;
+const SAME_END: f32 = HULL_PATH_SAME_END;
 /// `DAT_142ef9004`, `DAT_142eb880c`: the step along a box's side, of its length, of the walk out of
 /// a hull and of the walk into one.
-const EXIT_STEP: f32 = crate::math::image::hull_path::EXIT_STEP;
-const ENTRANCE_STEP: f32 = crate::math::image::hull_path::ENTRANCE_STEP;
+const EXIT_STEP: f32 = HULL_PATH_EXIT_STEP;
+const ENTRANCE_STEP: f32 = HULL_PATH_ENTRANCE_STEP;
 /// `DAT_142f43290`: the square root of 2, a detour point's distance from a square's middle.
-const SQRT_2: f32 = crate::math::image::hull_path::SQRT_2;
+const SQRT_2: f32 = HULL_PATH_SQRT_2;
 /// `DAT_142eb0f48`: within 2 tiles (squared) of a moving target the quick path stops short of it.
-const NEAR_TARGET: f32 = crate::math::image::hull_path::NEAR_TARGET;
+const NEAR_TARGET: f32 = HULL_PATH_NEAR_TARGET;
 /// The gift wrap's pseudo-angle (`MergePointsIntoHull`): none yet (`DAT_14330ec20`), the quadrants
 /// added left of the y axis and below the x axis (`DAT_142e8c150` 2, `DAT_142eb0f48` 4), the degrees
 /// of one (`DAT_142f43294`) and a turn (`DAT_142f02860`, `DAT_142f4329c`).
-const NO_ANGLE: f32 = crate::math::image::hull_path::NO_ANGLE;
-const HALF_TURN: f32 = crate::math::image::hull_path::HALF_TURN;
-const FULL_TURN: f32 = crate::math::image::hull_path::FULL_TURN;
-const QUADRANT: f32 = crate::math::image::hull_path::QUADRANT;
-const TURN: f32 = crate::math::image::hull_path::TURN;
-const UNTURN: f32 = crate::math::image::hull_path::UNTURN;
+const NO_ANGLE: f32 = HULL_PATH_NO_ANGLE;
+const HALF_TURN: f32 = HULL_PATH_HALF_TURN;
+const FULL_TURN: f32 = HULL_PATH_FULL_TURN;
+const QUADRANT: f32 = HULL_PATH_QUADRANT;
+const TURN: f32 = HULL_PATH_TURN;
+const UNTURN: f32 = HULL_PATH_UNTURN;
 /// `DAT_1439e6870`: the 16 directions of the first steps out of a box (the game's table: its 12th
 /// repeats the 11th).
-const DIRECTIONS: [GroundOffset; 16] =
-    GroundOffset::table(crate::math::image::hull_path::DIRECTIONS);
+const DIRECTIONS: [GroundOffset; 16] = GroundOffset::table(HULL_PATH_DIRECTIONS);
 /// `DAT_1439e68f0`: the four ray directions of a walk out of a hull or into one (down, up, left,
 /// right).
-const SIDES: [GroundOffset; 4] = GroundOffset::table(crate::math::image::hull_path::SIDES);
+const SIDES: [GroundOffset; 4] = GroundOffset::table(HULL_PATH_SIDES);
 
 /// A box in a hull (`ObstructionInfo`, 0x14 bytes): an obstruction's box grown by the unit's
 /// radius and the obstruction's id (an object's, or a tile's [`tile_record_id`]).
@@ -226,7 +238,7 @@ impl Nodes {
     }
 }
 
-impl std::ops::Index<NodeIndex> for Nodes {
+impl Index<NodeIndex> for Nodes {
     type Output = Node;
 
     fn index(&self, i: NodeIndex) -> &Node {
@@ -411,8 +423,8 @@ impl Default for KeptHulls {
 pub struct HullPather<'w> {
     world: &'w mut Spatial,
     /// The world's objects, whose gaits the hulls and the line tests read.
-    by_id: crate::world::index::ObjectsRef<'w>,
-    mask: crate::map::TerrainMask,
+    by_id: ObjectsRef<'w>,
+    mask: TerrainMask,
     radius: Distance,
     /// `FindShortPath`'s player (its argument 12, the unit's player's number `+0x718`), whom slot
     /// 0x678 asks about a gate; none (-1) for a unit the world does not hold.

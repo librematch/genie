@@ -8,19 +8,27 @@ use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::SpecificMove;
+use crate::groups::formation::top_path;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone, slot_gone};
 use crate::groups::motion::passes_waypoint;
 use crate::groups::steer::{CATCH_UP, CATCH_UP_SPAN, LINKED_RADIUS, SLOT_REACH};
 use crate::map::Distance;
 use crate::math::fmath::{BVector, at_most_or_unordered, below_or_unordered};
+use crate::math::rng::Stream;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
+use crate::movement::{
+    LONG_PATH_MOVER, LongWalker, Mover, Planning, long_path_for, short_path_for,
+};
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
+use crate::objects::facing::SpriteFacets;
 use crate::objects::masters::master_type::BUILDING;
+use crate::pathing::tile_path::Path;
 use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::{ObjectsRef, Place};
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 impl World {
@@ -101,25 +109,20 @@ impl World {
             let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
             let at = u.moved_vector(self.parts.mover_of(u.id));
             let walker = mover.walker(id);
-            let mut plan = crate::movement::Planning {
+            let mut plan = Planning {
                 pathing: &mut self.pathing,
                 now: self.world_time,
                 player_type,
-                object: self.streams.get(crate::math::rng::Stream::Object),
+                object: self.streams.get(Stream::Object),
                 groups: &self.groups,
             };
-            let mut path = crate::pathing::tile_path::Path::default();
-            let r = crate::movement::short_path_for(
+            let mut path = Path::default();
+            let r = short_path_for(
                 walker,
                 at.ground(),
                 (
                     &mut self.spatial,
-                    crate::world::index::ObjectsRef::new(
-                        &self.players,
-                        &self.index,
-                        &self.masters,
-                        &self.parts,
-                    ),
+                    ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
                 ),
                 &mut plan,
                 (to, Distance::ZERO, None),
@@ -128,29 +131,23 @@ impl World {
             )?;
             !r.fails()
         } else {
-            let walker = crate::movement::LongWalker {
+            let walker = LongWalker {
                 id,
                 position: u.position(),
                 radius: mover.stats.radius.ground(),
                 mask: mover.stats.restriction_mask,
-                moves: mover.stats.speed != Speed::ZERO
-                    || u.life.master_id == crate::movement::LONG_PATH_MOVER,
+                moves: mover.stats.speed != Speed::ZERO || u.life.master_id == LONG_PATH_MOVER,
                 ignore_units: &mover.ignore_units,
                 group_units: self.groups.group_units(u.group.id),
             };
-            crate::movement::long_path_for(
+            long_path_for(
                 &walker,
                 u.position().ground(),
                 &self.spatial,
                 player_type,
                 (to, 0.0),
                 None,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
+                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
             )?
             .0
         };
@@ -180,7 +177,7 @@ impl World {
             .transform_position;
         let dt = self.dt_seconds;
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let facets = u.sprite.map(|s| crate::objects::facing::SpriteFacets {
+        let facets = u.sprite.map(|s| SpriteFacets {
             count: s.graphic.facets,
             turns: s.graphic.flags.contains(SpriteFlags::TURNS),
         });
@@ -217,13 +214,10 @@ impl World {
     fn stop_at_slot(&mut self, group: GroupId, id: ObjectId) -> Result<(), GenieError> {
         self.stop_member(id)?;
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let paused = self
-            .parts
-            .mover_of(u.id)
-            .is_some_and(crate::movement::Mover::paused);
+        let paused = self.parts.mover_of(u.id).is_some_and(Mover::paused);
         let g = self.groups.held(group)?;
-        let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol =
+            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         let walks = g
             .motion
             .paths
@@ -343,8 +337,8 @@ impl World {
         };
         let kind = self.master(p, master_id)?.kind;
         let u = match place {
-            crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
-            crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
+            Place::Live(p, i) => self.players.live_mut(p, i)?,
+            Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
         };
         let Some(mover) = self.parts.mover_mut(u.id) else {
             return Ok(());

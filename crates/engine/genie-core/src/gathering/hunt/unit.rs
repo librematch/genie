@@ -1,10 +1,12 @@
 //! A hunter's search and its walk after a drop.
 
 use crate::GenieError;
+use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::combat::victims::victim;
 use crate::gathering::closest_resource::herded;
 use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::{HuntTask, NO_HUNT, Quarry, stand_sprite};
 use crate::map::Distance;
 use crate::map::spatial::{Placed, SearchQuery, Spatial};
 use crate::math::rng::Stream;
@@ -13,19 +15,32 @@ use crate::movement::{Me, Planning};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
+use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
+use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::objects::sprite::new_sprite;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::objects::{ObjectKey, WorkerCount};
+use crate::players::NO_RELATIONS;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::Search;
+use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::DropWorld;
+use crate::unit_ai::{
+    CIVILIAN, CIVILIAN_CARED, Memory, NoAttack, Pick, civilian_kind, civilian_search_radius,
+};
+use crate::world::HUNTER_UNMOVING;
 use crate::world::SEARCH_AGAIN;
+use crate::world::index::ObjectsRef;
+use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -38,13 +53,10 @@ impl Unit {
     /// (`set_state` 2), not modelled.
     pub(crate) fn hunt_set_search(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let hunt = actions
-            .list
-            .hunt_mut()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         if hunt.target_class != Some(class::PREDATOR) {
             let target = hunt.target.take();
             self.hunt_release(c, [target])?;
@@ -58,13 +70,10 @@ impl Unit {
     /// target and the second target go), a computer player's would end (1), not modelled.
     pub(crate) fn hunt_search_state(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let hunt = actions
-            .list
-            .hunt_mut()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let task = hunt.task;
         if hunt.target_class == Some(class::PREDATOR) {
             // a human player's hunt is done (set_state 2), a computer player's ends (1)
@@ -88,17 +97,17 @@ impl Unit {
     pub(crate) fn hunt_stand(
         &mut self,
         c: &mut Step<'_>,
-        task: &crate::gathering::hunt::HuntTask,
+        task: &HuntTask,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        let stand = crate::gathering::hunt::stand_sprite(
+        let stand = stand_sprite(
             task,
             master.standing_sprite,
             self.life.held(),
             &c.w.graphics,
         );
         if let Some(s) = stand {
-            crate::objects::sprite::new_sprite(
+            new_sprite(
                 &mut self.sprite,
                 c.w.parts.move_stats_mut(self.id),
                 s,
@@ -114,14 +123,14 @@ impl Unit {
     /// # Errors
     ///
     /// The release's.
-    pub(crate) fn hunt_release<K: crate::objects::ObjectKey, const N: usize>(
+    pub(crate) fn hunt_release<K: ObjectKey, const N: usize>(
         &mut self,
         c: &mut Step<'_>,
         ids: [K; N],
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
-        for id in ids.into_iter().filter_map(crate::objects::ObjectKey::key) {
-            crate::world::lets::release(c, self, id, by)?;
+        for id in ids.into_iter().filter_map(ObjectKey::key) {
+            release(c, self, id, by)?;
         }
         Ok(())
     }
@@ -133,17 +142,12 @@ impl Unit {
     /// found 0, and the hunt's class goes (−1).
     pub(crate) fn hunt_search_notify(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
         let master = self.master(c.w.master_tables(), c.player)?;
         let site = if let Some(carry) = carry_to {
@@ -152,10 +156,7 @@ impl Unit {
             -1
         } else {
             let mut w = DropWorld {
-                masters: crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                masters: OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 spatial: &mut c.w.spatial,
                 zones: &mut c.w.zones,
                 pathing: &mut c.w.pathing,
@@ -174,11 +175,7 @@ impl Unit {
             )?;
             match site {
                 None => {
-                    actions
-                        .list
-                        .hunt_mut()
-                        .ok_or(crate::gathering::hunt::NO_HUNT)?
-                        .target_class = None;
+                    actions.list.hunt_mut().ok_or(NO_HUNT)?.target_class = None;
                     0
                 }
                 // the notify's record holds the drop site's id
@@ -213,17 +210,11 @@ impl Unit {
     /// [`HuntAction::search_walk`]: crate::gathering::hunt::HuntAction::search_walk
     pub(crate) fn hunt_after_drop(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<HeadCode, GenieError> {
         let _ = self.master(c.w.master_tables(), c.player)?;
-        if actions
-            .list
-            .hunt()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?
-            .target
-            .is_some()
-        {
+        if actions.list.hunt().ok_or(NO_HUNT)?.target.is_some() {
             return self
                 .hunt_back_to_target(actions, c)
                 .map(|()| HeadCode::Keeps);
@@ -247,15 +238,15 @@ impl Unit {
     /// modelled.
     fn hunt_back_to_target(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let master = self.master(c.w.master_tables(), c.player)?;
         let v = victim(c, hunt.target)?.ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold live",
         ))?;
-        let quarry = crate::gathering::hunt::Quarry {
+        let quarry = Quarry {
             id: v.id,
             position: v.position,
             class: v.class,
@@ -279,7 +270,7 @@ impl Unit {
             c.w.parts
                 .mover_of(self.id)
                 .map_or(Speed::ZERO, |m| m.stats.speed);
-        let engagement = crate::combat::attack::engagement(
+        let engagement = engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
             master,
@@ -288,19 +279,16 @@ impl Unit {
             c.w.world_time,
         )?;
         let moving = hunt.task.walk_sprite_id(self.life.held());
-        let arms = crate::combat::attack::arms(master, &c.w.graphics, hunt.task.sprites, moving);
-        let hunt = actions
-            .list
-            .hunt_mut()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let arms = arms(master, &c.w.graphics, hunt.task.sprites, moving);
+        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let site = hunt.carry_to.take();
         let by = self.releaser(c)?;
         if site.is_some() {
-            crate::world::lets::release(c, self, site, by)?;
+            release(c, self, site, by)?;
         }
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
@@ -371,10 +359,10 @@ impl Unit {
     /// kind.
     fn hunt_next_search(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
     ) -> Result<(Option<ObjectId>, Option<GatherGroup>), GenieError> {
-        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let ai =
             c.w.parts
                 .unit_ai
@@ -383,20 +371,20 @@ impl Unit {
                     "a hunt without a unit AI after its drop-off",
                 ))?;
         let class = ai.target_class.or(hunt.target_class);
-        if ai.ai_type != crate::unit_ai::CIVILIAN {
+        if ai.ai_type != CIVILIAN {
             return Err(GenieError::unsupported(
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));
         }
-        let kind = class.and_then(crate::unit_ai::civilian_kind);
+        let kind = class.and_then(civilian_kind);
         let found = match kind {
             None if hunt.target_class == Some(class::PREDATOR) => None,
             None => self.hunt_closest_object(actions, c, class)?,
             Some(group) => {
                 let cap = if group == GatherGroup::WOOD {
-                    crate::objects::WorkerCount::of_data(2)
+                    WorkerCount::of_data(2)
                 } else {
-                    crate::objects::WorkerCount::NO_CAP
+                    WorkerCount::NO_CAP
                 };
                 self.resource_search(actions, c, group, cap)?
             }
@@ -411,7 +399,7 @@ impl Unit {
     /// are not modelled. The object found, -1 for none.
     fn hunt_closest_object(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
         class: Option<ClassId>,
     ) -> Result<Option<ObjectId>, GenieError> {
@@ -422,41 +410,30 @@ impl Unit {
             ));
         }
         let master = self.master(c.w.master_tables(), c.player)?;
-        let mover =
-            c.w.parts
-                .mover_of(self.id)
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
-        let radius =
-            crate::unit_ai::civilian_search_radius(master.line_of_sight, master.search_radius);
+        let mover = c.w.parts.mover_of(self.id).ok_or(HUNTER_UNMOVING)?;
+        let radius = civilian_search_radius(master.line_of_sight, master.search_radius);
         let search = Search {
             at: self.position().ground(),
             radius,
-            classes: &crate::unit_ai::CIVILIAN_CARED,
+            classes: &CIVILIAN_CARED,
             size: master.radius,
-            pick: crate::unit_ai::Pick::Closest {
+            pick: Pick::Closest {
                 group: class,
                 relation: None,
                 state: None,
                 master: None,
                 workers: if class == Some(class::FARM) {
-                    crate::objects::WorkerCount::ONE
+                    WorkerCount::ONE
                 } else {
-                    crate::objects::WorkerCount::NO_CAP
+                    WorkerCount::NO_CAP
                 },
                 spared: None,
                 reach: true,
             },
-            memory: crate::unit_ai::Memory::default(),
+            memory: Memory::default(),
         };
         let me = Me {
-            action_state: ActionState::new(
-                actions
-                    .list
-                    .hunt()
-                    .ok_or(crate::gathering::hunt::NO_HUNT)?
-                    .state
-                    .get(),
-            ),
+            action_state: ActionState::new(actions.list.hunt().ok_or(NO_HUNT)?.state.get()),
             ..self.me(actions)
         };
         let mut plan = Planning {
@@ -467,16 +444,11 @@ impl Unit {
             groups: &c.w.groups,
         };
         let (master_id, at) = (self.life.master_id, self.position());
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
         };
-        let mut no_attack = crate::unit_ai::NoAttack;
+        let mut no_attack = NoAttack;
         let moving = |id: ObjectId| herded(by_id, id);
         let shuns = |_: &Placed| -> Result<bool, GenieError> {
             Err(GenieError::unsupported(
@@ -513,7 +485,7 @@ impl Unit {
     /// (`set_state(2)`), not modelled.
     fn hunt_found_nothing(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         kind: Option<GatherGroup>,
     ) -> Result<(), GenieError> {
@@ -524,26 +496,20 @@ impl Unit {
         }
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let hunt = actions
-            .list
-            .hunt_mut()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         if hunt.point.x() == -1.0 || hunt.point.y() == -1.0 {
             return Err(GenieError::unsupported(
                 "a hunt without a point that found nothing after its drop-off (set_state 2)",
             ));
         }
-        let mover =
-            c.w.parts
-                .mover_mut(self.id)
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         hunt.search_walk(mover, &walks)
     }
 
@@ -555,7 +521,7 @@ impl Unit {
     /// carries nothing now).
     fn hunt_take_found(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         found: ObjectId,
     ) -> Result<(), GenieError> {
@@ -566,20 +532,13 @@ impl Unit {
                 "a hunt's new target the slice does not hold",
             ))?;
         let target_master = t.master(c.w.master_tables(), owner)?;
-        let relations =
-            c.w.spatial
-                .relations
-                .get(c.player)
-                .unwrap_or(&crate::players::NO_RELATIONS);
-        if matches!(
-            t.life.master_id,
-            crate::objects::masters::ids::PASTURE_MANGROVE | crate::objects::masters::ids::PASTURE
-        ) {
+        let relations = c.w.spatial.relations.get(c.player).unwrap_or(&NO_RELATIONS);
+        if matches!(t.life.master_id, PASTURE_MANGROVE | PASTURE) {
             return Err(GenieError::unsupported(
                 "a hunt finding a farm (FUN_1411c7670)",
             ));
         }
-        let quarry = crate::gathering::hunt::Quarry {
+        let quarry = Quarry {
             id: found,
             position: t.position(),
             class: target_master.class,
@@ -587,7 +546,7 @@ impl Unit {
             state: t.life.state,
             player: owner,
             amount: t.life.amount,
-            allied: crate::unit_ai::task_finder::allied(relations, c.player, owner, true),
+            allied: allied(relations, c.player, owner, true),
             top_action: c.w.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         };
@@ -603,7 +562,7 @@ impl Unit {
             c.w.parts
                 .mover_of(self.id)
                 .map_or(Speed::ZERO, |m| m.stats.speed);
-        let engagement = crate::combat::attack::engagement(
+        let engagement = engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
             master,
@@ -615,11 +574,11 @@ impl Unit {
             let moving = h.task.walk_sprite_id(self.life.held());
             (h.task.sprites, moving)
         });
-        let arms = crate::combat::attack::arms(master, &c.w.graphics, sprites, moving);
+        let arms = arms(master, &c.w.graphics, sprites, moving);
         let drops_here = master.drop_sites.contains(&t.life.master_id);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
@@ -645,25 +604,21 @@ impl Unit {
             mover,
         )? {
             if arrived {
-                crate::combat::attack::show_arrived(
+                show_arrived(
                     &arms,
                     &mut self.sprite,
                     c.w.parts.motion_mut(self.id),
                     c.w.streams.get(Stream::Sprite),
                 )?;
             }
-            crate::world::lets::take(c, self, found, by)?;
+            take(c, self, found, by)?;
         }
         self.hunt_failed_sprite(actions, c)
     }
 
     /// A hunt that failed at once after its retarget: the unit shows standing, and a unit with
     /// a sprite takes its master's standing sprite (none in the data file is not modelled).
-    fn hunt_failed_sprite(
-        &mut self,
-        actions: &crate::objects::layers::Action,
-        c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    fn hunt_failed_sprite(&mut self, actions: &Action, c: &mut Step<'_>) -> Result<(), GenieError> {
         let failed = actions
             .list
             .hunt()
@@ -683,7 +638,7 @@ impl Unit {
             let standing = standing.ok_or(GenieError::unsupported(
                 "a hunter without its standing sprite",
             ))?;
-            crate::objects::sprite::new_sprite(
+            new_sprite(
                 &mut self.sprite,
                 c.w.parts.move_stats_mut(self.id),
                 standing,

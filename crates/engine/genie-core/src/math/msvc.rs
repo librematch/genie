@@ -6,6 +6,7 @@
 
 use crate::GenieError;
 use crate::world::slots::CheckedIndex;
+use std::mem::take;
 
 /// `std::sort` (`_Sort_unchecked`, the tile pathfinder's at `0x140f9c510`): quicksort by the
 /// median guess while the range holds more than 32 elements and divisions are left, a heap sort
@@ -387,7 +388,7 @@ pub fn unordered_map_order<K: IntKey>(keys: impl IntoIterator<Item = K>) -> Vec<
             }
             buckets = buckets.next_power_of_two();
             let mask = buckets as u64 - 1;
-            let old = std::mem::take(&mut list);
+            let old = take(&mut list);
             for k in old {
                 insert_in_bucket(&mut list, k, mask);
             }

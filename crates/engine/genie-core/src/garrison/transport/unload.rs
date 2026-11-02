@@ -2,6 +2,7 @@
 //! unload and the units put ashore.
 
 use crate::GenieError;
+use crate::garrison::SIEGE_UNLOAD;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::{
     Around, Changed, DropDraws, MapShore, NONE, Ship, Shore, TRANSPORT, TransportAction, in_zone,
@@ -12,21 +13,29 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
+use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
+use crate::objects::masters::{Master, OwnerMasters};
 use crate::pathing::zones::ZoneId;
+use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
 use crate::players::PlayerId;
+use crate::production::spawn::{NOT_MOVING, Placing, Tested, WorldMap, placement};
+use crate::unit_ai::alert_owner;
+use crate::world::index::ObjectsRef;
+use crate::world::parts::Parts;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use crate::world::{Player, World};
 
 /// An unloading ship whose top action is no Transport where it was read as one.
 const NO_TRANSPORT: GenieError = GenieError::unreachable("an unloading ship without a Transport");
 
 /// The transports' parts that reach the world: the unload command's install, the unload and the
 /// units put ashore.
-impl crate::world::World {
+impl World {
     /// The unit's unload command (slot 0x3a8, `FUN_14108d050`) at `to` for player `p`'s object at
     /// `i`, after the unit AI that gave it: a Transport on top (type 12, `FUN_140a7be70`) is told
     /// to work at the unit's own place ("Telling existing action to work": slot 9 with the unit
@@ -126,7 +135,7 @@ impl crate::world::World {
         i: ListIndex,
         point: Position,
     ) -> Result<(), GenieError> {
-        let rng = self.streams.get(crate::math::rng::Stream::Sprite);
+        let rng = self.streams.get(Stream::Sprite);
         let id = self.players.live(p, i)?.id;
         self.players.live_mut(p, i)?.transport_sail(
             self.parts.actions.of_mut(id)?,
@@ -134,10 +143,7 @@ impl crate::world::World {
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &self.parts.own_master,
-                    self.masters.of(p),
-                ),
+                OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
                 (
                     &self.graphics,
                     self.parts.combat.of(id).abilities.look.as_ref(),
@@ -163,13 +169,10 @@ impl crate::world::World {
             m.stop()?;
         }
         if c.stands {
-            let rng = self.streams.get(crate::math::rng::Stream::Sprite);
+            let rng = self.streams.get(Stream::Sprite);
             unit.show_standing(
                 self.parts.motion.layer_mut(unit.id),
-                crate::objects::masters::OwnerMasters::new(
-                    &self.parts.own_master,
-                    self.masters.of(p),
-                ),
+                OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
                 &self.graphics,
                 rng,
             )?;
@@ -234,12 +237,8 @@ impl crate::world::World {
         };
         let mut changes = Vec::new();
         if count == 0 {
-            let terrain = self
-                .spatial
-                .terrain
-                .as_ref()
-                .ok_or(crate::pathing::zones::NO_TERRAIN)?;
-            let rng = self.streams.get(crate::math::rng::Stream::Action);
+            let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
+            let rng = self.streams.get(Stream::Action);
             let (point, sails) = retry_point(Point::new(x, y), ship.map, terrain, rng);
             let mut shore = MapShore::new(
                 &self.spatial,
@@ -259,10 +258,10 @@ impl crate::world::World {
                 )?);
                 t.retarget = true;
             } else {
-                crate::unit_ai::alert_owner(player_type)?;
+                alert_owner(player_type)?;
             }
         } else if ship.loaded {
-            crate::unit_ai::alert_owner(player_type)?;
+            alert_owner(player_type)?;
         }
         let mut shore = MapShore::new(
             &self.spatial,
@@ -351,23 +350,17 @@ impl crate::world::World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         id: ObjectId,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         around: Around,
         zone: Option<ZoneId>,
         last: &mut Option<Point>,
     ) -> Result<Option<Point>, GenieError> {
         let ship = self.players.live(p, i)?;
         let restriction = ship.master(self.master_tables(), p)?.terrain_restriction;
-        let terrain = self
-            .spatial
-            .terrain
-            .as_ref()
-            .ok_or(crate::pathing::zones::NO_TERRAIN)?;
+        let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let zone_map = match restriction {
             Some(r) if zone.is_some() => {
-                let values = terrain
-                    .restriction(r)
-                    .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+                let values = terrain.restriction(r).ok_or(UNKNOWN_RESTRICTION)?;
                 Some(
                     self.zones
                         .find(self.spatial.map, &terrain.kinds, values, false),
@@ -375,18 +368,11 @@ impl crate::world::World {
             }
             _ => None,
         };
-        let moving = made
-            .moving
-            .as_ref()
-            .ok_or(crate::production::spawn::NOT_MOVING)?;
-        let terrain = self
-            .spatial
-            .terrain
-            .as_ref()
-            .ok_or(crate::pathing::zones::NO_TERRAIN)?;
+        let moving = made.moving.as_ref().ok_or(NOT_MOVING)?;
+        let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let _ = terrain
             .restriction(moving.restriction)
-            .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+            .ok_or(UNKNOWN_RESTRICTION)?;
         let unit = self.object(id).map(|(_, u)| u);
         let (grow, mask) = unit.and_then(|u| self.parts.mover_of(u.id)).map_or_else(
             || {
@@ -398,7 +384,7 @@ impl crate::world::World {
             |m| (m.stats.radius.x(), m.stats.restriction_mask),
         );
         let zone_map = zone_map.map(|k| self.zones.map(k)).transpose()?;
-        let mut rng = self.streams.get(crate::math::rng::Stream::Object).clone();
+        let mut rng = self.streams.get(Stream::Object).clone();
         let mut draws = DropDraws::new(around, made.radius, self.spatial.map, last, &mut rng);
         let mut found = None;
         // the place's tests, each only after the one before passed
@@ -412,15 +398,11 @@ impl crate::world::World {
                 .check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
             // the placing reads the terrain, which `point_clear` below borrows with the map
             let free = {
-                let terrain = self
-                    .spatial
-                    .terrain
-                    .as_ref()
-                    .ok_or(crate::pathing::zones::NO_TERRAIN)?;
+                let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
                 let values = terrain
                     .restriction(moving.restriction)
-                    .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
-                let placing = crate::production::spawn::Placing {
+                    .ok_or(UNKNOWN_RESTRICTION)?;
+                let placing = Placing {
                     player: p,
                     radius: made.radius,
                     tall: made.tall,
@@ -429,9 +411,8 @@ impl crate::world::World {
                     hill_mode: made.hill_mode,
                     placement: made.placement,
                 };
-                let map = crate::production::spawn::WorldMap { turns: &*self };
-                crate::production::spawn::placement(&placing, &map, spot, false)?
-                    == crate::production::spawn::Tested::Free
+                let map = WorldMap { turns: &*self };
+                placement(&placing, &map, spot, false)? == Tested::Free
             };
             if free
                 && self.spatial.point_clear(
@@ -439,19 +420,14 @@ impl crate::world::World {
                     spot,
                     Distance::new(grow),
                     mask,
-                    crate::world::index::ObjectsRef::new(
-                        &self.players,
-                        &self.index,
-                        &self.masters,
-                        &self.parts,
-                    ),
+                    ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
                 )?
             {
                 found = Some(spot);
                 break;
             }
         }
-        *self.streams.get(crate::math::rng::Stream::Object) = rng;
+        *self.streams.get(Stream::Object) = rng;
         Ok(found)
     }
 
@@ -465,13 +441,13 @@ impl crate::world::World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         id: ObjectId,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         spot: Point,
     ) -> Result<(), GenieError> {
         let ship = self.players.live(p, i)?;
         let at = ship.position();
         if ship.master(self.master_tables(), p)?.class == class::SIEGE {
-            return Err(crate::garrison::SIEGE_UNLOAD);
+            return Err(SIEGE_UNLOAD);
         }
         let (up, ui) = self.live_inside(id)?;
         let unit = self.players.live_mut(up, ui)?;
@@ -493,8 +469,8 @@ impl crate::world::World {
 ///
 /// A slot the world does not hold, and an object without its Transport.
 fn transport_mut<'a>(
-    players: &[crate::world::Player],
-    parts: &'a mut crate::world::parts::Parts,
+    players: &[Player],
+    parts: &'a mut Parts,
     p: PlayerId,
     i: ListIndex,
 ) -> Result<&'a mut TransportAction, GenieError> {

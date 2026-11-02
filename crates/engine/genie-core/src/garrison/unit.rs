@@ -1,44 +1,63 @@
 //! A unit entering a building or a transport, and the transport's sail.
 
 use crate::GenieError;
+use crate::combat::Firepower;
+use crate::combat::abilities::Look;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
+use crate::garrison::transport::{MapShore, NO_TRANSPORT, Ship, TransportAction, TransportReads};
+use crate::garrison::{
+    EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate, enter_view, share,
+};
 use crate::gathering::gather::unit::give_load;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
+use crate::math::image::garrison::ENTER_HP_SHARE;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
 use crate::movement::move_to::MoveDefaults;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::action_type::DEPOSIT;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
+use crate::orders::town_bell::{BackToWork, TownBell};
+use crate::ownership::artifact::ArtifactSub;
 use crate::pathing::Pathing;
+use crate::pathing::zones::Zones;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::{allied, drops_at};
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::VisionBits;
+use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -63,7 +82,7 @@ impl Unit {
     /// The reads' and the update's.
     pub(crate) fn enter_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -88,26 +107,15 @@ impl Unit {
     /// # Errors
     ///
     /// The target's master's and [`crate::garrison::enter_view`]'s.
-    fn enter_reads(
-        &self,
-        c: &mut Step<'_>,
-        enter: &crate::garrison::EnterAction,
-    ) -> Result<crate::garrison::EnterReads, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+    fn enter_reads(&self, c: &mut Step<'_>, enter: &EnterAction) -> Result<EnterReads, GenieError> {
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {
-                let master = t.master(
-                    crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
-                    tp,
-                )?;
+                let master =
+                    t.master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), tp)?;
                 let room = units_inside(others, t.id) < master.garrison.units();
-                let (mut view, start) = crate::garrison::enter_view(
+                let (mut view, start) = enter_view(
                     &mut c.w.spatial,
                     &c.w.masters,
                     (self, c.w.parts.mover_of(self.id)),
@@ -117,24 +125,19 @@ impl Unit {
                 )?;
                 // FUN_141663dc0 with allies, or Gaia's
                 view.allied = tp == PlayerId::GAIA
-                    || crate::unit_ai::task_finder::allied(
-                        &c.w.players.player(c.player)?.relations,
-                        c.player,
-                        tp,
-                        true,
-                    );
+                    || allied(&c.w.players.player(c.player)?.relations, c.player, tp, true);
                 (Some(view), start)
             }
             None => (
                 None,
-                crate::garrison::WalkStart {
+                WalkStart {
                     gap: Distance::ZERO,
                 },
             ),
         };
         let master = self.master(c.w.master_tables(), c.player)?;
         let villager = master.class == class::VILLAGER;
-        Ok(crate::garrison::EnterReads {
+        Ok(EnterReads {
             target,
             start,
             waits: villager && !c.w.players.player(c.player)?.kind.is_computer(),
@@ -155,7 +158,7 @@ impl Unit {
     /// then the update's own `set_state(1)`).
     pub(crate) fn enter_in_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         target: Option<ContainerId>,
     ) -> Result<(), GenieError> {
@@ -184,12 +187,12 @@ impl Unit {
     /// The notify's and the `set_state(1)`'s.
     pub(crate) fn entered_again(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         self.post_own(
             &mut c.w.parts.unit_ai,
-            crate::unit_ai::NotifyKind::ACTION_COMPLETED,
+            NotifyKind::ACTION_COMPLETED,
             [ActionKind::Enter.value(), 0, 0],
         )?;
         for _ in 0..2 {
@@ -204,21 +207,18 @@ impl Unit {
     /// start shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
     pub(crate) fn transport_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
-        let mut t = *actions
-            .list
-            .transport()
-            .ok_or(crate::garrison::transport::NO_TRANSPORT)?;
+        let mut t = *actions.list.transport().ok_or(NO_TRANSPORT)?;
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
-        let given = crate::garrison::transport::TransportAction::given_sprite(t.task, master)?;
-        let reads = crate::garrison::transport::TransportReads {
+        let given = TransportAction::given_sprite(t.task, master)?;
+        let reads = TransportReads {
             radius: master.radius,
             restriction: master.terrain_restriction,
             defaults: MoveDefaults::of(
@@ -244,16 +244,13 @@ impl Unit {
     /// `MoveTo`'s teardown) and takes its standing sprite; `motion` is the unit's motion layer.
     pub(crate) fn transport_sail(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         mut motion: MotionMut<'_>,
         point: Position,
-        (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
+        (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
         (masters, (graphics, look), sprite_rng): (
-            crate::objects::masters::OwnerMasters<'_>,
-            (
-                &crate::objects::Graphics,
-                Option<&crate::combat::abilities::Look>,
-            ),
+            OwnerMasters<'_>,
+            (&Graphics, Option<&Look>),
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
@@ -263,7 +260,7 @@ impl Unit {
             .transport()
             .ok_or(GenieError::unreachable("a sail without its Transport"))?
             .task;
-        let ship = crate::garrison::transport::Ship::of_unit(
+        let ship = Ship::of_unit(
             (self, motion.mover()),
             master,
             spatial.map,
@@ -271,13 +268,7 @@ impl Unit {
             task,
         )?;
         let restriction = master.terrain_restriction;
-        let mut shore = crate::garrison::transport::MapShore::new(
-            spatial,
-            zones,
-            pathing,
-            restriction,
-            self.position(),
-        )?;
+        let mut shore = MapShore::new(spatial, zones, pathing, restriction, self.position())?;
         let t = actions
             .list
             .transport_mut()
@@ -304,7 +295,7 @@ impl Unit {
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
     pub(crate) fn entered(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let enter = actions
@@ -319,16 +310,13 @@ impl Unit {
         enter.state = EnterState::Done;
         self.shows_standing_sprite(
             c.w.parts.motion.layer_mut(self.id),
-            crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )?;
         self.post_own(
             &mut c.w.parts.unit_ai,
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
+            NotifyKind::ACTION_FAILED,
             [ActionKind::Enter.value(), 0, 0],
         )
     }
@@ -353,7 +341,7 @@ impl Unit {
     /// a Gaia building's capture (slot 0x70) are not held.
     pub(crate) fn enter_building(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         target: ContainerId,
         inside: usize,
@@ -362,20 +350,17 @@ impl Unit {
             "an enter into a building the world does not hold",
         ))?;
         let own = c.w.masters.of(c.player);
-        let masters = own.ok_or(crate::garrison::NO_MASTERS)?;
+        let masters = own.ok_or(NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
         let bm = building
-            .master_in(crate::objects::masters::OwnerMasters::new(
+            .master_in(OwnerMasters::new(
                 &c.w.parts.own_master,
                 c.w.masters.of(tp).or(own),
             ))?
             .clone();
         let hp = building.life.hp;
         let me = self
-            .master_in(crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                Some(masters),
-            ))?
+            .master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?
             .clone();
         let owner = c.w.players.player(c.player)?;
         let actor = Actor {
@@ -393,7 +378,7 @@ impl Unit {
             ),
             civ: owner.civ,
         };
-        if crate::unit_ai::task_finder::drops_at(&c.w.drop_sites, bm.id, &actor)
+        if drops_at(&c.w.drop_sites, bm.id, &actor)
             && Amount::ZERO < self.life.amount
             && bm.kind == BUILDING
         {
@@ -422,11 +407,7 @@ impl Unit {
             }
         }
         if bm.kind == BUILDING
-            && hp
-                <= HitPoints::new(
-                    HitPoints::of_master(bm.hit_points).get()
-                        * crate::math::image::garrison::ENTER_HP_SHARE,
-                )
+            && hp <= HitPoints::new(HitPoints::of_master(bm.hit_points).get() * ENTER_HP_SHARE)
         {
             return Err(GenieError::unsupported(
                 "an enter into a building at a fifth of its hit points (state 13)",
@@ -435,7 +416,7 @@ impl Unit {
         if me
             .tasks
             .iter()
-            .find(|t| t.action_type == crate::objects::masters::action_type::DEPOSIT)
+            .find(|t| t.action_type == DEPOSIT)
             .is_some_and(|t| t.object_id == Some(bm.id))
         {
             return Err(GenieError::unsupported(
@@ -448,7 +429,7 @@ impl Unit {
         self.go_inside(actions, c, target, &me, &bm)?;
         self.post_own(
             &mut c.w.parts.unit_ai,
-            crate::unit_ai::NotifyKind::ACTION_COMPLETED,
+            NotifyKind::ACTION_COMPLETED,
             [ActionKind::Enter.value(), 0, 0],
         )?;
         self.entered(actions, c)?;
@@ -467,7 +448,7 @@ impl Unit {
     /// `+0x9a8` (the units inside the unit), and a siege building's slot 0x1b0 are not modelled.
     pub(crate) fn go_inside(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         target: ContainerId,
         me: &Master,
@@ -542,21 +523,18 @@ impl Unit {
         me: &Master,
         bm: &Master,
     ) -> Result<(), GenieError> {
-        let masters =
-            c.w.masters
-                .get(c.player.index())
-                .ok_or(crate::garrison::NO_MASTERS)?;
+        let masters = c.w.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
         let firepower = if me.kind == COMBAT {
             let own = c.w.masters.of(bp).unwrap_or(masters);
-            let rate = crate::garrison::attack_rate(bm, own, reload);
-            crate::garrison::share(
+            let rate = attack_rate(bm, own, reload);
+            share(
                 me,
                 masters,
                 c.w.parts.combat_of(self.id).reload_powerup,
                 rate,
             )?
         } else {
-            crate::combat::Firepower::ZERO
+            Firepower::ZERO
         };
         if let Some((_, b)) = c.w.object_mut(target) {
             b.garrison.push(self.id);
@@ -575,7 +553,7 @@ impl Unit {
         target: ContainerId,
         at: Position,
         radius: Footprint,
-        placed: crate::map::spatial::Placed,
+        placed: Placed,
         bm: &Master,
     ) -> Result<(), GenieError> {
         let id = self.id;
@@ -594,9 +572,7 @@ impl Unit {
                 new: VisionBits::NONE,
             })?;
             // its mask (`+0x8f8`) is none after
-            r.entries
-                .get_or_insert_with(id, crate::vision::registry::Entry::default)?
-                .mask = VisionBits::NONE;
+            r.entries.get_or_insert_with(id, Entry::default)?.mask = VisionBits::NONE;
         }
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
         if bm.kind == BUILDING {
@@ -605,7 +581,7 @@ impl Unit {
                 at,
                 radius,
                 SightShape::Circle,
-                crate::garrison::INSIDE_SIGHT,
+                INSIDE_SIGHT,
                 SightCentre::Tile,
             )?;
         }
@@ -620,7 +596,7 @@ impl Unit {
     /// villagers; with 3 it is never cleared.
     fn enter_town_bell(
         &self,
-        (bell, ai): (&mut crate::orders::town_bell::TownBell, Option<&UnitAi>),
+        (bell, ai): (&mut TownBell, Option<&UnitAi>),
         target: Option<ContainerId>,
         at: Position,
         state: ObjectState,
@@ -635,7 +611,7 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a town-bell record of a unit without a unit AI",
                 ))?;
-            bell.record(crate::orders::town_bell::BackToWork {
+            bell.record(BackToWork {
                 target: target.map(ContainerId::id),
                 target_class: None,
                 action,
@@ -666,7 +642,7 @@ impl Unit {
     /// the next.
     pub(crate) fn inside_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         if !actions.list.is_empty() {
@@ -681,12 +657,12 @@ impl Unit {
     }
 }
 
-impl crate::objects::layers::Action {
+impl Action {
     /// The unit's new Enter: its own action, or with `sub` the sub-action of its Artifact on top.
-    pub(crate) fn place_enter(&mut self, action: crate::garrison::EnterAction, sub: bool) {
+    pub(crate) fn place_enter(&mut self, action: EnterAction, sub: bool) {
         match self.list.artifact_mut().filter(|_| sub) {
             Some(art) => {
-                art.sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter: action });
+                art.sub = Some(ArtifactSub::Enter { enter: action });
             }
             None => self.list.set_enter(Some(action)),
         }

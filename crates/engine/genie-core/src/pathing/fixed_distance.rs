@@ -1,6 +1,7 @@
 //! A length in the pathing's fixed point ([`FixedDistance`]) and a squared one
 //! ([`FixedDistanceSquared`]).
 
+use crate::pathing::mesh::ONE;
 use genie_diff::Diff;
 
 /// A length in fixed point, in units of 2^-22 tile like [`crate::pathing::FixedPoint`]'s
@@ -16,7 +17,7 @@ impl FixedDistance {
     /// No length.
     pub const ZERO: Self = Self(0);
     /// One tile ([`crate::pathing::mesh::ONE`]).
-    pub const TILE: Self = Self(crate::pathing::mesh::ONE);
+    pub const TILE: Self = Self(ONE);
 
     /// The length of `value` units.
     #[must_use]

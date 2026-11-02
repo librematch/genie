@@ -8,17 +8,29 @@ use genie_core::vision::TileCount;
 
 use crate::masters::{MasterTable, TerrainTable};
 use crate::{Error, game_state, header_objects, moving_speed, placement, saved_ghosts};
+use genie_core::map::Point;
 use genie_core::map::Position;
+use genie_core::map::spatial::Spatial;
+use genie_core::map::terrain::Terrain;
 use genie_core::objects::ObjectId;
+use genie_core::objects::ObjectState;
 use genie_core::objects::masters::ObstructionType;
+use genie_core::objects::masters::master_type::{BUILDING, COMBAT};
+use genie_core::objects::masters::{MasterId, MasterKind};
+use genie_core::ownership::CaptureKind;
 use genie_core::players::PlayerId;
+use genie_core::players::{PlayerType, UnitRelation};
 use genie_core::vision::VisionBits;
+use genie_core::vision::ghost::Ghost;
 use genie_core::vision::visibility::{
     BuildingSight, Extent, Seer, Visibility, VisibleMap, VisibleResource, VisibleResources,
     capture_kind,
 };
+use genie_core::world::GameState;
+use genie_core::world::parts::Object;
 use genie_rec::de;
 use genie_save::Header;
+use genie_save::generated::world::VisibleResourceManager;
 
 /// The world's objects as movement sees them: every player's live and sleeping objects with their
 /// positions and their masters' radii and class; the players' doppelgangers count on their tiles. An object has an obstruction record when its
@@ -26,10 +38,7 @@ use genie_save::Header;
 /// foundation no builder has started; the first builder's Build state 7 adds its record). Checked
 /// against the game's obstruction manager, dumped by the tick oracle.
 /// The map's terrain per tile from the save, with the `.dat`'s terrain records.
-pub(super) fn map_terrain(
-    header: &Header,
-    terrain: &TerrainTable,
-) -> genie_core::map::terrain::Terrain {
+pub(super) fn map_terrain(header: &Header, terrain: &TerrainTable) -> Terrain {
     let map = &header.world.base_world.map;
     let tiles = map
         .rows
@@ -40,7 +49,7 @@ pub(super) fn map_terrain(
                 .map(|t| TileTerrain::of_save(t.terrain_type, t.restore_terrain_type, t.layer))
         })
         .collect();
-    let mut t = genie_core::map::terrain::Terrain::new(
+    let mut t = Terrain::new(
         GridSize::new(map.map_width, map.map_height),
         tiles,
         terrain.kinds().to_vec(),
@@ -56,19 +65,13 @@ pub(super) fn map_terrain(
 }
 
 /// The differences between the slice's map terrain and a save's, tile by tile.
-pub fn terrain_differences(
-    slice: &genie_core::map::terrain::Terrain,
-    save: &[u8],
-) -> Result<Vec<String>, Error> {
+pub fn terrain_differences(slice: &Terrain, save: &[u8]) -> Result<Vec<String>, Error> {
     let chapter = de::chapters(save)?[0];
     Ok(header_terrain_differences(slice, &chapter.header()?))
 }
 
 /// [`terrain_differences`] of a read header.
-pub(super) fn header_terrain_differences(
-    slice: &genie_core::map::terrain::Terrain,
-    header: &Header,
-) -> Vec<String> {
+pub(super) fn header_terrain_differences(slice: &Terrain, header: &Header) -> Vec<String> {
     let (width, tiles) = saved_terrain(header);
     tile_differences(slice, width, &tiles)
 }
@@ -91,7 +94,7 @@ pub(super) fn saved_terrain(header: &Header) -> (usize, Vec<(u8, u8, i16)>) {
 
 /// The tiles whose terrain differs between the slice and the game's.
 pub(super) fn tile_differences(
-    slice: &genie_core::map::terrain::Terrain,
+    slice: &Terrain,
     width: usize,
     tiles: &[(u8, u8, i16)],
 ) -> Vec<String> {
@@ -119,13 +122,13 @@ pub(super) fn tile_differences(
 ///
 /// [`forced_run`]: crate::forced_replay::forced_run
 pub(super) struct SavedStep {
-    pub(super) objects: Vec<Vec<genie_core::world::parts::Object>>,
+    pub(super) objects: Vec<Vec<Object>>,
     /// Each player's ghosts (type 25) in its list's order.
-    pub(super) ghosts: Vec<Vec<genie_core::vision::ghost::Ghost>>,
+    pub(super) ghosts: Vec<Vec<Ghost>>,
     pub(super) seen: Visibility,
     pub(super) width: usize,
     pub(super) terrain: Vec<(u8, u8, i16)>,
-    pub(super) game: genie_core::world::GameState,
+    pub(super) game: GameState,
 }
 
 impl SavedStep {
@@ -155,7 +158,7 @@ impl SavedStep {
 pub(super) fn spatial(
     header: &Header,
     terrain: &TerrainTable,
-) -> Result<genie_core::map::spatial::Spatial, genie_core::GenieError> {
+) -> Result<Spatial, genie_core::GenieError> {
     use genie_core::map::spatial::{Obstruction, Placed, Spatial, Tiles};
     let map = &header.world.base_world.map;
     let classes = map
@@ -176,7 +179,7 @@ pub(super) fn spatial(
                 .base
                 .unit_diplomacy
                 .iter()
-                .map(|&k| genie_core::players::UnitRelation::of_field(k))
+                .map(|&k| UnitRelation::of_field(k))
                 .collect()
         })
         .collect();
@@ -188,7 +191,7 @@ pub(super) fn spatial(
             let Some(m) = placement(s, section.objects()) else {
                 continue;
             };
-            let master = genie_core::objects::masters::MasterId::try_from(s.master_obj)?;
+            let master = MasterId::try_from(s.master_obj)?;
             let id = ObjectId::try_from(s.id)?;
             let building = o.tribe_building_object.as_deref();
             // a building's place links its tiles (FUN_1411e6780), an annex's does not, and a
@@ -221,7 +224,7 @@ pub(super) fn spatial(
                     player,
                     master,
                     los: m.los,
-                    state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
+                    state: ObjectState::of_byte(s.object_state)?,
                     // a foundation made in the game explores first when its construction starts
                     explored: building.is_none_or(|b| b.built != 0 || b.build_pts != 0.0),
                     building: building.map(|b| BuildingSight {
@@ -233,19 +236,15 @@ pub(super) fn spatial(
                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
                     capture: o.combat().map_or_else(
                         || capture_kind(player, m.class, master),
-                        |c| {
-                            genie_core::ownership::CaptureKind::of_data(
-                                c.rge_combat_object.capture_flag,
-                            )
-                        },
+                        |c| CaptureKind::of_data(c.rge_combat_object.capture_flag),
                     ),
                     // the object's type: the save's factory types 70 and 80, any other below
                     kind: if o.tribe_combat_object.is_some() {
-                        genie_core::objects::masters::master_type::COMBAT
+                        COMBAT
                     } else if building.is_some() {
-                        genie_core::objects::masters::master_type::BUILDING
+                        BUILDING
                     } else {
-                        genie_core::objects::masters::MasterKind::of_data(0)
+                        MasterKind::of_data(0)
                     },
                 },
             );
@@ -342,7 +341,7 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
         umv.umv_data_list_size,
         players
             .iter()
-            .map(|p| genie_core::players::PlayerType::from(p.world_player().type_))
+            .map(|p| PlayerType::from(p.world_player().type_))
             .collect(),
     );
     sight.resources = players
@@ -354,7 +353,7 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
 
 /// A player's saved `Visible_Resource_Manager` as [`VisibleResources`] holds it.
 pub(super) fn saved_resources(
-    m: &genie_save::generated::world::VisibleResourceManager,
+    m: &VisibleResourceManager,
 ) -> Result<VisibleResources, genie_core::GenieError> {
     Ok(VisibleResources {
         capacities: m
@@ -375,7 +374,7 @@ pub(super) fn saved_resources(
                             id: ObjectId::try_from(r.object_id)?,
                             distance: Distance::new(r.distance),
                             zone: r.zone,
-                            at: genie_core::map::Point::new(r.pos_x, r.pos_y),
+                            at: Point::new(r.pos_x, r.pos_y),
                         })
                     })
                     .collect::<Result<Vec<_>, genie_core::GenieError>>()

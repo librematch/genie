@@ -1,6 +1,7 @@
 //! An Artifact's state: checking for a new owner and waiting between checks.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// An Artifact's state (`+0x18`): its step (`0x140aad250`) switches on it. Its `set_state`'s walks
 /// (4 and 5) pass on to 6 at once; the bytes without a state have no case, and no step modelled
@@ -41,8 +42,8 @@ impl ArtifactState {
     }
 }
 
-impl std::fmt::Display for ArtifactState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ArtifactState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

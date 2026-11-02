@@ -26,6 +26,7 @@ pub use self::building::Building;
 pub use self::combat::Combat;
 pub use self::default_task::{DefaultTask, UnreadDefault, Unstartable};
 pub use self::motion::{Animated, Motion, MotionMut};
+use crate::map::spatial::Placed;
 
 /// `RGE_Static_Object`'s place (FD-045-D15): x, y, z (`+0x3c8`, `+0x4c8`, `+0x5a8`, obfuscated in
 /// the game's memory). Every object has it, below its other layers. Only its setter
@@ -86,9 +87,9 @@ impl Static {
         &mut self,
         id: ObjectId,
         at: Position,
-        mut placed: crate::map::spatial::Placed,
+        mut placed: Placed,
         (world, pathing): (&mut Spatial, &mut Pathing),
-    ) -> crate::map::spatial::Placed {
+    ) -> Placed {
         self.position = at;
         placed.position = at;
         world.insert(id, placed);

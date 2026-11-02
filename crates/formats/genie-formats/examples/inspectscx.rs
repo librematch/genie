@@ -2,10 +2,11 @@
 
 use genie_formats::Scenario;
 use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode};
+use std::env::{args, var};
 use std::fs::File;
 
 fn main() {
-    let log_level = std::env::var("LOG")
+    let log_level = var("LOG")
         .ok()
         .and_then(|value| match value.as_str() {
             "info" => Some(LevelFilter::Info),
@@ -14,7 +15,7 @@ fn main() {
             _ => None,
         })
         .unwrap_or(LevelFilter::Warn);
-    let infile = std::env::args().nth(1).expect("usage: inspectscx <input>");
+    let infile = args().nth(1).expect("usage: inspectscx <input>");
 
     TermLogger::init(
         log_level,

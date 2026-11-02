@@ -4,18 +4,26 @@
 //! pasture's food.
 
 use crate::GenieError;
+use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
+use crate::math::image::pasture::{
+    END as PASTURE_END, INSET as PASTURE_INSET, STEP as PASTURE_STEP,
+};
+use crate::math::msvc::sort;
 use crate::math::rng::Stream;
+use crate::movement::footprint_gap_squared;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
+use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
+use crate::players::attribute::{PASTURE_FOOD, PASTURE_LIVESTOCK, PASTURE_WORKERS};
 use crate::technology::Attributes;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -26,11 +34,11 @@ use crate::world::slots::PlayerSlots;
 pub const LIVESTOCK: [MasterId; 2] = [MasterId::named(1899), MasterId::named(1900)];
 
 /// The edges lie this far inside the pasture's ground radius (`DAT_142e7f384`).
-const INSET: Distance = Distance::new(crate::math::image::pasture::INSET);
+const INSET: Distance = Distance::new(PASTURE_INSET);
 /// The step along an edge (`DAT_142e8c148`).
-const STEP: f32 = crate::math::image::pasture::STEP;
+const STEP: f32 = PASTURE_STEP;
 /// An edge's end (`DAT_14330eb8c`).
-const END: f32 = crate::math::image::pasture::END;
+const END: f32 = PASTURE_END;
 
 /// The points along the edges of a pasture at `at` whose ground radius on x is `radius_x`, in
 /// the routine's order: the radius less [`INSET`] gives the corners (x−r, y−r), (x+r, y−r),
@@ -91,11 +99,7 @@ impl World {
     ///
     /// Its master or attributes the player has not got, a facet draw on a sprite of one facet
     /// (the game divides by zero), and what the object's making does not model.
-    pub(crate) fn setup_pasture(
-        &mut self,
-        p: PlayerId,
-        id: crate::gathering::PastureId,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn setup_pasture(&mut self, p: PlayerId, id: PastureId) -> Result<(), GenieError> {
         let (at, master) = self
             .object(id)
             .map(|(_, u)| (u.position(), u.life.master_id))
@@ -103,9 +107,8 @@ impl World {
         let radius_x = self.master(p, master)?.radius.x();
         let mut points = edge_points(at, Distance::new(radius_x));
         let owner = self.players.player(p)?;
-        let count =
-            cvttss2si(Attributes::get(owner, crate::players::attribute::PASTURE_LIVESTOCK)?.get());
-        let food = Attributes::get(owner, crate::players::attribute::PASTURE_FOOD)? / count as f32;
+        let count = cvttss2si(Attributes::get(owner, PASTURE_LIVESTOCK)?.get());
+        let food = Attributes::get(owner, PASTURE_FOOD)? / count as f32;
         let map = self.spatial.map;
         let mut made = 0;
         while made < count && !points.is_empty() {
@@ -162,11 +165,8 @@ impl World {
     /// A pasture's slot 0x780 (`FUN_1411c5dd0`): the workers (`+0x644`) of its livestock
     /// ([`crate::objects::layers::Building::livestock`]) the world holds, summed; 0 for an object the world does
     /// not hold.
-    pub(crate) fn livestock_workers(
-        &self,
-        pasture: crate::gathering::PastureId,
-    ) -> crate::objects::WorkerCount {
-        crate::objects::WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
+    pub(crate) fn livestock_workers(&self, pasture: PastureId) -> WorkerCount {
+        WorkerCount::of_data(self.object(pasture).map_or(0, |(_, b)| {
             self.parts
                 .building_of(b.id)
                 .livestock
@@ -188,7 +188,7 @@ impl World {
     /// A master the players have not got, or an attribute the owner has not got.
     pub(crate) fn pasture_pick(
         &self,
-        pasture: crate::gathering::PastureId,
+        pasture: PastureId,
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<ObjectId>, GenieError> {
@@ -206,22 +206,14 @@ impl World {
                 continue;
             };
             let radius = l.master(self.master_tables(), r)?.radius;
-            let gap = crate::movement::footprint_gap_squared(
-                l.position(),
-                radius,
-                unit.position(),
-                reach,
-            );
+            let gap = footprint_gap_squared(l.position(), radius, unit.position(), reach);
             tended.push((id, l.workers, gap));
         }
-        crate::math::msvc::sort(&mut tended, &|a, b| a.2 < b.2)?;
-        let room = Attributes::get(
-            self.players.player(q)?,
-            crate::players::attribute::PASTURE_WORKERS,
-        )?;
+        sort(&mut tended, &|a, b| a.2 < b.2)?;
+        let room = Attributes::get(self.players.player(q)?, PASTURE_WORKERS)?;
         let mut pick = None;
         for (id, workers, _) in tended {
-            if workers == crate::objects::WorkerCount::ZERO {
+            if workers == WorkerCount::ZERO {
                 return Ok(Some(id));
             }
             if pick.is_none() && workers.as_f32() < room.get() {
@@ -245,7 +237,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        pasture: Option<crate::gathering::PastureId>,
+        pasture: Option<PastureId>,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(p, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
@@ -266,7 +258,7 @@ impl World {
 
     /// Whether the objects on `tile` (its list, `+0x28`) hold a livestock master ([`LIVESTOCK`])
     /// of the pasture `pasture` (`+0x790`). A ghost on it is not of a pasture.
-    fn holds_livestock_of(&self, pasture: crate::gathering::PastureId, tile: Tile) -> bool {
+    fn holds_livestock_of(&self, pasture: PastureId, tile: Tile) -> bool {
         self.spatial.tile_list(tile).iter().any(|&o| {
             self.object(o).is_some_and(|(_, u)| {
                 u.pasture == Some(pasture) && LIVESTOCK.contains(&u.life.master_id)

@@ -12,6 +12,8 @@ use crate::pathing::hull_path::{
     NodeIndex, NodeList, PATHS, Point, WalkResult, Waypoints,
 };
 use crate::world::slots::CheckedIndex;
+use std::mem::take;
+use std::slice::from_mut;
 
 /// What `FindShortPath`'s rounds carry from one to the next and to the end.
 pub(super) struct Rounds {
@@ -162,7 +164,7 @@ impl HullPather<'_> {
                 target: q.target,
                 range: q.range,
                 nudge: false,
-                paths: std::slice::from_mut(path),
+                paths: from_mut(path),
                 most: 1,
                 count: &mut count,
             })?;
@@ -196,7 +198,7 @@ impl HullPather<'_> {
         from: Point,
         range: Distance,
     ) -> Result<usize, GenieError> {
-        let mut exits = std::mem::take(&mut self.exits);
+        let mut exits = take(&mut self.exits);
         for e in &mut exits {
             e.points.clear();
         }
@@ -263,7 +265,7 @@ impl HullPather<'_> {
     /// `entrances`, at most [`PATHS`]), their ends joined to the hull's points
     /// ([`HullPather::join_entrances`]). Whether the walk ended in a box (its result 5).
     fn enter_goal_hull(&mut self, q: &HullQuery, hull: HullIndex) -> Result<bool, GenieError> {
-        let mut entrances = std::mem::take(&mut self.entrances);
+        let mut entrances = take(&mut self.entrances);
         for e in &mut entrances {
             e.points.clear();
         }

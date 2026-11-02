@@ -4,13 +4,21 @@
 use crate::masters::MasterTable;
 use crate::{Error, listed, run_from_save};
 use genie_core::GenieError;
+use genie_core::groups::{GroupId, GroupLink};
 use genie_core::map::Distance;
 use genie_core::map::Tile;
+use genie_core::map::spatial::Spatial;
+use genie_core::map::terrain::Terrain;
+use genie_core::map::{Footprint, Point};
 use genie_core::objects::ListIndex;
 use genie_core::objects::ObjectId;
+use genie_core::objects::masters::master_type::DOPPELGANGER;
+use genie_core::players::PlayerId;
 use genie_core::vision::VisionBits;
+use genie_core::vision::registry::{Registry, SLOTS};
 use genie_core::vision::visibility::Visibility;
 use genie_core::world::World;
+use genie_core::world::parts::Object;
 use genie_save::generated::world::RgeStaticObject;
 
 /// A slice run from a save ([`objects_from_save`]): one player's objects after it, and the first
@@ -20,7 +28,7 @@ pub struct SliceRun {
     /// Every listed object the player holds after the run, whole ([`World::object_of`]).
     ///
     /// [`World::object_of`]: genie_core::world::World::object_of
-    pub objects: Vec<genie_core::world::parts::Object>,
+    pub objects: Vec<Object>,
     /// The first update the slice could not model: the tick, the object's index and why.
     pub unsupported: Option<(u32, ListIndex, GenieError)>,
     /// The id of the object whose update was not modelled.
@@ -30,7 +38,7 @@ pub struct SliceRun {
     /// What the players see after the run.
     pub visibility: Option<Visibility>,
     /// The map's terrain after the run.
-    pub terrain: Option<genie_core::map::terrain::Terrain>,
+    pub terrain: Option<Terrain>,
     /// The objects the slice stopped updating, of every player.
     pub frozen: Vec<ObjectId>,
     /// Every object's freeze, by player: the tick, the object and why.
@@ -38,9 +46,9 @@ pub struct SliceRun {
 }
 
 /// An object's unit group link as saved (`mGroupID`, `mGroupFlag`).
-pub(super) const fn group_link(s: &RgeStaticObject) -> genie_core::groups::GroupLink {
-    genie_core::groups::GroupLink {
-        id: genie_core::groups::GroupId::of_field(s.group_id),
+pub(super) const fn group_link(s: &RgeStaticObject) -> GroupLink {
+    GroupLink {
+        id: GroupId::of_field(s.group_id),
         flag: s.group_flag,
     }
 }
@@ -134,12 +142,7 @@ pub fn ghost_pool_from_dump(text: &str) -> Result<Vec<ObjectId>, Error> {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words[..] {
             ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| Error::BadPoolDump)?),
-            [id, _]
-                if kind
-                    == Some(i32::from(
-                        genie_core::objects::masters::master_type::DOPPELGANGER.get(),
-                    )) =>
-            {
+            [id, _] if kind == Some(i32::from(DOPPELGANGER.get())) => {
                 ghosts.push(pooled_id(id)?);
             }
             [_, _] if kind.is_some() => {}
@@ -188,7 +191,7 @@ fn ids(words: &[i32]) -> Result<Vec<ObjectId>, Error> {
 /// order, as differences: `tile (x, y) order slice [...], the game [...]`. Tiles whose objects
 /// differ are left out: their objects' places differ.
 pub(super) fn tile_order_differences(
-    spatial: &genie_core::map::spatial::Spatial,
+    spatial: &Spatial,
     game: &[(Tile, Vec<ObjectId>)],
 ) -> Vec<String> {
     game.iter()
@@ -208,7 +211,7 @@ pub(super) fn tile_order_differences(
 /// a `registry PLAYERS CLASSES` line, a `list PLAYER CLASS COUNT CAPACITY` line before each list's
 /// `rec ID DIST OWNER X Y RX RY` lines (the floats as hex bits), then `mask ID HEX SLOTS...` per
 /// combat object (its record's index in each player's list of its class, -1 for none).
-pub fn registry_from_dump(text: &str) -> Result<genie_core::vision::registry::Registry, Error> {
+pub fn registry_from_dump(text: &str) -> Result<Registry, Error> {
     use genie_core::vision::registry::{Entry, Record, Registry};
     let bad = || Error::BadRegistryDump;
     let mut lines = text.lines();
@@ -245,12 +248,12 @@ pub fn registry_from_dump(text: &str) -> Result<genie_core::vision::registry::Re
                 out.lists[p][c].push(Record {
                     id: object(w[1])?,
                     distance: Distance::new(bits(w[2])?),
-                    owner: genie_core::players::PlayerId::new(number(w[3])? as u8),
-                    at: genie_core::map::Point::new(bits(w[4])?, bits(w[5])?),
-                    radius: genie_core::map::Footprint::new(bits(w[6])?, bits(w[7])?),
+                    owner: PlayerId::new(number(w[3])? as u8),
+                    at: Point::new(bits(w[4])?, bits(w[5])?),
+                    radius: Footprint::new(bits(w[6])?, bits(w[7])?),
                 });
             }
-            Some("mask") if w.len() == 3 + genie_core::vision::registry::SLOTS => {
+            Some("mask") if w.len() == 3 + SLOTS => {
                 let mut entry = Entry {
                     mask: VisionBits::from_bits_retain(
                         u64::from_str_radix(w[2], 16).map_err(|_| bad())?,

@@ -2,6 +2,7 @@
 //! look for, the value the `.dat` names `resource_gather_group`.
 
 use crate::GenieError;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's gather group (`+0x683`, the `.dat`'s `resource_gather_group`): the kind of
 /// resource an object that gathers by itself (`enable_auto_gather`) offers, by which the unit
@@ -61,8 +62,8 @@ impl TryFrom<i32> for GatherGroup {
     }
 }
 
-impl std::fmt::Display for GatherGroup {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for GatherGroup {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

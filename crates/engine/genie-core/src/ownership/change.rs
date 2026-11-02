@@ -28,7 +28,14 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
 
+use crate::map::spatial::{Obstruction, Placed};
+use crate::math::image::turn::HANDOVER_NO_POINT as TURN_HANDOVER_NO_POINT;
+use crate::objects::layers::Action;
+use crate::ownership::capture::HANDS_LEFT;
+use crate::unit_ai::{Inbox, UnitAi};
 use crate::world::World;
+use crate::world::index::Place;
+use crate::world::parts::Part;
 use crate::world::player::Player;
 
 impl World {
@@ -59,9 +66,9 @@ impl World {
         let Some(own) = changed? else {
             return Ok(());
         };
-        self.set_part(id, crate::world::parts::Part::OwnMaster(own))?;
+        self.set_part(id, Part::OwnMaster(own))?;
         if let Some(d) = dead {
-            self.set_part(id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
+            self.set_part(id, Part::DeadMaster(Box::new(d)))?;
         }
         let unit = self.swap_remove_live(q, j)?;
         let handed = self.hand_over_attributes(q, PlayerId::GAIA, unit.parts.own_master.as_ref());
@@ -131,8 +138,8 @@ impl World {
         watched: bool,
     ) -> Result<(), GenieError> {
         self.annexes_change_hands(old, id, new)?;
-        let Some(crate::world::index::Place::Live(_, idx)) = self.place(id) else {
-            return Err(crate::ownership::capture::HANDS_LEFT);
+        let Some(Place::Live(_, idx)) = self.place(id) else {
+            return Err(HANDS_LEFT);
         };
         let u = self.players.player(old)?.objects.checked(idx)?;
         let master = u.master(self.master_tables(), old)?.clone();
@@ -173,7 +180,7 @@ impl World {
             self.record_again(id, &master);
         }
         if self.object(id).is_some() {
-            self.set_part(id, crate::world::parts::Part::GatherPoint(None))?;
+            self.set_part(id, Part::GatherPoint(None))?;
         }
         Ok(())
     }
@@ -190,7 +197,7 @@ impl World {
         &mut self,
         new: PlayerId,
         id: ObjectId,
-        placed: Option<crate::map::spatial::Placed>,
+        placed: Option<Placed>,
     ) -> Result<(), GenieError> {
         if let Some(p) = placed {
             let _ = self.watch(new, id, p.position.tile())?;
@@ -220,7 +227,7 @@ impl World {
     pub(crate) fn foundation_sight_off(
         &mut self,
         id: ObjectId,
-        placed: Option<crate::map::spatial::Placed>,
+        placed: Option<Placed>,
     ) -> Result<(), GenieError> {
         if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
             v.sight_off(
@@ -239,7 +246,7 @@ impl World {
     pub(crate) fn foundation_sight_on(
         &mut self,
         id: ObjectId,
-        placed: Option<crate::map::spatial::Placed>,
+        placed: Option<Placed>,
     ) -> Result<(), GenieError> {
         if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
             let _ = v.sight_on(
@@ -256,7 +263,7 @@ impl World {
     /// [`World::building_changes_hands`] below state 3: the building's record and mesh shape of
     /// `master`'s obstruction come again (`FUN_141056460`).
     pub(crate) fn record_again(&mut self, id: ObjectId, master: &Master) {
-        let record = crate::map::spatial::Obstruction {
+        let record = Obstruction {
             kind: master.obstruction_type,
             class: master.obstruction_class,
         };
@@ -336,9 +343,9 @@ impl World {
         let own = changed?;
         let changed = own.is_some();
         if let Some(own) = own {
-            self.set_part(id, crate::world::parts::Part::OwnMaster(own))?;
+            self.set_part(id, Part::OwnMaster(own))?;
             if let Some(d) = dead {
-                self.set_part(id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
+                self.set_part(id, Part::DeadMaster(Box::new(d)))?;
             }
         }
         Ok(if changed {
@@ -405,7 +412,7 @@ impl World {
             .map_or_else(Vec::new, |(_, u)| u.garrison.clone());
         let mut stayed = Vec::new();
         for &g in inside.iter().rev() {
-            let Some(crate::world::index::Place::Live(_, bi)) = self.place(id) else {
+            let Some(Place::Live(_, bi)) = self.place(id) else {
                 break;
             };
             if !self.let_out(
@@ -518,11 +525,7 @@ pub(crate) fn dead_master_of(
 /// the message of game mode 12 for master 1377; nor are the slot 0xa8 calls on the copies (the
 /// masters' graphics).
 pub(crate) fn change_hands(
-    (u, actions, ai): (
-        &mut Unit,
-        &mut crate::objects::layers::Action,
-        Option<&mut crate::unit_ai::UnitAi>,
-    ),
+    (u, actions, ai): (&mut Unit, &mut Action, Option<&mut UnitAi>),
     (old, new): (usize, PlayerId),
     masters: MasterTables<'_>,
     spatial: &mut Spatial,
@@ -553,7 +556,7 @@ pub(crate) fn change_hands(
     if let Some(a) = actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }
-    let mut inbox = crate::unit_ai::Inbox {
+    let mut inbox = Inbox {
         ai,
         id: u.id,
         state: u.life.state,
@@ -622,4 +625,4 @@ pub(crate) const STORAGE_WHILE_BUILT: u8 = 4;
 /// The other storage flag a building's new owner gains on an ownership change (slot 0x70's).
 pub(crate) const STORAGE_8: u8 = 8;
 /// The point a building's units leave toward on an ownership change: none (`DAT_14330ec20`).
-pub(crate) const HANDOVER_NO_POINT: f32 = crate::math::image::turn::HANDOVER_NO_POINT;
+pub(crate) const HANDOVER_NO_POINT: f32 = TURN_HANDOVER_NO_POINT;

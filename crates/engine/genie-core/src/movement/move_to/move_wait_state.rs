@@ -1,6 +1,7 @@
 //! A `MoveTo`'s wait state: whether it waited after the motion step gave up.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A `MoveTo`'s wait state (`+0x6c`, `movement_wait_state`): a `MoveTo` waits once after the motion
 /// step gave up ([`MoveWait::give_up`]). The bytes without a state have no case.
@@ -42,8 +43,8 @@ impl MoveWaitState {
     }
 }
 
-impl std::fmt::Display for MoveWaitState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MoveWaitState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

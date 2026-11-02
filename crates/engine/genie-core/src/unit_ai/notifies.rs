@@ -12,6 +12,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi, UnitSide};
 use crate::world::Millis;
 use crate::world::slots::CheckedIndex;
+use std::mem::take;
 
 /// A unit's notifies to itself (its slot 0x328, [`UnitAi::post`]), borrowed beside its body: its
 /// unit AI (None for a unit without one), its id and its state.
@@ -221,7 +222,7 @@ impl UnitAi {
 
     /// `FUN_140c55270`: the buffered notifies join the queue, in order.
     pub(super) fn flush_buffered(&mut self) {
-        for n in std::mem::take(&mut self.buffered) {
+        for n in take(&mut self.buffered) {
             self.append(n);
         }
     }

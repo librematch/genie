@@ -3,3 +3,6 @@
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
+# C-CASE (CODING_STYLE.md section 3): an acronym is one word in every type and variant name,
+# not only in one that is all capitals.
+upper-case-acronyms-aggressive = true

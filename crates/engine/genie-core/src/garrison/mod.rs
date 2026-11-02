@@ -49,6 +49,10 @@ use self::unload::NO_POINT;
 use self::unload::unload_group_takes;
 pub use self::walk_in::{ENTER, EnterAction, EnterTarget, WalkStart, Walking};
 pub(crate) use self::walk_in::{EnterReads, NO_SPEED, SIEGE_UNLOAD};
+use crate::math::image::garrison::{
+    CLASS_FLAGS as GARRISON_CLASS_FLAGS, FAR as GARRISON_FAR, NEARBY as GARRISON_NEARBY,
+    TOWN_BELL_REACH as GARRISON_TOWN_BELL_REACH,
+};
 #[cfg(test)]
 #[cfg(test)]
 use crate::movement::move_to::MoveTo;
@@ -61,10 +65,10 @@ use crate::world::World;
 
 /// The squared footprint gap past which a garrison order sends no unit (`FUN_141621220` with 0:
 /// no limit).
-const FAR: f32 = crate::math::image::garrison::FAR;
+const FAR: f32 = GARRISON_FAR;
 /// The squared footprint gap within which a garrison order's target's neighbours shelter units
 /// too (`FUN_14161e370` with `+0x1e`, `DAT_14330ebcc`, 100.0: ten tiles).
-pub(crate) const NEARBY: f32 = crate::math::image::garrison::NEARBY;
+pub(crate) const NEARBY: f32 = GARRISON_NEARBY;
 /// The squared footprint gap within which the town bell reaches (its ring `FUN_14163a650`, its
 /// end `FUN_14163ab80`, and `FUN_141621220` with `param_6` 1: `DAT_142ef3e70`, 625.0, 25 tiles).
 /// An enter into an object the world holds asleep.
@@ -74,7 +78,7 @@ pub(crate) const INSIDE_SIGHT: SightTiles = SightTiles::new(5);
 const ENTER_SLEEPING: GenieError = GenieError::unsupported("an enter into a sleeping object");
 /// An enter without its owner's masters.
 pub(crate) const NO_MASTERS: GenieError = GenieError::unsupported("an enter without the masters");
-pub(crate) const TOWN_BELL_REACH: f32 = crate::math::image::garrison::TOWN_BELL_REACH;
+pub(crate) const TOWN_BELL_REACH: f32 = GARRISON_TOWN_BELL_REACH;
 
 /// The ids a command's check reads (`FUN_140e558b0`): a human player's first 60, a computer
 /// player's first 500.
@@ -83,7 +87,7 @@ const COMPUTER_IDS: usize = 500;
 
 /// The class-flags table `FUN_1411205e0` reads (`DAT_1439e37b0`, a u32 per class; its count,
 /// `DAT_1439e2cf8`, is 64), as the image holds it (nothing writes it).
-const CLASS_FLAGS: [u32; 64] = crate::math::image::garrison::CLASS_FLAGS;
+const CLASS_FLAGS: [u32; 64] = GARRISON_CLASS_FLAGS;
 
 #[cfg(test)]
 pub(crate) mod tests;

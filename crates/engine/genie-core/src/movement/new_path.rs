@@ -8,11 +8,13 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
+use crate::math::conversions::cvttss2si_64;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::LinkedPathType;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::PlanTries;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
@@ -27,7 +29,10 @@ use crate::pathing::FixedPoint;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Found, Path, Request};
+use crate::players::NO_RELATIONS;
+use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath, pathing::short_path};
 
@@ -99,7 +104,7 @@ impl Mover {
     ) -> Result<AfterRequest, GenieError> {
         let level = self.paths.walked_mut()?;
         level.state = PathState::Idle;
-        level.continue_counter = crate::movement::PlanTries::FULL;
+        level.continue_counter = PlanTries::FULL;
         new.range = level.range;
         new.target = level.target;
         new.waypoint = WaypointIndex::SECOND;
@@ -175,7 +180,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         target: Option<(ObjectId, &Placed)>,
         line: (Point, Point),
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Vec<ObjectId>, GenieError> {
         let now = plan.now;
         let mut list = vec![me.id];
@@ -237,11 +242,8 @@ impl Mover {
                     continue;
                 }
                 let allied = owner.is_some_and(|o| {
-                    let relations = world
-                        .relations
-                        .get(p.player)
-                        .unwrap_or(&crate::players::NO_RELATIONS);
-                    crate::unit_ai::task_finder::allied(relations, p.player, o, true)
+                    let relations = world.relations.get(p.player).unwrap_or(&NO_RELATIONS);
+                    task_finder_allied(relations, p.player, o, true)
                 });
                 let gap = footprint_gap_squared(p.position, p.radius, t.position, t.radius);
                 if !allied || gap <= DistanceSquared::new(r * r) {
@@ -264,8 +266,7 @@ impl Mover {
         (from, to): (Point, Point),
     ) -> Result<bool, GenieError> {
         // CVTTSS2SI into a 64-bit register, its low 32 bits kept
-        let fixed =
-            |f: f32| crate::math::conversions::cvttss2si_64(f * short_path::TO_FIXED) as i32;
+        let fixed = |f: f32| cvttss2si_64(f * short_path::TO_FIXED) as i32;
         let query = short_path::Query {
             from: FixedPoint::new(fixed(from.x()), fixed(from.y())),
             to: FixedPoint::new(fixed(to.x()), fixed(to.y())),
@@ -304,7 +305,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: ShortAsk<'_>,
         out: &mut Path,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<ShortFound, GenieError> {
         let walker = self.walker(me.id);
         let owner = owner_number(world, me.id);
@@ -342,7 +343,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         ask: TileAsk<'_>,
         out: &mut Path,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<Found>, GenieError> {
         // the smoothing's ignore list: the unit and the level's target object (the planner's
         // argument 12, the object the world holds)
@@ -369,7 +370,7 @@ impl Mover {
     pub fn reaches(
         &self,
         (at, me): (Position, &Me),
-        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         to: Point,
         range: Distance,
@@ -390,7 +391,7 @@ impl Mover {
     pub fn reaches_object(
         &self,
         (at, me): (Position, &Me),
-        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         target: ObjectId,
         range: Distance,
@@ -422,7 +423,7 @@ impl Mover {
         world: &mut Spatial,
         target: ObjectId,
         range: Distance,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<Distance>, GenieError> {
         let Some(t) = world.get_known(target)? else {
             return Ok(None);

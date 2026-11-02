@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -316,7 +317,7 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
         let gap = point_gap_squared(self.state_position, at.position, at.size);
-        if !crate::math::fmath::below_or_unordered(WALK_BACK, gap.get()) {
+        if !below_or_unordered(WALK_BACK, gap.get()) {
             return Ok(false);
         }
         let (x, y) = (self.state_position.x(), self.state_position.y());

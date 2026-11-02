@@ -43,21 +43,29 @@ pub use self::payment::{
 };
 pub use self::repair_state::RepairState;
 pub(crate) use self::unit::repair_target;
+use crate::construction::{BuilderCount, RepairTargetId};
+use crate::map::RestrictionId;
+use crate::math::image::repair::{
+    EXTRA_REPAIRER as REPAIR_EXTRA_REPAIRER, LEAST_HP as REPAIR_LEAST_HP,
+    MOVING_REACH as REPAIR_MOVING_REACH, ONE as REPAIR_ONE, REACH as REPAIR_REACH,
+};
+use crate::objects::masters::WorkValue;
+use crate::unit_ai::UnitStance;
 
 /// The Repair action's type, which word 9 adds, and its tasks' action type.
 pub const REPAIR: ActionType = ActionType::named(0x6a);
 
 /// The gap within which a repairer reaches its target (`DAT_142eb5690`).
-pub const REACH: f32 = crate::math::image::repair::REACH;
+pub const REACH: f32 = REPAIR_REACH;
 /// What a moving target (`FUN_140fdd080`) or a scenario's game mode adds to the reach
 /// (`DAT_142e8c150`).
-const MOVING_REACH: f32 = crate::math::image::repair::MOVING_REACH;
+const MOVING_REACH: f32 = REPAIR_MOVING_REACH;
 /// The hit points below which a target in state 2 is not repaired (`DAT_142e7f384`), and the
 /// share each repairer past the first adds to the work (the same constant).
-const LEAST_HP: f32 = crate::math::image::repair::LEAST_HP;
-const EXTRA_REPAIRER: f32 = crate::math::image::repair::EXTRA_REPAIRER;
+const LEAST_HP: f32 = REPAIR_LEAST_HP;
+const EXTRA_REPAIRER: f32 = REPAIR_EXTRA_REPAIRER;
 /// The wait of state 10 (`0x3f800000`), and the repairer count's first (`DAT_14330eb8c`).
-const ONE: f32 = crate::math::image::repair::ONE;
+const ONE: f32 = REPAIR_ONE;
 
 /// The ship classes whose repair meets them at the shore (`FUN_140ad9120`: 20, 21, 22, 2, 53).
 pub const SHIPS: [ClassId; 5] = [
@@ -88,7 +96,7 @@ pub struct RepairTask {
     /// The task's id.
     pub id: TaskId,
     /// Its work value.
-    pub work_value: crate::objects::masters::WorkValue,
+    pub work_value: WorkValue,
     /// Its moving sprite (`+0x40`), which its `MoveTo`s take and its turn toward the target
     /// (state 6) shows; None for none.
     pub moving: Option<SpriteId>,
@@ -113,7 +121,7 @@ impl RepairTask {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct RepairAction {
     /// The target's id (`+0x30`).
-    pub target: Option<crate::construction::RepairTargetId>,
+    pub target: Option<RepairTargetId>,
     /// The action state (`+0x18`), which word 9 adds, with its quiet `MoveTo` sub-action: to
     /// the target (state 4) or to the point (state 11).
     pub state: RepairState,
@@ -157,7 +165,7 @@ pub struct Repairee {
 
 /// The object `FUN_140ad9050` counts a Repair's repairers in (the target, an annex's main
 /// building) and their count (`+0x9e8`), None without one.
-pub(crate) type CountedIn = Option<(ObjectId, crate::construction::BuilderCount)>;
+pub(crate) type CountedIn = Option<(ObjectId, BuilderCount)>;
 
 /// What a Repair's update reads as it starts, each constant through the update: its target,
 /// the object its repairers count in, and the repairer's own values ([`Unit::repair_reads`]).
@@ -180,11 +188,11 @@ pub(crate) struct RepairReads {
     pub(crate) waits: bool,
     /// The unit AI's stance (`+0x1a9`), which sets the wait
     /// ([`crate::movement::move_to::MoveWait::give_up`]).
-    pub(crate) stance: crate::unit_ai::UnitStance,
+    pub(crate) stance: UnitStance,
     /// The master's standing sprite (`+0x470`), which slot 0x68 shows for none.
     pub(crate) standing: Option<SpriteId>,
     /// The master's terrain restriction, whose mask its quick path takes.
-    pub(crate) restriction: Option<crate::map::RestrictionId>,
+    pub(crate) restriction: Option<RestrictionId>,
 }
 
 #[cfg(test)]

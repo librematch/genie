@@ -3,12 +3,15 @@
 //! standing for a side without a unit, and [`With`] around another test side.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
+use crate::gathering::DropSiteId;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::rng::Well512;
+use crate::movement::WaypointIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
@@ -120,7 +123,7 @@ impl UnitSide for Vec<Effect> {
         Err(NO_WORLD)
     }
 
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
 }
@@ -199,11 +202,11 @@ impl UnitSide for With<'_> {
         Ok(self.interruptible || self.fx.contains(&Effect::Stop))
     }
 
-    fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
+    fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
         self.side.table_drop_site()
     }
 
-    fn builds(&self, foundation: crate::construction::FoundationId) -> Result<bool, GenieError> {
+    fn builds(&self, foundation: FoundationId) -> Result<bool, GenieError> {
         self.side.builds(foundation)
     }
 
@@ -231,7 +234,7 @@ impl UnitSide for With<'_> {
         self.side.make_scout_map()
     }
 
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         self.side.patrol_information()
     }
 
@@ -245,7 +248,7 @@ impl UnitSide for With<'_> {
 
     fn off_footprint(
         &mut self,
-        site: crate::construction::FoundationId,
+        site: FoundationId,
         radius: Footprint,
     ) -> Result<OffFootprint, GenieError> {
         self.side.off_footprint(site, radius)

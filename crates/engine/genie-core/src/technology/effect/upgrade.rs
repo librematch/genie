@@ -12,14 +12,19 @@ use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::cost_resource;
 use crate::objects::masters::ids::{self, RELIC, VILLAGER_FEMALE, VILLAGER_MALE};
 use crate::objects::masters::{CostSlot, Master, master_type, player_master};
 use crate::objects::unit::Unit;
+use crate::ownership::change::DEAD_COPY_TYPES;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::UpgradeMode;
 use crate::technology::{CostEdit, CostUnits, ObjectsKind};
+use crate::world::Player;
 use crate::world::World;
+use crate::world::index::Place;
+use crate::world::parts::Part;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// The masters [`World::upgrade_walk`] reads: the table's old and new ones, and the dead unit
@@ -122,10 +127,7 @@ impl World {
             let u = self.object_at(place)?;
             let reads = self.master_read(p, u)?;
             if upgradable(reads.kind, u.life.state) {
-                self.set_part(
-                    id,
-                    crate::world::parts::Part::OwnMaster(Box::new(reads.clone())),
-                )?;
+                self.set_part(id, Part::OwnMaster(Box::new(reads.clone())))?;
                 self.upgrade_object(p, place, (&reads, new), true)?;
                 if let Some(own) = self.parts.own_master.get_mut(id) {
                     own.copy_from(new);
@@ -160,10 +162,7 @@ impl World {
                     self.own_and_dead_master(p, i, old)?;
                 }
             } else if table && let Some(d) = dead.filter(|d| d.id == master_id) {
-                self.set_part(
-                    id,
-                    crate::world::parts::Part::OwnMaster(Box::new(d.clone())),
-                )?;
+                self.set_part(id, Part::OwnMaster(Box::new(d.clone())))?;
             } else if mode.own_masters()
                 && let Some(own) = self.parts.own_master.get(id).filter(|m| m.id == from)
                 && upgradable(own.kind, state)
@@ -217,17 +216,13 @@ impl World {
             .cloned();
         let id = self.players.live(p, i)?.id;
         if !self.parts.own_master.contains(id) {
-            self.set_part(
-                id,
-                crate::world::parts::Part::OwnMaster(Box::new(old.clone())),
-            )?;
+            self.set_part(id, Part::OwnMaster(Box::new(old.clone())))?;
         }
         if !self.parts.dead_master.contains(id)
             && old.death_spawns[0].is_some()
-            && let Some(d) =
-                dead.filter(|d| crate::ownership::change::DEAD_COPY_TYPES.contains(&d.kind))
+            && let Some(d) = dead.filter(|d| DEAD_COPY_TYPES.contains(&d.kind))
         {
-            self.set_part(id, crate::world::parts::Part::DeadMaster(Box::new(d)))?;
+            self.set_part(id, Part::DeadMaster(Box::new(d)))?;
         }
         Ok(())
     }
@@ -264,9 +259,7 @@ impl World {
         } else {
             PlayerId::GAIA
         };
-        let attribute = |q: &crate::world::Player, i: usize| {
-            q.attributes.get(i).copied().unwrap_or(Amount::ZERO)
-        };
+        let attribute = |q: &Player, i: usize| q.attributes.get(i).copied().unwrap_or(Amount::ZERO);
         let limit = attribute(self.players.player(p)?, 234).get() as i32;
         let buildings: Vec<ObjectId> = self
             .players
@@ -304,13 +297,13 @@ impl World {
                     break;
                 };
                 if self.has_room(bp, bu, None)? {
-                    let Some(crate::world::index::Place::Live(np, ni)) = self.place(new) else {
+                    let Some(Place::Live(np, ni)) = self.place(new) else {
                         continue;
                     };
                     self.enter_forced(np, ni, ContainerId::new(b))?;
                 }
                 if attribute(self.players.player(p)?, 283) <= Amount::ZERO {
-                    let Some(crate::world::index::Place::Live(bp, bi)) = self.place(b) else {
+                    let Some(Place::Live(bp, bi)) = self.place(b) else {
                         break;
                     };
                     let _ = self.let_out(bp, bi, new, Point::new(-1.0, -1.0), (None, false))?;
@@ -357,7 +350,7 @@ impl World {
         attribute: MasterAttribute,
         edit: Option<CostEdit>,
     ) {
-        let Some(resource) = crate::objects::masters::cost_resource(attribute) else {
+        let Some(resource) = cost_resource(attribute) else {
             return;
         };
         let (Some(units), Some(edit)) = (units, edit) else {

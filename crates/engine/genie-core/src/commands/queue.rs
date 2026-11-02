@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::commands::UnitList;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
+use crate::production::QueueButton;
 use crate::production::QueuedUnits;
 use crate::world::World;
 
@@ -22,7 +23,7 @@ pub struct QueueCommand {
     /// How many (`+0xe`, which the handler takes as an int).
     pub amount: QueuedUnits,
     /// `button_location_id`: the train button, −1 for none.
-    pub button: crate::production::QueueButton,
+    pub button: QueueButton,
 }
 
 impl QueueCommand {

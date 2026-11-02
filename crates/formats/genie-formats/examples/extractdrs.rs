@@ -2,6 +2,7 @@
 
 use genie_drs::{DrsReader, DrsTable, DrsWriter, ReserveDirectoryStrategy};
 use std::collections::HashSet;
+use std::fs::rename;
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write, stdout};
 use std::path::PathBuf;
@@ -186,7 +187,7 @@ fn add(args: Add) -> anyhow::Result<()> {
     // Close the new archive before it replaces the old one.
     drop(drs_write.flush()?);
 
-    std::fs::rename(
+    rename(
         temp_out,
         if let Some(outfile) = args.output {
             outfile

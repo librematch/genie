@@ -2,7 +2,9 @@
 //! the siege's, the soldier's, the tower's and the building's.
 
 use crate::GenieError;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Well512;
+use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ObjectFlags;
@@ -119,16 +121,14 @@ impl UnitAi {
         let gap = at
             .target
             .filter(|_| self.current_target.is_some())
-            .map(|t| {
-                crate::movement::footprint_gap_squared(at.position, at.size, t.position, t.radius)
-            });
+            .map(|t| footprint_gap_squared(at.position, at.size, t.position, t.radius));
         // a target within its sight whose master has no flag 0x10 (`+0x654`) it
         // attacks again (slot 0xb8: the target, forced, not any, its group) and the
         // processing breaks
         let flags = at.target.map_or(ObjectFlags::NONE, |t| t.flags);
         if let Some(gap) = gap
             && let Some(target) = self.current_target
-            && !crate::math::fmath::below_or_unordered(at.los.squared().get(), gap.get())
+            && !below_or_unordered(at.los.squared().get(), gap.get())
             && !flags.contains(ObjectFlags::SCOUT)
         {
             let _ = self.attack_object(target, true, false, at, side)?;

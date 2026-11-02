@@ -1,5 +1,7 @@
 //! A master's task swap group (`+0x7b8`): the masters a unit may switch between for a task.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's task swap group (`+0x7b8`, the `.dat`'s `TaskSwapGroup`; the save does not carry it):
 /// a unit of a master of a group switches to another master of the same group whose task list has a
 /// task for the target. 0 is none.
@@ -29,8 +31,8 @@ impl TaskGroup {
     }
 }
 
-impl std::fmt::Display for TaskGroup {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TaskGroup {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

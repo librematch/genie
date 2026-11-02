@@ -1,6 +1,8 @@
 //! A master's obstruction class as one type: what its obstruction record blocks, the value the
 //! `.dat` names `obstruction_class`.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's obstruction class (`+0x652`, the `.dat`'s `obstruction_class`, the blockage
 /// class; an obstruction record's class): the kind of thing its record blocks as. The game's
 /// tests name 0 (no record) and 5 (a gate, whose tile marks carry bit `0x8000`); the `.dat`'s
@@ -44,8 +46,8 @@ impl From<u8> for ObstructionClass {
     }
 }
 
-impl std::fmt::Display for ObstructionClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ObstructionClass {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

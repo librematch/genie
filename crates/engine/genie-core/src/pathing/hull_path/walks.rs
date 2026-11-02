@@ -2,6 +2,7 @@
 //! (`pathWithinHull`).
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::spatial::RecordId;
@@ -126,12 +127,7 @@ impl HullPather<'_> {
             let fine = match second[..] {
                 [] => true,
                 [h] => target.is_some_and(|t| {
-                    h.id == t
-                        || self
-                            .by_id
-                            .annex_of(h.id)
-                            .map(crate::construction::MainBuildingId::id)
-                            == Some(t)
+                    h.id == t || self.by_id.annex_of(h.id).map(MainBuildingId::id) == Some(t)
                 }),
                 _ => false,
             };

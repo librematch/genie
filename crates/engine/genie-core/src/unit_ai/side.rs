@@ -1,17 +1,21 @@
 //! What the unit AI asks of the world ([`UnitSide`]) and the commands it gives its unit.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
+use crate::gathering::{DropSiteId, PastureId};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::rng::Well512;
+use crate::movement::WaypointIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::{ObjectState, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -96,7 +100,7 @@ pub trait UnitSide {
     /// # Errors
     ///
     /// A side without its unit.
-    fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
+    fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
         Err(WITHOUT_UNIT)
     }
 
@@ -106,7 +110,7 @@ pub trait UnitSide {
     /// # Errors
     ///
     /// A side without its unit, and what the task search does not model.
-    fn builds(&self, _foundation: crate::construction::FoundationId) -> Result<bool, GenieError> {
+    fn builds(&self, _foundation: FoundationId) -> Result<bool, GenieError> {
         Err(WITHOUT_UNIT)
     }
 
@@ -168,7 +172,7 @@ pub trait UnitSide {
     /// The unit's slot 0x468 (`FUN_141157c50`, `getPatrolInformation`): a copy of its top path
     /// (`FUN_140f960f0`; `FUN_140f95c00` into a new path: its points, its length, its flags) and
     /// the waypoint of its top level (`+0x24`); None without one.
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)>;
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)>;
 
     /// The builder's search for another foundation (`FUN_140c1c7c0`), None when it finds none.
     ///
@@ -198,7 +202,7 @@ pub trait UnitSide {
     /// What the spot's search does not model.
     fn off_footprint(
         &mut self,
-        _site: crate::construction::FoundationId,
+        _site: FoundationId,
         _radius: Footprint,
     ) -> Result<OffFootprint, GenieError> {
         Err(GenieError::unsupported(
@@ -433,7 +437,7 @@ pub struct TargetFlags {
     /// `capture_flag` (`+0x924`, `FUN_14107cc90`).
     pub capture: CaptureKind,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
-    pub pasture: Option<crate::gathering::PastureId>,
+    pub pasture: Option<PastureId>,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (`FUN_141188bb0`).
     pub untargetable: bool,
     /// `+0x68a`, `unit_attackable_flag` (`FUN_141188b10`).
@@ -447,16 +451,16 @@ pub struct ResourceSearch {
     /// The gather group (`param_2`).
     pub kind: GatherGroup,
     /// Fewer workers than this (`param_4`; −1 any).
-    pub cap: crate::objects::WorkerCount,
+    pub cap: WorkerCount,
     /// The drop site the search starts from (`param_3`).
-    pub site: Option<crate::gathering::DropSiteId>,
+    pub site: Option<DropSiteId>,
     /// The unit AI's current target (`+0x48`), which the search passes over.
     pub current: Option<ObjectId>,
     /// The point the search starts from without a site (`param_7`, `param_8`; (−1, −1) for the
     /// unit's place).
     pub point: Point,
     /// Below this state the unit finds nothing (`param_6`; its −1 is 0 here).
-    pub min_state: crate::objects::ObjectState,
+    pub min_state: ObjectState,
 }
 
 /// [`ResourceSearch::point`]'s (−1, −1): the unit's own place (`DAT_14330ec20`).
@@ -548,7 +552,7 @@ impl<F: FnMut(&Search<'_>) -> Result<Found, GenieError>> UnitSide for F {
 
     /// A side of searches alone stands for no unit with movement state, whose slot 0x468 (the
     /// static object's) holds no path.
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
 }

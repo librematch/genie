@@ -4,6 +4,7 @@ use crate::reader::RecordingHeaderReader;
 use crate::{Error, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
+use std::vec::IntoIter as VecIntoIter;
 
 /// A table of strings in the recording header, with room for a fixed number of them.
 #[derive(Debug, Clone)]
@@ -91,7 +92,7 @@ impl WritableHeaderElement for StringTable {
 
 impl IntoIterator for StringTable {
     type Item = String;
-    type IntoIter = ::std::vec::IntoIter<String>;
+    type IntoIter = VecIntoIter<String>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.strings.into_iter()

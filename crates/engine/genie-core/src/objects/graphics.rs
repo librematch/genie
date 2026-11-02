@@ -2,6 +2,8 @@
 
 use crate::objects::SpriteId;
 use crate::objects::sprite::Graphic;
+use std::iter::Enumerate;
+use std::slice::Iter as SliceIter;
 
 /// What the sprite clock reads of each graphic (the `.dat`'s), by sprite id: a dense column
 /// by the id (the `.dat`'s ids are 0 and up), walked in the ids' order. Two tables are equal
@@ -85,7 +87,7 @@ impl Graphics {
 #[derive(Clone, Debug)]
 pub struct Iter<'a> {
     /// The column with its indices.
-    inner: std::iter::Enumerate<std::slice::Iter<'a, Option<Graphic>>>,
+    inner: Enumerate<SliceIter<'a, Option<Graphic>>>,
 }
 
 impl<'a> Iterator for Iter<'a> {

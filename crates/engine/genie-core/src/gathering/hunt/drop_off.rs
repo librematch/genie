@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::combat::attack::set_walker_anim;
 use crate::gathering::DropSiteId;
+use crate::gathering::HuntTargetId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
@@ -12,16 +13,20 @@ use crate::gathering::hunt::{
 };
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::fmath::at_most_or_unordered;
+use crate::math::image::hunt::DROP_REACH as HUNT_DROP_REACH;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
+use crate::objects::layers::Action;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::world_view::DropWorld;
 use crate::world::Seconds;
+use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -44,7 +49,7 @@ pub enum Dropped {
 /// The wait of a hunt's drop-off that cannot go on (`0xc0400000`).
 pub(super) const DROP_WAIT: Seconds = Seconds::new(-3.0);
 /// A hunt's drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
-pub(super) const DROP_REACH: f32 = crate::math::image::hunt::DROP_REACH;
+pub(super) const DROP_REACH: f32 = HUNT_DROP_REACH;
 
 impl HuntAction {
     /// `set_state(8)` (`0x140ac60e0` case 8) with a load and its drop site (`carry_to`, at `site`,
@@ -158,7 +163,7 @@ impl HuntAction {
 
     /// Slot 0x68 with none (`FUN_140ac7980`, [`HuntAction::set_target`]): the target goes; the
     /// old target, which the caller releases (slot 0x180).
-    pub const fn let_go(&mut self) -> Option<crate::gathering::HuntTargetId> {
+    pub const fn let_go(&mut self) -> Option<HuntTargetId> {
         let target = self.target;
         self.set_target(None);
         target
@@ -167,7 +172,7 @@ impl HuntAction {
     /// Slot 0x68 (`FUN_140ac7980`): the base's change of target (`FUN_140a7a230`, whose release
     /// and take are the caller's), then the lead clears ([`Lead::NEW`]: `moved_sheep` and
     /// `sheep_still_time` 0, the start −1).
-    pub const fn set_target(&mut self, target: Option<crate::gathering::HuntTargetId>) {
+    pub const fn set_target(&mut self, target: Option<HuntTargetId>) {
         self.target = target;
         self.lead = Lead::NEW;
     }
@@ -190,7 +195,7 @@ impl HuntAction {
     /// (`set_state(8)`, true, the caller's); with none, or one that is not a number (`COMISS`
     /// with `JBE`), the hunt searches (`set_state(3)`: [`HuntState::Search`] here, the rest the caller's).
     pub(super) fn ends_without_target(&mut self, held: Amount) -> bool {
-        if crate::math::fmath::at_most_or_unordered(held.get(), 0.0) {
+        if at_most_or_unordered(held.get(), 0.0) {
             self.state = HuntState::Search;
             false
         } else {
@@ -212,7 +217,7 @@ impl Unit {
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
     pub(crate) fn hunt_drop_off(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let (mover, by_id) =
@@ -231,7 +236,7 @@ impl Unit {
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         if let Some(site) = self.drop_off_in(actions, mover, w, others, &c.w.graphics, by_id)? {
             let by = self.releaser(c)?;
-            crate::world::lets::take(c, self, site, by)?;
+            take(c, self, site, by)?;
         }
         Ok(())
     }

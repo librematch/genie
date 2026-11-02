@@ -2,6 +2,11 @@
 //! read and written back to the same value (`GENIE_GAME_DAT` names `resources/_common/dat`).
 
 use genie_json::{Buttons, DropSites, FutureUnits, LinkedTechs, Maps, StringId};
+use serde::de::DeserializeOwned;
+use std::env::var_os;
+use std::fmt::Debug;
+use std::fs::read_to_string;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn linked_techs_read_their_keys() {
@@ -90,11 +95,11 @@ fn buttons_read_their_keys() {
 }
 
 /// Read a table, write it, read it again: the same value.
-fn round_trip<T>(dir: &std::path::Path, file: &str)
+fn round_trip<T>(dir: &Path, file: &str)
 where
-    T: serde::de::DeserializeOwned + serde::Serialize + PartialEq + std::fmt::Debug,
+    T: DeserializeOwned + serde::Serialize + PartialEq + Debug,
 {
-    let text = std::fs::read_to_string(dir.join(file)).unwrap();
+    let text = read_to_string(dir.join(file)).unwrap();
     let table: T = genie_json::from_str(&text).unwrap_or_else(|e| panic!("{file}: {e}"));
     let written = genie_json::to_string(&table).unwrap();
     let again: T = genie_json::from_str(&written).unwrap();
@@ -107,7 +112,7 @@ where
 
 #[test]
 fn the_installed_tables_read_and_write_back_the_same_values() {
-    let Some(dir) = std::env::var_os("GENIE_GAME_DAT").map(std::path::PathBuf::from) else {
+    let Some(dir) = var_os("GENIE_GAME_DAT").map(PathBuf::from) else {
         return eprintln!("GENIE_GAME_DAT is not set; skipping");
     };
     round_trip::<LinkedTechs>(&dir, "linkedTechs.json");

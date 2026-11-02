@@ -3,6 +3,7 @@
 //! as the object's [`Motion`] in the world's table, and [`MotionMut`], the one a routine changes
 //! beside the object's row.
 
+use crate::movement::MoveStats;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use genie_diff::Diff;
@@ -125,7 +126,7 @@ impl<'a> MotionMut<'a> {
     }
 
     /// The movement's values to change (its top speed among them), if the object moves.
-    pub fn move_stats_mut(&mut self) -> Option<&mut crate::movement::MoveStats> {
+    pub fn move_stats_mut(&mut self) -> Option<&mut MoveStats> {
         self.mover_mut().map(|m| &mut m.stats)
     }
 
@@ -157,9 +158,11 @@ impl<'a> MotionMut<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::movement::tests::builder_9177;
 
     fn mover() -> Mover {
-        crate::movement::tests::builder_9177()
+        builder_9177()
     }
 
     #[test]

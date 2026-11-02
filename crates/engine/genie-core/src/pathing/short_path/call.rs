@@ -5,6 +5,8 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
+use crate::map::TerrainMask;
+use crate::math::conversions::cvttss2si_64;
 use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
 use crate::pathing::FixedDistance;
@@ -15,6 +17,7 @@ use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::short_path::{
     Ctx, FixedPoint, Goal, NodeIndex, Search, Started, TO_FIXED, TO_FLOAT, clip, tile_of,
 };
+use crate::pathing::tile_path::Path;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -43,8 +46,7 @@ impl Query {
     /// `FUN_140f9d300`'s and `FUN_140f9d3e0`'s casts: each float times 2^22 by `CVTTSS2SI` into
     /// a 64-bit register, its low 32 bits kept (the radius through `uint`, the same bits).
     pub(super) fn fixed(&self) -> Fixed {
-        let fixed =
-            |f: Distance| crate::math::conversions::cvttss2si_64((f * TO_FIXED).get()) as i32;
+        let fixed = |f: Distance| cvttss2si_64((f * TO_FIXED).get()) as i32;
         Fixed {
             from: self.from,
             to: self.to,
@@ -123,7 +125,7 @@ pub struct Call {
     /// The map's size in tiles.
     pub map: GridSize,
     /// The terrain classes the unit can cross (its restriction's mask).
-    pub mask: crate::map::TerrainMask,
+    pub mask: TerrainMask,
 }
 
 /// What the entry makes of a call.
@@ -176,7 +178,7 @@ impl Call {
             return Entry::Invalid;
         }
         // CVTTSS2SI into a 64-bit register, its low 32 bits kept
-        let fixed = |f: f32| crate::math::conversions::cvttss2si_64(f * TO_FIXED) as i32;
+        let fixed = |f: f32| cvttss2si_64(f * TO_FIXED) as i32;
         let to = FixedPoint::new(fixed(self.to.x()), fixed(self.to.y()));
         let at_target = self
             .target
@@ -205,8 +207,8 @@ impl Call {
 /// A path's fixed-point points as the game appends them (`{x * 2^-22, 0, y * 2^-22}` through the
 /// path's dedup, `FUN_140f95a10`).
 #[must_use]
-pub fn to_path(points: &[FixedPoint]) -> crate::pathing::tile_path::Path {
-    let mut path = crate::pathing::tile_path::Path::default();
+pub fn to_path(points: &[FixedPoint]) -> Path {
+    let mut path = Path::default();
     for p in points {
         let [x, y] = p.get();
         let _ = path.push(BVector::new(x as f32 * TO_FLOAT, 0.0, y as f32 * TO_FLOAT));

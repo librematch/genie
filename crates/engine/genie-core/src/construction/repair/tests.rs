@@ -1,9 +1,12 @@
 use super::*;
 use crate::combat::damage::ArmorPair;
 use crate::construction::MainBuildingId;
+use crate::gathering::hunt::tests::walker;
 use crate::map::TerrainFlags;
+use crate::math::rng::Well512;
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{
     MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads, WalkTo,
 };
@@ -17,17 +20,26 @@ use crate::objects::Voice;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
+use crate::objects::masters::{Master, Masters};
+use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
+use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame, Graphics};
+use crate::orders::Work;
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
+use crate::technology::Attributes;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
+use crate::unit_ai::{ActionKind, NotifyKind};
+use crate::world::tests::{in_update, repairing};
+use crate::world::{Player, World, WorldTime};
 
 const TASK: RepairTask = RepairTask {
     id: TaskId::test(7),
-    work_value: crate::objects::masters::WorkValue::new(0.5),
+    work_value: WorkValue::new(0.5),
     moving: None,
     proceeding: None,
 };
@@ -41,13 +53,13 @@ const SHOWING: RepairTask = RepairTask {
 
 /// The sprites' table of the tests: the task's 3 and 4, the master's standing sprite 5 and the
 /// `MoveTo`s' defaults 20 (to a point) and 21 (to an object), each of speed factor 1.
-fn graphics() -> crate::objects::Graphics {
+fn graphics() -> Graphics {
     [3, 4, 5, 20, 21]
         .map(|id| {
-            let g = crate::objects::sprite::Graphic {
+            let g = Graphic {
                 id: SpriteId::named(id),
-                frames: crate::objects::Frame::of_data(10),
-                facets: crate::objects::FacetCount::of_data(16),
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(16),
                 speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -66,7 +78,7 @@ const DEFAULTS: MoveDefaults = MoveDefaults {
 
 /// What the tests' repairer's `MoveTo`s read of it: [`DEFAULTS`] in the table `graphics`, alive
 /// (state 2), of speed 1, at (10, 10) with radii 0.2.
-const fn move_reads(graphics: &crate::objects::Graphics) -> MoveToReads<'_> {
+const fn move_reads(graphics: &Graphics) -> MoveToReads<'_> {
     MoveToReads {
         sprites: SpriteReads {
             defaults: DEFAULTS,
@@ -99,7 +111,7 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
     assert_eq!(
         work_amount(
             WorkRate::new(1.0),
-            crate::objects::masters::WorkValue::new(0.5),
+            WorkValue::new(0.5),
             Seconds::new(0.05),
             None
         ),
@@ -108,9 +120,9 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
     assert_eq!(
         work_amount(
             WorkRate::new(1.0),
-            crate::objects::masters::WorkValue::new(0.5),
+            WorkValue::new(0.5),
             Seconds::new(0.05),
-            Some(crate::construction::BuilderCount::of_data(1))
+            Some(BuilderCount::of_data(1))
         ),
         HitPoints::new(1.0 * 0.5 * 0.05)
     );
@@ -118,9 +130,9 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
     assert_eq!(
         work_amount(
             WorkRate::new(1.0),
-            crate::objects::masters::WorkValue::new(0.5),
+            WorkValue::new(0.5),
             Seconds::new(0.05),
-            Some(crate::construction::BuilderCount::of_data(3))
+            Some(BuilderCount::of_data(3))
         ),
         HitPoints::new(alone * (((3.0 - 1.0) * 0.5 + 1.0) / 3.0))
     );
@@ -129,7 +141,7 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
 /// The repairer's player's attributes as a list (food, wood, stone, gold at 0 to 3).
 struct Held(Vec<Amount>);
 
-impl crate::technology::Attributes for Held {
+impl Attributes for Held {
     fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
         Ok(self.0[i.index()])
     }
@@ -141,25 +153,25 @@ impl crate::technology::Attributes for Held {
 
 /// A house (70, class 3, 550 hit points, 25 wood) and a ram (35, class 13, 175 hit points,
 /// 160 wood, 75 gold) of the repairer's player.
-fn masters() -> crate::objects::masters::Masters {
-    crate::objects::masters::Masters::new([
-        crate::objects::masters::Master {
+fn masters() -> Masters {
+    Masters::new([
+        Master {
             id: ids::HOUSE,
-            terrain_restriction: Some(crate::map::RestrictionId::named(0)),
+            terrain_restriction: Some(RestrictionId::named(0)),
             kind: master_type::BUILDING,
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(550),
             cost: costs(&[(attribute::WOOD, 25, true)]),
-            ..crate::objects::masters::Master::default()
+            ..Master::default()
         },
-        crate::objects::masters::Master {
+        Master {
             id: ids::ID_35,
-            terrain_restriction: Some(crate::map::RestrictionId::named(0)),
+            terrain_restriction: Some(RestrictionId::named(0)),
             kind: master_type::COMBAT,
             class: class::SIEGE,
             hit_points: MasterHitPoints::of_data(175),
             cost: costs(&[(attribute::WOOD, 160, true), (attribute::GOLD, 75, true)]),
-            ..crate::objects::masters::Master::default()
+            ..Master::default()
         },
     ])
 }
@@ -319,14 +331,14 @@ const fn moving(state: MoveTo) -> RepairState {
 /// Repair of the house 10028 (300 of 550 hit points), the Repair then set by `set`; its master
 /// 118 with the standing sprite 5 and the walking sprite 20, the sprites' table [`graphics`],
 /// the repairer showing its standing sprite.
-fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world::World {
-    let mut t = crate::world::tests::repairing(at);
+fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> World {
+    let mut t = repairing(at);
     t.graphics = graphics();
     for masters in &mut t.masters {
         let m = masters.get_mut(ids::BUILDER).unwrap();
         (m.standing_sprite, m.move_sprite) = (Some(SpriteId::named(5)), Some(SpriteId::named(20)));
     }
-    let work = crate::orders::Work {
+    let work = Work {
         target: Some(object_id(10028)),
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
@@ -337,10 +349,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
         .unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     let standing = *graphics().get(SpriteId::named(5)).unwrap();
-    v.sprite = Some(crate::objects::sprite::ActiveSprite::start(
-        standing,
-        &mut crate::math::rng::Well512::default(),
-    ));
+    v.sprite = Some(ActiveSprite::start(standing, &mut Well512::default()));
     set(t
         .parts
         .actions
@@ -354,19 +363,19 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
 
 /// The map's terrain of class 4 (`terrain_class` of flags 0x20), the tiles' class: the
 /// repairer's master's restriction then passes them, so its quick path reaches the house.
-fn passable(t: &mut crate::world::World) {
+fn passable(t: &mut World) {
     t.spatial.terrain.as_mut().unwrap().terrains[0].flags = TerrainFlags::LAND;
 }
 
 /// The repairer's Repair part of 50 ms through its step (`Unit::repair_part`): its code.
-fn repaired(t: &mut crate::world::World) -> Result<HeadCode, GenieError> {
-    crate::world::tests::in_update(
+fn repaired(t: &mut World) -> Result<HeadCode, GenieError> {
+    in_update(
         t,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
             let me = Me {
-                human_order: crate::world::WorldTime::ZERO,
+                human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: actions
@@ -379,7 +388,7 @@ fn repaired(t: &mut crate::world::World) -> Result<HeadCode, GenieError> {
 }
 
 /// The repairer's Repair after its update.
-fn repair_of(t: &crate::world::World) -> RepairAction {
+fn repair_of(t: &World) -> RepairAction {
     *t.parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
         .list
@@ -388,13 +397,13 @@ fn repair_of(t: &crate::world::World) -> RepairAction {
 }
 
 /// The notifies the repairer's unit AI heard, each with the repair's action value.
-fn heard(t: &crate::world::World) -> Vec<crate::unit_ai::NotifyKind> {
+fn heard(t: &World) -> Vec<NotifyKind> {
     let ai = t
         .parts
         .unit_ai
         .get(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
-    let repair = crate::unit_ai::ActionKind::Repair.value();
+    let repair = ActionKind::Repair.value();
     ai.notifies
         .iter()
         .inspect(|n| assert_eq!(n.p, [repair, 0, 0]))
@@ -403,14 +412,14 @@ fn heard(t: &crate::world::World) -> Vec<crate::unit_ai::NotifyKind> {
 }
 
 /// The repairer's sprite.
-fn sprite_of(t: &crate::world::World) -> Option<SpriteId> {
+fn sprite_of(t: &World) -> Option<SpriteId> {
     t.players[1].objects[ListIndex::new(0)]
         .sprite
         .map(|s| s.graphic.id)
 }
 
 /// The house's hit points, repairers and holders (its slot 0x180 count).
-fn the_house(t: &crate::world::World) -> (f32, u8, i32) {
+fn the_house(t: &World) -> (f32, u8, i32) {
     let h = t.object(object_id(10028)).unwrap().1;
     (
         h.life.hp.get(),
@@ -468,7 +477,7 @@ fn repair_move_tos_are_quiet() {
         range: Distance::new(1.5),
         sprite: Some(*g.get(SpriteId::named(21)).unwrap()),
         voice: Voice::Quiet,
-        on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+        on_target_moved: TargetMoved::Follows,
         wait: MoveWait::NEW,
     };
     assert_eq!(r.state.move_to().copied(), Some(to_target));
@@ -572,7 +581,7 @@ fn repair_walk_to_its_point_shows_its_sprite_as_it_starts() {
 /// removes it.
 #[test]
 fn repair_ends_with_its_target_gone_foreign_or_dead() {
-    type Change = fn(&mut crate::world::World);
+    type Change = fn(&mut World);
     let cases: [(Change, bool); 4] = [
         (
             |t| drop(t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap()),
@@ -589,11 +598,11 @@ fn repair_ends_with_its_target_gone_foreign_or_dead() {
         (
             |t| {
                 let house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
-                t.players.push(crate::world::Player {
+                t.players.push(Player {
                     objects: vec![house.unit].into(),
                     attributes: vec![Amount::ZERO; 300],
                     relations: relation_row([1, 0, 0]),
-                    ..crate::world::Player::default()
+                    ..Player::default()
                 });
                 t.reindex();
                 t.players[1].relations = relation_row([1, 0, 3]);
@@ -610,7 +619,7 @@ fn repair_ends_with_its_target_gone_foreign_or_dead() {
         assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
         let r = repair_of(&t);
         assert_eq!((r.state, r.target), (RepairState::Done, None));
-        assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);
+        assert_eq!(heard(&t), [NotifyKind::ACTION_COMPLETED]);
         assert_eq!(sprite_of(&t), Some(SpriteId::named(5)));
         if held {
             assert_eq!(the_house(&t).2, 0, "the house let go");
@@ -632,9 +641,9 @@ fn repair_whose_move_to_target_died_lets_go_and_ends() {
             }),
         };
     });
-    let mut dying = crate::objects::unit::Unit {
+    let mut dying = Unit {
         id: object_id(777),
-        ..crate::objects::unit::Unit::default()
+        ..Unit::default()
     };
     dying.life.state = ObjectState::Removed;
     let _ = t.push_live(PlayerId::new(1), dying).unwrap();
@@ -644,7 +653,7 @@ fn repair_whose_move_to_target_died_lets_go_and_ends() {
         (r.state, r.target, r.state.move_to().copied()),
         (RepairState::Done, None, None)
     );
-    assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);
+    assert_eq!(heard(&t), [NotifyKind::ACTION_COMPLETED]);
     assert_eq!(the_house(&t).2, 0, "the house let go");
 }
 
@@ -695,7 +704,7 @@ fn repairer_at_its_target_faces_it_or_waits_or_fails() {
     assert_eq!(repair_of(&t).state, RepairState::Failed);
     assert_eq!(repaired(&mut t), Ok(HeadCode::Deletes));
     assert_eq!(repair_of(&t).state, RepairState::Halted);
-    assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_FAILED]);
+    assert_eq!(heard(&t), [NotifyKind::ACTION_FAILED]);
     assert_eq!(the_house(&t).0, 300.0);
 }
 
@@ -712,7 +721,7 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = crate::construction::BuilderCount::of_data(1);
+        .builders = BuilderCount::of_data(1);
     t.parts
         .actions
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
@@ -729,9 +738,9 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
             300.0
                 + work_amount(
                     WorkRate::new(1.0),
-                    crate::objects::masters::WorkValue::new(0.5),
+                    WorkValue::new(0.5),
                     Seconds::new(0.05),
-                    Some(crate::construction::BuilderCount::of_data(1))
+                    Some(BuilderCount::of_data(1))
                 )
                 .get(),
             1,
@@ -751,7 +760,7 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
             .armor_removed,
         ArmorPair::ZERO
     );
-    assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);
+    assert_eq!(heard(&t), [NotifyKind::ACTION_COMPLETED]);
     // the player without the wood the building repair cost asks
     let mut t = repair_at(NEAR, working);
     t.players[1].attributes.resize(300, Amount::ZERO);
@@ -760,10 +769,7 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     assert_eq!(
         heard(&t),
-        [
-            crate::unit_ai::NotifyKind::ACTION_INVALIDATED,
-            crate::unit_ai::NotifyKind::ACTION_COMPLETED
-        ]
+        [NotifyKind::ACTION_INVALIDATED, NotifyKind::ACTION_COMPLETED]
     );
     assert_eq!(the_house(&t).0, 300.0);
     // the house moved out of reach: the repairer walks again, no longer counted
@@ -774,7 +780,7 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .construction
         .as_mut()
         .unwrap()
-        .builders = crate::construction::BuilderCount::of_data(1);
+        .builders = BuilderCount::of_data(1);
     t.parts
         .actions
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
@@ -832,7 +838,7 @@ fn waiting_repairer_looks_again_each_second() {
 /// repairers), the walk there; its end ends the Repair.
 #[test]
 fn move_sends_the_repairer_to_its_point() {
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     let mut r = RepairAction {
         state: RepairState::Work,
         counted: true,
@@ -875,10 +881,7 @@ fn move_sends_the_repairer_to_its_point() {
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     assert_eq!(
         (repair_of(&t).state.bare(), heard(&t)),
-        (
-            RepairState::Done,
-            vec![crate::unit_ai::NotifyKind::ACTION_COMPLETED]
-        )
+        (RepairState::Done, vec![NotifyKind::ACTION_COMPLETED])
     );
 }
 
@@ -886,7 +889,7 @@ fn move_sends_the_repairer_to_its_point() {
 /// caller's to leave the repairers), the `MoveTo` goes, the target stays.
 #[test]
 fn halt_stops_the_repair_and_answers_whether_it_counted() {
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     let mut r = RepairAction {
         state: RepairState::Work,
         counted: true,
@@ -899,7 +902,7 @@ fn halt_stops_the_repair_and_answers_whether_it_counted() {
             RepairState::Halted,
             false,
             None,
-            Some(crate::construction::RepairTargetId::new(object_id(20)))
+            Some(RepairTargetId::new(object_id(20)))
         )
     );
     assert_eq!(r.halt(None), Ok(false));
@@ -909,7 +912,7 @@ fn halt_stops_the_repair_and_answers_whether_it_counted() {
 /// target starts.
 #[test]
 fn walking_again_starts_new_move_to_the_target() {
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     let g = graphics();
     let r = started();
     let mut walking = RepairAction {

@@ -2,6 +2,8 @@
 //! their unit lists and their targets hold it.
 
 use crate::GenieError;
+use crate::math::msvc::IntKey;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// An object's id (`+0x8`), which names the object across ticks: a live or sleeping object's
 /// is 0 or more, a recyclable master's object (a missile, a ghost) has a negative one. Every
@@ -85,14 +87,14 @@ impl genie_diff::Diff for ObjectId {
 }
 
 /// A map of objects by id hashes the id's value (`std::hash<int>`).
-impl crate::math::msvc::IntKey for ObjectId {
+impl IntKey for ObjectId {
     fn int(self) -> i32 {
         self.0
     }
 }
 
-impl std::fmt::Display for ObjectId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ObjectId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

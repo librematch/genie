@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::image::garrison::FAR;
 use crate::movement::PathAsk;
 use crate::movement::Speed;
 use crate::movement::move_to::action::ARRIVED;
@@ -16,6 +17,7 @@ use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::sprite::Graphic;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::UnitStance;
 use crate::unit_ai::{ActionKind, Inbox};
 use crate::world::Seconds;
 
@@ -26,7 +28,7 @@ const SUB_RELEASE: GenieError =
 
 /// The gap `FUN_14118f680` gives a `MoveTo` without a target, one to a point: the largest
 /// float, which no start counts as arrived ([`MoveToAction::added`]).
-pub const NO_TARGET_GAP: f32 = crate::math::image::garrison::FAR;
+pub const NO_TARGET_GAP: f32 = FAR;
 
 /// What the motion step's giving up reads of the unit ([`MoveWait::give_up`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -35,7 +37,7 @@ pub struct GiveUp {
     /// which waits once before it asks again.
     pub waits: bool,
     /// The unit AI's stance (`+0x1a9`), 0 without one: below 2 it waits a second, else two.
-    pub stance: crate::unit_ai::UnitStance,
+    pub stance: UnitStance,
 }
 
 impl MoveToAction {

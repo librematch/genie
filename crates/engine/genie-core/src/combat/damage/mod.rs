@@ -44,13 +44,25 @@ use self::taking::kill_bonus;
 pub use self::taking::take;
 #[cfg(test)]
 use self::taking::take_static;
+use crate::combat::AttackPowerup;
 use crate::combat::Charge;
+use crate::combat::missile::ShooterId;
+use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::Angle;
 #[cfg(test)]
 use crate::math::fmath;
+use crate::math::image::damage::{
+    BLAST_RANGE as DAMAGE_BLAST_RANGE, CONE as DAMAGE_CONE, EPSILON as DAMAGE_EPSILON,
+    FACING as DAMAGE_FACING, HIGHER as DAMAGE_HIGHER, LEAST_CLASS_HIT as DAMAGE_LEAST_CLASS_HIT,
+    LOWER as DAMAGE_LOWER, MINUS_CONE as DAMAGE_MINUS_CONE, MINUS_FACING as DAMAGE_MINUS_FACING,
+    ONE as DAMAGE_ONE, RELIC_BOOST as DAMAGE_RELIC_BOOST,
+    RETALIATION_RANGE as DAMAGE_RETALIATION_RANGE, RETALIATION_SCALE as DAMAGE_RETALIATION_SCALE,
+    SPECIAL as DAMAGE_SPECIAL, SPECIFIC_RELIC_BOOST as DAMAGE_SPECIFIC_RELIC_BOOST,
+    WIDE_CONE as DAMAGE_WIDE_CONE,
+};
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::MasterHitPoints;
@@ -69,35 +81,41 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
+use crate::objects::masters::{
+    ClassAmount, DamageAmount, DamageShare, InvulnerabilityLevel, RestrictionField, Task,
+};
+use crate::objects::{DamagedTimer, FacetCount, WorkerCount};
 use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::players::history::EventKind;
+use crate::world::Mode680;
 
 /// Elevation: a higher attacker hits at 1.25 (`DAT_142eb56a8`), a lower one at 0.75
 /// (`DAT_142e7f388`), each plus its player's and the target's player's attributes (211/272,
 /// 212/273).
-const HIGHER: f32 = crate::math::image::damage::HIGHER;
-const LOWER: f32 = crate::math::image::damage::LOWER;
+const HIGHER: f32 = DAMAGE_HIGHER;
+const LOWER: f32 = DAMAGE_LOWER;
 /// A building's hits with a specific relic inside (`DAT_142ed66b4`, 1.2), and with any relic
 /// (`DAT_142e86c14`, 1.1), [`building_elevation_factor`].
-const SPECIFIC_RELIC_BOOST: f32 = crate::math::image::damage::SPECIFIC_RELIC_BOOST;
-const RELIC_BOOST: f32 = crate::math::image::damage::RELIC_BOOST;
+const SPECIFIC_RELIC_BOOST: f32 = DAMAGE_SPECIFIC_RELIC_BOOST;
+const RELIC_BOOST: f32 = DAMAGE_RELIC_BOOST;
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`), and the share of
 /// reflected damage above which a target reflects.
-const EPSILON: f32 = crate::math::image::damage::EPSILON;
+const EPSILON: f32 = DAMAGE_EPSILON;
 /// A special attack and a retaliation need their attacker within 1.2 facets of where the target
 /// faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66
 /// (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2
 /// (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
-const FACING: f32 = crate::math::image::damage::FACING;
-const MINUS_FACING: f32 = crate::math::image::damage::MINUS_FACING;
-const SPECIAL: f32 = crate::math::image::damage::SPECIAL;
-const RETALIATION_RANGE: f32 = crate::math::image::damage::RETALIATION_RANGE;
-const RETALIATION_SCALE: f32 = crate::math::image::damage::RETALIATION_SCALE;
+const FACING: f32 = DAMAGE_FACING;
+const MINUS_FACING: f32 = DAMAGE_MINUS_FACING;
+const SPECIAL: f32 = DAMAGE_SPECIAL;
+const RETALIATION_RANGE: f32 = DAMAGE_RETALIATION_RANGE;
+const RETALIATION_SCALE: f32 = DAMAGE_RETALIATION_SCALE;
 /// A melee attacker (weapon range below 0.99, `DAT_142eb569c`) with an area effect tramples:
 /// its blast goes about itself (`FUN_1412115e0`).
-pub const BLAST_RANGE: f32 = crate::math::image::damage::BLAST_RANGE;
+pub const BLAST_RANGE: f32 = DAMAGE_BLAST_RANGE;
 /// What a player's attributes add to the elevation factor of a hit ([`elevation_factor`]): from
 /// higher up (attribute 211 for its own hits, 272 for the hits it takes) or from lower down (212,
 /// 273).
@@ -112,9 +130,9 @@ pub struct ElevationBonus {
 /// A cone blast (its level's bit 7) reaches objects within half a facet of where its attacker
 /// faces (`DAT_142e7f384`, `DAT_142eb6e58`), or within 1.67 facets (`DAT_142f4fea8`) for a wide
 /// one (bit 5).
-const CONE: f32 = crate::math::image::damage::CONE;
-const MINUS_CONE: f32 = crate::math::image::damage::MINUS_CONE;
-const WIDE_CONE: f32 = crate::math::image::damage::WIDE_CONE;
+const CONE: f32 = DAMAGE_CONE;
+const MINUS_CONE: f32 = DAMAGE_MINUS_CONE;
+const WIDE_CONE: f32 = DAMAGE_WIDE_CONE;
 
 /// The class whose damage alerts its target's owner itself (`-0xe6c` raw): its target's unit AI
 /// gets no notify 500.
@@ -129,10 +147,10 @@ const RAMS: [MasterId; 4] = [
 ];
 /// 1 (`DAT_14330eb8c`, read into `XMM9` at `0x1411cec8e`): a building's least hit, the hit
 /// points below which a hit razes a building or kills a unit, and what each razing count adds.
-const ONE: f32 = crate::math::image::damage::ONE;
+const ONE: f32 = DAMAGE_ONE;
 /// The least hit of the attacker classes [`LEAST_HIT_CLASSES`] under the game's setting `+0x680`
 /// at 1 (`DAT_142eb5690`, read into `XMM6` at `0x1411ceea4`).
-const LEAST_CLASS_HIT: f32 = crate::math::image::damage::LEAST_CLASS_HIT;
+const LEAST_CLASS_HIT: f32 = DAMAGE_LEAST_CLASS_HIT;
 /// The attacker classes whose least hit on a building is [`LEAST_CLASS_HIT`] (decoded `0`, `0x24`,
 /// `0x16`, `0x2c`, `0x34` at `0x1411ced23`..`0x1411cee9e`).
 const LEAST_HIT_CLASSES: [ClassId; 5] = [
@@ -179,7 +197,7 @@ pub struct Victim {
     pub capacity: CarryCapacity,
     /// `+0x644`, `worker_num`: the actions that have it as their target (a farm another farmer
     /// works).
-    pub workers: crate::objects::WorkerCount,
+    pub workers: WorkerCount,
     /// Its master's `area_effect_object_level` (`+0x62b`): the blast levels that reach it.
     pub blast_defense: BlastDefense,
     /// Flagged to sleep (`+0x641`, `+0x643`): a killing hit wakes it (`FUN_14119deb0` with 0).
@@ -208,12 +226,12 @@ pub struct Victim {
     pub master_hp: MasterHitPoints,
     /// Its master's tasks of action type 0xa0 ([`BONUS_DAMAGE`]), in their order: the damage its
     /// hits add by hit points ([`bonus_damage`]).
-    pub bonus_tasks: Vec<crate::objects::masters::Task>,
+    pub bonus_tasks: Vec<Task>,
     /// Its own attack (a retaliation's): its values as a hit's source and its master's weapons
     /// (class, amount).
     pub source: Attacker,
     /// Its master's weapons (class, amount).
-    pub weapons: Vec<crate::objects::masters::ClassAmount>,
+    pub weapons: Vec<ClassAmount>,
     /// A combat object's armor and what its damage reads (types 50 and up); None for others.
     pub armored: Option<Armored>,
     /// The damage notifies (500, `FUN_141082e80`) its hits post to its unit AI, in order (a
@@ -232,7 +250,7 @@ pub struct Victim {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Building {
     /// `+0xbb8`: an annex's main building, whose slot 0xe8 takes a hit on the annex.
-    pub main: Option<crate::construction::MainBuildingId>,
+    pub main: Option<MainBuildingId>,
     /// `+0xbc0`..`+0xbd8`: its annexes, which take its hit points after each hit.
     pub annexes: Vec<ObjectId>,
     /// `+0xb90` (not saved): the damage the blast under way has done to it ([`blast`]).
@@ -244,7 +262,7 @@ pub struct Building {
     /// floats in their order).
     pub cost: Amount,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after each hit, a second off in its update.
-    pub damaged_lately: crate::objects::DamagedTimer,
+    pub damaged_lately: DamagedTimer,
     /// A hit got past its hit point test: the write-back gives its annexes its hit points and
     /// its `damaged_lately`.
     pub struck: bool,
@@ -266,7 +284,7 @@ pub struct Razed {
     pub owner: PlayerId,
     /// A castle's (master 82) or a wonder's (276) destruction
     /// ([`crate::players::history::EventKind::CASTLE_DESTROYED`], [`crate::players::history::EventKind::WONDER_DESTROYED`]).
-    pub event: Option<crate::players::history::EventKind>,
+    pub event: Option<EventKind>,
     /// The attribute adds: (player, attribute, amount).
     pub adds: Vec<(PlayerId, AttributeId, Amount)>,
 }
@@ -293,7 +311,7 @@ pub struct Facing {
     /// `+0x7e8`, where it faces.
     pub angle: Angle,
     /// Its sprite's facets, 0 without a sprite.
-    pub facets: crate::objects::FacetCount,
+    pub facets: FacetCount,
 }
 
 /// What a hit on a combat object reads of it (its master's and its own values) and changes.
@@ -302,23 +320,23 @@ pub struct Armored {
     /// Its master's armor classes (class, amount), base armor, `defense_terrain_bonus`,
     /// `bonus_damage_resistance`, `combat_ability`, `damage_reflection`,
     /// `invulnerability_level`, `special_attack_flag`, hit points and `friendly_fire_damage`.
-    pub armors: Vec<crate::objects::masters::ClassAmount>,
+    pub armors: Vec<ClassAmount>,
     /// Its master's base armor for a class it does not list.
-    pub base_armor: crate::objects::masters::DamageAmount,
+    pub base_armor: DamageAmount,
     /// Its master's `defense_terrain_bonus`.
-    pub terrain_bonus: crate::objects::masters::RestrictionField,
+    pub terrain_bonus: RestrictionField,
     /// Its master's `bonus_damage_resistance`.
-    pub resistance: crate::objects::masters::DamageShare,
+    pub resistance: DamageShare,
     /// Its master's `combat_ability`.
     pub ability: CombatAbility,
     /// Its master's `damage_reflection`.
-    pub reflection: crate::objects::masters::DamageShare,
+    pub reflection: DamageShare,
     /// Its master's `invulnerability_level`.
-    pub invulnerability: crate::objects::masters::InvulnerabilityLevel,
+    pub invulnerability: InvulnerabilityLevel,
     /// Its master's `special_attack_flag`.
     pub special_attack: SpecialAttack,
     /// Its master's `friendly_fire_damage`.
-    pub friendly_fire: crate::objects::masters::DamageShare,
+    pub friendly_fire: DamageShare,
     /// Its master has a special graphic (`+0x8e8`), which its special attack shows.
     pub special_graphic: bool,
     /// Its terrain defense: `defense_terrain_bonus`'s restriction's value for its tile's terrain
@@ -371,7 +389,7 @@ pub struct Attacker {
     /// Its master's `area_effect_level` (`+0x830`).
     pub blast_level: BlastLevel,
     /// Its master's `area_damage` (`+0x834`).
-    pub area_damage: crate::objects::masters::DamageShare,
+    pub area_damage: DamageShare,
     /// Its master's `charge_type`, `max_charge`, `charge_target` and `special_attack_flag`; its
     /// charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
     pub charge_type: ChargeType,
@@ -387,16 +405,16 @@ pub struct Attacker {
     pub charge_hit: bool,
     /// Its attack powerup (`+0xa24`) and the game's setting `+0x680`
     /// ([`crate::world::World::mode_680`]: at 1 a hit may do no damage).
-    pub attack_powerup: crate::combat::AttackPowerup,
+    pub attack_powerup: AttackPowerup,
     /// The game's setting `+0x680` ([`crate::world::World::mode_680`]).
-    pub mode_680: crate::world::Mode680,
+    pub mode_680: Mode680,
     /// Its player and whether its master has a task of action type 0x9a (a kill bonus,
     /// `FUN_1415c6510`).
     pub player: PlayerId,
     /// Its master has a task of action type 0x9a (a kill bonus).
     pub kill_bonus_tasks: bool,
     /// What a missile was fired from (`+0x998`), its damage notify's sender.
-    pub fired_from: Option<crate::combat::missile::ShooterId>,
+    pub fired_from: Option<ShooterId>,
 }
 
 #[cfg(test)]

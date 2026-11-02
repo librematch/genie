@@ -3,8 +3,10 @@
 
 use crate::GenieError;
 use crate::gathering::QueueCount;
+use crate::math::fmath::at_most_or_unordered;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::cost_entries;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, Masters};
@@ -15,6 +17,7 @@ use crate::production::CostCount;
 use crate::production::QueuedUnits;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::{Attributes, TechDef, TechState, is_age};
 use crate::world::Seconds;
 
 /// `FUN_141630530`: a queued unit's refund. For a master of type 70 and up each of its cost
@@ -24,12 +27,12 @@ use crate::world::Seconds;
 pub fn refund(
     master: &Master,
     costs: &[(Option<AttributeId>, Amount); 3],
-    attributes: &mut dyn crate::technology::Attributes,
+    attributes: &mut dyn Attributes,
 ) -> Result<(), GenieError> {
     if master.kind < COMBAT {
         return Ok(());
     }
-    for (attribute, _, paid) in crate::objects::masters::cost_entries(&master.cost) {
+    for (attribute, _, paid) in cost_entries(&master.cost) {
         if !paid {
             continue;
         }
@@ -50,7 +53,7 @@ pub fn refund(
 pub fn refund_research(
     costs: &[(Option<AttributeId>, Amount); 3],
     count: QueuedUnits,
-    attributes: &mut dyn crate::technology::Attributes,
+    attributes: &mut dyn Attributes,
 ) -> Result<(), GenieError> {
     for &(attribute, amount) in costs {
         let Some(attribute) = attribute else {
@@ -71,12 +74,12 @@ pub fn refund_research(
 pub fn refund_master(
     master: &Master,
     n: QueueCount,
-    attributes: &mut dyn crate::technology::Attributes,
+    attributes: &mut dyn Attributes,
 ) -> Result<(), GenieError> {
     if master.kind < COMBAT {
         return Ok(());
     }
-    for (attribute, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
+    for (attribute, amount, paid) in cost_entries(&master.cost) {
         if !paid {
             continue;
         }
@@ -95,10 +98,10 @@ pub fn refund_master(
 /// scales truncated to 16 bits), straight into the attributes, and is in state 1 with no work
 /// done. True when it was; in another state nothing happens.
 pub fn refund_tech(
-    state: &mut crate::technology::TechState,
-    def: &crate::technology::TechDef,
+    state: &mut TechState,
+    def: &TechDef,
     tech: TechId,
-    attributes: &mut dyn crate::technology::Attributes,
+    attributes: &mut dyn Attributes,
 ) -> Result<bool, GenieError> {
     use crate::math::conversions::cvttss2si;
     if !matches!(
@@ -107,7 +110,7 @@ pub fn refund_tech(
     ) {
         return Ok(false);
     }
-    let modifier = if crate::technology::is_age(tech) {
+    let modifier = if is_age(tech) {
         0.0
     } else {
         // The research cost modifier (attribute 85, `+0x2a8`), which scales a refunded technology's
@@ -176,7 +179,7 @@ pub fn cost_test(
     master: MasterId,
     count: CostCount,
     population: bool,
-    attributes: &dyn crate::technology::Attributes,
+    attributes: &dyn Attributes,
 ) -> Result<bool, GenieError> {
     let Some(m) = masters.get(master).filter(|m| COMBAT <= m.kind) else {
         return Ok(false);
@@ -201,7 +204,7 @@ pub fn cost_test(
             }
             let room = attributes.get(attribute::HEADROOM)? + pop;
             // CMOVBE: the cap unless it is above the headroom's sum (a NaN takes the cap)
-            let limit = if crate::math::fmath::at_most_or_unordered(cap.get(), room.get()) {
+            let limit = if at_most_or_unordered(cap.get(), room.get()) {
                 cap
             } else {
                 room
@@ -224,7 +227,7 @@ pub fn pay(
     masters: &Masters,
     master: MasterId,
     count: CostCount,
-    attributes: &mut dyn crate::technology::Attributes,
+    attributes: &mut dyn Attributes,
 ) -> Result<bool, GenieError> {
     if !cost_test(masters, master, count, false, &*attributes)? {
         return Ok(false);
@@ -252,7 +255,7 @@ pub fn pay(
 pub fn master_costs(
     masters: &Masters,
     master: MasterId,
-    attributes: &dyn crate::technology::Attributes,
+    attributes: &dyn Attributes,
 ) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
     use crate::math::conversions::cvttss2si;
     let mut out = [(None, 0i16); 3];

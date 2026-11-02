@@ -9,12 +9,18 @@ use crate::groups::MotionFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::UnitType;
+use crate::groups::WorldObject;
 use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
 use crate::map::Distance;
+use crate::math::image::group::{
+    DEFAULT_RADIUS as GROUP_DEFAULT_RADIUS, SPACING_FACTOR as GROUP_SPACING_FACTOR,
+};
+use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::master_type::COMBAT;
@@ -22,13 +28,15 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use std::mem::take;
 
 /// A unit's radius in a formation where its master has no full footprint (`FUN_141025920`,
 /// `DAT_142e7f384`).
-const DEFAULT_RADIUS: f32 = crate::math::image::group::DEFAULT_RADIUS;
+const DEFAULT_RADIUS: f32 = GROUP_DEFAULT_RADIUS;
 /// A radius's share of the spacing (`DAT_142e8c150`): two radii side by side.
-const SPACING_FACTOR: f32 = crate::math::image::group::SPACING_FACTOR;
+const SPACING_FACTOR: f32 = GROUP_SPACING_FACTOR;
 /// A group holds fewer than this many members (`FUN_1410083c0`'s `0x46`: "No room in this
 /// group").
 const MAX_MEMBERS: usize = 70;
@@ -58,7 +66,7 @@ impl FormationUnit {
     /// The unit's radius in a formation (`FUN_141025920`): a master above type 69 with a footprint
     /// and a height (`FUN_141194060` with 1) has its spacing modifier (`+0x8b8`) times its radius
     /// on x (`+0x5d8`), any other [`DEFAULT_RADIUS`].
-    pub(crate) fn of(master: &crate::objects::masters::Master) -> Self {
+    pub(crate) fn of(master: &Master) -> Self {
         let full =
             Distance::ZERO < master.height && 0.0 < master.radius.x() && 0.0 < master.radius.y();
         let radius = if COMBAT <= master.kind && full {
@@ -212,8 +220,8 @@ impl World {
         let group_id = g.id;
         if let Some(place) = self.place(id) {
             let u = match place {
-                crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
-                crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
+                Place::Live(p, i) => self.players.live_mut(p, i)?,
+                Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
             };
             if u.group.id == Some(group_id) {
                 if !keep_moving && let Some(m) = self.parts.mover_mut(u.id) {
@@ -274,7 +282,7 @@ impl World {
             .map(|u| (u.id, u.life.master_id))
             .collect();
         let masters_of = |id: ObjectId| masters.iter().find(|(u, _)| *u == id).map(|&(_, m)| m);
-        let mut scratch = std::mem::take(&mut self.groups.unit_types_scratch);
+        let mut scratch = take(&mut self.groups.unit_types_scratch);
         let left = self.groups.held_mut(group)?.drop_from_statistic(
             id,
             category,
@@ -354,7 +362,7 @@ impl World {
         };
         let sub = self.unit_category(Some(object))?;
         // a ghost (type 25) has no sub-formation: only a unit gets past this
-        let crate::groups::WorldObject::Unit(p, u, _) = object else {
+        let WorldObject::Unit(p, u, _) = object else {
             return Ok(false);
         };
         if sub == FormationCategory::ANY {
@@ -376,11 +384,11 @@ impl World {
             let _ = self.remove_unit(old, id, None, false)?;
         }
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
-        let ai_rng = self.streams.get(crate::math::rng::Stream::Ai);
+        let ai_rng = self.streams.get(Stream::Ai);
         // a sleeping unit joins as a live one
         let u = match place {
-            crate::world::index::Place::Live(q, i) => self.players.live_mut(q, i)?,
-            crate::world::index::Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
+            Place::Live(q, i) => self.players.live_mut(q, i)?,
+            Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
         u.group.id = Some(group);
         if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
@@ -401,7 +409,7 @@ impl World {
             .map(|u| (u.id, u.life.master_id))
             .collect();
         let masters_of = |id: ObjectId| masters.iter().find(|(u, _)| *u == id).map(|&(_, m)| m);
-        let mut scratch = std::mem::take(&mut self.groups.unit_types_scratch);
+        let mut scratch = take(&mut self.groups.unit_types_scratch);
         let g = self.groups.held_mut(group)?;
         let seconds = g.next_seconds();
         g.members.push(Member {
@@ -451,11 +459,31 @@ mod tests {
     use crate::world::Seconds;
     use crate::world::WorldTime;
 
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
+    #[cfg(test)]
+    use crate::math::image::group::SPACING_FACTOR as GROUP_SPACING_FACTOR;
+    #[cfg(test)]
+    use crate::movement::PathData;
+    #[cfg(test)]
+    use crate::objects::layers::{Motion, Static};
+    #[cfg(test)]
+    use crate::objects::masters::SpacingModifier;
+    #[cfg(test)]
+    use crate::players::ByPlayer;
     use crate::players::relation_row;
     use crate::players::relations;
     use crate::test_ids::group_id;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::unit_ai::{SOLDIER_AI, UnitAi};
+    #[cfg(test)]
+    use crate::vision::registry::Registry;
+    #[cfg(test)]
+    use crate::vision::visibility::Visibility;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::{Player, World};
 
     /// Group 1 of player 1's units 10, 11 (master 4, category 1) and 12 (master 6, category 3),
@@ -464,7 +492,7 @@ mod tests {
         let unit = |id: i32, master: MasterId, x: f32| {
             let mut u = Unit {
                 id: object_id(id),
-                place: crate::objects::layers::Static::at(Position::new(x, 0.0, 0.0)),
+                place: Static::at(Position::new(x, 0.0, 0.0)),
                 ..Unit::default()
             };
             u.life.master_id = master;
@@ -472,13 +500,13 @@ mod tests {
             u
         };
         let walking = unit(11, master_id(4), 2.0);
-        let mut mover = crate::gathering::hunt::tests::walker();
+        let mut mover = walker();
         mover.paths = vec![
             mover
                 .paths
                 .first()
                 .cloned()
-                .unwrap_or(crate::movement::PathData::without_path()),
+                .unwrap_or(PathData::without_path()),
         ];
         mover.paths[0].state = PathState::Walking;
         let player = Player {
@@ -492,12 +520,12 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), player],
         )
-        .with_motions([(object_id(11), crate::objects::layers::Motion::Moving(mover))]);
+        .with_motions([(object_id(11), Motion::Moving(mover))]);
         let master = |id: MasterId, category: u8| Master {
             id,
             kind: master_type::COMBAT,
@@ -703,27 +731,18 @@ mod tests {
         for u in &mut t.players[1].objects {
             t.parts.set_unit_ai(
                 u.id,
-                Some(crate::unit_ai::UnitAi {
-                    ai_type: crate::unit_ai::SOLDIER_AI,
-                    ..crate::unit_ai::UnitAi::default()
+                Some(UnitAi {
+                    ai_type: SOLDIER_AI,
+                    ..UnitAi::default()
                 }),
             );
         }
         // the members' searches find nothing: an empty registry, no relations
-        let mut v = crate::vision::visibility::Visibility::new(
-            GridSize::new(20, 20),
-            vec![],
-            vec![],
-            vec![],
-            0,
-            vec![],
-        );
-        v.registry = Some(crate::vision::registry::Registry::new(2, 65));
+        let mut v = Visibility::new(GridSize::new(20, 20), vec![], vec![], vec![], 0, vec![]);
+        v.registry = Some(Registry::new(2, 65));
         t.spatial.sight = Some(v);
-        t.spatial.relations =
-            crate::players::ByPlayer::new(vec![relation_row([0, 0]), relation_row([0, 0])]);
-        t.spatial.unit_diplomacy =
-            crate::players::ByPlayer::new(vec![relations([1, 2]), relations([0, 1])]);
+        t.spatial.relations = ByPlayer::new(vec![relation_row([0, 0]), relation_row([0, 0])]);
+        t.spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 2]), relations([0, 1])]);
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags |= GroupFlags::RELAYOUT;
         g.motion.flags &= !MotionFlags::NEW;
@@ -740,8 +759,7 @@ mod tests {
     fn the_stances_reach_sleeping_member() {
         let mut t = three();
         for u in &mut t.players[1].objects {
-            t.parts
-                .set_unit_ai(u.id, Some(crate::unit_ai::UnitAi::default()));
+            t.parts.set_unit_ai(u.id, Some(UnitAi::default()));
         }
         let asleep = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
         let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
@@ -775,9 +793,9 @@ mod tests {
             for (u, stance) in t.players[1].objects.iter_mut().zip(stances) {
                 t.parts.set_unit_ai(
                     u.id,
-                    Some(crate::unit_ai::UnitAi {
+                    Some(UnitAi {
                         stance,
-                        ..crate::unit_ai::UnitAi::default()
+                        ..UnitAi::default()
                     }),
                 );
             }
@@ -814,16 +832,13 @@ mod tests {
                 let m = masters.get_mut(master_id(id)).unwrap();
                 m.radius = Footprint::new(r, r);
                 m.height = Distance::new(1.0);
-                m.spacing_modifier = crate::objects::masters::SpacingModifier::new(1.0);
+                m.spacing_modifier = SpacingModifier::new(1.0);
             }
         }
         t.groups.get_mut(group_id(1)).unwrap().desired_spacing = Distance::ZERO;
         let _ = t.lock_formation(group_id(1), FormationKind::LINE);
         let spacing = t.groups.get(group_id(1)).unwrap().desired_spacing;
-        assert_eq!(
-            spacing,
-            Distance::new(0.2 * crate::math::image::group::SPACING_FACTOR)
-        );
+        assert_eq!(spacing, Distance::new(0.2 * GROUP_SPACING_FACTOR));
     }
 
     /// Kept moving, the unit's walk stays; a unit the world does not hold leaves the first

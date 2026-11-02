@@ -9,6 +9,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::master_type::MOVING;
 use crate::orders::{Interact, MAX_UNGROUPED, Split, Splittable, centroid, splits_together};
 use crate::pathing::tile_path::Found;
+use crate::pathing::tile_path::{Path, Request};
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -232,7 +233,7 @@ impl World {
                 let Some(planner) = pathing.planner(restriction, tiles) else {
                     return Ok(None);
                 };
-                let req = crate::pathing::tile_path::Request {
+                let req = Request {
                     from: b.position.ground(),
                     to: a.position.ground(),
                     radii: a.radius,
@@ -240,7 +241,7 @@ impl World {
                     closed: Vec::new(),
                     full: false,
                 };
-                let mut p = crate::pathing::tile_path::Path::default();
+                let mut p = Path::default();
                 let found = planner.plan::<GenieError>(&req, false, &mut p, None)?;
                 p.measure();
                 Ok(Some((found, p.length)))

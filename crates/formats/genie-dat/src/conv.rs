@@ -1,15 +1,14 @@
 //! Checked conversions for the fields the format fixes the width of: a value that does not fit is
 //! an `io::Error` of kind `InvalidData`, not a panic.
 
+use std::error::Error;
 use std::io;
 
 /// A count or an id that does not fit the width its field has in the file.
 const DOES_NOT_FIT: &str = "a value that does not fit its field";
 
 /// The error of a value the format cannot hold: `InvalidData`, with `reason`.
-pub(crate) fn invalid_data(
-    reason: impl Into<Box<dyn std::error::Error + Send + Sync>>,
-) -> io::Error {
+pub(crate) fn invalid_data(reason: impl Into<Box<dyn Error + Send + Sync>>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, reason)
 }
 

@@ -1,6 +1,9 @@
 //! The game's tech tree table ([`TechTree`], `FUN_140c7e080`) and its lookups.
 
+use crate::players::CivId;
 use crate::players::world_player::{TreeMaster, TreeTech};
+use crate::world::Age;
+use crate::world::settings::Settings;
 
 /// One unit of a building in a civilisation's tech tree (`0x48` bytes).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -10,7 +13,7 @@ pub struct TreeUnit {
     /// `+0x4`: the master it links to ([`TechTree::link`]).
     pub link: TreeMaster,
     /// `+0x8`: its age (2 Feudal, 3 Castle, 4 Imperial).
-    pub age: crate::world::Age,
+    pub age: Age,
     /// `+0xc`: the technology that brings it ([`TechTree::tech`]).
     pub tech: TreeTech,
 }
@@ -63,7 +66,7 @@ pub struct TechTree {
 #[derive(Clone, Copy, Debug)]
 pub struct TreeQuery<'a> {
     /// The civilisation index.
-    pub civ: crate::players::CivId,
+    pub civ: CivId,
     /// The building's master.
     pub building: TreeMaster,
     /// The unit's master.
@@ -71,9 +74,9 @@ pub struct TreeQuery<'a> {
     /// The Feudal, Castle and Imperial Ages out of reach.
     pub ages_out: [bool; 3],
     /// The game's options: the full tech tree and the last age.
-    pub settings: &'a crate::world::settings::Settings,
+    pub settings: &'a Settings,
     /// The civilisation the full tech tree falls back to (`FUN_140c7e6f0`).
-    pub fallback: crate::players::CivId,
+    pub fallback: CivId,
 }
 
 /// What [`TechTree::find`] answers.
@@ -103,15 +106,15 @@ impl TechTree {
             };
             if let Some(b) = buildings.iter().find(|b| b.id == q.building) {
                 let unit = b.units.iter().find(|u| u.id == q.unit);
-                let age = unit.map_or(crate::world::Age::DEFAULT, |u| u.age);
+                let age = unit.map_or(Age::DEFAULT, |u| u.age);
                 if q.settings.last_age().before() < age {
                     return Found::OutOfAges;
                 }
                 let [feudal, castle, imperial] = q.ages_out;
                 let out = unit.is_some_and(|u| {
-                    (u.age == crate::world::Age::FEUDAL && feudal)
-                        || (u.age == crate::world::Age::CASTLE && (feudal || castle))
-                        || (u.age == crate::world::Age::IMPERIAL && (feudal || castle || imperial))
+                    (u.age == Age::FEUDAL && feudal)
+                        || (u.age == Age::CASTLE && (feudal || castle))
+                        || (u.age == Age::IMPERIAL && (feudal || castle || imperial))
                 });
                 if out {
                     return Found::OutOfAges;

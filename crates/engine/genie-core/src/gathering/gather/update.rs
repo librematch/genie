@@ -2,15 +2,18 @@
 //! in the way and the teardown.
 
 use crate::GenieError;
+use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
     GatherAction, GatherReads, Next, REGATHERED, SEARCH_WAIT, STOP_FARMS, StopRate, WAIT_GAP,
     WAIT_WORKERS, waits_for_farm,
 };
+use crate::gathering::hunt::asked_drop_off;
 use crate::gathering::hunt::walk_sprite;
 use crate::map::Distance;
 use crate::math::rng::Stream;
+use crate::movement::footprint_gap_squared;
 use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{GiveUp, MoveTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
@@ -18,7 +21,10 @@ use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
+use crate::objects::WorkerCount;
 use crate::objects::masters::class;
+use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -51,7 +57,7 @@ impl GatherAction {
     /// another resource (the unit AI takes notify 0x21c, the caller's).
     #[must_use]
     pub fn drop_off_asked(&self, held_kind: Option<AttributeId>, attributes: usize) -> bool {
-        crate::gathering::hunt::asked_drop_off(self.task.resource, held_kind, attributes)
+        asked_drop_off(self.task.resource, held_kind, attributes)
     }
 
     /// The teardown (`FUN_140a73fc0`) and `set_state`'s first step (`FUN_140a98620`): the
@@ -71,11 +77,7 @@ impl GatherAction {
 
     /// The sprite the walks show (`FUN_140a8b660`, slot 0x68 with it): the task's carrying sprite
     /// while the unit carries at least 1 of the task's resource, else its moving one.
-    pub(super) fn walk_sprite(
-        &self,
-        unit: &Unit,
-        r: &GatherReads,
-    ) -> Option<crate::objects::sprite::Graphic> {
+    pub(super) fn walk_sprite(&self, unit: &Unit, r: &GatherReads) -> Option<Graphic> {
         walk_sprite(self.task.resource, unit.life.held(), &r.sprites)
     }
 
@@ -226,22 +228,18 @@ impl GatherAction {
             if target.state < ObjectState::Alive {
                 return self.begin_search(c, unit, r);
             }
-            if matches!(
-                target.master_id,
-                crate::objects::masters::ids::PASTURE_MANGROVE
-                    | crate::objects::masters::ids::PASTURE
-            ) {
+            if matches!(target.master_id, PASTURE_MANGROVE | PASTURE) {
                 return Err(GenieError::unsupported(
                     "a gather facing a pasture (its animals, slot 0x780)",
                 ));
             }
-            if crate::objects::WorkerCount::ONE < target.workers {
+            if WorkerCount::ONE < target.workers {
                 return self.begin_farm_wait(c, unit, r);
             }
         }
         let at = unit.place.position();
         let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-        if !crate::combat::attack::face_target(mover, at, target.position, c.w.world_time)? {
+        if !face_target(mover, at, target.position, c.w.world_time)? {
             return Ok(Next::Stay);
         }
         if Amount::ZERO < target.amount || REGATHERED.contains(&target.master_id) {
@@ -310,8 +308,7 @@ impl GatherAction {
                 let mover = c.w.parts.mover_of(unit.id).ok_or(UNMOVING)?;
                 let me = mover.stats.radius.ground();
                 let at = unit.place.position();
-                let gap =
-                    crate::movement::footprint_gap_squared(at, me, target.position, target.radius);
+                let gap = footprint_gap_squared(at, me, target.position, target.radius);
                 if target.workers.as_f32() <= WAIT_WORKERS || WAIT_GAP <= gap.get() {
                     self.random_wait(c, unit);
                     return Ok(Next::Stay);

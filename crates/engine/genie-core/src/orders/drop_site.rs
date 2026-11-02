@@ -2,6 +2,9 @@
 //! and the way back.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
+use crate::gathering::drop_sites::drop_site_search;
+use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
 use crate::map::Point;
@@ -11,6 +14,7 @@ use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -24,8 +28,12 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::world_view::DropWorld;
+use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
+use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -64,7 +72,7 @@ impl World {
         let filter = if held.is_some_and(|h| HUNTED_LOADS.contains(&h)) {
             HUNT
         } else {
-            crate::gathering::gather::GATHER
+            GATHER
         };
         let work = Work {
             target: Some(site.id()),
@@ -89,13 +97,8 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+    ) -> Result<Option<DropSiteId>, GenieError> {
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let seeks = master.kind < COMBAT
@@ -108,9 +111,9 @@ impl World {
             "a drop-off of a player without masters",
         ))?;
         if !seeks {
-            return crate::gathering::drop_sites::drop_site_search(
+            return drop_site_search(
                 &self.players.player(p)?.objects,
-                crate::objects::masters::OwnerMasters::new(&self.parts.own_master, Some(masters)),
+                OwnerMasters::new(&self.parts.own_master, Some(masters)),
                 &master.drop_sites,
                 unit.position(),
                 None,
@@ -124,11 +127,8 @@ impl World {
             .top_action()
             .map_or(ActionState::NO_ACTION, |a| a.state);
         let player = &self.players.player(p)?;
-        let mut world = crate::unit_ai::world_view::DropWorld {
-            masters: crate::objects::masters::OwnerMasters::new(
-                &self.parts.own_master,
-                self.masters.of(p),
-            ),
+        let mut world = DropWorld {
+            masters: OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
@@ -137,7 +137,7 @@ impl World {
             player_type: player.kind,
             groups: &self.groups,
         };
-        let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
+        let others = OthersRef::of(&self.players, &self.index, p)?;
         player.live(idx)?.drop_site_with(
             (self.parts.actions_of(unit.id), self.parts.mover_of(unit.id)),
             &mut world,
@@ -162,7 +162,7 @@ impl World {
         at: Point,
         held: Option<AttributeId>,
         class: ClassId,
-    ) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
+    ) -> Result<Option<DropSiteId>, GenieError> {
         let player = self.players.player(p)?;
         let look = |id: ObjectId| self.object(id).map(|(_, o)| (o.life.state, o.position()));
         Ok(nearest_table_site(
@@ -242,7 +242,7 @@ impl World {
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            let n = crate::unit_ai::Notify::own(id, crate::unit_ai::NotifyKind::OTHER_LOAD, [0; 3]);
+            let n = Notify::own(id, NotifyKind::OTHER_LOAD, [0; 3]);
             let _ = ai.accept(n, state);
         }
         Ok(())
@@ -264,7 +264,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        site: crate::gathering::DropSiteId,
+        site: DropSiteId,
         back: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let back = back.filter(|t| !t.is_recyclable()).and_then(|t| {
@@ -289,10 +289,10 @@ impl World {
         let unit = self.players.live_mut(p, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            let order = crate::unit_ai::QueuedOrder {
+            let order = QueuedOrder {
                 issuer: Some(Issuer::Object(id)),
                 order: OrderKind::OnTarget,
-                priority: crate::unit_ai::OrderPriority::COMMAND,
+                priority: OrderPriority::COMMAND,
                 target: Some(target),
                 target_owner: Some(owner),
                 point: place,
@@ -360,10 +360,10 @@ impl World {
         let (id, target_type, owner, at) = target;
         let (x, y) = (at.x(), at.y());
         ai.insert_order(
-            crate::unit_ai::QueuedOrder {
+            QueuedOrder {
                 issuer: Some(Issuer::Player(p)),
                 order: OrderKind::OnTarget2,
-                priority: crate::unit_ai::OrderPriority::COMMAND,
+                priority: OrderPriority::COMMAND,
                 target: id,
                 target_owner: owner,
                 point: Position::new(x, y, 0.0),

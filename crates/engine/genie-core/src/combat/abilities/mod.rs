@@ -65,6 +65,12 @@ mod movement_damage;
 pub use self::generation::{TopWork, WorkTarget, generated, generates, store};
 pub use self::looks_and_rewards::{look, reward, terrain_mask};
 pub use self::movement_damage::{Bystander, Hitter, finish, movement_damage_due, reach, struck};
+use crate::combat::attack::ATTACK;
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::HUNT;
+use crate::math::image::abilities::{EPSILON as ABILITIES_EPSILON, ONE as ABILITIES_ONE};
+use crate::objects::masters::action_type::COMBAT as ACTION_TYPE_COMBAT;
+use crate::world::index::Place;
 
 /// The action type of a generation task (151): the Feitoria's trickle and the like.
 pub const GENERATE: ActionType = ActionType::named(0x97);
@@ -77,12 +83,7 @@ pub const REMOVAL_REWARD: ActionType = ActionType::named(0xa1);
 
 /// The top action types a generation task's test passes (`FUN_140a7be70`): the Attack (9),
 /// type 7, the Gather (5) and the Hunt (0x6e).
-const WORKING_ACTIONS: [ActionType; 4] = [
-    crate::combat::attack::ATTACK,
-    crate::objects::masters::action_type::COMBAT,
-    crate::gathering::gather::GATHER,
-    crate::gathering::hunt::HUNT,
-];
+const WORKING_ACTIONS: [ActionType; 4] = [ATTACK, ACTION_TYPE_COMBAT, GATHER, HUNT];
 /// The action state of an action at work (`+0x18`).
 const WORKING: ActionState = ActionState::new(7);
 
@@ -94,9 +95,9 @@ const ALWAYS_REACHED: BlastDefense = BlastDefense::ALWAYS_REACHED;
 
 /// Hit points below which an object counts dead, and the store's give threshold
 /// (`DAT_14330eb8c`).
-const ONE: f32 = crate::math::image::abilities::ONE;
+const ONE: f32 = ABILITIES_ONE;
 /// The range below which a removal reward task pays (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::abilities::EPSILON;
+const EPSILON: f32 = ABILITIES_EPSILON;
 
 /// What the routine keeps on its object. The constructor's values are the default: no timer,
 /// rate 1 and the master's look.
@@ -206,7 +207,7 @@ impl World {
         let i = match self.players.player(p)?.objects.get(i) {
             Some(u) if u.id == id => i,
             _ => match self.place(id) {
-                Some(crate::world::index::Place::Live(q, j)) if q == p => j,
+                Some(Place::Live(q, j)) if q == p => j,
                 _ => return Ok(Vec::new()),
             },
         };

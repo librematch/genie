@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::construction::build::construction::{completion_counts, hand_storage, lay_foundation};
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD, StackUnit, held, show_built};
 use crate::map::spatial::Placed;
+use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -15,10 +16,12 @@ use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{BuildingMaster, Master};
 use crate::players::PlayerId;
+use crate::players::diplomacy::REVEAL_UNITS;
 use crate::world::Seconds;
+use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
-impl crate::world::World {
+impl World {
     /// The building `id`'s `set_state(2)` from state 0 (`FUN_1411dbb70`), after its annexes'
     /// ([`crate::world::World::set_state`] runs them first), in the game's order: the
     /// completion's first part ([`crate::world::World::completion_part`], `FUN_1411c6bd0`), then,
@@ -44,7 +47,7 @@ impl crate::world::World {
     /// What the completion does not model, and a building without its master or place.
     pub(crate) fn complete_building(&mut self, id: ObjectId) -> Result<(), GenieError> {
         if self.attribute_204() {
-            return Err(crate::players::diplomacy::REVEAL_UNITS);
+            return Err(REVEAL_UNITS);
         }
         let (p, u) = self.object(id).ok_or(NOT_HELD)?;
         let master = u.master(self.master_tables(), p)?.clone();
@@ -148,7 +151,7 @@ impl crate::world::World {
             master,
             parts.building.of(id).build_frame,
             graphics,
-            streams.get(crate::math::rng::Stream::Sprite),
+            streams.get(Stream::Sprite),
         );
         Ok(())
     }

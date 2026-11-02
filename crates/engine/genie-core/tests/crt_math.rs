@@ -8,6 +8,8 @@
 //! same msun sources the game links (`cargo test --release -- --ignored`).
 
 use genie_core::math::fmath;
+use std::num::NonZero;
+use std::thread::{available_parallelism, scope};
 
 /// Each routine's calls: its name, then per call the inputs and the output as f32 bits.
 fn fixture() -> Vec<(String, Vec<Vec<u32>>)> {
@@ -94,10 +96,10 @@ fn atan2_is_the_games_atan2f() {
 /// The f32 inputs (bits) where `ours` and `oracle` give other bits, over all 2^32 of them (at
 /// most 16 per thread).
 fn sweep(ours: fn(f32) -> f32, oracle: fn(f32) -> f32) -> Vec<u32> {
-    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZero::get);
+    let threads = available_parallelism().map_or(4, NonZero::get);
     let threads = u32::try_from(threads).unwrap_or(4);
     let span = u32::MAX / threads + 1;
-    std::thread::scope(|s| {
+    scope(|s| {
         let mut workers = Vec::new();
         for t in 0..threads {
             let start = t * span;
@@ -140,7 +142,7 @@ fn atan2_agrees_with_libm_on_random_pairs() {
         ours.to_bits() != theirs.to_bits() && !(ours.is_nan() && theirs.is_nan())
     };
     let threads = 16u64;
-    let bad: Vec<(u32, u32)> = std::thread::scope(|s| {
+    let bad: Vec<(u32, u32)> = scope(|s| {
         let mut workers = Vec::new();
         for t in 0..threads {
             workers.push(s.spawn(move || {
@@ -198,7 +200,7 @@ fn fmod_is_the_exact_remainder_on_random_pairs() {
             .any(|r| r.to_bits() != ours.to_bits() && !(r.is_nan() && ours.is_nan()))
     };
     let threads = 16u64;
-    let bad: Vec<(u32, u32)> = std::thread::scope(|s| {
+    let bad: Vec<(u32, u32)> = scope(|s| {
         let mut workers = Vec::new();
         for t in 0..threads {
             workers.push(s.spawn(move || {

@@ -1,10 +1,13 @@
 //! An object's death (`set_state(3)` and the static part of it) and a foundation's death.
 
 use crate::GenieError;
+use crate::construction::build::NO_CONSTRUCTION;
 use crate::construction::build::{Completion, Construction};
+use crate::gathering::PastureId;
 use crate::math::rng::Stream;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::layers::Action;
 use crate::objects::lifecycle::Class;
 use crate::objects::lifecycle::death_parts::{built_death, combat_dies, farm_bonus, refund_of};
 use crate::objects::masters::Master;
@@ -12,8 +15,10 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::sprite::{building_death, dying, new_sprite};
 use crate::objects::unit::{NO_DYING_SPRITE, Unit};
 use crate::players::Amount;
+use crate::players::tracker::key;
 use crate::technology::TechId;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -69,7 +74,7 @@ impl Unit {
     /// master's dying sprite. Not held: the particles and the sounds.
     pub(crate) fn died(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         before: ObjectState,
     ) -> Result<(), GenieError> {
@@ -102,7 +107,7 @@ impl Unit {
             // from its angle again)
             if self.life.class == Class::Animated
                 && self.life.dying_sprite.is_some()
-                && let Some(id) = crate::objects::sprite::dying(master, None)
+                && let Some(id) = dying(master, None)
             {
                 self.show_dying(c, id)?;
             }
@@ -137,10 +142,10 @@ impl Unit {
                 c.w.parts
                     .building_of(self.id)
                     .construction
-                    .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
-            crate::objects::sprite::building_death(master, look, built.progress)
+                    .ok_or(NO_CONSTRUCTION)?;
+            building_death(master, look, built.progress)
         } else {
-            crate::objects::sprite::dying(master, look)
+            dying(master, look)
         };
         if let Some(id) = shown {
             self.show_dying(c, id)?;
@@ -154,7 +159,7 @@ impl Unit {
     /// dying sprite).
     fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> Result<(), GenieError> {
         let g = c.w.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
-        crate::objects::sprite::new_sprite(
+        new_sprite(
             &mut self.sprite,
             c.w.parts.move_stats_mut(self.id),
             g,
@@ -173,7 +178,7 @@ impl Unit {
     /// the foundation lent to the world).
     pub(crate) fn foundation_died(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         master: &Master,
     ) -> Result<(), GenieError> {
@@ -183,7 +188,7 @@ impl Unit {
                 .building_mut(self.id)?
                 .construction
                 .as_mut()
-                .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+                .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
@@ -193,8 +198,7 @@ impl Unit {
         };
         let part = completion.first_part(construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
-        let k =
-            crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, self.life.master_id);
+        let k = key(c.w.masters.of(c.player), &c.w.lines, self.life.master_id);
         c.w.players
             .player_mut(c.player)?
             .tracker
@@ -208,7 +212,7 @@ impl Unit {
             let (p, id) = (c.player, self.id);
             c.lend((&mut *self, &mut *actions), |w| {
                 if part.pasture {
-                    w.setup_pasture(p, crate::gathering::PastureId::new(id))?;
+                    w.setup_pasture(p, PastureId::new(id))?;
                 }
                 if part.cart {
                     w.cart_search(p, id, ObjectState::Foundation)?;
@@ -217,10 +221,7 @@ impl Unit {
             })?;
         }
         let (layer, mover) = c.w.parts.building_and_mover_mut(self.id)?;
-        let construction = layer
-            .construction
-            .as_mut()
-            .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+        let construction = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let started = Construction::begin(
             self.id,
             construction,

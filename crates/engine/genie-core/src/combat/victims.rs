@@ -26,6 +26,16 @@ use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
 pub(crate) use crate::combat::victim_reads::{victim_in, victim_of};
+use crate::construction::MainBuildingId;
+use crate::construction::build::NOT_HELD;
+use crate::map::spatial::TileSight;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::at_most_or_unordered;
+use crate::objects::layers::Action;
+use crate::objects::masters::cost_entries;
+use crate::unit_ai::{NotifyKind, Seen};
+use crate::world::index::Place;
+use std::mem::take;
 
 impl World {
     /// What a hit of an attacker of player `attacker` reads of the object `id` ([`Victim`]): an
@@ -69,7 +79,7 @@ impl World {
         &self,
         id: impl ObjectKey,
         viewer: PlayerId,
-    ) -> Result<Option<crate::unit_ai::Seen>, GenieError> {
+    ) -> Result<Option<Seen>, GenieError> {
         if let Some((p, u, _)) = self.locate(id) {
             return self.seen_of(u, p, viewer).map(Some);
         }
@@ -88,10 +98,10 @@ impl World {
         u: &Unit,
         p: PlayerId,
         viewer: PlayerId,
-    ) -> Result<crate::unit_ai::Seen, GenieError> {
+    ) -> Result<Seen, GenieError> {
         let master = u.master(self.master_tables(), p)?;
         let (x, y) = (u.position().x(), u.position().y());
-        Ok(crate::unit_ai::Seen {
+        Ok(Seen {
             state: u.life.state,
             kind: master.kind,
             owner: p,
@@ -102,14 +112,8 @@ impl World {
             flags: master.object_flags,
             sight: self
                 .spatial
-                .tile_sight(
-                    viewer,
-                    Tile::new(
-                        crate::math::conversions::cvttss2si(x),
-                        crate::math::conversions::cvttss2si(y),
-                    ),
-                )
-                .unwrap_or(crate::map::spatial::TileSight::UNKNOWN),
+                .tile_sight(viewer, Tile::new(cvttss2si(x), cvttss2si(y)))
+                .unwrap_or(TileSight::UNKNOWN),
         })
     }
 
@@ -154,11 +158,7 @@ impl World {
         let mains: Vec<ObjectId> = target
             .into_iter()
             .chain(near.iter().map(|v| v.id))
-            .filter_map(|id| {
-                self.objects()
-                    .annex_of(id)
-                    .map(crate::construction::MainBuildingId::id)
-            })
+            .filter_map(|id| self.objects().annex_of(id).map(MainBuildingId::id))
             .collect();
         for m in mains {
             if m != unit.id
@@ -258,14 +258,14 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
 ///
 /// A notify its unit AI's queue does not take.
 pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<KillLeft>, GenieError> {
-    let damaged = std::mem::take(&mut v.damaged);
+    let damaged = take(&mut v.damaged);
     let left = KillLeft {
         id: v.id,
         kill: v.killed.take(),
         razed: v
             .building
             .as_mut()
-            .map(|b| std::mem::take(&mut b.razed))
+            .map(|b| take(&mut b.razed))
             .unwrap_or_default(),
     };
     let Some((_, _, sleeps)) = c.w.locate(v.id) else {
@@ -275,7 +275,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
         let (_, u) = c.w.object_mut(v.id).ok_or(NOT_LOCATED)?;
         u.life.hp = v.hp;
         u.life.amount = v.amount;
-        if crate::math::fmath::at_most_or_unordered(1.0, v.hp.get()) {
+        if at_most_or_unordered(1.0, v.hp.get()) {
             return Ok(None);
         }
         let _ = c.w.wake_sleeper(v.id)?;
@@ -305,7 +305,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
             let n = Notify {
                 caller: attacker,
                 recipient: v.id,
-                kind: crate::unit_ai::NotifyKind::DAMAGED,
+                kind: NotifyKind::DAMAGED,
                 p,
             };
             ai.post(n, state)?;
@@ -332,7 +332,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
 /// What the kill does not model, or an attribute a player lacks.
 pub(crate) fn file_kill(
     c: &mut Step<'_>,
-    (me, actions): (&mut Unit, &mut crate::objects::layers::Action),
+    (me, actions): (&mut Unit, &mut Action),
     k: KillLeft,
 ) -> Result<(), GenieError> {
     if k.id != c.me {
@@ -358,7 +358,7 @@ pub(crate) fn file_kill(
 pub(crate) fn write_struck(
     c: &mut Step<'_>,
     me: &mut Unit,
-    actions: &mut crate::objects::layers::Action,
+    actions: &mut Action,
     mut blasted: Vec<Victim>,
     v: &mut Victim,
 ) -> Result<(), GenieError> {
@@ -383,10 +383,10 @@ pub(crate) fn write_struck(
 pub(crate) fn write_strike_back(
     c: &mut Step<'_>,
     me: &mut Unit,
-    actions: &mut crate::objects::layers::Action,
+    actions: &mut Action,
     v: &mut Victim,
 ) -> Result<(), GenieError> {
-    let blasted = std::mem::take(&mut c.blasted);
+    let blasted = take(&mut c.blasted);
     write_struck(c, me, actions, blasted, v)
 }
 
@@ -398,7 +398,7 @@ impl World {
     ///
     /// What the kill does not model, or an attribute a player lacks.
     pub(crate) fn kill_left(&mut self, k: &KillLeft) -> Result<(), GenieError> {
-        let Some(crate::world::index::Place::Live(q, j)) = self.place(k.id) else {
+        let Some(Place::Live(q, j)) = self.place(k.id) else {
             return Ok(());
         };
         if let Some(kill) = k.kill {
@@ -509,9 +509,7 @@ impl World {
     /// An object the slice does not hold, and an attribute whose change the slice does not
     /// model.
     pub(crate) fn count_kill(&mut self, id: ObjectId, killer: PlayerId) -> Result<(), GenieError> {
-        let (q, u) = self
-            .object(id)
-            .ok_or(crate::construction::build::NOT_HELD)?;
+        let (q, u) = self.object(id).ok_or(NOT_HELD)?;
         let master = u.master(self.master_tables(), q)?.clone();
         self.count_kill_of(q, &master, killer)
     }
@@ -594,7 +592,7 @@ pub(crate) fn is_trebuchet(master: &Master) -> bool {
 /// floats in its order, as the kill counts read it (`FUN_1412005b0`, `FUN_1411cea90`).
 pub(crate) fn paid_cost(master: &Master) -> Amount {
     let mut cost = Amount::ZERO;
-    for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
+    for (_, amount, paid) in cost_entries(&master.cost) {
         if paid {
             cost += Amount::new(amount.as_f32());
         }

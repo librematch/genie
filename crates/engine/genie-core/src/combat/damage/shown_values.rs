@@ -13,6 +13,7 @@ use crate::objects::masters::DamageAmount;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::players::attribute::AttributeId;
 use crate::{GenieError, math::fmath};
 
@@ -115,7 +116,7 @@ pub struct Shown<'a> {
     pub target: Option<&'a Victim>,
     /// The weapons (class, amount) of its master's charge projectile (`+0x928`) when its player
     /// holds that master (`FUN_141659d20`).
-    pub projectile: Option<&'a [crate::objects::masters::ClassAmount]>,
+    pub projectile: Option<&'a [ClassAmount]>,
     /// Its master's `charge_event` (`+0x920`), which a ready charge of type 6 or 7 adds to its
     /// range.
     pub charge_event: ChargeEvent,
@@ -137,19 +138,14 @@ pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>) -> bool {
 
 /// The best amount of `weapons` above 0 (the first of a tie), of a melee, pierce or class-31
 /// weapon with `fighting`.
-pub(super) fn best_attack(
-    weapons: &[crate::objects::masters::ClassAmount],
-    fighting: bool,
-) -> DamageAmount {
+pub(super) fn best_attack(weapons: &[ClassAmount], fighting: bool) -> DamageAmount {
     weapons
         .iter()
         .filter(|w| {
             !fighting
                 || matches!(
                     w.class,
-                    crate::objects::masters::DamageClass::PIERCE
-                        | crate::objects::masters::DamageClass::MELEE
-                        | crate::objects::masters::DamageClass::CLASS_31
+                    DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
                 )
         })
         .fold(

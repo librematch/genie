@@ -1,11 +1,14 @@
 use super::*;
 use crate::combat::Firepower;
+use crate::combat::MissileCount;
 use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
 use crate::construction::MainBuildingId;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
+use crate::gathering::hunt::tests::walker as tests_walker;
+use crate::groups::{Member, UnitGroup};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -19,14 +22,19 @@ use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::spatial::{Obstruction, Placed, Spatial};
 use crate::map::terrain::TileTerrain;
+use crate::map::terrain::{Terrain, TerrainKind};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::math::rng::Stream;
 use crate::movement::MoveAlgorithm;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::MoveWaitState;
+use crate::movement::move_to::{ListUpdate, MoveWait, TargetMoved, update_sub_actions};
+use crate::movement::{Me, MoveStats, Mover, SubstituteCount, WaitDelays};
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -38,6 +46,8 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::Voice;
+use crate::objects::facing::SpriteFacets;
+use crate::objects::layers::Animated;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
@@ -52,11 +62,17 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskTerrain;
+use crate::objects::masters::action_type::{COMBAT, DEPOSIT};
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{MasterId, ids};
+use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame, WorkerCount};
+use crate::orders::Work;
+use crate::orders::town_bell::{BackToWork, TownBell};
+use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
@@ -80,13 +96,20 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::task_finder::{DropSite, DropTarget};
+use crate::unit_ai::{NotifyKind, OrderPriority, QueuedOrder, UnitAi};
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
+use crate::vision::visibility::{Visibility, VisibleMap};
+use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::parts::Object;
+use crate::world::parts::Part;
+use crate::world::tests::in_update;
 
 /// An Enter task of work range `range` and class `class` without sprites.
 pub(crate) fn enter_task(range: Distance, class: ClassId) -> Task {
@@ -145,7 +168,7 @@ fn garrison_masters() -> Masters {
             id: ARCHER,
             kind: master_type::COMBAT,
             class: class::CLASS_0,
-            tasks: vec![task(crate::objects::masters::action_type::COMBAT, 3)],
+            tasks: vec![task(COMBAT, 3)],
             ..Master::default()
         },
         Master {
@@ -193,7 +216,7 @@ fn garrison_world() -> World {
     players[3].relations = relation_row([1, 3, 3, 0]);
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         players,
@@ -229,8 +252,8 @@ fn the_unload_groups() {
 
 /// Unit `idx` of player 1 moves at `speed`.
 fn walks_at(t: &mut World, idx: ListIndex, speed: f32) {
-    let mut walker = crate::gathering::hunt::tests::walker();
-    walker.stats = crate::movement::MoveStats {
+    let mut walker = tests_walker();
+    walker.stats = MoveStats {
         speed: Speed::new(speed),
         base: Speed::new(speed),
         ..standing()
@@ -250,11 +273,7 @@ fn walk_again_world() -> (World, ListIndex) {
 }
 
 /// What the reach tile test reads, for unit 1 between (10.5, 10.5) and (11.5, 11.5).
-fn walls<'a>(
-    spatial: &'a mut crate::map::spatial::Spatial,
-    masters: &'a [Masters],
-    stats: &'a crate::movement::MoveStats,
-) -> Walls<'a> {
+fn walls<'a>(spatial: &'a mut Spatial, masters: &'a [Masters], stats: &'a MoveStats) -> Walls<'a> {
     Walls {
         me: Point::new(10.5, 10.5),
         them: Point::new(11.5, 11.5),
@@ -351,7 +370,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
             gap,
             speed,
             &mut walls(&mut walled, &masters, &stats),
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
     };
     assert_eq!(
@@ -408,7 +427,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
             DistanceSquared::new(0.5),
             Speed::new(0.8),
             &mut walls(&mut open, &masters, &stats),
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(true)
     );
@@ -496,8 +515,8 @@ fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-            wait: crate::movement::move_to::MoveWait::default(),
+            on_target_moved: TargetMoved::Follows,
+            wait: MoveWait::default(),
         }));
     assert_eq!(
         t.enter_walk_again(PlayerId::new(1), v, &mut enter, &ship, start),
@@ -525,8 +544,8 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
     }
     // its walk turns by 16 facets
     if let Some(m) = t.parts.mover_mut(object_id(1000)) {
-        m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
-            count: crate::objects::FacetCount::of_data(16),
+        m.sprite_facets = Some(SpriteFacets {
+            count: FacetCount::of_data(16),
             turns: false,
         });
     }
@@ -558,8 +577,8 @@ fn ship_enter(point: Position, state: MoveTo) -> EnterAction {
 /// [`Unit::enter_part`]) and its code.
 fn enter_update(t: &mut World, dt: u32) -> Result<HeadCode, GenieError> {
     let v = villager(t);
-    crate::world::tests::in_update(t, (PlayerId::new(1), v), dt, |u, actions, c| {
-        let me = crate::movement::Me {
+    in_update(t, (PlayerId::new(1), v), dt, |u, actions, c| {
+        let me = Me {
             human_order: WorldTime::ZERO,
             id: u.id,
             group: u.group.id,
@@ -598,7 +617,7 @@ fn completed(t: &World) -> usize {
         .unwrap()
         .notifies
         .iter()
-        .filter(|n| n.kind == crate::unit_ai::NotifyKind::ACTION_COMPLETED)
+        .filter(|n| n.kind == NotifyKind::ACTION_COMPLETED)
         .count()
 }
 
@@ -658,7 +677,7 @@ fn transport_that_moved_off_the_point_makes_the_enter_walk_again() {
 fn an_enter_waiting_move_to_asks_again_at_its_delay() {
     let mut e = ship_enter(Position::new(5.5, 30.5, 0.0), MoveTo::Waiting);
     if let Some(m) = e.state.walk_mut().and_then(Option::as_mut) {
-        m.wait = crate::movement::move_to::MoveWait {
+        m.wait = MoveWait {
             state: MoveWaitState::Waiting,
             timer: Seconds::ZERO,
             delay: Seconds::new(1.0),
@@ -973,7 +992,7 @@ fn walled_map(
     blocked: &[(i32, i32)],
     buildings: &[(i32, i32)],
     others: &[(i32, i32)],
-) -> (crate::map::spatial::Spatial, crate::movement::MoveStats) {
+) -> (Spatial, MoveStats) {
     use crate::map::spatial::{Placed, Spatial, Tiles};
     let (w, h) = (size.width(), size.height());
     let mut words = vec![0u8; (w * h) as usize];
@@ -1001,7 +1020,7 @@ fn walled_map(
     for (id, p) in (10..).zip(placed) {
         spatial.insert(object_id(id), p);
     }
-    let stats = crate::movement::MoveStats {
+    let stats = MoveStats {
         fly_mode: FlyMode::GROUND,
         speed: Speed::new(0.8),
         base: Speed::new(0.8),
@@ -1026,14 +1045,14 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
     // FUN_140a85c30 for range <= 1 and a target with speed: the box of the two tiles (one
     // tile and the next when it spans more than one), the two tiles left out
     let masters = [Masters::default(), garrison_masters()];
-    let walled = |spatial: &mut crate::map::spatial::Spatial, stats, me, them| {
+    let walled = |spatial: &mut Spatial, stats, me, them| {
         walled_off(
             me,
             them,
             spatial,
             &masters,
             (object_id(1), stats),
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
     };
     let blocked = [(10, 11), (11, 10)];
@@ -1106,7 +1125,7 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
             &mut spatial,
             &masters,
             (object_id(1), &stats),
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         )
         .is_err()
     );
@@ -1192,7 +1211,7 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
         weapons: vec![ClassAmount::new(3, 5)],
         volley_missile: Some(master_id(54)),
         volley_fire: Firepower::new(1.0),
-        max_volley: crate::combat::MissileCount::of_data(11),
+        max_volley: MissileCount::of_data(11),
         ..Master::default()
     };
     let villager = Master {
@@ -1524,7 +1543,7 @@ fn garrison_task_compares_the_bytes_the_game_passes_widened() {
         class::NO_CLASS
     ));
     assert!(!has_garrison_task(
-        &[task(crate::objects::masters::action_type::COMBAT, 3)],
+        &[task(COMBAT, 3)],
         GARRISON,
         class::BUILDING
     ));
@@ -1732,8 +1751,8 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
 }
 
 /// A unit's movement as the spot test reads it: terrain restriction 0, no speed.
-fn standing() -> crate::movement::MoveStats {
-    crate::movement::MoveStats {
+fn standing() -> MoveStats {
+    MoveStats {
         fly_mode: FlyMode::GROUND,
         speed: Speed::ZERO,
         base: Speed::ZERO,
@@ -1780,12 +1799,12 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     }
     t.masters = (0..4).map(|_| masters.clone()).collect();
     let n = (w * h) as usize;
-    t.spatial = crate::map::spatial::Spatial::new(GridSize::new(w, h));
-    let mut terrain = crate::map::terrain::Terrain::new(
+    t.spatial = Spatial::new(GridSize::new(w, h));
+    let mut terrain = Terrain::new(
         GridSize::new(w, h),
         vec![TileTerrain::of_save(0, 255, -1); n],
         vec![
-            crate::map::terrain::TerrainKind {
+            TerrainKind {
                 shown: true,
                 flags: TerrainFlags::NONE,
                 forest: false,
@@ -1797,10 +1816,10 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     terrain.set_elevations(vec![0; n]);
     t.spatial.terrain = Some(terrain);
     let seen = (0..4).fold(0u64, |b, p| b | (1 << p) | (1 << (32 + p)));
-    t.spatial.sight = Some(crate::vision::visibility::Visibility::new(
+    t.spatial.sight = Some(Visibility::new(
         GridSize::new(w, h),
         (0..4)
-            .map(|_| crate::vision::visibility::VisibleMap {
+            .map(|_| VisibleMap {
                 counts: vec![0; n],
                 explored: TileCount::ZERO,
             })
@@ -1816,7 +1835,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     t.parts.combat_mut(id).unwrap().firepower = Firepower::new(1.0);
     t.spatial.insert(
         object_id(100),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(10.0, 10.0, 0.0),
             radius: Footprint::new(2.0, 2.0),
             class: class::TOWER,
@@ -1827,7 +1846,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
             tall: true,
             moves: false,
             unknown: None,
-            obstruction: Some(crate::map::spatial::Obstruction {
+            obstruction: Some(Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
             }),
@@ -1886,7 +1905,7 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
     let mut t = let_out_world();
     let mut v = unit(400, VILLAGER, HitPoints::new(25.0));
     v.place_for_test(Position::new(12.5, 10.0, 0.0));
-    let mut walker = crate::gathering::hunt::tests::walker();
+    let mut walker = tests_walker();
     walker.stats = standing();
     t.parts.put_mover(v.id, Some(walker));
     v.group.id = Some(group_id(7));
@@ -1894,7 +1913,7 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
     t.parts.set_town_bell_flag(object_id(400), true);
     t.spatial.insert(
         object_id(400),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(12.5, 10.0, 0.0),
             radius: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -1908,15 +1927,15 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
             obstruction: None,
         },
     );
-    let member = |id| crate::groups::Member {
+    let member = |id| Member {
         id,
-        ..crate::groups::Member::default()
+        ..Member::default()
     };
-    t.groups.groups.push(crate::groups::UnitGroup {
+    t.groups.groups.push(UnitGroup {
         id: group_id(7),
         owner: Some(PlayerId::new(1)),
         members: vec![member(object_id(401)), member(object_id(400))],
-        ..crate::groups::UnitGroup::default()
+        ..UnitGroup::default()
     });
     let idx = t.players[1].objects.last_place().unwrap();
     let garrison = Task {
@@ -1949,21 +1968,21 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
     let mut t = let_out_world();
     let mut v = unit(400, VILLAGER, HitPoints::new(25.0));
     v.place_for_test(Position::new(12.5, 10.0, 0.0));
-    let mut walker = crate::gathering::hunt::tests::walker();
+    let mut walker = tests_walker();
     walker.stats = standing();
     t.parts.put_mover(v.id, Some(walker));
-    let villager_ai = crate::unit_ai::UnitAi {
+    let villager_ai = UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
         current_action: None,
         current_target: None,
-        ..crate::unit_ai::UnitAi::default()
+        ..UnitAi::default()
     };
     let _ = t
         .push_live(PlayerId::new(1), Object::with_ai(v, villager_ai))
         .unwrap();
     t.players[1].attributes = vec![Amount::ZERO; 250];
-    let placed = crate::map::spatial::Placed {
+    let placed = Placed {
         position: Position::new(12.5, 10.0, 0.0),
         radius: Footprint::new(0.2, 0.2),
         class: class::VILLAGER,
@@ -2007,16 +2026,16 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
             (Some(AttributeId::numbered(17)), Amount::new(6.0));
     };
     let drop_site = |t: &mut World| {
-        t.drop_sites = vec![crate::unit_ai::task_finder::DropSite {
+        t.drop_sites = vec![DropSite {
             building: TC,
             worker_class: Some(class::VILLAGER),
-            targets: vec![crate::unit_ai::task_finder::DropTarget {
+            targets: vec![DropTarget {
                 class: class::CLASS_7,
-                workers: crate::objects::WorkerCount::of_data(-1),
+                workers: WorkerCount::of_data(-1),
                 state: None,
                 attribute: Some(AttributeId::numbered(17)),
             }],
-            ..crate::unit_ai::task_finder::DropSite::default()
+            ..DropSite::default()
         }];
     };
     let (r, t) = enters_the_centre(|t| {
@@ -2051,7 +2070,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
             let v = m.get_mut(VILLAGER).unwrap();
             v.tasks.push(Task {
                 object_id: Some(TC),
-                ..task(crate::objects::masters::action_type::DEPOSIT, -1)
+                ..task(DEPOSIT, -1)
             });
         }
     };
@@ -2078,7 +2097,7 @@ pub(crate) fn inside_tc(t: &mut World, p: PlayerId, id: i32, m: MasterId) {
     let _ = t.push_live(p, u).unwrap();
     t.spatial.insert(
         object_id(id),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(10.0, 10.0, 0.0),
             radius: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -2107,9 +2126,9 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
     let v = &mut t.players[2].objects[ListIndex::new(0)];
     t.parts.set_town_bell_flag(v.id, true);
-    t.parts.town_bell_of(v.id).work = crate::orders::town_bell::BackToWork {
+    t.parts.town_bell_of(v.id).work = BackToWork {
         point: Point::new(4.5, 4.5),
-        ..crate::orders::town_bell::BackToWork::NONE
+        ..BackToWork::NONE
     };
     // the building's last unit inside: the volleys go back to the master's volley fire
     t.parts
@@ -2197,8 +2216,8 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
         let mut t = let_out_world();
         inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
         t.parts
-            .set_unit_ai(object_id(1000), Some(crate::unit_ai::UnitAi::default()));
-        let bell = crate::orders::town_bell::TownBell {
+            .set_unit_ai(object_id(1000), Some(UnitAi::default()));
+        let bell = TownBell {
             work: BackToWork {
                 target: Some(object_id(7)),
                 target_class: class_of(class),
@@ -2220,7 +2239,7 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
             assert_eq!(
                 heard,
                 [(
-                    crate::unit_ai::NotifyKind::REQUIRES_SEARCH,
+                    NotifyKind::REQUIRES_SEARCH,
                     [ActionKind::Gather.value(), 5, 7]
                 )]
             );
@@ -2270,37 +2289,37 @@ fn unit_ais_test_takes_building_or_transport_that_takes_its_unit_in() {
 pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point) {
     let mut v = unit(id, m, HitPoints::new(25.0));
     v.place_for_test(at.with_height(0.0));
-    let villager_ai = crate::unit_ai::UnitAi {
+    let villager_ai = UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
         current_action: None,
         current_target: None,
-        ..crate::unit_ai::UnitAi::default()
+        ..UnitAi::default()
     };
     t.parts.put_mover(
         v.id,
-        Some(crate::movement::Mover {
+        Some(Mover {
             forward: BVector::new(1.0, 0.0, 0.0),
             right: BVector::new(0.0, 0.0, -1.0),
             velocity: None,
             paths: vec![],
             factor: 1.0,
-            stats: crate::movement::MoveStats {
+            stats: MoveStats {
                 speed: Speed::new(0.8),
                 base: Speed::new(0.8),
                 ..standing()
             },
             waiting: 0,
-            wait_delays: crate::movement::WaitDelays::of_data(0),
+            wait_delays: WaitDelays::of_data(0),
             attack_moving: false,
             last_move: WorldTime::ZERO,
             moved_at: Position::ORIGIN,
-            substitute_count: crate::movement::SubstituteCount::of_data(0),
+            substitute_count: SubstituteCount::of_data(0),
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
             angle: Angle::ZERO,
-            animated: crate::objects::layers::Animated::default(),
+            animated: Animated::default(),
             pauses: Vec::new(),
             in_the_way: Vec::new(),
             sprite_facets: None,
@@ -2309,7 +2328,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
     let _ = t.push_live(p, Object::with_ai(v, villager_ai)).unwrap();
     t.spatial.insert(
         object_id(id),
-        crate::map::spatial::Placed {
+        Placed {
             position: at.with_height(0.0),
             radius: Footprint::new(0.2, 0.2),
             class: class::VILLAGER,
@@ -2339,7 +2358,7 @@ pub(crate) fn building_at(
     t.parts.building_mut(object_id(id)).unwrap().annex_of = annex_of.map(MainBuildingId::new);
     t.spatial.insert(
         object_id(id),
-        crate::map::spatial::Placed {
+        Placed {
             position: at.with_height(0.0),
             radius: Footprint::new(2.0, 2.0),
             class: class::TOWER,
@@ -2350,7 +2369,7 @@ pub(crate) fn building_at(
             tall: true,
             moves: false,
             unknown: None,
-            obstruction: Some(crate::map::spatial::Obstruction {
+            obstruction: Some(Obstruction {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
             }),
@@ -2488,10 +2507,10 @@ fn garrison_through_the_unit_ais_queues_their_enter_orders() {
     );
     assert_eq!(
         t.parts.unit_ai.get(v.id).unwrap().orders,
-        [crate::unit_ai::QueuedOrder {
+        [QueuedOrder {
             issuer: Some(Issuer::Object(object_id(1000))),
             order: OrderKind::Enter,
-            priority: crate::unit_ai::OrderPriority::of_data(100),
+            priority: OrderPriority::of_data(100),
             target: Some(object_id(100)),
             target_owner: owner(1),
             point: Position::new(10.0, 10.0, 0.0),
@@ -2509,7 +2528,7 @@ fn ship_at(t: &mut World, at: Point) {
     ship.place_for_test(at.with_height(0.0));
     t.spatial.insert(
         object_id(200),
-        crate::map::spatial::Placed {
+        Placed {
             position: at.with_height(0.0),
             radius: Footprint::new(0.5, 0.5),
             class: class::TRANSPORT,
@@ -2632,12 +2651,12 @@ fn shore_world(at: Point, ship: Point) -> World {
         })
         .map(|(k, r, l)| TileTerrain::of_save(k, r, l))
         .collect();
-    let kind = |flags| crate::map::terrain::TerrainKind {
+    let kind = |flags| TerrainKind {
         shown: true,
         flags,
         forest: false,
     };
-    let mut terrain = crate::map::terrain::Terrain::new(
+    let mut terrain = Terrain::new(
         GridSize::new(40, 40),
         tiles,
         vec![
@@ -2650,8 +2669,8 @@ fn shore_world(at: Point, ship: Point) -> World {
     terrain.set_elevations(vec![0; 40 * 40]);
     t.spatial.terrain = Some(terrain);
     ship_at(&mut t, ship);
-    let mut mover = crate::gathering::hunt::tests::walker();
-    mover.stats = crate::movement::MoveStats {
+    let mut mover = tests_walker();
+    mover.stats = MoveStats {
         speed: Speed::new(1.1),
         base: Speed::new(1.1),
         ..standing()
@@ -2671,10 +2690,10 @@ fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
     // ship reaches within 1 of (5, 17) (slot 0x3d8, the long pather's answer) and moves
     // there (slot 0x340: a MoveTo, range 0, with the master's running sprite 2001)
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
-    let running = crate::objects::sprite::Graphic {
+    let running = Graphic {
         id: SpriteId::named(2001),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(16),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -2764,8 +2783,8 @@ fn villager_meets_moving_ship_where_it_goes() {
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-            wait: crate::movement::move_to::MoveWait::default(),
+            on_target_moved: TargetMoved::Follows,
+            wait: MoveWait::default(),
         }));
     t.garrison_order(
         player_id(1),
@@ -2868,7 +2887,7 @@ fn villager_meets_sailing_transport_where_it_sails() {
 /// `ship` with villager 1000 inside; the streams are seeded.
 fn coast_world(ship: Point) -> World {
     let mut t = sized_world(30, 20);
-    let sails = crate::movement::MoveStats {
+    let sails = MoveStats {
         speed: Speed::new(1.1),
         base: Speed::new(1.1),
         radius: Radii::new(0.5, 0.5, 2.0),
@@ -2897,7 +2916,7 @@ fn coast_world(ship: Point) -> World {
         })
         .collect();
     let kinds: Vec<TerrainId> = tiles.iter().map(|t| TerrainId::named(t.0)).collect();
-    let kind = |flags| crate::map::terrain::TerrainKind {
+    let kind = |flags| TerrainKind {
         shown: true,
         flags,
         forest: false,
@@ -2906,7 +2925,7 @@ fn coast_world(ship: Point) -> World {
         Restriction::new(vec![1.0, 0.0]),
         Restriction::new(vec![0.0, 1.0]),
     ];
-    let mut terrain = crate::map::terrain::Terrain::new(
+    let mut terrain = Terrain::new(
         GridSize::new(30, 20),
         tiles
             .into_iter()
@@ -2917,20 +2936,20 @@ fn coast_world(ship: Point) -> World {
     );
     terrain.set_elevations(vec![0; 30 * 20]);
     t.spatial.terrain = Some(terrain);
-    t.pathing = crate::pathing::Pathing::new(GridSize::new(30, 20), kinds, restrictions, 0);
+    t.pathing = Pathing::new(GridSize::new(30, 20), kinds, restrictions, 0);
     t.streams.seed_all(7);
     ship_at(&mut t, ship);
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = tests_walker();
     mover.stats = sails;
     mover.moved_at = ship.with_height(0.0);
     t.parts.set_unit_ai(
         object_id(200),
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             ai_type: UnitAiType::TRANSPORT,
             current_order: None,
             current_action: None,
             current_target: None,
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
     t.parts.put_mover(object_id(200), Some(mover));
@@ -2946,7 +2965,7 @@ fn coast_world(ship: Point) -> World {
 /// the Object stream) where a unit of radius 0.2 stands on the land (x 15 and up) and clear
 /// of the ship.
 fn ashore(t: &mut World, center: Point, radius: f32) -> Point {
-    let mut r = t.streams.get(crate::math::rng::Stream::Object).clone();
+    let mut r = t.streams.get(Stream::Object).clone();
     let gap = radius + (0.2 + 0.01);
     let along = |r: u32, c: f32| ((r as f32 * (radius + radius)) / 32767.0 - radius) + c;
     let mut place = Point::ORIGIN;
@@ -3092,8 +3111,8 @@ fn transport_task_world() -> (World, ListIndex) {
 }
 
 /// A work order (slot 0x7e8) on `target` (−1 for none) at `point`, as INTERACT gives it.
-fn work_at(target: i32, point: Position) -> crate::orders::Work {
-    crate::orders::Work {
+fn work_at(target: i32, point: Position) -> Work {
+    Work {
         target: ObjectId::of_field(target),
         point,
         carry_test: false,
@@ -3347,7 +3366,7 @@ fn transport_without_drop_location_sails_on_to_new_point() {
     .run(&mut t)
     .unwrap();
     let idx = t.players[1].objects.position_of(object_id(200)).unwrap();
-    let mut action = t.streams.get(crate::math::rng::Stream::Action).clone();
+    let mut action = t.streams.get(Stream::Action).clone();
     t.transport_unload(PlayerId::new(1), idx).unwrap();
     assert_eq!(
         t.object(object_id(1000)).unwrap().1.life.inside,
@@ -3522,7 +3541,7 @@ fn villager_beside_ship_enters_it_at_once() {
     assert!(!t.parts.town_bell_of(v.id).flag);
     assert_eq!(
         t.parts.town_bell_of(v.id).work,
-        crate::orders::town_bell::BackToWork {
+        BackToWork {
             target: Some(object_id(200)),
             target_class: None,
             action: Some(ActionKind::Enter),
@@ -3662,9 +3681,9 @@ fn unload_of_building_lets_every_unit_inside_out() {
         t.parts.set_town_bell_flag(object_id(id), true);
         t.parts.set_unit_ai(
             object_id(id),
-            Some(crate::unit_ai::UnitAi {
-                orders: vec![crate::unit_ai::QueuedOrder::default()],
-                ..crate::unit_ai::UnitAi::default()
+            Some(UnitAi {
+                orders: vec![QueuedOrder::default()],
+                ..UnitAi::default()
             }),
         );
     }
@@ -3691,9 +3710,9 @@ fn unload_of_building_lets_every_unit_inside_out() {
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
-        Some(crate::unit_ai::UnitAi {
-            building_orders: vec![crate::unit_ai::QueuedOrder::default()],
-            ..crate::unit_ai::UnitAi::default()
+        Some(UnitAi {
+            building_orders: vec![QueuedOrder::default()],
+            ..UnitAi::default()
         }),
     );
     assert!(
@@ -3718,7 +3737,7 @@ fn unload_lets_unit_out_of_the_building_it_is_inside() {
     inside_tc(&mut t, PlayerId::new(1), 1001, VILLAGER);
     t.parts.set_town_bell_flag(object_id(1000), true);
     t.parts
-        .set_unit_ai(object_id(1000), Some(crate::unit_ai::UnitAi::default()));
+        .set_unit_ai(object_id(1000), Some(UnitAi::default()));
     UnloadCommand {
         player: player_id(1),
         units: unit_list(object_ids([1000])),
@@ -3746,11 +3765,11 @@ fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     t.parts.set_unit_ai(
         object_id(1000),
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             current_action: Some(ActionKind::Gather),
             current_target: Some(object_id(77)),
             stance: UnitStance::DEFENSIVE,
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
     assert_eq!(
@@ -3900,20 +3919,19 @@ fn transport_unloads_inside_its_own_update() {
     .run(&mut t)
     .unwrap();
     let i = t.players[1].objects.position_of(object_id(200)).unwrap();
-    let seen =
-        crate::world::tests::in_update(&mut t, (PlayerId::new(1), i), 100, |unit, actions, c| {
-            let me = crate::movement::Me {
-                human_order: WorldTime::ZERO,
-                id: unit.id,
-                group: unit.group.id,
-                action_state: actions
-                    .top_action()
-                    .map_or(ActionState::NO_ACTION, |a| a.state),
-            };
-            let _ = unit.transport_update(actions, c, me)?;
-            let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
-            Ok((inside, actions.list.transport().map(|t| t.state)))
-        });
+    let seen = in_update(&mut t, (PlayerId::new(1), i), 100, |unit, actions, c| {
+        let me = Me {
+            human_order: WorldTime::ZERO,
+            id: unit.id,
+            group: unit.group.id,
+            action_state: actions
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
+        };
+        let _ = unit.transport_update(actions, c, me)?;
+        let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
+        Ok((inside, actions.list.transport().map(|t| t.state)))
+    });
     assert_eq!(seen, Ok((Some(None), Some(TransportState::Idle))));
 }
 
@@ -3955,7 +3973,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
     assert_eq!(
         heard,
         [(
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
+            NotifyKind::ACTION_FAILED,
             [ActionKind::Transport.value(), 0, 0]
         )]
     );
@@ -4058,11 +4076,11 @@ fn let_out_beside_second_centre(
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     t.parts.set_unit_ai(
         object_id(1000),
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             current_action: Some(ActionKind::Gather),
             current_target: Some(object_id(77)),
             stance: UnitStance::DEFENSIVE,
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
     let mut second = unit(101, TC, HitPoints::new(2400.0));
@@ -4071,7 +4089,7 @@ fn let_out_beside_second_centre(
     let placed = *t.spatial.get(object_id(100)).unwrap();
     t.spatial.insert(
         object_id(101),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(16.0, 4.0, 0.0),
             ..placed
         },
@@ -4107,7 +4125,7 @@ fn unit_let_out_works_its_record_or_the_gather_point_target() {
         let id = t.players[1].objects[ListIndex::new(0)].id;
         t.set_part(
             id,
-            crate::world::parts::Part::GatherPoint(Some(GatherPoint {
+            Part::GatherPoint(Some(GatherPoint {
                 state: GatherPointState::POINT,
                 target: Some(object_id(101)),
                 point: Position::new(16.0, 4.0, 0.0),
@@ -4295,7 +4313,7 @@ fn market_tells_computer_ally_of_its_tile() {
         t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(10.5, 12.5, 0.0));
         t.players[2].kind = ally;
         t.players[1].kind = own;
-        let mut v = crate::vision::visibility::Visibility::new(
+        let mut v = Visibility::new(
             GridSize::new(20, 20),
             Vec::new(),
             Vec::new(),
@@ -4330,20 +4348,14 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
     );
     let v = villager(&t);
     let mut update = |list: &mut Option<MoveToAction>| {
-        crate::world::tests::in_update(&mut t, (PlayerId::new(1), v), 0, |u, _, c| {
-            let me = crate::movement::Me {
+        in_update(&mut t, (PlayerId::new(1), v), 0, |u, _, c| {
+            let me = Me {
                 human_order: WorldTime::ZERO,
                 id: u.id,
                 group: u.group.id,
                 action_state: ActionState::NO_ACTION,
             };
-            crate::movement::move_to::update_sub_actions(
-                list,
-                c,
-                u,
-                me,
-                crate::movement::move_to::ListUpdate::default(),
-            )
+            update_sub_actions(list, c, u, me, ListUpdate::default())
         })
     };
     assert_eq!(update(&mut None), Ok(UpdateCode::DONE));

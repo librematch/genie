@@ -1,6 +1,8 @@
 //! The statistics' values: an entry's kill time and scores, the table's counts and the order
 //! history's weights.
 
+use std::ops::{Add, AddAssign, MulAssign};
+
 /// The time a unit takes to kill an entry (`+8`): its hit points over the unit's damage to it,
 /// over the unit's reload time; a stand-in for one it does no damage to.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
@@ -42,7 +44,7 @@ impl TargetScore {
     }
 }
 
-impl std::ops::Add for TargetScore {
+impl Add for TargetScore {
     type Output = Self;
 
     /// One `f32` add, `self` first.
@@ -51,7 +53,7 @@ impl std::ops::Add for TargetScore {
     }
 }
 
-impl std::ops::MulAssign<f32> for TargetScore {
+impl MulAssign<f32> for TargetScore {
     /// One `f32` product.
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
@@ -108,7 +110,7 @@ impl OrderWeight {
     }
 }
 
-impl std::ops::AddAssign for OrderWeight {
+impl AddAssign for OrderWeight {
     /// One `f32` add.
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;

@@ -2,7 +2,10 @@
 //! repairer's player.
 
 use crate::GenieError;
+use crate::combat::damage::heal_hp;
+use crate::construction::MainBuildingId;
 use crate::construction::repair::ONE;
+use crate::math::fmath::below_or_unordered;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::MasterHitPoints;
@@ -10,12 +13,17 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::Masters;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
+use crate::production::pay;
+use crate::technology::Attributes;
+use crate::world::NO_ATTRIBUTE;
 use crate::world::slots::CheckedIndex;
+use std::fmt::{Debug, Error, Formatter};
 
 /// What a repair's slot 0x8c8 answers (the game's 0, 1 and 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,7 +76,7 @@ pub struct Repaired {
     /// Its hit point powerup (`+0xa38`, `+0xa3c`).
     pub hp_powerup: HpPowerup,
     /// An annex's main building (`+0xbb8`).
-    pub main: Option<crate::construction::MainBuildingId>,
+    pub main: Option<MainBuildingId>,
     /// A main building's annexes (`+0xbc0`, its four slots in their order).
     pub annexes: Vec<ObjectId>,
     /// Its owner's attribute 270 ([`UNIT_REPAIR_COST`]): a unit's repair cost rate.
@@ -81,13 +89,13 @@ pub struct Repaired {
 /// with the repairer's player).
 pub struct Payer<'a> {
     /// The repairer's player's masters.
-    pub masters: &'a crate::objects::masters::Masters,
+    pub masters: &'a Masters,
     /// The repairer's player's attributes.
-    pub attributes: &'a mut dyn crate::technology::Attributes,
+    pub attributes: &'a mut dyn Attributes,
 }
 
-impl std::fmt::Debug for Payer<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for Payer<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Payer").finish_non_exhaustive()
     }
 }
@@ -122,7 +130,7 @@ pub fn repair_building(
     if TREBUCHETS.contains(&o.class) {
         return repair_unit(set, idx, amount, payer);
     }
-    if crate::math::fmath::below_or_unordered(o.hp.get(), ONE) {
+    if below_or_unordered(o.hp.get(), ONE) {
         return Ok(RepairOutcome::Unpaid);
     }
     if top && let Some(main) = o.main {
@@ -148,7 +156,7 @@ pub fn repair_building(
         amount = most - o.hp;
     }
     let share = CostCount::new((o.building_repair_cost.get() * amount) / most);
-    if crate::production::pay(payer.masters, o.master, share, &mut *payer.attributes)? {
+    if pay(payer.masters, o.master, share, &mut *payer.attributes)? {
         return repair_unit(set, idx, amount, payer);
     }
     Ok(RepairOutcome::Unpaid)
@@ -179,11 +187,11 @@ pub fn repair_unit(
             amount = most - now;
         }
         let share = CostCount::new((o.unit_repair_cost.get() * amount) / most);
-        if !crate::production::pay(payer.masters, o.master, share, &mut *payer.attributes)? {
+        if !pay(payer.masters, o.master, share, &mut *payer.attributes)? {
             return Ok(RepairOutcome::Unpaid);
         }
     }
-    let full = crate::combat::damage::heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount);
+    let full = heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount);
     Ok(if full {
         RepairOutcome::Full
     } else {
@@ -209,12 +217,9 @@ impl PaidAttributes {
     }
 }
 
-impl crate::technology::Attributes for PaidAttributes {
+impl Attributes for PaidAttributes {
     fn get(&self, i: AttributeId) -> Result<Amount, GenieError> {
-        self.values
-            .get(i.index())
-            .copied()
-            .ok_or(crate::world::NO_ATTRIBUTE)
+        self.values.get(i.index()).copied().ok_or(NO_ATTRIBUTE)
     }
 
     fn set(&mut self, _: AttributeId, _: Amount) -> Result<(), GenieError> {
@@ -224,10 +229,7 @@ impl crate::technology::Attributes for PaidAttributes {
     }
 
     fn subtract(&mut self, i: AttributeId, amount: Amount) -> Result<(), GenieError> {
-        let v = self
-            .values
-            .get_mut(i.index())
-            .ok_or(crate::world::NO_ATTRIBUTE)?;
+        let v = self.values.get_mut(i.index()).ok_or(NO_ATTRIBUTE)?;
         *v -= amount;
         self.adds.push((i, -amount));
         Ok(())

@@ -11,10 +11,12 @@ use crate::objects::ObjectId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Masters, player_master};
+use crate::objects::unit::Unit;
 use crate::orders::NO_QUEUE;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -24,10 +26,14 @@ use crate::players::attribute::QUEUED;
 use crate::production::CostCount;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
+use crate::production::{Making, ROOM, costed, same_costs, train_time};
 use crate::technology::TechId;
+use crate::technology::{Attributes, factors};
+use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::index::Place;
+use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, VILLAGER_ANY, World, villager};
@@ -99,10 +105,10 @@ impl World {
         }
         // game mode 16: with attribute 6 at most 1 (COMISS, JC: a NaN is not) a military unit
         // (its key's +9) is queued one at a time, the player's +0x1378 its flag
-        if self.settings.game_mode == crate::world::GameMode::ONE_UNIT
+        if self.settings.game_mode == GameMode::ONE_UNIT
             // The player's attribute game mode 16's QUEUE reads (6, `+0x30`), and its bound
             // (`DAT_14330eb8c`).
-            && crate::technology::Attributes::get(owner, attribute::CURRENT_AGE)? <= Amount::new(ONE_UNIT_AGE)
+            && Attributes::get(owner, attribute::CURRENT_AGE)? <= Amount::new(ONE_UNIT_AGE)
             && self.tracker_key(player, unit_id).military
         {
             if owner.one_military_queued {
@@ -174,7 +180,7 @@ impl World {
             *rooms.checked_mut(k)? -= 1;
             *counts.checked_mut(k)? += 1;
             let at = self.at(*found.checked(k)?)?.1.life.master_id;
-            let time = crate::production::train_time(&unit.train_locations, at, button);
+            let time = train_time(&unit.train_locations, at, button);
             *loads.checked_mut(k)? += Seconds::of_master(time);
             pick = Some(k);
         }
@@ -182,7 +188,7 @@ impl World {
     }
 
     /// The object at `place`, with its player.
-    fn at(&self, place: Place) -> Result<(PlayerId, &crate::objects::unit::Unit), GenieError> {
+    fn at(&self, place: Place) -> Result<(PlayerId, &Unit), GenieError> {
         Ok(match place {
             Place::Live(p, i) => (p, self.players.live(p, i)?),
             Place::Sleeping(p, i) => (p, self.players.asleep(p, i)?),
@@ -279,7 +285,7 @@ impl World {
     pub(crate) fn production_load(
         &self,
         p: PlayerId,
-        building: &crate::objects::unit::Unit,
+        building: &Unit,
     ) -> Result<Seconds, GenieError> {
         let owner = self.players.player(p)?;
         let Some(production) = self.parts.production.get(building.id) else {
@@ -309,8 +315,8 @@ impl World {
             return Ok(queued);
         }
         let done = match production.action {
-            Some(crate::production::Making::Unit(m)) => m.progress,
-            Some(crate::production::Making::Research(r)) => r.progress,
+            Some(Making::Unit(m)) => m.progress,
+            Some(Making::Research(r)) => r.progress,
             None => Seconds::ZERO,
         };
         Ok(queued - (Seconds::ZERO + done))
@@ -357,7 +363,7 @@ impl World {
         let n = QueuedUnits::of_data(if i32::from(count as i16) + i32::from(total) < 16 {
             count as i16
         } else {
-            crate::production::ROOM.get() - total
+            ROOM.get() - total
         });
         if let Some(tech) = tech {
             self.queue_techs(player, i, (master, tech), n, button)
@@ -422,12 +428,12 @@ impl World {
         };
         let time = made
             .filter(|m| COMBAT <= m.kind)
-            .map(|m| crate::production::train_time(&m.train_locations, building, button));
+            .map(|m| train_time(&m.train_locations, building, button));
         let production = self.production_or_new(id)?;
         if let Some(last) = production.queue.last()
             && last.master == Some(master)
             && last.button == button
-            && crate::production::same_costs(&last.costs, &costs)
+            && same_costs(&last.costs, &costs)
         {
             let queue = &mut production.queue;
             let k = (queue.count.get() - 1) as usize;
@@ -519,11 +525,11 @@ impl World {
         let Some(def) = self.techs.get(t) else {
             return Ok(NO_COSTS);
         };
-        let get = |k: AttributeId| crate::technology::Attributes::get(owner, k);
+        let get = |k: AttributeId| Attributes::get(owner, k);
         owner
             .techs
             .checked(t)?
-            .entry_costs(def, crate::technology::factors(tech, &get)?)
+            .entry_costs(def, factors(tech, &get)?)
     }
 }
 
@@ -553,18 +559,18 @@ pub(crate) fn least_loaded(rooms: &[i32], loads: &[Seconds], pick: Option<usize>
 /// but the population's needs its amount times the count (`COMISS`, `JA`: a NaN passes). None
 /// when one unit is still short.
 fn affordable(
-    owner: &crate::world::player::Player,
+    owner: &Player,
     masters: &Masters,
     unit: &Master,
     mut amount: i32,
 ) -> Result<Option<i32>, GenieError> {
-    let (costed, annex) = crate::production::costed(masters, unit);
+    let (costed, annex) = costed(masters, unit);
     let short = |count: i32| -> Result<bool, GenieError> {
-        for (attribute, each, paid) in crate::objects::masters::cost_entries(&costed.cost) {
+        for (attribute, each, paid) in cost_entries(&costed.cost) {
             if (annex && !paid) || attribute == attribute::HEADROOM {
                 continue;
             }
-            let held = crate::technology::Attributes::get(owner, attribute)?;
+            let held = Attributes::get(owner, attribute)?;
             if held < Amount::new(each.as_f32() * count as f32) {
                 return Ok(true);
             }

@@ -38,26 +38,46 @@ pub use self::player_parts::{ai_module, history};
 
 use crate::masters::{MasterTable, TerrainTable};
 use crate::{groups, market, object, spatial, work_masters};
+use genie_core::combat::Firepower;
+use genie_core::garrison::{attack_rate, share as garrison_share};
 use genie_core::map::Position;
+use genie_core::map::{Restriction, TerrainId};
+use genie_core::movement::explore::InfluenceMap;
 use genie_core::objects::ObjectId;
+use genie_core::objects::ObjectState;
+use genie_core::objects::lines::UnitLines;
 use genie_core::objects::masters::MasterId;
+use genie_core::objects::masters::Masters;
+use genie_core::objects::masters::master_type::COMBAT;
 use genie_core::objects::unit::Unit;
+use genie_core::pathing::zones::{ZoneMap, Zones};
+use genie_core::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
+use genie_core::players::tracker::Tracker;
+use genie_core::players::world_player::VictoryTimes;
+use genie_core::players::{PlayerSet, PlayerType, Posture, Relations, Stance};
+use genie_core::technology::{Location, ResearchState, TechState};
 use genie_core::vision::VisionBits;
+use genie_core::vision::ghost::Ghost;
 use genie_core::world::parts::ObjectParts;
 use genie_core::world::parts::Part;
+use genie_core::world::settings::Settings;
+use genie_core::world::{
+    Age, ContentMode, Formations, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Unread,
+    Visibility,
+};
 use genie_core::world::{Player, World};
+use genie_save::generated::world::{GameOptions, TechPlayerTree};
 use genie_save::{Header, PlayerSection};
+use std::mem::take;
 
 /// A player's saved state of one technology (`Tech_Player_Tree`).
 ///
 /// # Errors
 ///
 /// A saved state that names none.
-pub(super) fn tech_state(
-    t: &genie_save::generated::world::TechPlayerTree,
-) -> Result<genie_core::technology::TechState, genie_core::GenieError> {
+pub(super) fn tech_state(t: &TechPlayerTree) -> Result<TechState, genie_core::GenieError> {
     let o = |j: usize| {
         t.cost_override
             .get(j)
@@ -69,9 +89,9 @@ pub(super) fn tech_state(
                 used: OverrideUse::of_data(e.tech_player_tree_cost_attribute_used_override as i16),
             })
     };
-    Ok(genie_core::technology::TechState {
+    Ok(TechState {
         research_done: Seconds::new(t.research_done),
-        state: genie_core::technology::ResearchState::of_int(t.state)?,
+        state: ResearchState::of_int(t.state)?,
         cost_adj: [0, 1, 2].map(|j| CostAmount::of_data(t.cost_adj.get(j).copied().unwrap_or(0))),
         times_researched: ResearchCount::of_data(t.tech_player_tree_times_researched as i16),
         allow_multiple: t.tech_player_tree_allow_multiple_research != 0,
@@ -86,7 +106,7 @@ pub(super) fn tech_state(
             .location
             .iter()
             .flatten()
-            .map(|l| genie_core::technology::Location {
+            .map(|l| Location {
                 building: MasterId::of_data(l.location_research_location_id as i16),
                 time: WholeSeconds::of_data(l.location_research_time.cast_signed()),
                 button: LocationButton::of_data(l.location_button_location_id),
@@ -160,7 +180,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             Player {
                 objects: live.into(),
                 sleeping: sleeping.into(),
-                kind: genie_core::players::PlayerType::from(p.player.type_),
+                kind: PlayerType::from(p.player.type_),
                 attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
                 // the second attribute array (+0x658), floats as their bits
                 generated: p
@@ -171,9 +191,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     .map(|&b| Amount::new(f32::from_bits(b)))
                     .collect(),
                 civ,
-                relations: genie_core::players::Relations::of_bytes(
-                    p.world_player().base.relation.iter().copied(),
-                ),
+                relations: Relations::of_bytes(p.world_player().base.relation.iter().copied()),
                 auto_farm_queue: p.world_player().auto_farm_queue != 0,
                 auto_fishtrap_queue: p.world_player().auto_fish_trap_queue != 0,
                 farm_queue: QueueCount::of_data(p.world_player().farm_queue_count),
@@ -183,10 +201,10 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     .world_player()
                     .per_player
                     .iter()
-                    .map(|e| genie_core::players::Stance::from(e.diplomacy))
+                    .map(|e| Stance::from(e.diplomacy))
                     .collect(),
                 ai_settings: ai_settings(&p.world_player().base),
-                formations: genie_core::world::Formations {
+                formations: Formations {
                     auto: p.world_player().base.auto_formations != 0,
                     influence: Distance::new(p.world_player().base.formation_influence_distance),
                     by_speed: p.world_player().base.break_auto_formations_by_speed == 1,
@@ -198,7 +216,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     ),
                 },
                 pending_debit: p.world_player().base.pending_debit.map(Amount::new),
-                techs: techs.get_mut(i).map(std::mem::take).unwrap_or_default(),
+                techs: techs.get_mut(i).map(take).unwrap_or_default(),
                 unsupported: None,
                 freezes: Vec::new(),
                 stopped: false,
@@ -217,7 +235,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 victory: VictoryState::of_data(victory.get(i).map_or(0, |v| v.victory)),
                 fealty: Fealty::of_data(p.world_player().fealty as i16),
                 // the load sets it 0 (`FUN_14163e970`)
-                posture: genie_core::players::Posture::AGGRESSIVE,
+                posture: Posture::AGGRESSIVE,
                 dodge_chance: Chance::of_data(p.world_player().chance_to_dodge_missiles),
                 keep_distance_chance: Chance::of_data(
                     p.world_player().chance_for_archers_to_maintain_distance,
@@ -228,7 +246,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 ghosts: Vec::new(),
                 history: history(&p.world_player().history),
                 // the load files the objects (World::load_trackers, once the masters are in)
-                tracker: genie_core::players::tracker::Tracker::default(),
+                tracker: Tracker::default(),
                 // +0x1378 is not saved
                 one_military_queued: false,
                 update_time: Seconds::new(p.world_player().update_time),
@@ -242,7 +260,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                     .escrow_percentage
                     .map(EscrowShare::of_data),
                 sudden_death_eliminable: p.world_player().sudden_death_can_be_eliminated != 0,
-                victory_times: genie_core::players::world_player::VictoryTimes {
+                victory_times: VictoryTimes {
                     // the world's load resets every player's (FUN_140c90040), then a wonder's
                     // action in state 7 sets its time (its load, FUN_140ae8fa0)
                     wonder: wonder_time(p),
@@ -324,7 +342,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 .collect();
             turns.spatial.set_scout_map(
                 i,
-                genie_core::movement::explore::InfluenceMap {
+                InfluenceMap {
                     size: GridSize::new(m.xsize_value, m.ysize_value),
                     origin: Tile::new(m.xreference_point_value, m.yreference_point_value),
                     limit: m.unchangeable_limit_value,
@@ -340,30 +358,26 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         }
     }
     let map = &world.map;
-    turns.pathing = genie_core::pathing::Pathing::new(
+    turns.pathing = Pathing::new(
         GridSize::new(map.map_width, map.map_height),
         map.rows
             .iter()
-            .flat_map(|r| {
-                r.tiles
-                    .iter()
-                    .map(|t| genie_core::map::TerrainId::named(t.terrain_type))
-            })
+            .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_type)))
             .collect(),
         terrain.passable().to_vec(),
         header.world.game_type,
     );
     // the zone maps (`map+0x5e28`) as the save holds them, their adjacency built by the load
-    turns.zones = genie_core::pathing::zones::Zones::from_saved(
+    turns.zones = Zones::from_saved(
         map.map_zones
             .zone_map
             .iter()
             .map(|z| {
-                genie_core::pathing::zones::ZoneMap::from_saved(
+                ZoneMap::from_saved(
                     GridSize::new(map.map_width, map.map_height),
                     &z.number_tiles_in_zone_value,
                     &z.zone_map,
-                    &genie_core::map::Restriction::new(z.float_value.clone()),
+                    &Restriction::new(z.float_value.clone()),
                     z.number_zones,
                 )
             })
@@ -375,10 +389,10 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         .iter()
         .map(|p| {
             let b = &p.world_player().base;
-            genie_core::pathing::PlanBudget {
-                attempt_cap: genie_core::pathing::PlanCap::of_data(b.pathing_attempt_cap_value),
-                delay_cap: genie_core::pathing::PlanCap::of_data(b.pathing_delay_cap_value),
-                plans: genie_core::pathing::PlanCount::ZERO,
+            PlanBudget {
+                attempt_cap: PlanCap::of_data(b.pathing_attempt_cap_value),
+                delay_cap: PlanCap::of_data(b.pathing_delay_cap_value),
+                plans: PlanCount::ZERO,
             }
         })
         .collect();
@@ -405,7 +419,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             .players()
             .first()
             .map_or(0, |p| p.objects().master_object_num);
-        turns.lines = genie_core::objects::lines::UnitLines::build(gaia_masters, &table.unit_lines);
+        turns.lines = UnitLines::build(gaia_masters, &table.unit_lines);
         let masters = header
             .players()
             .iter()
@@ -421,8 +435,8 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 .masters
                 .iter()
                 .skip(1)
-                .flat_map(genie_core::objects::masters::Masters::iter)
-                .filter(|m| m.kind == genie_core::objects::masters::master_type::COMBAT)
+                .flat_map(Masters::iter)
+                .filter(|m| m.kind == COMBAT)
         };
         turns.spatial.fastest = all()
             .filter_map(|m| m.moving.as_ref().map(|s| s.speed.get()))
@@ -508,23 +522,21 @@ pub(super) fn wonder_time(p: &PlayerSection<'_>) -> Seconds {
 /// The game options the simulation reads ([`genie_core::world::settings::Settings`]) from the header's
 /// `GameOptions`, as `FUN_141305310` loads them.
 #[must_use]
-pub const fn settings(
-    o: &genie_save::generated::world::GameOptions,
-) -> genie_core::world::settings::Settings {
-    genie_core::world::settings::Settings {
-        game_mode: genie_core::world::GameMode::of_data(o.game_mode),
-        ending_age: genie_core::world::Age::of_data(o.ending_age),
-        visibility_type: genie_core::world::Visibility::of_data(o.visibility_type),
-        sub_game_mode_flag: genie_core::world::SubModeFlags::from_bits_retain(o.sub_game_mode_flag),
+pub const fn settings(o: &GameOptions) -> Settings {
+    Settings {
+        game_mode: GameMode::of_data(o.game_mode),
+        ending_age: Age::of_data(o.ending_age),
+        visibility_type: Visibility::of_data(o.visibility_type),
+        sub_game_mode_flag: SubModeFlags::from_bits_retain(o.sub_game_mode_flag),
         full_tech_tree: o.full_tech_tree_enabled != 0,
         walkable_farms: o.walkable_farms != 0,
-        selected_content_mode: genie_core::world::ContentMode::of_data(o.selected_content_mode),
+        selected_content_mode: ContentMode::of_data(o.selected_content_mode),
         villager_force_drop: o.villager_force_drop != 0,
         cheats_enabled: o.cheats_enabled != 0,
-        treaty_length: genie_core::world::TreatyLength::of_minutes(o.treaty_length),
+        treaty_length: TreatyLength::of_minutes(o.treaty_length),
         teams_locked: o.teams_locked != 0,
-        starting_age: genie_core::world::Age::of_data(o.starting_age),
-        resource_level: genie_core::world::ResourceLevel::of_data(o.resource_level),
+        starting_age: Age::of_data(o.starting_age),
+        resource_level: ResourceLevel::of_data(o.resource_level),
         turbo: o.turbo_enabled != 0,
         shared_exploration: o.shared_exploration != 0,
         antiquity: o.antiquity_mode != 0,
@@ -533,7 +545,7 @@ pub const fn settings(
 
 pub(super) fn saved_ghosts(
     section: &PlayerSection<'_>,
-) -> Result<Vec<genie_core::vision::ghost::Ghost>, genie_core::GenieError> {
+) -> Result<Vec<Ghost>, genie_core::GenieError> {
     section
         .objects()
         .doppleganger_objects
@@ -548,7 +560,7 @@ pub(super) fn saved_ghosts(
         })
         .map(|(s, d)| {
             let original = ObjectId::of_field(d.long_val as i32);
-            Ok(genie_core::vision::ghost::Ghost {
+            Ok(Ghost {
                 id: ObjectId::try_from(s.id)?,
                 original,
                 original_id: original,
@@ -559,9 +571,9 @@ pub(super) fn saved_ghosts(
                 tile: Tile::new(s.tx as i32, s.ty as i32),
                 footprint: d.multi_unified_points,
                 bits: VisionBits::NONE,
-                cant_see: genie_core::players::PlayerSet::from_bits_retain(d.cant_see_bits),
+                cant_see: PlayerSet::from_bits_retain(d.cant_see_bits),
                 seen: false,
-                state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
+                state: ObjectState::of_byte(s.object_state)?,
             })
         })
         .collect()
@@ -585,7 +597,7 @@ pub(super) fn garrison_firepower(turns: &mut World) {
 type Entered = (
     ObjectId,
     ObjectId,
-    Option<Result<genie_core::combat::Firepower, genie_core::GenieError>>,
+    Option<Result<Firepower, genie_core::GenieError>>,
 );
 
 /// Player `p`'s units inside a building of its own, in list order, each with its building and
@@ -605,15 +617,11 @@ fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
         };
         let share = masters
             .get(u.life.master_id)
-            .filter(|m| m.kind == genie_core::objects::masters::master_type::COMBAT)
+            .filter(|m| m.kind == COMBAT)
             .and_then(|me| {
                 let bm = masters.get(b.life.master_id)?;
-                let rate = genie_core::garrison::attack_rate(
-                    bm,
-                    masters,
-                    turns.parts.combat_of(b.id).reload_powerup,
-                );
-                Some(genie_core::garrison::share(
+                let rate = attack_rate(bm, masters, turns.parts.combat_of(b.id).reload_powerup);
+                Some(garrison_share(
                     me,
                     masters,
                     turns.parts.combat_of(u.id).reload_powerup,
@@ -648,7 +656,7 @@ fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
         };
         building.garrison.push(id);
         if let Some(e) = unmodelled {
-            let unread = Part::Unread(Some(genie_core::world::Unread::new(e)));
+            let unread = Part::Unread(Some(Unread::new(e)));
             // the world holds the building (it is in its player's lists): the write cannot fail
             if let Err(e) = turns.set_part(b, unread) {
                 stop_all(turns, &e);

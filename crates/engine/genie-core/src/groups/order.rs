@@ -9,6 +9,7 @@ use crate::groups::GroupId;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::{ATTACK_COMMANDS, MOVE_COMMAND, MoveTo};
 use crate::groups::task::TargetTask;
+use crate::groups::{GroupTarget, TargetData};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::BVector;
@@ -186,8 +187,8 @@ impl World {
         let at = self.moved_place_of(target)?;
         let radius = self.target_radius(target)?;
         let g = self.groups.held_mut(group)?;
-        g.current_target = crate::groups::TargetData {
-            target: crate::groups::GroupTarget::Object(target),
+        g.current_target = TargetData {
+            target: GroupTarget::Object(target),
             original_position: at,
             range,
             target_radius: radius,

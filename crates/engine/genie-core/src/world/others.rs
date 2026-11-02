@@ -22,6 +22,8 @@ use crate::unit_ai::world_view::Foreign;
 use crate::world::World;
 use crate::world::index::{ObjectIndex, Place};
 use crate::world::player::Player;
+use std::cmp::Ordering;
+use std::ptr::eq;
 
 /// The objects besides the one that updates, to read: its owner's other live objects in their
 /// list's order and the other players' live and sleeping ones.
@@ -113,10 +115,10 @@ impl<'a> OthersRef<'a> {
         } = self.foreign;
         let (q, sleeping) = (place.player(), place.sleeping());
         let list = match q.index().cmp(&before.len()) {
-            std::cmp::Ordering::Less => side(before.get(q.index())?, sleeping),
-            std::cmp::Ordering::Greater => side(after.get(q.index() - before.len() - 1)?, sleeping),
-            std::cmp::Ordering::Equal if sleeping => return None,
-            std::cmp::Ordering::Equal => left.map_or(self.own, |(_, l)| l),
+            Ordering::Less => side(before.get(q.index())?, sleeping),
+            Ordering::Greater => side(after.get(q.index() - before.len() - 1)?, sleeping),
+            Ordering::Equal if sleeping => return None,
+            Ordering::Equal => left.map_or(self.own, |(_, l)| l),
         };
         Some((q, list))
     }
@@ -136,7 +138,7 @@ impl<'a> OthersRef<'a> {
             return self.own.by_id(id);
         }
         let (_, list, u) = self.held(id)?;
-        std::ptr::eq(list, self.own).then_some(u)
+        eq(list, self.own).then_some(u)
     }
 
     /// The owner's live objects in their list's order, the updating one aside.
@@ -290,9 +292,9 @@ impl<'a> Others<'a> {
     fn lists_mut(&mut self, q: PlayerId) -> Option<(&mut ObjectList, &mut ObjectList)> {
         let own = self.before.len();
         let player = match q.index().cmp(&own) {
-            std::cmp::Ordering::Less => self.before.get_mut(q.index())?,
-            std::cmp::Ordering::Greater => self.after.get_mut(q.index() - own - 1)?,
-            std::cmp::Ordering::Equal => return Some((&mut *self.own, &mut *self.own_sleeping)),
+            Ordering::Less => self.before.get_mut(q.index())?,
+            Ordering::Greater => self.after.get_mut(q.index() - own - 1)?,
+            Ordering::Equal => return Some((&mut *self.own, &mut *self.own_sleeping)),
         };
         let Player {
             objects, sleeping, ..
@@ -304,9 +306,9 @@ impl<'a> Others<'a> {
     fn lists(&self, q: PlayerId) -> Option<(&ObjectList, &ObjectList)> {
         let own = self.before.len();
         let player = match q.index().cmp(&own) {
-            std::cmp::Ordering::Less => self.before.get(q.index())?,
-            std::cmp::Ordering::Greater => self.after.get(q.index() - own - 1)?,
-            std::cmp::Ordering::Equal => return Some((&*self.own, &*self.own_sleeping)),
+            Ordering::Less => self.before.get(q.index())?,
+            Ordering::Greater => self.after.get(q.index() - own - 1)?,
+            Ordering::Equal => return Some((&*self.own, &*self.own_sleeping)),
         };
         Some((&player.objects, &player.sleeping))
     }
@@ -411,14 +413,14 @@ impl<'a> Others<'a> {
         };
         let q = place.player();
         let (live, sleeping, tracker) = match q.index().cmp(&before.len()) {
-            std::cmp::Ordering::Equal => (&mut **own, &mut **own_sleeping, own_tracker),
-            std::cmp::Ordering::Less => {
+            Ordering::Equal => (&mut **own, &mut **own_sleeping, own_tracker),
+            Ordering::Less => {
                 let Some(pl) = before.get_mut(q.index()) else {
                     return false;
                 };
                 (&mut pl.objects, &mut pl.sleeping, &mut pl.tracker)
             }
-            std::cmp::Ordering::Greater => {
+            Ordering::Greater => {
                 let Some(pl) = after.get_mut(q.index() - before.len() - 1) else {
                     return false;
                 };

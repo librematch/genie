@@ -2,11 +2,18 @@
 
 use crate::GenieError;
 use crate::combat::MissileCount;
+use crate::combat::damage::Kill;
 use crate::combat::damage::Victim;
 use crate::combat::missile::AimAt;
 use crate::combat::missile::ShooterId;
+use crate::combat::missile::{
+    Aimer, Missile, MissileAction, MissileState, MissileTargetId, Origin, StrikeResult, aim,
+    grounded, reach, scatter, spawn_point, volley_count, volley_reach, volley_spawn_point,
+};
+use crate::combat::{AttackCount, Firepower};
 use crate::map::Distance;
 use crate::map::Radii;
+use crate::map::spatial::Obstruction;
 use crate::map::spatial::Placed;
 use crate::map::{GroundOffset, Offset, Position};
 use crate::math::Angle;
@@ -14,17 +21,21 @@ use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::{Acceleration, SubstituteCount, WaitDelays};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::actions::ActionList;
+use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
+use crate::objects::layers::{Action, Animated, Combat, Motion, Static};
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::VolleySpread;
 use crate::objects::masters::class;
@@ -36,13 +47,18 @@ use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::PlayerId;
+use crate::players::tracker::key;
+use crate::production::spawn::START_RIGHT_Z;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::UnitAi;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::ARMED_FIREPOWER;
 use crate::world::Seconds;
+use crate::world::lets::take;
+use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -54,11 +70,8 @@ impl Unit {
     pub(crate) fn hit_back(
         &mut self,
         own: Victim,
-        (ai, combat): (
-            Option<&mut crate::unit_ai::UnitAi>,
-            &mut crate::objects::layers::Combat,
-        ),
-    ) -> Result<Option<crate::combat::damage::Kill>, GenieError> {
+        (ai, combat): (Option<&mut UnitAi>, &mut Combat),
+    ) -> Result<Option<Kill>, GenieError> {
         self.life.hp = own.hp;
         if let Some(a) = own.armored.as_ref() {
             combat.hp_powerup = a.hp_powerup;
@@ -148,10 +161,7 @@ impl Unit {
             for _ in 0..extra {
                 let object = c.w.streams.get(Stream::Object);
                 let (x, y) = (object.rand15(), object.rand15());
-                let scatter = GroundOffset::new(
-                    crate::combat::missile::scatter(x, spread_x),
-                    crate::combat::missile::scatter(y, spread_y),
-                );
+                let scatter = GroundOffset::new(scatter(x, spread_x), scatter(y, spread_y));
                 self.volley_missile(c, &aimed, scatter)?;
             }
         }
@@ -183,10 +193,7 @@ impl Unit {
         (max_volley, spread, full): (MissileCount, VolleySpread, bool),
         notifies: bool,
     ) -> Result<(bool, i32), GenieError> {
-        let count = crate::combat::missile::volley_count(
-            c.w.parts.combat_of(self.id).firepower,
-            max_volley,
-        );
+        let count = volley_count(c.w.parts.combat_of(self.id).firepower, max_volley);
         let old = c.w.parts.combat_of(self.id).next_volley;
         let mut n = count - old.counted();
         let VolleySpread {
@@ -254,11 +261,11 @@ impl Unit {
             made: master.missile.master().ok_or(GenieError::missing_data(
                 "a ranged unit whose master has no missile",
             ))?,
-            at: crate::combat::missile::spawn_point(self.position(), facing, master.weapon_offset),
+            at: spawn_point(self.position(), facing, master.weapon_offset),
             point: aimed.position,
-            reach: crate::combat::missile::reach(master.radius, master.weapon_range),
+            reach: reach(master.radius, master.weapon_range),
             shooter: true,
-            aimer: crate::combat::missile::Aimer {
+            aimer: Aimer {
                 hit_chance: master.hit_chance,
                 spread: master.missed_spread,
                 class: master.class,
@@ -307,17 +314,14 @@ impl Unit {
             c.w.masters
                 .get(c.player.index())
                 .ok_or(GenieError::unsupported("a volley without the masters"))?;
-        let master = self.master_in(crate::objects::masters::OwnerMasters::new(
-            &c.w.parts.own_master,
-            Some(masters),
-        ))?;
+        let master = self.master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?;
         let facing =
             c.w.parts
                 .mover_of(self.id)
                 .map(|m| m.angle)
                 .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
         let building = master.class == class::BUILDING;
-        let at = crate::combat::missile::volley_spawn_point(
+        let at = volley_spawn_point(
             self.position(),
             facing,
             master.weapon_offset,
@@ -349,19 +353,15 @@ impl Unit {
         let shot = Shot {
             made: made.id,
             at,
-            point: crate::combat::missile::spawn_point(
-                aimed.position,
-                facing,
-                scatter.with_height(0.0),
-            ),
-            reach: crate::combat::missile::volley_reach(master.radius, master.weapon_range),
+            point: spawn_point(aimed.position, facing, scatter.with_height(0.0)),
+            reach: volley_reach(master.radius, master.weapon_range),
             shooter,
-            aimer: crate::combat::missile::Aimer {
+            aimer: Aimer {
                 hit_chance: aimer.hit_chance,
                 spread: aimer.missed_spread,
                 class: aimer.class,
             },
-            attack_count: crate::combat::AttackCount::ZERO,
+            attack_count: AttackCount::ZERO,
         };
         self.launch(c, aimed, &shot)?;
         if !matches!(self.life.master_id, ids::ID_73 | ids::ID_559) {
@@ -427,29 +427,29 @@ impl Unit {
                 let _ = c.w.streams.get(Stream::Object).rand15();
             }
         }
-        let facets = standing.map(|g| crate::objects::facing::SpriteFacets {
+        let facets = standing.map(|g| SpriteFacets {
             count: g.facets,
             turns: g.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
-        if let Some(f) = facets.filter(|_| crate::objects::facing::draws_angle(facets)) {
+        if let Some(f) = facets.filter(|_| draws_angle(facets)) {
             let r = c.w.streams.get(Stream::Object).rand15();
-            angle = crate::objects::facing::drawn_angle(r, f);
+            angle = drawn_angle(r, f);
         }
         let mut mover = Mover {
-            animated: crate::objects::layers::Animated::default(),
+            animated: Animated::default(),
             forward: BVector::new(1.0, 0.0, 0.0),
-            right: BVector::new(0.0, 0.0, crate::production::spawn::START_RIGHT_Z),
+            right: BVector::new(0.0, 0.0, START_RIGHT_Z),
             velocity: None,
             paths: Vec::new(),
             factor: 1.0,
             stats: moving,
             waiting: 0,
-            wait_delays: crate::movement::WaitDelays::NONE,
+            wait_delays: WaitDelays::NONE,
             attack_moving: false,
             last_move: c.w.world_time,
             moved_at: Position::ORIGIN,
-            substitute_count: crate::movement::SubstituteCount::NONE,
+            substitute_count: SubstituteCount::NONE,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
@@ -468,12 +468,7 @@ impl Unit {
                         "a missile without the map's terrain",
                     ))?
                     .ground(position.ground())?;
-            position = position.with_z(crate::combat::missile::grounded(
-                position.z(),
-                ground,
-                false,
-                stats.fly_mode,
-            ));
+            position = position.with_z(grounded(position.z(), ground, false, stats.fly_mode));
         }
         mover.mark_move(position, c.w.world_time);
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
@@ -489,7 +484,7 @@ impl Unit {
             moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
-                crate::map::spatial::Obstruction {
+                Obstruction {
                     kind: made.obstruction_type,
                     class: made.obstruction_class,
                 },
@@ -522,36 +517,34 @@ impl Unit {
         }
         let held = static_storage(c.w.players.player_mut(c.player)?, &made.storage)?;
         // its action: the target and the shooter taken (slot 0x178), then the start
-        let mut action = crate::combat::missile::MissileAction {
-            state: crate::combat::missile::MissileState::New,
+        let mut action = MissileAction {
+            state: MissileState::New,
             // the volley gives the missile its aim as its target
-            target: aimed
-                .target
-                .map(crate::combat::missile::MissileTargetId::new),
+            target: aimed.target.map(MissileTargetId::new),
             fired_from: shot.shooter.then_some(ShooterId::new(self.id)),
             point: shot.point,
             timer: Distance::ZERO,
             direction: Offset::ZERO,
             ballistic_velocity: Speed::ZERO,
-            ballistic_acceleration: crate::movement::Acceleration::ZERO,
+            ballistic_acceleration: Acceleration::ZERO,
             distance: Distance::ZERO,
             hit_mode: stats.hit_mode,
-            result: crate::combat::missile::StrikeResult::NONE,
+            result: StrikeResult::NONE,
             origin: if shot.shooter {
-                crate::combat::missile::Origin {
+                Origin {
                     position: self.position(),
                     radius: made.radius,
                     master: Some(self.life.master_id),
                     owner: Some(c.player),
                 }
             } else {
-                crate::combat::missile::Origin::NONE
+                Origin::NONE
             },
             met: Vec::new(),
         };
         let point = {
             let draws = c.w.streams.get(Stream::Action);
-            crate::combat::missile::aim(
+            aim(
                 AimAt {
                     point: action.point,
                     from: position,
@@ -583,7 +576,7 @@ impl Unit {
                 master_id: made.id,
                 master: made.life,
             },
-            place: crate::objects::layers::Static::at(position),
+            place: Static::at(position),
             attackable: true,
             pasture: None,
             my_pasture: None,
@@ -591,29 +584,29 @@ impl Unit {
         };
         // it joins the end of its owner's list (slot 0x2d0, which files it in the tracker);
         // then its action takes the target and the shooter
-        c.w.players.player_mut(c.player)?.tracker.add(
-            id,
-            crate::players::tracker::key(c.w.masters.of(c.player), &c.w.lines, made.id),
-        );
+        c.w.players
+            .player_mut(c.player)?
+            .tracker
+            .add(id, key(c.w.masters.of(c.player), &c.w.lines, made.id));
         let class = made.class;
-        let own = crate::combat::missile::Missile {
+        let own = Missile {
             max_range: shot.reach,
             fired_from: Some(ShooterId::new(self.id)),
             charge: false,
             flying,
             step: Offset::ZERO,
         };
-        let missile = crate::world::parts::Object {
+        let missile = Object {
             unit: missile,
-            parts: crate::world::parts::ObjectParts {
-                actions: crate::objects::layers::Action {
+            parts: ObjectParts {
+                actions: Action {
                     list: ActionList::default().with_missile(Some(action)),
                     ..Default::default()
                 },
                 missile: Some(own),
-                motion: Some(crate::objects::layers::Motion::Moving(mover)),
+                motion: Some(Motion::Moving(mover)),
                 // its +0x900, the firing object's attack count when fired
-                combat: crate::objects::layers::Combat {
+                combat: Combat {
                     attack_count: c.w.parts.combat_of(self.id).attack_count,
                     ..Default::default()
                 },
@@ -626,7 +619,7 @@ impl Unit {
             class: Some(class),
             player: c.player,
         };
-        crate::world::lets::take(c, self, aimed.target, missile)?;
+        take(c, self, aimed.target, missile)?;
         if shot.shooter {
             // the shooter, of the missile's own player: never listed
             self.taken(None, id);
@@ -661,7 +654,7 @@ impl Aimed {
 
 /// `FUN_14120ea30` of an attacker of `master` with `firepower` (`+0xa00`): a building can attack
 /// when of class 51 or 54, with a missile, or with a firepower above 1; any other attacker can.
-pub(crate) fn armed(master: &Master, firepower: crate::combat::Firepower) -> bool {
+pub(crate) fn armed(master: &Master, firepower: Firepower) -> bool {
     master.kind != BUILDING
         || matches!(master.class, class::CLASS_51 | class::CLASS_54)
         || master.missile.master().is_some()
@@ -693,6 +686,6 @@ pub(crate) struct Shot {
     pub(crate) point: Position,
     pub(crate) reach: Distance,
     pub(crate) shooter: bool,
-    pub(crate) aimer: crate::combat::missile::Aimer,
-    pub(crate) attack_count: crate::combat::AttackCount,
+    pub(crate) aimer: Aimer,
+    pub(crate) attack_count: AttackCount,
 }

@@ -17,22 +17,29 @@
 //! cart's own search for resources ([`World::cart_work_search`]).
 
 use crate::GenieError;
+use crate::construction::build::CART_TASK;
 use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
 use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::Tile;
+use crate::map::spatial::{BLOCKED, Spatial};
 use crate::math::rng::Stream;
 use crate::movement::{Me, Planning};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FISH_TRAP;
+use crate::objects::masters::master_type::BUILDING;
+use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::PlayerSlots;
 
 /// The gather groups the resource search tries, in order (0 to 4).
@@ -84,13 +91,8 @@ impl World {
             let unit = &self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
             let class = master.class;
-            let building = master.kind == crate::objects::masters::master_type::BUILDING;
-            let cart_task = building
-                && self.has_task(
-                    p,
-                    unit.life.master_id,
-                    crate::construction::build::CART_TASK,
-                )?;
+            let building = master.kind == BUILDING;
+            let cart_task = building && self.has_task(p, unit.life.master_id, CART_TASK)?;
             let Some(start) = start_of(class, building, cart_task) else {
                 i = i.next();
                 continue;
@@ -200,7 +202,7 @@ impl World {
     fn search_seeker(
         &self,
         p: PlayerId,
-        unit: &crate::objects::unit::Unit,
+        unit: &Unit,
     ) -> Result<(gather_search::Seeker, Me), GenieError> {
         let master = unit.master(self.master_tables(), p)?;
         let ai = self
@@ -245,10 +247,10 @@ impl World {
         );
         let (players, masters, index) = (
             &self.players,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             &self.index,
         );
-        let by_id = crate::world::index::ObjectsRef::of_tables(
+        let by_id = ObjectsRef::of_tables(
             players,
             index,
             masters,
@@ -260,9 +262,7 @@ impl World {
                 self.parts.motion.unlent(),
             ),
         );
-        let candidate = |spatial: &crate::map::spatial::Spatial,
-                         id: ObjectId|
-         -> Result<Candidate, GenieError> {
+        let candidate = |spatial: &Spatial, id: ObjectId| -> Result<Candidate, GenieError> {
             let (owner, u, _) = index.locate(players, id).ok_or(GenieError::unsupported(
                 "an object on a tile the slice does not hold",
             ))?;
@@ -284,9 +284,7 @@ impl World {
                 gather_group: m.gather_group,
             })
         };
-        let objects = |spatial: &crate::map::spatial::Spatial,
-                       tile: Tile|
-         -> Result<Vec<Candidate>, GenieError> {
+        let objects = |spatial: &Spatial, tile: Tile| -> Result<Vec<Candidate>, GenieError> {
             spatial
                 .objects_on(tile)
                 .map(|(id, _)| candidate(spatial, id))
@@ -299,12 +297,12 @@ impl World {
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };
-        let blocked = mask.blocked() | crate::map::spatial::BLOCKED;
+        let blocked = mask.blocked() | BLOCKED;
         gather_search::closest_resource_at(
             &seeker,
             None,
             kind,
-            crate::objects::WorkerCount::NO_CAP,
+            WorkerCount::NO_CAP,
             ResourceWorld {
                 map: self.spatial.map,
                 world: &mut self.spatial,

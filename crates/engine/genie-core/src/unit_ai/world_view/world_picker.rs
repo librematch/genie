@@ -1,40 +1,65 @@
 //! The world as `bestUnitToAttack` and the attack tests read it ([`WorldPicker`]).
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
+use crate::combat::damage::{
+    Shown, armor_damage, bonus_damage, building_elevation_factor, elevation_factor, shown_attack,
+    shown_melee_armor, shown_range,
+};
 use crate::combat::victims::victim_of;
 use crate::map::Distance;
+use crate::map::RestrictionId;
 use crate::map::spatial::Spatial;
+use crate::math::image::unit_ai::{
+    HARMLESS_HP as UNIT_AI_HARMLESS_HP, HARMLESS_RANGE as UNIT_AI_HARMLESS_RANGE,
+};
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::{WaypointIndex, footprint_gap};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::objects::masters::player_master;
+use crate::objects::masters::{DamageAmount, DamageClass, Master, MasterTables};
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
+use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
+use crate::pathing::tile_path::Path;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::Relations;
 use crate::unit_ai::NearestAttacker;
+use crate::unit_ai::best_target::{AttackCategory, Candidate, Searcher, Thing, order_weights};
+use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::Foreign;
+use crate::unit_ai::{
+    AttackPicker, Attacker, Convertee, Converter, Duel, Memory, PRIEST_AI, PatrolPath, Seeker,
+    Target, attack_sight, attacks_neutral as unit_ai_attacks_neutral,
+    can_attack as unit_ai_can_attack, can_convert, spares_friends as unit_ai_spares_friends,
+};
+use crate::world::Mode680;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
+use crate::world::parts::Parts;
+use crate::world::player::AiSettings;
 
 /// Slot 0x228 (`FUN_141084070`): the sum of master `m`'s attacks above 0 (`COMISS`), from +0.
-pub(super) fn attacks(m: &crate::objects::masters::Master) -> f32 {
+pub(super) fn attacks(m: &Master) -> f32 {
     m.weapons
         .iter()
-        .filter(|w| crate::objects::masters::DamageAmount::ZERO < w.amount)
+        .filter(|w| DamageAmount::ZERO < w.amount)
         .fold(0.0, |sum, w| sum + w.amount.as_f32())
 }
 
 /// The hit points (`DAT_14330ebc8`) and the range (`DAT_142e7f384`) below which a villager
 /// fights its attacker back ([`WorldPicker::harmless`]).
-pub(super) const HARMLESS_HP: f32 = crate::math::image::unit_ai::HARMLESS_HP;
-pub(super) const HARMLESS_RANGE: Distance =
-    Distance::new(crate::math::image::unit_ai::HARMLESS_RANGE);
+pub(super) const HARMLESS_HP: f32 = UNIT_AI_HARMLESS_HP;
+pub(super) const HARMLESS_RANGE: Distance = Distance::new(UNIT_AI_HARMLESS_RANGE);
 
 /// An object the unit AI found or names that the slice does not hold (another player's it does
 /// not keep).
@@ -46,9 +71,9 @@ pub(crate) const NOT_HELD: GenieError =
 /// the unit's quick path to them.
 pub(crate) struct WorldPicker<'a> {
     /// What the tests read of the unit.
-    pub(crate) attacker: &'a crate::unit_ai::Attacker,
+    pub(crate) attacker: &'a Attacker,
     /// What they read of its unit AI; None outside `bestUnitToAttack`.
-    pub(crate) seeker: Option<crate::unit_ai::Seeker>,
+    pub(crate) seeker: Option<Seeker>,
     /// The unit.
     pub(crate) me: ObjectId,
     /// Its owner.
@@ -56,44 +81,39 @@ pub(crate) struct WorldPicker<'a> {
     /// The owner's other objects.
     pub(crate) others: OthersRef<'a>,
     /// The world's objects, whose gaits the quick path reads.
-    pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
+    pub(crate) by_id: ObjectsRef<'a>,
     /// The other players' lists.
     pub(crate) foreign: Foreign<'a>,
     /// Every player's masters.
-    pub(crate) every: crate::objects::masters::MasterTables<'a>,
+    pub(crate) every: MasterTables<'a>,
     /// The world's parts by id ([`crate::world::parts::Parts`]): the units' AIs (the unit's own
     /// is out of the table) and the buildings' layers.
-    pub(crate) parts: &'a crate::world::parts::Parts,
+    pub(crate) parts: &'a Parts,
     /// The unit's master's terrain restriction (`+0x606`).
-    pub(crate) restriction: Option<crate::map::RestrictionId>,
+    pub(crate) restriction: Option<RestrictionId>,
     /// The unit itself.
     pub(crate) unit: &'a Unit,
     /// Its action layer, out of the table with it.
-    pub(crate) actions: &'a crate::objects::layers::Action,
+    pub(crate) actions: &'a Action,
     /// Its owner's attributes, diplomacy and AI settings.
     pub(crate) attributes: &'a [Amount],
     /// Its owner's diplomacy (`player+0x260`).
-    pub(crate) relations: &'a crate::players::Relations,
+    pub(crate) relations: &'a Relations,
     /// Its owner's AI settings.
-    pub(crate) ai_settings: crate::world::player::AiSettings,
+    pub(crate) ai_settings: AiSettings,
     /// The world's time.
     pub(crate) now: WorldTime,
     /// The game's setting `+0x680`.
-    pub(crate) mode_680: crate::world::Mode680,
+    pub(crate) mode_680: Mode680,
 }
 
 /// An object the picker reads: its owner, the object, its owner's attributes and its master.
-type Held<'a> = (
-    PlayerId,
-    &'a Unit,
-    &'a [Amount],
-    &'a crate::objects::masters::Master,
-);
+type Held<'a> = (PlayerId, &'a Unit, &'a [Amount], &'a Master);
 
 impl WorldPicker<'_> {
     /// The action layer of object `id`: the unit's own (out of the table with it, as its row is
     /// out of its list) or the table's.
-    fn actions_of(&self, id: ObjectId) -> &crate::objects::layers::Action {
+    fn actions_of(&self, id: ObjectId) -> &Action {
         if id == self.me {
             self.actions
         } else {
@@ -136,30 +156,24 @@ impl WorldPicker<'_> {
             .parts
             .unit_ai
             .get(p.id)
-            .is_none_or(|a| a.ai_type != crate::unit_ai::PRIEST_AI)
+            .is_none_or(|a| a.ai_type != PRIEST_AI)
         {
             return Ok(false);
         }
-        let converter = crate::unit_ai::Converter {
+        let converter = Converter {
             class: pm.class,
             master: p.life.master_id,
             faith: p.life.amount,
             attributes,
             tasks: &pm.tasks,
         };
-        let target = self
-            .held(whom)?
-            .map(|(q, t, _, tm)| crate::unit_ai::Convertee {
-                owner: q,
-                class: tm.class,
-                master: t.life.master_id,
-                hero: tm.hero_flag,
-            });
-        Ok(crate::unit_ai::can_convert(
-            &converter,
-            target.as_ref(),
-            any,
-        ))
+        let target = self.held(whom)?.map(|(q, t, _, tm)| Convertee {
+            owner: q,
+            class: tm.class,
+            master: t.life.master_id,
+            hero: tm.hero_flag,
+        });
+        Ok(can_convert(&converter, target.as_ref(), any))
     }
 
     /// What object `from` deals object `to` per hit (`to`'s slot 0x220 with `from`,
@@ -206,32 +220,24 @@ impl WorldPicker<'_> {
             terrain,
             self.mode_680,
         );
-        let mut factor = crate::combat::damage::elevation_factor(
-            f.position().z(),
-            unit.attack_elevation,
-            &target,
-        );
+        let mut factor = elevation_factor(f.position().z(), unit.attack_elevation, &target);
         if fm.kind == BUILDING {
-            factor = crate::combat::damage::building_elevation_factor(
+            factor = building_elevation_factor(
                 factor,
                 self.parts.building_of(f.id).relics,
                 tm.kind,
                 self.parts.building_of(t.id).relics,
             );
         }
-        let bonus = crate::combat::damage::bonus_damage(&unit, &target);
-        crate::combat::damage::armor_damage(&target, &unit.weapons, factor, &unit.source, bonus)
+        let bonus = bonus_damage(&unit, &target);
+        armor_damage(&target, &unit.weapons, factor, &unit.source, bonus)
     }
 
     /// What a computer player's unit weighs of object `other` on a damage notify
     /// ([`crate::unit_ai::Duel`]).
-    pub(crate) fn duel(
-        &self,
-        spatial: &Spatial,
-        other: ObjectId,
-    ) -> Result<crate::unit_ai::Duel, GenieError> {
+    pub(crate) fn duel(&self, spatial: &Spatial, other: ObjectId) -> Result<Duel, GenieError> {
         let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
-        Ok(crate::unit_ai::Duel {
+        Ok(Duel {
             converts: self.converts(other, self.me, true)?,
             attacks: attacks(om),
             harms: self.damage(spatial, other, self.me)?,
@@ -268,10 +274,9 @@ impl WorldPicker<'_> {
             terrain,
             self.mode_680,
         );
-        let attacked = (self.actions_of(o.id).top_action_kind()
-            == Some(crate::combat::attack::ATTACK))
-        .then(|| self.actions_of(o.id).top_target())
-        .flatten();
+        let attacked = (self.actions_of(o.id).top_action_kind() == Some(ATTACK))
+            .then(|| self.actions_of(o.id).top_target())
+            .flatten();
         let target = match attacked {
             Some(t) => self.held(t)?.map(|(tq, t, ta, tm)| {
                 victim_of(
@@ -292,7 +297,7 @@ impl WorldPicker<'_> {
             }),
             None => None,
         };
-        let shown = crate::combat::damage::Shown {
+        let shown = Shown {
             target: target.as_ref(),
             projectile: om
                 .charge_projectile
@@ -301,17 +306,17 @@ impl WorldPicker<'_> {
             charge_event: om.charge_event,
             range_powerup: self.parts.combat_of(o.id).range_powerup,
         };
-        let attack = crate::combat::damage::shown_attack(&v, &shown);
-        let amount = crate::objects::masters::DamageAmount::new;
+        let attack = shown_attack(&v, &shown);
+        let amount = DamageAmount::new;
         if amount(4) < attack
             || (amount(3) < attack && HARMLESS_HP <= HitPoints::of_master(om.hit_points).get())
         {
             return Ok(false);
         }
-        if amount(0) < crate::combat::damage::shown_melee_armor(&v)? {
+        if amount(0) < shown_melee_armor(&v)? {
             return Ok(false);
         }
-        Ok(crate::combat::damage::shown_range(&v, &shown) <= HARMLESS_RANGE)
+        Ok(shown_range(&v, &shown) <= HARMLESS_RANGE)
     }
 
     /// Slot 0x78 of object `target`'s unit AI (`FUN_140c48610`): of its attackers in their order,
@@ -334,8 +339,7 @@ impl WorldPicker<'_> {
             let Some((_, a, _, am)) = self.held(id)? else {
                 continue;
             };
-            let gap =
-                crate::movement::footprint_gap(t.position(), tm.radius, a.position(), am.radius);
+            let gap = footprint_gap(t.position(), tm.radius, a.position(), am.radius);
             if best.is_none_or(|(least, _)| gap < Distance::new(least)) {
                 best = Some((gap.get(), id));
             }
@@ -350,7 +354,7 @@ impl WorldPicker<'_> {
         &self,
         spatial: &Spatial,
         id: ObjectId,
-    ) -> Result<(crate::unit_ai::Target, bool), GenieError> {
+    ) -> Result<(Target, bool), GenieError> {
         let (owner, t) = self.others.find(id).ok_or(NOT_HELD)?;
         let m = t.master(self.every, owner)?;
         let placed = spatial
@@ -361,7 +365,7 @@ impl WorldPicker<'_> {
             .as_ref()
             .and_then(|v| v.seer(id))
             .map_or(CaptureKind::NONE, |s| s.capture);
-        let target = crate::unit_ai::Target {
+        let target = Target {
             owner,
             class: m.class,
             kind: m.kind,
@@ -390,20 +394,17 @@ impl WorldPicker<'_> {
     }
 }
 
-impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
+impl AttackPicker for WorldPicker<'_> {
     /// The unit, its master and its AI as `bestUnitToAttack` reads them: the AI's targets, order
     /// and action ([`crate::unit_ai::Seeker`]), its may-move test, the sight
     /// ([`crate::unit_ai::attack_sight`]), its ranges and speed, its owner's walls flag and
     /// targeting, the order history's weights and the retarget entries' targets.
-    fn searcher(
-        &mut self,
-        memory: crate::unit_ai::Memory<'_>,
-    ) -> Result<crate::unit_ai::best_target::Searcher, GenieError> {
+    fn searcher(&mut self, memory: Memory<'_>) -> Result<Searcher, GenieError> {
         let seeker = self.seeker.ok_or(GenieError::unsupported(
             "an attack test outside bestUnitToAttack",
         ))?;
         let a = self.attacker;
-        Ok(crate::unit_ai::best_target::Searcher {
+        Ok(Searcher {
             id: self.me,
             target: seeker.target,
             target_classes: [seeker.target_class, seeker.last_target_class],
@@ -416,7 +417,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             player_type: a.player_type,
             walls_allowed: self.ai_settings.may_attack_walls,
             can_move: seeker.can_move(),
-            sight: crate::unit_ai::attack_sight(a)?,
+            sight: attack_sight(a)?,
             range: a.range_against()?,
             weapon_range: a.range,
             min_range: a.min_range,
@@ -426,17 +427,13 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
                 self.ai_settings.local_targeting_mode,
                 self.ai_settings.targeting_factor_scalar,
             ),
-            weights: crate::unit_ai::best_target::order_weights(memory.history, self.now),
+            weights: order_weights(memory.history, self.now),
             retries: memory.retries.iter().map(|&(id, _)| id).collect(),
             now: self.now,
         })
     }
 
-    fn thing(
-        &mut self,
-        spatial: &Spatial,
-        id: ObjectId,
-    ) -> Result<Option<crate::unit_ai::best_target::Thing>, GenieError> {
+    fn thing(&mut self, spatial: &Spatial, id: ObjectId) -> Result<Option<Thing>, GenieError> {
         let Some((owner, t, _, m)) = self.held(id)? else {
             return Ok(None);
         };
@@ -449,9 +446,9 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             .and_then(|v| v.seer(id))
             .map_or(CaptureKind::NONE, |s| s.capture);
         let a = self.attacker;
-        Ok(Some(crate::unit_ai::best_target::Thing {
+        Ok(Some(Thing {
             owner,
-            allied: crate::unit_ai::task_finder::allied(self.relations, self.player, owner, true),
+            allied: allied(self.relations, self.player, owner, true),
             state: t.life.state,
             has_ai: self.parts.unit_ai.contains(t.id),
             inside: t.life.inside.is_some(),
@@ -462,12 +459,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             targetable: !t.untargetable,
             attackable: t.attackable,
             held: t.life.amount,
-            distance: crate::movement::footprint_gap(
-                a.position,
-                a.radius,
-                placed.position,
-                placed.radius,
-            ),
+            distance: footprint_gap(a.position, a.radius, placed.position, placed.radius),
             speed: self
                 .parts
                 .mover_of(t.id)
@@ -480,16 +472,16 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             "an attack test outside bestUnitToAttack",
         ))?;
         let (target, _) = self.target(spatial, id)?;
-        crate::unit_ai::can_attack(self.attacker, &seeker, &target)
+        unit_ai_can_attack(self.attacker, &seeker, &target)
     }
 
     fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
-        Ok(crate::unit_ai::attacks_neutral(self.attacker, class))
+        Ok(unit_ai_attacks_neutral(self.attacker, class))
     }
 
     fn spares_friends(&mut self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
         let (target, _) = self.target(spatial, id)?;
-        crate::unit_ai::spares_friends(self.attacker, &target)
+        unit_ai_spares_friends(self.attacker, &target)
     }
 
     /// `FUN_140c41690`: a human player's unit passes nothing over (the computer player's test
@@ -509,15 +501,15 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
         spatial: &Spatial,
         id: ObjectId,
         distance: Distance,
-        category: Option<crate::unit_ai::best_target::AttackCategory>,
-    ) -> Result<crate::unit_ai::best_target::Candidate, GenieError> {
+        category: Option<AttackCategory>,
+    ) -> Result<Candidate, GenieError> {
         let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
             "a searching unit of a master the slice does not have",
         ))?;
         let damage = self.damage(spatial, self.me, id)?;
         let armed = 0.0 < attacks(m) || self.converts(id, self.me, true)?;
-        Ok(crate::unit_ai::best_target::Candidate {
+        Ok(Candidate {
             id,
             distance,
             category,
@@ -545,7 +537,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
         let class3 = m
             .armors
             .iter()
-            .filter(|a| a.class == crate::objects::masters::DamageClass::PIERCE)
+            .filter(|a| a.class == DamageClass::PIERCE)
             .map(|a| a.amount)
             .max();
         let armor = class3.unwrap_or_else(|| {
@@ -554,8 +546,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
                 |best, a| if best < a.amount { a.amount } else { best },
             )
         });
-        Ok(crate::objects::masters::DamageAmount::new(100)
-            <= armor.plus(self.parts.combat_of(t.id).armor_powerups.pierce))
+        Ok(DamageAmount::new(100) <= armor.plus(self.parts.combat_of(t.id).armor_powerups.pierce))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).
@@ -581,15 +572,10 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
         id: ObjectId,
         range: Distance,
     ) -> Result<bool, GenieError> {
-        let terrain = spatial
-            .terrain
-            .as_ref()
-            .ok_or(crate::pathing::hull_path::NO_TERRAIN)?;
-        let restriction = self
-            .restriction
-            .ok_or(crate::pathing::hull_path::NO_RESTRICTION)?;
+        let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
+        let restriction = self.restriction.ok_or(NO_RESTRICTION)?;
         let mask = terrain.restriction_mask(restriction);
-        crate::pathing::hull_path::quick_reach(
+        quick_reach(
             (spatial, self.by_id),
             self.me,
             Some(id),
@@ -604,16 +590,14 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
 /// (`FUN_140f960f0`) copied into a new path ([`crate::pathing::tile_path::Path::append`]: its points, its
 /// length or one measured) with its flags, and that level's waypoint; None without path data or
 /// a path at the top.
-pub(crate) fn patrol_information(
-    mover: Option<&Mover>,
-) -> Option<(crate::unit_ai::PatrolPath, crate::movement::WaypointIndex)> {
+pub(crate) fn patrol_information(mover: Option<&Mover>) -> Option<(PatrolPath, WaypointIndex)> {
     let top = mover?.paths.last().filter(|l| l.has_path)?;
-    let mut path = crate::pathing::tile_path::Path::default();
-    path.append(&crate::pathing::tile_path::Path {
+    let mut path = Path::default();
+    path.append(&Path {
         points: top.points.clone(),
         length: top.length,
     });
-    let saved = crate::unit_ai::PatrolPath {
+    let saved = PatrolPath {
         path,
         flags: top.path_flags,
     };

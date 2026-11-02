@@ -1,6 +1,7 @@
 //! A terrain's id ([`TerrainId`]): a map tile's terrain and the `.dat`'s terrain records' index.
 
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// A terrain by its id: a map tile's terrain (`+0x9`), the terrain it restores (`+0xa`) and its
 /// layer (`+0xc`), the index of the `.dat`'s terrain records
@@ -40,8 +41,8 @@ impl TerrainId {
     }
 }
 
-impl std::fmt::Display for TerrainId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TerrainId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

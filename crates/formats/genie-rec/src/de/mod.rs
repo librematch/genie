@@ -14,6 +14,7 @@ pub mod command;
 pub use body::{Checkpoint, Op, OpReader, Pregame, TriggerSync, View};
 pub use genie_save::SaveVersion;
 
+use flate2::read::DeflateDecoder;
 pub use genie_error::{ErrorKind, GenieError};
 
 /// The errors of reading a DE recording: [`GenieError`]s.
@@ -129,7 +130,7 @@ impl<'a> Chapter<'a> {
         use std::io::Read;
         let mut out = Vec::new();
         // The byte count is `out.len()`.
-        let _ = flate2::read::DeflateDecoder::new(self.compressed_header)
+        let _ = DeflateDecoder::new(self.compressed_header)
             .read_to_end(&mut out)
             .map_err(|_| not_inflating(self.offset))?;
         Ok(out)
@@ -155,7 +156,7 @@ impl<'a> Chapter<'a> {
         use std::io::Read;
         // "VER 9.4\0", the old f32 save version, minor, major, build
         let mut start = [0u8; 20];
-        flate2::read::DeflateDecoder::new(self.compressed_header)
+        DeflateDecoder::new(self.compressed_header)
             .read_exact(&mut start)
             .map_err(|_| not_inflating(self.offset))?;
         Ok(SaveVersion {
@@ -169,10 +170,12 @@ impl<'a> Chapter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use flate2::write::DeflateEncoder;
     use std::io::Write;
 
     fn deflate(bytes: &[u8]) -> Vec<u8> {
-        let mut e = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::fast());
+        let mut e = DeflateEncoder::new(Vec::new(), flate2::Compression::fast());
         e.write_all(bytes).unwrap();
         e.finish().unwrap()
     }

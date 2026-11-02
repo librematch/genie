@@ -2,16 +2,29 @@ use crate::fixtures::{action_list, building_mut, building_object, combat_object,
 use crate::masters::{DefaultAction, MasterTable};
 use crate::sub_actions::{DefaultStart, default_task, gather_point, production, saved_attack};
 use crate::test_ids::object_id;
+use genie_core::combat::AttackTargetId;
+use genie_core::combat::attack::ATTACK;
 use genie_core::combat::attack::AttackState;
+use genie_core::garrison::ENTER;
+use genie_core::gathering::make::MAKE;
+use genie_core::movement::explore::EXPLORE;
+use genie_core::movement::fly::FLY;
+use genie_core::movement::move_to::MOVE_TO;
 use genie_core::movement::move_to::MoveTo;
+use genie_core::objects::Graphics;
 use genie_core::objects::Voice;
 use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
+use genie_core::objects::masters::action_type::{HUNT_RANGE, MAKE_OBJECT, MAKE_TECH};
+use genie_core::objects::masters::ids::VILLAGER_MALE;
+use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::attribute;
 use genie_core::production::{MakeObjState, MakeTechState, Making};
+use genie_core::technology::TechId;
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByType, RgeActionMoveTo, RgeObject,
     TribeActionMakeObj, TribeActionMakeTech, TribeBuildingObjectEntry1,
@@ -53,19 +66,13 @@ fn building_production_holds_its_slots_and_make_action() {
     b.production_queue = vec![slot(), slot()];
     b.production_queue_count = 1;
     b.production_queue_enabled = 1;
-    b.production_queue_actions = action_list(vec![(
-        genie_core::objects::masters::action_type::MAKE_OBJECT,
-        make(),
-    )]);
+    b.production_queue_actions = action_list(vec![(MAKE_OBJECT, make())]);
     let p = production(&town_centre).unwrap().unwrap();
     assert_eq!(p.queue.slots.len(), 2);
     assert_eq!(p.queue.slots[1].serial.get(), 1);
     assert_eq!(
         p.queue.slots[0].costs[0],
-        (
-            Some(attribute::FOOD),
-            genie_core::players::Amount::new(50.0)
-        )
+        (Some(attribute::FOOD), Amount::new(50.0))
     );
     assert_eq!((p.queue.count.get(), p.queue.next_serial.get()), (1, 2));
     assert!(p.queue.enabled);
@@ -74,11 +81,7 @@ fn building_production_holds_its_slots_and_make_action() {
     };
     assert_eq!(
         (made.state, made.paid, made.master),
-        (
-            MakeObjState::Making,
-            true,
-            Some(genie_core::objects::masters::ids::VILLAGER_MALE)
-        )
+        (MakeObjState::Making, true, Some(VILLAGER_MALE))
     );
 }
 
@@ -93,13 +96,11 @@ fn research_is_production_action_too() {
         })),
         ..Action::default()
     };
-    building_mut(&mut university).production_queue_actions = action_list(vec![(
-        genie_core::objects::masters::action_type::MAKE_TECH,
-        research,
-    )]);
+    building_mut(&mut university).production_queue_actions =
+        action_list(vec![(MAKE_TECH, research)]);
     let p = production(&university).unwrap().unwrap();
     assert!(
-        matches!(p.action, Some(Making::Research(r)) if r.tech == genie_core::technology::TechId::try_from(22).unwrap() && !r.paid && r.state == MakeTechState::New)
+        matches!(p.action, Some(Making::Research(r)) if r.tech == TechId::try_from(22).unwrap() && !r.paid && r.state == MakeTechState::New)
     );
 }
 
@@ -111,10 +112,7 @@ fn make_action_in_state_of_none_fails() {
     if let Some(m) = made.tribe_action_make_obj.as_deref_mut() {
         m.rge_action.state = 2;
     }
-    building_mut(&mut barracks).production_queue_actions = action_list(vec![(
-        genie_core::objects::masters::action_type::MAKE_OBJECT,
-        made,
-    )]);
+    building_mut(&mut barracks).production_queue_actions = action_list(vec![(MAKE_OBJECT, made)]);
     assert!(production(&barracks).is_err());
 }
 
@@ -133,10 +131,8 @@ fn research_in_state_of_none_fails() {
         })),
         ..Action::default()
     };
-    building_mut(&mut university).production_queue_actions = action_list(vec![(
-        genie_core::objects::masters::action_type::MAKE_TECH,
-        research,
-    )]);
+    building_mut(&mut university).production_queue_actions =
+        action_list(vec![(MAKE_TECH, research)]);
     assert!(production(&university).is_err());
 }
 
@@ -166,25 +162,16 @@ fn building_without_anything_to_make_has_no_production() {
     assert!(production(&house).unwrap().is_none());
     building_mut(&mut house).value = vec![3];
     let p = production(&house).unwrap().unwrap();
-    assert_eq!(
-        p.disabled_techs,
-        [genie_core::technology::TechId::try_from(3).unwrap()]
-    );
+    assert_eq!(p.disabled_techs, [TechId::try_from(3).unwrap()]);
 }
 
 /// A make or research action without its part, or another action, is not modelled.
 #[test]
 fn another_production_action_is_unsupported() {
     for (kind, action) in [
-        (
-            genie_core::objects::masters::action_type::MAKE_OBJECT,
-            Action::default(),
-        ),
-        (
-            genie_core::objects::masters::action_type::MAKE_TECH,
-            Action::default(),
-        ),
-        (genie_core::movement::explore::EXPLORE, make()),
+        (MAKE_OBJECT, Action::default()),
+        (MAKE_TECH, Action::default()),
+        (EXPLORE, make()),
     ] {
         let mut building = building_object(13, 109);
         building_mut(&mut building).production_queue_actions = action_list(vec![(kind, action)]);
@@ -222,24 +209,22 @@ fn the_default_task_starts_what_the_table_names() {
         )
         .with_default_action(CivId::GAIA, MasterId::of_data(83).unwrap(), action)
     };
-    let artifact = genie_core::ownership::artifact::ARTIFACT_TYPE;
+    let artifact = ARTIFACT_TYPE;
     assert!(matches!(
         start(&table(DefaultAction::Type(artifact))),
         Ok(Some(DefaultStart::Artifact(a))) if a.gaia
     ));
-    let make = genie_core::gathering::make::MAKE;
+    let make = MAKE;
     assert!(matches!(
         start(&table(DefaultAction::Type(make))),
         Ok(Some(DefaultStart::Make))
     ));
     assert!(matches!(start(&table(DefaultAction::None)), Ok(None)));
     assert!(matches!(
-        start(&table(DefaultAction::Type(
-            genie_core::objects::masters::action_type::HUNT_RANGE
-        ))),
+        start(&table(DefaultAction::Type(HUNT_RANGE))),
         Ok(None)
     ));
-    let enter = genie_core::garrison::ENTER;
+    let enter = ENTER;
     assert!(matches!(
         start(&table(DefaultAction::Type(enter))),
         Err(Unstartable::Unported(t)) if t == enter
@@ -249,7 +234,7 @@ fn the_default_task_starts_what_the_table_names() {
         Err(Unstartable::Unread(UnreadDefault::NoSuchTask))
     ));
     // a bird's Fly reads its master's default task as it starts, not at the load
-    let fly = genie_core::movement::fly::FLY;
+    let fly = FLY;
     assert!(matches!(
         start(&table(DefaultAction::Type(fly))),
         Ok(Some(DefaultStart::Fly))
@@ -329,16 +314,12 @@ fn move_to() -> Action {
 /// walks, and the `MoveTo` comes with its state.
 #[test]
 fn saved_attack_reads_its_target_range_and_move_to() {
-    let graphics = genie_core::objects::Graphics::new();
-    let a = saved_attack(
-        &attack(5, vec![(genie_core::movement::move_to::MOVE_TO, move_to())]),
-        Some(&graphics),
-    )
-    .unwrap();
+    let graphics = Graphics::new();
+    let a = saved_attack(&attack(5, vec![(MOVE_TO, move_to())]), Some(&graphics)).unwrap();
     assert_eq!(
         (a.target, a.state.bare()),
         (
-            Some(genie_core::combat::AttackTargetId::new(object_id(700))),
+            Some(AttackTargetId::new(object_id(700))),
             AttackState::GotoSeen { move_to: None }
         )
     );
@@ -352,11 +333,7 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     let plain = saved_attack(&attack(2, vec![]), Some(&graphics)).unwrap();
     assert_eq!(plain.state, AttackState::Killed);
     // a MoveTo belongs to a walk: in any other state it is no state of the game
-    let stray = saved_attack(
-        &attack(6, vec![(genie_core::movement::move_to::MOVE_TO, move_to())]),
-        Some(&graphics),
-    )
-    .unwrap_err();
+    let stray = saved_attack(&attack(6, vec![(MOVE_TO, move_to())]), Some(&graphics)).unwrap_err();
     assert_eq!(
         (stray.kind(), stray.reason()),
         (
@@ -366,10 +343,7 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     );
     assert!(
         saved_attack(
-            &attack(
-                2,
-                vec![(genie_core::combat::attack::ATTACK, attack(1, vec![]))]
-            ),
+            &attack(2, vec![(ATTACK, attack(1, vec![]))]),
             Some(&graphics)
         )
         .is_err()

@@ -1,6 +1,7 @@
 //! A player's masters by id ([`Masters`]) and the work command's choice of master and task.
 
 use crate::GenieError;
+use crate::construction::repair::REPAIR;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::action_type;
@@ -180,8 +181,8 @@ impl Masters {
                     )
                 });
                 let Some(target) = listed.filter(|t| {
-                    task.action_type == crate::construction::repair::REPAIR
-                        && (filter.is_none() || filter == Some(crate::construction::repair::REPAIR))
+                    task.action_type == REPAIR
+                        && (filter.is_none() || filter == Some(REPAIR))
                         && task.object_id != Some(t.master.id)
                 }) else {
                     return Ok(Some((candidate.id, task)));

@@ -3,9 +3,12 @@ use crate::test_ids::object_id;
 use genie_core::objects::ActionState;
 use genie_core::objects::HitPoints;
 use genie_core::objects::actions::ActionList;
+use genie_core::objects::layers::Action;
 use genie_core::objects::masters::{MasterId, ids};
+use genie_core::ownership::artifact::Artifact;
 use genie_core::ownership::artifact::ArtifactState;
 use genie_core::production::QueueButton;
+use genie_core::production::{MakeObj, MakeObjState, Making, Production};
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_core::world::checkpoint::ActionTerm;
@@ -16,7 +19,7 @@ use genie_core::world::parts::Object;
 /// make action in state 6 count 9 + 6); its type stays the top action's, −1 without one.
 #[test]
 fn building_production_state_comes_before_its_top_action_s() {
-    let artifact = genie_core::ownership::artifact::Artifact {
+    let artifact = Artifact {
         state: ArtifactState::Wait,
         timer: Seconds::ZERO,
         gaia: false,
@@ -25,22 +28,20 @@ fn building_production_state_comes_before_its_top_action_s() {
         target: None,
         moving: None,
     };
-    let making = genie_core::production::Production {
-        action: Some(genie_core::production::Making::Unit(
-            genie_core::production::MakeObj {
-                state: genie_core::production::MakeObjState::Making,
-                paid: true,
-                master: Some(ids::VILLAGER_MALE),
-                progress: Seconds::new(0.5),
-                unique_id: -1,
-                button: QueueButton::of_data(0),
-                train_time: WholeSeconds::of_data(25),
-            },
-        )),
-        ..genie_core::production::Production::default()
+    let making = Production {
+        action: Some(Making::Unit(MakeObj {
+            state: MakeObjState::Making,
+            paid: true,
+            master: Some(ids::VILLAGER_MALE),
+            progress: Seconds::new(0.5),
+            unique_id: -1,
+            button: QueueButton::of_data(0),
+            train_time: WholeSeconds::of_data(25),
+        })),
+        ..Production::default()
     };
     let kind = ARTIFACT_TYPE;
-    let top = genie_core::objects::layers::Action {
+    let top = Action {
         list: ActionList::default().with_artifact(Some(artifact)),
         ..Default::default()
     };
@@ -59,19 +60,13 @@ fn building_production_state_comes_before_its_top_action_s() {
         })
     );
     assert_eq!(
-        checkpoint_action(
-            &genie_core::objects::layers::Action::default(),
-            Some(&making)
-        ),
+        checkpoint_action(&Action::default(), Some(&making)),
         Some(ActionTerm {
             kind: None,
             state: ActionState::new(6)
         })
     );
-    assert_eq!(
-        checkpoint_action(&genie_core::objects::layers::Action::default(), None),
-        None
-    );
+    assert_eq!(checkpoint_action(&Action::default(), None), None);
 }
 
 /// Each differing field of a matched object is one difference with the game's master; an

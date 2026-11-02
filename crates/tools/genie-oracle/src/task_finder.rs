@@ -6,15 +6,23 @@ use genie_core::gathering::PastureId;
 use genie_core::map::Position;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
+use genie_core::objects::ObjectState;
 use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::PlayersMasters;
+use genie_core::objects::masters::{MasterId, Masters};
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::players::{ByPlayer, Relations};
+use genie_core::unit_ai::task_finder::{
+    Actor, Diplomacy, DropSite, TaskTarget, allied as task_finder_allied,
+    drops_at as task_finder_drops_at,
+};
 use genie_rec::de;
+use genie_save::generated::world::{RgeStaticObject, TribeCombatObject};
+use std::collections::HashMap;
 
 /// What the task finder (`genie_core::unit_ai::task_finder`) reads of a save: every player's masters as the work
 /// command reads them, every object's state, holding and flags, the players' relations and their
@@ -22,9 +30,9 @@ use genie_rec::de;
 #[derive(Debug)]
 pub struct FinderWorld {
     /// Every player's masters.
-    pub masters: Vec<genie_core::objects::masters::Masters>,
+    pub masters: Vec<Masters>,
     /// The objects by id.
-    pub objects: std::collections::HashMap<ObjectId, FinderObject>,
+    pub objects: HashMap<ObjectId, FinderObject>,
     /// `relation[i]` of each player (`player+0x260`).
     pub relations: ByPlayer<Relations>,
     /// Every player's attribute 95.
@@ -32,7 +40,7 @@ pub struct FinderWorld {
     /// Every player's civ.
     pub civs: Vec<CivId>,
     /// The drop-site table.
-    pub drop_sites: Vec<genie_core::unit_ai::task_finder::DropSite>,
+    pub drop_sites: Vec<DropSite>,
 }
 
 /// One object as the task finder reads it.
@@ -41,9 +49,9 @@ pub struct FinderObject {
     /// Its player.
     pub player: PlayerId,
     /// Its master.
-    pub master: genie_core::objects::masters::MasterId,
+    pub master: MasterId,
     /// Its state.
-    pub state: genie_core::objects::ObjectState,
+    pub state: ObjectState,
     /// What it holds: the attribute and the amount.
     pub held: Held,
     /// Its hit points.
@@ -62,21 +70,17 @@ pub struct FinderObject {
     pub position: Position,
 }
 
-impl genie_core::unit_ai::task_finder::Diplomacy for FinderWorld {
+impl Diplomacy for FinderWorld {
     /// [`genie_core::unit_ai::task_finder::allied`] with `from`'s relations: a player without
     /// them counts only itself.
     fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
-        self.relations.get(from).map_or(from == to, |r| {
-            genie_core::unit_ai::task_finder::allied(r, from, to, with_ally)
-        })
+        self.relations
+            .get(from)
+            .map_or(from == to, |r| task_finder_allied(r, from, to, with_ally))
     }
 
-    fn drops_at(
-        &self,
-        building: genie_core::objects::masters::MasterId,
-        actor: &genie_core::unit_ai::task_finder::Actor<'_>,
-    ) -> bool {
-        genie_core::unit_ai::task_finder::drops_at(&self.drop_sites, building, actor)
+    fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
+        task_finder_drops_at(&self.drop_sites, building, actor)
     }
 }
 
@@ -84,11 +88,7 @@ impl FinderWorld {
     /// The finder's view of object `id`, with its master from its player's masters; an annex
     /// stands for its main building (the finder's step, `+0xbb8`), `steps` times.
     #[must_use]
-    pub fn target_up(
-        &self,
-        id: ObjectId,
-        steps: usize,
-    ) -> Option<genie_core::unit_ai::task_finder::TaskTarget<'_>> {
+    pub fn target_up(&self, id: ObjectId, steps: usize) -> Option<TaskTarget<'_>> {
         let mut id = id;
         for _ in 0..steps {
             match self.objects.get(&id)?.annex_of {
@@ -97,7 +97,7 @@ impl FinderWorld {
             }
         }
         let o = self.objects.get(&id)?;
-        Some(genie_core::unit_ai::task_finder::TaskTarget {
+        Some(TaskTarget {
             id,
             master: self.masters.of(o.player)?.get(o.master)?,
             player: o.player,
@@ -113,15 +113,15 @@ impl FinderWorld {
 
     /// The finder's target: an annex stands for its main building.
     #[must_use]
-    pub fn target(&self, id: ObjectId) -> Option<genie_core::unit_ai::task_finder::TaskTarget<'_>> {
+    pub fn target(&self, id: ObjectId) -> Option<TaskTarget<'_>> {
         self.target_up(id, 1)
     }
 
     /// The finder's view of unit `id` as the actor.
     #[must_use]
-    pub fn actor(&self, id: ObjectId) -> Option<genie_core::unit_ai::task_finder::Actor<'_>> {
+    pub fn actor(&self, id: ObjectId) -> Option<Actor<'_>> {
         let o = self.objects.get(&id)?;
-        Some(genie_core::unit_ai::task_finder::Actor {
+        Some(Actor {
             id,
             master: self.masters.of(o.player)?.get(o.master)?,
             player: o.player,
@@ -182,8 +182,8 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
 /// The finder's view of every live and sleeping object of the players' `sections`, by id.
 fn finder_objects(
     sections: &[genie_save::PlayerSection<'_>],
-) -> Result<std::collections::HashMap<ObjectId, FinderObject>, Error> {
-    let mut objects = std::collections::HashMap::new();
+) -> Result<HashMap<ObjectId, FinderObject>, Error> {
+    let mut objects = HashMap::new();
     for (player, section) in PlayerId::each(sections.len()).zip(sections) {
         for o in section.live_objects().chain(section.sleeping_objects()) {
             if let Some(s) = o.static_part() {
@@ -199,14 +199,10 @@ fn finder_objects(
 fn finder_object(
     player: PlayerId,
     section: &genie_save::PlayerSection<'_>,
-    (o, s): (
-        &genie_save::Object,
-        &genie_save::generated::world::RgeStaticObject,
-    ),
+    (o, s): (&genie_save::Object, &RgeStaticObject),
 ) -> Result<FinderObject, Error> {
     let combat = o.combat();
-    let powerup =
-        |f: fn(&genie_save::generated::world::TribeCombatObject) -> f32| combat.map_or(0.0, f);
+    let powerup = |f: fn(&TribeCombatObject) -> f32| combat.map_or(0.0, f);
     let master_hp = section
         .objects()
         .master(s.master_obj)
@@ -214,8 +210,8 @@ fn finder_object(
         .map_or(0.0, |m| f32::from(m.read_temp_6));
     Ok(FinderObject {
         player,
-        master: genie_core::objects::masters::MasterId::try_from(s.master_obj)?,
-        state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
+        master: MasterId::try_from(s.master_obj)?,
+        state: ObjectState::of_byte(s.object_state)?,
         held: Held {
             kind: AttributeId::of_field(s.attribute_type_held)?,
             amount: Amount::new(s.attribute_amount_held),

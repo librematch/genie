@@ -8,6 +8,7 @@ use crate::groups::MotionFlags;
 use crate::groups::WorldObject;
 use crate::groups::command::MOVE_COMMAND;
 use crate::groups::update::{ATTACK, BUILD, DELIVER_RELIC, NO_COMMAND, PICK_UP_RELIC, REPAIR};
+use crate::math::fmath::below_or_unordered;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::{ObjectId, ObjectKey};
@@ -239,10 +240,8 @@ impl World {
             ));
         };
         let most = HitPoints::of_master(u.master(self.master_tables(), p)?.hit_points).get();
-        Ok(
-            crate::math::fmath::below_or_unordered(u.life.hp.get(), most)
-                && self.spatial.allied_with(owner, p)
-                && self.spatial.allied_with(p, owner),
-        )
+        Ok(below_or_unordered(u.life.hp.get(), most)
+            && self.spatial.allied_with(owner, p)
+            && self.spatial.allied_with(p, owner))
     }
 }

@@ -8,8 +8,11 @@ use crate::objects::AnimateState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
+use crate::objects::facing::facet_of_angle;
+use crate::objects::layers::Action;
 use crate::objects::lifecycle::death_parts::forget_resource;
 use crate::objects::masters::GhostMode;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::{Outcome, Unit};
 use crate::world::slots::PlayerSlots;
@@ -23,7 +26,7 @@ impl Unit {
     /// world.
     pub(crate) fn life_step(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<Outcome, GenieError> {
         self.dying_storage_leaves(c)?;
@@ -63,7 +66,7 @@ impl Unit {
             return Ok(());
         }
         let m = self.master(
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
         )?;
         for &(attribute, amount, kind) in &m.storage {
@@ -86,7 +89,7 @@ impl Unit {
     /// that holds nothing makes its death spawn ([`Unit::death_spawn_comes`]).
     pub(crate) fn state_set_off(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         before: ObjectState,
     ) -> Result<(), GenieError> {
@@ -128,7 +131,7 @@ impl Unit {
     /// What an annex's `set_state` does not model.
     pub(crate) fn annexes_follow(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         before: ObjectState,
         after: ObjectState,
@@ -170,7 +173,7 @@ impl Unit {
         }
         if before < ObjectState::DyingSprite && ObjectState::Undead < after {
             let master = self.master(
-                crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                MasterTables::new(&c.w.masters, &c.w.parts.own_master),
                 c.player,
             )?;
             forget_resource(&mut c.w.spatial, Some(master), self.id, self.position())?;
@@ -184,7 +187,7 @@ impl Unit {
     /// left it ([`crate::objects::facing::facet_of_angle`]).
     pub(crate) fn dying_sprite_ended(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         c.w.parts.set_anim_speed(self.id, Speed::ZERO);
@@ -195,7 +198,7 @@ impl Unit {
             let facet =
                 c.w.parts
                     .mover_of(self.id)
-                    .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
+                    .map(|m| facet_of_angle(m.angle, m.stats.facets).0);
             let (p, at) = (c.player, self.position());
             c.lend((&mut *self, &mut *actions), |w| {
                 w.remains(p, remains, at, facet)
@@ -210,7 +213,7 @@ impl Unit {
     /// spawn's sprite from slot 0x7a8 (the master's undead sprite) is not held.
     pub(crate) fn death_spawn_comes(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let spawn = self.master(c.w.master_tables(), c.player)?.death_spawns[0];
@@ -220,7 +223,7 @@ impl Unit {
         let facet =
             c.w.parts
                 .mover_of(self.id)
-                .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
+                .map(|m| facet_of_angle(m.angle, m.stats.facets).0);
         let (p, at) = (c.player, self.position());
         c.lend((&mut *self, &mut *actions), |w| {
             w.remains(p, spawn, at, facet)

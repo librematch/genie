@@ -3,22 +3,33 @@
 use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BuildAction, BuildReads, DROP_REACH, DROP_WAIT, DROPPED_ORDERS};
+use crate::gathering::DropSiteId;
+use crate::gathering::hunt::resource_kind;
 use crate::map::Distance;
+use crate::math::fmath::below_or_unordered;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::TargetMoved;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::orders::nearest_table_site;
 use crate::players::Amount;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::NotifyKind;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::world::task_target_with;
+use crate::world::OBJECT_MASTER;
 use crate::world::Seconds;
+use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use std::mem::replace;
 
 /// What the drop-off's search gives `set_state(8)` ([`BuildAction::set_drop`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -32,7 +43,7 @@ pub enum DropSearch {
     /// and its carrying sprite `+0x58`), else the Build task's.
     Site {
         /// The drop site.
-        id: crate::gathering::DropSiteId,
+        id: DropSiteId,
         /// The `MoveTo`'s range.
         range: Distance,
         /// The found task's carrying sprite, None without the task or the sprite.
@@ -57,7 +68,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        by: crate::objects::release::Releaser,
+        by: Releaser,
     ) -> Result<(), GenieError> {
         let search = if Amount::ZERO < builder.life.amount {
             Self::drop_search(c, builder, self.task.range)?
@@ -75,17 +86,11 @@ impl BuildAction {
         task_range: Distance,
     ) -> Result<DropSearch, GenieError> {
         let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let masters =
-            c.w.masters
-                .get(c.player.index())
-                .ok_or(crate::world::OBJECT_MASTER)?;
-        let own = builder.master_in(crate::objects::masters::OwnerMasters::new(
-            &c.w.parts.own_master,
-            Some(masters),
-        ))?;
+        let masters = c.w.masters.get(c.player.index()).ok_or(OBJECT_MASTER)?;
+        let own = builder.master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?;
         let at = builder.position().ground();
         let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
-        let found = crate::orders::nearest_table_site(
+        let found = nearest_table_site(
             (
                 &c.w.drop_sites,
                 c.w.players.player(c.player)?.civ,
@@ -104,22 +109,10 @@ impl BuildAction {
             }
             view.find(t)
         };
-        let every = crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master);
+        let every = MasterTables::new(&c.w.masters, &c.w.parts.own_master);
         let task = match (
-            crate::unit_ai::task_finder::world::task_target_with(
-                id.id(),
-                1,
-                &find,
-                &c.w.parts,
-                every,
-            )?,
-            crate::unit_ai::task_finder::world::task_target_with(
-                id.id(),
-                2,
-                &find,
-                &c.w.parts,
-                every,
-            )?,
+            task_target_with(id.id(), 1, &find, &c.w.parts, every)?,
+            task_target_with(id.id(), 2, &find, &c.w.parts, every)?,
         ) {
             (Some(t), Some(general)) => {
                 use crate::unit_ai::task_finder::world::SideWorld;
@@ -178,7 +171,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         search: DropSearch,
-        by: crate::objects::release::Releaser,
+        by: Releaser,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         self.state = BuildState::Drop { move_to: None };
@@ -189,21 +182,21 @@ impl BuildAction {
         };
         let new = found.map(|(id, _, _)| id);
         if self.site != new {
-            let old = std::mem::replace(&mut self.site, new);
-            crate::world::lets::release(c, builder, old, by)?;
-            crate::world::lets::take(c, builder, new, by)?;
+            let old = replace(&mut self.site, new);
+            release(c, builder, old, by)?;
+            take(c, builder, new, by)?;
         }
         let Some((id, range, sprite)) = found else {
             builder.post_own(
                 &mut c.w.parts.unit_ai,
-                crate::unit_ai::NotifyKind::NO_DROP_SITE,
+                NotifyKind::NO_DROP_SITE,
                 [ActionKind::Build.value(), 0, 0],
             )?;
             return self.restart(c, builder);
         };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
@@ -243,7 +236,7 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
-        if crate::math::fmath::below_or_unordered(self.timer.get(), 0.0) {
+        if below_or_unordered(self.timer.get(), 0.0) {
             self.timer += c.dt.seconds();
             if self.timer < Seconds::ZERO {
                 return Ok(HeadCode::Keeps);
@@ -275,7 +268,7 @@ impl BuildAction {
             return Ok(HeadCode::Keeps);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = crate::gathering::hunt::resource_kind(builder.life.attribute_type, attributes);
+        let kind = resource_kind(builder.life.attribute_type, attributes);
         let amount = builder.life.amount;
         Self::drop_load(c, builder, kind, amount)?;
         self.after_deposit(c, builder, reads)
@@ -296,7 +289,7 @@ impl BuildAction {
         if self.target.is_some() {
             let site = self.site.take();
             if site.is_some() {
-                crate::world::lets::release(c, builder, site, reads.by)?;
+                release(c, builder, site, reads.by)?;
             }
             self.restart(c, builder)?;
             return Ok(HeadCode::Keeps);

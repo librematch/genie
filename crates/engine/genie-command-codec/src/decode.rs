@@ -4,6 +4,7 @@ use crate::encode::encode;
 use crate::names::unmodelled_command;
 use genie_core::GenieError;
 use genie_core::commands::GameSub;
+use genie_core::commands::GatherPointState;
 use genie_core::commands::QueueId;
 use genie_core::commands::ResourceWord;
 use genie_core::commands::SpriteOverride;
@@ -17,8 +18,10 @@ use genie_core::commands::{
     TributeCommand, UnitAiStateCommand, UnitList, UnitOrderAction, UnitOrderCommand, UnloadCommand,
     UnloadPick, UnmodelledCommand, Waypoints,
 };
+use genie_core::groups::FormationKind;
 use genie_core::map::Point;
 use genie_core::map::Tile;
+use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionType, MasterId};
 use genie_core::orders::{Interact, MoveOrder};
@@ -26,8 +29,11 @@ use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
 use genie_core::players::tribute::Gift;
+use genie_core::production::{QueueButton, QueuedUnits, UnitIndex};
 use genie_core::technology::TechId;
+use genie_core::unit_ai::UnitStance;
 use genie_rec::de::command::{self as packets, Command as Packet};
+use std::array::from_fn;
 
 /// The command a packet holds.
 ///
@@ -175,7 +181,7 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         Packet::UnitAiState(c) => Command::UnitAiState(UnitAiStateCommand {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
-            state: genie_core::unit_ai::UnitStance::of_byte(c.state),
+            state: UnitStance::of_byte(c.state),
         }),
         Packet::AutoScout(c) => Command::AutoScout(AutoScoutCommand {
             player: PlayerId::from(c.commp_id),
@@ -184,12 +190,12 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         Packet::FormFormation(c) => Command::FormFormation(FormFormationCommand {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
-            formation: genie_core::groups::FormationKind::from(c.formation),
+            formation: FormationKind::from(c.formation),
         }),
         Packet::SetGatherState(c) => Command::SetGatherState(SetGatherStateCommand {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
-            state: genie_core::commands::GatherPointState::of_byte(c.field_0x08),
+            state: GatherPointState::of_byte(c.field_0x08),
         }),
         Packet::SeekShelter(c) => Command::SeekShelter(SeekShelterCommand {
             player: PlayerId::from(c.commp_id),
@@ -213,7 +219,7 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             through_ai: c.field_0x1d != 0,
             nearby: c.field_0x1e != 0,
             action: UnitOrderAction::of(c.action),
-            param: genie_core::production::UnitIndex::of_data(c.param.cast_unsigned()),
+            param: UnitIndex::of_data(c.param.cast_unsigned()),
             human: c.field_0x20 == 1,
         }),
         Packet::GoBackToWork2(c) => {
@@ -261,7 +267,7 @@ fn patrol(c: &packets::Patrol) -> Command {
         units: listed(c.num, &c.ids),
         waypoints: Waypoints {
             count: c.waypoints_count,
-            points: std::array::from_fn(|i| Point::new(f32::from_bits(xs[i]), ys[i])),
+            points: from_fn(|i| Point::new(f32::from_bits(xs[i]), ys[i])),
         },
         reset: c.field_0x08 != 0,
     })
@@ -271,7 +277,7 @@ fn patrol(c: &packets::Patrol) -> Command {
 /// `+0x10`, the first y at `+0x34` and nine more from `+0x38`; its flags at `+0x8`..`+0xa`.
 fn attack_move(c: &packets::AttackMove) -> Command {
     let word = |b: &[u8; 36], i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
-    let points = std::array::from_fn(|i| match i {
+    let points = from_fn(|i| match i {
         0 => Point::new(f32::from_bits(c.field_0x0c), c.field_0x34),
         _ => Point::new(
             word(&c.gap_0x10, 4 * (i - 1)),
@@ -314,7 +320,7 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             builders: listed(c.num, &c.ids),
             queued: c.field_0x1e != 0,
             commits: c.field_0x1f == 0,
-            frame: genie_core::objects::Frame::of_byte(c.frame),
+            frame: Frame::of_byte(c.frame),
         }),
         Packet::BuildWall(c) => Command::BuildWall(BuildWallCommand {
             player: PlayerId::from(c.commp_id),
@@ -331,8 +337,8 @@ fn building_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             buildings: listed(c.num, &c.ids),
             building_master: MasterId::try_from(c.bid)?,
             unit: MasterId::try_from(c.tid)?,
-            amount: genie_core::production::QueuedUnits::of_data(c.count),
-            button: genie_core::production::QueueButton::of_data(c.button_location_id),
+            amount: QueuedUnits::of_data(c.count),
+            button: QueueButton::of_data(c.button_location_id),
         }),
         Packet::Research(c) => Command::Research(ResearchCommand {
             player: PlayerId::from(c.commp_id),

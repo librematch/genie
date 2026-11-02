@@ -3,9 +3,13 @@
 
 use crate::GenieError;
 use crate::combat::abilities::Look;
+use crate::construction::build::CART_TASK;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
+use crate::math::image::artifact::TOWN_CENTRE_OFFSET as ARTIFACT_TOWN_CENTRE_OFFSET;
+use crate::math::image::move_to::ARRIVED as MOVE_TO_ARRIVED;
+use crate::math::image::order::CART_MOVE_RANGE;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::move_to::Shown;
@@ -26,6 +30,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, standing, walkin
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{ActionKind, Inbox};
 use crate::world::Seconds;
+use crate::world::WALKER_UNMOVING;
 use genie_diff::Diff;
 
 /// A `MoveTo` (`RGE_Action_Move_To`): a unit's own top action (a wandering animal's, a moved or
@@ -63,13 +68,13 @@ pub struct MoveToAction {
 
 /// A `MoveTo`'s start counts the unit at its target within this gap (`0x140aa2100`,
 /// `DAT_142eb99cc`).
-pub(super) const ARRIVED: f32 = crate::math::image::move_to::ARRIVED;
+pub(super) const ARRIVED: f32 = MOVE_TO_ARRIVED;
 /// A `MoveTo` to an object the world does not hold.
 pub(crate) const TARGET_LACKING: GenieError =
     GenieError::unsupported("a MoveTo to an object the world lacks");
 /// Livestock's `MoveTo` to a town centre walks to its place less this on both axes
 /// (`FUN_140aa0df0`, `DAT_142eae8d0`).
-const TOWN_CENTRE_OFFSET: f32 = crate::math::image::artifact::TOWN_CENTRE_OFFSET;
+const TOWN_CENTRE_OFFSET: f32 = ARTIFACT_TOWN_CENTRE_OFFSET;
 
 /// `FUN_140aa0df0`'s test of a `MoveTo`'s target object of master `master` in `state`:
 /// livestock (`livestock`, the unit's class 58) moving to a town centre (master 109) holds none,
@@ -108,13 +113,10 @@ pub fn object_range(range: Distance, master: Option<&Master>) -> Distance {
         return range;
     }
     let cart = master.is_some_and(|m| {
-        m.kind == master_type::BUILDING
-            && m.tasks
-                .iter()
-                .any(|t| t.action_type == crate::construction::build::CART_TASK)
+        m.kind == master_type::BUILDING && m.tasks.iter().any(|t| t.action_type == CART_TASK)
     });
     if cart {
-        Distance::new(crate::math::image::order::CART_MOVE_RANGE)
+        Distance::new(CART_MOVE_RANGE)
     } else {
         Distance::ZERO
     }
@@ -462,7 +464,7 @@ impl MoveToAction {
         let follow = target_left(walk, target, self.point, self.on_target_moved)?;
         match follow {
             Follow::PathEnd(p) => {
-                let mover = walk.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
+                let mover = walk.mover_mut().ok_or(WALKER_UNMOVING)?;
                 mover.follow_path_end(p);
                 self.point = p;
             }
@@ -507,21 +509,27 @@ impl MoveToAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker as tests_walker;
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::spatial::Placed;
+    #[cfg(test)]
+    use crate::movement::WaypointIndex;
     use crate::movement::move_to::MoveWaitState;
     use crate::movement::move_to::tests::sheep;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    #[cfg(test)]
+    use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
 
     /// A sprite `id` whose speed factor is `factor`, looped.
     const fn graphic(id: i16, factor: f32) -> Graphic {
         Graphic {
             id: SpriteId::named(id),
-            frames: crate::objects::Frame::of_data(10),
-            facets: crate::objects::FacetCount::of_data(16),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(16),
             speed_multiplier: SpeedMultiplier::of_data(factor),
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -779,24 +787,15 @@ mod tests {
             (m.state, step.target_moved)
         };
         assert_eq!(
-            walked(
-                Position::new(30.0, 88.0, 0.0),
-                crate::movement::WaypointIndex::of_data(1)
-            ),
+            walked(Position::new(30.0, 88.0, 0.0), WaypointIndex::of_data(1)),
             (MoveTo::Moving, false)
         );
         assert_eq!(
-            walked(
-                Position::new(36.0, 88.0, 0.0),
-                crate::movement::WaypointIndex::of_data(1)
-            ),
+            walked(Position::new(36.0, 88.0, 0.0), WaypointIndex::of_data(1)),
             (MoveTo::Moving, false)
         );
         assert_eq!(
-            walked(
-                Position::new(36.0, 88.0, 0.0),
-                crate::movement::WaypointIndex::of_data(0)
-            ),
+            walked(Position::new(36.0, 88.0, 0.0), WaypointIndex::of_data(0)),
             (MoveTo::Start, true)
         );
     }
@@ -809,7 +808,7 @@ mod tests {
     fn move_to_an_object_without_range_takes_mule_cart_s() {
         use crate::objects::masters::{Master, Task, master_type::BUILDING};
         let cart_task = Task {
-            action_type: crate::construction::build::CART_TASK,
+            action_type: CART_TASK,
             ..Task::default()
         };
         let cart = Master {
@@ -859,7 +858,7 @@ mod tests {
         let mut world = Spatial::new(GridSize::new(120, 120));
         world.insert(object_id(9185), sheep(30.4, 40.0));
         world.insert(object_id(9186), sheep(35.0, 40.0));
-        let mut walker = crate::gathering::hunt::tests::walker();
+        let mut walker = tests_walker();
         // footprints 0 apart: within ARRIVED, state 1 (its owner shows the standing sprite)
         let me = Position::new(30.0, 40.0, 0.0);
         let at_hand = MoveToAction::to_target(
@@ -873,7 +872,7 @@ mod tests {
         .unwrap();
         assert!(at_hand.arrived());
         // 4.6 tiles on it starts walking (state 3)
-        let mut walker = crate::gathering::hunt::tests::walker();
+        let mut walker = tests_walker();
         let far = MoveToAction::to_target(
             &world,
             me,
@@ -905,7 +904,7 @@ mod tests {
         );
         let me = Position::new(30.0, 40.0, 0.0);
         let to = |target, livestock, speed: f32| {
-            let mut walker = crate::gathering::hunt::tests::walker();
+            let mut walker = tests_walker();
             walker.stats.speed = Speed::new(speed);
             MoveToAction::to_object(
                 &world,
@@ -951,7 +950,7 @@ mod tests {
     fn move_to_point_starts_unless_its_unit_has_no_speed() {
         let point = Position::new(12.0, 34.0, 1.0);
         let start = |speed: f32| {
-            let mut walker = crate::gathering::hunt::tests::walker();
+            let mut walker = tests_walker();
             walker.stats.speed = Speed::new(speed);
             let m =
                 MoveToAction::to_point(point, Distance::new(0.5), Some(RUNNING), Some(&mut walker));
@@ -993,7 +992,7 @@ mod tests {
         let mut world = Spatial::new(GridSize::new(120, 120));
         world.insert(object_id(9186), sheep(35.0, 40.0));
         let me = Position::new(30.0, 40.0, 0.0);
-        let mut walker = crate::gathering::hunt::tests::walker();
+        let mut walker = tests_walker();
         let far = MoveToAction::to_target(
             &world,
             me,

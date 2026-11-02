@@ -1,5 +1,6 @@
 //! The start's node, the hits' points and the two legs of an L.
 
+use crate::math::conversions::cvttss2si_64;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
@@ -67,8 +68,7 @@ impl Search<'_> {
         let fx = (g.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
         let fy = (g.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
         // CVTTSS2SI RAX at 0x140fa4558, EAX stored: a start 512 tiles or more away wraps
-        let f = crate::math::conversions::cvttss2si_64(fmath::sqrt(fx * fx + fy * fy) * TO_FIXED)
-            as i32;
+        let f = cvttss2si_64(fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
         let start = Node {
             g: FixedDistance::ZERO,
             f: FixedDistance::new(f),

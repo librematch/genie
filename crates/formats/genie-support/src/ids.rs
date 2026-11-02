@@ -312,6 +312,8 @@ mod tests {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -325,6 +327,6 @@ mod genie_error_tests {
                 "a string key that does not fit the integer"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 }

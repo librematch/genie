@@ -3,11 +3,15 @@
 
 use std::fmt::Write;
 
+use crate::groups::unit_groups;
 use crate::{Error, MasterTable};
 use genie_core::GenieError;
+use genie_core::objects::ObjectId;
+use genie_core::unit_ai::QueuedOrder;
 use genie_rec::de::{self, Op};
 use genie_save::generated::world::RgeActionObject;
 use genie_save::generated::world::{Formation, UnitGroup};
+use genie_save::generated::world::{Path, RgeMovingObject, RgeStaticObject};
 use genie_save::{Header, Object};
 
 fn chapter(data: &[u8]) -> Result<de::Chapter<'_>, Error> {
@@ -43,7 +47,7 @@ fn groups_of(header: &Header, full: bool) -> String {
     );
     if full {
         // the state as genie-core holds it, every vector decoded
-        match crate::groups::unit_groups(&header.world.base_world) {
+        match unit_groups(&header.world.base_world) {
             Ok(groups) => {
                 for u in &groups.groups {
                     let _ = writeln!(out, "{u:#?}");
@@ -205,7 +209,7 @@ fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> Result
 
 /// The current sprite (`+0x140`, the save's `sprite`) and its node in the sprite list: `a` with
 /// the animated node's `animate_flag`, `s` for a static node, `-` without a node.
-fn sprite_column(s: &genie_save::generated::world::RgeStaticObject) -> String {
+fn sprite_column(s: &RgeStaticObject) -> String {
     let nodes = || {
         s.active_sprite_list
             .iter()
@@ -270,12 +274,7 @@ fn movement_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
 
 /// One moving object's lines: its place, velocity, orientation, speedup and each path level
 /// with the world's paths of its id.
-fn moving_lines(
-    out: &mut String,
-    s: &genie_save::generated::world::RgeStaticObject,
-    m: &genie_save::generated::world::RgeMovingObject,
-    paths: &[genie_save::generated::world::Path],
-) {
+fn moving_lines(out: &mut String, s: &RgeStaticObject, m: &RgeMovingObject, paths: &[Path]) {
     let _ = writeln!(
         out,
         "{} master {} at ({}, {}, {}) facet {} sprite {}",
@@ -356,7 +355,7 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
         let Some(ai) = combat.unit_ai() else {
             continue;
         };
-        let own = genie_core::objects::ObjectId::try_from(s.id).map_err(Error::Unmodelled)?;
+        let own = ObjectId::try_from(s.id).map_err(Error::Unmodelled)?;
         let _ = writeln!(
             out,
             "{} master {} at ({}, {}) state {} unit-AI type {}",
@@ -414,7 +413,7 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
             let _ = writeln!(
                 out,
                 "    order {:?}",
-                genie_core::unit_ai::QueuedOrder::from_bytes(order, own, players.len())
+                QueuedOrder::from_bytes(order, own, players.len())
             );
         }
     }

@@ -32,6 +32,8 @@ use genie_diff::Diff;
 pub const MAKE: ActionType = ActionType::named(21);
 
 pub use crate::gathering::make_state::MakeState;
+use crate::objects::layers::Action;
+use crate::world::NO_ATTRIBUTE;
 
 /// The masters whose exhaustion the update does not check (`FUN_140a99e30`: the master id, not
 /// 0x765 and not 0x769): the pastures.
@@ -142,7 +144,7 @@ impl MakeAction {
                         farm.life.amount = capacity;
                     }
                 } else {
-                    let attribute = self.task.attribute_type.ok_or(crate::world::NO_ATTRIBUTE)?;
+                    let attribute = self.task.attribute_type.ok_or(NO_ATTRIBUTE)?;
                     c.w.players
                         .player_mut(c.player)?
                         .add_attribute(attribute, Amount::new(rate))?;
@@ -168,7 +170,7 @@ impl Unit {
     /// A farm's Make in its update ([`MakeAction::update`]) and its code: nothing without one.
     pub(crate) fn make_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<HeadCode, GenieError> {
         let Some(mut make) = actions.list.make().copied() else {
@@ -189,6 +191,8 @@ mod tests {
     use crate::objects::ObjectState;
     use crate::objects::WorkRate;
     use crate::objects::masters::CarryCapacity;
+    #[cfg(test)]
+    use crate::objects::masters::WorkValue;
     use crate::objects::masters::ids;
     use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
@@ -197,8 +201,12 @@ mod tests {
     use crate::players::attribute::AttributeId;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::tests::in_update;
     use crate::world::{Player, World};
 
     /// The farm's default task in build 158041's `.dat` (master 50, task 0).
@@ -207,7 +215,7 @@ mod tests {
             action_type: MAKE,
             attribute_type: Some(attribute::FARM_FOOD),
             attribute_type2: Some(attribute::FOOD),
-            work_val1: crate::objects::masters::WorkValue::new(1.0),
+            work_val1: WorkValue::new(1.0),
             ..Task::default()
         }
     }
@@ -248,7 +256,7 @@ mod tests {
             },
             ..Unit::default()
         };
-        let mut layer = crate::objects::layers::Action::default();
+        let mut layer = Action::default();
         layer.list.set_make(Some(make));
         let owner = Player {
             objects: vec![farm].into(),
@@ -257,7 +265,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(1),
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), owner],
@@ -275,7 +283,7 @@ mod tests {
     /// The farm's update of 104 ms through its step: its code, its Make, what it holds and its
     /// hit points.
     fn made(t: &mut World) -> (HeadCode, MakeAction, f32, f32) {
-        let code = crate::world::tests::in_update(
+        let code = in_update(
             t,
             (PlayerId::new(1), ListIndex::new(0)),
             104,
@@ -414,7 +422,7 @@ mod tests {
     #[test]
     fn farm_without_its_master_fails() {
         let mut t = farm_world(making(0.0, 0.0, farm_task()), master_id(99), 0.0);
-        let r = crate::world::tests::in_update(
+        let r = in_update(
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             104,

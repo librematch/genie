@@ -4,6 +4,7 @@
 use crate::Frame;
 use genie_core::commands::{Command, Order, OrderCommand};
 use genie_core::objects::ObjectId;
+use std::collections::BTreeMap;
 
 /// Decodes the recorded commands, in their order ([`genie_command_codec::decode`]). An order's
 /// count of `0xffff` names the comm player's last commanded units, which the world keeps as the
@@ -16,7 +17,7 @@ pub(super) struct Decoder {
     /// Each comm player's last own list of an INTERACT, WORK, MOVE or RETREAT (its count's
     /// ids), without the world's checks: what a run from a mid-game save starts its world's
     /// last commanded units with ([`Decoder::prime`]).
-    pub(super) last_commanded: std::collections::BTreeMap<usize, Vec<Option<ObjectId>>>,
+    pub(super) last_commanded: BTreeMap<usize, Vec<Option<ObjectId>>>,
 }
 
 impl Decoder {

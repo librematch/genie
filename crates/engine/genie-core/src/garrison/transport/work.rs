@@ -14,12 +14,13 @@ use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
 /// The trade cart's and the trade boat's classes (`FUN_141195400`, `FUN_141195490`).
 const TRADE_CLASSES: [ClassId; 2] = [class::TRADE_CART, class::TRADE_BOAT];
 
-impl crate::world::World {
+impl World {
     /// The work command's Transport (its task of action type 12, the factory `FUN_140aca4b0`
     /// case 0xc: [`TransportAction::on_task`] at the work's `point`); the unit AI's notify
     /// (`FUN_14106e4e0` kind 0xc: the transport order 0x2ca and action 0x266, the target with

@@ -1,13 +1,17 @@
 //! The velocity step, a new object's setup, the position setter and the motion step's loop.
 
+use crate::combat::missile::grounded as missile_grounded;
+use crate::groups::UnitGroups;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::{Placed, RecordId, Spatial, WalkQuery};
+use crate::map::terrain::Terrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::math::image::movement::UNCAPPED_SPEED as MOVEMENT_UNCAPPED_SPEED;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathFlags;
@@ -19,12 +23,18 @@ use crate::movement::{
     MoveStats, Mover, Next, Planning, RANGE_FLOOR, Reach, footprint_gap, gate_gap, ground,
     include_kept, moved_far, pause_holds, point_or_zero_of, reach,
 };
+use crate::movement::{SubstituteCount, WaitDelays};
 use crate::objects::ObjectId;
+use crate::objects::facing::SpriteFacets;
+use crate::objects::layers::Animated;
 use crate::objects::layers::Static;
+use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
 use crate::players::PlayerType;
+use crate::production::spawn::START_RIGHT_Z;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::{GenieError, math::fmath};
 
 /// [`Mover::level_gaps`]'s measure: the target with its place (none for a level without one or
@@ -34,7 +44,7 @@ type LevelGaps = (Option<(ObjectId, Placed)>, Distance, Distance);
 
 /// The speed below which a free group member's speed is not capped by its top speed (slot
 /// 0x5e0).
-const UNCAPPED_SPEED: f32 = crate::math::image::movement::UNCAPPED_SPEED;
+const UNCAPPED_SPEED: f32 = MOVEMENT_UNCAPPED_SPEED;
 
 /// What slot 0x5e0 (`FUN_14114f300`) reads of a unit its unit group steers: the unit is in a
 /// group the world holds (`+0x6d0`, `FUN_14152ff40`), the group's motion moves
@@ -64,7 +74,7 @@ pub(super) struct WalkStep<'a> {
     /// The world's spatial index.
     pub(super) world: &'a mut Spatial,
     /// The world's unit groups (none for a walk without the world's planners).
-    pub(super) groups: Option<&'a crate::groups::UnitGroups>,
+    pub(super) groups: Option<&'a UnitGroups>,
     /// The world's pathers (none likewise).
     pub(super) pathing: Option<&'a mut Pathing>,
     /// The goal the level walks to.
@@ -123,7 +133,7 @@ impl Mover {
         position: Position,
         dt: Seconds,
         map: GridSize,
-        terrain: Option<&crate::map::terrain::Terrain>,
+        terrain: Option<&Terrain>,
         (now, group): (WorldTime, Option<GroupSpeed>),
     ) -> Position {
         let Some(v) = self.velocity.as_ref() else {
@@ -148,16 +158,12 @@ impl Mover {
     /// others keep it. Without the map's elevations the height stays; `+0x7f8` (the place is on
     /// the ground) is not held.
     #[must_use]
-    pub fn grounded(
-        &self,
-        at: Position,
-        terrain: Option<&crate::map::terrain::Terrain>,
-    ) -> Position {
+    pub fn grounded(&self, at: Position, terrain: Option<&Terrain>) -> Position {
         let height = at.z();
         let z = terrain
             .and_then(|t| t.ground(at.ground()).ok())
             .map_or(height, |ground| {
-                crate::combat::missile::grounded(at.z(), ground, false, self.stats.fly_mode)
+                missile_grounded(at.z(), ground, false, self.stats.fly_mode)
             });
         at.with_z(z)
     }
@@ -171,28 +177,28 @@ impl Mover {
     /// reads the last move time of a building it meets (slot 0x5e8, `FUN_14106d2d0`).
     pub(crate) fn new_object(
         mut stats: MoveStats,
-        shown: Option<&crate::objects::sprite::Graphic>,
+        shown: Option<&Graphic>,
         at: Position,
         now: WorldTime,
         angle: Angle,
-        sprite_facets: Option<crate::objects::facing::SpriteFacets>,
+        sprite_facets: Option<SpriteFacets>,
     ) -> Self {
         stats.show(shown);
         Self {
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            animated: crate::objects::layers::Animated::new(Speed::ZERO),
+            animated: Animated::new(Speed::ZERO),
             forward: BVector::new(1.0, 0.0, 0.0),
-            right: BVector::new(0.0, 0.0, crate::production::spawn::START_RIGHT_Z),
+            right: BVector::new(0.0, 0.0, START_RIGHT_Z),
             velocity: None,
             paths: Vec::new(),
             factor: 1.0,
             stats,
             waiting: 0,
-            wait_delays: crate::movement::WaitDelays::NONE,
+            wait_delays: WaitDelays::NONE,
             attack_moving: false,
             last_move: now,
             moved_at: at,
-            substitute_count: crate::movement::SubstituteCount::NONE,
+            substitute_count: SubstituteCount::NONE,
             ignore_units: Vec::new(),
             user_waypoints: Vec::new(),
             last_turn: Seconds::ZERO,
@@ -288,7 +294,7 @@ impl Mover {
         dt: Seconds,
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Motion, GenieError> {
         let result = self.motion_passes(place, me, dt, world, plan.as_deref_mut(), by_id);
         // every exit of the step removes the kept hits' temporary shapes (FUN_141055970)
@@ -312,7 +318,7 @@ impl Mover {
         world: &Spatial,
         target_id: Option<ObjectId>,
         ground_radius: Footprint,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<LevelGaps, GenieError> {
         // FUN_1415417a0 on the level's target: none for -1 and for an object that is gone,
         // which then measures as a walk to a point (LAB_1411512df)
@@ -359,7 +365,7 @@ impl Mover {
     pub(super) fn level_state(
         &mut self,
         (at, me): (Position, &Me),
-        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: Option<&mut Planning<'_>>,
         goal: Goal<'_>,
         plans: &mut StepPlans,
@@ -392,7 +398,7 @@ impl Mover {
         dt: Seconds,
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Motion, GenieError> {
         if self.stats.speed == Speed::ZERO {
             return Ok(Motion::Done);
@@ -498,7 +504,7 @@ impl Mover {
         at: Position,
         me: &Me,
         step: WalkStep<'_>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let WalkStep {
             time_step: dt,
@@ -604,7 +610,7 @@ impl Mover {
         at: Position,
         world: &Spatial,
         goal: Goal<'_>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<Next>, GenieError> {
         let ground_radius = self.stats.radius.ground();
         let level = self.paths.walked()?;

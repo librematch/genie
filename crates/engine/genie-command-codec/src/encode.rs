@@ -1,6 +1,7 @@
 //! A command into its packet: genie-rec's layout of the command's kind, filled from the command.
 
 use genie_core::GenieError;
+use genie_core::commands::GatherPointState;
 use genie_core::commands::{
     AttackMoveCommand, BuildCommand, BuildWallCommand, Command, FlareCommand, GameCommand, Order,
     OrderCommand, PatrolCommand, QueueCommand, ResearchCommand, TradeCommand, TributeCommand,
@@ -147,9 +148,7 @@ fn listed(command: &Command) -> Result<Packet, GenieError> {
             commp_id: c.player.get(),
             num: c.units.count,
             gap_0x06: [0; 2],
-            field_0x08: c
-                .state
-                .map_or(0, genie_core::commands::GatherPointState::get),
+            field_0x08: c.state.map_or(0, GatherPointState::get),
             ids: ids(&c.units.ids, packets::SetGatherState::FIXED)?,
         }),
         Command::SeekShelter(c) => Packet::SeekShelter(packets::SeekShelter {

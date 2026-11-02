@@ -1,6 +1,9 @@
 use crate::Error;
 use crate::fixtures::{combat_mut, combat_object, gaia, header, moving_mut, static_mut};
+use crate::fixtures::{human, recording};
+use crate::masters::MasterTable;
 use crate::views::{checkpoint_lines, groups_of, movement_of, objects_of, unit_ais_of};
+use crate::views::{checkpoints, groups, movement, objects, unit_ais};
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::CivId;
@@ -9,6 +12,7 @@ use genie_save::generated::world::{
     Action, ActionListEntry1, Formation, FormationEntry1, Path, PathData, RgeAction,
     RgeActionByType, TribeElephantUnitAiModule, UnitAiModule, UnitGroup, UnitGroupEntry1,
 };
+use std::iter::once;
 
 /// A little-endian vector of three floats, as the save holds one.
 fn vec3(v: [f32; 3]) -> [u8; 12] {
@@ -46,7 +50,7 @@ fn with_actions(id: i32, actions: Vec<(i16, Action)>) -> genie_save::Object {
             action_type,
             action: Some(Box::new(action)),
         })
-        .chain(std::iter::once(ActionListEntry1::default()))
+        .chain(once(ActionListEntry1::default()))
         .collect();
     object
 }
@@ -277,34 +281,31 @@ fn the_views_of_recording_read_its_header() {
         ..UnitAiModule::default()
     }));
     let save = header(vec![gaia(vec![boar])]);
-    let rec = crate::fixtures::recording(&save, &[]);
+    let rec = recording(&save, &[]);
     assert_eq!(
-        crate::views::objects(&rec, 0, None).unwrap(),
+        objects(&rec, 0, None).unwrap(),
         objects_of(&save, 0, None).unwrap()
     );
+    assert_eq!(groups(&rec, false).unwrap(), groups_of(&save, false));
     assert_eq!(
-        crate::views::groups(&rec, false).unwrap(),
-        groups_of(&save, false)
-    );
-    assert_eq!(
-        crate::views::movement(&rec, 0, &[6]).unwrap(),
+        movement(&rec, 0, &[6]).unwrap(),
         movement_of(&save, 0, &[6]).unwrap()
     );
-    let ais = crate::views::unit_ais(&rec, 0, &[6]).unwrap();
+    let ais = unit_ais(&rec, 0, &[6]).unwrap();
     assert!(ais.contains("order 700"), "{ais}");
     assert_eq!(ais, unit_ais_of(&save, 0, &[6]).unwrap());
-    assert!(crate::views::objects(&[], 0, None).is_err());
+    assert!(objects(&[], 0, None).is_err());
 }
 
 /// The checkpoint view runs the recording with the master table and compares each recorded
 /// checkpoint with the players' blocks.
 #[test]
 fn the_checkpoint_view_runs_the_recording() {
-    let save = header(vec![gaia(Vec::new()), crate::fixtures::human(Vec::new())]);
+    let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let mut lanes = [[0; 11]; 8];
     lanes[0][8] = 1;
     lanes[0][0] = 9;
-    let rec = crate::fixtures::recording(
+    let rec = recording(
         &save,
         &[
             Op::Sync { dt: 50 },
@@ -317,12 +318,12 @@ fn the_checkpoint_view_runs_the_recording() {
             },
         ],
     );
-    let table = crate::masters::MasterTable::of_master(
+    let table = MasterTable::of_master(
         CivId::GAIA,
         MasterId::of_data(83).unwrap(),
         None,
         FlyMode::of_data(0),
     );
-    let text = crate::views::checkpoints(&rec, &table, 2).unwrap();
+    let text = checkpoints(&rec, &table, 2).unwrap();
     assert!(text.starts_with("checkpoint at 1: p1 [(0, "), "{text}");
 }

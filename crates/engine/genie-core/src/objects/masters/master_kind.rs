@@ -2,6 +2,7 @@
 //! or a building, which the `.dat` names `unit_type`.
 
 use genie_diff::{Diff, Differ};
+use std::fmt::{Display, Error, Formatter};
 
 /// A master's type (`+0x8`, the `.dat`'s `unit_type`): 10 to 80 in steps the game names
 /// ([`crate::objects::masters::master_type`]). The routines that test a type compare it with a
@@ -35,8 +36,8 @@ impl MasterKind {
     }
 }
 
-impl std::fmt::Display for MasterKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MasterKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

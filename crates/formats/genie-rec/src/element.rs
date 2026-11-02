@@ -1,4 +1,5 @@
 use crate::reader::RecordingHeaderReader;
+use std::io::Error;
 use std::io::{Read, Write};
 
 /// A part of the recording header that may be absent: reading it can give `None`.
@@ -97,7 +98,7 @@ pub(crate) fn read_counted<T: ReadableHeaderElement, R: Read>(
 /// # Errors
 ///
 /// Returns an error if reading fails.
-pub(crate) fn read_xyz<R: Read>(input: &mut R) -> std::io::Result<(f32, f32, f32)> {
+pub(crate) fn read_xyz<R: Read>(input: &mut R) -> Result<(f32, f32, f32), Error> {
     use byteorder::{LE, ReadBytesExt};
     Ok((
         input.read_f32::<LE>()?,

@@ -2,6 +2,7 @@
 //! of its sub-action list (`FUN_140a992b0`).
 
 use crate::GenieError;
+use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{ATTACK_WITHOUT_TARGET, Attack, AttackReads};
 use crate::map::Distance;
@@ -11,9 +12,11 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::objects::Graphics;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
+use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::step::Step;
 
@@ -32,7 +35,7 @@ pub(super) const QUIET_CODE: GenieError =
 pub(super) fn move_reads<'g>(
     (unit, mover): (&Unit, Option<&Mover>),
     r: &AttackReads,
-    graphics: &'g crate::objects::Graphics,
+    graphics: &'g Graphics,
 ) -> Result<MoveToReads<'g>, GenieError> {
     let _ = speed_of(mover)?;
     let sprites = SpriteReads {
@@ -48,7 +51,7 @@ pub(super) fn move_reads<'g>(
 ///
 /// A unit that does not move.
 pub(crate) fn speed_of(mover: Option<&Mover>) -> Result<Speed, GenieError> {
-    Ok(mover.ok_or(crate::world::ATTACKER_UNMOVING)?.stats.speed)
+    Ok(mover.ok_or(ATTACKER_UNMOVING)?.stats.speed)
 }
 
 impl Attack {
@@ -82,7 +85,7 @@ impl Attack {
             return Err(ATTACK_WITHOUT_TARGET.with("state", self.state));
         }
         let to = WalkTo {
-            id: self.target.map(crate::combat::AttackTargetId::id),
+            id: self.target.map(AttackTargetId::id),
             at,
             gap,
             state: None,
@@ -165,7 +168,7 @@ impl Attack {
     /// A unit that does not move.
     pub(super) fn delete_move_to(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
         if self.state.take_move_to().is_some() {
-            mover.ok_or(crate::world::ATTACKER_UNMOVING)?.stop()?;
+            mover.ok_or(ATTACKER_UNMOVING)?.stop()?;
         }
         Ok(())
     }

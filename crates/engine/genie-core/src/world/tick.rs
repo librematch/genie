@@ -1,5 +1,7 @@
 //! An update's number.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// The updates the world ran (its `ticks`; the tick oracle's trace rows count them from 0): what
 /// a freeze, a stop or a report records as its update.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -28,8 +30,8 @@ impl Tick {
     }
 }
 
-impl std::fmt::Display for Tick {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Tick {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

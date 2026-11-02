@@ -5,6 +5,7 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A player's attribute number (`player+0x100`'s array, the `.dat`'s attribute types, an effect's
 /// attribute argument): 0 or more. The first four are the resources (food, wood, stone, gold).
@@ -111,8 +112,8 @@ impl AttributeId {
     }
 }
 
-impl std::fmt::Display for AttributeId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for AttributeId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

@@ -3,14 +3,20 @@
 
 use crate::GenieError;
 use crate::commands::Command;
+use crate::construction::build::CART_TASK;
+use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::player_master;
 use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::capture::Captured;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::tracker::key;
+use crate::trace::{UPDATE, object_freezes, player_unsupported};
 use crate::world::Millis;
+use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -33,7 +39,7 @@ impl World {
         self.dt = dt;
         self.streams.seed_all(self.frame_seed.get());
         for command in commands {
-            tracing::debug!(target: crate::trace::UPDATE, ?command, "command");
+            tracing::debug!(target: UPDATE, ?command, "command");
             let stopped: Vec<bool> = self
                 .players
                 .iter()
@@ -56,12 +62,12 @@ impl World {
     /// the world does not hold may be anywhere.
     ///
     /// [`Spatial::grow_unknown`]: crate::map::spatial::Spatial::grow_unknown
-    pub(crate) fn grow_unknown(&mut self, dt: crate::world::Seconds) {
+    pub(crate) fn grow_unknown(&mut self, dt: Seconds) {
         let masters = &self.masters;
         self.spatial.grow_unknown(dt, |player, master| {
-            crate::objects::masters::player_master(masters, player, master)
+            player_master(masters, player, master)
                 .and_then(|m| m.moving)
-                .map_or(crate::movement::Speed::new(f32::INFINITY), |m| m.base)
+                .map_or(Speed::new(f32::INFINITY), |m| m.base)
         });
     }
 
@@ -77,11 +83,7 @@ impl World {
             .iter()
             .map(|m| {
                 m.iter()
-                    .filter(|m| {
-                        m.tasks
-                            .iter()
-                            .any(|t| t.action_type == crate::construction::build::CART_TASK)
-                    })
+                    .filter(|m| m.tasks.iter().any(|t| t.action_type == CART_TASK))
                     .map(|m| m.id)
                     .collect()
             })
@@ -126,7 +128,7 @@ impl World {
             }
             let (id, master) = (unit.id, unit.life.master_id);
             let _object =
-                tracing::trace_span!(target: crate::trace::UPDATE, "object", id = id.get(), master = %master)
+                tracing::trace_span!(target: UPDATE, "object", id = id.get(), master = %master)
                     .entered();
             match self.step_object((p, i), (dt, turn, true), Unit::update) {
                 Ok(s) => {
@@ -163,7 +165,7 @@ impl World {
             Outcome::Leave => {
                 let gone = self.swap_remove_live(p, i)?;
                 if let Err(e) = self.leave_world(p, &gone) {
-                    crate::trace::player_unsupported(self.ticks, p, &e);
+                    player_unsupported(self.ticks, p, &e);
                     let _ = self
                         .players
                         .player_mut(p)?
@@ -179,11 +181,7 @@ impl World {
                 // for the next tick; the player's remove and add (slots 0x2d8, 0x2d0) file it last
                 // in the tracker
                 let asleep = self.swap_remove_live(p, i)?;
-                let k = crate::players::tracker::key(
-                    self.masters.of(p),
-                    &self.lines,
-                    asleep.unit.life.master_id,
-                );
+                let k = key(self.masters.of(p), &self.lines, asleep.unit.life.master_id);
                 let tracker = &mut self.players.player_mut(p)?.tracker;
                 tracker.remove(asleep.unit.id, k);
                 tracker.add(asleep.unit.id, k);
@@ -197,7 +195,7 @@ impl World {
                 let id = player.live(i)?.id;
                 let watched = player.watched.iter().any(|w| w.id == id);
                 if let Err(e) = self.building_changes_hands(p, id, new, watched) {
-                    crate::trace::player_unsupported(self.ticks, p, &e);
+                    player_unsupported(self.ticks, p, &e);
                     let _ = self
                         .players
                         .player_mut(p)?
@@ -249,7 +247,7 @@ impl World {
             }
         }
         if let Some(e) = failed {
-            crate::trace::player_unsupported(self.ticks, p, &e);
+            player_unsupported(self.ticks, p, &e);
             let _ = self
                 .players
                 .player_mut(p)?
@@ -260,9 +258,9 @@ impl World {
         // 0x2d0), each tracker by its own masters
         for u in &moved {
             let m = u.unit.life.master_id;
-            let old = crate::players::tracker::key(self.masters.of(p), &self.lines, m);
+            let old = key(self.masters.of(p), &self.lines, m);
             self.players.player_mut(p)?.tracker.remove(u.unit.id, old);
-            let k = crate::players::tracker::key(self.masters.of(new), &self.lines, m);
+            let k = key(self.masters.of(new), &self.lines, m);
             self.players.player_mut(new)?.tracker.add(u.unit.id, k);
         }
         self.extend_live(new, moved)
@@ -291,7 +289,7 @@ impl World {
             }
             None => e.with("object", id),
         };
-        crate::trace::object_freezes(self.ticks, p, id, &e);
+        object_freezes(self.ticks, p, id, &e);
         player.freezes.push((self.ticks, id, e.clone()));
         let first = (self.ticks, slot.unwrap_or(i), e);
         let _ = player.unsupported.get_or_insert(first);

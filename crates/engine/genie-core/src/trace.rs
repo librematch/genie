@@ -29,9 +29,14 @@
 
 use crate::GenieError;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
+use crate::unit_ai::{ActionKind, OrderKind, UnitAi};
+use crate::world::Tick;
+use std::panic::Location;
 
 /// The target of the update, player and object spans and the command events.
 pub const UPDATE: &str = "genie_core::update";
@@ -50,26 +55,21 @@ pub(crate) fn draw(stream: u8, draw: u32, value: u32) {
         stream,
         draw,
         value,
-        at = %std::panic::Location::caller()
+        at = %Location::caller()
     );
 }
 
 /// A new object of `master` for `player` took the world's next object id `object` in update
 /// `tick` ([`STATE`]); `at` is the line of the engine that made it.
 #[track_caller]
-pub(crate) fn new_object(
-    tick: crate::world::Tick,
-    player: PlayerId,
-    object: ObjectId,
-    master: MasterId,
-) {
+pub(crate) fn new_object(tick: Tick, player: PlayerId, object: ObjectId, master: MasterId) {
     tracing::debug!(
         target: STATE,
         tick = tick.get(),
         player = player.index(),
         object = object.get(),
         master = %master,
-        at = %std::panic::Location::caller(),
+        at = %Location::caller(),
         "new_object"
     );
 }
@@ -81,12 +81,7 @@ fn context_of(why: &GenieError) -> Option<String> {
 }
 
 /// An object's update meets a case the engine does not model: the object freezes.
-pub(crate) fn object_freezes(
-    tick: crate::world::Tick,
-    player: PlayerId,
-    object: ObjectId,
-    why: &GenieError,
-) {
+pub(crate) fn object_freezes(tick: Tick, player: PlayerId, object: ObjectId, why: &GenieError) {
     let (reason, at) = (why.reason(), why.location());
     if let Some(context) = context_of(why) {
         tracing::warn!(
@@ -113,7 +108,7 @@ pub(crate) fn object_freezes(
 }
 
 /// A command or a pass meets a case the engine does not model: the whole player stops.
-pub(crate) fn player_stops(tick: crate::world::Tick, player: PlayerId, why: &GenieError) {
+pub(crate) fn player_stops(tick: Tick, player: PlayerId, why: &GenieError) {
     let (reason, at) = (why.reason(), why.location());
     if let Some(context) = context_of(why) {
         tracing::warn!(
@@ -139,7 +134,7 @@ pub(crate) fn player_stops(tick: crate::world::Tick, player: PlayerId, why: &Gen
 
 /// A case the engine does not model after an object's update (its leave, a capture's transfer,
 /// a new object's unit AI): the player's first unmodelled case, without a freeze.
-pub(crate) fn player_unsupported(tick: crate::world::Tick, player: PlayerId, why: &GenieError) {
+pub(crate) fn player_unsupported(tick: Tick, player: PlayerId, why: &GenieError) {
     let (reason, at) = (why.reason(), why.location());
     if let Some(context) = context_of(why) {
         tracing::warn!(
@@ -167,7 +162,7 @@ pub(crate) fn player_unsupported(tick: crate::world::Tick, player: PlayerId, why
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Watch {
     /// The object's state (`+0x640`).
-    object_state: crate::objects::ObjectState,
+    object_state: ObjectState,
     /// Its top action's type and state.
     action: Option<(i16, u8)>,
     /// Its unit AI's order, action and target.
@@ -177,18 +172,14 @@ pub(crate) struct Watch {
 impl Watch {
     /// The watch of `u`, its action layer `actions` and its unit AI `ai`, taken only while a
     /// subscriber listens to the state events.
-    pub(crate) fn of(
-        u: &Unit,
-        actions: &crate::objects::layers::Action,
-        ai: Option<&crate::unit_ai::UnitAi>,
-    ) -> Option<Self> {
+    pub(crate) fn of(u: &Unit, actions: &Action, ai: Option<&UnitAi>) -> Option<Self> {
         tracing::enabled!(target: STATE, tracing::Level::DEBUG).then(|| Self {
             object_state: u.life.state,
             action: actions.top_action().map(|a| (a.kind.get(), a.state.get())),
             order: ai.map(|ai| {
                 [
-                    crate::unit_ai::OrderKind::field(ai.current_order),
-                    crate::unit_ai::ActionKind::field(ai.current_action),
+                    OrderKind::field(ai.current_order),
+                    ActionKind::field(ai.current_action),
                     ObjectId::field(ai.current_target),
                 ]
             }),
@@ -199,12 +190,8 @@ impl Watch {
     /// unit AI `ai`) in the update `tick` of `player`.
     pub(crate) fn report(
         self,
-        (u, actions, ai): (
-            &Unit,
-            &crate::objects::layers::Action,
-            Option<&crate::unit_ai::UnitAi>,
-        ),
-        tick: crate::world::Tick,
+        (u, actions, ai): (&Unit, &Action, Option<&UnitAi>),
+        tick: Tick,
         player: PlayerId,
     ) {
         let Some(now) = Self::of(u, actions, ai) else {
@@ -261,18 +248,30 @@ impl Watch {
 mod tests {
     use super::*;
     use crate::commands::{Command, UnmodelledCommand};
+    #[cfg(test)]
+    use crate::math::rng::{Stream, Streams, Well512};
     use crate::objects::HitPoints;
     use crate::objects::ListIndex;
     use crate::objects::lifecycle::{Class, Lifecycle, MasterData};
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::tests::stock_masters;
     use crate::world::{Player, World};
+    #[cfg(test)]
+    use std::fmt::Debug;
     use std::fmt::Write;
     use std::sync::{Arc, Mutex};
+    #[cfg(test)]
+    use tracing::callsite::rebuild_interest_cache;
     use tracing::field::{Field, Visit};
     use tracing::span::{Attributes, Id, Record};
+    #[cfg(test)]
+    use tracing::subscriber::with_default;
     use tracing::{Event, Metadata};
 
     /// A subscriber that writes down every span and event as `level target name field=value…`.
@@ -285,7 +284,7 @@ mod tests {
     struct Line(String);
 
     impl Visit for Line {
-        fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
             let _ = if field.name() == "message" {
                 write!(self.0, " {value:?}")
             } else {
@@ -337,8 +336,8 @@ mod tests {
     /// hold a stale "never".
     fn heard_with_draws(run: impl FnOnce()) -> Vec<String> {
         let recorder = Recorder::default();
-        tracing::subscriber::with_default(recorder.clone(), || {
-            tracing::callsite::rebuild_interest_cache();
+        with_default(recorder.clone(), || {
+            rebuild_interest_cache();
             run();
         });
         recorder.lines()
@@ -358,12 +357,12 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
         );
-        crate::world::tests::stock_masters(&mut t);
+        stock_masters(&mut t);
         t
     }
 
@@ -371,9 +370,9 @@ mod tests {
     /// asked for it, through every draw helper.
     #[test]
     fn draw_tells_its_stream_value_and_the_line_that_asked() {
-        let mut streams = crate::math::rng::Streams::default();
+        let mut streams = Streams::default();
         streams.seed_all(29910);
-        let ai = streams.get(crate::math::rng::Stream::Ai);
+        let ai = streams.get(Stream::Ai);
         let mut copy = ai.clone();
         let (lines, line) = (
             heard_with_draws(|| {
@@ -392,7 +391,7 @@ mod tests {
         );
         assert!(draws[0].starts_with(&head), "{} against {head}", draws[0]);
         // a generator outside the streams, and a helper of two steps
-        let mut lone = crate::math::rng::Well512::default();
+        let mut lone = Well512::default();
         lone.set_seed(1);
         let lines = heard_with_draws(|| {
             let _ = lone.raw64();
@@ -403,14 +402,7 @@ mod tests {
 
     #[test]
     fn without_subscriber_no_watch_is_taken() {
-        assert_eq!(
-            Watch::of(
-                &Unit::default(),
-                &crate::objects::layers::Action::default(),
-                None
-            ),
-            None
-        );
+        assert_eq!(Watch::of(&Unit::default(), &Action::default(), None), None);
     }
 
     #[test]

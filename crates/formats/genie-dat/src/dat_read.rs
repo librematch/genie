@@ -264,6 +264,8 @@ pub(super) fn skip_kill_rates(mut input: impl Read) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use std::io::Error;
 
     /// Version 5.7 with 32 terrains is for Age of Kings, with 100 for HD Edition, with any
     /// other count for The Conquerors; any other version too.
@@ -288,7 +290,7 @@ mod tests {
             Ok(next)
         });
         assert_eq!(read.unwrap(), [1, 2, 3]);
-        let failed = read_array(3, || Err::<u8, _>(std::io::Error::other("short")));
+        let failed = read_array(3, || Err::<u8, _>(Error::other("short")));
         assert!(failed.is_err());
     }
 

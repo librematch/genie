@@ -1,6 +1,8 @@
 //! A master's obstruction type as one type: the shape of the record its objects file in the
 //! obstruction manager, the value the `.dat` names `obstruction_type`.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's obstruction type (`+0x651`, the `.dat`'s `obstruction_type`; an obstruction
 /// record's byte `+1`): whether its objects get a record and a mesh shape, the shape the walk
 /// tests (a box or a circle) and whether the record marks its tiles. The `.dat` holds types the
@@ -86,8 +88,8 @@ impl From<u8> for ObstructionType {
     }
 }
 
-impl std::fmt::Display for ObstructionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ObstructionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

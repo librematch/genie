@@ -7,6 +7,7 @@ use crate::object_ids;
 use crate::{combat_master, master_facets};
 use genie_core::GenieError;
 use genie_core::map::Distance;
+use genie_core::map::RestrictionId;
 use genie_core::map::{Position, Radii};
 use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
@@ -18,12 +19,17 @@ use genie_core::movement::Speed;
 use genie_core::movement::SubstituteCount;
 use genie_core::movement::WaitDelays;
 use genie_core::movement::WaypointIndex;
+use genie_core::movement::{
+    Mover, PathData as MovementPathData, PathState, WaypointLevel, turn_rate,
+};
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteId;
+use genie_core::objects::layers::Animated;
 use genie_core::players::CivId;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
+use genie_save::generated::world::RgeMasterMovingObject;
 use genie_save::generated::world::{
     Master, Path, PathData, PlayerObjects, RgeMasterAnimatedObject, RgeStaticObject,
 };
@@ -77,9 +83,7 @@ pub(super) fn animated_master(m: &Master) -> Option<&RgeMasterAnimatedObject> {
 }
 
 /// The moving part of a saved master, when its class has one.
-pub(super) fn moving_master(
-    m: &Master,
-) -> Option<&genie_save::generated::world::RgeMasterMovingObject> {
+pub(super) fn moving_master(m: &Master) -> Option<&RgeMasterMovingObject> {
     let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
         m.tribe_master_building_object
             .as_deref()
@@ -114,10 +118,7 @@ pub(super) fn moving_master(
 }
 
 /// One saved level of path data, with its path's waypoints from the world's path table.
-pub(super) fn path_level(
-    d: &PathData,
-    paths: &[Path],
-) -> Result<genie_core::movement::PathData, GenieError> {
+pub(super) fn path_level(d: &PathData, paths: &[Path]) -> Result<MovementPathData, GenieError> {
     // a level without a path (id -1) holds none: a bird's top level
     let path = match d.path_id {
         -1 => None,
@@ -130,14 +131,14 @@ pub(super) fn path_level(
                 ))?,
         ),
     };
-    Ok(genie_core::movement::PathData {
-        level: genie_core::movement::WaypointLevel::of_byte(d.waypoint_level),
+    Ok(MovementPathData {
+        level: WaypointLevel::of_byte(d.waypoint_level),
         linked_type: LinkedPathType::of_data(d.linked_path_type),
         points: path.map_or_else(Vec::new, |p| p.waypoints.iter().map(vec3).collect()),
         has_path: path.is_some(),
         path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_bits)),
         waypoint: WaypointIndex::of_data(d.waypoint),
-        state: genie_core::movement::PathState::of_int(d.state)?,
+        state: PathState::of_int(d.state)?,
         range: Distance::new(d.range),
         target: ObjectId::of_field(d.target_id),
         pause_time: Seconds::new(f32::from_bits(d.pause_time)),
@@ -177,7 +178,7 @@ pub(super) fn mover(
     paths: &[Path],
     civ: CivId,
     masters: Option<&MasterTable>,
-) -> Result<Option<genie_core::movement::Mover>, GenieError> {
+) -> Result<Option<Mover>, GenieError> {
     use genie_core::movement::{MoveStats, Mover, Velocity};
     let Some(m) = object.moving_part() else {
         return Ok(None);
@@ -266,9 +267,7 @@ pub(super) fn mover(
     let ignore_units = object_ids(&s.temp_int)?;
     loaded_ignored(&mut levels, &ignore_units);
     Ok(Some(Mover {
-        animated: genie_core::objects::layers::Animated::new(Speed::new(
-            m.rge_animated_object.current_speed,
-        )),
+        animated: Animated::new(Speed::new(m.rge_animated_object.current_speed)),
         forward: vec3(&m.orientation_forward_value),
         right: vec3(&m.orientation_right_value),
         velocity,
@@ -280,13 +279,13 @@ pub(super) fn mover(
                 .unwrap_or_default(),
             speed,
             base: Speed::new(base),
-            turn_rate: genie_core::movement::turn_rate(Seconds::new(turn_speed), facets),
+            turn_rate: turn_rate(Seconds::new(turn_speed), facets),
             turn_radius: Distance::ZERO,
             turn_radius_speed: Speed::MAX,
             radius,
-            restriction: genie_core::map::RestrictionId::of_field(restriction)?
+            restriction: RestrictionId::of_field(restriction)?
                 .ok_or(GenieError::unsupported("a negative terrain restriction"))?,
-            restriction_mask: genie_core::map::RestrictionId::of_data(restriction)
+            restriction_mask: RestrictionId::of_data(restriction)
                 .and_then(|r| table.terrain.masks().get(r.index()))
                 .copied()
                 .ok_or(GenieError::unsupported(
@@ -330,7 +329,7 @@ pub(super) fn mover(
 /// A loaded unit's paths' ignore units (`+0x450`), which the save does not hold: a level below
 /// the top whose path was made in the top path's tick took the unit's own (`+0x670`,
 /// `FUN_140f9b7a0` after the short pather).
-pub(super) fn loaded_ignored(levels: &mut [genie_core::movement::PathData], units: &[ObjectId]) {
+pub(super) fn loaded_ignored(levels: &mut [MovementPathData], units: &[ObjectId]) {
     let Some((top, below)) = levels.split_last_mut() else {
         return;
     };

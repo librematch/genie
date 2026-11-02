@@ -3,10 +3,14 @@
 
 use crate::GenieError;
 use crate::construction::building_update::blasts_at_death;
+use crate::math::rng::Well512;
 use crate::objects::ListIndex;
 use crate::objects::layers::Action;
 use crate::objects::unit::{Outcome, Unit};
 use crate::players::PlayerId;
+use crate::players::PlayerType;
+use crate::trace::Watch;
+use crate::unit_ai::{Surroundings, UnitAi, UnitSide};
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::step::Step;
@@ -30,7 +34,7 @@ impl World {
     ) -> Result<Outcome, GenieError> {
         let mut unit = self.take_out(p, i)?;
         let mut actions = self.parts.take_actions(unit.id);
-        let watch = crate::trace::Watch::of(&unit, &actions, self.parts.unit_ai.get(unit.id));
+        let watch = Watch::of(&unit, &actions, self.parts.unit_ai.get(unit.id));
         // the objects a hit's blast may reach about its target (one a hit can read), or about
         // the unit for its blast at death (TRIBE_Combat_Object::update)
         let target = match actions.attack_target() {
@@ -112,11 +116,7 @@ impl World {
     pub(crate) fn run_ai_calls<R>(
         &mut self,
         (p, i): (PlayerId, ListIndex),
-        f: impl FnOnce(
-            &mut crate::unit_ai::UnitAi,
-            &mut dyn crate::unit_ai::UnitSide,
-            &mut crate::math::rng::Well512,
-        ) -> Result<R, GenieError>,
+        f: impl FnOnce(&mut UnitAi, &mut dyn UnitSide, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let mut answer = None;
         let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
@@ -140,11 +140,11 @@ impl World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         f: impl FnOnce(
-            &mut crate::unit_ai::UnitAi,
-            &crate::unit_ai::Surroundings,
-            &mut dyn crate::unit_ai::UnitSide,
-            crate::players::PlayerType,
-            &mut crate::math::rng::Well512,
+            &mut UnitAi,
+            &Surroundings,
+            &mut dyn UnitSide,
+            PlayerType,
+            &mut Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {
         let stepped =

@@ -1,3 +1,5 @@
+use crate::element::ReadableHeaderElement;
+use crate::test_support::header_reader;
 use crate::test_support::{floats, read_all, words};
 use crate::unit::unit_ai::{
     UnitAi, UnitAiNotification, UnitAiOrder, UnitAiOrderHistory, UnitAiRetargetEntry,
@@ -175,6 +177,6 @@ fn unit_ai_of_11_05_stops_after_its_retarget_entries() {
 #[test]
 fn short_unit_ai_is_an_error() {
     let bytes = unit_ai_bytes();
-    let mut reader = crate::test_support::header_reader(&bytes[..bytes.len() - 1], 10.0);
-    assert!(<UnitAi as crate::element::ReadableHeaderElement>::read_from(&mut reader).is_err());
+    let mut reader = header_reader(&bytes[..bytes.len() - 1], 10.0);
+    assert!(<UnitAi as ReadableHeaderElement>::read_from(&mut reader).is_err());
 }

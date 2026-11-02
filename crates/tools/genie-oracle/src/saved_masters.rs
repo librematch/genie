@@ -2,6 +2,7 @@
 //! tasks, the work command's masters, the movement and the placement.
 
 use crate::masters::MasterTable;
+use crate::masters::attributes;
 use crate::masters::dat_id;
 use crate::{animated_master, combat_master, moving_master};
 use genie_core::GenieError;
@@ -11,18 +12,23 @@ use genie_core::combat::MissileCount;
 use genie_core::combat::missile::MissSpread;
 use genie_core::combat::missile::SmartMode;
 use genie_core::combat::missile::VanishMode;
+use genie_core::combat::missile::{ArcRatio, HitMode, MissileStats};
 use genie_core::map::Distance;
 use genie_core::map::Footprint;
 use genie_core::map::Offset;
 use genie_core::map::Radii;
+use genie_core::map::RestrictionId;
 use genie_core::map::TerrainId;
 use genie_core::movement::Speed;
+use genie_core::movement::{MoveStats, turn_rate};
 use genie_core::objects::Frame;
 use genie_core::objects::HitPoints;
 use genie_core::objects::MasterHitPoints;
 use genie_core::objects::SpeedMultiplier;
+use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
+use genie_core::objects::facing::SpriteFacets;
 use genie_core::objects::masters::CarryCapacity;
 use genie_core::objects::masters::ChargeTarget;
 use genie_core::objects::masters::ChargeType;
@@ -49,15 +55,23 @@ use genie_core::objects::masters::WorkValue;
 use genie_core::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
+use genie_core::objects::masters::{
+    AttackPriority, BuildableOn, DamageAmount, DamageGraphic, DamageSpriteMode, HpPercent, Masters,
+    Task, TaskId, TrainLocation,
+};
 use genie_core::objects::masters::{BlastDefense, BlastLevel};
 use genie_core::objects::masters::{COST_SLOTS, CostSlot};
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
+use genie_core::production::HotkeyId;
 use genie_core::production::LocationButton;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
+use genie_save::generated::world::{
+    RgeMasterActionObject, RgeMasterStaticObject, Task as WorldTask,
+};
 
 /// The facets every sprite a live object of a saved master shows ([`genie_core::objects::facing::SpriteFacets`]):
 /// its standing, second standing, walking, running and attack sprites and its tasks' four, those
@@ -65,9 +79,9 @@ use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 /// it has none. The dying sprite shows once the object is dead, where nothing turns it.
 pub(super) fn master_facets(
     m: &Master,
-    s: &genie_save::generated::world::RgeMasterStaticObject,
+    s: &RgeMasterStaticObject,
     table: &MasterTable,
-) -> Option<genie_core::objects::facing::SpriteFacets> {
+) -> Option<SpriteFacets> {
     let mut sprites = vec![s.idle_sprite_id, s.idle2_sprite_id];
     if let Some(mv) = moving_master(m) {
         sprites.extend([mv.move_sprite_id, mv.run_sprite_id]);
@@ -85,9 +99,9 @@ pub(super) fn master_facets(
         .into_iter()
         .filter_map(SpriteId::of_data)
         .filter_map(|id| table.graphics.get(id))
-        .map(|g| genie_core::objects::facing::SpriteFacets {
+        .map(|g| SpriteFacets {
             count: g.facets,
-            turns: g.flags.contains(genie_core::objects::SpriteFlags::TURNS),
+            turns: g.flags.contains(SpriteFlags::TURNS),
         });
     let first = seen.next()?;
     seen.all(|f| f == first).then_some(first)
@@ -95,9 +109,7 @@ pub(super) fn master_facets(
 
 /// A master's action part, whatever class it is: what holds its work rate, search radius and
 /// task list.
-pub(super) fn action_part(
-    m: &Master,
-) -> Option<&genie_save::generated::world::RgeMasterActionObject> {
+pub(super) fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
     None.or_else(|| {
         m.tribe_master_combat_object
             .as_deref()
@@ -130,7 +142,7 @@ pub(super) fn task_at(
     masters: Option<&MasterTable>,
     master: i16,
     index: i16,
-) -> Result<genie_core::objects::masters::Task, GenieError> {
+) -> Result<Task, GenieError> {
     let i = usize::try_from(index)
         .map_err(|_| GenieError::unsupported("a saved action without its task"))?;
     let saved = objects
@@ -157,24 +169,22 @@ pub(super) fn task_at(
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-pub(super) fn core_task(
-    t: &genie_save::generated::world::Task,
-) -> Result<genie_core::objects::masters::Task, GenieError> {
+pub(super) fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
     let [
         attribute_type,
         attribute_type2,
         attribute_type3,
         attribute_type4,
         enablement,
-    ] = crate::masters::attributes([
+    ] = attributes([
         t.attribute_type,
         t.attribute_type2,
         t.attribute_type3,
         t.attribute_type4,
         t.enablement_resource_id,
     ])?;
-    Ok(genie_core::objects::masters::Task {
-        id: genie_core::objects::masters::TaskId::of_task(t.id),
+    Ok(Task {
+        id: TaskId::of_task(t.id),
         action_type: ActionType::try_from(t.action_type)?,
         object_group: ClassId::of_field(t.object_group)?,
         object_id: MasterId::of_data(t.object_id),
@@ -208,7 +218,7 @@ pub(super) fn work_masters(
     objects: &PlayerObjects,
     civ: CivId,
     table: &MasterTable,
-) -> Result<genie_core::objects::masters::Masters, GenieError> {
+) -> Result<Masters, GenieError> {
     let task = core_task;
     let saved = objects.masters.iter().flatten().map(|m| &m.master);
     let masters = saved.filter_map(|m| {
@@ -221,7 +231,7 @@ pub(super) fn work_masters(
         work.tall = 0.0 < s.radius_z;
         work.height = Distance::new(s.radius_z);
         work.obstruction_type = ObstructionType::from(s.obstruction_type);
-        work.buildable_on = genie_core::objects::masters::BuildableOn::of_data(s.can_be_built_on);
+        work.buildable_on = BuildableOn::of_data(s.can_be_built_on);
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
         work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
         work.hit_points = MasterHitPoints::of_data(s.read_temp_6);
@@ -265,8 +275,7 @@ pub(super) fn work_masters(
             work.volley_missile = id(c.volley_missile_id);
             work.charge_projectile = id(c.charge_projectile_unit);
             work.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
-            work.attack_priority =
-                genie_core::objects::masters::AttackPriority::of_byte(c.attack_priority);
+            work.attack_priority = AttackPriority::of_byte(c.attack_priority);
             work.special_attack = SpecialAttack::of_data(c.special_attack_flag);
             work.max_charge = Charge::new(c.max_charge);
             work.charge_target = ChargeTarget::of_data(c.charge_target);
@@ -295,7 +304,7 @@ pub(super) fn work_masters(
                 .iter()
                 .map(|&w| ClassAmount::new((w & 0xffff) as i16, (w >> 16) as i16))
                 .collect();
-            work.base_armor = genie_core::objects::masters::DamageAmount::new(rc.base_armor);
+            work.base_armor = DamageAmount::new(rc.base_armor);
             work.armors = rc
                 .armor
                 .iter()
@@ -347,14 +356,14 @@ pub(super) fn work_masters(
             .as_deref()
             .and_then(|r| r.rge_master_missile_object.as_deref())
         {
-            work.missile_stats = Some(genie_core::combat::missile::MissileStats {
+            work.missile_stats = Some(MissileStats {
                 projectile_type: MasterId::of_data(s.copy_id())
                     .and_then(|m| table.projectile_type(civ, m))
                     .unwrap_or_default(),
                 smart_mode: SmartMode::from_bits_retain(mm.targetting_type),
-                hit_mode: genie_core::combat::missile::HitMode::of_data(mm.missile_hit_info),
+                hit_mode: HitMode::of_data(mm.missile_hit_info),
                 vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
-                arc: genie_core::combat::missile::ArcRatio::new(mm.ballistics_ratio),
+                arc: ArcRatio::new(mm.ballistics_ratio),
                 speed: animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed)),
                 radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
                 fly_mode: MasterId::of_data(s.copy_id())
@@ -370,25 +379,21 @@ pub(super) fn work_masters(
         work.damage_graphics = s
             .damage_sprite
             .iter()
-            .map(|d| genie_core::objects::masters::DamageGraphic {
+            .map(|d| DamageGraphic {
                 sprite: SpriteId::of_data(d.temp_id),
-                percent: genie_core::objects::masters::HpPercent::of_data(
-                    d.sprite_info_damage_percent,
-                ),
-                apply_mode: genie_core::objects::masters::DamageSpriteMode::of_data(
-                    d.sprite_info_flag,
-                ),
+                percent: HpPercent::of_data(d.sprite_info_damage_percent),
+                apply_mode: DamageSpriteMode::of_data(d.sprite_info_flag),
             })
             .collect();
         // a master without a combat part has no train locations, whatever its copy's are
         work.train_locations = combat.map_or_else(Vec::new, |c| {
             c.train_location
                 .iter()
-                .map(|t| genie_core::objects::masters::TrainLocation {
+                .map(|t| TrainLocation {
                     location: MasterId::of_data(t.train_location_id),
                     time: WholeSeconds::of_data(t.train_time),
                     button: LocationButton::of_data(t.button_location_id),
-                    hotkey: genie_core::production::HotkeyId::of_data(t.hotkey_id),
+                    hotkey: HotkeyId::of_data(t.hotkey_id),
                 })
                 .collect()
         });
@@ -414,13 +419,12 @@ pub(super) fn work_masters(
             MasterId::of_data(s.death_spawn_obj_id),
             MasterId::of_data(s.death_spawn_obj_id2),
         ];
-        work.terrain_restriction =
-            genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id);
+        work.terrain_restriction = RestrictionId::of_data(s.terrain_restriction_mask_id);
         work.life = MasterId::of_data(s.copy_id()).and_then(|m| table.get(civ, m));
         work.moving = moving_stats(m, s, civ, table);
         Some(Ok(work))
     });
-    Ok(genie_core::objects::masters::Masters::new(
+    Ok(Masters::new(
         masters.collect::<Result<Vec<_>, GenieError>>()?,
     ))
 }
@@ -431,10 +435,10 @@ pub(super) fn work_masters(
 /// the terrain restriction with its mask.
 pub(super) fn moving_stats(
     m: &Master,
-    s: &genie_save::generated::world::RgeMasterStaticObject,
+    s: &RgeMasterStaticObject,
     civ: CivId,
     table: &MasterTable,
-) -> Option<genie_core::movement::MoveStats> {
+) -> Option<MoveStats> {
     let moving = moving_master(m)?;
     let sprite = SpriteId::of_data(moving.run_sprite_id)
         .or_else(|| SpriteId::of_data(moving.move_sprite_id));
@@ -443,17 +447,17 @@ pub(super) fn moving_stats(
         .and_then(|sprite| table.sprite_speed(sprite))
         .unwrap_or(SpeedMultiplier::ZERO);
     let turning = table.turning(civ, MasterId::of_data(s.copy_id())?)?;
-    let restriction = genie_core::map::RestrictionId::of_data(s.terrain_restriction_mask_id)?;
+    let restriction = RestrictionId::of_data(s.terrain_restriction_mask_id)?;
     let facets = SpriteId::of_data(moving.move_sprite_id)
         .and_then(|w| table.graphics.get(w))
         .map(|g| g.facets);
-    Some(genie_core::movement::MoveStats {
+    Some(MoveStats {
         fly_mode: MasterId::of_data(s.copy_id())
             .and_then(|m| table.fly_mode(civ, m))
             .unwrap_or_default(),
         speed: factor.applied_to(Speed::new(base)),
         base: Speed::new(base),
-        turn_rate: genie_core::movement::turn_rate(Seconds::new(moving.turn_speed), facets),
+        turn_rate: turn_rate(Seconds::new(moving.turn_speed), facets),
         turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
         radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
@@ -524,7 +528,7 @@ pub(super) struct Placement {
     pub(super) class: ClassId,
     pub(super) obstruction_type: ObstructionType,
     pub(super) obstruction_class: ObstructionClass,
-    pub(super) buildable_on: genie_core::objects::masters::BuildableOn,
+    pub(super) buildable_on: BuildableOn,
     pub(super) los: Distance,
 }
 
@@ -537,7 +541,7 @@ pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<
             class: ClassId::of_master(own.read_temp_2),
             obstruction_type: ObstructionType::from(own.obstruction_type),
             obstruction_class: ObstructionClass::from(own.obstruction_class),
-            buildable_on: genie_core::objects::masters::BuildableOn::of_data(own.can_be_built_on),
+            buildable_on: BuildableOn::of_data(own.can_be_built_on),
             los: Distance::new(own.los),
         });
     }
@@ -547,7 +551,7 @@ pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<
         class: ClassId::of_master(m.read_temp_5),
         obstruction_type: ObstructionType::from(m.obstruction_type),
         obstruction_class: ObstructionClass::from(m.obstruction_class),
-        buildable_on: genie_core::objects::masters::BuildableOn::of_data(m.can_be_built_on),
+        buildable_on: BuildableOn::of_data(m.can_be_built_on),
         los: Distance::new(m.los),
     })
 }

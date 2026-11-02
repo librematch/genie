@@ -1,6 +1,7 @@
 //! A civilisation's number.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A civilisation (`player+0x738`, the save's `civ_id`; the data's civ lists): its number, 0
 /// Gaia's, the place of its row in the civilisations' tables.
@@ -45,8 +46,8 @@ impl CivId {
     }
 }
 
-impl std::fmt::Display for CivId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for CivId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.0)
     }
 }

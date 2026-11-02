@@ -1,4 +1,5 @@
 use super::*;
+use crate::gathering::hunt::tests::walker;
 use crate::groups::GroupFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
@@ -15,6 +16,7 @@ use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
 use crate::math::fmath::BVector;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::{Mover, Velocity, Walker};
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
@@ -23,6 +25,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::ObstructionClass;
@@ -33,6 +36,7 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::test_ids::group_id;
@@ -40,6 +44,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::UnitAi;
+use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
@@ -55,8 +60,8 @@ const RUNNING: f32 = 0.8 * 1.875;
 const fn graphic(id: i16, factor: f32) -> Graphic {
     Graphic {
         id: SpriteId::named(id),
-        frames: crate::objects::Frame::of_data(1),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::of_data(factor),
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
@@ -70,11 +75,11 @@ const DT: f32 = 0.069;
 /// A unit of master 4 at (`x`, `y`), where it last moved to, with the hunt tests' walker (top
 /// speed 0.8, radius 0.2, turn rate the largest); its unit AI [`free_ai`].
 fn member(id: i32, x: f32, y: f32) -> Object {
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     mover.moved_at = Position::new(x, y, 0.0);
     let mut u = Unit {
         id: object_id(id),
-        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+        place: Static::at(Position::new(x, y, 0.0)),
         ..Unit::default()
     };
     u.life.master_id = master_id(4);
@@ -120,7 +125,7 @@ fn world() -> World {
     ];
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         players,
@@ -210,7 +215,7 @@ fn unit(t: &World, id: i32) -> &Unit {
     t.object(object_id(id)).unwrap().1
 }
 
-fn mover(t: &World, id: i32) -> &crate::movement::Mover {
+fn mover(t: &World, id: i32) -> &Mover {
     t.parts.mover_of(object_id(id)).unwrap()
 }
 
@@ -635,7 +640,7 @@ fn the_members_moves_end_wait_or_stop() {
     stray.parts.unit_ai = Some(free_ai());
     let _ = t.push_live(PlayerId::new(1), stray).unwrap();
     t.parts.set_anim_speed(object_id(12), Speed::new(1.0));
-    t.parts.mover_mut(object_id(12)).unwrap().velocity = Some(crate::movement::Velocity {
+    t.parts.mover_mut(object_id(12)).unwrap().velocity = Some(Velocity {
         velocity: BVector::new(0.0, 0.0, 0.5),
         acceleration: BVector::ZERO,
     });
@@ -708,7 +713,7 @@ fn the_members_moves_end_wait_or_stop() {
 fn rounder(at: BVector) -> detour::Rounder<'static> {
     detour::Rounder {
         id: object_id(10),
-        walker: crate::movement::Walker {
+        walker: Walker {
             id: object_id(10),
             radius: Distance::new(0.1),
             restriction: RestrictionId::named(0),

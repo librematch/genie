@@ -1,9 +1,14 @@
 //! The repair part of the update and the unit's attackers and seen target.
 
 use crate::GenieError;
+use crate::combat::Firepower;
 use crate::construction::MainBuildingId;
+use crate::construction::RepairTargetId;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::payment::PaidAttributes;
+use crate::construction::repair::{
+    BUILDING_REPAIR_COST, Payer, Repaired, UNIT_REPAIR_COST, repair_building, repair_unit,
+};
 use crate::construction::repair::{CountedIn, RepairReads, Repairee};
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -14,6 +19,8 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::RoleId;
+use crate::objects::layers::Action;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::Master;
@@ -22,6 +29,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
+use crate::objects::masters::{AttackPriority, MasterTables};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
@@ -32,7 +40,10 @@ use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::task_finder::allied;
+use crate::unit_ai::{Attacker, TopTarget};
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -43,7 +54,7 @@ impl Unit {
     /// and put back after it; its code (the end's 1). Nothing without a Repair.
     pub(crate) fn repair_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -67,17 +78,17 @@ impl Unit {
     pub(crate) fn repair_reads(
         &self,
         c: &Step<'_>,
-        target: Option<crate::construction::RepairTargetId>,
+        target: Option<RepairTargetId>,
     ) -> Result<RepairReads, GenieError> {
         let own = repair_master(
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             self,
         )?;
         let (repairee, counted_in) = repairee_of(
             c,
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-            target.map(crate::construction::RepairTargetId::id),
+            target.map(RepairTargetId::id),
         )?;
         Ok(RepairReads {
             target: repairee,
@@ -104,14 +115,14 @@ impl Unit {
     /// (its mover's, 0 for an object that does not move).
     pub(crate) fn attacker_of(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         ai_type: UnitAiType,
         master: Option<&Master>,
         (player, player_type): (PlayerId, PlayerType),
         scenario: bool,
-        (capture, firepower, speed): (CaptureKind, crate::combat::Firepower, Speed),
-    ) -> crate::unit_ai::Attacker {
-        crate::unit_ai::Attacker {
+        (capture, firepower, speed): (CaptureKind, Firepower, Speed),
+    ) -> Attacker {
+        Attacker {
             ai_type,
             player,
             player_type,
@@ -121,10 +132,7 @@ impl Unit {
             master: self.life.master_id,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
             class: master.map(|m| m.class),
-            attack_priority: master
-                .map_or(crate::objects::masters::AttackPriority::PRIORITY_0, |m| {
-                    m.attack_priority
-                }),
+            attack_priority: master.map_or(AttackPriority::PRIORITY_0, |m| m.attack_priority),
             missile: master.and_then(|m| m.missile.master()),
             range: master.map_or(Distance::ZERO, |m| m.weapon_range),
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
@@ -173,11 +181,7 @@ impl Unit {
 }
 
 /// Object `u`'s master: its own (`+0x6c0`), else player `q`'s of its id.
-fn repair_master(
-    every: crate::objects::masters::MasterTables<'_>,
-    q: PlayerId,
-    u: &Unit,
-) -> Result<Master, GenieError> {
+fn repair_master(every: MasterTables<'_>, q: PlayerId, u: &Unit) -> Result<Master, GenieError> {
     Ok(u.master(every, q)?.clone())
 }
 
@@ -193,21 +197,12 @@ fn repairee_of(
     let Some((target, (q, t))) = target.and_then(|id| Some((id, held(id)?))) else {
         return Ok((None, None));
     };
-    let tm = repair_master(
-        crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
-        q,
-        t,
-    )?;
+    let tm = repair_master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), q, t)?;
     let repairee = Repairee {
         state: t.life.state,
         hp: t.life.hp,
         owner: q,
-        allied: crate::unit_ai::task_finder::allied(
-            &c.w.players.player(c.player)?.relations,
-            c.player,
-            q,
-            true,
-        ),
+        allied: allied(&c.w.players.player(c.player)?.relations, c.player, q, true),
         position: t.position(),
         radius: tm.radius,
         class: tm.class,
@@ -240,20 +235,16 @@ fn repairee_of(
 /// lacks, and an attribute the player has not got.
 pub(crate) fn repair_target(
     c: &mut Step<'_>,
-    target: Option<crate::construction::RepairTargetId>,
+    target: Option<RepairTargetId>,
     amount: HitPoints,
 ) -> Result<(RepairOutcome, MasterKind), GenieError> {
     let player = c.player;
     let mut set = Vec::new();
     let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
-    if let Some(target) = target.map(crate::objects::RoleId::id)
+    if let Some(target) = target.map(RoleId::id)
         && let Some((q, t)) = others.find(target)
     {
-        let tm = repair_master(
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
-            q,
-            t,
-        )?;
+        let tm = repair_master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), q, t)?;
         for id in reached_ids(c.w.objects(), target, tm.kind == BUILDING) {
             let Some(o) = others.find(id) else {
                 continue;
@@ -275,17 +266,13 @@ pub(crate) fn repair_target(
     // what the owner holds now: the update may have paid or gained before the repair
     let owner = c.w.players.player(player)?;
     let mut paid = PaidAttributes::new(&owner.attributes);
-    let mut payer = crate::construction::repair::Payer {
+    let mut payer = Payer {
         masters,
         attributes: &mut paid,
     };
     let answer = match kind {
-        BUILDING => {
-            crate::construction::repair::repair_building(&mut set, 0, amount, true, &mut payer)
-        }
-        master_type::COMBAT => {
-            crate::construction::repair::repair_unit(&mut set, 0, amount, &mut payer)
-        }
+        BUILDING => repair_building(&mut set, 0, amount, true, &mut payer),
+        master_type::COMBAT => repair_unit(&mut set, 0, amount, &mut payer),
         // the task finder repairs buildings and combat units of its classes alone
         _ => Err(GenieError::unreachable(
             "a repaired object of a type below 70 (slot 0x110)",
@@ -298,11 +285,7 @@ pub(crate) fn repair_target(
 
 /// The objects a repair of `target` reaches, in order: the target; for a building, an annex's
 /// main building, then the main building's annexes by id, the target left out.
-fn reached_ids(
-    by_id: crate::world::index::ObjectsRef<'_>,
-    target: ObjectId,
-    building: bool,
-) -> Vec<ObjectId> {
+fn reached_ids(by_id: ObjectsRef<'_>, target: ObjectId, building: bool) -> Vec<ObjectId> {
     let mut ids = vec![target];
     if building {
         // the annex's main building, else the target is its own
@@ -332,9 +315,9 @@ fn repaired(
     others: OthersRef<'_>,
     (oq, o): (PlayerId, &Unit),
     id: ObjectId,
-) -> Result<crate::construction::repair::Repaired, GenieError> {
+) -> Result<Repaired, GenieError> {
     let om = repair_master(
-        crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        MasterTables::new(&c.w.masters, &c.w.parts.own_master),
         oq,
         o,
     )?;
@@ -354,7 +337,7 @@ fn repaired(
     } else {
         Vec::new()
     };
-    Ok(crate::construction::repair::Repaired {
+    Ok(Repaired {
         id,
         kind: om.kind,
         class: om.class,
@@ -368,8 +351,8 @@ fn repaired(
             None
         },
         annexes,
-        unit_repair_cost: rate(crate::construction::repair::UNIT_REPAIR_COST),
-        building_repair_cost: rate(crate::construction::repair::BUILDING_REPAIR_COST),
+        unit_repair_cost: rate(UNIT_REPAIR_COST),
+        building_repair_cost: rate(BUILDING_REPAIR_COST),
     })
 }
 
@@ -381,8 +364,8 @@ fn repaired(
 /// None (an unreachable error where a table lost the part it took).
 fn repair_write_back(
     w: &mut World,
-    set: &[crate::construction::repair::Repaired],
-    original: &[crate::construction::repair::Repaired],
+    set: &[Repaired],
+    original: &[Repaired],
 ) -> Result<(), GenieError> {
     for (now, was) in set.iter().zip(original) {
         if now == was {
@@ -396,7 +379,7 @@ fn repair_write_back(
     Ok(())
 }
 
-impl crate::objects::layers::Action {
+impl Action {
     /// Slot 400 (`FUN_14106d090`) as the unit AI reads it: its top action's target as the world
     /// holds it (its owner's other objects as they stand, the other players' lists), with its
     /// type, place and its master's radii; None without one.
@@ -404,7 +387,7 @@ impl crate::objects::layers::Action {
         &self,
         c: &Step<'_>,
         others: OthersRef<'_>,
-    ) -> Result<Option<crate::unit_ai::TopTarget>, GenieError> {
+    ) -> Result<Option<TopTarget>, GenieError> {
         let Some(id) = self.top_target() else {
             return Ok(None);
         };
@@ -412,7 +395,7 @@ impl crate::objects::layers::Action {
             return Ok(None);
         };
         let m = u.master(c.w.master_tables(), owner)?;
-        Ok(Some(crate::unit_ai::TopTarget {
+        Ok(Some(TopTarget {
             id,
             kind: m.kind,
             position: u.position(),

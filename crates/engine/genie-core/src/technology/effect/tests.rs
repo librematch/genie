@@ -1,13 +1,23 @@
 use super::*;
 use crate::combat::Charge;
+use crate::combat::Firepower;
+use crate::combat::attack::Arms;
 use crate::construction::MainBuildingId;
+use crate::construction::build::Construction;
+use crate::construction::{Annexes, BuilderCount};
 use crate::garrison::ContainerId;
+use crate::gathering::hunt::tests::walker as tests_walker;
+use crate::gathering::make::MakeAction;
 use crate::gathering::make::MakeState;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
+use crate::map::Snow;
+use crate::map::spatial::{Obstruction, Placed, Spatial};
+use crate::math::rng::Well512;
 use crate::movement::Speed;
+use crate::movement::explore::{ExploreAction, bare_walk};
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
@@ -17,6 +27,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::layers::Building;
+use crate::objects::layers::{Action, Combat, Motion, Static};
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
@@ -28,8 +39,11 @@ use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
+use crate::objects::masters::{BuildingMaster, Task};
 use crate::objects::masters::{CostSlot, Master, Masters};
+use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::CivId;
@@ -37,27 +51,35 @@ use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
+use crate::players::{ByPlayer, relation_row};
 use crate::production::LocationButton;
+use crate::production::{MakeTech, MakeTechState, Making, Production};
 use crate::technology::CostPaid;
 use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::TechMode;
+use crate::technology::{ResearchCap, TechType};
 use crate::test_ids::costs;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
+use crate::test_ids::{amounts, opt_master};
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
+use crate::vision::VisionMasks;
+use crate::vision::visibility::{Seer, Visibility, VisibleMap};
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
+use crate::world::{FrameSeed, GameMode};
 
 /// A combat unit's charge after its master's maximum charge changes (`FUN_1412163c0`'s
 /// `;`): a set and an add keep the charge's share of the maximum, without a maximum a set
@@ -90,20 +112,18 @@ fn charge_keeps_its_share_of_changed_maximum() {
 /// building's Make) or it is a missile; an empty queue or none at all is no action.
 #[test]
 fn an_object_has_actions_while_it_holds_one() {
-    let a = crate::objects::layers::Action::default();
+    let a = Action::default();
     assert!(!has_actions(&a, None, false));
     assert!(has_actions(&a, None, true));
-    let mut production = crate::production::Production::default();
+    let mut production = Production::default();
     assert!(!has_actions(&a, Some(&production), false));
-    production.action = Some(crate::production::Making::Research(
-        crate::production::MakeTech {
-            state: crate::production::MakeTechState::Researching,
-            paid: false,
-            tech: tech_id(22),
-            master: -1,
-            progress: Seconds::ZERO,
-        },
-    ));
+    production.action = Some(Making::Research(MakeTech {
+        state: MakeTechState::Researching,
+        paid: false,
+        tech: tech_id(22),
+        master: -1,
+        progress: Seconds::ZERO,
+    }));
     assert!(has_actions(&a, Some(&production), false));
 }
 
@@ -113,24 +133,24 @@ fn an_object_has_actions_while_it_holds_one() {
 /// master's idle attack and second attack sprites replace its own.
 #[test]
 fn an_attack_takes_its_master_sprites_but_its_task_s() {
-    let g = |id| crate::objects::sprite::Graphic {
+    let g = |id| Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(1),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(1),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
     };
-    let arms = crate::combat::attack::Arms {
+    let arms = Arms {
         move_sprite: Some(g(SpriteId::named(1))),
         sprite: Some(g(SpriteId::named(2))),
         second_sprite: Some(g(SpriteId::named(3))),
         idle_sprite: Some(g(SpriteId::named(4))),
         idle_attack_sprite: None,
         missile: None,
-        fire_frame: crate::objects::Frame::of_data(0),
-        interrupt_frame: crate::objects::Frame::of_data(-1),
+        fire_frame: Frame::of_data(0),
+        interrupt_frame: Frame::of_data(-1),
     };
     let sprites = MasterSprites {
         moving: Some(g(SpriteId::named(11))),
@@ -170,7 +190,7 @@ fn an_attack_takes_its_master_sprites_but_its_task_s() {
         ]
     );
     // a sprite it lacks stays lacking; a combat master's last two replace its own
-    let mut a = crate::combat::attack::Arms {
+    let mut a = Arms {
         move_sprite: None,
         ..arms
     };
@@ -200,7 +220,7 @@ fn an_attack_takes_its_master_sprites_but_its_task_s() {
 fn population_set_moves_each_storage_entry_to_the_new_value() {
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -228,7 +248,7 @@ fn population_set_moves_each_storage_entry_to_the_new_value() {
             at(attribute::RELICS_HELD),
             at(RESOURCE_19)
         ],
-        crate::test_ids::amounts([-3.0, 5.0, 0.0, 0.0])
+        amounts([-3.0, 5.0, 0.0, 0.0])
     );
 }
 
@@ -240,7 +260,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     let unit = |id, state: ObjectState, inside: Option<ObjectId>| {
         let mut u = Unit {
             id,
-            place: crate::objects::layers::Static::at(Position::new(5.5, 5.5, 0.0)),
+            place: Static::at(Position::new(5.5, 5.5, 0.0)),
             ..Unit::default()
         };
         u.life.master_id = ids::HOUSE;
@@ -250,7 +270,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
@@ -263,11 +283,11 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
             ..Player::default()
         }],
     );
-    t.spatial = crate::map::spatial::Spatial::new(GridSize::new(10, 10));
+    t.spatial = Spatial::new(GridSize::new(10, 10));
     for id in 1..=3 {
         t.spatial.insert(
             object_id(id),
-            crate::map::spatial::Placed {
+            Placed {
                 position: Position::new(5.5, 5.5, 0.0),
                 radius: Footprint::new(0.5, 0.5),
                 class: class::CLASS_0,
@@ -293,7 +313,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
         t.give_record(object_id(id), &master);
     }
     let record = |t: &World, id: ObjectId| t.spatial.get(id).and_then(|p| p.obstruction);
-    let wall = Some(crate::map::spatial::Obstruction {
+    let wall = Some(Obstruction {
         kind: ObstructionType::TYPE_2,
         class: ObstructionClass::UNIT,
     });
@@ -326,10 +346,10 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
 fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
     use crate::garrison::tests::{TC, VILLAGER, let_out_world};
     let mut t = let_out_world();
-    let standing = crate::objects::sprite::Graphic {
+    let standing = Graphic {
         id: SpriteId::named(300),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(1),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(1),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -395,7 +415,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -436,18 +456,18 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
 /// A unit of `master` with `hp` hit points.
 /// A building's construction whose build points reached its build time: built, so the load
 /// completes it in its player's tracker ([`World::load_trackers`]).
-fn built() -> crate::construction::build::Construction {
-    crate::construction::build::Construction {
+fn built() -> Construction {
+    Construction {
         progress: Seconds::new(1.0),
         desolid: false,
-        builders: crate::construction::BuilderCount::of_data(0),
+        builders: BuilderCount::of_data(0),
         hit_points: MasterHitPoints::of_data(1),
         build_time: WholeSeconds::of_data(1),
-        record: crate::map::spatial::Obstruction {
+        record: Obstruction {
             kind: ObstructionType::NONE,
             class: ObstructionClass::NONE,
         },
-        snow: crate::map::Snow::None,
+        snow: Snow::None,
         sprite_override: false,
     }
 }
@@ -497,7 +517,7 @@ fn total_missiles_change_sets_adds_or_scales_the_volleys() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -536,7 +556,7 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -590,15 +610,15 @@ fn change_moves_the_shares_of_the_units_inside_building() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
     )
     .with_combats([(
         object_id(10),
-        crate::objects::layers::Combat {
-            firepower: crate::combat::Firepower::new(2.0),
+        Combat {
+            firepower: Firepower::new(2.0),
             ..Default::default()
         },
     )]);
@@ -610,7 +630,7 @@ fn change_moves_the_shares_of_the_units_inside_building() {
     let mut archer_master = combat(master_id(4), class::CLASS_0, 30);
     archer_master.reload = Seconds::new(2.0);
     archer_master.weapons = vec![ClassAmount::new(3, 4)];
-    archer_master.garrison_firepower = crate::combat::Firepower::new(1.0);
+    archer_master.garrison_firepower = Firepower::new(1.0);
     t.masters = vec![Masters::new([archer_master, tower_master])];
     // the tower's rate: 5 / 2 = 2.5; the archer's share 4 / 2 / 2.5 = 0.8, then 6 / 2 / 2.5
     t.do_effect(
@@ -627,7 +647,7 @@ fn change_moves_the_shares_of_the_units_inside_building() {
         t.parts
             .combat_of(t.players[0].objects[ListIndex::new(0)].id)
             .firepower,
-        crate::combat::Firepower::new(2.0 - 0.8 + 1.2)
+        Firepower::new(2.0 - 0.8 + 1.2)
     );
 }
 
@@ -640,7 +660,7 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
     main.life.master_id = master_id(30);
     let main_layer = Building {
         construction: Some(built()),
-        annexes: crate::construction::Annexes::new([Some(object_id(21)), None, None, None]),
+        annexes: Annexes::new([Some(object_id(21)), None, None, None]),
         ..Building::default()
     };
     let annex = unit_of(21, master_id(31), HitPoints::new(50.0));
@@ -657,7 +677,7 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -668,11 +688,11 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
         kind: master_type::BUILDING,
         class: class::BUILDING,
         hit_points,
-        building: Some(crate::objects::masters::BuildingMaster {
+        building: Some(BuildingMaster {
             stack_unit: None,
-            head_unit: crate::test_ids::opt_master(head_unit),
+            head_unit: opt_master(head_unit),
             annexes,
-            ..crate::objects::masters::BuildingMaster::default()
+            ..BuildingMaster::default()
         }),
         ..Master::default()
     };
@@ -705,12 +725,12 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
 #[test]
 fn team_effect_reaches_the_mutual_allies() {
     let player = |relations: Vec<u8>| Player {
-        relations: crate::players::relation_row(relations),
+        relations: relation_row(relations),
         ..Player::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         vec![
@@ -763,7 +783,7 @@ fn storage_set_moves_the_player_attribute_by_each_object() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -807,7 +827,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -827,9 +847,9 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
         };
         t.masters = vec![Masters::new([stone])];
         t.load_trackers().unwrap();
-        let mut v = crate::vision::visibility::Visibility::new(
+        let mut v = Visibility::new(
             GridSize::new(w, h),
-            vec![crate::vision::visibility::VisibleMap {
+            vec![VisibleMap {
                 counts: vec![0; n],
                 explored: TileCount::ZERO,
             }],
@@ -838,7 +858,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             0,
             vec![PlayerType::HUMAN],
         );
-        let seer = crate::vision::visibility::Seer {
+        let seer = Seer {
             player: PlayerId::new(0),
             master: ids::FARM,
             los: Distance::new(2.0),
@@ -862,7 +882,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
         t.spatial.sight = Some(v);
         t.spatial.insert(
             object_id(1),
-            crate::map::spatial::Placed {
+            Placed {
                 position,
                 radius,
                 class: class::CLASS_11,
@@ -939,10 +959,10 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
 #[test]
 fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     use crate::objects::masters::attribute as a;
-    let fast = crate::objects::sprite::Graphic {
+    let fast = Graphic {
         id: SpriteId::named(7),
-        frames: crate::objects::Frame::of_data(1),
-        facets: crate::objects::FacetCount::of_data(1),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(1),
         speed_multiplier: SpeedMultiplier::of_data(2.0),
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -950,22 +970,19 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     };
     let moving = |id| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));
-        u.place = crate::objects::layers::Static::at(Position::new(5.5, 5.5, 0.0));
+        u.place = Static::at(Position::new(5.5, 5.5, 0.0));
         u
     };
-    let walker = || crate::objects::layers::Motion::Moving(crate::gathering::hunt::tests::walker());
+    let walker = || Motion::Moving(tests_walker());
     let mut shows = moving(1);
-    shows.sprite = Some(crate::objects::sprite::ActiveSprite::start(
-        fast,
-        &mut crate::math::rng::Well512::default(),
-    ));
+    shows.sprite = Some(ActiveSprite::start(fast, &mut Well512::default()));
     let player = Player {
         objects: vec![shows, moving(2)].into(),
         ..Player::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1007,7 +1024,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1028,7 +1045,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
     for id in [1, 3] {
         t.spatial.insert(
             object_id(id),
-            crate::map::spatial::Placed {
+            Placed {
                 position: Position::new(5.5, 5.5, 0.0),
                 radius: Footprint::new(0.5, 0.5),
                 class: class::CLASS_6,
@@ -1043,7 +1060,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
             },
         );
     }
-    let mut v = crate::vision::visibility::Visibility::new(
+    let mut v = Visibility::new(
         GridSize::new(10, 10),
         Vec::new(),
         vec![VisionBits::NONE; 100],
@@ -1051,7 +1068,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
         0,
         Vec::new(),
     );
-    let seer = crate::vision::visibility::Seer {
+    let seer = Seer {
         player: PlayerId::new(0),
         master: master_id(4),
         los: Distance::new(2.0),
@@ -1099,7 +1116,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
     assert_eq!(c.build_time, WholeSeconds::of_data(33));
     assert_eq!(
         c.record,
-        crate::map::spatial::Obstruction {
+        Obstruction {
             kind: ObstructionType::CIRCLE,
             class: ObstructionClass::UNIT
         }
@@ -1125,7 +1142,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
 #[test]
 fn speed_change_reaches_the_units_movement() {
     let walker = unit_of(1, master_id(4), HitPoints::new(25.0));
-    let mover = crate::gathering::hunt::tests::walker();
+    let mover = tests_walker();
     let stats = mover.stats;
     let id = walker.id;
     let player = Player {
@@ -1134,12 +1151,12 @@ fn speed_change_reaches_the_units_movement() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
     )
-    .with_motions([(id, crate::objects::layers::Motion::Moving(mover))]);
+    .with_motions([(id, Motion::Moving(mover))]);
     let mut villager = combat(master_id(4), class::VILLAGER, 25);
     villager.max_speed = Speed::new(0.8);
     villager.moving = Some(stats);
@@ -1179,7 +1196,7 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1209,15 +1226,13 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
 fn farm_food_change_grows_the_farms_food() {
     let mut farm = unit_of(5, ids::FARM, HitPoints::new(480.0));
     farm.life.amount = Amount::new(75.0);
-    let mut layer = crate::objects::layers::Action::default();
-    layer
-        .list
-        .set_make(Some(crate::gathering::make::MakeAction {
-            state: MakeState::Done,
-            remaining: Amount::new(100.0),
-            total: Amount::new(175.0),
-            task: crate::objects::masters::Task::default(),
-        }));
+    let mut layer = Action::default();
+    layer.list.set_make(Some(MakeAction {
+        state: MakeState::Done,
+        remaining: Amount::new(100.0),
+        total: Amount::new(175.0),
+        task: Task::default(),
+    }));
     let player = Player {
         objects: vec![farm].into(),
         attributes: vec![Amount::ZERO; 300],
@@ -1225,7 +1240,7 @@ fn farm_food_change_grows_the_farms_food() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1262,13 +1277,13 @@ fn farm_food_change_grows_the_farms_food() {
 #[test]
 fn the_resource_commands_side_effects() {
     let player = |relations: Vec<u8>| Player {
-        relations: crate::players::relation_row(relations),
+        relations: relation_row(relations),
         attributes: vec![Amount::ZERO; 300],
         ..Player::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         vec![
@@ -1277,8 +1292,7 @@ fn the_resource_commands_side_effects() {
             player(vec![3, 0, 0]),
         ],
     );
-    t.spatial.vision =
-        crate::players::ByPlayer::new(vec![crate::vision::VisionMasks::default(); 3]);
+    t.spatial.vision = ByPlayer::new(vec![VisionMasks::default(); 3]);
     t.do_effect(PlayerId::new(1), &[attribute(1, 50, 1, -1, 1.0)], None)
         .unwrap();
     assert!(t.players[1].allied_vision);
@@ -1333,7 +1347,7 @@ fn barracks_tech() -> World {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1409,7 +1423,7 @@ fn technology_change_reaches_its_costs_locations_and_state() {
         (s.locations[0].building, s.locations[0].button),
         (Some(master_id(87)), LocationButton::of_data(7))
     );
-    assert_eq!(s.research_cap, crate::technology::ResearchCap::of_data(2));
+    assert_eq!(s.research_cap, ResearchCap::of_data(2));
     // a location past the list adds a copy of the last, without a building
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 5, 3, 9.0)], None)
         .unwrap();
@@ -1494,7 +1508,7 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     let player = Player::default();
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1559,7 +1573,7 @@ fn spawns_and_cost_entries() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1602,7 +1616,7 @@ fn spawns_and_cost_entries() {
 fn the_object_kinds_without_an_object_do_nothing() {
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player::default()],
@@ -1632,7 +1646,7 @@ fn the_object_kinds_without_an_object_do_nothing() {
 fn the_enable_command_sets_available_unless_disabled() {
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player::default()],
@@ -1652,11 +1666,11 @@ fn the_enable_command_sets_available_unless_disabled() {
     .unwrap();
     let available: Vec<bool> = t.masters[0].iter().map(|m| m.available).collect();
     assert_eq!(available, [true, false, false]);
-    t.settings.game_mode = crate::world::GameMode::of_data(11);
+    t.settings.game_mode = GameMode::of_data(11);
     t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
         .unwrap();
     assert!(!t.masters[0].get(master_id(0x26d)).unwrap().available);
-    t.settings.game_mode = crate::world::GameMode::of_data(0);
+    t.settings.game_mode = GameMode::of_data(0);
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
             .is_err()
@@ -1683,7 +1697,7 @@ fn research_whose_effect_needs_its_building_stops() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1732,7 +1746,7 @@ fn an_age_adds_its_event_to_the_history() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1746,9 +1760,9 @@ fn an_age_adds_its_event_to_the_history() {
     ];
     t.world_time = WorldTime::from_millis(612_345);
     t.players[0].history.entries = vec![
-        crate::players::history::HistoryEntry {
-            civilian: crate::players::history::Population::of_data(3),
-            military: crate::players::history::Population::ZERO,
+        HistoryEntry {
+            civilian: Population::of_data(3),
+            military: Population::ZERO,
         };
         20
     ];
@@ -1764,11 +1778,11 @@ fn an_age_adds_its_event_to_the_history() {
     assert_eq!(t.players[0].techs[102].state, ResearchState::Researched);
     assert_eq!(
         t.players[0].history.events,
-        [crate::players::history::Event {
-            kind: crate::players::history::EventKind::CASTLE_AGE,
-            time_slice: crate::players::history::TimeSlice::of_data(20),
+        [Event {
+            kind: EventKind::CASTLE_AGE,
+            time_slice: TimeSlice::of_data(20),
             world_time: WorldTime::from_millis(612_345),
-            ..crate::players::history::Event::default()
+            ..Event::default()
         }]
     );
 }
@@ -1798,7 +1812,7 @@ fn dependent_technology_done_already_completes_with_its_requirement() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1833,7 +1847,7 @@ fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -1882,12 +1896,12 @@ fn the_technology_commands_disable_and_adjust_costs() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
     );
-    let kind = |k: crate::technology::TechType| TechDef {
+    let kind = |k: TechType| TechDef {
         kind: k,
         costs: [
             Cost {
@@ -1905,10 +1919,10 @@ fn the_technology_commands_disable_and_adjust_costs() {
         ..TechDef::default()
     };
     t.techs = vec![
-        kind(crate::technology::TechType::default()),
-        kind(crate::technology::TechType::default()),
-        kind(crate::technology::TechType::REENABLED),
-        kind(crate::technology::TechType::SHARED),
+        kind(TechType::default()),
+        kind(TechType::default()),
+        kind(TechType::REENABLED),
+        kind(TechType::SHARED),
     ];
     let command = |kind: u8, a: i16, b: i16, c: i16, d: f32| {
         EffectCommand::of_data(kind, a, b, c, d).unwrap()
@@ -1967,7 +1981,7 @@ fn the_disable_command_reads_its_id_low_16_bits() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1995,7 +2009,7 @@ fn cost_change_past_the_i32_range_adds_nothing() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -2055,7 +2069,7 @@ fn the_last_building_of_master_withdraws_its_technology() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -2083,14 +2097,14 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
     use crate::objects::sprite::{ActiveSprite, Graphic};
     let graphic = |id| Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let mut rng = crate::math::rng::Well512::default();
+    let mut rng = Well512::default();
     let mut shown = |id, variant| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));
         u.sprite = Some(ActiveSprite::start(graphic(SpriteId::named(300)), &mut rng));
@@ -2098,14 +2112,11 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
         u
     };
     let exploring = shown(3, 0);
-    let mut layer = crate::objects::layers::Action::default();
+    let mut layer = Action::default();
     layer.list.set_explore(Some(
-        crate::movement::explore::ExploreAction::new(
-            Position::new(5.0, 5.0, 0.0),
-            &crate::movement::explore::bare_walk(),
-        )
-        .unwrap()
-        .0,
+        ExploreAction::new(Position::new(5.0, 5.0, 0.0), &bare_walk())
+            .unwrap()
+            .0,
     ));
     let player = Player {
         objects: vec![shown(1, 0), shown(2, 1), exploring].into(),
@@ -2113,7 +2124,7 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -2175,7 +2186,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -2194,10 +2205,10 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             ..Master::default()
         },
     ])];
-    t.spatial = crate::map::spatial::Spatial::new(GridSize::new(10, 10));
+    t.spatial = Spatial::new(GridSize::new(10, 10));
     t.spatial.insert(
         object_id(1),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(5.5, 5.5, 0.0),
             radius: Footprint::new(0.5, 0.5),
             class: class::BUILDING,
@@ -2217,7 +2228,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
         .unwrap();
     assert_eq!(
         record(&t),
-        Some(crate::map::spatial::Obstruction {
+        Some(Obstruction {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT
         })
@@ -2226,7 +2237,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
         .unwrap();
     assert_eq!(
         record(&t),
-        Some(crate::map::spatial::Obstruction {
+        Some(Obstruction {
             kind: ObstructionType::TYPE_3,
             class: ObstructionClass::UNIT
         })

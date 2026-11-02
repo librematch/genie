@@ -10,26 +10,41 @@
 //!
 //! [`Motion`]: crate::objects::layers::Motion
 
+use crate::combat::attack::ATTACK;
 use crate::combat::attack::Attack;
+use crate::combat::missile::MISSILE;
 use crate::combat::missile::MissileAction;
 use crate::construction::build::BuildAction;
+use crate::construction::repair::REPAIR;
 use crate::construction::repair::RepairAction;
+use crate::construction::wait_solidify::WAIT_SOLIDIFY;
 use crate::construction::wait_solidify::WaitSolidify;
+use crate::garrison::ENTER;
 use crate::garrison::EnterAction;
+use crate::garrison::transport::TRANSPORT;
 use crate::garrison::transport::TransportAction;
+use crate::gathering::gather::GATHER;
 use crate::gathering::gather::GatherAction;
+use crate::gathering::hunt::HUNT;
 use crate::gathering::hunt::HuntAction;
+use crate::gathering::make::MAKE;
 use crate::gathering::make::MakeAction;
+use crate::movement::explore::EXPLORE;
 use crate::movement::explore::ExploreAction;
+use crate::movement::fly::FLY;
 use crate::movement::fly::Fly;
+use crate::movement::move_to::MOVE_TO;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::RoleId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
+use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::ownership::artifact::Artifact;
 use genie_diff::Diff;
+use std::mem::discriminant;
+use std::slice::Iter;
 
 /// Declares the action kinds: the [`Action`] variants and, for each, the list's accessors.
 macro_rules! action_kinds {
@@ -128,20 +143,20 @@ impl Action {
     #[must_use]
     pub const fn kind(&self) -> ActionType {
         match self {
-            Self::Artifact(_) => crate::ownership::artifact::ARTIFACT_TYPE,
+            Self::Artifact(_) => ARTIFACT_TYPE,
             Self::Build(_) => action_type::BUILD,
-            Self::Repair(_) => crate::construction::repair::REPAIR,
-            Self::MoveTo(_) => crate::movement::move_to::MOVE_TO,
-            Self::Fly(_) => crate::movement::fly::FLY,
-            Self::Hunt(_) => crate::gathering::hunt::HUNT,
-            Self::Gather(_) => crate::gathering::gather::GATHER,
-            Self::Attack(_) => crate::combat::attack::ATTACK,
-            Self::Explore(_) => crate::movement::explore::EXPLORE,
-            Self::Enter(_) => crate::garrison::ENTER,
-            Self::Transport(_) => crate::garrison::transport::TRANSPORT,
-            Self::Missile(_) => crate::combat::missile::MISSILE,
-            Self::Make(_) => crate::gathering::make::MAKE,
-            Self::WaitSolidify(_) => crate::construction::wait_solidify::WAIT_SOLIDIFY,
+            Self::Repair(_) => REPAIR,
+            Self::MoveTo(_) => MOVE_TO,
+            Self::Fly(_) => FLY,
+            Self::Hunt(_) => HUNT,
+            Self::Gather(_) => GATHER,
+            Self::Attack(_) => ATTACK,
+            Self::Explore(_) => EXPLORE,
+            Self::Enter(_) => ENTER,
+            Self::Transport(_) => TRANSPORT,
+            Self::Missile(_) => MISSILE,
+            Self::Make(_) => MAKE,
+            Self::WaitSolidify(_) => WAIT_SOLIDIFY,
         }
     }
 
@@ -214,12 +229,8 @@ pub struct ActionList(Vec<Action>);
 impl ActionList {
     /// `action` replaces the list's action of its kind in its place, or else becomes the head.
     pub fn put(&mut self, action: Action) {
-        let kind = std::mem::discriminant(&action);
-        match self
-            .0
-            .iter_mut()
-            .find(|a| std::mem::discriminant(*a) == kind)
-        {
+        let kind = discriminant(&action);
+        match self.0.iter_mut().find(|a| discriminant(*a) == kind) {
             Some(held) => *held = action,
             None => self.0.insert(0, action),
         }
@@ -256,14 +267,14 @@ impl ActionList {
     }
 
     /// The actions, the head first.
-    pub fn iter(&self) -> std::slice::Iter<'_, Action> {
+    pub fn iter(&self) -> Iter<'_, Action> {
         self.0.iter()
     }
 }
 
 impl<'a> IntoIterator for &'a ActionList {
     type Item = &'a Action;
-    type IntoIter = std::slice::Iter<'a, Action>;
+    type IntoIter = Iter<'a, Action>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
@@ -323,21 +334,12 @@ mod tests {
     #[test]
     fn an_action_reads_its_type_and_state() {
         let a = Action::Artifact(artifact(ArtifactState::Check));
-        assert_eq!(
-            (a.kind(), a.state()),
-            (
-                crate::ownership::artifact::ARTIFACT_TYPE,
-                ActionState::new(6)
-            )
-        );
+        assert_eq!((a.kind(), a.state()), (ARTIFACT_TYPE, ActionState::new(6)));
         let list = ActionList::default().with_artifact(Some(artifact(ArtifactState::Check)));
-        assert_eq!(
-            list.of_kind(crate::ownership::artifact::ARTIFACT_TYPE),
-            Some(&a)
-        );
-        assert!(list.holds(crate::ownership::artifact::ARTIFACT_TYPE));
-        assert_eq!(list.of_kind(crate::combat::attack::ATTACK), None);
-        assert!(!list.holds(crate::combat::attack::ATTACK));
+        assert_eq!(list.of_kind(ARTIFACT_TYPE), Some(&a));
+        assert!(list.holds(ARTIFACT_TYPE));
+        assert_eq!(list.of_kind(ATTACK), None);
+        assert!(!list.holds(ATTACK));
     }
 
     #[test]

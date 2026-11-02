@@ -8,9 +8,13 @@ use crate::construction::build::{
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
+use crate::movement::footprint_gap_squared;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::pathing::tile_path::Found;
+use crate::pathing::tile_path::{Path, Request};
+use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -46,7 +50,7 @@ impl BuildAction {
                     .map(|m| m.stats.radius.ground())
                     .ok_or(BUILDER_UNMOVING)?;
             let t = *c.w.spatial.get_known(self.target)?.ok_or(SITE_GONE)?;
-            let gap = crate::movement::footprint_gap_squared(at, ground, t.position, t.radius);
+            let gap = footprint_gap_squared(at, ground, t.position, t.radius);
             let range = self.task.range;
             if !(gap <= range.squared() || gap <= DistanceSquared::new(REACH)) {
                 return self.restart(c, builder);
@@ -119,7 +123,7 @@ impl BuildAction {
         {
             let t = known?.ok_or(SITE_GONE)?;
             let radius = master_radius.unwrap_or_else(|| t.radius.x());
-            let req = crate::pathing::tile_path::Request {
+            let req = Request {
                 from: moved_at.ground(),
                 to: t.position.ground(),
                 radii: Distance::new(radius + ground),
@@ -127,7 +131,7 @@ impl BuildAction {
                 closed: Vec::new(),
                 full: false,
             };
-            let mut path = crate::pathing::tile_path::Path::default();
+            let mut path = Path::default();
             found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
         }
         if found.reaches() {
@@ -170,7 +174,7 @@ impl BuildAction {
         self.leave(c, builder)?;
         if self.target.is_some() {
             let target = self.target.take();
-            crate::world::lets::release(c, builder, target, reads.by)?;
+            release(c, builder, target, reads.by)?;
         }
         self.walk_to_point(c, builder)
     }
@@ -194,7 +198,7 @@ impl BuildAction {
         self.state = BuildState::WalkPoint { move_to: None };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,

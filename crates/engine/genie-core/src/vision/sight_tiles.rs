@@ -3,6 +3,7 @@
 
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
+use std::fmt::{Display, Error, Formatter};
 
 /// A line of sight in whole tiles: a seer's sight truncated toward zero (`CVTTSS2SI`: a NaN or
 /// one out of range is `i32::MIN`), the radius of the circle the explore tables hold
@@ -47,8 +48,8 @@ impl SightTiles {
     }
 }
 
-impl std::fmt::Display for SightTiles {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for SightTiles {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

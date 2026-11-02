@@ -2,6 +2,7 @@
 //! string 12200 plus the number names each).
 
 use getset::CopyGetters;
+use std::fmt::{Display, Error, Formatter};
 
 /// An attribute an effect changes on a master (an attribute command's third argument, its low
 /// byte: `FUN_140ec2ac0` reads `c & 0xff`). The simulation names the ones it tells apart (below);
@@ -35,8 +36,8 @@ impl MasterAttribute {
     }
 }
 
-impl std::fmt::Display for MasterAttribute {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MasterAttribute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

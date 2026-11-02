@@ -14,6 +14,7 @@
 //! so never.
 
 use crate::GenieError;
+use crate::commands::QueueId;
 use crate::commands::UnitList;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildAction;
@@ -23,6 +24,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::math::image::wall::{HALF as WALL_HALF, MAP_MARGIN as WALL_MAP_MARGIN, ONE as WALL_ONE};
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
@@ -31,17 +33,19 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{MasterId, player_master};
+use crate::orders::readiness;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use std::cmp::Ordering;
 
 /// The snap's half tile and its step up (`FUN_141123ac0`).
-const HALF: f32 = crate::math::image::wall::HALF;
-const ONE: f32 = crate::math::image::wall::ONE;
+const HALF: f32 = WALL_HALF;
+const ONE: f32 = WALL_ONE;
 /// How far inside the map's far edges the snap keeps a footprint (`FUN_141123ac0`).
-const MAP_MARGIN: f32 = crate::math::image::wall::MAP_MARGIN;
+const MAP_MARGIN: f32 = WALL_MAP_MARGIN;
 
 /// A builder's master type is above this (`FUN_141262270`: `0x27`).
 const BUILDER_TYPE: MasterKind = MasterKind::of_data(0x27);
@@ -65,7 +69,7 @@ pub struct BuildWallCommand {
     /// The line's last tile (`+0xc`, `+0xe`).
     pub to: Tile,
     /// `+0x14`: anything but −1 and the command does nothing.
-    pub queue_id: crate::commands::QueueId,
+    pub queue_id: QueueId,
     /// The units told to build it, in packet order (the count at `+0x4`, the ids from `+0x1c`).
     pub builders: UnitList,
     /// `+0x1a`: queued (a builder with a unit AI takes the line as orders in its queue).
@@ -342,7 +346,7 @@ impl World {
                 "BUILD_WALL with more builders than the insertion sort takes (FUN_140e6eee0)",
             ));
         }
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
         Ok(sorted)
     }
 
@@ -385,7 +389,7 @@ impl World {
                 && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
             {
                 // the readiness pass with 0: every queued order is ready
-                crate::orders::readiness(&mut ai.orders, false);
+                readiness(&mut ai.orders, false);
             }
         }
         Ok(())

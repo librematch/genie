@@ -6,15 +6,9 @@ fn building_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(
-                crate::objects::RelicCount::of_data(0),
-                crate::objects::RelicCount::of_data(0)
-            ),
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
             master_type::COMBAT,
-            Relics::new(
-                crate::objects::RelicCount::of_data(5),
-                crate::objects::RelicCount::of_data(5)
-            )
+            Relics::new(RelicCount::of_data(5), RelicCount::of_data(5))
         )
         .to_bits(),
         up.to_bits()
@@ -22,15 +16,9 @@ fn building_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(
-                crate::objects::RelicCount::of_data(3),
-                crate::objects::RelicCount::of_data(1)
-            ),
+            Relics::new(RelicCount::of_data(3), RelicCount::of_data(1)),
             master_type::COMBAT,
-            Relics::new(
-                crate::objects::RelicCount::of_data(0),
-                crate::objects::RelicCount::of_data(0)
-            )
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0))
         )
         .to_bits(),
         (up * SPECIFIC_RELIC_BOOST).to_bits()
@@ -38,15 +26,9 @@ fn building_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(
-                crate::objects::RelicCount::of_data(3),
-                crate::objects::RelicCount::of_data(0)
-            ),
+            Relics::new(RelicCount::of_data(3), RelicCount::of_data(0)),
             master_type::COMBAT,
-            Relics::new(
-                crate::objects::RelicCount::of_data(0),
-                crate::objects::RelicCount::of_data(0)
-            )
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0))
         )
         .to_bits(),
         (up * RELIC_BOOST).to_bits()
@@ -54,15 +36,9 @@ fn building_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(
-                crate::objects::RelicCount::of_data(3),
-                crate::objects::RelicCount::of_data(0)
-            ),
+            Relics::new(RelicCount::of_data(3), RelicCount::of_data(0)),
             BUILDING,
-            Relics::new(
-                crate::objects::RelicCount::of_data(0),
-                crate::objects::RelicCount::of_data(2)
-            )
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(2))
         )
         .to_bits(),
         (up * RELIC_BOOST / SPECIFIC_RELIC_BOOST).to_bits()
@@ -70,15 +46,9 @@ fn building_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(
-                crate::objects::RelicCount::of_data(0),
-                crate::objects::RelicCount::of_data(0)
-            ),
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
             BUILDING,
-            Relics::new(
-                crate::objects::RelicCount::of_data(1),
-                crate::objects::RelicCount::of_data(-1)
-            )
+            Relics::new(RelicCount::of_data(1), RelicCount::of_data(-1))
         )
         .to_bits(),
         (up / RELIC_BOOST).to_bits()
@@ -87,15 +57,9 @@ fn building_relics_scale_its_elevation_factor() {
     assert_eq!(
         building_elevation_factor(
             up,
-            Relics::new(
-                crate::objects::RelicCount::of_data(-1),
-                crate::objects::RelicCount::of_data(-1)
-            ),
+            Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1)),
             BUILDING,
-            Relics::new(
-                crate::objects::RelicCount::of_data(-1),
-                crate::objects::RelicCount::of_data(-1)
-            )
+            Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1))
         )
         .to_bits(),
         up.to_bits()
@@ -103,22 +67,28 @@ fn building_relics_scale_its_elevation_factor() {
 }
 
 use super::*;
+use crate::combat::abilities::REMOVAL_REWARD;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
 use crate::construction::MainBuildingId;
+use crate::construction::build::NOT_HELD;
 use crate::map::Tile;
 use crate::objects::HpPowerup;
+use crate::objects::RelicCount;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::DamageAmount;
 use crate::objects::masters::RestrictionField;
+use crate::objects::masters::WorkValue;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::test_ids::class_of;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use std::f32::consts::FRAC_PI_2;
 
 fn sheep() -> Victim {
     Victim {
@@ -137,7 +107,7 @@ fn sheep() -> Victim {
                 ClassAmount::new(31, 0),
             ],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
+            friendly_fire: DamageShare::new(1.0),
             ..Armored::default()
         }),
         ..Victim::default()
@@ -172,7 +142,7 @@ fn hunter() -> Victim {
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
+            friendly_fire: DamageShare::new(1.0),
             ..Armored::default()
         }),
         ..Victim::default()
@@ -367,7 +337,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         Ok(HitPoints::new(1.0))
     );
     let zero = Attacker {
-        mode_680: crate::world::Mode680::ONE,
+        mode_680: Mode680::ONE,
         ..hunter.source
     };
     assert_eq!(
@@ -427,18 +397,17 @@ fn hit_point_share_reads_the_powerups_and_the_master() {
 /// share lacking with `attribute_type4`), and the sum is at least 0.
 #[test]
 fn bonus_damage_counts_whole_steps_of_hit_point_share() {
-    let task = |object_group: i16, object_id: Option<MasterId>, range: Distance, lacking: i16| {
-        crate::objects::masters::Task {
+    let task =
+        |object_group: i16, object_id: Option<MasterId>, range: Distance, lacking: i16| Task {
             action_type: BONUS_DAMAGE,
-            object_group: crate::test_ids::class_of(object_group),
+            object_group: class_of(object_group),
             object_id,
             work_range: range,
             attribute_type4: AttributeId::of_data(lacking),
-            work_val1: crate::objects::masters::WorkValue::new(2.0),
-            work_val2: crate::objects::masters::WorkValue::new(0.25),
-            ..crate::objects::masters::Task::default()
-        }
-    };
+            work_val1: WorkValue::new(2.0),
+            work_val2: WorkValue::new(0.25),
+            ..Task::default()
+        };
     let (mut sheep, mut hunter) = (sheep(), hunter());
     sheep.hp = HitPoints::new(7.0);
     // any target below type 80: the sheep lacks half its hit points, two steps of 0.25
@@ -454,8 +423,8 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
         task(-1, Some(master_id(705)), Distance::ZERO, 0),
         task(3, Some(ids::ID_0), Distance::ZERO, 0),
         task(-1, Some(master_id(9)), Distance::ZERO, 0),
-        crate::objects::masters::Task {
-            action_type: crate::combat::abilities::REMOVAL_REWARD,
+        Task {
+            action_type: REMOVAL_REWARD,
             ..task(-1, None, Distance::ZERO, 0)
         },
     ];
@@ -468,8 +437,8 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
     tc.class = class::CLASS_51;
     assert_eq!(bonus_damage(&hunter, &tc), 8.0);
     // no step, no target hit points, or a negative sum: 0
-    hunter.bonus_tasks = vec![crate::objects::masters::Task {
-        work_val2: crate::objects::masters::WorkValue::new(0.0),
+    hunter.bonus_tasks = vec![Task {
+        work_val2: WorkValue::new(0.0),
         ..task(-1, None, Distance::ZERO, 0)
     }];
     assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
@@ -477,8 +446,8 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
     sheep.hp = HitPoints::ZERO;
     assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
     sheep.hp = HitPoints::new(7.0);
-    hunter.bonus_tasks = vec![crate::objects::masters::Task {
-        work_val1: crate::objects::masters::WorkValue::new(-3.0),
+    hunter.bonus_tasks = vec![Task {
+        work_val1: WorkValue::new(-3.0),
         ..task(-1, None, Distance::ZERO, 0)
     }];
     assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
@@ -488,7 +457,7 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
 #[test]
 fn the_bonus_damage_adds_to_the_first_melee_weapon() {
     let (sheep, mut hunter) = (sheep(), hunter());
-    hunter.source.attack_powerup = crate::combat::AttackPowerup::new(1.0);
+    hunter.source.attack_powerup = AttackPowerup::new(1.0);
     assert_eq!(
         armor_damage(
             &sheep,
@@ -510,7 +479,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     let (sheep, mut v) = (sheep(), hunter());
     let none = Shown::default();
     assert_eq!(shown_attack(&v, &none), DamageAmount::new(3));
-    v.source.attack_powerup = crate::combat::AttackPowerup::new(1.7);
+    v.source.attack_powerup = AttackPowerup::new(1.7);
     assert_eq!(shown_attack(&v, &none), DamageAmount::new(4));
     let mut far = v.clone();
     far.weapons = vec![ClassAmount::new(13, 6), ClassAmount::new(11, -2)];
@@ -518,12 +487,12 @@ fn combat_object_shows_its_attack_armor_and_range() {
     far.kind = master_type::RGE_COMBAT;
     assert_eq!(shown_attack(&far, &none), DamageAmount::new(6));
     // the bonus against its attack's target
-    v.bonus_tasks = vec![crate::objects::masters::Task {
+    v.bonus_tasks = vec![Task {
         action_type: BONUS_DAMAGE,
         attribute_type4: Some(attribute::FOOD),
-        work_val1: crate::objects::masters::WorkValue::new(1.5),
-        work_val2: crate::objects::masters::WorkValue::new(0.5),
-        ..crate::objects::masters::Task::default()
+        work_val1: WorkValue::new(1.5),
+        work_val2: WorkValue::new(0.5),
+        ..Task::default()
     }];
     let at_sheep = Shown {
         target: Some(&sheep),
@@ -723,7 +692,7 @@ fn facing_offset_counts_facets_from_the_angle() {
     let at = Position::new(10.0, 10.0, 0.0);
     let facing = Facing {
         angle: Angle::ZERO,
-        facets: crate::objects::FacetCount::of_data(16),
+        facets: FacetCount::of_data(16),
     };
     assert_eq!(
         facing_offset(at, facing, Position::new(11.0, 10.0, 0.0)),
@@ -733,7 +702,7 @@ fn facing_offset_counts_facets_from_the_angle() {
     let q = facing_offset(at, facing, Position::new(10.0, 11.0, 0.0));
     assert!((q - 4.0).abs() < 1e-5);
     let few = Facing {
-        facets: crate::objects::FacetCount::of_data(4),
+        facets: FacetCount::of_data(4),
         ..facing
     };
     assert!((facing_offset(at, few, Position::new(10.0, 11.0, 0.0)) - 2.0).abs() < 1e-5);
@@ -746,7 +715,7 @@ fn facing_offset_counts_facets_from_the_angle() {
         facing_offset(
             at,
             Facing {
-                facets: crate::objects::FacetCount::of_data(0),
+                facets: FacetCount::of_data(0),
                 ..facing
             },
             Position::new(11.0, 12.0, 0.0)
@@ -763,8 +732,8 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
     let x = sheep.armored.as_mut().unwrap();
     x.special_attack = SpecialAttack::FRONT_DEFENCE;
     x.facing = Some(Facing {
-        angle: Angle::new(std::f32::consts::FRAC_PI_2),
-        facets: crate::objects::FacetCount::of_data(8),
+        angle: Angle::new(FRAC_PI_2),
+        facets: FacetCount::of_data(8),
     });
     take(
         &mut sheep,
@@ -816,8 +785,8 @@ fn retaliation_strikes_the_melee_attacker_first() {
     x.unit_ai = true;
     x.alert_idle = Some(true);
     x.facing = Some(Facing {
-        angle: Angle::new(std::f32::consts::FRAC_PI_2),
-        facets: crate::objects::FacetCount::of_data(8),
+        angle: Angle::new(FRAC_PI_2),
+        facets: FacetCount::of_data(8),
     });
     take(
         &mut sheep,
@@ -855,7 +824,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
 #[test]
 fn reflected_damage_comes_back_at_least_one() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
-    sheep.armored.as_mut().unwrap().reflection = crate::objects::masters::DamageShare::new(0.5);
+    sheep.armored.as_mut().unwrap().reflection = DamageShare::new(0.5);
     take(
         &mut sheep,
         &mut hunter,
@@ -894,7 +863,7 @@ fn blast_nan_paths_are_the_game_s() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(0x42);
-    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
+    elephant.source.area_damage = DamageShare::new(0.5);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let center = elephant.position;
     let enemy = |x: f32, y: f32| Victim {
@@ -919,7 +888,7 @@ fn blast_nan_paths_are_the_game_s() {
     elephant.source.blast_level = BlastLevel::from_bits_retain(0x82);
     elephant.armored.as_mut().unwrap().facing = Some(Facing {
         angle: Angle::new(f32::NAN),
-        facets: crate::objects::FacetCount::of_data(8),
+        facets: FacetCount::of_data(8),
     });
     let mut t = enemy(10.8, 11.0);
     assert!(
@@ -927,7 +896,7 @@ fn blast_nan_paths_are_the_game_s() {
             center,
             Facing {
                 angle: Angle::new(f32::NAN),
-                facets: crate::objects::FacetCount::of_data(8)
+                facets: FacetCount::of_data(8)
             },
             t.position
         )
@@ -940,7 +909,7 @@ fn blast_nan_paths_are_the_game_s() {
     assert_eq!(t.hp, HitPoints::new(9.0));
     // a NaN area damage share leaves the factor at 1
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = crate::objects::masters::DamageShare::new(f32::NAN);
+    elephant.source.area_damage = DamageShare::new(f32::NAN);
     let mut t = enemy(10.8, 11.0);
     assert_eq!(
         blast(&mut elephant, center, None, None, &mut [&mut t], 1.0),
@@ -976,7 +945,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
+    elephant.source.area_damage = DamageShare::new(0.5);
     elephant.source.player = PlayerId::new(1);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let enemy = |id: i32, x: f32| Victim {
@@ -1043,7 +1012,7 @@ fn house() -> Victim {
         armored: Some(Armored {
             armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 7)],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
+            friendly_fire: DamageShare::new(1.0),
             ..Armored::default()
         }),
         building: Some(Building {
@@ -1077,10 +1046,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
     let b = h.building.as_ref().unwrap();
     assert_eq!(
         (b.damaged_lately, b.struck, b.razed.len()),
-        (crate::objects::DamagedTimer::of_data(60), true, 0)
+        (DamagedTimer::of_data(60), true, 0)
     );
     // at 1 a hit may do nothing: the least takes 1 more
-    villager.source.mode_680 = crate::world::Mode680::ONE;
+    villager.source.mode_680 = Mode680::ONE;
     let mut h = house();
     h.armored.as_mut().unwrap().armors = vec![ClassAmount::new(4, 10)];
     take(
@@ -1242,7 +1211,7 @@ fn hit_on_an_annex_goes_to_its_main_building() {
             1.0,
             HitPoints::ZERO
         ),
-        Err(crate::construction::build::NOT_HELD)
+        Err(NOT_HELD)
     );
 }
 
@@ -1276,7 +1245,7 @@ fn player_building_below_one_hit_point_is_razed() {
         &[Razed {
             attacker_player: PlayerId::new(1),
             owner: PlayerId::new(2),
-            event: Some(crate::players::history::EventKind::CASTLE_DESTROYED),
+            event: Some(EventKind::CASTLE_DESTROYED),
             adds: vec![
                 (PlayerId::new(1), attribute::RAZINGS, Amount::new(1.0)),
                 (PlayerId::new(1), attribute::KILLS_VALUE, Amount::new(25.0)),
@@ -1332,10 +1301,7 @@ fn player_building_below_one_hit_point_is_razed() {
     let razed = &wonder.building.as_ref().unwrap().razed;
     assert_eq!(
         (razed[0].event, razed[0].adds.len()),
-        (
-            Some(crate::players::history::EventKind::WONDER_DESTROYED),
-            0
-        )
+        (Some(EventKind::WONDER_DESTROYED), 0)
     );
     let mut gaia = Victim {
         hp: HitPoints::new(1.5),
@@ -1371,7 +1337,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         ..house()
     };
     let mut villager = hunter();
-    villager.source.mode_680 = crate::world::Mode680::ONE;
+    villager.source.mode_680 = Mode680::ONE;
     // no damage at 1, the least takes it below 1 but its damage did not kill it
     let mut t = trebuchet(HitPoints::new(1.5));
     t.armored.as_mut().unwrap().armors = vec![ClassAmount::new(4, 10)];
@@ -1518,7 +1484,7 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
     let mut mangonel = hunter();
     mangonel.source.area_effect = Distance::new(2.0);
     mangonel.source.blast_level = BlastLevel::from_bits_retain(2);
-    mangonel.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
+    mangonel.source.area_damage = DamageShare::new(0.5);
     mangonel.weapons = vec![ClassAmount::new(4, 10)];
     mangonel.position = Position::new(10.5, 10.5, 0.0);
     let center = mangonel.position;
@@ -1535,7 +1501,7 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
         }),
         ..house()
     };
-    main.source.area_damage = crate::objects::masters::DamageShare::new(0.0);
+    main.source.area_damage = DamageShare::new(0.0);
     let mut annex = Victim {
         id: object_id(21),
         hp: HitPoints::new(100.0),
@@ -1576,7 +1542,7 @@ fn blast_walks_tile_objects_in_its_list_order() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
+    elephant.source.area_damage = DamageShare::new(0.5);
     elephant.source.player = PlayerId::new(1);
     elephant.weapons = vec![ClassAmount::new(4, 10)];
     let enemy = |id: i32, x: f32, y: f32, tile_place| Victim {
@@ -1714,7 +1680,7 @@ fn heal_to_full_holds_the_master_hit_points() {
 fn blast_keeps_building_damage_on_it_or_its_main_building() {
     use crate::combat::damage::blasts::{blast_ledger, ledger_values};
     let mut main = house();
-    main.source.area_damage = crate::objects::masters::DamageShare::new(0.25);
+    main.source.area_damage = DamageShare::new(0.25);
     main.blast_defense = BlastDefense::new(3);
     main.building.as_mut().unwrap().blast_taken = HitPoints::new(7.0);
     let mut annex = Victim {
@@ -1732,7 +1698,7 @@ fn blast_keeps_building_damage_on_it_or_its_main_building() {
     assert_eq!(blast_ledger(&all, 1), Ok(Some(0)));
     assert_eq!(blast_ledger(&all, 2), Ok(None));
     let a = Attacker {
-        area_damage: crate::objects::masters::DamageShare::new(0.5),
+        area_damage: DamageShare::new(0.5),
         ..Attacker::default()
     };
     assert_eq!(
@@ -1840,7 +1806,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
         0.5
     );
     enemy.player = PlayerId::new(1);
-    enemy.armored.as_mut().unwrap().friendly_fire = crate::objects::masters::DamageShare::new(0.25);
+    enemy.armored.as_mut().unwrap().friendly_fire = DamageShare::new(0.25);
     assert_eq!(
         blast_falloff(&attacker, &melee, &enemy, (1.0, d2), false),
         0.25
@@ -1884,7 +1850,7 @@ fn cone_blast_leaves_out_what_lies_beside_its_facing() {
     );
     attacker.armored.as_mut().unwrap().facing = Some(Facing {
         angle: Angle::ZERO,
-        facets: crate::objects::FacetCount::of_data(8),
+        facets: FacetCount::of_data(8),
     });
     let narrow = level(BlastLevel::from_bits_retain(0x82));
     assert_eq!(
@@ -2016,7 +1982,7 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
-    elephant.source.area_damage = crate::objects::masters::DamageShare::new(0.5);
+    elephant.source.area_damage = DamageShare::new(0.5);
     let center = elephant.position;
     let blast = |a: Attacker| Blast {
         a,

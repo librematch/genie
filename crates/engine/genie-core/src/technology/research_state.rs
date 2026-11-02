@@ -2,6 +2,7 @@
 //! researched.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A player's technology's state (`Tech_Player_Tree` `+0x4`, the save's `state`). The states order
 /// as their numbers: the research's tests take ranges of them (0 to 2 may complete,
@@ -54,8 +55,8 @@ impl ResearchState {
     }
 }
 
-impl std::fmt::Display for ResearchState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ResearchState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

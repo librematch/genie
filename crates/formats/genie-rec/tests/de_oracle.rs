@@ -8,8 +8,14 @@
 //! skips without them.
 
 use binrw::io::{Cursor, Read, Seek, SeekFrom};
+use flate2::read::ZlibDecoder;
 use genie_rec::de;
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet};
+use std::env::var_os;
 use std::fmt::Write as _;
+use std::fs::{read as fs_read, read_dir};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 
 /// A cursor that records the position and length of every read.
@@ -19,7 +25,7 @@ struct LoggingReader<'a> {
 }
 
 impl Read for LoggingReader<'_> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         let pos = self.inner.position();
         let n = self.inner.read(buf)?;
         if n > 0 {
@@ -30,7 +36,7 @@ impl Read for LoggingReader<'_> {
 }
 
 impl Seek for LoggingReader<'_> {
-    fn seek(&mut self, to: SeekFrom) -> std::io::Result<u64> {
+    fn seek(&mut self, to: SeekFrom) -> Result<u64, Error> {
         self.inner.seek(to)
     }
 }
@@ -44,7 +50,7 @@ struct Trace {
 }
 
 fn read_trace(path: &Path) -> Trace {
-    let data = std::fs::read(path).unwrap();
+    let data = fs_read(path).unwrap();
     assert_eq!(&data[..8], b"GRTRACE3", "{}: not a trace", path.display());
     let word_at = |b: &[u8], i: usize| u32::from_le_bytes(b[4 * i..4 * i + 4].try_into().unwrap());
     let (count, width) = (
@@ -53,7 +59,7 @@ fn read_trace(path: &Path) -> Trace {
     );
     let mut rows = Vec::new();
     // The row count is checked against `rows.len()` below.
-    let _ = flate2::read::ZlibDecoder::new(&data[16..])
+    let _ = ZlibDecoder::new(&data[16..])
         .read_to_end(&mut rows)
         .unwrap();
     let step = 1 + width;
@@ -200,11 +206,11 @@ fn context(header: &[u8], ours: &[(u64, u64)], trace: &Trace, at: u64, radius: u
 }
 
 fn env_dir(name: &str) -> Option<PathBuf> {
-    std::env::var_os(name).map(PathBuf::from)
+    var_os(name).map(PathBuf::from)
 }
 
 fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).unwrap() {
+    for entry in read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         if path.is_dir() {
             recordings(&path, out);
@@ -241,13 +247,13 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
     let mut first_context = None;
     let (mut read_by_us, mut read_by_game) = (0u64, 0u64);
     // crossings per caller of the crossed game read: which routines this reader misreads
-    let mut by_caller = std::collections::BTreeMap::<u32, (usize, usize)>::new();
+    let mut by_caller = BTreeMap::<u32, (usize, usize)>::new();
     for path in paths {
         let trace_path = traces.join(trace_name(&path, &corpus));
         if !trace_path.exists() {
             continue;
         }
-        let data = std::fs::read(&path).unwrap();
+        let data = fs_read(&path).unwrap();
         let header = de::chapters(&data).unwrap()[0].inflate_header().unwrap();
         let trace = read_trace(&trace_path);
         let mut reader = LoggingReader {
@@ -274,7 +280,7 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
         read_by_game += total;
         stops.push((reader.inner.position(), total, path.clone()));
         let all = crossings(&reader.reads, &trace.sizes);
-        let mut callers_here = std::collections::BTreeSet::new();
+        let mut callers_here = BTreeSet::new();
         for c in &all {
             let e = by_caller.entry(trace.callers[c.theirs.2]).or_default();
             e.0 += 1;
@@ -306,10 +312,10 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
         eprintln!("  stops at {at:#x} of {total:#x}: {}", path.display());
     }
     let mut ranked: Vec<_> = by_caller.into_iter().collect();
-    ranked.sort_by_key(|(_, (n, _))| std::cmp::Reverse(*n));
+    ranked.sort_by_key(|(_, (n, _))| Reverse(*n));
     eprintln!("  crossed game reads come from {} callers", ranked.len());
     // GENIE_REC_ALL_CALLERS lists every caller, not only the first twelve
-    let shown = if std::env::var_os("GENIE_REC_ALL_CALLERS").is_some() {
+    let shown = if var_os("GENIE_REC_ALL_CALLERS").is_some() {
         ranked.len()
     } else {
         12

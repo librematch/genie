@@ -3,6 +3,8 @@
 
 use crate::math::Angle;
 use crate::world::Seconds;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Div, Mul};
 
 /// The most a unit or a group turns per second, in radians, as the game's `f32` holds it: a
 /// master's turn rate (`+0x774`) and its revolution's rate (`+0x77c`, 2π over a revolution's
@@ -31,7 +33,7 @@ impl TurnRate {
     }
 }
 
-impl std::ops::Mul<Seconds> for TurnRate {
+impl Mul<Seconds> for TurnRate {
     type Output = Angle;
 
     /// The most turn in `dt` (one `f32` product, the rate first).
@@ -40,7 +42,7 @@ impl std::ops::Mul<Seconds> for TurnRate {
     }
 }
 
-impl std::ops::Div<Seconds> for Angle {
+impl Div<Seconds> for Angle {
     type Output = TurnRate;
 
     /// The rate of turning by the angle in `dt` (one `f32` quotient: 2π over a revolution's
@@ -50,8 +52,8 @@ impl std::ops::Div<Seconds> for Angle {
     }
 }
 
-impl std::fmt::Display for TurnRate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TurnRate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

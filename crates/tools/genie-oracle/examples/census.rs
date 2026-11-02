@@ -14,16 +14,19 @@ mod support;
 
 use genie_oracle::MasterTable;
 use genie_oracle::census::census_run;
+use std::env::{args, var};
+use std::error::Error;
+use std::fs::read;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    support::install(std::env::var("RUST_LOG").ok().as_deref())?;
-    let args: Vec<String> = std::env::args().collect();
+fn main() -> Result<(), Box<dyn Error>> {
+    support::install(var("RUST_LOG").ok().as_deref())?;
+    let args: Vec<String> = args().collect();
     let (rec, dat, limit) = match &args[1..] {
         [rec, dat] => (rec, dat, None),
         [rec, dat, updates] => (rec, dat, Some(updates.parse()?)),
         _ => return Err("usage: census REC DAT [UPDATES]".into()),
     };
-    let recording = std::fs::read(rec)?;
+    let recording = read(rec)?;
     let masters = MasterTable::read(dat.as_ref())?;
     let run = census_run(&recording, Some(&masters), limit)?;
     println!(

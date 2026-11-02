@@ -3,6 +3,8 @@
 
 use crate::map::Tile;
 use crate::objects::{ObjectId, ObjectKey};
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 /// The top four bits of a tile's temporary record (`FUN_1410510c0`).
 const TILE_BITS: u32 = 0xf000_0000;
@@ -61,19 +63,19 @@ impl PartialEq for RecordId {
 impl Eq for RecordId {}
 
 impl PartialOrd for RecordId {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for RecordId {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.value().cmp(&other.value())
     }
 }
 
-impl std::hash::Hash for RecordId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl Hash for RecordId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.value().hash(state);
     }
 }

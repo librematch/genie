@@ -15,11 +15,18 @@ use crate::world::WorldTime;
 use genie_diff::Diff;
 
 use crate::GenieError;
+use crate::construction::FootprintWaits;
+use crate::gathering::{DropSiteId, PastureId};
+use crate::groups::GroupLink;
+use crate::map::spatial::Spatial;
 use crate::objects::layers::Static;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::{Master, MasterTables, Masters, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
+use crate::objects::{DamagedTimer, WorkerCount};
 use crate::ownership::capture::Captured;
+use crate::pathing::Pathing;
+use crate::world::OBJECT_MASTER;
 use crate::world::step::Step;
 
 mod death;
@@ -40,7 +47,7 @@ pub struct Unit {
     pub id: ObjectId,
     /// `+0x889`: its waits as a builder for an occupied footprint (not saved; 0 at a load).
     #[diff(unsaved)]
-    pub footprint_waits: crate::construction::FootprintWaits,
+    pub footprint_waits: FootprintWaits,
     /// Its life cycle: state, hit points, master, what it holds, its dying sprite.
     pub life: Lifecycle,
     /// Its static layer, its place (every object, [`Static`]); the layers above it its type has
@@ -56,13 +63,13 @@ pub struct Unit {
     /// `+0x685`, `underAttackValue`: its unit AI keeps attackers (`FUN_14119d2d0`).
     pub under_attack: bool,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
-    pub pasture: Option<crate::gathering::PastureId>,
+    pub pasture: Option<PastureId>,
     /// `+0x794`, `my_pasture_id`: the pasture it tends.
-    pub my_pasture: Option<crate::gathering::PastureId>,
+    pub my_pasture: Option<PastureId>,
     /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
     pub undeletable: bool,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).
-    pub group: crate::groups::GroupLink,
+    pub group: GroupLink,
     /// The objects inside it (`+0x2f8`), in the order they came in (`FUN_141164af0`); one that
     /// leaves takes the last one's place (`FUN_141166450`).
     /// Not saved as a list: a load lists them by each one's `+0x2f0` in the objects' order.
@@ -70,7 +77,7 @@ pub struct Unit {
     pub garrison: Vec<ObjectId>,
     /// `damaged_lately_timer` (`+0x30d`, saved): 60 after a hit on a building (`FUN_1411cea90`),
     /// one off in each of its updates that passes whole seconds; the computer AI reads it.
-    pub damaged_lately: crate::objects::DamagedTimer,
+    pub damaged_lately: DamagedTimer,
     /// Its active sprite, held from an attack's swing on; None while the slice does not know it.
     /// Its clock runs at the animated layer's speed ([`crate::world::parts::Parts::anim_speed_of`]).
     #[diff(
@@ -85,7 +92,7 @@ pub struct Unit {
     #[diff(
         gap = "genie counts a target the game does not (MarvinBlue/426048731's town centre 9156 at update 1900)"
     )]
-    pub workers: crate::objects::WorkerCount,
+    pub workers: WorkerCount,
     /// `+0x650`, `mLastHumanOrderTime`: the world time of the last order a human gave it
     /// (`FUN_140e5e780`, for a unit with a unit AI); an animal's idle check lowers it to 5000.
     pub last_human_order: WorldTime,
@@ -147,10 +154,7 @@ impl Unit {
         &mut self,
         at: Position,
         moving: bool,
-        places: (
-            &mut crate::map::spatial::Spatial,
-            Option<&mut crate::pathing::Pathing>,
-        ),
+        places: (&mut Spatial, Option<&mut Pathing>),
     ) -> Result<(), GenieError> {
         self.place.new_position(self.id, at, moving, places)
     }
@@ -170,13 +174,10 @@ impl Unit {
 /// target's absence before the first target's state; the two touch different objects. Returns
 /// the second target after them and the object let go.
 pub(crate) fn second_target_checked(
-    site: Option<crate::gathering::DropSiteId>,
+    site: Option<DropSiteId>,
     held: bool,
     state: Option<ObjectState>,
-) -> (
-    Option<crate::gathering::DropSiteId>,
-    Option<crate::gathering::DropSiteId>,
-) {
+) -> (Option<DropSiteId>, Option<DropSiteId>) {
     let Some(site) = site else {
         return (None, None);
     };
@@ -201,11 +202,8 @@ pub(crate) fn object_master<'a>(
     (id, master_id): (ObjectId, MasterId),
     table: Option<&'a Masters>,
 ) -> Result<&'a Master, GenieError> {
-    own.or_else(|| table?.get(master_id)).ok_or_else(|| {
-        crate::world::OBJECT_MASTER
-            .with("object", id)
-            .with("master", master_id)
-    })
+    own.or_else(|| table?.get(master_id))
+        .ok_or_else(|| OBJECT_MASTER.with("object", id).with("master", master_id))
 }
 
 /// `RGE_Action_Object::update` (`0x14106ac90`): the action list of an object past state 2 goes

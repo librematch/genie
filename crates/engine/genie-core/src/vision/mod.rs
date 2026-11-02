@@ -35,6 +35,7 @@ pub use self::sight_shape::{SightCentre, SightShape};
 pub use self::sight_tiles::SightTiles;
 pub use self::tile_count::TileCount;
 pub use self::vision_bits::{VisionBits, VisionMasks};
+use crate::players::Relation;
 
 /// The attribute whose change turns the allied vision on (`FUN_141616820`'s case 0x32).
 pub const REVEAL_ALLY: usize = 50;
@@ -82,9 +83,9 @@ impl World {
         {
             let attribute = |i: usize| me.attributes.get(i).copied().unwrap_or(Amount::ZERO);
             let allies = |q: PlayerId| {
-                me.relations.get(q) == Some(&crate::players::Relation::ALLY)
+                me.relations.get(q) == Some(&Relation::ALLY)
                     && self.players.player(q).ok().and_then(|o| o.relations.get(p))
-                        == Some(&crate::players::Relation::ALLY)
+                        == Some(&Relation::ALLY)
             };
             let mine = masks.checked_mut(p)?;
             if me.allied_vision {
@@ -150,8 +151,22 @@ mod tests {
     use super::*;
     use crate::map::Position;
     use crate::objects::ObjectState;
+    #[cfg(test)]
+    use crate::objects::layers::Static;
+    #[cfg(test)]
+    use crate::objects::lifecycle::Lifecycle;
+    #[cfg(test)]
+    use crate::objects::masters::master_type::ANIMATED;
+    #[cfg(test)]
+    use crate::objects::masters::{Master, Masters};
+    #[cfg(test)]
+    use crate::objects::unit::Unit;
     use crate::players::Relation;
+    #[cfg(test)]
+    use crate::players::relation_row;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -169,14 +184,14 @@ mod tests {
     /// game's header load (`0xaa` for 1, 3, 5, 7 in its 4v4).
     fn teams() -> World {
         let player = |relations: Vec<u8>| Player {
-            relations: crate::players::relation_row(relations),
+            relations: relation_row(relations),
             allied_vision: true,
             attributes: vec![Amount::ZERO; 250],
             ..Player::default()
         };
         World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 5],
             vec![
@@ -273,14 +288,14 @@ mod tests {
     fn every_update_ends_with_the_masks_rebuilt_and_new_town_centres_flared() {
         let mut t = teams();
         t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
-        let flare = crate::objects::masters::Master {
+        let flare = Master {
             id: FLARE4,
-            kind: crate::objects::masters::master_type::ANIMATED,
+            kind: ANIMATED,
             standing_sprite: None,
-            ..crate::objects::masters::Master::default()
+            ..Master::default()
         };
         t.masters = (0..t.players.len())
-            .map(|_| crate::objects::masters::Masters::new([flare.clone()]))
+            .map(|_| Masters::new([flare.clone()]))
             .collect();
         t.next_object_id = object_id(100);
         let flares = |t: &World| -> Vec<(i32, Position)> {
@@ -301,15 +316,15 @@ mod tests {
         let _ = t
             .push_live(
                 PlayerId::new(1),
-                crate::objects::unit::Unit {
+                Unit {
                     id: object_id(50),
-                    place: crate::objects::layers::Static::at(Position::new(7.0, 8.0, 0.0)),
-                    life: crate::objects::lifecycle::Lifecycle {
+                    place: Static::at(Position::new(7.0, 8.0, 0.0)),
+                    life: Lifecycle {
                         master_id: TOWN_CENTRE,
                         state: ObjectState::Alive,
-                        ..crate::objects::lifecycle::Lifecycle::default()
+                        ..Lifecycle::default()
                     },
-                    ..crate::objects::unit::Unit::default()
+                    ..Unit::default()
                 },
             )
             .unwrap();

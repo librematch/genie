@@ -30,10 +30,13 @@ use genie_diff::Diff;
 pub const WAIT_SOLIDIFY: ActionType = ActionType::named(0x9a);
 
 pub use crate::construction::wait_solidify_state::WaitSolidifyState;
+use crate::math::image::wait_solidify::SOLID_FROM as WAIT_SOLIDIFY_SOLID_FROM;
+use crate::objects::masters::MasterTables;
+use crate::world::UNIT_AI_MASTER;
 
 /// `DAT_142eb56a0` (a double): the foundation's build points (`+0xc50`, widened) at most which
 /// it is not solid yet.
-const SOLID_FROM: f64 = crate::math::image::wait_solidify::SOLID_FROM;
+const SOLID_FROM: f64 = WAIT_SOLIDIFY_SOLID_FROM;
 
 /// `TRIBE_Action_Wait_Solidify`: its state (`+0x18`), its task (`+0x48`) and the foundation it
 /// waits for (`+0x68`).
@@ -110,20 +113,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Ok(false);
@@ -133,7 +130,7 @@ impl UnitView<'_, '_> {
             .w
             .masters
             .get(self.player.index())
-            .ok_or(crate::world::UNIT_AI_MASTER)?;
+            .ok_or(UNIT_AI_MASTER)?;
         let own = unit.master(self.c.w.master_tables(), self.player)?;
         let actor = Actor {
             id: unit.id,
@@ -181,6 +178,8 @@ impl UnitView<'_, '_> {
 mod tests {
     use super::*;
     use crate::objects::masters::TaskId;
+    #[cfg(test)]
+    use crate::objects::masters::action_type::BUILD;
     use crate::test_ids::object_id;
 
     fn foundation(id: i32) -> FoundationId {
@@ -190,7 +189,7 @@ mod tests {
     fn task() -> Task {
         Task {
             id: TaskId::test(3),
-            action_type: crate::objects::masters::action_type::BUILD,
+            action_type: BUILD,
             ..Task::default()
         }
     }

@@ -3,13 +3,22 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::image::unit_ai::{
+    DEFEND_SLACK as UNIT_AI_DEFEND_SLACK, EXPLORE_Z as UNIT_AI_EXPLORE_Z,
+    FOLLOW_SLACK_HIGH as UNIT_AI_FOLLOW_SLACK_HIGH, FOLLOW_SLACK_LOW as UNIT_AI_FOLLOW_SLACK_LOW,
+    FOUNDATION_REACH as UNIT_AI_FOUNDATION_REACH, INVALID_POINT as UNIT_AI_INVALID_POINT,
+    LION_SIGHT_DIVISOR as UNIT_AI_LION_SIGHT_DIVISOR, LION_SIGHT_SHARE as UNIT_AI_LION_SIGHT_SHARE,
+    RETARGET_RANGE as UNIT_AI_RETARGET_RANGE, RETARGET_REACH as UNIT_AI_RETARGET_REACH, RUN_ONE,
+};
 use crate::math::rng::Well512;
 use crate::objects::ActionState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::HeroFlags;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
+use crate::objects::masters::action_type::HUNT_RANGE;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::players::Amount;
@@ -94,11 +103,10 @@ pub(super) const BOAR_STEP: u32 = 6;
 pub(super) const BOAR_OFFSET: i32 = 3;
 pub(super) const AI_MOVE_RANGE: Distance = Distance::new(0.5);
 /// The height of the explore's target point (`FUN_140c4d910`, `DAT_14330eb8c`).
-pub(super) const EXPLORE_Z: f32 = crate::math::image::unit_ai::EXPLORE_Z;
+pub(super) const EXPLORE_Z: f32 = UNIT_AI_EXPLORE_Z;
 /// The villager's reach test of the foundation its search found (slot 0x3d0 in
 /// `FUN_140c22bf0`, `DAT_142eb5690`).
-pub(super) const FOUNDATION_REACH: Distance =
-    Distance::new(crate::math::image::unit_ai::FOUNDATION_REACH);
+pub(super) const FOUNDATION_REACH: Distance = Distance::new(UNIT_AI_FOUNDATION_REACH);
 
 /// A villager's notify, or a part of one, the slice does not model.
 pub(super) const VILLAGER_NOTIFY: GenieError =
@@ -109,9 +117,9 @@ pub(super) const VILLAGER_NOTIFY: GenieError =
 pub(super) const NO_ANIM_SPEED: GenieError =
     GenieError::unsupported("a moving villager's damage notify without its animation speed");
 /// The target point's x that marks it unset (`DAT_14330ec20`, −1), which the defend order fills.
-pub(super) const INVALID_POINT: f32 = crate::math::image::unit_ai::INVALID_POINT;
+pub(super) const INVALID_POINT: f32 = UNIT_AI_INVALID_POINT;
 /// What the defend order adds to its desired distance before it follows (`DAT_14330eb8c`, 1).
-pub(super) const DEFEND_SLACK: f32 = crate::math::image::unit_ai::DEFEND_SLACK;
+pub(super) const DEFEND_SLACK: f32 = UNIT_AI_DEFEND_SLACK;
 /// The master whose unit takes no defend order (slot 0x230's case 0x2bd: raw `0x611c`).
 pub(super) const DEFENDLESS_MASTER: MasterId = MasterId::named(128);
 
@@ -140,8 +148,8 @@ pub(super) const TREBUCHET_CLASS: ClassId = class::CLASS_51;
 pub(super) const TREBUCHET_PACKED_CLASS: ClassId = class::CLASS_54;
 /// The follow order's target counts as moved when it is more than a tile off the AI's target
 /// point on either axis (`0x140c567c0`: `DAT_14330ec20`, `DAT_14330eb8c`).
-pub(super) const FOLLOW_SLACK_LOW: f32 = crate::math::image::unit_ai::FOLLOW_SLACK_LOW;
-pub(super) const FOLLOW_SLACK_HIGH: f32 = crate::math::image::unit_ai::FOLLOW_SLACK_HIGH;
+pub(super) const FOLLOW_SLACK_LOW: f32 = UNIT_AI_FOLLOW_SLACK_LOW;
+pub(super) const FOLLOW_SLACK_HIGH: f32 = UNIT_AI_FOLLOW_SLACK_HIGH;
 
 /// The hunted animal's idle check (`FUN_140c1eea0`): away from its origin by more than
 /// `DAT_142eb0f48` (4, squared) it goes home once in 7 checks; otherwise it wanders 1 to 3 tiles
@@ -162,10 +170,10 @@ pub(super) const LION_IDLE_TIMEOUT: Millis = Millis::new(6000);
 pub(super) const LION_ATTACKED_TIMEOUT: Millis = Millis::new(1000);
 /// Outside mode 1 the lion attacks within this share of its line of sight (`FUN_140c1fb70`,
 /// `DAT_142e7f384`).
-pub(super) const LION_SIGHT_SHARE: f32 = crate::math::image::unit_ai::LION_SIGHT_SHARE;
+pub(super) const LION_SIGHT_SHARE: f32 = UNIT_AI_LION_SIGHT_SHARE;
 /// Finding no villager outside mode 1 it attacks within its line of sight over this
 /// (`FUN_140c1fb70`, `DAT_142eb1c98`).
-pub(super) const LION_SIGHT_DIVISOR: f32 = crate::math::image::unit_ai::LION_SIGHT_DIVISOR;
+pub(super) const LION_SIGHT_DIVISOR: f32 = UNIT_AI_LION_SIGHT_DIVISOR;
 /// The king's master that the branch passes over (raw `0x635c`).
 pub(super) const KING_UNLED: MasterId = MasterId::named(704);
 
@@ -173,7 +181,7 @@ pub(super) const KING_UNLED: MasterId = MasterId::named(704);
 /// the unit AI's table is [`RUN_ONE`]'s).
 ///
 /// [`RUN_ONE`]: crate::unit_ai::RUN_ONE
-pub(super) const WALK_BACK: f32 = crate::math::image::unit_ai::RUN_ONE;
+pub(super) const WALK_BACK: f32 = RUN_ONE;
 
 /// The action values the full update resets once the unit's actions ended (`0x140c66b10`, the
 /// unit's slot 0x430 false).
@@ -190,9 +198,9 @@ pub(super) const ENDED_ACTIONS: [ActionKind; 9] = [
 ];
 /// A human player's unit on the attack order with a range above this does not retarget
 /// (processMisc).
-pub(super) const RETARGET_RANGE: f32 = crate::math::image::unit_ai::RETARGET_RANGE;
+pub(super) const RETARGET_RANGE: f32 = UNIT_AI_RETARGET_RANGE;
 /// The retarget's reference distance about a current target (`DAT_142eb9430`).
-pub(super) const RETARGET_REACH: f32 = crate::math::image::unit_ai::RETARGET_REACH;
+pub(super) const RETARGET_REACH: f32 = UNIT_AI_RETARGET_REACH;
 
 /// What the retarget's search reads of its checks ([`UnitAi::retarget_outcome`]): the current
 /// target is a building's, wall's or trebuchet's (or one off the attack order), and the top
@@ -307,11 +315,7 @@ impl NewObject {
     /// human player's in the Dark Age with posture 0 ([`NewObject::player_type`],
     /// [`NewObject::posture`], [`NewObject::age`] are the caller's).
     #[must_use]
-    pub fn of(
-        position: Position,
-        master: MasterId,
-        made: &crate::objects::masters::Master,
-    ) -> Self {
+    pub fn of(position: Position, master: MasterId, made: &Master) -> Self {
         Self {
             position,
             master,
@@ -324,7 +328,7 @@ impl NewObject {
                 .tasks
                 .iter()
                 .rev()
-                .find(|t| t.action_type == crate::objects::masters::action_type::HUNT_RANGE)
+                .find(|t| t.action_type == HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
             player_type: PlayerType::HUMAN,
             posture: Posture::AGGRESSIVE,

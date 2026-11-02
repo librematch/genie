@@ -1,4 +1,6 @@
+use crate::element::ReadableHeaderElement;
 use crate::player::history::{DiplomacyOffer, HistoryEvent, HistoryInfo};
+use crate::test_support::header_reader;
 use crate::test_support::{Bytes, read_all};
 
 /// An event: its type, the time slice, the world time and three parameters.
@@ -55,8 +57,8 @@ fn history_short_of_its_statistics_is_an_error() {
         .i32(0)
         .raw(&[0; 179])
         .0;
-    let mut reader = crate::test_support::header_reader(&bytes, 11.97);
-    let read = <HistoryInfo as crate::element::ReadableHeaderElement>::read_from(&mut reader);
+    let mut reader = header_reader(&bytes, 11.97);
+    let read = <HistoryInfo as ReadableHeaderElement>::read_from(&mut reader);
     assert!(read.is_err());
 }
 

@@ -1,6 +1,9 @@
 //! A worker's work rate ([`WorkRate`]), with the game's `f32` operations.
 
+use crate::objects::masters::WorkValue;
 use crate::world::Seconds;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, AddAssign, Mul, MulAssign};
 
 /// The work an object does per second, as the game's `f32` holds it: a master's `work_rate`
 /// (`+0x798`) and an object's powerup of it (`mWorkRatePowerup`, `+0xa30`, slot 0x6e8), their
@@ -29,7 +32,7 @@ impl WorkRate {
     }
 }
 
-impl std::ops::Add for WorkRate {
+impl Add for WorkRate {
     type Output = Self;
 
     /// The `f32` sum (a master's rate and an object's powerup, in the game's order).
@@ -38,14 +41,14 @@ impl std::ops::Add for WorkRate {
     }
 }
 
-impl std::ops::AddAssign for WorkRate {
+impl AddAssign for WorkRate {
     /// The `f32` sum in place (a powerup added).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::Mul<f32> for WorkRate {
+impl Mul<f32> for WorkRate {
     type Output = Self;
 
     /// The rate scaled by `f` (one `f32` product, the rate first: a task's work value).
@@ -54,14 +57,14 @@ impl std::ops::Mul<f32> for WorkRate {
     }
 }
 
-impl std::ops::MulAssign<f32> for WorkRate {
+impl MulAssign<f32> for WorkRate {
     /// The rate scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
     }
 }
 
-impl std::ops::Mul<Seconds> for WorkRate {
+impl Mul<Seconds> for WorkRate {
     type Output = f32;
 
     /// The work done in `dt` (one `f32` product, the rate first), in the task's unit.
@@ -70,17 +73,17 @@ impl std::ops::Mul<Seconds> for WorkRate {
     }
 }
 
-impl std::fmt::Display for WorkRate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for WorkRate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
 
-impl std::ops::Mul<crate::objects::masters::WorkValue> for WorkRate {
+impl Mul<WorkValue> for WorkRate {
     type Output = Self;
 
     /// The rate a task's work value scales (one `f32` product, the rate first).
-    fn mul(self, value: crate::objects::masters::WorkValue) -> Self {
+    fn mul(self, value: WorkValue) -> Self {
         Self(self.0 * value.get())
     }
 }

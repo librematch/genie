@@ -11,26 +11,32 @@
 use crate::map::Point;
 use crate::math::Angle;
 use crate::math::fmath::{self, BVector};
+use crate::math::image::facing::{
+    EPSILON as FACING_EPSILON, HALF as FACING_HALF, MINUS_HALF as FACING_MINUS_HALF,
+    MINUS_ONE as FACING_MINUS_ONE, MINUS_PI as FACING_MINUS_PI,
+    MINUS_TWO_PI as FACING_MINUS_TWO_PI, ONE as FACING_ONE, PI as FACING_PI,
+    QUARTER_PI as FACING_QUARTER_PI, TWO as FACING_TWO, TWO_PI as FACING_TWO_PI,
+};
 use crate::objects::{Facet, FacetCount};
 use crate::world::{Seconds, WorldTime};
 use genie_diff::Diff;
 
-const TWO_PI: f32 = crate::math::image::facing::TWO_PI;
-const MINUS_TWO_PI: f32 = crate::math::image::facing::MINUS_TWO_PI;
-const PI: f32 = crate::math::image::facing::PI;
-const MINUS_PI: f32 = crate::math::image::facing::MINUS_PI;
+const TWO_PI: f32 = FACING_TWO_PI;
+const MINUS_TWO_PI: f32 = FACING_MINUS_TWO_PI;
+const PI: f32 = FACING_PI;
+const MINUS_PI: f32 = FACING_MINUS_PI;
 /// A facet's angle starts a quarter turn of π in (`DAT_142eb6e44`).
-const QUARTER_PI: f32 = crate::math::image::facing::QUARTER_PI;
+const QUARTER_PI: f32 = FACING_QUARTER_PI;
 /// A facing within half a facet (`DAT_142e7f384`, `DAT_142eb6e58`) faces.
-const HALF: f32 = crate::math::image::facing::HALF;
-const MINUS_HALF: f32 = crate::math::image::facing::MINUS_HALF;
+const HALF: f32 = FACING_HALF;
+const MINUS_HALF: f32 = FACING_MINUS_HALF;
 /// No offset below this (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::facing::EPSILON;
+const EPSILON: f32 = FACING_EPSILON;
 /// The cosine's bounds (`DAT_14330eb8c`, `DAT_14330ec20`) and the diagonal's square (`DAT_142e8c150`)
 /// of the forward vector's facet (`FUN_14119d0c0`).
-const ONE: f32 = crate::math::image::facing::ONE;
-const MINUS_ONE: f32 = crate::math::image::facing::MINUS_ONE;
-const TWO: f32 = crate::math::image::facing::TWO;
+const ONE: f32 = FACING_ONE;
+const MINUS_ONE: f32 = FACING_MINUS_ONE;
+const TWO: f32 = FACING_TWO;
 
 /// What the facing routines read of the current sprite: its facets and whether its sequence
 /// flags have bit 1 (`+0x1a`).

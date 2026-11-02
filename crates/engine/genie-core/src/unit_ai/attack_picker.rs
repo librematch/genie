@@ -8,6 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::unit_ai::Memory;
 use crate::unit_ai::best_target::AttackCategory;
+use crate::unit_ai::best_target::{Candidate, Searcher, Thing};
 
 /// What `bestUnitToAttack` (`FUN_140c44680`, [`crate::unit_ai::best_target::best_unit_to_attack`]) asks
 /// of the world while its unit AI runs: the searching unit ([`AttackPicker::searcher`]) and its
@@ -18,21 +19,14 @@ pub trait AttackPicker {
     /// # Errors
     ///
     /// A unit the reads do not model (a computer player's).
-    fn searcher(
-        &mut self,
-        memory: Memory<'_>,
-    ) -> Result<crate::unit_ai::best_target::Searcher, GenieError>;
+    fn searcher(&mut self, memory: Memory<'_>) -> Result<Searcher, GenieError>;
 
     /// [`crate::unit_ai::best_target::Battlefield::thing`].
     ///
     /// # Errors
     ///
     /// An object the slice does not hold.
-    fn thing(
-        &mut self,
-        world: &Spatial,
-        id: ObjectId,
-    ) -> Result<Option<crate::unit_ai::best_target::Thing>, GenieError>;
+    fn thing(&mut self, world: &Spatial, id: ObjectId) -> Result<Option<Thing>, GenieError>;
 
     /// [`crate::unit_ai::best_target::Battlefield::can_attack`].
     ///
@@ -73,7 +67,7 @@ pub trait AttackPicker {
         id: ObjectId,
         distance: Distance,
         category: Option<AttackCategory>,
-    ) -> Result<crate::unit_ai::best_target::Candidate, GenieError>;
+    ) -> Result<Candidate, GenieError>;
 
     /// [`crate::unit_ai::best_target::Battlefield::armored`].
     ///
@@ -118,18 +112,11 @@ pub(super) const NO_ATTACK: GenieError =
 pub struct NoAttack;
 
 impl AttackPicker for NoAttack {
-    fn searcher(
-        &mut self,
-        _: Memory<'_>,
-    ) -> Result<crate::unit_ai::best_target::Searcher, GenieError> {
+    fn searcher(&mut self, _: Memory<'_>) -> Result<Searcher, GenieError> {
         Err(NO_ATTACK)
     }
 
-    fn thing(
-        &mut self,
-        _: &Spatial,
-        _: ObjectId,
-    ) -> Result<Option<crate::unit_ai::best_target::Thing>, GenieError> {
+    fn thing(&mut self, _: &Spatial, _: ObjectId) -> Result<Option<Thing>, GenieError> {
         Err(NO_ATTACK)
     }
 
@@ -155,7 +142,7 @@ impl AttackPicker for NoAttack {
         _: ObjectId,
         _: Distance,
         _: Option<AttackCategory>,
-    ) -> Result<crate::unit_ai::best_target::Candidate, GenieError> {
+    ) -> Result<Candidate, GenieError> {
         Err(NO_ATTACK)
     }
 

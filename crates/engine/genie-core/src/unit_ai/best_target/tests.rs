@@ -17,9 +17,12 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::test_ids::{attack_category, category_of};
+use crate::unit_ai::OrderRecord;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::{Percent, TargetingMode};
+use std::collections::BTreeMap;
 
 fn candidate(id: i32, distance: Distance, speed: f32) -> Candidate {
     Candidate {
@@ -98,10 +101,7 @@ fn the_scores_rank_and_sort_the_entries() {
     st.add(&candidate(9, Distance::new(4.0), 0.0));
     let mut weights = ByCategory::default();
     weights[category_of(1)] = OrderWeight::new(0.5);
-    let targeting = (
-        crate::world::TargetingMode::of_data(0),
-        crate::world::Percent::new(0),
-    );
+    let targeting = (TargetingMode::of_data(0), Percent::new(0));
     st.score(&weights, targeting, &mut |_| Ok(false)).unwrap();
     let scores: Vec<(f32, f32, f32, f32)> = st
         .entries
@@ -144,10 +144,10 @@ fn the_scores_rank_and_sort_the_entries() {
 /// first one older than a minute ends the walk.
 #[test]
 fn the_order_history_weighs_the_last_minute_categories() {
-    let record = |time, category| crate::unit_ai::OrderRecord {
+    let record = |time, category| OrderRecord {
         time,
         category: attack_category(category),
-        ..crate::unit_ai::OrderRecord::default()
+        ..OrderRecord::default()
     };
     let w = order_weights(
         &[
@@ -168,7 +168,7 @@ fn the_order_history_weighs_the_last_minute_categories() {
 /// the friends' scan, `'n'` the neutral test) and the ones made, in order.
 #[derive(Default)]
 struct Field {
-    things: std::collections::BTreeMap<ObjectId, (Thing, Candidate)>,
+    things: BTreeMap<ObjectId, (Thing, Candidate)>,
     quick: Vec<ObjectId>,
     paths: Vec<ObjectId>,
     asked: Vec<(char, ObjectId)>,

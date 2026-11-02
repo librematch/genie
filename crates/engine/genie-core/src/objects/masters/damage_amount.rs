@@ -1,5 +1,7 @@
 //! An attack's or an armor's amount.
 
+use crate::math::conversions::cvttss2si;
+
 /// An attack's or an armor's amount: the `.dat`'s `amount` of an attack or armor entry, the base
 /// armor (`+0x800`), the shown attack and armors, and an object's armor powerups and the armor
 /// its charge's hits took off it. A signed short, which the armor slots add and subtract
@@ -42,7 +44,7 @@ impl DamageAmount {
     /// The amount an effect's float `v` sets: `CVTTSS2SI`, then its low 16 bits.
     #[must_use]
     pub fn of_effect(v: f32) -> Self {
-        Self(crate::math::conversions::cvttss2si(v) as i16)
+        Self(cvttss2si(v) as i16)
     }
 
     /// The product with the short `factor`, wrapping as the game's 16-bit multiply.

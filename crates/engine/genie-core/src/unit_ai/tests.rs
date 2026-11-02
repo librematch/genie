@@ -1,18 +1,24 @@
 use super::*;
+use crate::combat::Firepower;
+use crate::combat::attack::ATTACK;
 use crate::construction::FoundationId;
 use crate::construction::MainBuildingId;
 use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
+use crate::gathering::gather::GATHER;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Tile;
+use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
+use crate::math::fmath::sqrt;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
@@ -24,13 +30,16 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
+use crate::objects::masters::action_type::{COMBAT, CONVERT, PACK};
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::{Master, Task};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
+use crate::players::Chance;
 use crate::players::PlayerType;
 use crate::players::Posture;
 use crate::players::QueryRelation;
@@ -227,7 +236,7 @@ fn the_builder_flood_tests_left_right_below_above() {
 }
 
 impl UnitSide for Recorder {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
@@ -297,7 +306,7 @@ struct HelpSide {
 }
 
 impl UnitSide for HelpSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
@@ -309,7 +318,7 @@ impl UnitSide for HelpSide {
             position: None,
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(0),
+            distance: WholeDistance::of_data(0),
             retries: [None; 3],
         })
     }
@@ -368,15 +377,15 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
         a
     };
     let tasks = [
-        crate::objects::masters::Task {
-            action_type: crate::objects::masters::action_type::CONVERT,
-            ..crate::objects::masters::Task::default()
+        Task {
+            action_type: CONVERT,
+            ..Task::default()
         },
-        crate::objects::masters::Task {
-            action_type: crate::objects::masters::action_type::CONVERT,
+        Task {
+            action_type: CONVERT,
             object_group: Some(class_id(3)),
             attribute_type4: Some(AttributeId::numbered(28)),
-            ..crate::objects::masters::Task::default()
+            ..Task::default()
         },
     ];
     let monk = Converter {
@@ -582,7 +591,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
 struct OffSide(OffFootprint, Vec<(ObjectId, Footprint)>);
 
 impl UnitSide for OffSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -783,7 +792,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
 struct WaitSide(bool, Vec<ObjectId>);
 
 impl UnitSide for WaitSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
@@ -1063,7 +1072,7 @@ struct ResourceSide {
 }
 
 impl UnitSide for ResourceSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
@@ -1127,7 +1136,7 @@ fn found_at(id: i32) -> Found {
         position: (id != -1).then_some(Position::new(5.0, 6.0, 0.0)),
         fresh: true,
         players: 0,
-        distance: crate::map::WholeDistance::of_data(-1),
+        distance: WholeDistance::of_data(-1),
         retries: [None; 3],
     }
 }
@@ -1909,7 +1918,7 @@ struct LionSide {
 }
 
 impl UnitSide for LionSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -1921,7 +1930,7 @@ impl UnitSide for LionSide {
             position: Some(Position::ORIGIN),
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     }
@@ -2030,13 +2039,13 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
 struct SoldierSide {
     found: i32,
     attacks: Vec<(ObjectId, bool)>,
-    patrol: Option<(PatrolPath, crate::movement::WaypointIndex)>,
+    patrol: Option<(PatrolPath, WaypointIndex)>,
     /// Slot 0xa0 refuses every target.
     refuses: bool,
 }
 
 impl UnitSide for SoldierSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         self.patrol.clone()
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -2046,7 +2055,7 @@ impl UnitSide for SoldierSide {
             position: Some(Position::new(10.0, 11.0, 0.0)),
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     }
@@ -2094,7 +2103,7 @@ struct DamageSide {
     attacks: Vec<ObjectId>,
     helps: Vec<ObjectId>,
     under_attack: Vec<bool>,
-    patrol: Option<(PatrolPath, crate::movement::WaypointIndex)>,
+    patrol: Option<(PatrolPath, WaypointIndex)>,
     harmless: Vec<ObjectId>,
     defended: Option<NearestAttacker>,
 }
@@ -2113,7 +2122,7 @@ impl UnitSide for DamageSide {
             position: None,
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     }
@@ -2147,7 +2156,7 @@ impl UnitSide for DamageSide {
     fn make_scout_map(&mut self) -> Result<(), GenieError> {
         Err(GenieError::unsupported("no world here"))
     }
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         self.patrol.clone()
     }
     fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
@@ -2705,7 +2714,7 @@ fn villager_dodges_missile_warning_or_takes_it_as_damage() {
         kind: NotifyKind::MISSILE_WARNING,
         ..hit
     };
-    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r + 1).unwrap());
+    at.dodge_chance = Chance::of_data(u8::try_from(r + 1).unwrap());
     let mut side = DamageSide {
         units: vec![foe(30, class::CLASS_6)],
         ..DamageSide::default()
@@ -2724,7 +2733,7 @@ fn villager_dodges_missile_warning_or_takes_it_as_damage() {
         Ok(GO_ON)
     );
     assert_eq!((ai.draws, fx.len(), u.attackers.iter().count()), (1, 0, 0));
-    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r).unwrap());
+    at.dodge_chance = Chance::of_data(u8::try_from(r).unwrap());
     assert_eq!(
         u.handle(
             warning,
@@ -3436,10 +3445,7 @@ fn soldier_with_target_attacks_back_from_buildings_only() {
             units: vec![foe(7, class::CLASS_6), foe(9, class)],
             found: 7,
             reaches: true,
-            patrol: Some((
-                PatrolPath::default(),
-                crate::movement::WaypointIndex::of_data(2),
-            )),
+            patrol: Some((PatrolPath::default(), WaypointIndex::of_data(2))),
             ..DamageSide::default()
         };
         let r = u
@@ -4396,7 +4402,7 @@ fn new_building_unit_ai_draws_its_three_timers() {
             alert_mode: false,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
-            patrol_waypoint: crate::movement::WaypointIndex::of_data(0),
+            patrol_waypoint: WaypointIndex::of_data(0),
             stop_after_kill: false,
             home: None,
             hunted: None,
@@ -4476,7 +4482,7 @@ impl ArtifactSide {
             found: Found {
                 id: ObjectId::of_field(id),
                 players,
-                distance: crate::map::WholeDistance::of_data(-1),
+                distance: WholeDistance::of_data(-1),
                 position: Some(Position::new(140.0, 100.0, 0.0)),
                 ..Found::NONE
             },
@@ -4488,7 +4494,7 @@ impl ArtifactSide {
 }
 
 impl UnitSide for ArtifactSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
@@ -4543,7 +4549,7 @@ struct ScoutSide {
 }
 
 impl UnitSide for ScoutSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -4854,7 +4860,7 @@ fn the_artifact_notifies_stop_it_or_go_on() {
     ai.current_target = Some(object_id(9));
     let seen = Surroundings {
         target: Some(Seen {
-            sight: crate::map::spatial::TileSight::of_data(0xf),
+            sight: TileSight::of_data(0xf),
             ..Seen::default()
         }),
         ..at.clone()
@@ -4865,7 +4871,7 @@ fn the_artifact_notifies_stop_it_or_go_on() {
     );
     let explored = Surroundings {
         target: Some(Seen {
-            sight: crate::map::spatial::TileSight::of_data(0x80),
+            sight: TileSight::of_data(0x80),
             ..Seen::default()
         }),
         ..at
@@ -5267,26 +5273,23 @@ fn new_siege_unit_takes_its_stance_from_its_class_and_owner() {
 /// its last task of action type 6 (0 without one).
 #[test]
 fn new_object_takes_its_hunt_range_from_its_master_last_task_of_type_6() {
-    let task = |action_type, work_range| crate::objects::masters::Task {
+    let task = |action_type, work_range| Task {
         action_type,
         work_range,
-        ..crate::objects::masters::Task::default()
+        ..Task::default()
     };
-    let made = crate::objects::masters::Master {
+    let made = Master {
         copy_id: Some(master_id(1240)),
         class: class::PREY,
         object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
         hero_flag: HeroFlags::REGENERATES,
         tasks: vec![
             task(ActionType::named(6), Distance::new(2.0)),
-            task(
-                crate::objects::masters::action_type::COMBAT,
-                Distance::new(9.0),
-            ),
+            task(COMBAT, Distance::new(9.0)),
             task(ActionType::named(6), Distance::new(3.5)),
-            task(crate::gathering::gather::GATHER, Distance::new(1.0)),
+            task(GATHER, Distance::new(1.0)),
         ],
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     };
     let new = NewObject::of(Position::new(1.0, 2.0, 3.0), master_id(1239), &made);
     assert_eq!(
@@ -5304,11 +5307,7 @@ fn new_object_takes_its_hunt_range_from_its_master_last_task_of_type_6() {
             ..NewObject::default()
         }
     );
-    let none = NewObject::of(
-        Position::ORIGIN,
-        master_id(1),
-        &crate::objects::masters::Master::default(),
-    );
+    let none = NewObject::of(Position::ORIGIN, master_id(1), &Master::default());
     assert_eq!(none.hunt_range, Distance::ZERO);
 }
 
@@ -5320,7 +5319,7 @@ fn an_order_redraws_an_adjusted_idle_timeout_of_750_or_more_and_caps_the_seconda
         adjusted_idle_timeout: Millis::new(2600),
         secondary_timer: Millis::new(900),
         patrol_path: Some(PatrolPath::default()),
-        patrol_waypoint: crate::movement::WaypointIndex::of_data(3),
+        patrol_waypoint: WaypointIndex::of_data(3),
         ..idle(UnitAiType::SOLDIER)
     };
     let mut r = rng();
@@ -5750,7 +5749,7 @@ fn deer_that_sees_an_object_evades_it() {
             position: Some(Position::new(33.5, 106.5, 0.0)),
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -6403,7 +6402,7 @@ fn making_building_runs_process_idle_only_without_target() {
     // a building without a missile and a single volley forgets its target, then searches
     let single = Surroundings {
         ranged: false,
-        firepower: crate::combat::Firepower::new(1.0),
+        firepower: Firepower::new(1.0),
         ..at
     };
     let mut u = tc(Some(object_id(29826)));
@@ -6417,7 +6416,7 @@ fn making_building_runs_process_idle_only_without_target() {
     );
     // with units inside it shoots more and keeps it
     let manned = Surroundings {
-        firepower: crate::combat::Firepower::new(3.0),
+        firepower: Firepower::new(3.0),
         ..single
     };
     let mut u = tc(Some(object_id(29826)));
@@ -6855,7 +6854,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
             position: Some(Position::ORIGIN),
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -6951,7 +6950,7 @@ const TC: Attacker = Attacker {
     radius: Footprint::new(2.0, 2.0),
     speed: Speed::ZERO,
     scenario: false,
-    firepower: crate::combat::Firepower::new(0.0),
+    firepower: Firepower::new(0.0),
     capture: CaptureKind::NONE,
 };
 
@@ -7020,21 +7019,11 @@ fn each_unit_ai_type_has_its_own_attack_check() {
         Ok(false)
     );
     assert_eq!(
-        check(
-            UnitAiType::HUNTED,
-            Some(crate::combat::attack::ATTACK),
-            0,
-            class::VILLAGER
-        ),
+        check(UnitAiType::HUNTED, Some(ATTACK), 0, class::VILLAGER),
         Ok(true)
     );
     assert_eq!(
-        check(
-            UnitAiType::HUNTED,
-            Some(crate::objects::masters::action_type::COMBAT),
-            0,
-            class::VILLAGER
-        ),
+        check(UnitAiType::HUNTED, Some(COMBAT), 0, class::VILLAGER),
         Ok(true)
     );
     // the predator's list and the lion's: 4 (villagers) yes, 10 no
@@ -7112,7 +7101,7 @@ fn tower_passes_boar_but_not_wolf() {
     };
     assert_eq!(can_attack(&bare, &IDLE, &enemy), Ok(false));
     let manned = Attacker {
-        firepower: crate::combat::Firepower::new(2.0),
+        firepower: Firepower::new(2.0),
         ..bare
     };
     assert_eq!(can_attack(&manned, &IDLE, &enemy), Ok(true));
@@ -7775,7 +7764,7 @@ fn grouped_unit_full_update_reads_its_group() {
         radius: Footprint::new(0.2, 0.2),
         visible: true,
         flags: ObjectFlags::NONE,
-        sight: crate::map::spatial::TileSight::of_data(0xf),
+        sight: TileSight::of_data(0xf),
     };
     let target_at = Surroundings {
         target: Some(seen),
@@ -7989,7 +7978,7 @@ fn no_attack_tower_only_searches() {
             position: None,
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -8509,7 +8498,7 @@ fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
             position: Some(Position::new(31.5, 106.5, 0.0)),
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -8538,7 +8527,7 @@ fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
             position: Some(Position::new(3.5, 4.5, 0.0)),
             fresh: true,
             players: 0,
-            distance: crate::map::WholeDistance::of_data(-1),
+            distance: WholeDistance::of_data(-1),
             retries: [None; 3],
         })
     };
@@ -8563,7 +8552,7 @@ struct StandSide {
 }
 
 impl UnitSide for StandSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -9106,7 +9095,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         (r + r) / RUN_DRAW_SCALE - RUN_ONE
     };
     let (vx, vy) = (part(), part());
-    let d = crate::math::fmath::sqrt(vy * vy + vx * vx);
+    let d = sqrt(vy * vy + vx * vx);
     let away = Position::new(20.0 - (vx / d) * 2.0, 30.0 - (vy / d) * 2.0, 0.0);
     let mut u = runner(vec![77, 78]);
     assert_eq!(run(&mut u, &at, true, PlayerType::HUMAN).1, to(away));
@@ -9280,7 +9269,7 @@ fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
             ends_in_range: false,
             patrol: true,
             back_and_forth: false,
-            resume: crate::movement::WaypointIndex::of_data(-1),
+            resume: WaypointIndex::of_data(-1),
             attack_move: Some(false),
         }
     );
@@ -9308,7 +9297,7 @@ fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
             flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
             ..PatrolPath::default()
         }),
-        patrol_waypoint: crate::movement::WaypointIndex::of_data(2),
+        patrol_waypoint: WaypointIndex::of_data(2),
         ..idle(UnitAiType::SOLDIER)
     };
     let ask = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(20.5, 20.0));
@@ -9388,7 +9377,7 @@ fn patrol_saves_itself_and_attacks_what_it_finds() {
     let mut side = SoldierSide {
         found: 77,
         attacks: Vec::new(),
-        patrol: Some((saved.clone(), crate::movement::WaypointIndex::of_data(2))),
+        patrol: Some((saved.clone(), WaypointIndex::of_data(2))),
         refuses: false,
     };
     let mut r = rng();
@@ -9542,10 +9531,7 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     let (mut u, at) = patroller(0);
     let mut s = SoldierSide {
         refuses: true,
-        patrol: Some((
-            PatrolPath::default(),
-            crate::movement::WaypointIndex::of_data(3),
-        )),
+        patrol: Some((PatrolPath::default(), WaypointIndex::of_data(3))),
         ..side(77)
     };
     assert_eq!(idle(&mut u, &at, &mut s, PlayerType::HUMAN), Ok(false));
@@ -10118,7 +10104,7 @@ fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
         tested: Vec::new(),
     };
     let (mut u, mut at) = attacked_transport();
-    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r + 1).unwrap());
+    at.dodge_chance = Chance::of_data(u8::try_from(r + 1).unwrap());
     let mut ai = rng();
     let mut fx = Vec::new();
     assert_eq!(
@@ -10134,7 +10120,7 @@ fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
     );
     assert_eq!((ai.draws, fx.len()), (1, 0));
     let (mut u, mut at) = attacked_transport();
-    at.dodge_chance = crate::players::Chance::of_data(u8::try_from(r).unwrap());
+    at.dodge_chance = Chance::of_data(u8::try_from(r).unwrap());
     let mut fx = Vec::new();
     assert_eq!(
         u.handle(
@@ -10271,7 +10257,7 @@ struct ShipSide {
 }
 
 impl UnitSide for ShipSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
@@ -10570,10 +10556,10 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
     };
     let mut side = ShipSide {
         found: vec![
-            found(None, crate::map::WholeDistance::of_data(-1)),
-            found(Some(object_id(41)), crate::map::WholeDistance::of_data(6)),
-            found(Some(object_id(42)), crate::map::WholeDistance::of_data(3)),
-            found(Some(object_id(43)), crate::map::WholeDistance::of_data(3)),
+            found(None, WholeDistance::of_data(-1)),
+            found(Some(object_id(41)), WholeDistance::of_data(6)),
+            found(Some(object_id(42)), WholeDistance::of_data(3)),
+            found(Some(object_id(43)), WholeDistance::of_data(3)),
             Found::NONE,
         ],
         reach: true,
@@ -10618,10 +10604,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
     assert_eq!(groups, FISHING_BUILDS.map(Some).to_vec());
     // out of reach: the human's goes on, the computer's posts its completion
     let mut side = ShipSide {
-        found: vec![found(
-            Some(object_id(41)),
-            crate::map::WholeDistance::of_data(6),
-        )],
+        found: vec![found(Some(object_id(41)), WholeDistance::of_data(6))],
         ..ShipSide::default()
     };
     let mut fx = Vec::new();
@@ -10757,7 +10740,7 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
         );
     }
     // the diagonal: sqrt(0.36 + 0.36) = 0.8485; a gap of 7.8 - 0.8485 is within 7
-    let diagonal = crate::math::fmath::sqrt(0.6f32 * 0.6 + 0.6 * 0.6);
+    let diagonal = sqrt(0.6f32 * 0.6 + 0.6 * 0.6);
     let x = 20.0 + 0.2 + 7.0 + diagonal;
     assert_eq!(
         check(
@@ -10839,7 +10822,7 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
         Ok(true)
     );
     let packing = Attacker {
-        top_action: Some(crate::objects::masters::action_type::PACK),
+        top_action: Some(PACK),
         ..MANGONEL
     };
     assert_eq!(
@@ -10941,7 +10924,7 @@ struct SiegeSide {
 }
 
 impl UnitSide for SiegeSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -11276,7 +11259,7 @@ struct TailSide {
 }
 
 impl UnitSide for TailSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -11757,7 +11740,7 @@ fn patrol_distance_is_the_least_to_the_lines_through_its_points() {
 #[test]
 fn unit_with_patrol_information_leashes_to_its_patrol_path() {
     let path = PatrolPath {
-        path: crate::pathing::tile_path::Path {
+        path: Path {
             points: vec![BVector::new(0.0, 0.0, 10.0), BVector::new(20.0, 0.0, 10.0)],
             length: Distance::new(20.0),
         },
@@ -11914,7 +11897,7 @@ impl OrderSide {
 }
 
 impl UnitSide for OrderSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         None
     }
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
@@ -12954,7 +12937,7 @@ fn gone_target_of_type_sends_the_unit_to_the_closest_resource_of_its_kind() {
         side.searches,
         [ResourceSearch {
             kind: GatherGroup::WOOD,
-            cap: crate::objects::WorkerCount::of_data(2),
+            cap: WorkerCount::of_data(2),
             site: None,
             current: Some(object_id(7)),
             point: Point::new(12.5, 30.5),
@@ -12980,7 +12963,7 @@ fn gone_target_of_type_sends_the_unit_to_the_closest_resource_of_its_kind() {
     );
     assert_eq!(
         (side.searches[0].kind, side.searches[0].cap),
-        (GatherGroup::GOLD, crate::objects::WorkerCount::of_data(-1))
+        (GatherGroup::GOLD, WorkerCount::of_data(-1))
     );
     let (r, fx, _) = run_order(&mut u, owned(67), class::VILLAGER, &mut side);
     assert_eq!(
@@ -13483,7 +13466,7 @@ impl RetargetSide {
 }
 
 impl UnitSide for RetargetSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         self.soldier.patrol_information()
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {

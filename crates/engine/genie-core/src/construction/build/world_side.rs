@@ -3,23 +3,38 @@
 //! stacking and its new objects.
 
 use crate::GenieError;
+use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::construction::FoundationId;
 use crate::construction::build::{Completion, Construction, StackUnit};
+use crate::gathering::PastureId;
 use crate::map::Position;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
+use crate::math::image::build::STACK_WORK as BUILD_STACK_WORK;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::lifecycle::death_parts::{
+    farm_bonus, storage_leaves as death_parts_storage_leaves,
+};
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, player_master};
+use crate::objects::unit::Unit;
+use crate::orders::lock_gate;
 use crate::players::PlayerId;
+use crate::production::spawn::Facing;
+use crate::unit_ai::QueuedOrder;
 use crate::world::Seconds;
 use crate::world::index::Place;
+use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
+use crate::world::{Player, World};
 
-impl crate::world::World {
+impl World {
     /// What a built building's storage gave its owner leaves (`FUN_1411e63f0`, then
     /// `FUN_1411e6580`, [`crate::objects::lifecycle::death_parts::storage_leaves`]) outside its update.
     ///
@@ -33,7 +48,7 @@ impl crate::world::World {
         master: &Master,
     ) -> Result<(), GenieError> {
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
-        for (kind, amount) in crate::objects::lifecycle::death_parts::storage_leaves(held, master) {
+        for (kind, amount) in death_parts_storage_leaves(held, master) {
             self.players
                 .player_mut(owner)?
                 .add_attribute(kind, amount)?;
@@ -63,9 +78,7 @@ impl crate::world::World {
             .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
-            farm_bonus: crate::objects::lifecycle::death_parts::farm_bonus(
-                &self.players.player(owner)?.attributes,
-            ),
+            farm_bonus: farm_bonus(&self.players.player(owner)?.attributes),
             masters: self.masters.of(owner),
             player_type: self.players.player(owner)?.kind,
             ai: self.parts.unit_ai.contains(u.id),
@@ -79,7 +92,7 @@ impl crate::world::World {
                 .add_attribute(kind, amount)?;
         }
         if part.pasture {
-            self.setup_pasture(owner, crate::gathering::PastureId::new(id))?;
+            self.setup_pasture(owner, PastureId::new(id))?;
         }
         if part.cart {
             self.cart_search(owner, id, ObjectState::Foundation)?;
@@ -103,10 +116,7 @@ impl crate::world::World {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let (Place::Live(p, _) | Place::Sleeping(p, _)) = place;
         let volley = held(&mut self.players, place)?
-            .master(
-                crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
-                p,
-            )?
+            .master(MasterTables::new(&self.masters, &self.parts.own_master), p)?
             .volley_fire;
         let now = self.world_time;
         let u = held(&mut self.players, place)?;
@@ -124,7 +134,7 @@ impl crate::world::World {
 
 /// The seconds of work a new object's building gets at once from its owner's slot 0x1c0 with its
 /// flag (`FUN_14162ce00`'s `FUN_1411cc430` with `DAT_142eea788`).
-pub(crate) const STACK_WORK: Seconds = Seconds::new(crate::math::image::build::STACK_WORK);
+pub(crate) const STACK_WORK: Seconds = Seconds::new(BUILD_STACK_WORK);
 
 /// The guard of an object the routines here reach through the object itself (their callers
 /// hold it): the slice's lists hold every object the world does.
@@ -141,17 +151,14 @@ pub(crate) const NO_CONSTRUCTION: GenieError =
 /// # Errors
 ///
 /// A place its player's lists do not hold.
-pub(crate) fn held(
-    players: &mut [crate::world::Player],
-    place: Place,
-) -> Result<&mut crate::objects::unit::Unit, GenieError> {
+pub(crate) fn held(players: &mut [Player], place: Place) -> Result<&mut Unit, GenieError> {
     match place {
         Place::Live(p, i) => players.live_mut(p, i),
         Place::Sleeping(p, i) => players.asleep_mut(p, i),
     }
 }
 
-impl crate::world::World {
+impl World {
     /// `FUN_1411cc430` outside a builder's update, `amount` seconds on the building `id`: first
     /// each annex (`+0xbc0`..`+0xbd8`) of a building type that is desolid starts
     /// (`FUN_1411cd0d0`, [`crate::world::World::clear_foundations_under`], then `FUN_1411e5670`,
@@ -168,7 +175,7 @@ impl crate::world::World {
     /// What the starts and the completion do not model.
     pub(crate) fn work_building(
         &mut self,
-        id: crate::construction::FoundationId,
+        id: FoundationId,
         amount: Seconds,
     ) -> Result<bool, GenieError> {
         let mut at = id.id();
@@ -197,7 +204,7 @@ impl crate::world::World {
             match self.object(main) {
                 Some((_, m))
                     if m.life.state == ObjectState::Foundation
-                        && crate::math::fmath::at_most_or_unordered(1.0, m.life.hp.get()) =>
+                        && at_most_or_unordered(1.0, m.life.hp.get()) =>
                 {
                     at = main.id();
                 }
@@ -205,9 +212,7 @@ impl crate::world::World {
             }
         }
         let (q, u) = self.object(at).ok_or(NOT_HELD)?;
-        if u.life.state != ObjectState::Foundation
-            || crate::math::fmath::below_or_unordered(u.life.hp.get(), 1.0)
-        {
+        if u.life.state != ObjectState::Foundation || below_or_unordered(u.life.hp.get(), 1.0) {
             return Ok(false);
         }
         if self
@@ -305,25 +310,23 @@ impl crate::world::World {
                     g.target
                 };
                 match self.object(target) {
-                    Some((_, t)) => Some(crate::commands::GatherPoint {
+                    Some((_, t)) => Some(GatherPoint {
                         state: GatherPointState::POINT,
                         point: Position::new(t.position().x(), t.position().y(), 0.0),
                         target,
                         target_master: Some(t.life.master_id),
                     }),
-                    None => (g.point.x() != -1.0 && g.point.y() != -1.0).then_some(
-                        crate::commands::GatherPoint {
-                            state: GatherPointState::POINT,
-                            point: Position::new(g.point.x(), g.point.y(), 0.0),
-                            target: None,
-                            target_master: None,
-                        },
-                    ),
+                    None => (g.point.x() != -1.0 && g.point.y() != -1.0).then_some(GatherPoint {
+                        state: GatherPointState::POINT,
+                        point: Position::new(g.point.x(), g.point.y(), 0.0),
+                        target: None,
+                        target_master: None,
+                    }),
                 }
             });
         }
         if let Some(g) = point.filter(|_| building_made) {
-            self.set_part(new, crate::world::parts::Part::GatherPoint(g))?;
+            self.set_part(new, Part::GatherPoint(g))?;
         }
         self.stack_takes_over(new, building_made, (orders, gate_lock))?;
         let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
@@ -343,7 +346,7 @@ impl crate::world::World {
         &mut self,
         new: ObjectId,
         building_made: bool,
-        (orders, gate_lock): (Vec<crate::unit_ai::QueuedOrder>, Option<bool>),
+        (orders, gate_lock): (Vec<QueuedOrder>, Option<bool>),
     ) -> Result<(), GenieError> {
         let now = self.world_time;
         if building_made
@@ -361,7 +364,7 @@ impl crate::world::World {
                 return Err(NOT_HELD);
             }
             let (layer, mover) = self.parts.building_and_mover_mut(new)?;
-            crate::orders::lock_gate((mover, layer), locked, now)?;
+            lock_gate((mover, layer), locked, now)?;
         }
         Ok(())
     }
@@ -404,13 +407,7 @@ impl crate::world::World {
         // a plain object (types 10 and 20 to 39: a pasture's livestock): the master's slot 0x40
         // there, facing its drawn angle
         if made.kind != BUILDING {
-            let idx = self.plain_object(
-                p,
-                master,
-                &made,
-                at,
-                crate::production::spawn::Facing::Drawn,
-            )?;
+            let idx = self.plain_object(p, master, &made, at, Facing::Drawn)?;
             let id = self.players.live(p, idx)?.id;
             if flagged {
                 self.clear_footprint(p, master, at.ground(), true)?;
@@ -425,7 +422,7 @@ impl crate::world::World {
         if flagged {
             self.clear_footprint(p, master, at.ground(), true)?;
             // the building made on a flagged stack is the foundation its work builds
-            let _ = self.work_building(crate::construction::FoundationId::new(id), STACK_WORK)?;
+            let _ = self.work_building(FoundationId::new(id), STACK_WORK)?;
         }
         if made.auto_gather {
             if self.players.player(p)?.objects.last().map(|u| u.id) != Some(id) {

@@ -1,6 +1,8 @@
 //! An amount of a player attribute ([`Amount`]), with the game's `f32` operations.
 
 use crate::objects::masters::CarryCapacity;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
 /// An amount of a player attribute (a resource) as the game's `f32` holds it: what an object
 /// holds of its attribute (`+0x310`), what a unit carries at most (its master's
@@ -40,7 +42,7 @@ impl Amount {
     }
 }
 
-impl std::ops::Add for Amount {
+impl Add for Amount {
     type Output = Self;
 
     /// The `f32` sum.
@@ -49,7 +51,7 @@ impl std::ops::Add for Amount {
     }
 }
 
-impl std::ops::Sub for Amount {
+impl Sub for Amount {
     type Output = Self;
 
     /// The `f32` difference.
@@ -58,21 +60,21 @@ impl std::ops::Sub for Amount {
     }
 }
 
-impl std::ops::AddAssign for Amount {
+impl AddAssign for Amount {
     /// The `f32` sum in place (a gather, a deposit).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::SubAssign for Amount {
+impl SubAssign for Amount {
     /// The `f32` difference in place (a take, a payment).
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }
 
-impl std::ops::Neg for Amount {
+impl Neg for Amount {
     type Output = Self;
 
     /// The amount negated (its sign bit flipped).
@@ -81,7 +83,7 @@ impl std::ops::Neg for Amount {
     }
 }
 
-impl std::ops::Mul<f32> for Amount {
+impl Mul<f32> for Amount {
     type Output = Self;
 
     /// The amount scaled by `f` (one `f32` product, the amount first).
@@ -90,7 +92,7 @@ impl std::ops::Mul<f32> for Amount {
     }
 }
 
-impl std::ops::Mul<Amount> for f32 {
+impl Mul<Amount> for f32 {
     type Output = Amount;
 
     /// The amount scaled by `self` (one `f32` product, the factor first).
@@ -99,7 +101,7 @@ impl std::ops::Mul<Amount> for f32 {
     }
 }
 
-impl std::ops::Div<f32> for Amount {
+impl Div<f32> for Amount {
     type Output = Self;
 
     /// The amount divided by `f` (one `f32` quotient).
@@ -108,7 +110,7 @@ impl std::ops::Div<f32> for Amount {
     }
 }
 
-impl std::ops::Div for Amount {
+impl Div for Amount {
     type Output = f32;
 
     /// The ratio of two amounts (one `f32` quotient: a share).
@@ -117,8 +119,8 @@ impl std::ops::Div for Amount {
     }
 }
 
-impl std::fmt::Display for Amount {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Amount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

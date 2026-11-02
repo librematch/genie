@@ -223,6 +223,8 @@ impl From<ParseLangFileTypeError> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -233,7 +235,7 @@ mod genie_error_tests {
             (e.kind(), e.reason()),
             (genie_error::ErrorKind::Io, "a read or write that failed")
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(Error::source(&e).is_some());
         let e: genie_error::GenieError = ParseLangFileTypeError("x".to_owned()).into();
         assert_eq!(
             (e.kind(), e.reason()),
@@ -242,6 +244,6 @@ mod genie_error_tests {
                 "a language file type this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(Error::source(&e).is_some());
     }
 }

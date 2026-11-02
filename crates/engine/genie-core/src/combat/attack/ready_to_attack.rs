@@ -11,10 +11,12 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, Spatial};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::footprint_gap;
+use crate::movement::gate_gap;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::FogVisibility;
@@ -23,6 +25,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
+use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 
 impl Attack {
@@ -102,12 +105,7 @@ impl Attack {
         skip_ready: bool,
     ) -> Result<Readiness, GenieError> {
         let (target, t) = self.held_target(g.map)?;
-        let speed = g
-            .motion
-            .mover()
-            .ok_or(crate::world::ATTACKER_UNMOVING)?
-            .stats
-            .speed;
+        let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
         if target_unseen(g.map, f, &t)? {
             if r.stance == UnitStance::AGGRESSIVE && Speed::ZERO < speed && r.can_move {
                 self.wait_at_seen(unit, g.motion.reborrow(), f, r, g.graphics)?;
@@ -120,7 +118,7 @@ impl Attack {
             .motion
             .mover()
             .map(|m| m.stats.radius.ground())
-            .ok_or(crate::world::ATTACKER_UNMOVING)?;
+            .ok_or(ATTACKER_UNMOVING)?;
         let gap = footprint_gap(at, ground, t.position, t.radius);
         let near = if self.range <= Distance::new(NO_RANGE) {
             gap + SHORT_RANGE_GAP
@@ -146,7 +144,7 @@ impl Attack {
             return self.fail(unit, g.motion.reborrow(), g.sprite_rng);
         }
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
-        let gap = crate::movement::gate_gap(g.map, (at, ground), (target, &t), gap, |g| g, g.by_id);
+        let gap = gate_gap(g.map, (at, ground), (target, &t), gap, |g| g, g.by_id);
         if self.reach() < gap {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
@@ -193,7 +191,7 @@ impl Attack {
         let p = self.point;
         let far = [to.x() - p.x(), to.y() - p.y(), to.z() - p.z()]
             .iter()
-            .any(|d| crate::math::fmath::below_or_unordered(HALF, d.abs()));
+            .any(|d| below_or_unordered(HALF, d.abs()));
         !moved || (!far && (moves_or_volleys || in_range(near, self.range, self.min_range)))
     }
 
@@ -220,19 +218,17 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
     ) -> Result<Readiness, GenieError> {
-        let mover = mover.ok_or(crate::world::ATTACKER_UNMOVING)?;
+        let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         if !matches!(f.own.master_id, MASTER_1704 | MASTER_1706)
             && !face_target(mover, at, to, r.world_time)?
         {
             return Ok(Readiness::Waiting);
         }
-        Ok(
-            if crate::math::fmath::at_most_or_unordered(attack_timer.get(), 0.0) {
-                Readiness::Ready
-            } else {
-                Readiness::Waiting
-            },
-        )
+        Ok(if at_most_or_unordered(attack_timer.get(), 0.0) {
+            Readiness::Ready
+        } else {
+            Readiness::Waiting
+        })
     }
 }
 

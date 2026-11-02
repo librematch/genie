@@ -2,6 +2,8 @@
 //! operations.
 
 use crate::world::Seconds;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 /// A charge as the game's `f32` holds it: an object's charge (`+0x9e0`) and its master's most
 /// (`max_charge`, `+0x918`). A ready charge (its most for charge types 1 and 3, else 1) adds
@@ -33,7 +35,7 @@ impl Charge {
     }
 }
 
-impl std::ops::Sub for Charge {
+impl Sub for Charge {
     type Output = Self;
 
     /// The `f32` difference (a new most less the old).
@@ -42,29 +44,29 @@ impl std::ops::Sub for Charge {
     }
 }
 
-impl std::ops::SubAssign for Charge {
+impl SubAssign for Charge {
     /// The `f32` difference in place (a shield's spent charge).
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }
 
-impl std::ops::AddAssign for Charge {
+impl AddAssign for Charge {
     /// The `f32` sum in place (an effect's addition).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for Charge {
+impl MulAssign<f32> for Charge {
     /// The charge scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
     }
 }
 
-impl std::fmt::Display for Charge {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Charge {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
@@ -98,21 +100,21 @@ impl ChargeRate {
     }
 }
 
-impl std::ops::AddAssign for ChargeRate {
+impl AddAssign for ChargeRate {
     /// The `f32` sum in place (an effect's addition).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for ChargeRate {
+impl MulAssign<f32> for ChargeRate {
     /// The rate scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
     }
 }
 
-impl std::ops::Mul<Seconds> for ChargeRate {
+impl Mul<Seconds> for ChargeRate {
     type Output = Charge;
 
     /// The charge it fills in `dt` (one `f32` product, the rate first).
@@ -121,8 +123,8 @@ impl std::ops::Mul<Seconds> for ChargeRate {
     }
 }
 
-impl std::fmt::Display for ChargeRate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ChargeRate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

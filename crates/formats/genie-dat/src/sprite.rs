@@ -9,6 +9,7 @@ use genie_support::{MapInto, fallible_try_into, infallible_try_into, read_opt_u1
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Result, Write};
 use std::num::TryFromIntError;
+use std::result::Result as StdResult;
 
 /// An ID identifying a string resource.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +29,7 @@ impl From<u32> for GraphicId {
 
 impl TryFrom<i32> for GraphicId {
     type Error = TryFromIntError;
-    fn try_from(n: i32) -> std::result::Result<Self, Self::Error> {
+    fn try_from(n: i32) -> StdResult<Self, Self::Error> {
         Ok(Self(n.try_into()?))
     }
 }

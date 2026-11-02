@@ -2,6 +2,12 @@
 
 use crate::map::GridSize;
 use crate::map::Point;
+use crate::math::fmath::{maxss, sqrt};
+use crate::math::image::group::SHORT_LENGTH;
+use crate::math::image::order::{
+    BOX_START as ORDER_BOX_START, EDGE as ORDER_EDGE, GRID_AREA as ORDER_GRID_AREA,
+    GRID_STEP as ORDER_GRID_STEP, SPREAD as ORDER_SPREAD,
+};
 
 /// The box of an order's units (`0x140e68b90`, the loop after the splitter): the least and the
 /// greatest x and y, where a value below the least so far moves only the least (the greatest
@@ -9,9 +15,9 @@ use crate::map::Point;
 /// the centroid (the sums alone without a point); a wider one None.
 pub(super) fn centroid(points: &[Point]) -> Option<Point> {
     /// `DAT_142eea788`.
-    const BOX_START: f32 = crate::math::image::order::BOX_START;
+    const BOX_START: f32 = ORDER_BOX_START;
     /// `DAT_142eb9430`.
-    const SPREAD: f32 = crate::math::image::order::SPREAD;
+    const SPREAD: f32 = ORDER_SPREAD;
     let (mut x, mut y) = (Spread::new(BOX_START), Spread::new(BOX_START));
     for p in points {
         x.take(p.x());
@@ -71,7 +77,7 @@ pub(super) fn offset_point(position: Point, centroid: Point, point: Point, map: 
 /// the size or beyond the size less `EDGE`.
 pub(super) fn inside_map(v: f32, size: i32) -> f32 {
     /// `DAT_14330eb8c`.
-    const EDGE: f32 = crate::math::image::order::EDGE;
+    const EDGE: f32 = ORDER_EDGE;
     if v < 0.0 {
         EDGE
     } else if size as f32 <= v {
@@ -92,9 +98,9 @@ pub(super) fn inside_map(v: f32, size: i32) -> f32 {
 pub(super) fn follow_spread(points: &[Point]) -> Option<Point> {
     use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
     /// `DAT_142eea788`.
-    const BOX_START: f32 = crate::math::image::order::BOX_START;
+    const BOX_START: f32 = ORDER_BOX_START;
     /// `DAT_142eb9430`.
-    const SPREAD: f32 = crate::math::image::order::SPREAD;
+    const SPREAD: f32 = ORDER_SPREAD;
     let (mut lesser, mut least, mut greater, mut greatest) = (BOX_START, BOX_START, 0.0f32, 0.0f32);
     let (mut sx, mut sy) = (0.0f32, 0.0f32);
     for p in points {
@@ -130,8 +136,8 @@ pub(super) fn follow_spread(points: &[Point]) -> Option<Point> {
 /// (a NaN too).
 pub(super) fn follow_axis(v: f32, size: i32) -> f32 {
     /// `DAT_142eb99cc`.
-    const EDGE_GAP: f32 = crate::math::image::group::SHORT_LENGTH;
-    let most = crate::math::fmath::maxss(size as f32 - EDGE_GAP, 0.0);
+    const EDGE_GAP: f32 = SHORT_LENGTH;
+    let most = maxss(size as f32 - EDGE_GAP, 0.0);
     if v > most {
         most
     } else if 0.0 > v {
@@ -146,10 +152,10 @@ pub(super) fn follow_axis(v: f32, size: i32) -> f32 {
 /// `GRID_STEP` each from the order's point, kept on the map ([`inside_map`]).
 pub(super) fn grid_point(i: usize, n: usize, point: Point, map: GridSize) -> Point {
     /// `DAT_142eb4838`.
-    const GRID_AREA: f32 = crate::math::image::order::GRID_AREA;
+    const GRID_AREA: f32 = ORDER_GRID_AREA;
     /// `DAT_142e7f384`.
-    const GRID_STEP: f32 = crate::math::image::order::GRID_STEP;
-    let side = crate::math::fmath::sqrt(n as i32 as f32 * GRID_AREA) as i32;
+    const GRID_STEP: f32 = ORDER_GRID_STEP;
+    let side = sqrt(n as i32 as f32 * GRID_AREA) as i32;
     let (i, half) = (i as i32, side / 2);
     let x = (i % side - half) as f32 * GRID_STEP + point.x();
     let y = (i / side - half) as f32 * GRID_STEP + point.y();

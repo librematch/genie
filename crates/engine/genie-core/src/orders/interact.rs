@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationKind;
+use crate::groups::common_group;
 use crate::groups::{CommandArgs, GroupId};
 use crate::map::Distance;
 use crate::map::Point;
@@ -18,6 +19,7 @@ use crate::orders::{
 };
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -144,12 +146,12 @@ impl World {
             return self.order_work(player, idx, &work);
         }
         let (target_type, target_owner) = target.map_or((None, None), |(m, o)| {
-            (Some(crate::unit_ai::OrderTargetType::of_master(m)), Some(o))
+            (Some(OrderTargetType::of_master(m)), Some(o))
         });
-        let queued = crate::unit_ai::QueuedOrder {
-            issuer: Some(crate::unit_ai::Issuer::Player(issuer)),
+        let queued = QueuedOrder {
+            issuer: Some(Issuer::Player(issuer)),
             order: OrderKind::OnTarget,
-            priority: crate::unit_ai::OrderPriority::COMMAND,
+            priority: OrderPriority::COMMAND,
             target: if target.is_some() { order.target } else { None },
             target_owner,
             point: point.with_height(0.0),
@@ -237,7 +239,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        order: crate::unit_ai::QueuedOrder,
+        order: QueuedOrder,
     ) -> Result<(), GenieError> {
         let (_, t) = self.object(order.target).ok_or(GenieError::unsupported(
             "a queued order on a target that is gone",
@@ -403,8 +405,7 @@ impl World {
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
             let units = &units[..];
-            let common =
-                crate::groups::common_group(units, |id| self.object(id).map(|(_, u)| u.group));
+            let common = common_group(units, |id| self.object(id).map(|(_, u)| u.group));
             // the units' common group, kept when it holds them all
             let kept = match common {
                 None => None,

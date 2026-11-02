@@ -1,5 +1,7 @@
 //! A path level's place in a unit's path data.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A path level's place (`mWaypointLevel`, the level's `+0x14`): the top level holds the
 /// order's waypoints (2), its plan's stretches below it (1), and the path the unit walks (0).
 /// The byte is saved; a value past 2 is kept as it is.
@@ -27,8 +29,8 @@ impl WaypointLevel {
     }
 }
 
-impl std::fmt::Display for WaypointLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for WaypointLevel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.0)
     }
 }

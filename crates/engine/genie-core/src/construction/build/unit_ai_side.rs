@@ -3,12 +3,14 @@
 //! spot off a foundation's footprint.
 
 use crate::GenieError;
+use crate::commands::FOUNDATION_GONE;
 use crate::construction::FoundationId;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::action_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
@@ -18,6 +20,9 @@ use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::world_view::owner_view;
+use crate::unit_ai::{Named, OffFootprint, flood_search};
+use crate::world::UNIT_AI_MASTER;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -73,30 +78,24 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 foundation.id(),
                 2,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
-            return Err(crate::commands::FOUNDATION_GONE);
+            return Err(FOUNDATION_GONE);
         };
         let masters = self
             .c
             .w
             .masters
             .get(self.player.index())
-            .ok_or(crate::world::UNIT_AI_MASTER)?;
+            .ok_or(UNIT_AI_MASTER)?;
         let unit = &*self.unit;
         let own = unit.master(self.c.w.master_tables(), self.player)?;
         let actor = Actor {
@@ -154,10 +153,7 @@ impl UnitView<'_, '_> {
                 self.c.player,
                 self.new_owner,
             )?,
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             &self.c.w.spatial,
         );
         let foundation_on = |tile: Tile| -> Result<Option<ObjectId>, GenieError> {
@@ -175,7 +171,7 @@ impl UnitView<'_, '_> {
             }
             Ok(None)
         };
-        crate::unit_ai::flood_search(Tile::new(ux, uy), r, foundation_on)
+        flood_search(Tile::new(ux, uy), r, foundation_on)
     }
 
     /// The base handler's case 0x216: the unit's closest spot beside the foundation `site`
@@ -187,8 +183,8 @@ impl UnitView<'_, '_> {
         &mut self,
         site: FoundationId,
         radius: Footprint,
-    ) -> Result<crate::unit_ai::OffFootprint, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
+    ) -> Result<OffFootprint, GenieError> {
+        let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
             &self.c.w.masters,
@@ -196,10 +192,7 @@ impl UnitView<'_, '_> {
         );
         let unit = &*self.unit;
         let master = unit.master(
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             self.player,
         )?;
         let (player, others) = (
@@ -217,7 +210,7 @@ impl UnitView<'_, '_> {
             } else {
                 others.find(id)
             };
-            found.map(|(p, u)| crate::unit_ai::Named {
+            found.map(|(p, u)| Named {
                 id,
                 master: u.life.master_id,
                 owner: p,
@@ -246,7 +239,7 @@ impl UnitView<'_, '_> {
             None => None,
         };
         let target = self.actions.top_target();
-        Ok(crate::unit_ai::OffFootprint {
+        Ok(OffFootprint {
             spot,
             z: unit.position().z(),
             class: master.class,

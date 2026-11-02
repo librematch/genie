@@ -1,15 +1,22 @@
 //! The swing's and the arrival's sprites, the attack timer and the unit's turn to its target.
 
 use crate::GenieError;
+use crate::combat::abilities::Look;
 use crate::combat::attack::{Arms, RELOAD_MS};
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::objects::Graphics;
 use crate::objects::SpriteId;
+use crate::objects::facing::{face, turn_toward};
+use crate::objects::layers::Combat;
 use crate::objects::layers::MotionMut;
+use crate::objects::masters::{Master, MasterId, Masters};
+use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::world::Millis;
+use crate::world::NO_STANDING_SPRITE;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 
@@ -17,11 +24,7 @@ use crate::world::WorldTime;
 /// Attack's own ([`SwingSprites`]): its look's attack sprite while it shows its look, its
 /// master's special graphic.
 #[must_use]
-pub fn swing_sprites(
-    look: Option<&crate::combat::abilities::Look>,
-    master: &crate::objects::masters::Master,
-    graphics: &crate::objects::Graphics,
-) -> SwingSprites {
+pub fn swing_sprites(look: Option<&Look>, master: &Master, graphics: &Graphics) -> SwingSprites {
     let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     SwingSprites {
         look: g(look.and_then(|l| l.attacking)),
@@ -51,23 +54,15 @@ pub struct SwingSprites {
 
 /// `FUN_141089820`: the attack timer of a unit's combat layer `combat` becomes `t` and its reload world time the world's
 /// time `now` plus `t` in whole milliseconds (slot 0x248).
-pub(super) fn set_attack_timer(
-    combat: &mut crate::objects::layers::Combat,
-    now: WorldTime,
-    t: Seconds,
-) {
+pub(super) fn set_attack_timer(combat: &mut Combat, now: WorldTime, t: Seconds) {
     combat.attack_timer = t;
     combat.reload_worldtime = now.after(Millis::new((t.get() * RELOAD_MS) as i64 as u32));
 }
 
 /// `FUN_14120c0a0`'s test of `master`: it has a volley missile or a charge projectile its player
 /// has (`masters`), so its hits go through its volley even without a missile.
-pub(crate) fn volleys(
-    master: &crate::objects::masters::Master,
-    masters: &crate::objects::masters::Masters,
-) -> bool {
-    let has =
-        |id: Option<crate::objects::masters::MasterId>| id.and_then(|id| masters.get(id)).is_some();
+pub(crate) fn volleys(master: &Master, masters: &Masters) -> bool {
+    let has = |id: Option<MasterId>| id.and_then(|id| masters.get(id)).is_some();
     has(master.volley_missile) || has(master.charge_projectile)
 }
 
@@ -83,8 +78,8 @@ pub(crate) fn show_arrived(
     mut motion: MotionMut<'_>,
     rng: &mut Well512,
 ) -> Result<(), GenieError> {
-    let g = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
-    crate::objects::sprite::new_sprite(sprite, motion.move_stats_mut(), g, rng);
+    let g = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
+    new_sprite(sprite, motion.move_stats_mut(), g, rng);
     motion.set_anim_speed(Speed::ZERO);
     Ok(())
 }
@@ -117,10 +112,10 @@ pub(crate) fn face_target(
     ))?;
     let (at, to) = (at.ground(), to.ground());
     if mover.stats.turn_time == Seconds::ZERO {
-        mover.angle = crate::objects::facing::face(at, mover.angle, to, Some(facets));
+        mover.angle = face(at, mover.angle, to, Some(facets));
         return Ok(true);
     }
-    let (angle, last, faces) = crate::objects::facing::turn_toward(
+    let (angle, last, faces) = turn_toward(
         at,
         mover.angle,
         to,

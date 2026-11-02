@@ -4,10 +4,12 @@
 
 use binrw::io::Cursor;
 use genie_rec::de;
+use std::env::var;
+use std::fs::{read, read_dir};
 use std::path::{Path, PathBuf};
 
 fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).unwrap().map(Result::unwrap) {
+    for entry in read_dir(dir).unwrap().map(Result::unwrap) {
         let path = entry.path();
         if path.is_dir() {
             recordings(&path, out);
@@ -32,7 +34,7 @@ fn first_difference(ours: &[u8], theirs: &[u8]) -> Option<usize> {
 
 #[test]
 fn tier_1_headers_write_back_their_bytes() {
-    let Ok(dir) = std::env::var("GENIE_REC_CORPUS") else {
+    let Ok(dir) = var("GENIE_REC_CORPUS") else {
         eprintln!("GENIE_REC_CORPUS is not set; skipping the round trip");
         return;
     };
@@ -41,7 +43,7 @@ fn tier_1_headers_write_back_their_bytes() {
     paths.sort();
     let (mut checked, mut differ) = (0, Vec::new());
     for path in &paths {
-        let data = std::fs::read(path).unwrap();
+        let data = read(path).unwrap();
         let Ok(chapters) = de::chapters(&data) else {
             continue;
         };

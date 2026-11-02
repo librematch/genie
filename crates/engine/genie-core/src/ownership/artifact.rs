@@ -104,12 +104,20 @@ pub struct Artifact {
 /// The action type the checkpoint adds for an Artifact action.
 pub const ARTIFACT_TYPE: ActionType = ActionType::named(107);
 
+use crate::garrison::EnterAction;
+use crate::math::image::artifact::TOWN_CENTRE_OFFSET as ARTIFACT_TOWN_CENTRE_OFFSET;
+use crate::objects::layers::Action as LayersAction;
+use crate::objects::masters::master_type::COMBAT;
 pub use crate::ownership::artifact_state::ArtifactState;
 pub use crate::ownership::artifact_sub::ArtifactSub;
+use crate::unit_ai::NotifyKind;
+use crate::world::Tick;
+use crate::world::lets::release;
+use std::mem::take;
 
 /// Livestock's `MoveTo` to a town centre walks to its place less this on both axes
 /// (`FUN_140aa0df0`, `DAT_142eae8d0`).
-const TOWN_CENTRE_OFFSET: f32 = crate::math::image::artifact::TOWN_CENTRE_OFFSET;
+const TOWN_CENTRE_OFFSET: f32 = ARTIFACT_TOWN_CENTRE_OFFSET;
 
 impl Artifact {
     /// A new action of a task whose moving sprite is `moving`, about to check for a new owner.
@@ -137,7 +145,7 @@ impl Artifact {
 
     /// Its Enter, none without one.
     #[must_use]
-    pub const fn enter(&self) -> Option<&crate::garrison::EnterAction> {
+    pub const fn enter(&self) -> Option<&EnterAction> {
         match &self.sub {
             Some(ArtifactSub::Enter { enter }) => Some(enter),
             _ => None,
@@ -156,7 +164,7 @@ impl Artifact {
     }
 
     /// Its Enter taken out, none without one (a walk stays).
-    pub const fn take_enter(&mut self) -> Option<crate::garrison::EnterAction> {
+    pub const fn take_enter(&mut self) -> Option<EnterAction> {
         match self.sub {
             Some(ArtifactSub::Enter { enter }) => {
                 self.sub = None;
@@ -192,7 +200,7 @@ impl Artifact {
     /// The enter command's Enter as the sub-action (`FUN_1410847e0` with an Artifact on top:
     /// `FUN_140a98e20` pops the sub-action it held, [`Artifact::drop_sub_actions`], then
     /// `FUN_140a977e0` takes the Enter). What went, the caller's.
-    pub fn hold_enter(&mut self, enter: crate::garrison::EnterAction) -> SubActionsGone {
+    pub fn hold_enter(&mut self, enter: EnterAction) -> SubActionsGone {
         let gone = self.drop_sub_actions();
         self.sub = Some(ArtifactSub::Enter { enter });
         gone
@@ -385,8 +393,8 @@ impl Artifact {
             return Ok(());
         };
         let notify = match state {
-            MoveTo::Arrived => Some(crate::unit_ai::NotifyKind::ACTION_COMPLETED),
-            MoveTo::Failed => Some(crate::unit_ai::NotifyKind::ACTION_FAILED),
+            MoveTo::Arrived => Some(NotifyKind::ACTION_COMPLETED),
+            MoveTo::Failed => Some(NotifyKind::ACTION_FAILED),
             state => {
                 // a motion step that gives up in the start's update fails the MoveTo, as in
                 // its moving state
@@ -412,7 +420,7 @@ impl Artifact {
             m.stop()?;
         }
         if let Some(t) = released {
-            crate::world::lets::release(c, unit, t, r.by)?;
+            release(c, unit, t, r.by)?;
         }
         if let Some(notify) = notify.filter(|_| voice.is_loud()) {
             unit.post_own(
@@ -488,7 +496,7 @@ fn let_go_gone(
     by: Releaser,
 ) -> Result<(), GenieError> {
     if let Some(t) = gone.released {
-        crate::world::lets::release(c, unit, t, by)?;
+        release(c, unit, t, by)?;
     }
     if gone.stops
         && let Some(m) = c.w.parts.mover_mut(unit.id)
@@ -505,12 +513,12 @@ impl Unit {
     /// ([`Unit::artifact_handover`]). In the first tick it waits.
     pub(crate) fn artifact_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<Option<Captured>, GenieError> {
         let by = self.releaser(c)?;
-        if c.w.ticks <= crate::world::Tick::new(1) {
+        if c.w.ticks <= Tick::new(1) {
             return Ok(None);
         }
         self.artifact_enter_part(actions, c, me, by)?;
@@ -525,7 +533,7 @@ impl Unit {
     /// unit in stays, and the inside update of the next update deletes the Artifact.
     pub(crate) fn artifact_enter_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
         by: Releaser,
@@ -552,7 +560,7 @@ impl Unit {
             } else {
                 art.goal = None;
                 if let Some(t) = art.drop_target() {
-                    crate::world::lets::release(c, self, t, by)?;
+                    release(c, self, t, by)?;
                 }
             }
         }
@@ -566,7 +574,7 @@ impl Unit {
     /// none without an Artifact.
     pub(crate) fn artifact_walk_and_check(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
         by: Releaser,
@@ -580,8 +588,7 @@ impl Unit {
                 .as_ref()
                 .and_then(|v| v.seer(self.id))
                 .map(|s| s.capture);
-        let combat = crate::objects::masters::master_type::COMBAT
-            <= self.master(c.w.master_tables(), c.player)?.kind;
+        let combat = COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
         let r = ArtifactReads {
             searches: !(combat && capture == Some(CaptureKind::NONE)),
             by,
@@ -600,7 +607,7 @@ impl Unit {
     /// nothing.
     pub(crate) fn artifact_handover(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         new: Option<Handover>,
     ) -> Result<Option<Captured>, GenieError> {
@@ -611,14 +618,14 @@ impl Unit {
                     new,
                     main,
                     also,
-                    building: std::mem::take(&mut c.building_handover),
+                    building: take(&mut c.building_handover),
                 }))
             }
             Some(Handover::ToGaia) => {
                 let class = self.placed_class(c)?;
                 self.capture_stop(actions, c, class)?;
                 let main = self.change_owner(actions, c, PlayerId::GAIA)?;
-                let building = std::mem::take(&mut c.building_handover);
+                let building = take(&mut c.building_handover);
                 Ok((main || building).then(|| Captured {
                     new: PlayerId::new(0),
                     main,
@@ -635,6 +642,10 @@ impl Unit {
 mod tests {
     use super::*;
     use crate::combat::attack::tests::Rig;
+    #[cfg(test)]
+    use crate::combat::damage::Victim;
+    #[cfg(test)]
+    use crate::garrison::tests::enter_task;
     use crate::map::Footprint;
     use crate::movement::Speed;
     use crate::movement::move_to::MoveWaitState;
@@ -646,7 +657,11 @@ mod tests {
     use crate::objects::SpriteFlags;
     use crate::objects::masters::class;
     use crate::objects::sprite::Graphic;
+    #[cfg(test)]
+    use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::world::WorldTime;
 
     #[test]
     fn check_finds_no_owner_and_waits_one_second() {
@@ -707,7 +722,7 @@ mod tests {
                 ..to_point
             },
         });
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));
         assert_eq!(found, Ok(None));
         assert_eq!(
@@ -729,10 +744,10 @@ mod tests {
         assert_eq!(a.take_enter(), None);
         assert_eq!(a.take_move_to(), Some(walk));
         assert_eq!(a.sub, None);
-        let enter = crate::garrison::EnterAction::new(
+        let enter = EnterAction::new(
             ContainerId::new(object_id(11970)),
             Position::new(34.125, 123.333, 0.0),
-            &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
+            &enter_task(Distance::ZERO, class::TRANSPORT),
         );
         a.sub = Some(ArtifactSub::Enter { enter });
         assert_eq!((a.move_to(), a.enter()), (None, Some(&enter)));
@@ -748,10 +763,10 @@ mod tests {
     #[test]
     fn move_deletes_the_held_enter_letting_its_transport_go() {
         let walking_enter = || {
-            crate::garrison::EnterAction::new(
+            EnterAction::new(
                 ContainerId::new(object_id(11970)),
                 Position::new(34.125, 123.333, 0.0),
-                &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
+                &enter_task(Distance::ZERO, class::TRANSPORT),
             )
             .walking(MoveTo::Moving)
         };
@@ -805,10 +820,10 @@ mod tests {
         // an Enter that does not walk stops nothing
         let mut c = Artifact::new(false, None);
         c.sub = Some(ArtifactSub::Enter {
-            enter: crate::garrison::EnterAction::new(
+            enter: EnterAction::new(
                 ContainerId::new(object_id(11970)),
                 Position::new(1.0, 2.0, 0.0),
-                &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
+                &enter_task(Distance::ZERO, class::TRANSPORT),
             ),
         });
         assert_eq!(
@@ -825,10 +840,10 @@ mod tests {
     /// teardown (`FUN_140a73fc0`) lets the target go before the Enter's.
     #[test]
     fn the_stop_and_the_teardown_delete_the_held_enter() {
-        let mut e = crate::garrison::EnterAction::new(
+        let mut e = EnterAction::new(
             ContainerId::new(object_id(11970)),
             Position::new(1.0, 2.0, 0.0),
-            &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
+            &enter_task(Distance::ZERO, class::TRANSPORT),
         );
         e = e.walking(MoveTo::Moving);
         let by_enter = SubActionsGone {
@@ -873,10 +888,10 @@ mod tests {
     #[test]
     fn an_enter_command_replaces_the_held_enter_letting_its_target_go_and_stopping_its_walk() {
         let enter = |target| {
-            crate::garrison::EnterAction::new(
+            EnterAction::new(
                 target,
                 Position::new(1.0, 2.0, 0.0),
-                &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
+                &enter_task(Distance::ZERO, class::TRANSPORT),
             )
         };
         let gone = |stops, released| SubActionsGone { stops, released };
@@ -1140,7 +1155,7 @@ mod tests {
         let _ = a
             .take_point(Position::new(35.5, 88.5, 0.0), &move_reads(&sprites()))
             .unwrap();
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().stats.speed = Speed::ZERO;
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
@@ -1151,10 +1166,7 @@ mod tests {
         rig.mover_mut().animated.speed = Speed::new(1.0);
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
-        let failed = (
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
-            [ActionKind::Move.value(), 0, 0],
-        );
+        let failed = (NotifyKind::ACTION_FAILED, [ActionKind::Move.value(), 0, 0]);
         assert_eq!((a.move_to().copied(), rig.posted()), (None, vec![failed]));
         assert_eq!(rig.mover().animated.speed, Speed::new(0.0));
     }
@@ -1179,7 +1191,7 @@ mod tests {
     /// [`Rig::on_the_path`]'s unit 9177 as the walker.
     const fn me() -> Me {
         Me {
-            human_order: crate::world::WorldTime::ZERO,
+            human_order: WorldTime::ZERO,
             id: object_id(9177),
             group: None,
             action_state: ActionState::NO_ACTION,
@@ -1236,8 +1248,8 @@ mod tests {
     const fn graphic(id: i16) -> Graphic {
         Graphic {
             id: SpriteId::named(id),
-            frames: crate::objects::Frame::of_data(10),
-            facets: crate::objects::FacetCount::of_data(16),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(16),
             speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -1341,14 +1353,14 @@ mod tests {
         let _ = a
             .take_point(Position::new(35.5, 88.5, 0.0), &move_reads(&with_3))
             .unwrap();
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         // the top speed derives from the base and the sprite shown
         (rig.mover_mut().stats.speed, rig.mover_mut().stats.base) = (Speed::ZERO, Speed::ZERO);
         assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic(3)), None);
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
-        let in_the_way = (crate::unit_ai::NotifyKind::IN_THE_WAY, [77, -1, -1]);
+        let in_the_way = (NotifyKind::IN_THE_WAY, [77, -1, -1]);
         assert_eq!(
             (a.move_to().copied().map(|m| m.state), rig.sprite()),
             (Some(MoveTo::Failed), Some(SpriteId::named(3)))
@@ -1365,7 +1377,7 @@ mod tests {
                 ..start
             },
         });
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig.run(50, |c, u, _, _, _| walking.walk(c, u, me(), &reads()))
             .unwrap();
@@ -1389,7 +1401,7 @@ mod tests {
             }),
             ..Artifact::new(false, None)
         };
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig.run(50, |c, u, _, _, _| waiting.walk(c, u, me(), &reads()))
             .unwrap();
@@ -1423,8 +1435,7 @@ mod tests {
             Some(-1)
         );
         // a target that died (state 7) is let go, and the walk ends at once (code 5)
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default())
-            .holding(600, PlayerId::new(1));
+        let mut rig = Rig::on_the_path(Victim::default()).holding(600, PlayerId::new(1));
         if let Some(u) = rig.t.players[1].objects.last_mut() {
             u.life.state = ObjectState::Removed;
         }
@@ -1448,7 +1459,7 @@ mod tests {
     /// none); a quiet one (to an object) posts nothing, one to the point posts its end.
     #[test]
     fn an_ended_walk_lets_the_target_go() {
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default())
+        let mut rig = Rig::on_the_path(Victim::default())
             .holding(9149, PlayerId::new(1))
             .holding(77, PlayerId::new(1));
         let mut a = Artifact::new(false, None);
@@ -1473,10 +1484,7 @@ mod tests {
         });
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
-        let failed = (
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
-            [ActionKind::Move.value(), 0, 0],
-        );
+        let failed = (NotifyKind::ACTION_FAILED, [ActionKind::Move.value(), 0, 0]);
         assert_eq!(
             (rig.workers(77, PlayerId::new(1)), rig.posted()),
             (Some(0), vec![failed])
@@ -1493,18 +1501,17 @@ mod tests {
     #[test]
     fn an_update_checks_after_its_walk_and_lets_go_what_handover_drops() {
         let mut a = Artifact::new(false, None);
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));
         assert_eq!((found, a.state), (Ok(None), ArtifactState::Wait));
         // the step's effects on a handover: the Enter's transport let go, the unit stopped
-        let mut e = crate::garrison::EnterAction::new(
+        let mut e = EnterAction::new(
             ContainerId::new(object_id(11970)),
             Position::new(1.0, 2.0, 0.0),
-            &crate::garrison::tests::enter_task(Distance::ZERO, class::TRANSPORT),
+            &enter_task(Distance::ZERO, class::TRANSPORT),
         );
         e = e.walking(MoveTo::Moving);
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default())
-            .holding(11970, PlayerId::new(1));
+        let mut rig = Rig::on_the_path(Victim::default()).holding(11970, PlayerId::new(1));
         rig.mover_mut().animated.speed = Speed::new(1.0);
         let mut b = Artifact::new(false, None);
         b.sub = Some(ArtifactSub::Enter { enter: e });

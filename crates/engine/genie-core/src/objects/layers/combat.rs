@@ -3,9 +3,14 @@
 //! object holds it for now, with the game's defaults below type 50 (T4 step 1).
 
 use crate::combat::Charge;
+use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
+use crate::combat::{AttackCount, AttackPowerup, Firepower, MissileCount};
+use crate::construction::BuilderCount;
+use crate::garrison::RaiderCountdown;
 use crate::map::Distance;
 use crate::objects::HpPowerup;
+use crate::objects::Regeneration;
 use crate::objects::WorkRate;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -31,34 +36,34 @@ pub struct Combat {
     #[diff(
         gap = "differs on 380 of MarvinBlue/426048731's samples (9181 at update 1075: genie 0, game 1): the resets on a new target (FUN_140a7c210, FUN_140a82a10) are not checked"
     )]
-    pub attack_count: crate::combat::AttackCount,
+    pub attack_count: AttackCount,
     /// `mHitSomethingValidForChargeAttack` (`+0x8a8`): its last hit was its charge's.
     pub charge_hit: bool,
     /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired.
-    pub next_volley: crate::combat::MissileCount,
+    pub next_volley: MissileCount,
     /// A combat object's `raider_build_countdown` (`+0x9a0`): the seconds it may stay inside a
     /// building.
-    pub raider_countdown: crate::garrison::RaiderCountdown,
+    pub raider_countdown: RaiderCountdown,
     /// `berserker_timer` (`+0xa10`): the seconds the regeneration holds back toward its next
     /// whole hit point ([`crate::objects::unit::Unit::regenerate`]).
     pub regen_timer: Seconds,
     /// `+0x9e8` (`num_builders`) of a combat object that is no building: the Repair actions
     /// counted among its repairers. A building's is its construction's
     /// ([`crate::construction::build::Construction::builders`]).
-    pub builders: crate::construction::BuilderCount,
+    pub builders: BuilderCount,
     /// Its charge (`+0x9e0`).
     pub charge: Charge,
     /// The melee and pierce armor taken off it by charge hits (`+0x9e4`, `+0x9e6`).
     pub armor_removed: ArmorPair,
     /// What its master's passive abilities keep on it ([`crate::combat::abilities`]): the movement damage
     /// timer, the attack timer's rate and its terrain look.
-    pub abilities: crate::combat::abilities::Abilities,
+    pub abilities: Abilities,
     /// What a hit reads of its unit and its target besides the masters: `+0xa24`
     /// (`mAttackPowerup`, the attacker's slot 0x6d8), the armor powerups (`+0xa48` melee,
     /// `+0xa4c` pierce, slots 0x708 and 0x710; whole numbers), the armor attacks removed
     /// (`+0x9e4`, `+0x9e6`), the charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack`
     /// (`+0x8a8`: its last hit was its charge's).
-    pub attack_powerup: crate::combat::AttackPowerup,
+    pub attack_powerup: AttackPowerup,
     /// `mReloadPowerup` (`+0xa28`), taken off its master's reload time.
     pub reload_powerup: Seconds,
     /// `+0xa30`, `mWorkRatePowerup`: what the unit adds to its master's work rate.
@@ -67,12 +72,12 @@ pub struct Combat {
     /// ([`regeneration_rate`]).
     ///
     /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
-    pub regen_powerup: crate::objects::Regeneration,
+    pub regen_powerup: Regeneration,
     /// `mRegenerationStinger` (`+0xb3c`), which the regeneration rate adds last
     /// ([`regeneration_rate`]).
     ///
     /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
-    pub regen_stinger: crate::objects::Regeneration,
+    pub regen_stinger: Regeneration,
     /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
     pub reload_stinger: Seconds,
     /// `mHitpointsPowerup` and `mHitpointsMaxPowerup` (`+0xa38`, `+0xa3c`), which the task finder
@@ -90,5 +95,5 @@ pub struct Combat {
     /// `+0xa00` (not saved): a combat object's missiles per volley, its master's volley fire plus
     /// the shares of the units inside it ([`crate::garrison::share`]).
     #[diff(unsaved)]
-    pub firepower: crate::combat::Firepower,
+    pub firepower: Firepower,
 }

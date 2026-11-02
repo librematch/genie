@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Point;
 use crate::math::rng::Well512;
+use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::masters::ClassId;
@@ -18,6 +19,7 @@ use crate::unit_ai::{
     Surroundings, TREBUCHET_CLASS, TREBUCHET_PACKED_CLASS, UnitAi, UnitCommand, UnitSeen, UnitSide,
     order_move,
 };
+use crate::world::UNIT_AI_MASTER;
 
 impl UnitAi {
     /// Slot 0x230 (`FUN_140c5c170`, every type's) on the order `o`: one not ready returns 0xe.
@@ -336,12 +338,7 @@ impl UnitAi {
             return Ok(Some(LiveTop {
                 id,
                 kind: t.kind,
-                gap_squared: crate::movement::footprint_gap_squared(
-                    at.position,
-                    at.size,
-                    t.position,
-                    t.radius,
-                ),
+                gap_squared: footprint_gap_squared(at.position, at.size, t.position, t.radius),
             }));
         }
         Ok(Self::world_object(id, at, side)?.map(|s| LiveTop {
@@ -386,17 +383,12 @@ impl UnitAi {
         if id == at.id {
             return Ok(Some(UnitSeen {
                 id,
-                class: at.class.ok_or(crate::world::UNIT_AI_MASTER)?,
+                class: at.class.ok_or(UNIT_AI_MASTER)?,
                 owner: at.player,
                 combat_level: at.combat_level,
                 state: at.state,
                 target: None,
-                gap_squared: crate::movement::footprint_gap_squared(
-                    at.position,
-                    at.size,
-                    at.position,
-                    at.size,
-                ),
+                gap_squared: footprint_gap_squared(at.position, at.size, at.position, at.size),
                 position: at.position,
                 hp: at.hp,
                 master: at.master,

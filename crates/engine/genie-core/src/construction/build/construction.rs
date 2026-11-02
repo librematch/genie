@@ -4,11 +4,17 @@
 
 use crate::GenieError;
 use crate::construction::build::{Construction, SITE_GONE, STARTED};
+use crate::map::Snow;
 use crate::map::TerrainId;
 use crate::map::Tile;
+use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
+use crate::map::terrain::Foundation;
+use crate::math::fmath::at_most_or_unordered;
+use crate::movement::Mover;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::CASTLE;
@@ -25,7 +31,9 @@ use crate::players::attribute::CASTLES_BUILT;
 use crate::players::attribute::MONASTERIES;
 use crate::players::attribute::WONDERS;
 use crate::players::attribute::WONDERS_BUILT;
+use crate::players::history::EventKind;
 use crate::world::Millis;
+use crate::world::Mode680;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 
@@ -69,11 +77,11 @@ pub(super) fn hand_storage(
 pub(super) fn lay_foundation(
     c: &mut Construction,
     world: &mut Spatial,
-    placed: &crate::map::spatial::Placed,
+    placed: &Placed,
     master: &Master,
-    building: &crate::objects::masters::BuildingMaster,
+    building: &BuildingMaster,
     stack_master: Option<MasterId>,
-    mode_680: crate::world::Mode680,
+    mode_680: Mode680,
 ) -> Result<(), GenieError> {
     /// The terrain the pasture master 1889's stack unit on mangrove or rice terrain lays
     /// (`0x3f`).
@@ -82,12 +90,12 @@ pub(super) fn lay_foundation(
         "a completion without the map's terrain",
     ))?;
     let (x, y) = (placed.position.x(), placed.position.y());
-    if c.snow == crate::map::Snow::None
+    if c.snow == Snow::None
         && 0 <= x as i32
         && 0 <= y as i32
         && terrain.snow_under(Tile::new(x as i32, y as i32))?
     {
-        c.snow = crate::map::Snow::Completed;
+        c.snow = Snow::Completed;
     }
     if let Some(foundation) = building.foundation_terrain {
         let laid = if stack_master == Some(PASTURE_MANGROVE) {
@@ -95,7 +103,7 @@ pub(super) fn lay_foundation(
         } else {
             foundation
         };
-        terrain.cover(&crate::map::terrain::Foundation {
+        terrain.cover(&Foundation {
             position: placed.position,
             clearance: master.clearance,
             terrain: laid,
@@ -116,17 +124,17 @@ pub(super) fn lay_foundation(
 /// shorts. The castle's and the wonder's history event (0x1411dd094), returned.
 pub(super) fn completion_counts(
     master: &Master,
-    building: &crate::objects::masters::BuildingMaster,
+    building: &BuildingMaster,
     main: bool,
     attributes: &mut Vec<(AttributeId, Amount)>,
-) -> Option<crate::players::history::EventKind> {
+) -> Option<EventKind> {
     // the castle's and the wonder's history event (0x1411dd094), the counts (slot 0xf8 with
     // 1.0, 0x14330eb8c)
     let history = match master.id {
-        CASTLE => Some(crate::players::history::EventKind::CASTLE_BUILT),
+        CASTLE => Some(EventKind::CASTLE_BUILT),
         // The Wonder's master (`0x114`), whose construction rate the player's attribute raises at most to
         // `DAT_142ed66b4`.
-        WONDER => Some(crate::players::history::EventKind::WONDER_BUILT),
+        WONDER => Some(EventKind::WONDER_BUILT),
         _ => None,
     };
     match master.id {
@@ -179,7 +187,7 @@ impl Construction {
         *hp = HitPoints::new(if hit_points < new { hit_points } else { new });
         let before = self.progress.get();
         self.progress = Seconds::new(amount + before);
-        crate::math::fmath::at_most_or_unordered(build_time, amount + before)
+        at_most_or_unordered(build_time, amount + before)
     }
 
     /// The construction starts (`FUN_1411e5670`) on a desolid foundation (one not desolid, or
@@ -200,7 +208,7 @@ impl Construction {
     pub(crate) fn begin(
         id: ObjectId,
         c: &mut Self,
-        mover: Option<&mut crate::movement::Mover>,
+        mover: Option<&mut Mover>,
         world: &mut Spatial,
         pathing: &mut Pathing,
         now: WorldTime,

@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
+use crate::garrison::Walls;
 use crate::garrison::meeting::Meeting;
 use crate::garrison::{ENTER_NEAR, HALF_TILE};
 use crate::map::Distance;
@@ -15,16 +16,24 @@ use crate::movement::Speed;
 use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
+#[cfg(test)]
+use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+#[cfg(test)]
+use crate::objects::Voice;
+use crate::objects::layers::Action;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
 use genie_diff::Diff;
@@ -114,7 +123,7 @@ pub(crate) struct EnterReads {
     /// The `MoveTo`'s give-up waits (a human player's villager), by the unit AI's stance.
     pub(crate) waits: bool,
     /// The unit AI's stance.
-    pub(crate) stance: crate::unit_ai::UnitStance,
+    pub(crate) stance: UnitStance,
     /// The sprites its `MoveTo`s' constructors take for none (`FUN_140aa0d30`,
     /// `FUN_140aa0df0`).
     pub(crate) defaults: MoveDefaults,
@@ -176,7 +185,7 @@ impl EnterAction {
         start: WalkStart,
         meeting: Meeting<'_>,
         reads: &MoveToReads<'_>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Walking, GenieError> {
         self.state = EnterState::Walk { move_to: None };
         if t.in_reach {
@@ -223,8 +232,8 @@ impl EnterAction {
     /// The Enter with a `MoveTo` in `state` to its target within the task's range, as
     /// [`EnterAction::walk_again`] makes it toward a building (without a sprite), for a test.
     #[cfg(test)]
-    pub(crate) const fn walking(mut self, state: crate::movement::move_to::MoveTo) -> Self {
-        let move_to = Some(crate::movement::move_to::MoveToAction {
+    pub(crate) const fn walking(mut self, state: MoveTo) -> Self {
+        let move_to = Some(MoveToAction {
             state,
             point: Position::ORIGIN,
             target: match self.target {
@@ -233,9 +242,9 @@ impl EnterAction {
             },
             range: self.range,
             sprite: None,
-            voice: crate::objects::Voice::Quiet,
+            voice: Voice::Quiet,
             on_target_moved: TargetMoved::Ignores,
-            wait: crate::movement::move_to::MoveWait::NEW,
+            wait: MoveWait::NEW,
         });
         self.state = EnterState::Walk { move_to };
         self
@@ -258,10 +267,7 @@ impl EnterAction {
         self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
             c.w.parts.motion.layer_mut(unit.id),
-            crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )
@@ -282,8 +288,8 @@ impl EnterAction {
         range: Distance,
         gap_squared: DistanceSquared,
         target_speed: Speed,
-        walls: &mut crate::garrison::Walls<'_>,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        walls: &mut Walls<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         if range.squared() < gap_squared {
             return Ok(false);
@@ -308,7 +314,7 @@ impl EnterAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         reads: &EnterReads,
     ) -> Result<HeadCode, GenieError> {
@@ -351,7 +357,7 @@ impl EnterAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         t: &EnterTarget,
         reads: &EnterReads,
@@ -452,7 +458,7 @@ impl EnterAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         t: &EnterTarget,
         reads: &EnterReads,
     ) -> Result<bool, GenieError> {
@@ -468,10 +474,7 @@ impl EnterAction {
                 .ok_or(GenieError::unreachable(
                     "an Enter's held target gone in its update",
                 ))?;
-            let master = target.master(
-                crate::objects::masters::MasterTables::new(&w.masters, &w.parts.own_master),
-                tp,
-            )?;
+            let master = target.master(MasterTables::new(&w.masters, &w.parts.own_master), tp)?;
             let meeting = Meeting {
                 spatial: &mut w.spatial,
                 zones: &mut w.zones,
@@ -494,7 +497,7 @@ impl EnterAction {
                 reads.start,
                 meeting,
                 &moves,
-                crate::world::index::ObjectsRef::new(&w.players, &w.index, &w.masters, &w.parts),
+                ObjectsRef::new(&w.players, &w.index, &w.masters, &w.parts),
             )?
         };
         match walking {
@@ -524,7 +527,7 @@ impl EnterAction {
     /// The enter's.
     fn enter_at_once(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         unit: &mut Unit,
     ) -> Result<(), GenieError> {
@@ -544,8 +547,8 @@ impl EnterAction {
     fn on_unit<R>(
         &mut self,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
-        f: impl FnOnce(&mut Unit, &mut crate::objects::layers::Action) -> Result<R, GenieError>,
+        actions: &mut Action,
+        f: impl FnOnce(&mut Unit, &mut Action) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         actions.list.set_enter(Some(*self));
         let answer = f(unit, actions);

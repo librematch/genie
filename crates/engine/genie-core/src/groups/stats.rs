@@ -3,6 +3,7 @@
 //! change of members (`FUN_14100b940`).
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
@@ -10,33 +11,43 @@ use crate::groups::GroupId;
 use crate::groups::MotionFlags;
 use crate::groups::attack::moved_place;
 use crate::groups::create::FormationUnit;
+use crate::groups::formation::top_path;
 use crate::groups::group_list::member_gone;
+use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
+use crate::math::image::group::{
+    FAR as GROUP_FAR, FAR_WIDE as GROUP_FAR_WIDE, SLOW_GROUP_FACTOR as GROUP_SLOW_GROUP_FACTOR,
+    WIDE_RADIUS as GROUP_WIDE_RADIUS,
+};
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::UnitRelation;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::{Memory, Pick, Search, search_area, type_attacks_neutral};
 use crate::world::Seconds;
+use crate::world::Unread;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// A group with [`GroupFlags::CATCHING_UP`] moves at its slowest member's speed divided by this
 /// (`FUN_14100bcb0`, `DAT_142ed66b4`).
-const SLOW_GROUP_FACTOR: f32 = crate::math::image::group::SLOW_GROUP_FACTOR;
+const SLOW_GROUP_FACTOR: f32 = GROUP_SLOW_GROUP_FACTOR;
 /// A member farther than this from its slot leaves the group (`FUN_14100bcb0`'s far test,
 /// `DAT_142e7f38c`).
-const FAR: f32 = crate::math::image::group::FAR;
+const FAR: f32 = GROUP_FAR;
 /// The far test's distance in a formation of type 7, or once a member of radius
 /// [`WIDE_RADIUS`] or more came before (`DAT_142ecbff0`).
-const FAR_WIDE: f32 = crate::math::image::group::FAR_WIDE;
+const FAR_WIDE: f32 = GROUP_FAR_WIDE;
 /// The radius from which the far test takes [`FAR_WIDE`] (`DAT_142e7f384`).
-const WIDE_RADIUS: f32 = crate::math::image::group::WIDE_RADIUS;
+const WIDE_RADIUS: f32 = GROUP_WIDE_RADIUS;
 /// The objects of the members' searches a group keeps at most (`FUN_140c65c60`'s `0x46`).
 const MOST_OBJECTS: usize = 70;
 
@@ -252,10 +263,10 @@ impl World {
                     range = r;
                 }
                 let radius = match object {
-                    crate::groups::WorldObject::Unit(p, u, _) => {
+                    WorldObject::Unit(p, u, _) => {
                         FormationUnit::of(u.master(self.master_tables(), p)?).radius
                     }
-                    crate::groups::WorldObject::Ghost(p, _) => {
+                    WorldObject::Ghost(p, _) => {
                         FormationUnit::of(self.master(p, object.master_id())?).radius
                     }
                 };
@@ -315,20 +326,20 @@ impl World {
         }
         let master = u.master(self.master_tables(), p)?;
         let attack_priority = master.attack_priority;
-        let (classes, radius) = crate::unit_ai::search_area(
+        let (classes, radius) = search_area(
             ai_type,
             Some(master.class),
             master.line_of_sight,
             master.search_radius,
             player_type,
         )?;
-        let search = crate::unit_ai::Search {
+        let search = Search {
             at: u.position().ground(),
             radius,
             classes,
             size: master.radius,
-            pick: crate::unit_ai::Pick::Look,
-            memory: crate::unit_ai::Memory::default(),
+            pick: Pick::Look,
+            memory: Memory::default(),
         };
         let fresh = self.spatial.search_query(p, &search)?;
         let lists = self.spatial.searched().ok_or(GenieError::unsupported(
@@ -353,15 +364,15 @@ impl World {
                     continue;
                 };
                 let state = match object {
-                    crate::groups::WorldObject::Unit(_, u, _) => u.life.state,
-                    crate::groups::WorldObject::Ghost(_, g) => g.state,
+                    WorldObject::Unit(_, u, _) => u.life.state,
+                    WorldObject::Ghost(_, g) => g.state,
                 };
                 if ObjectState::Dying <= state {
                     continue;
                 }
                 if list == UnitRelation::NEUTRAL {
                     let class = self.master(object.player(), object.master_id())?.class;
-                    if !crate::unit_ai::type_attacks_neutral(ai_type, attack_priority, class) {
+                    if !type_attacks_neutral(ai_type, attack_priority, class) {
                         continue;
                     }
                 }
@@ -390,15 +401,15 @@ impl World {
     /// An object of a master the slice does not have.
     pub(super) fn range_against(
         &self,
-        object: crate::groups::WorldObject<'_>,
-        target: Option<crate::groups::WorldObject<'_>>,
+        object: WorldObject<'_>,
+        target: Option<WorldObject<'_>>,
     ) -> Result<Distance, GenieError> {
         let master = self.master(object.player(), object.master_id())?;
         if !COMBAT_KINDS.contains(&master.kind) {
             return Ok(Distance::ZERO);
         }
         let range = weapon_range(master);
-        let crate::groups::WorldObject::Unit(_, u, _) = object else {
+        let WorldObject::Unit(_, u, _) = object else {
             return Ok(range);
         };
         let target = target.or_else(|| {
@@ -438,19 +449,18 @@ impl World {
         largest: f32,
     ) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
-        let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol =
+            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         if patrol || g.flags.contains(GroupFlags::PATROL) {
             return Ok(false);
         }
         let (p, u) = self.object(view.id).ok_or_else(|| member_gone(view.id))?;
         // The types of action objects (`RGE_Action_Object`), whose action list slot 0x538 reads.
         if u.master(self.master_tables(), p)?.kind >= ACTION {
-            if let Some(e) = self.parts.unread.get(u.id).map(crate::world::Unread::error) {
+            if let Some(e) = self.parts.unread.get(u.id).map(Unread::error) {
                 return Err(e);
             }
-            if self.parts.actions_of(u.id).top_action_kind() == Some(crate::combat::attack::ATTACK)
-            {
+            if self.parts.actions_of(u.id).top_action_kind() == Some(ATTACK) {
                 return Ok(false);
             }
         }
@@ -460,17 +470,16 @@ impl World {
         let Some(slot) = f.slots.iter().find(|s| s.unit_id == Some(view.id)) else {
             return Ok(false);
         };
-        let mut d = crate::math::fmath::sub(view.at, slot.transform_position);
+        let mut d = sub(view.at, slot.transform_position);
         d = d.with_height(0.0);
-        let limit = if f.kind == FormationKind::STAGGERED
-            || !crate::math::fmath::below_or_unordered(largest, WIDE_RADIUS)
-        {
-            FAR_WIDE
-        } else {
-            FAR
-        };
-        let gap = crate::math::fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
-        Ok(!crate::math::fmath::at_most_or_unordered(gap, limit))
+        let limit =
+            if f.kind == FormationKind::STAGGERED || !below_or_unordered(largest, WIDE_RADIUS) {
+                FAR_WIDE
+            } else {
+                FAR
+            };
+        let gap = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
+        Ok(!at_most_or_unordered(gap, limit))
     }
 
     /// A member inside another object (`+0x2f0`: another object's garrison holds it) stops
@@ -511,7 +520,7 @@ pub(in crate::groups) const COMBAT_KINDS: [MasterKind; 4] = [
 /// added up (centroid, radii, ranges, attack times), `objects` its search list; the members
 /// counted, the slowest speed and whether any member is under attack.
 fn member_totals(
-    g: &mut crate::groups::UnitGroup,
+    g: &mut UnitGroup,
     views: &[(usize, MemberView)],
     objects: Vec<ObjectId>,
     dt: Seconds,
@@ -573,7 +582,7 @@ fn member_totals(
 
 /// Slot 0x230 of an object of `master`: a combat object's weapon range (`+0x828`,
 /// `FUN_14108d960`), any other's 0 (`FUN_14106ff50`).
-pub(crate) fn weapon_range(master: &crate::objects::masters::Master) -> Distance {
+pub(crate) fn weapon_range(master: &Master) -> Distance {
     if COMBAT_KINDS.contains(&master.kind) {
         master.weapon_range
     } else {
@@ -606,6 +615,18 @@ mod tests {
     use crate::world::Millis;
     use crate::world::WorldTime;
 
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
+    #[cfg(test)]
+    use crate::groups::{Formation, Slot};
+    #[cfg(test)]
+    use crate::map::spatial::Spatial;
+    #[cfg(test)]
+    use crate::objects::layers::Static;
+    #[cfg(test)]
+    use crate::objects::masters::SpacingModifier;
+    #[cfg(test)]
+    use crate::players::ByPlayer;
     use crate::players::relation_row;
     use crate::players::relations;
     use crate::test_ids::group_id;
@@ -613,7 +634,15 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::object_id_list;
     use crate::unit_ai::UnitAiType;
+    #[cfg(test)]
+    use crate::unit_ai::{CIVILIAN, SOLDIER_AI, UnitAi};
+    #[cfg(test)]
+    use crate::vision::registry::Registry;
     use crate::vision::registry::UnitUpdate;
+    #[cfg(test)]
+    use crate::vision::visibility::Visibility;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Player;
 
     /// Slot 0x238 (`FUN_14108d9b0`): the weapon range, plus `charge_event` for a ready charge of
@@ -663,7 +692,7 @@ mod tests {
         let unit = |id: i32, master: MasterId, x: f32, y: f32| {
             let mut u = Unit {
                 id: object_id(id),
-                place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+                place: Static::at(Position::new(x, y, 0.0)),
                 ..Unit::default()
             };
             u.life.master_id = master;
@@ -671,9 +700,9 @@ mod tests {
             u
         };
         let soldier = unit(10, master_id(4), 5.0, 5.0);
-        let soldier_ai = crate::unit_ai::UnitAi {
-            ai_type: crate::unit_ai::SOLDIER_AI,
-            ..crate::unit_ai::UnitAi::default()
+        let soldier_ai = UnitAi {
+            ai_type: SOLDIER_AI,
+            ..UnitAi::default()
         };
         let mut dying = unit(21, master_id(4), 5.0, 6.0);
         dying.life.state = ObjectState::Dying;
@@ -698,7 +727,7 @@ mod tests {
         ];
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 4],
             players,
@@ -721,20 +750,20 @@ mod tests {
             ]);
             4
         ];
-        let mut s = crate::map::spatial::Spatial::new(GridSize::new(20, 20));
-        s.relations = crate::players::ByPlayer::new(vec![
+        let mut s = Spatial::new(GridSize::new(20, 20));
+        s.relations = ByPlayer::new(vec![
             relation_row([0, 3, 3, 3]),
             relation_row([0, 0, 3, 1]),
             relation_row([0, 3, 0, 3]),
             relation_row([0, 1, 3, 0]),
         ]);
-        s.unit_diplomacy = crate::players::ByPlayer::new(vec![
+        s.unit_diplomacy = ByPlayer::new(vec![
             relations([1, 4, 4, 4]),
             relations([0, 1, 4, 3]),
             relations([0, 4, 1, 4]),
             relations([0, 3, 4, 1]),
         ]);
-        let mut r = crate::vision::registry::Registry::new(4, 65);
+        let mut r = Registry::new(4, 65);
         for (id, owner, at, class) in [
             (20, 2, Point::new(6.0, 5.0), class::CLASS_6),
             (21, 2, Point::new(5.0, 6.0), class::CLASS_6),
@@ -752,7 +781,7 @@ mod tests {
             })
             .unwrap();
         }
-        let mut v = crate::vision::visibility::Visibility::new(
+        let mut v = Visibility::new(
             GridSize::new(20, 20),
             Vec::new(),
             Vec::new(),
@@ -860,12 +889,9 @@ mod tests {
             )
         };
         assert_eq!(found(UnitAiType::TRANSPORT), (vec![], false));
+        assert_eq!(found(CIVILIAN), (vec![object_id(20), object_id(22)], true));
         assert_eq!(
-            found(crate::unit_ai::CIVILIAN),
-            (vec![object_id(20), object_id(22)], true)
-        );
-        assert_eq!(
-            found(crate::unit_ai::SOLDIER_AI),
+            found(SOLDIER_AI),
             (vec![object_id(20), object_id(30)], true)
         );
     }
@@ -928,15 +954,14 @@ mod tests {
             for masters in &mut t.masters {
                 *masters = Masters::new(masters.iter().cloned().map(|mut m| {
                     m.height = Distance::new(1.0);
-                    m.spacing_modifier = crate::objects::masters::SpacingModifier::new(spacing);
+                    m.spacing_modifier = SpacingModifier::new(spacing);
                     m
                 }));
             }
             let mut stray = t.object_of(&t.players[1].objects[ListIndex::new(0)]);
             stray.unit.id = object_id(11);
             stray.unit.place_for_test(Position::new(6.0, 6.0, 0.0));
-            t.parts
-                .put_mover(stray.unit.id, Some(crate::gathering::hunt::tests::walker()));
+            t.parts.put_mover(stray.unit.id, Some(walker()));
             t.parts.mover_mut(stray.unit.id).unwrap().moved_at = Position::new(6.0, 6.0, 0.0);
             stray.unit.group.id = Some(group_id(1));
             t.players[1].objects[ListIndex::new(0)].group.id = Some(group_id(1));
@@ -950,20 +975,20 @@ mod tests {
                 })
                 .to_vec();
             g.unit_types[0].units = object_id_list(order);
-            g.current_formation = Some(crate::groups::Formation {
+            g.current_formation = Some(Formation {
                 slots: vec![
-                    crate::groups::Slot {
+                    Slot {
                         unit_id: Some(object_id(10)),
                         transform_position: BVector::new(5.0, 0.0, 5.0),
-                        ..crate::groups::Slot::default()
+                        ..Slot::default()
                     },
-                    crate::groups::Slot {
+                    Slot {
                         unit_id: Some(object_id(11)),
                         transform_position: BVector::new(30.0, 0.0, 6.0),
-                        ..crate::groups::Slot::default()
+                        ..Slot::default()
                     },
                 ],
-                ..crate::groups::Formation::default()
+                ..Formation::default()
             });
             t
         };

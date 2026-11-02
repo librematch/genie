@@ -17,6 +17,7 @@ use crate::objects::masters::TaskGroup;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::players::Amount;
+use crate::unit_ai::task_finder::TaskTarget;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::{Actor, find_task};
 use crate::world::World;
@@ -187,7 +188,7 @@ impl World {
     pub(super) fn task_range(
         &self,
         task: &Task,
-        target: &crate::unit_ai::task_finder::TaskTarget<'_>,
+        target: &TaskTarget<'_>,
     ) -> Result<TargetTask, GenieError> {
         let range = match task.action_type {
             OWN_RANGE_TASK => None,

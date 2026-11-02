@@ -4,6 +4,8 @@
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::{acos, cos, sin, sqrt};
+use std::f32::consts::{FRAC_PI_2, PI};
+use std::ops::Neg;
 
 /// A vector in the game's order (`BVector`): x, height, y. The map's y is the third component,
 /// so a place on the map (x, y, z) is the vector (x, z, y) ([`Position::vector`],
@@ -87,7 +89,7 @@ impl From<[f32; 3]> for BVector {
     }
 }
 
-impl std::ops::Neg for BVector {
+impl Neg for BVector {
     type Output = Self;
 
     /// Each component negated (its sign bit flipped, a NaN's too).
@@ -159,11 +161,11 @@ pub fn normalize(v: BVector) -> BVector {
 pub fn angle_between(a: BVector, b: BVector) -> f32 {
     let d = dot(a, b);
     if d.abs() < 1e-7 {
-        std::f32::consts::FRAC_PI_2
+        FRAC_PI_2
     } else if d >= 1.0 {
         0.0
     } else if d <= -1.0 {
-        std::f32::consts::PI
+        PI
     } else {
         // COMISS -1, d; JC at 0x14087e6ed: an unordered dot goes on to acosf
         acos(d)

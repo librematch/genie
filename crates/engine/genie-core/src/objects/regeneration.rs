@@ -1,5 +1,7 @@
 //! A regeneration rate: the hit points an object gains a minute.
 
+use std::ops::{Add, AddAssign, MulAssign};
+
 /// A regeneration rate in hit points a minute (a float): a master's (`regeneration_rate`,
 /// `+0x8b4`, which the effects set, add to and scale), an object's powerup (`+0xa0c`) and
 /// stinger, and a hero's bonus. A negative rate takes hit points. Each operator is the one
@@ -24,7 +26,7 @@ impl Regeneration {
     }
 }
 
-impl std::ops::Add for Regeneration {
+impl Add for Regeneration {
     type Output = Self;
 
     /// The `f32` sum.
@@ -33,14 +35,14 @@ impl std::ops::Add for Regeneration {
     }
 }
 
-impl std::ops::AddAssign for Regeneration {
+impl AddAssign for Regeneration {
     /// An effect's add (`f32`).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for Regeneration {
+impl MulAssign<f32> for Regeneration {
     /// An effect's multiply (`f32`).
     fn mul_assign(&mut self, factor: f32) {
         self.0 *= factor;

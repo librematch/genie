@@ -17,6 +17,7 @@ use crate::map::Distance;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::{GridSize, Tile, TileOffset};
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::world::slots::CheckedIndex;
 
 /// The number after the last a patch takes; the next patch takes 0 again.
@@ -324,11 +325,9 @@ impl ZoneMap {
             for ty in y0..=y1 {
                 let dy = y.wrapping_sub(ty);
                 let steps = dy.wrapping_mul(dy).wrapping_add(dx.wrapping_mul(dx));
-                let d = crate::math::fmath::sqrt(steps as f32);
+                let d = sqrt(steps as f32);
                 let tile = Tile::new(tx, ty);
-                if crate::math::fmath::at_most_or_unordered(d, reach.get())
-                    && self.zone(tile) == zone
-                {
+                if at_most_or_unordered(d, reach.get()) && self.zone(tile) == zone {
                     return Some(tile);
                 }
             }

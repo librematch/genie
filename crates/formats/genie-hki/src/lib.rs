@@ -70,6 +70,8 @@ impl From<HotkeyIndexError> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -86,7 +88,7 @@ mod genie_error_tests {
         let e: genie_error::GenieError =
             IndexError::HotkeyIndex(HotkeyIndexError::new(9, 2)).into();
         assert_eq!(e.reason(), "a hotkey index past the group's hotkeys");
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(Error::source(&e).is_some());
     }
 }
 

@@ -2,6 +2,7 @@
 //! follows.
 
 use crate::GenieError;
+use crate::combat::MissileCount;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
@@ -9,13 +10,16 @@ use crate::combat::victims::{KillLeft, file_kill, victim, victim_of};
 use crate::combat::volley::armed;
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::objects::layers::Action;
 use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::PlayerType;
+use crate::world::ATTACKER_MASTER;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
@@ -35,7 +39,7 @@ impl Unit {
     /// the caller's after the update.
     pub(crate) fn attack_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
@@ -52,7 +56,7 @@ impl Unit {
     /// disarm posts to the unit AI; codes 1 and 3 delete it.
     fn attack_lost_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -88,7 +92,7 @@ impl Unit {
     /// update ([`crate::combat::attack::Attack::update_gone`]); codes 1 and 3 delete it.
     fn attack_walks_unseen(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         master_class: ClassId,
@@ -103,10 +107,7 @@ impl Unit {
             c.w.parts.combat_of(self.id),
             master,
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 &c.w.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
@@ -125,7 +126,7 @@ impl Unit {
     /// unit ([`Unit::hit_back`]). Codes 1 and 3 delete it (`RGE_Action_Object::update`).
     fn attack_strike_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
@@ -144,10 +145,7 @@ impl Unit {
             c.w.parts.combat_of(self.id),
             master,
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 &c.w.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
@@ -156,7 +154,7 @@ impl Unit {
         let victim = victim(c, attack.target)?.ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold live",
         ))?;
-        let own = own.ok_or(crate::world::ATTACKER_MASTER)?;
+        let own = own.ok_or(ATTACKER_MASTER)?;
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
         let code = attack.update(c, self, actions, me, &mut f, &r);
@@ -187,7 +185,7 @@ pub(crate) fn run_down_attack_timers(combat: &mut Combat, dt: Seconds, now: Worl
     }
     // then a reload world time past ends the volley under way (`+0xa04`) and is none
     if combat.reload_worldtime != WorldTime::ZERO && combat.reload_worldtime < now {
-        combat.next_volley = crate::combat::MissileCount::ZERO;
+        combat.next_volley = MissileCount::ZERO;
         combat.reload_worldtime = WorldTime::ZERO;
     }
 }
@@ -197,7 +195,7 @@ impl Unit {
     /// unit without a Hunt or an Attack, or without its master.
     pub(crate) fn own_victim(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &Step<'_>,
     ) -> Result<Option<Victim>, GenieError> {
         if actions.list.hunt().is_none() && actions.list.attack().is_none() {

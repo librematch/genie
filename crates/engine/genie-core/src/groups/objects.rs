@@ -4,13 +4,18 @@
 use crate::groups::FormationCategory;
 use crate::map::Position;
 use crate::math::fmath::BVector;
+use crate::movement::Mover;
+use crate::objects::ObjectState;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
+use crate::vision::ghost::{GHOST_MASTER, Ghost};
+use crate::world::World;
 
 /// An object of the world's id table (`FUN_1415417a0`, `BaseWorld::object`): the objects of
 /// every player's live, sleeping and doppelganger lists, which the player's add and removal
@@ -22,13 +27,9 @@ use crate::players::PlayerId;
 pub(crate) enum WorldObject<'a> {
     /// An object of player `.0`'s live or sleeping list, with its mover (none for one that does
     /// not move).
-    Unit(
-        PlayerId,
-        &'a crate::objects::unit::Unit,
-        Option<&'a crate::movement::Mover>,
-    ),
+    Unit(PlayerId, &'a Unit, Option<&'a Mover>),
     /// A ghost of player `.0`'s doppelganger list (type 25, its master `243`).
-    Ghost(PlayerId, &'a crate::vision::ghost::Ghost),
+    Ghost(PlayerId, &'a Ghost),
 }
 
 impl WorldObject<'_> {
@@ -43,7 +44,7 @@ impl WorldObject<'_> {
     pub(crate) const fn master_id(&self) -> MasterId {
         match *self {
             Self::Unit(_, u, _) => u.life.master_id,
-            Self::Ghost(..) => crate::vision::ghost::GHOST_MASTER,
+            Self::Ghost(..) => GHOST_MASTER,
         }
     }
 
@@ -56,7 +57,7 @@ impl WorldObject<'_> {
     }
 
     /// Its state (`+0x640`): a ghost's own (2, then 7 and 8 once destroyed).
-    pub(crate) const fn state(&self) -> crate::objects::ObjectState {
+    pub(crate) const fn state(&self) -> ObjectState {
         match *self {
             Self::Unit(_, u, _) => u.life.state,
             Self::Ghost(_, g) => g.state,
@@ -108,7 +109,7 @@ impl WorldObject<'_> {
     }
 }
 
-impl crate::world::World {
+impl World {
     /// `FUN_1415417a0` of `id`: the object the world's table holds for it ([`WorldObject`]),
     /// none for `i32::MIN` (the routine's own test, [`ObjectId::TAKEN_OUT`]'s value) and for an
     /// id no list holds. Only the negative half holds ghosts.

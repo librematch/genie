@@ -18,6 +18,7 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Task, player_master};
+use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
@@ -115,7 +116,7 @@ impl World {
     pub(crate) fn has_room(
         &self,
         bp: PlayerId,
-        b: &crate::objects::unit::Unit,
+        b: &Unit,
         unit: Option<ObjectId>,
     ) -> Result<bool, GenieError> {
         let capacity = b.master(self.master_tables(), bp)?.garrison;

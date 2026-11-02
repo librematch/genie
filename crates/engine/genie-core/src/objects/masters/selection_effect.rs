@@ -1,5 +1,7 @@
 //! A master's selection effect (`+0x684`): how a selected object of it shows.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's selection effect (`+0x684`, the `.dat`'s `selection_effect`; openage's names): its
 /// hit point bar and outline when selected. The simulation only keeps it; every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -22,8 +24,8 @@ impl SelectionEffect {
     }
 }
 
-impl std::fmt::Display for SelectionEffect {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for SelectionEffect {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

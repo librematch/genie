@@ -3,6 +3,7 @@ use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
 use crate::groups::TransformType;
+use crate::groups::{LinePoint, Member, PointLine, UnitGroups, UnitTypeStatistic, WorldObject};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -12,14 +13,17 @@ use crate::map::Restriction;
 use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
+use crate::map::WholeDistance;
 use crate::map::terrain::TileTerrain;
 use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
+use crate::movement::{LinkedPathType, PlanTries, WaypointIndex};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
@@ -30,16 +34,22 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::DOPPELGANGER;
+use crate::objects::masters::{Master, Masters};
+use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
+use crate::players::PlayerSet;
 use crate::players::PlayerType;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::vision::VisionBits;
+use crate::vision::ghost::{GHOST_MASTER, Ghost};
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::{Formations, FrameSeed, Player};
+use std::slice::from_ref;
 
 /// `FUN_14102d580` copies a slot in use without its transform mark (`+0x44`).
 #[test]
@@ -63,38 +73,38 @@ fn larger_slots_array_drops_the_transform_marks() {
 pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usize)]) -> World {
     use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
     use crate::map::terrain::{Terrain, TerrainKind};
-    let objects: Vec<crate::objects::unit::Unit> = units
+    let objects: Vec<Unit> = units
         .iter()
         .map(|&(id, master, x, y)| {
-            let mut u = crate::objects::unit::Unit {
+            let mut u = Unit {
                 id: object_id(id),
-                place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
-                ..crate::objects::unit::Unit::default()
+                place: Static::at(Position::new(x, y, 0.0)),
+                ..Unit::default()
             };
             u.life.master_id = master_id(master);
             u
         })
         .collect();
-    let player = crate::world::Player {
+    let player = Player {
         objects: objects.clone().into(),
-        ..crate::world::Player::default()
+        ..Player::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
-        vec![crate::world::Player::default(), player],
+        vec![Player::default(), player],
     );
-    let master = |id: MasterId, category: u8| crate::objects::masters::Master {
+    let master = |id: MasterId, category: u8| Master {
         id,
         kind: master_type::COMBAT,
         formation_category: FormationClass::of_data(category),
         terrain_restriction: Some(RestrictionId::named(0)),
         radius: Footprint::new(0.2, 0.2),
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     };
-    let masters = crate::objects::masters::Masters::new([
+    let masters = Masters::new([
         master(master_id(4), 1),
         master(master_id(5), 1),
         master(ids::ID_6, 3),
@@ -151,17 +161,17 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     g.owner = Some(PlayerId::new(1));
     g.members = units
         .iter()
-        .map(|&(id, ..)| crate::groups::Member {
+        .map(|&(id, ..)| Member {
             id: object_id(id),
-            ..crate::groups::Member::default()
+            ..Member::default()
         })
         .collect();
     g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
     g.motion.position[2] = BVector::new(0.0, 1.0, 0.0);
     g.desired_spacing = Distance::new(2.0);
-    t.groups = crate::groups::UnitGroups {
+    t.groups = UnitGroups {
         groups: vec![g],
-        ..crate::groups::UnitGroups::default()
+        ..UnitGroups::default()
     };
     t
 }
@@ -185,17 +195,17 @@ pub(crate) fn slot_at(at: BVector, category: i32) -> Slot {
 /// point is no line.
 #[test]
 fn the_point_from_the_front_runs_along_the_stored_positions() {
-    let point = |p: BVector| crate::groups::LinePoint {
+    let point = |p: BVector| LinePoint {
         point: p,
-        ..crate::groups::LinePoint::default()
+        ..LinePoint::default()
     };
-    let line = crate::groups::PointLine {
+    let line = PointLine {
         points: vec![
             point(BVector::new(0.0, 7.0, 0.0)),
             point(BVector::new(3.0, 1.0, 4.0)),
             point(BVector::new(3.0, 0.0, 10.0)),
         ],
-        ..crate::groups::PointLine::default()
+        ..PointLine::default()
     };
     assert_eq!(
         find_point_from_front(&line, Distance::ZERO),
@@ -218,9 +228,9 @@ fn the_point_from_the_front_runs_along_the_stored_positions() {
         Some(BVector::new(3.0, 1.0, 10.0))
     );
     assert_eq!(find_point_from_front(&line, Distance::new(12.0)), None);
-    let one = crate::groups::PointLine {
+    let one = PointLine {
         points: vec![point(BVector::ZERO)],
-        ..crate::groups::PointLine::default()
+        ..PointLine::default()
     };
     assert_eq!(find_point_from_front(&one, Distance::ZERO), None);
 }
@@ -233,31 +243,31 @@ fn the_point_from_the_front_runs_along_the_stored_positions() {
 fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
     let mut t = slot_world(&[(10, 4, 1.0, 0.0), (35, 35, 2.0, 0.0)], &[]);
     for masters in &mut t.masters {
-        *masters = crate::objects::masters::Masters::new([
-            crate::objects::masters::Master {
+        *masters = Masters::new([
+            Master {
                 id: master_id(4),
                 kind: master_type::COMBAT,
                 formation_category: FormationClass::of_data(1),
                 hero_flag: HeroFlags::PROTECTED_FORMATION,
-                ..crate::objects::masters::Master::default()
+                ..Master::default()
             },
-            crate::objects::masters::Master {
+            Master {
                 id: ids::ID_35,
                 kind: master_type::COMBAT,
                 class: class::SIEGE,
                 formation_category: FormationClass::of_data(2),
-                ..crate::objects::masters::Master::default()
+                ..Master::default()
             },
-            crate::objects::masters::Master {
-                id: crate::vision::ghost::GHOST_MASTER,
+            Master {
+                id: GHOST_MASTER,
                 kind: DOPPELGANGER,
                 formation_category: FormationClass::of_data(1),
-                ..crate::objects::masters::Master::default()
+                ..Master::default()
             },
         ]);
     }
     t.players[1].kind = PlayerType::HUMAN;
-    t.players[1].ghosts = vec![crate::vision::ghost::Ghost {
+    t.players[1].ghosts = vec![Ghost {
         id: object_id(-2),
         original: None,
         original_id: None,
@@ -267,7 +277,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
         tile: Tile::new(3, 4),
         footprint: 0,
         bits: VisionBits::NONE,
-        cant_see: crate::players::PlayerSet::NONE,
+        cant_see: PlayerSet::NONE,
         seen: false,
         state: ObjectState::Alive,
     }];
@@ -279,7 +289,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
     let ghost = t.world_object(object_id(-2));
     assert!(matches!(
         ghost,
-        Some(crate::groups::WorldObject::Ghost(p, _)) if p == PlayerId::new(1)
+        Some(WorldObject::Ghost(p, _)) if p == PlayerId::new(1)
     ));
     assert_eq!(
         t.unit_category(ghost).unwrap(),
@@ -296,7 +306,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
     // the world's table holds ghosts only in its negative half, none for −1 (no object takes
     // it) and none for i32::MIN
     assert!(t.world_object(None::<ObjectId>).is_none());
-    assert!(t.world_object(crate::objects::unit::TAKEN_OUT).is_none());
+    assert!(t.world_object(TAKEN_OUT).is_none());
 }
 
 /// `FUN_14100e370` from the origin: of all, 12 (category 3) is nearest; of category 1, 11;
@@ -383,9 +393,9 @@ fn the_feature_assignment_keeps_the_start_of_least_variance() {
     let run = |feature: bool, gone: bool| {
         let mut t = slot_world(&[(10, 4, 0.0, 0.0), (11, 4, 1.0 / 3.0, y)], &[]);
         if gone {
-            t.groups.groups[0].members.push(crate::groups::Member {
+            t.groups.groups[0].members.push(Member {
                 id: object_id(12),
-                ..crate::groups::Member::default()
+                ..Member::default()
             });
         }
         let g = t.groups.get(group_id(1)).unwrap().clone();
@@ -622,8 +632,8 @@ fn an_unreachable_slot_moves_to_the_reachable_cell_its_unit_finds() {
 }
 
 /// A ghost of id `id` at (`x`, `y`) in its player's doppelganger list.
-pub(crate) fn ghost_at(id: i32, x: f32, y: f32) -> crate::vision::ghost::Ghost {
-    crate::vision::ghost::Ghost {
+pub(crate) fn ghost_at(id: i32, x: f32, y: f32) -> Ghost {
+    Ghost {
         id: object_id(id),
         original: None,
         original_id: None,
@@ -633,7 +643,7 @@ pub(crate) fn ghost_at(id: i32, x: f32, y: f32) -> crate::vision::ghost::Ghost {
         tile: Tile::new(x as i32, y as i32),
         footprint: 0,
         bits: VisionBits::NONE,
-        cant_see: crate::players::PlayerSet::NONE,
+        cant_see: PlayerSet::NONE,
         seen: false,
         state: ObjectState::Alive,
     }
@@ -663,14 +673,13 @@ fn the_passability_tests_with_the_world_object_of_the_lead_id() {
             ],
         ));
         for masters in &mut t.masters {
-            let ghost = crate::objects::masters::Master {
-                id: crate::vision::ghost::GHOST_MASTER,
+            let ghost = Master {
+                id: GHOST_MASTER,
                 kind: DOPPELGANGER,
                 terrain_restriction: Some(RestrictionId::named(1)),
-                ..crate::objects::masters::Master::default()
+                ..Master::default()
             };
-            *masters =
-                crate::objects::masters::Masters::new(masters.iter().cloned().chain([ghost]));
+            *masters = Masters::new(masters.iter().cloned().chain([ghost]));
         }
         if ghost {
             t.players[1].ghosts = vec![ghost_at(-2, 1.0, 1.0)];
@@ -841,14 +850,14 @@ fn one_statistic(t: &mut World, units: &[ObjectId]) {
     counts[0] = units.len() as u32;
     let g = &mut t.groups.groups[0];
     g.desired_spacing = Distance::new(1.0);
-    g.unit_types = vec![crate::groups::UnitTypeStatistic {
+    g.unit_types = vec![UnitTypeStatistic {
         formation_category: FormationCategory::named(1),
         units: units.to_vec(),
         desired_spacing: Distance::new(1.0),
         number_unit_types: 1,
         unit_types,
         unit_type_counts: counts,
-        ..crate::groups::UnitTypeStatistic::default()
+        ..UnitTypeStatistic::default()
     }];
 }
 
@@ -903,11 +912,11 @@ fn line_after_column_takes_its_units_in_the_column_order() {
 fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
     PathData {
         level: WaypointLevel::WALKED,
-        linked_type: crate::movement::LinkedPathType::of_data(0),
+        linked_type: LinkedPathType::of_data(0),
         points: points.to_vec(),
         has_path: !points.is_empty(),
         path_flags: PathFlags::from_bits_retain(flags),
-        waypoint: crate::movement::WaypointIndex::of_data(waypoint),
+        waypoint: WaypointIndex::of_data(waypoint),
         state: PathState::Idle,
         range: Distance::ZERO,
         target: None,
@@ -915,7 +924,7 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
         flags: LevelFlags::NONE,
         length: Distance::ZERO,
         created: WorldTime::ZERO,
-        continue_counter: crate::movement::PlanTries::of_data(10),
+        continue_counter: PlanTries::of_data(10),
         repath_time: Seconds::ZERO,
         ignore: Vec::new(),
         ignored: Vec::new(),
@@ -925,44 +934,44 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
 /// Player 1 (minimum column distance 10, column-to-line 5) with unit 7 of a soldier master
 /// (type 70, category 1) in group 1 at the origin along `paths` (walked first).
 fn type_world(paths: Vec<PathData>) -> World {
-    let mut u = crate::objects::unit::Unit {
+    let mut u = Unit {
         id: object_id(7),
-        ..crate::objects::unit::Unit::default()
+        ..Unit::default()
     };
     u.life.master_id = master_id(4);
-    let player = crate::world::Player {
+    let player = Player {
         objects: vec![u].into(),
-        formations: crate::world::Formations {
-            min_column_distance: crate::map::WholeDistance::of_data(10),
-            column_to_line_distance: crate::map::WholeDistance::of_data(5),
-            ..crate::world::Formations::default()
+        formations: Formations {
+            min_column_distance: WholeDistance::of_data(10),
+            column_to_line_distance: WholeDistance::of_data(5),
+            ..Formations::default()
         },
-        ..crate::world::Player::default()
+        ..Player::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
-        vec![crate::world::Player::default(), player],
+        vec![Player::default(), player],
     );
-    let masters = crate::objects::masters::Masters::new([crate::objects::masters::Master {
+    let masters = Masters::new([Master {
         id: master_id(4),
         kind: master_type::COMBAT,
         formation_category: FormationClass::of_data(1),
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     }]);
     t.masters = vec![masters.clone(), masters];
     let mut g = UnitGroup::new(group_id(1));
     g.owner = Some(PlayerId::new(1));
-    g.members = vec![crate::groups::Member {
+    g.members = vec![Member {
         id: object_id(7),
-        ..crate::groups::Member::default()
+        ..Member::default()
     }];
     g.motion.paths = paths;
-    t.groups = crate::groups::UnitGroups {
+    t.groups = UnitGroups {
         groups: vec![g],
-        ..crate::groups::UnitGroups::default()
+        ..UnitGroups::default()
     };
     t
 }
@@ -987,9 +996,9 @@ fn the_last_high_level_waypoint_is_the_top_levels_last_point() {
     );
     let walked = level(&[BVector::ZERO, BVector::new(1.0, 0.0, 0.0)], 0, 0);
     assert!(on_last_high_level_waypoint(&[walked.clone(), top.clone()]));
-    assert!(!on_last_high_level_waypoint(std::slice::from_ref(&top)));
+    assert!(!on_last_high_level_waypoint(from_ref(&top)));
     let mut early = top;
-    early.waypoint = crate::movement::WaypointIndex::of_data(1);
+    early.waypoint = WaypointIndex::of_data(1);
     assert!(!on_last_high_level_waypoint(&[walked.clone(), early]));
     assert!(!on_last_high_level_waypoint(&[walked, level(&[], 5, 0)]));
 }
@@ -1045,10 +1054,10 @@ fn lock_or_given_type_overrides_the_groups_own_choice() {
     let mut t = type_world(far);
     t.groups.groups[0].flags |= GroupFlags::LINE;
     assert_eq!(own(&t), FormationKind::LINE);
-    t.masters[1] = crate::objects::masters::Masters::new([crate::objects::masters::Master {
+    t.masters[1] = Masters::new([Master {
         id: master_id(4),
         kind: master_type::COMBAT,
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     }]);
     assert_eq!(own(&t), FormationKind::HORDE);
     let g = t.groups.get(group_id(1)).unwrap().clone();
@@ -1096,19 +1105,19 @@ fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> 
     }
     UnitGroup {
         members: (0..count)
-            .map(|i| crate::groups::Member {
+            .map(|i| Member {
                 id: object_id(i as i32),
-                ..crate::groups::Member::default()
+                ..Member::default()
             })
             .collect(),
-        unit_types: vec![crate::groups::UnitTypeStatistic {
+        unit_types: vec![UnitTypeStatistic {
             formation_category: FormationCategory::named(category),
             units: object_id_list(0..count as i32),
             desired_spacing: Distance::new(spacing),
             number_unit_types: types.len() as i32,
             unit_types,
             unit_type_counts: counts,
-            ..crate::groups::UnitTypeStatistic::default()
+            ..UnitTypeStatistic::default()
         }],
         ..UnitGroup::default()
     }
@@ -1197,9 +1206,9 @@ fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
     let mut g = group_of(3, 10, 1.5, &[(4, 10)]);
     let narrow = group_of(0, 3, 1.0, &[(83, 3)]);
     g.unit_types.insert(0, narrow.unit_types[0].clone());
-    g.members.extend((10..13).map(|id| crate::groups::Member {
+    g.members.extend((10..13).map(|id| Member {
         id: object_id(id),
-        ..crate::groups::Member::default()
+        ..Member::default()
     }));
     let mut f = Formation::new();
     assert!(column_line_slots(&mut f, &g, false, (false, false), WorldTime::ZERO).unwrap());

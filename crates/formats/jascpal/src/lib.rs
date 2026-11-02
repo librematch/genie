@@ -43,9 +43,15 @@ use nom::multi::many1;
 use rgb::RGB;
 use std::convert::{TryFrom, TryInto};
 
+use std::fmt::{Display, Error as FmtError, Formatter};
+use std::io::Error as IoError;
 use std::io::{Read, Write};
+use std::num::ParseIntError;
 use std::num::TryFromIntError;
+use std::ops::{Index, IndexMut};
+use std::slice::Iter;
 use std::str::{self, FromStr};
+use std::vec::IntoIter as VecIntoIter;
 
 /// Represents an RGB colour.
 pub type Color = RGB<u8>;
@@ -97,7 +103,7 @@ impl From<PaletteIndex> for usize {
 }
 
 impl FromStr for PaletteIndex {
-    type Err = std::num::ParseIntError;
+    type Err = ParseIntError;
     #[inline]
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         input.parse().map(Self)
@@ -157,7 +163,7 @@ fn parse(input: &[u8]) -> IResult<&[u8], Vec<Color>> {
 pub enum ReadPaletteError {
     /// An I/O error occurred.
     #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    IoError(#[from] IoError),
     /// The palette could not be parsed.
     #[error("parse error")]
     ParseError,
@@ -214,7 +220,7 @@ impl Palette {
     ///
     /// Returns an error if writing to `output` fails.
     #[inline]
-    pub fn write_to(&self, mut output: impl Write) -> Result<(), std::io::Error> {
+    pub fn write_to(&self, mut output: impl Write) -> Result<(), IoError> {
         write!(output, "{self}")
     }
 
@@ -249,7 +255,7 @@ impl Palette {
 
     /// Iterate over the colours.
     #[inline]
-    pub fn iter(&self) -> std::slice::Iter<'_, Color> {
+    pub fn iter(&self) -> Iter<'_, Color> {
         self.colors.iter()
     }
 
@@ -274,7 +280,7 @@ impl Palette {
     }
 }
 
-impl std::ops::Index<PaletteIndex> for Palette {
+impl Index<PaletteIndex> for Palette {
     type Output = Color;
     /// Get the colour at the given index.
     #[inline]
@@ -284,7 +290,7 @@ impl std::ops::Index<PaletteIndex> for Palette {
     }
 }
 
-impl std::ops::IndexMut<PaletteIndex> for Palette {
+impl IndexMut<PaletteIndex> for Palette {
     /// Get the colour at the given index.
     #[inline]
     fn index_mut(&mut self, index: PaletteIndex) -> &mut Self::Output {
@@ -304,7 +310,7 @@ impl FromStr for Palette {
 
 impl IntoIterator for Palette {
     type Item = Color;
-    type IntoIter = std::vec::IntoIter<Color>;
+    type IntoIter = VecIntoIter<Color>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -314,7 +320,7 @@ impl IntoIterator for Palette {
 
 impl<'a> IntoIterator for &'a Palette {
     type Item = &'a Color;
-    type IntoIter = std::slice::Iter<'a, Color>;
+    type IntoIter = Iter<'a, Color>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
@@ -322,9 +328,9 @@ impl<'a> IntoIterator for &'a Palette {
     }
 }
 
-impl std::fmt::Display for Palette {
+impl Display for Palette {
     /// Write the palette in the JASC-PAL text format.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         f.write_str("JASC-PAL\r\n0100\r\n")?;
         write!(f, "{}\r\n", self.colors.len())?;
         for c in &self.colors {
@@ -427,6 +433,8 @@ mod tests {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -440,6 +448,6 @@ mod genie_error_tests {
                 "a palette that does not parse"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 }

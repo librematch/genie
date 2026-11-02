@@ -10,6 +10,8 @@ use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::command::MOVE_COMMAND;
+use crate::groups::command::MoveTo;
+use crate::groups::formation::top_path;
 use crate::groups::group_list::member_gone;
 use crate::groups::update::{
     ATTACK, CLOSE, FOLLOW, FOLLOW_SHARE, IDLE_LIMIT, IDLE_SPAN, NO_COMMAND, OTHER_COMMANDS,
@@ -17,12 +19,17 @@ use crate::groups::update::{
 use crate::groups::{SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{below_or_unordered, sqrt, sub};
+use crate::math::rng::Stream;
 use crate::movement::PathFlags;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::pathing::DelayCount;
 use crate::world::Millis;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use crate::world::{IN_THE_WAY, WALKER_UNMOVING};
+use std::mem::take;
 
 impl World {
     /// The current command's update (`0x14103e5f7`..`0x14103e865`): false deletes the group. No
@@ -69,14 +76,14 @@ impl World {
                             .master(leader.player(), leader.master_id())?
                             .line_of_sight;
                         let range = sight * FOLLOW_SHARE;
-                        let d = crate::math::fmath::sub(from, moved);
+                        let d = sub(from, moved);
                         let squared = d.x() * d.x() + 0.0 + d.y() * d.y();
-                        if !crate::math::fmath::below_or_unordered(squared, range.squared().get()) {
+                        if !below_or_unordered(squared, range.squared().get()) {
                             let _ = self.command_move_to(
                                 group,
                                 target,
                                 at.ground(),
-                                crate::groups::command::MoveTo {
+                                MoveTo {
                                     range,
                                     leg: false,
                                     forget_target: false,
@@ -159,8 +166,8 @@ impl World {
         if g.motion.number_wait_delays != DelayCount::ZERO || g.motion.waits_to_move() {
             return Ok(false);
         }
-        let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol =
+            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         let mut patrolling = true;
         if !patrol && !g.flags.contains(GroupFlags::PATROL) {
             patrolling = false;
@@ -227,15 +234,15 @@ impl World {
             let Some(target) = self.world_object(g.current_target.target) else {
                 return Ok(false);
             };
-            if let Some(top) = crate::groups::formation::top_path(&g.motion.paths) {
+            if let Some(top) = top_path(&g.motion.paths) {
                 let end = match top.points.as_slice() {
                     [.., _, last] => *last,
                     // DAT_143f0dc78, zero-initialised (.bss) and written by nothing
                     _ => BVector::ZERO,
                 };
-                let d = crate::math::fmath::sub(end, target.moved_vector());
+                let d = sub(end, target.moved_vector());
                 let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
-                if !crate::math::fmath::below_or_unordered(squared, CLOSE) {
+                if !below_or_unordered(squared, CLOSE) {
                     self.groups.held_mut(group)?.current_command = FOLLOW;
                     return Ok(false);
                 }
@@ -368,11 +375,9 @@ impl World {
                     .members
                     .checked_mut(i - 1)?
                     .specific_move;
-                let mut d = crate::math::fmath::sub(at, own.last_position);
+                let mut d = sub(at, own.last_position);
                 d = d.with_height(0.0);
-                own.distance -= Distance::new(crate::math::fmath::sqrt(
-                    d.x() * d.x() + 0.0 + d.y() * d.y(),
-                ));
+                own.distance -= Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()));
                 own.last_position = at;
                 continue;
             }
@@ -384,7 +389,7 @@ impl World {
             let g = self.groups.held_mut(group)?;
             let timer = &mut g.members.checked_mut(i - 1)?.specific_move.timer;
             *timer -= dt;
-            if !crate::math::fmath::below_or_unordered(0.0, timer.get()) {
+            if !below_or_unordered(0.0, timer.get()) {
                 g.members.checked_mut(i - 1)?.specific_move = SpecificMove {
                     path_id: MovePath::NONE,
                     reason: MoveReason::NONE,
@@ -416,7 +421,7 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(true);
         };
-        let crate::world::index::Place::Live(p, idx) = place else {
+        let Place::Live(p, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
         let player_type = self.players.player(p)?.kind;
@@ -432,7 +437,7 @@ impl World {
                     pathing: &mut self.pathing,
                     now: self.world_time,
                     player_type,
-                    object: self.streams.get(crate::math::rng::Stream::Object),
+                    object: self.streams.get(Stream::Object),
                     groups: &self.groups,
                 };
                 mover
@@ -445,16 +450,16 @@ impl World {
                         by_id,
                     )
                     .map(|motion| {
-                        let pauses = std::mem::take(&mut mover.pauses);
+                        let pauses = take(&mut mover.pauses);
                         (motion, pauses, mover.in_the_way.is_empty())
                     })
             }
-            None => Err(crate::world::WALKER_UNMOVING),
+            None => Err(WALKER_UNMOVING),
         };
         let _ = self.put_back_own(p, unit)?;
         let (motion, pauses, clear) = stepped?;
         if !clear {
-            return Err(crate::world::IN_THE_WAY);
+            return Err(IN_THE_WAY);
         }
         for (other, pause) in pauses {
             self.pause(other, pause);
@@ -513,7 +518,7 @@ impl World {
         if self.groups.get(group).is_none() {
             return;
         }
-        let draw = self.streams.get(crate::math::rng::Stream::World).rand15();
+        let draw = self.streams.get(Stream::World).rand15();
         if let Some(g) = self.groups.get_mut(group) {
             g.idle_timer = Millis::new(draw % IDLE_SPAN.get());
         }

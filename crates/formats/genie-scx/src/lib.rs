@@ -38,6 +38,7 @@ pub use genie_support::{StringKey, UnitTypeId};
 pub use header::{DlcOptions, ScxHeader};
 pub use map::{Map, Tile};
 pub use player::{ScenarioPlayerData, WorldPlayerData};
+use std::result::Result as StdResult;
 pub use triggers::{Trigger, TriggerCondition, TriggerEffect, TriggerSystem};
 pub use types::*;
 pub use victory::{VictoryConditions, VictoryEntry, VictoryPointEntry, VictoryState};
@@ -139,7 +140,7 @@ impl From<WriteStringError> for Error {
 }
 
 /// Result type for SCX methods.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 /// A Scenario file.
 #[derive(Debug, Clone)]
@@ -378,6 +379,8 @@ impl From<Error> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -391,7 +394,7 @@ mod genie_error_tests {
                 "a scenario without a file name"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = Error::CannotDisableTechsError.into();
         assert_eq!(
             (e.kind(), e.reason()),
@@ -400,13 +403,13 @@ mod genie_error_tests {
                 "disabled technologies in a version without them"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = Error::IoError(io::Error::other("x")).into();
         assert_eq!(
             (e.kind(), e.reason()),
             (genie_error::ErrorKind::Io, "a read or write that failed")
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 
     /// Each scenario error's kind and reason.

@@ -6,7 +6,9 @@ use crate::combat::damage::{
     Attacker, ElevationBonus, Facing, HIGHER, LOWER, RELIC_BOOST, SPECIFIC_RELIC_BOOST, Victim,
 };
 use crate::map::Position;
+use crate::objects::RelicCount;
 use crate::objects::Relics;
+use crate::objects::facing::offset_in_facets;
 use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
@@ -43,16 +45,16 @@ pub fn building_elevation_factor(
     victim_relics: Relics,
 ) -> f32 {
     let mut f = factor;
-    if crate::objects::RelicCount::ZERO < relics.specific {
+    if RelicCount::ZERO < relics.specific {
         f *= SPECIFIC_RELIC_BOOST;
-    } else if crate::objects::RelicCount::ZERO < relics.count {
+    } else if RelicCount::ZERO < relics.count {
         f *= RELIC_BOOST;
     }
     if kind == BUILDING {
-        if crate::objects::RelicCount::ZERO < victim_relics.specific {
+        if RelicCount::ZERO < victim_relics.specific {
             return f / SPECIFIC_RELIC_BOOST;
         }
-        if crate::objects::RelicCount::ZERO < victim_relics.count {
+        if RelicCount::ZERO < victim_relics.count {
             f /= RELIC_BOOST;
         }
     }
@@ -67,7 +69,7 @@ pub fn facing_offset(at: Position, facing: Facing, other: Position) -> f32 {
     if !facing.facets.any() {
         return 0.0;
     }
-    crate::objects::facing::offset_in_facets(
+    offset_in_facets(
         other.x() - at.x(),
         other.y() - at.y(),
         facing.angle,

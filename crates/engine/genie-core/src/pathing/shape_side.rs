@@ -1,6 +1,7 @@
 //! A side of a shape in the obstruction manager's mesh.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A side of a shape's box in the mesh and the short pather (side s runs from corner s to
 /// corner s + 1, [`crate::pathing::mesh::corner`]): its low y, high x, high y or low x edge,
@@ -87,8 +88,8 @@ impl ShapeSide {
     }
 }
 
-impl std::fmt::Display for ShapeSide {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ShapeSide {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

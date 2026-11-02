@@ -52,17 +52,25 @@ mod update;
 
 pub use self::tech_tree::{TechTree, TreeBuilding, TreeQuery, TreeUnit, UniqueUnit};
 pub use self::tree_ids::{TreeMaster, TreeTech};
+use crate::math::image::world_player::{
+    LIVESTOCK_SCALE as WORLD_PLAYER_LIVESTOCK_SCALE, MINUTE as WORLD_PLAYER_MINUTE,
+    PERCENT as WORLD_PLAYER_PERCENT, SECOND as WORLD_PLAYER_SECOND,
+};
+use crate::players::CivId;
+use crate::players::attribute::POPULATION;
+use crate::technology::TechId;
+use crate::world::Mode680;
 #[cfg(test)]
 use crate::world::World;
 
 /// One second (`DAT_14330eb8c`): the loop's step.
-const SECOND: f32 = crate::math::image::world_player::SECOND;
+const SECOND: f32 = WORLD_PLAYER_SECOND;
 /// One hundred (`DAT_14330ebcc`): attribute 22 is a percentage.
-const PERCENT: f32 = crate::math::image::world_player::PERCENT;
+const PERCENT: f32 = WORLD_PLAYER_PERCENT;
 /// A minute's seconds (`DAT_14330ebc8`): the trickles and the mills' food are rates a minute.
-const MINUTE: f32 = crate::math::image::world_player::MINUTE;
+const MINUTE: f32 = WORLD_PLAYER_MINUTE;
 /// The livestock food over which a mill's yield grows by one e-fold (`DAT_142eb0f54`).
-const LIVESTOCK_SCALE: f32 = crate::math::image::world_player::LIVESTOCK_SCALE;
+const LIVESTOCK_SCALE: f32 = WORLD_PLAYER_LIVESTOCK_SCALE;
 /// Until this world time (ms) the scout map takes only the explored tiles the player sees.
 const EARLY_SCOUTING_MS: WorldTime = WorldTime::from_millis(5000);
 
@@ -75,22 +83,18 @@ const UNKEPT_LOW: ClassMask = ClassMask::new(0x4800_0800, 31);
 const UNKEPT_HIGH: ClassMask = ClassMask::new(0x1402_04a0_0038_4006, 61);
 /// The ages' technologies (Feudal, Castle, Imperial: `0x3284`, `0x3304`, `0x3384` in the
 /// player's technologies), whose state −1 puts their units out of the player's tree.
-const AGES: [crate::technology::TechId; 3] = [
-    crate::technology::TechId::FIRST_AGE,
-    crate::technology::TechId::CASTLE_AGE,
-    crate::technology::TechId::LAST_AGE,
-];
+const AGES: [TechId; 3] = [TechId::FIRST_AGE, TechId::CASTLE_AGE, TechId::LAST_AGE];
 /// `FUN_140c7e6f0`: the civilisation the full tech tree reads, by the game's tagged value at
 /// `+0x680` ([`crate::world::World::mode_680`]): 18 for 1, 59 for 2, else 0.
-const fn full_tree_civ(mode_680: crate::world::Mode680) -> crate::players::CivId {
-    crate::players::CivId::new(match mode_680.get() {
+const fn full_tree_civ(mode_680: Mode680) -> CivId {
+    CivId::new(match mode_680.get() {
         1 => 0x12,
         2 => 0x3b,
         _ => 0,
     })
 }
 /// The resource storage that keeps its player (`0x14163b86b`): attribute 11 …
-const POPULATION_STORAGE: AttributeId = crate::players::attribute::POPULATION;
+const POPULATION_STORAGE: AttributeId = POPULATION;
 /// … with the store mode 0x20 (`0x14163b89d`).
 const ALIVE_STORE_MODE: u8 = 0x20;
 

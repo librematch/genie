@@ -39,8 +39,16 @@ use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
 
 use crate::combat::attack::tests::Rig;
+use crate::combat::attack::tests::reads;
+use crate::map::spatial::Spatial;
 use crate::movement::{Me, MoveStats, Velocity};
+use crate::movement::{SubstituteCount, WaitDelays};
+use crate::objects::facing::SpriteFacets;
+use crate::objects::layers::{Animated, Motion, Static};
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
+use crate::unit_ai::{NotifyKind, UnitAi};
+use crate::world::World;
 
 /// The reads of a human player's hunt ([`HuntReads`]): a work rate and a productivity of 1, a
 /// capacity of 10, its unit AI's target class −1, no sprites, the Attack's of
@@ -48,7 +56,7 @@ use crate::objects::unit::Unit;
 pub(crate) fn hunt_reads() -> HuntReads {
     HuntReads {
         defaults: MoveDefaults::default(),
-        attack: crate::combat::attack::tests::reads(),
+        attack: reads(),
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
@@ -168,7 +176,7 @@ fn load_of_another_resource_asks_no_drop_off() {
 /// A Hunt gathering `target` with the chopping task.
 pub(crate) fn hunting(target: i32) -> HuntAction {
     HuntAction {
-        target: crate::gathering::HuntTargetId::of_field(target),
+        target: HuntTargetId::of_field(target),
         state: HuntState::Gather,
         point: Position::ORIGIN,
         target_class: None,
@@ -261,23 +269,23 @@ pub(crate) fn walker() -> Mover {
             move_algorithm: MoveAlgorithm::NONE,
             min_collision: 1.0,
             fast_turn: false,
-            facets: Some(crate::objects::facing::SpriteFacets {
-                count: crate::objects::FacetCount::of_data(16),
+            facets: Some(SpriteFacets {
+                count: FacetCount::of_data(16),
                 turns: true,
             }),
             weapon_range: Distance::ZERO,
         },
         waiting: 1,
-        wait_delays: crate::movement::WaitDelays::of_data(0),
+        wait_delays: WaitDelays::of_data(0),
         attack_moving: false,
         last_move: WorldTime::ZERO,
         moved_at: Position::ORIGIN,
-        substitute_count: crate::movement::SubstituteCount::of_data(0),
+        substitute_count: SubstituteCount::of_data(0),
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
         angle: Angle::ZERO,
-        animated: crate::objects::layers::Animated::default(),
+        animated: Animated::default(),
         pauses: Vec::new(),
         in_the_way: Vec::new(),
         sprite_facets: None,
@@ -326,8 +334,8 @@ const ARMS: Arms = Arms {
     idle_sprite: None,
     idle_attack_sprite: None,
     missile: None,
-    fire_frame: crate::objects::Frame::of_data(0),
-    interrupt_frame: crate::objects::Frame::of_data(-1),
+    fire_frame: Frame::of_data(0),
+    interrupt_frame: Frame::of_data(-1),
 };
 
 const CHOP: HuntTask = HuntTask {
@@ -335,7 +343,7 @@ const CHOP: HuntTask = HuntTask {
     range: Distance::ZERO,
     resource: Some(attribute::MEAT),
     sprites: TaskSprites::of_data([-1, 1239, 1961, 1960]),
-    work_value: crate::objects::masters::WorkValue::new(1.0),
+    work_value: WorkValue::new(1.0),
     productivity: None,
     kind4: None,
 };
@@ -442,7 +450,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             attack.state.move_to().copied().map(|m| m.state)
         ),
         (
-            Some(crate::gathering::HuntTargetId::new(object_id(9366))),
+            Some(HuntTargetId::new(object_id(9366))),
             HuntState::Attack { attack: None },
             AttackState::Move { move_to: None },
             Some(MoveTo::Arrived)
@@ -514,10 +522,7 @@ fn hunt_new_target_clears_its_lead() {
         .unwrap();
     assert_eq!(
         (hunt.target, hunt.lead),
-        (
-            Some(crate::gathering::HuntTargetId::new(object_id(9366))),
-            Lead::NEW
-        )
+        (Some(HuntTargetId::new(object_id(9366))), Lead::NEW)
     );
 }
 
@@ -571,12 +576,12 @@ fn victim(amount: f32) -> Victim {
 #[test]
 fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full() {
     let hunt = HuntAction {
-        target: Some(crate::gathering::HuntTargetId::new(object_id(9357))),
+        target: Some(HuntTargetId::new(object_id(9357))),
         state: HuntState::Gather,
         point: Position::new(24.5, 94.5, 0.0),
         target_class: Some(class::TREE),
         task: HuntTask {
-            work_value: crate::objects::masters::WorkValue::new(0.39),
+            work_value: WorkValue::new(0.39),
             resource: Some(attribute::WOOD),
             ..CHOP
         },
@@ -673,7 +678,7 @@ fn hunt_on_live_ally_fails() {
         (
             HuntState::Failed,
             Seconds::ZERO,
-            Some(crate::gathering::HuntTargetId::new(ally.id))
+            Some(HuntTargetId::new(ally.id))
         )
     );
 }
@@ -742,7 +747,7 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
 #[test]
 fn hunt_whose_target_went_walks_to_its_point() {
     let mut hunt = HuntAction {
-        target: Some(crate::gathering::HuntTargetId::new(object_id(28813))),
+        target: Some(HuntTargetId::new(object_id(28813))),
         state: HuntState::Walk {
             move_to: Some(to_house(MoveTo::Moving, CHOP.range)),
         },
@@ -800,8 +805,8 @@ fn hunt_whose_target_went_walks_to_its_point() {
 fn hunt_faces_its_own_pasture_dead_livestock() {
     const MOVING: Graphic = Graphic {
         id: SpriteId::named(1880),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(16),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -883,16 +888,11 @@ fn walk_to_the_point_ends_in_search_or_done() {
         stance: UnitStance::DEFENSIVE,
     };
     let run = |h: &mut HuntAction, who: PointWalker| {
-        let mut rig = Rig::on(
-            crate::map::spatial::Spatial::default(),
-            0.8,
-            Victim::default(),
-        );
+        let mut rig = Rig::on(Spatial::default(), 0.8, Victim::default());
         let at = Position::new(171.888_89, 59.053_39, 0.0);
-        rig.unit_mut().place = crate::objects::layers::Static::at(at);
+        rig.unit_mut().place = Static::at(at);
         let id = rig.unit().id;
-        rig.t
-            .set_motion(id, Some(crate::objects::layers::Motion::Moving(walker())));
+        rig.t.set_motion(id, Some(Motion::Moving(walker())));
         let got = rig.run(500, |c, u, _, _, _| {
             h.update_point_walk(c, u, me(&h.state), who)
         });
@@ -931,7 +931,7 @@ fn walk_to_the_point_ends_in_search_or_done() {
     // set_state(2) lets the target and the second target go, in that order
     let mut h = hunt(HuntState::Search, MoveTo::Arrived);
     (h.target, h.carry_to, h.timer) = (
-        Some(crate::gathering::HuntTargetId::new(object_id(28813))),
+        Some(HuntTargetId::new(object_id(28813))),
         Some(DropSiteId::new(object_id(9156))),
         Seconds::new(-10.0),
     );
@@ -1090,8 +1090,8 @@ fn hunter_walks_pass_on_the_units_in_their_way() {
         stance: UnitStance::AGGRESSIVE,
     };
     let in_the_way = vec![
-        (crate::unit_ai::NotifyKind::IN_THE_WAY, [77, -1, -1]),
-        (crate::unit_ai::NotifyKind::IN_THE_WAY, [78, -1, -1]),
+        (NotifyKind::IN_THE_WAY, [77, -1, -1]),
+        (NotifyKind::IN_THE_WAY, [78, -1, -1]),
     ];
     for state in [
         HuntState::Drop { move_to: None },
@@ -1132,7 +1132,7 @@ fn hunter_walks_pass_on_the_units_in_their_way() {
 #[test]
 fn hunt_walks_to_its_target_place_within_its_range() {
     let set_walk = |h: &mut HuntAction, rig: &mut Rig, victim: &Victim| {
-        let crate::world::World {
+        let World {
             spatial,
             players,
             parts,
@@ -1490,8 +1490,8 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
         (a.voice, a.seen) = (Voice::Quiet, Position::new(30.0, 88.0, 0.0));
         a.arms.idle_sprite = Some(Graphic {
             id: SpriteId::named(1),
-            frames: crate::objects::Frame::of_data(10),
-            facets: crate::objects::FacetCount::of_data(8),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(8),
             speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -1724,16 +1724,11 @@ fn drop_off_gives_the_load_to_the_player() {
         timer: Seconds::ZERO,
         lead: Lead::default(),
     };
-    let mut rig = Rig::on(
-        crate::map::spatial::Spatial::default(),
-        0.8,
-        Victim::default(),
-    );
+    let mut rig = Rig::on(Spatial::default(), 0.8, Victim::default());
     let at = Position::new(26.820_372, 94.718_056, 0.0);
-    rig.unit_mut().place = crate::objects::layers::Static::at(at);
+    rig.unit_mut().place = Static::at(at);
     let id = rig.unit().id;
-    rig.t
-        .set_motion(id, Some(crate::objects::layers::Motion::Moving(walker())));
+    rig.t.set_motion(id, Some(Motion::Moving(walker())));
     rig.t.players[1].attributes = vec![Amount::ZERO; 230];
     let site = DropOff {
         takes: true,
@@ -1845,8 +1840,8 @@ fn drop_off_gives_the_load_to_the_player() {
 fn hunt_walk_starts_toward_its_target() {
     const MOVING: Graphic = Graphic {
         id: SpriteId::named(1880),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(16),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1981,9 +1976,9 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
                 .iter_mut()
                 .for_each(|u| u.life.state = state);
         }
-        rig.set_ai(Some(crate::unit_ai::UnitAi {
+        rig.set_ai(Some(UnitAi {
             target_class: class_of(15),
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }));
         rig.actions_mut().list.set_hunt(Some(HuntAction {
             state: HuntState::Walk {

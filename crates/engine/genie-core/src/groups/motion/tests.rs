@@ -33,8 +33,8 @@ fn top_target_below_minus_one_is_none() {
     use crate::objects::unit::Unit;
     use crate::world::Player;
     // the hunter 5's action layer, which the world's table holds
-    let hunter = |target: i32| crate::objects::layers::Action {
-        list: ActionList::default().with_hunt(Some(crate::gathering::hunt::tests::hunting(target))),
+    let hunter = |target: i32| Action {
+        list: ActionList::default().with_hunt(Some(hunting(target))),
         ..Default::default()
     };
     let held = |id: i32| Unit {
@@ -47,7 +47,7 @@ fn top_target_below_minus_one_is_none() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![Player::default(), player],
@@ -75,10 +75,17 @@ fn nan_yaw_does_not_turn() {
         format!("{:?}", before.new_position)
     );
 }
+use crate::gathering::hunt::tests::hunting;
 use crate::groups::UnitGroups;
 use crate::map::spatial::Placed;
+use crate::map::spatial::{Obstruction, Tiles};
 use crate::math::rng::Well512;
+use crate::movement::LinkedPathType;
+use crate::objects::layers::Action;
 use crate::pathing::Pathing;
+use crate::world::FrameSeed;
+use crate::world::index::{ObjectsRef, TestObjects};
+use std::f32::consts::FRAC_PI_2;
 
 fn level(level: u8, points: &[Point], waypoint: i32, state: PathState) -> PathData {
     PathData {
@@ -148,7 +155,7 @@ fn the_walked_levels_below_the_high_level_go() {
         2,
         PathState::Arrived,
     );
-    top.continue_counter = crate::movement::PlanTries::of_data(3);
+    top.continue_counter = PlanTries::of_data(3);
     m.paths = vec![
         level(0, &[Point::new(1.0, 1.0)], 1, PathState::Walking),
         level(1, &[Point::new(2.0, 2.0)], 1, PathState::Idle),
@@ -345,7 +352,7 @@ fn turn_is_limited_by_the_yaw_per_second() {
     let mut m = Motion::new();
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     let free = m.calculate_yaw_angle(x, z, Seconds::new(0.1), true);
-    assert_eq!(free, Angle::new(-std::f32::consts::FRAC_PI_2));
+    assert_eq!(free, Angle::new(-FRAC_PI_2));
     m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
     assert_eq!(
         m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
@@ -357,7 +364,7 @@ fn turn_is_limited_by_the_yaw_per_second() {
     );
     assert_eq!(
         m.calculate_yaw_angle(z, x, Seconds::new(0.1), false),
-        Angle::new(std::f32::consts::FRAC_PI_2)
+        Angle::new(FRAC_PI_2)
     );
 }
 
@@ -371,7 +378,7 @@ fn the_yaw_clamp_keeps_the_angle_for_nan_operand() {
     m.maximum_yaw_per_second_moving = TurnRate::new(f32::NAN);
     assert_eq!(
         m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
-        Angle::new(-std::f32::consts::FRAC_PI_2)
+        Angle::new(-FRAC_PI_2)
     );
     m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
     let nan = m.calculate_yaw_angle(BVector::new(f32::NAN, 0.0, 0.0), z, Seconds::new(0.1), true);
@@ -387,7 +394,7 @@ fn the_motion_turns_then_moves_along_its_forward() {
     m.flags = MotionFlags::NONE;
     m.turn(Angle::new(1e-8));
     assert_eq!((m.new_position, m.flags), (m.position, MotionFlags::NONE));
-    m.turn(Angle::new(-std::f32::consts::FRAC_PI_2));
+    m.turn(Angle::new(-FRAC_PI_2));
     assert_eq!(m.flags, MotionFlags::MOVED);
     let f = m.new_position[1];
     assert!((f.y() - 1.0).abs() < 1e-6 && f.x().abs() < 1e-6, "{f:?}");
@@ -408,7 +415,7 @@ struct Fixture {
     object: Well512,
     groups: UnitGroups,
     /// The units the walk meets by id, built for their gaits.
-    objects: crate::world::index::TestObjects,
+    objects: TestObjects,
 }
 
 impl Fixture {
@@ -418,7 +425,7 @@ impl Fixture {
             pathing: Pathing::default(),
             object: Well512::default(),
             groups: UnitGroups::default(),
-            objects: crate::world::index::TestObjects::default(),
+            objects: TestObjects::default(),
         }
     }
 
@@ -514,7 +521,7 @@ fn an_arrived_level_hands_over_and_pause_waits() {
         1,
         PathState::Arrived,
     );
-    walked.linked_type = crate::movement::LinkedPathType::of_data(1);
+    walked.linked_type = LinkedPathType::of_data(1);
     let parent = level(
         2,
         &[Point::new(5.0, 5.0), Point::new(5.0, 9.0)],
@@ -636,7 +643,7 @@ fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     );
     assert_eq!(fx.pathing.budgets[1].plans, PlanCount::of_data(1));
     let mut m = requesting(0, 6.0);
-    m.paths[0].continue_counter = crate::movement::PlanTries::of_data(1);
+    m.paths[0].continue_counter = PlanTries::of_data(1);
     m.number_wait_delays = DelayCount::of_data(4);
     let p = fx.request(
         &mut m,
@@ -654,7 +661,7 @@ fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     // (a lead the short pather does not serve: the near waypoint counts as reached)
     for lead in [grouped(0x800), lead()] {
         let mut m = requesting(0, 6.0);
-        m.paths[0].continue_counter = crate::movement::PlanTries::of_data(1);
+        m.paths[0].continue_counter = PlanTries::of_data(1);
         let lead = Lead {
             solid: false,
             ..lead
@@ -671,7 +678,7 @@ fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
 fn top_level_without_planner_plans_the_straight_way() {
     let mut fx = Fixture::new();
     let mut m = requesting(2, 30.0);
-    m.paths[0].continue_counter = crate::movement::PlanTries::of_data(4);
+    m.paths[0].continue_counter = PlanTries::of_data(4);
     assert!(matches!(
         fx.request(&mut m, &lead(), false, None, DistanceSquared::new(f32::MAX)),
         Some(Pass::Next)
@@ -787,7 +794,7 @@ fn open_fixture() -> Fixture {
     let mut fx = Fixture::new();
     fx.spatial = Spatial::with_tiles(
         GridSize::new(40, 40),
-        crate::map::spatial::Tiles::new(GridSize::new(40, 40), vec![4; 40 * 40]),
+        Tiles::new(GridSize::new(40, 40), vec![4; 40 * 40]),
     );
     fx
 }
@@ -868,20 +875,20 @@ fn request_without_path_pauses_waits_gives_up_or_counts_its_waypoint() {
         )
         .unwrap()
     };
-    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
+    let mut m = at(2, &last, PlanTries::of_data(2));
     assert!(matches!(
         end(&mut m, &grouped(0x800), false),
         Some(Pass::Done(false))
     ));
     assert_eq!(m.paths[0].pause_time, PATROL_PAUSE);
-    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
+    let mut m = at(2, &last, PlanTries::of_data(2));
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
     ));
     assert_eq!(m.paths[0].pause_time, PATROL_PAUSE);
-    let mut m = at(0, &last, crate::movement::PlanTries::of_data(2));
+    let mut m = at(0, &last, PlanTries::of_data(2));
     m.paths.push(level(
         2,
         &[
@@ -894,7 +901,7 @@ fn request_without_path_pauses_waits_gives_up_or_counts_its_waypoint() {
     ));
     assert!(matches!(end(&mut m, &lead(), false), Some(Pass::Next)));
     assert_eq!(m.paths[0].state, PathState::Unplanned);
-    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
+    let mut m = at(2, &last, PlanTries::of_data(2));
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
@@ -903,19 +910,19 @@ fn request_without_path_pauses_waits_gives_up_or_counts_its_waypoint() {
         (m.paths.clone(), m.velocity.y()),
         (vec![PathData::without_path()], 0.0)
     );
-    let mut m = at(2, &last, crate::movement::PlanTries::of_data(2));
+    let mut m = at(2, &last, PlanTries::of_data(2));
     m.paths[0].waypoint = WaypointIndex::of_data(0);
     assert!(matches!(end(&mut m, &lead(), false), Some(Pass::Reached)));
-    let mut m = at(2, &last, crate::movement::PlanTries::of_data(3));
+    let mut m = at(2, &last, PlanTries::of_data(3));
     assert!(matches!(
         end(&mut m, &lead(), false),
         Some(Pass::Done(false))
     ));
     assert_eq!((m.paths[0].pause_time, m.velocity.y()), (STUCK_PAUSE, 0.0));
-    let mut m = at(0, &last, crate::movement::PlanTries::of_data(5));
+    let mut m = at(0, &last, PlanTries::of_data(5));
     assert!(matches!(end(&mut m, &lead(), true), Some(Pass::Done(true))));
     assert_eq!(m.paths, vec![PathData::without_path()]);
-    let mut m = at(0, &last, crate::movement::PlanTries::of_data(5));
+    let mut m = at(0, &last, PlanTries::of_data(5));
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(end(&mut m, &lead(), true), Some(Pass::Reached)));
 }
@@ -1068,7 +1075,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            crate::movement::LinkedPathType::of_data(2),
+            LinkedPathType::of_data(2),
             PathFlags::LOOPS,
             &lead(),
             1
@@ -1078,7 +1085,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            crate::movement::LinkedPathType::of_data(2),
+            LinkedPathType::of_data(2),
             PathFlags::NONE,
             &grouped(0x800),
             1
@@ -1088,7 +1095,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            crate::movement::LinkedPathType::of_data(2),
+            LinkedPathType::of_data(2),
             PathFlags::NONE,
             &grouped(0x800),
             2
@@ -1098,7 +1105,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            crate::movement::LinkedPathType::of_data(3),
+            LinkedPathType::of_data(3),
             PathFlags::LOOPS,
             &grouped(0x800),
             1
@@ -1128,7 +1135,7 @@ fn placed_at(x: f32, y: f32) -> Placed {
     Placed {
         position: Position::new(x, y, 0.0),
         radius: Footprint::new(0.2, 0.2),
-        obstruction: Some(crate::map::spatial::Obstruction {
+        obstruction: Some(Obstruction {
             kind: ObstructionType::CIRCLE,
             class: ObstructionClass::UNIT,
         }),
@@ -1249,7 +1256,7 @@ fn the_members_centre_pulls_group_whose_members_all_act() {
             groups: &fx.groups,
         };
         let mut world = StepWorld {
-            by_id: crate::world::index::ObjectsRef::empty(),
+            by_id: ObjectsRef::empty(),
             spatial: &mut fx.spatial,
             plan: &mut plan,
             dt: Seconds::new(0.1),

@@ -1,5 +1,6 @@
 //! `GenieSwissKnife` Abscissa Application
 
+use crate::subscriber::install;
 use crate::{commands::EntryPoint, config::GenieSwissKnifeConfig};
 use abscissa_core::{
     Application, Component, FrameworkError, FrameworkErrorKind, StandardPaths,
@@ -60,8 +61,7 @@ impl Application for GenieSwissKnifeApp {
         &mut self,
         command: &Self::Cmd,
     ) -> Result<Vec<Box<dyn Component<Self>>>, FrameworkError> {
-        crate::subscriber::install(command.verbose)
-            .map_err(|e| FrameworkErrorKind::ComponentError.context(e))?;
+        install(command.verbose).map_err(|e| FrameworkErrorKind::ComponentError.context(e))?;
         Ok(vec![Box::new(Terminal::new(self.term_colors(command)))])
     }
 

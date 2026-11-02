@@ -3,7 +3,9 @@
 
 use crate::GenieError;
 use crate::map::Tile;
+use crate::map::spatial::TileSight;
 use crate::math::fmath::at_most_or_unordered;
+use crate::math::fmath::log;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::Amount;
@@ -60,7 +62,7 @@ impl World {
                 sum += self.parts.building_of(unit.id).livestock_summation.get();
             }
         }
-        let grows = crate::math::fmath::log(sum / LIVESTOCK_SCALE + SECOND);
+        let grows = log(sum / LIVESTOCK_SCALE + SECOND);
         let rate = get(&self.players.player(p)?.attributes, attribute::MILL_FOOD).get() / MINUTE;
         self.add_resource(
             p,
@@ -217,7 +219,7 @@ impl World {
             let seen = self
                 .spatial
                 .scout_sight(p, Tile::new(x, y))
-                .is_some_and(crate::map::spatial::TileSight::seen);
+                .is_some_and(TileSight::seen);
             if (self.world_time < EARLY_SCOUTING_MS && seen) || EARLY_SCOUTING_MS <= self.world_time
             {
                 self.spatial.scout(p, Tile::new(x, y));

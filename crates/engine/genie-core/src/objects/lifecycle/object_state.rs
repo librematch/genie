@@ -1,6 +1,7 @@
 //! An object's state: where it stands between its placing and its leaving.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// An object's state (`+0x640`, the save's `object_state`, `RGE_Static_Object::set_object_state`):
 /// the steps of its update ([`crate::objects::lifecycle::Lifecycle::update`]). The game compares
@@ -62,8 +63,8 @@ impl ObjectState {
     }
 }
 
-impl std::fmt::Display for ObjectState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ObjectState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

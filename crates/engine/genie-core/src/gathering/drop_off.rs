@@ -4,7 +4,10 @@ use crate::GenieError;
 use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::{Seeker, drop_site_search};
 use crate::gathering::gather::GatherState;
+use crate::gathering::gather::unit::NO_GATHER;
 use crate::gathering::gather::{GatherRetarget, Walks};
+use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
+use crate::gathering::hunt::NO_HUNT;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
@@ -14,15 +17,23 @@ use crate::movement::{Me, Mover, Planning, footprint_gap};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::release::Releaser;
+use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::objects::{Graphics, WorkerCount};
+use crate::pathing::zones::UNKNOWN_RESTRICTION;
 use crate::players::Amount;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::DropWorld;
+use crate::unit_ai::{CIVILIAN, civilian_kind};
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
+use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -41,7 +52,7 @@ impl Unit {
     /// human's idles (`set_state(2)`).
     pub(crate) fn gather_after_drop(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
@@ -91,26 +102,23 @@ impl Unit {
     /// group, or a unit without a unit AI.
     fn after_drop_search(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let gather = actions
-            .list
-            .gather()
-            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
+        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
             return Ok(None);
         };
         let class = ai.target_class.or(gather.target_class);
-        if ai.ai_type != crate::unit_ai::CIVILIAN {
+        if ai.ai_type != CIVILIAN {
             return Err(GenieError::unsupported(
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));
         }
-        let Some(kind) = class.and_then(crate::unit_ai::civilian_kind) else {
+        let Some(kind) = class.and_then(civilian_kind) else {
             return Ok(None);
         };
-        self.resource_search(actions, c, kind, crate::objects::WorkerCount::NO_CAP)
+        self.resource_search(actions, c, kind, WorkerCount::NO_CAP)
     }
 
     /// Nothing found after the drop: a Gather with its point walks there to search again
@@ -120,27 +128,24 @@ impl Unit {
     /// [`Unit::idle_sprite`]'s) and lets its drop site go.
     fn after_drop_nothing(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
-        let farm_waits = crate::gathering::gather::waits_for_farm(
+        let farm_waits = waits_for_farm(
             self.life.master_id,
             actions.list.gather().and_then(|g| g.target_class),
         );
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let gather = actions
-            .list
-            .gather_mut()
-            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
+        let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
         if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
             if farm_waits {
                 return Err(GenieError::unsupported(
@@ -161,10 +166,7 @@ impl Unit {
         }
         let carry_to = gather.carry_to;
         let shows = self.idle_sprite(actions, c)?;
-        let gather = actions
-            .list
-            .gather_mut()
-            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
+        let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
         gather.tear_down(c.w.parts.mover_mut(self.id))?;
         gather.state = GatherState::Idle;
         gather.timer = Seconds::ZERO;
@@ -172,7 +174,7 @@ impl Unit {
         gather.carry_to = None;
         gather.point = Position::from([-1.0; 3]);
         if let Some(g) = shows {
-            crate::objects::sprite::new_sprite(
+            new_sprite(
                 &mut self.sprite,
                 c.w.parts.move_stats_mut(self.id),
                 g,
@@ -180,22 +182,15 @@ impl Unit {
             );
         }
         if carry_to.is_some() {
-            crate::world::lets::release(c, self, carry_to, by)?;
+            release(c, self, carry_to, by)?;
         }
         Ok(HeadCode::Keeps)
     }
 
     /// The sprite an idle gatherer shows: its task's carrying sprite while it holds at least 1 of
     /// the task's resource, else its master's standing sprite (none the data file lacks).
-    fn idle_sprite(
-        &self,
-        actions: &crate::objects::layers::Action,
-        c: &Step<'_>,
-    ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
-        let gather = actions
-            .list
-            .gather()
-            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
+    fn idle_sprite(&self, actions: &Action, c: &Step<'_>) -> Result<Option<Graphic>, GenieError> {
+        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let master = self.master(c.w.master_tables(), c.player)?;
         let standing = master
             .standing_sprite
@@ -222,7 +217,7 @@ impl Unit {
     /// changed is let go and the new one taken (one of its own player's directly, never listed).
     fn after_drop_retarget(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         found: ObjectId,
         by: Releaser,
@@ -236,17 +231,17 @@ impl Unit {
         );
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let rate = crate::gathering::gather::StopRate {
+        let rate = StopRate {
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
-            productivity: crate::gathering::gather::productivity_of(
+            productivity: productivity_of(
                 actions.list.gather().and_then(|g| g.task.productivity),
                 &c.w.players.player(c.player)?.attributes,
             ),
@@ -277,7 +272,7 @@ impl Unit {
                 continue;
             }
             if old.is_some() {
-                crate::world::lets::release(c, self, old, by)?;
+                release(c, self, old, by)?;
             }
             if new.is_none() {
                 continue;
@@ -293,7 +288,7 @@ impl Unit {
                 u.taken(None, by.id);
             } else {
                 let by = self.releaser(c)?;
-                crate::world::lets::take(c, self, new, by)?;
+                take(c, self, new, by)?;
             }
         }
         Ok(())
@@ -307,7 +302,7 @@ impl Unit {
         c: &Step<'_>,
         others: OthersRef<'_>,
         found: ObjectId,
-    ) -> Result<(usize, crate::gathering::gather::Resource), GenieError> {
+    ) -> Result<(usize, Resource), GenieError> {
         let (owner, t) = others.find(found).ok_or(GenieError::unsupported(
             "a gather's new target the slice does not hold",
         ))?;
@@ -315,7 +310,7 @@ impl Unit {
         let target_master = t.master(c.w.master_tables(), owner)?;
         Ok((
             owner.index(),
-            crate::gathering::gather::Resource {
+            Resource {
                 id: found,
                 position: t.position(),
                 class: target_master.class,
@@ -342,7 +337,7 @@ impl Unit {
     /// part (notify 0x203) is not modelled.
     pub(crate) fn gather_drop_off(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let (mover, by_id) =
@@ -363,7 +358,7 @@ impl Unit {
             self.gather_drop_off_in(actions, mover, w, others, &c.w.graphics, by_id)?
         {
             let by = self.releaser(c)?;
-            crate::world::lets::take(c, self, site, by)?;
+            take(c, self, site, by)?;
         }
         Ok(())
     }
@@ -373,22 +368,19 @@ impl Unit {
     /// slot 0x178).
     pub(crate) fn gather_drop_off_in(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
-        graphics: &crate::objects::Graphics,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        graphics: &Graphics,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
                 "a gather's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let gather = actions
-            .list
-            .gather()
-            .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
+        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
         let (site, gap) = self.drop_site(
             (actions, mover.as_deref()),
@@ -423,19 +415,19 @@ impl Unit {
     /// (`FUN_140a7a190`, the caller's to take, slot 0x178).
     pub(crate) fn drop_off_in(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
-        graphics: &crate::objects::Graphics,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        graphics: &Graphics,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
                 "a hunt's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) = self.drop_site(
             (actions, mover.as_deref()),
@@ -477,12 +469,12 @@ impl Unit {
     /// With the footprint gap to it (`FUN_14118f680`).
     pub(crate) fn drop_site(
         &self,
-        (actions, mover): (&crate::objects::layers::Action, Option<&Mover>),
+        (actions, mover): (&Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         carry_to: Option<DropSiteId>,
         state: ActionState,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
         let master = self.master_in(c.masters)?;
         let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
@@ -497,7 +489,7 @@ impl Unit {
                     Some(s) => Some(s),
                     None => drop_site_search(
                         others.own_iter(),
-                        crate::objects::masters::OwnerMasters::new(c.masters.own, Some(masters)),
+                        OwnerMasters::new(c.masters.own, Some(masters)),
                         sites,
                         self.position(),
                         None,
@@ -526,12 +518,12 @@ impl Unit {
     /// when `outside` (its argument 10) and those at work on `0x7d` or `0x7c` (its argument 8).
     pub(crate) fn drop_site_from(
         &self,
-        (actions, mover): (&crate::objects::layers::Action, Option<&Mover>),
+        (actions, mover): (&Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
         outside: bool,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let by_path = !c.player_type.is_computer();
         self.drop_site_with(
@@ -548,12 +540,12 @@ impl Unit {
     /// and the action type `at_work` it passes over (−1 none).
     pub(crate) fn drop_site_with(
         &self,
-        (actions, mover): (&crate::objects::layers::Action, Option<&Mover>),
+        (actions, mover): (&Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
         (outside, by_path, at_work): (bool, bool, Option<ActionType>),
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let masters = c.masters.table.ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
@@ -565,7 +557,7 @@ impl Unit {
         ))?;
         let values = terrain
             .restriction(mover.stats.restriction)
-            .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+            .ok_or(UNKNOWN_RESTRICTION)?;
         let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
         let me = Me {
             action_state: state,
@@ -592,7 +584,7 @@ impl Unit {
         };
         drop_site_search(
             others.own_iter(),
-            crate::objects::masters::OwnerMasters::new(c.masters.own, Some(masters)),
+            OwnerMasters::new(c.masters.own, Some(masters)),
             &master.drop_sites,
             self.position(),
             Some(seeker),

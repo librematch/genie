@@ -1,6 +1,12 @@
 //! A technology's change (kind 8): its state, a forced research and its research time.
 
 use crate::GenieError;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::below_or_unordered;
+use crate::math::image::effect::{
+    NO_TIME as EFFECT_NO_TIME, STATE_AVAILABLE as EFFECT_STATE_AVAILABLE,
+    STATE_RESEARCHED as EFFECT_STATE_RESEARCHED, STATE_UNAVAILABLE as EFFECT_STATE_UNAVAILABLE,
+};
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -15,6 +21,7 @@ use crate::technology::ModifyMode;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::effect::{ONE, ROUND};
+use crate::technology::{Attributes, Location, ResearchCap, factors};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -46,11 +53,11 @@ pub(super) const fn tech_time_mode(mode: ModifyMode) -> Option<ChangeMode> {
 
 /// 1.0, 2.0 and 3.0 (`DAT_14330eb8c`, `DAT_142e8c150`, `DAT_142eb1c98`): a state change's values
 /// (kind 8's mode 12): 0 disables, 1 makes it unavailable, 2 available and enabled, 3 researched.
-pub(super) const STATE_UNAVAILABLE: f32 = crate::math::image::effect::STATE_UNAVAILABLE;
-pub(super) const STATE_AVAILABLE: f32 = crate::math::image::effect::STATE_AVAILABLE;
-pub(super) const STATE_RESEARCHED: f32 = crate::math::image::effect::STATE_RESEARCHED;
+pub(super) const STATE_UNAVAILABLE: f32 = EFFECT_STATE_UNAVAILABLE;
+pub(super) const STATE_AVAILABLE: f32 = EFFECT_STATE_AVAILABLE;
+pub(super) const STATE_RESEARCHED: f32 = EFFECT_STATE_RESEARCHED;
 /// −1.0 (`DAT_14330ec20`): a research time without a `.dat` location, and a set's "none".
-pub(super) const NO_TIME: f32 = crate::math::image::effect::NO_TIME;
+pub(super) const NO_TIME: f32 = EFFECT_NO_TIME;
 
 /// A technology location a modify command names: its index and its building.
 type LocationAt = (Option<usize>, Option<MasterId>);
@@ -115,7 +122,7 @@ impl World {
                     return Ok(None);
                 };
                 at = Some(state.locations.len());
-                state.locations.push(crate::technology::Location {
+                state.locations.push(Location {
                     building: None,
                     ..last
                 });
@@ -135,15 +142,14 @@ impl World {
         at: Option<usize>,
     ) -> Result<(), GenieError> {
         let (tech, t) = (t, t.index());
-        let short = crate::math::conversions::cvttss2si(v) as i16;
+        let short = cvttss2si(v) as i16;
         match mode {
             ModifyMode::BUILDING => self.set_tech_building(p, tech, v, at)?,
             ModifyMode::BUTTON => {
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
                 for (i, l) in state.locations.iter_mut().enumerate() {
                     if at.is_none_or(|a| a == i) {
-                        l.button =
-                            LocationButton::of_data(crate::math::conversions::cvttss2si(v) as u8);
+                        l.button = LocationButton::of_data(cvttss2si(v) as u8);
                     }
                 }
             }
@@ -155,7 +161,7 @@ impl World {
                     .player_mut(p)?
                     .techs
                     .checked_mut(t)?
-                    .research_cap = crate::technology::ResearchCap::of_data(short);
+                    .research_cap = ResearchCap::of_data(short);
             }
             ModifyMode::STATE => self.set_tech_state(p, tech, v)?,
             ModifyMode::EFFECT_OVERRIDE => {
@@ -182,7 +188,7 @@ impl World {
         at: Option<usize>,
     ) -> Result<(), GenieError> {
         let t = t.index();
-        let short = MasterId::of_data(crate::math::conversions::cvttss2si(v) as i16);
+        let short = MasterId::of_data(cvttss2si(v) as i16);
         if let Some(short) = short
             && self
                 .masters
@@ -232,8 +238,8 @@ impl World {
         self.research_effect_known(p, tech)?;
         self.do_effect(p, &def.effect, None)?;
         let owner = self.players.player(p)?;
-        let get = |k: AttributeId| crate::technology::Attributes::get(owner, k);
-        let factors = crate::technology::factors(tech, &get)?;
+        let get = |k: AttributeId| Attributes::get(owner, k);
+        let factors = factors(tech, &get)?;
         let listed = owner.techs.checked(t)?.listed_costs(&def, factors)?;
         let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
         let owner = self.players.player_mut(p)?;
@@ -292,10 +298,10 @@ impl World {
             let Some(entry) = state.locations.get_mut(i) else {
                 continue;
             };
-            let short = |x: f32| f32::from(crate::math::conversions::cvttss2si(x) as i16);
+            let short = |x: f32| f32::from(cvttss2si(x) as i16);
             let adjustment = match mode {
                 ChangeMode::SCALE => {
-                    let half = if crate::math::fmath::below_or_unordered(v, ONE) {
+                    let half = if below_or_unordered(v, ONE) {
                         -ROUND
                     } else {
                         ROUND
@@ -303,11 +309,7 @@ impl World {
                     Seconds::new(short((v - ONE) * time + half)) + entry.adjustment
                 }
                 ChangeMode::SET => {
-                    let s = if v == NO_TIME {
-                        0
-                    } else {
-                        crate::math::conversions::cvttss2si(v) as i16
-                    };
+                    let s = if v == NO_TIME { 0 } else { cvttss2si(v) as i16 };
                     Seconds::new(f32::from(s) - time)
                 }
                 _ => Seconds::new(short(v)) + entry.adjustment,

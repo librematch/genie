@@ -66,8 +66,30 @@ mod work;
 #[cfg(test)]
 use self::actions::{SwitchWorld, switch_master};
 use self::points::{centroid, follow_axis, follow_spread, grid_point, offset_point};
+use crate::combat::AttackPowerup;
+use crate::gathering::DropSiteId;
 #[cfg(test)]
 use crate::gathering::hunt::HUNT;
+use crate::groups::UnitGroup;
+use crate::map::RestrictionId;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
+use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
+use crate::math::image::order::{
+    DAMAGE_WHOLE as ORDER_DAMAGE_WHOLE, GUARD_RANGE as ORDER_GUARD_RANGE,
+    SPLIT_PATH_REACH as ORDER_SPLIT_PATH_REACH, SPLIT_SPEED_GAP as ORDER_SPLIT_SPEED_GAP,
+    TABLE_DROP_FAR as ORDER_TABLE_DROP_FAR, WAYPOINT_APART as ORDER_WAYPOINT_APART,
+    WAYPOINT_APART_LOW as ORDER_WAYPOINT_APART_LOW,
+};
+use crate::math::rng::Well512;
+use crate::movement::Mover;
+use crate::objects::layers::{Building, Combat};
+use crate::players::CivId;
+use crate::players::tracker::Tracker;
+use crate::unit_ai::task_finder::{DropSite, table_drop_buildings};
+use crate::unit_ai::{QueuedOrder, UnitAi, UnitSide, UnitStance};
+use crate::world::{Formations, OBJECT_MASTER};
+use std::collections::BTreeSet;
+use std::ops::RangeInclusive;
 
 /// INTERACT's fields past its units (`+0x4`..`+0x16`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -146,7 +168,7 @@ const HERD_MOST: usize = 16;
 /// The groups one command lists (`DAT_143f152b8`, below `0x3c`).
 const LISTED: usize = 60;
 /// The range of GUARD's defend order (`DAT_142eb3634`, [`World::guard`]).
-const GUARD_RANGE: f32 = crate::math::image::order::GUARD_RANGE;
+const GUARD_RANGE: f32 = ORDER_GUARD_RANGE;
 /// The task filter of garrisoning (3).
 pub(crate) const GARRISON: ActionType = ActionType::named(3);
 /// A task's action type of attacking (7), whose factory makes an Attack (type 9).
@@ -168,7 +190,7 @@ struct Splittable {
     moved_at: Point,
     state: ObjectState,
     radius: Distance,
-    restriction: Option<crate::map::RestrictionId>,
+    restriction: Option<RestrictionId>,
 }
 
 /// What the order splitter makes of an order's units (`FUN_140fd76d0`'s result at
@@ -184,7 +206,7 @@ pub(crate) struct Split {
     /// The units a path from them did not join (`+0x3a48`, a `std::unordered_set` the splitter
     /// fills through `FUN_140a3e380` and the kept-group order `FUN_140fd9f40` reads), as a set:
     /// its bucket order is not held.
-    pub(crate) far: std::collections::BTreeSet<ObjectId>,
+    pub(crate) far: BTreeSet<ObjectId>,
 }
 
 impl Split {
@@ -214,12 +236,12 @@ type SplitPath<'a> =
 
 /// The drop-site table's search starts beyond this squared distance (`FUN_141658e20`,
 /// `DAT_142f89ac4`).
-const TABLE_DROP_FAR: f32 = crate::math::image::order::TABLE_DROP_FAR;
+const TABLE_DROP_FAR: f32 = ORDER_TABLE_DROP_FAR;
 /// The loads whose drop-off works with the hunt's task filter (`FUN_14161e370`'s list: meat 15,
 /// wood 1, food 0).
 const HUNTED_LOADS: [AttributeId; 3] = [attribute::MEAT, attribute::WOOD, attribute::FOOD];
 /// The action's point on neither axis (`DAT_14330ec20`).
-const NO_POINT: f32 = crate::math::image::garrison::NO_POINT;
+const NO_POINT: f32 = GARRISON_NO_POINT;
 
 /// A hunt command on an object the world does not hold.
 pub(crate) const HUNT_TARGET_GONE: GenieError =
@@ -232,10 +254,10 @@ pub(crate) const NO_HUNT_TASK: GenieError =
 const MAX_UNGROUPED: MasterKind = MasterKind::of_data(69);
 /// Units whose speeds differ by more than this do not join where the player breaks formations by
 /// speed (`FUN_140fd76d0`, `DAT_143cc2918`).
-const SPLIT_SPEED_GAP: f32 = crate::math::image::order::SPLIT_SPEED_GAP;
+const SPLIT_SPEED_GAP: f32 = ORDER_SPLIT_SPEED_GAP;
 /// Units nearer than this are measured by a path (`FUN_140fd76d0`, `DAT_142e7f38c`) while
 /// `DAT_1439e60e3` (1 at run time) holds.
-const SPLIT_PATH_REACH: f32 = crate::math::image::order::SPLIT_PATH_REACH;
+const SPLIT_PATH_REACH: f32 = ORDER_SPLIT_PATH_REACH;
 const SPLIT_BY_PATH: bool = true;
 
 /// `FUN_140fd76d0`'s test whether `b` joins `a`: both above type 69, both of formation category
@@ -252,10 +274,10 @@ const SPLIT_BY_PATH: bool = true;
 fn splits_together(
     a: &Splittable,
     b: &Splittable,
-    f: crate::world::Formations,
+    f: Formations,
     member: bool,
     path: &mut SplitPath<'_>,
-    far: &mut std::collections::BTreeSet<ObjectId>,
+    far: &mut BTreeSet<ObjectId>,
 ) -> Result<bool, GenieError> {
     if a.kind <= MAX_UNGROUPED || b.kind <= MAX_UNGROUPED {
         return Ok(false);
@@ -273,31 +295,27 @@ fn splits_together(
         a.moved_at.x() - b.moved_at.x(),
         a.moved_at.y() - b.moved_at.y(),
     );
-    let d = crate::math::fmath::sqrt(dx * dx + 0.0 + dy * dy);
+    let d = sqrt(dx * dx + 0.0 + dy * dy);
     if SPLIT_BY_PATH
         && d < SPLIT_PATH_REACH
         && let Some((found, length)) = path(a, b)?
     {
-        let joins = found == Found::Goal
-            && crate::math::fmath::at_most_or_unordered(length.get(), f.influence.get());
+        let joins = found == Found::Goal && at_most_or_unordered(length.get(), f.influence.get());
         if !joins {
             let _ = far.insert(b.id);
         }
         return Ok(joins);
     }
-    Ok(crate::math::fmath::at_most_or_unordered(
-        d,
-        f.influence.get(),
-    ))
+    Ok(at_most_or_unordered(d, f.influence.get()))
 }
 
 /// The trophy master `TRANSFORM_OBJECT` changes ("Trophy None") and the trophies it may take.
 const TROPHY: MasterId = MasterId::named(1649);
-const TROPHIES: std::ops::RangeInclusive<i16> = 1650..=1653;
+const TROPHIES: RangeInclusive<i16> = 1650..=1653;
 /// A patrol's waypoint counts when it is this far from the last one on x or y
 /// (`FUN_14161b970`, `DAT_14330eb8c`), or this far the other way (`DAT_14330ec20`).
-const WAYPOINT_APART: f32 = crate::math::image::order::WAYPOINT_APART;
-const WAYPOINT_APART_LOW: f32 = crate::math::image::order::WAYPOINT_APART_LOW;
+const WAYPOINT_APART: f32 = ORDER_WAYPOINT_APART;
+const WAYPOINT_APART_LOW: f32 = ORDER_WAYPOINT_APART_LOW;
 
 /// An object that a caller found or was given, which the world does not hold.
 pub(crate) fn object_gone(id: impl ObjectKey) -> GenieError {
@@ -363,7 +381,7 @@ impl World {
     pub(crate) fn object_and_combat_mut(
         &mut self,
         id: impl ObjectKey,
-    ) -> Result<Option<(&mut Unit, &mut crate::objects::layers::Combat)>, GenieError> {
+    ) -> Result<Option<(&mut Unit, &mut Combat)>, GenieError> {
         let Some(place) = self.place(id) else {
             return Ok(None);
         };
@@ -381,7 +399,7 @@ impl World {
     pub(crate) fn object_and_layer_mut(
         &mut self,
         id: impl ObjectKey,
-    ) -> Result<Option<(&mut Unit, &mut crate::objects::layers::Building)>, GenieError> {
+    ) -> Result<Option<(&mut Unit, &mut Building)>, GenieError> {
         let Some(place) = self.place(id) else {
             return Ok(None);
         };
@@ -398,11 +416,8 @@ impl World {
     /// A player without a table or a table without the master ([`crate::world::OBJECT_MASTER`],
     /// with the player and the master).
     pub(crate) fn master(&self, player: PlayerId, master: MasterId) -> Result<&Master, GenieError> {
-        player_master(&self.masters, player, master).ok_or_else(|| {
-            crate::world::OBJECT_MASTER
-                .with("player", player)
-                .with("master", master)
-        })
+        player_master(&self.masters, player, master)
+            .ok_or_else(|| OBJECT_MASTER.with("player", player).with("master", master))
     }
 
     /// What the task finder reads of object `id`; an annex stands for its main building (`+0xbb8`),
@@ -448,7 +463,7 @@ impl World {
 /// is neither queued nor direct) the pass ends in the unit's stop (its slot 0x148, a tail jump at
 /// 0x140c42cd4), which the caller runs ([`World::object_stop`]); with 0 (BUILD's and
 /// `BUILD_WALL`'s) every order is ready after it.
-pub(crate) fn readiness(orders: &mut Vec<crate::unit_ai::QueuedOrder>, drop_ready: bool) {
+pub(crate) fn readiness(orders: &mut Vec<QueuedOrder>, drop_ready: bool) {
     // each order is judged alone, so the walk's direction does not matter
     orders.retain_mut(|order| {
         if order.ready {
@@ -466,8 +481,8 @@ pub(crate) fn readiness(orders: &mut Vec<crate::unit_ai::QueuedOrder>, drop_read
 /// zeroes `+0xa34`, `+0xa50` and `+0x9f8`, empties the powerup map (`+0xa98`, count `+0xaa0`),
 /// sets `+0xa2c` to slot 0x1b8 × 0.05 and takes a sight powerup (`+0xad4`) off (slots 0x1d8,
 /// 0x1d0): none of them is held.
-const fn clear_powerups(combat: &mut crate::objects::layers::Combat) {
-    combat.attack_powerup = crate::combat::AttackPowerup::ZERO;
+const fn clear_powerups(combat: &mut Combat) {
+    combat.attack_powerup = AttackPowerup::ZERO;
     combat.range_powerup = Distance::ZERO;
     combat.reload_powerup = Seconds::ZERO;
     combat.work_rate_powerup = WorkRate::ZERO;
@@ -524,7 +539,7 @@ fn waypoints_from(from: Point, waypoints: &[Point]) -> Vec<Point> {
     kept
 }
 
-fn own_order_target(ai: &crate::unit_ai::UnitAi, id: ObjectId) -> Option<ObjectId> {
+fn own_order_target(ai: &UnitAi, id: ObjectId) -> Option<ObjectId> {
     // the issuer compares as the game's integer (a player's number equals that object's id)
     ai.orders
         .iter()
@@ -538,15 +553,15 @@ fn own_order_target(ai: &crate::unit_ai::UnitAi, id: ObjectId) -> Option<ObjectI
 /// [`crate::unit_ai::UnitAi::stop_with`], whose stopAction goes to the unit's `side`, with the AI
 /// stream `rng`) and forgets the target (`FUN_140c5e1e0`).
 pub(crate) fn set_stance(
-    ai: &mut crate::unit_ai::UnitAi,
-    state: crate::unit_ai::UnitStance,
+    ai: &mut UnitAi,
+    state: UnitStance,
     place: (Point, Option<ClassId>),
-    side: &mut dyn crate::unit_ai::UnitSide,
-    rng: &mut crate::math::rng::Well512,
+    side: &mut dyn UnitSide,
+    rng: &mut Well512,
 ) -> Result<(), GenieError> {
     ai.stance = state;
     ai.state_position = place.0;
-    if state == crate::unit_ai::UnitStance::NO_ATTACK
+    if state == UnitStance::NO_ATTACK
         && (ai.current_order == Some(OrderKind::Attack)
             || ai.current_action == Some(ActionKind::Attack))
     {
@@ -561,10 +576,7 @@ pub(crate) fn set_stance(
 /// `mover`'s last move time (`+0x870`, [`crate::movement::Mover::last_move`]) to the world time
 /// (`FUN_1415300d0`) plus 1.
 pub(crate) fn lock_gate(
-    (mover, layer): (
-        Option<&mut crate::movement::Mover>,
-        &mut crate::objects::layers::Building,
-    ),
+    (mover, layer): (Option<&mut Mover>, &mut Building),
     locked: bool,
     now: WorldTime,
 ) -> Result<(), GenieError> {
@@ -585,7 +597,7 @@ pub(crate) fn lock_gate(
 /// `setDifferentiatorGroups` (`FUN_1410395a0`): group `g`'s differentiator groups (`+0x108`,
 /// count `+0x110`) are `list` instead. The routine's false for an allocation that failed cannot
 /// come: `operator new` (`FUN_142a8bd2c`) throws rather than return none.
-fn set_differentiator_groups(g: &mut crate::groups::UnitGroup, list: &[GroupId]) {
+fn set_differentiator_groups(g: &mut UnitGroup, list: &[GroupId]) {
     g.differentiator_groups.clear();
     g.differentiator_groups.extend_from_slice(list);
 }
@@ -602,13 +614,12 @@ fn ignore_unit(ignore: &mut Vec<ObjectId>, id: ObjectId) {
 /// whether it is too close, below the least range (slot 0x240; `COMISS`, `SETA`: NaN not).
 fn work_reach(gap: Distance, weapon_range: Distance, min_range: Distance) -> (bool, bool) {
     let too_close = gap < min_range;
-    let within =
-        !crate::math::fmath::below_or_unordered(weapon_range.get(), gap.get()) && !too_close;
+    let within = !below_or_unordered(weapon_range.get(), gap.get()) && !too_close;
     (within, too_close)
 }
 
 /// A whole share (`DAT_14330ebcc`), which `FUN_1411859a0` takes hit points against.
-const DAMAGE_WHOLE: f32 = crate::math::image::order::DAMAGE_WHOLE;
+const DAMAGE_WHOLE: f32 = ORDER_DAMAGE_WHOLE;
 
 /// The damage share `FUN_1411859a0` picks damage sprites by: `100 − hp × 100 / hit points`,
 /// whole, of hit points at most the master's. An object whose share is its resource's (the
@@ -654,16 +665,11 @@ fn damage_share(
 /// and place) in state 2, the nearest by the squared distance of the centres (the first of
 /// equals; none from [`TABLE_DROP_FAR`] on).
 pub(crate) fn nearest_table_site(
-    (table, civ, tracker): (
-        &[crate::unit_ai::task_finder::DropSite],
-        crate::players::CivId,
-        &crate::players::tracker::Tracker,
-    ),
+    (table, civ, tracker): (&[DropSite], CivId, &Tracker),
     (at, held, class): (Point, Option<AttributeId>, ClassId),
     look: impl Fn(ObjectId) -> Option<(ObjectState, Position)>,
-) -> Option<crate::gathering::DropSiteId> {
-    let buildings =
-        crate::unit_ai::task_finder::table_drop_buildings(table, held, Some(class), civ);
+) -> Option<DropSiteId> {
+    let buildings = table_drop_buildings(table, held, Some(class), civ);
     let mut best = (None, TABLE_DROP_FAR);
     for m in buildings {
         // a queued unit's place (−1) names no object
@@ -677,7 +683,7 @@ pub(crate) fn nearest_table_site(
             let (dx, dy) = (at.x() - position.x(), at.y() - position.y());
             let d = dy * dy + dx * dx;
             if d < best.1 {
-                best = (Some(crate::gathering::DropSiteId::new(id)), d);
+                best = (Some(DropSiteId::new(id)), d);
             }
         }
     }

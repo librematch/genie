@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::ResourceWord;
+use crate::commands::TradeLots;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -17,7 +18,7 @@ pub struct TradeCommand {
     /// `+0x4`: the commodity (the dispatcher reads its low byte).
     pub attribute: ResourceWord,
     /// `+0x6`: how many lots.
-    pub times: crate::commands::TradeLots,
+    pub times: TradeLots,
     /// `+0x8`: the market, which the check (`FUN_140e6f3f0`) reads; none for −1, which a
     /// recorded trade can hold.
     pub market: Option<ObjectId>,

@@ -137,12 +137,14 @@ impl From<Unit> for Object {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
     use crate::objects::layers::{Animated, Motion};
     use crate::world::parts::ObjectParts;
 
     #[test]
     fn only_moving_object_parts_hold_mover() {
-        let walker = crate::gathering::hunt::tests::walker();
+        let walker = walker();
         let moving = ObjectParts {
             motion: Some(Motion::Moving(walker.clone())),
             ..ObjectParts::default()

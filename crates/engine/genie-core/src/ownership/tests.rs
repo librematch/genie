@@ -11,8 +11,12 @@ use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
 
+use crate::movement::move_to::TargetMoved;
+use crate::objects::WorkerCount;
+use crate::ownership::artifact::{ArtifactState, ArtifactSub};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::UnitAi;
 use crate::world::World;
 use crate::world::others::OthersRef;
 use crate::world::parts::Object;
@@ -35,7 +39,7 @@ fn walking_forager() -> World {
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+            on_target_moved: TargetMoved::Follows,
             wait: MoveWait::default(),
         }));
     let ai = t.parts.unit_ai.get_mut(u.id).unwrap();
@@ -52,7 +56,7 @@ fn walking_forager() -> World {
 /// none after).
 fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieError> {
     for b in &mut t.players[0].objects {
-        b.workers = crate::objects::WorkerCount::of_data(1);
+        b.workers = WorkerCount::of_data(1);
     }
     let released = in_update(
         &mut t,
@@ -63,7 +67,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieErro
             let gone = OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
                 .foreign_iter()
-                .filter(|(_, b)| b.workers == crate::objects::WorkerCount::of_data(0));
+                .filter(|(_, b)| b.workers == WorkerCount::of_data(0));
             Ok(gone.map(|(_, b)| b.id.get()).collect())
         },
     )?;
@@ -96,7 +100,7 @@ fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     // livestock's unit AI, and one on action 0x2c2, keep their order and target
     let (o, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
     assert_eq!(o.parts.actions.list.move_to().copied(), None);
-    let kept = |ai: &crate::unit_ai::UnitAi| (ai.current_order, ai.current_target);
+    let kept = |ai: &UnitAi| (ai.current_order, ai.current_target);
     assert_eq!(
         kept(o.parts.unit_ai.as_ref().unwrap()),
         (Some(OrderKind::Move), Some(object_id(600)))
@@ -120,7 +124,7 @@ fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
 #[test]
 fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     let artifact = || Artifact {
-        sub: Some(crate::ownership::artifact::ArtifactSub::Walk {
+        sub: Some(ArtifactSub::Walk {
             move_to: MoveToAction::sub_in(MoveTo::Moving),
         }),
         goal: Some(Position::new(32.5, 89.5, 0.0)),
@@ -137,12 +141,7 @@ fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     let a = o.parts.actions.list.artifact().copied().unwrap();
     assert_eq!(
         (a.move_to().copied(), a.goal, a.target, a.state),
-        (
-            None,
-            None,
-            None,
-            crate::ownership::artifact::ArtifactState::Check
-        )
+        (None, None, None, ArtifactState::Check)
     );
     assert_eq!(released, [600]);
     assert_eq!(o.parts.mover().unwrap().animated.speed, Speed::new(0.0));

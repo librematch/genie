@@ -105,9 +105,14 @@ data-oriented architect makes it.
 
 ## 4. Modules and files
 
-- Import from the crate root: `use crate::movement::move_to::MoveWait;`. Do not write
-  `use super::…`. Inline paths and doc links follow the same rule. A test module's
-  `use super::*;` is the one exception.
+- Import from the crate root: `use crate::movement::move_to::MoveWait;`, then name the item
+  by its own name (`MoveWait`, `Snow::None`); `use std::mem::take;`, then `take`. Do not write
+  `use super::…`. A test module's `use super::*;` is the one exception. The code holds no
+  item by its whole path: `clippy::absolute_paths` denies one of more than two segments
+  (section 15). Where another item holds the name, the import takes an alias of its module's
+  name and its own: `use std::fmt::Error as FmtError;`. std's `fmt::Result` and
+  `io::Result<T>` are the prelude's `Result` with the error imported: `Result<(), Error>`,
+  `use std::fmt::Error;`. Doc links name the item by its path from the crate root.
 - Give each engine system a folder with a `README.md`. Write its prose by hand.
   `scripts/readmes.py SRC` fills the generated tables. If you add a file or a folder, run it.
   If you change the first sentence of a `//!` doc, run it too.
@@ -529,6 +534,9 @@ genie gives the same bits as the game on every host, WebAssembly included.
   item. `scripts/lint_allows.py --check` fails on a new allowance.
 - genie-core turns off the cast and float lints for the game's arithmetic. No other crate does,
   except for a field width that its file format fixes.
+- `clippy::absolute_paths` is denied (section 4). `clippy::upper_case_acronyms` checks every
+  type and variant name (`upper-case-acronyms-aggressive`, `clippy.toml`); `scripts/c_case.py`
+  checks the public ones the lint spares (section 3).
 
 ## 16. The gates
 

@@ -10,6 +10,7 @@ use genie_core::world::World;
 use genie_save::PlayerSection;
 
 use crate::{Decoder, Error, MasterTable, frames, header_slice, lane_block, run};
+use std::slice::from_ref;
 
 /// Why a census run ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,7 +123,7 @@ pub fn census_run(
         CensusEnd::Recording
     };
     for frame in frames(&chapter, total)? {
-        run(&mut turns, &mut decoder, std::slice::from_ref(&frame));
+        run(&mut turns, &mut decoder, from_ref(&frame));
         census.update(&turns, &sections);
         if census.players.iter().all(CensusPlayer::done) {
             end = CensusEnd::AllDone;
@@ -284,7 +285,7 @@ pub fn header_divergences(
     let mut out: Vec<Followed> = vec![Followed::Follows; players.len()];
     let mut done = vec![false; players.len()];
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
-        run(&mut turns, &mut decoder, std::slice::from_ref(frame));
+        run(&mut turns, &mut decoder, from_ref(frame));
         let update = i + 1;
         for (k, &p) in players.iter().enumerate() {
             if let (false, Some(stop)) = (done[k], stop_of(&turns, p)) {
@@ -350,7 +351,7 @@ pub fn next_id_divergence(
     let mut turns = header_slice(&header, masters);
     let mut decoder = Decoder::default();
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
-        run(&mut turns, &mut decoder, std::slice::from_ref(frame));
+        run(&mut turns, &mut decoder, from_ref(frame));
         let update = i + 1;
         if update < first {
             continue;
@@ -389,7 +390,7 @@ pub fn header_run(
     let mut decoder = Decoder::default();
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
         before(i + 1);
-        run(&mut turns, &mut decoder, std::slice::from_ref(frame));
+        run(&mut turns, &mut decoder, from_ref(frame));
     }
     Ok(turns)
 }

@@ -1,6 +1,7 @@
 //! The state of an action of any type ([`ActionState`]): its number.
 
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// An action's state by its number (`+0x18`, `RGE_Action_Object::actionState`), whatever the
 /// action's type: what the readers of any action compare (the unit AI, the movement, the
@@ -27,8 +28,8 @@ impl ActionState {
     }
 }
 
-impl std::fmt::Display for ActionState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ActionState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

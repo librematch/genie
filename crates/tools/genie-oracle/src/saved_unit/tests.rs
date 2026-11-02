@@ -3,13 +3,21 @@ use crate::fixtures::{
     with_masters,
 };
 use crate::masters::{DefaultAction, MasterTable};
+use crate::saved_unit::object as saved_unit_object;
 use crate::saved_unit::{annexes, object};
 use crate::test_ids::object_id;
+use genie_core::combat::AttackCount;
 use genie_core::combat::missile::ShooterId;
+use genie_core::construction::Annexes;
+use genie_core::movement::explore::EXPLORE;
 use genie_core::objects::ObjectId;
+use genie_core::objects::layers::{DefaultTask, UnreadDefault, Unstartable};
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
+use genie_core::orders::town_bell::TownBell;
+use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::CivId;
+use genie_core::technology::TechId;
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionByType, RgeMissileObject, RgeObject,
 };
@@ -62,10 +70,7 @@ fn saved_building_parts_are_its_object_s() {
     );
     assert!(o.parts.dead_master.is_none());
     let disabled = o.parts.production.map(|p| p.disabled_techs);
-    assert_eq!(
-        disabled,
-        Some(vec![genie_core::technology::TechId::try_from(3).unwrap()])
-    );
+    assert_eq!(disabled, Some(vec![TechId::try_from(3).unwrap()]));
     let o = whole(0x100);
     assert!(o.parts.gather_point.is_none());
     assert!(o.parts.unread.is_some());
@@ -84,7 +89,7 @@ fn livestock_starts_with_its_artifact() {
     .with_default_action(
         CivId::GAIA,
         MasterId::of_data(83).unwrap(),
-        DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE),
+        DefaultAction::Type(ARTIFACT_TYPE),
     );
     let sheep = combat_object(5, 83);
     let u = object(
@@ -97,10 +102,7 @@ fn livestock_starts_with_its_artifact() {
     );
     assert_eq!(u.unit.id, object_id(5));
     assert!(u.parts.actions.list.artifact().is_some());
-    assert_eq!(
-        u.parts.actions.default_task,
-        genie_core::objects::layers::DefaultTask::Artifact
-    );
+    assert_eq!(u.parts.actions.default_task, DefaultTask::Artifact);
     // a combat object's mover needs its master, which this save does not hold
     assert!(u.parts.unread.is_some());
 }
@@ -118,11 +120,7 @@ fn without_table_the_default_task_is_reported() {
     );
     assert_eq!(
         u.parts.actions.default_task,
-        genie_core::objects::layers::DefaultTask::Fails(
-            genie_core::objects::layers::Unstartable::Unread(
-                genie_core::objects::layers::UnreadDefault::NoMasterTable
-            )
-        )
+        DefaultTask::Fails(Unstartable::Unread(UnreadDefault::NoMasterTable))
     );
     assert!(u.parts.actions.list.artifact().is_none());
 }
@@ -141,7 +139,7 @@ fn saved_action_the_slice_does_not_model_is_reported() {
     combat_mut(&mut scout)
         .rge_combat_object
         .rge_action_object
-        .actions = action_list(vec![(genie_core::movement::explore::EXPLORE, explore)]);
+        .actions = action_list(vec![(EXPLORE, explore)]);
     let u = object(
         &scout,
         &PlayerObjects::default(),
@@ -151,10 +149,7 @@ fn saved_action_the_slice_does_not_model_is_reported() {
         PLAYERS,
     );
     assert!(u.parts.unread.is_some());
-    assert_ne!(
-        u.parts.actions.default_task,
-        genie_core::objects::layers::DefaultTask::Fly
-    );
+    assert_ne!(u.parts.actions.default_task, DefaultTask::Fly);
 }
 
 /// A missile without its action (it met its target) flies on with its own fields.
@@ -197,10 +192,7 @@ fn missile_without_its_action_keeps_flying() {
     assert_eq!(flying.fired_from, Some(ShooterId::new(object_id(900))));
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());
-    assert_eq!(
-        o.parts.combat.attack_count,
-        genie_core::combat::AttackCount::of_data(2)
-    );
+    assert_eq!(o.parts.combat.attack_count, AttackCount::of_data(2));
     assert_eq!(u.id, object_id(6));
 }
 
@@ -271,7 +263,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     c.town_bell_flag = 1;
     c.back_to_work1_town_bell_action = 0x261;
     let whole = |object: &genie_save::Object| {
-        crate::saved_unit::object(
+        saved_unit_object(
             object,
             &PlayerObjects::default(),
             &[],
@@ -292,10 +284,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         o.parts.unread.map(|e| e.error().kind()),
         Some(genie_core::ErrorKind::InvalidInput)
     );
-    assert_eq!(
-        o.parts.town_bell,
-        genie_core::orders::town_bell::TownBell::default()
-    );
+    assert_eq!(o.parts.town_bell, TownBell::default());
 }
 
 /// The save's linked object ids fill a main building's four annex slots in their order, −1 an
@@ -304,12 +293,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
 fn the_linked_object_ids_fill_the_annex_slots_in_order() {
     assert_eq!(
         annexes(&[12, -1, 14, -1]),
-        genie_core::construction::Annexes::new([
-            Some(object_id(12)),
-            None,
-            Some(object_id(14)),
-            None
-        ])
+        Annexes::new([Some(object_id(12)), None, Some(object_id(14)), None])
     );
-    assert_eq!(annexes(&[]), genie_core::construction::Annexes::NONE);
+    assert_eq!(annexes(&[]), Annexes::NONE);
 }

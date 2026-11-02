@@ -62,15 +62,30 @@ pub use self::drop_off::DropSearch;
 #[cfg(test)]
 use self::placing::beside_diagonal;
 pub(crate) use crate::construction::build::world_side::{NO_CONSTRUCTION, NOT_HELD, held};
+use crate::construction::{BuilderCount, FoundationId};
+use crate::gathering::DropSiteId;
+use crate::gathering::hunt::DropOff;
+use crate::map::Snow;
 #[cfg(test)]
 use crate::map::spatial::Spatial;
+use crate::math::image::build::{
+    DROP_REACH as BUILD_DROP_REACH, EXTRA_BUILDER as BUILD_EXTRA_BUILDER, REACH as BUILD_REACH,
+    WONDER_RATE as BUILD_WONDER_RATE,
+};
+use crate::math::rng::Well512;
+use crate::movement::MoveStats;
+use crate::objects::masters::{Masters, WorkValue};
+use crate::objects::release::Releaser;
+use crate::objects::sprite::{ActiveSprite, new_sprite};
+use crate::objects::{Frame, Graphics, ObjectState};
 #[cfg(test)]
 use crate::pathing::Pathing;
 #[cfg(test)]
 use crate::players::PlayerId;
+use crate::world::NO_ATTRIBUTE;
 
 /// A builder within this of its foundation's footprint has reached it (`DAT_142eb5690`).
-const REACH: f32 = crate::math::image::build::REACH;
+const REACH: f32 = BUILD_REACH;
 /// A foundation of another player than the builder's, which the slice does not hand the Build.
 const FOREIGN_SITE: GenieError = GenieError::unsupported("a foundation of another player");
 /// The Build's foundation the world no longer holds where its place is read.
@@ -87,7 +102,7 @@ const UNSEEN_SITE: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct BuildAction {
     /// The foundation's id; none once it is gone.
-    pub target: Option<crate::construction::FoundationId>,
+    pub target: Option<FoundationId>,
     /// The action state (`+0x18`), which word 9 adds, with its sub-action list's `MoveTo`
     /// (`+0x50`): to the foundation (`set_state(4)`), to the drop site (8), to its point (11) or
     /// off the footprint (223).
@@ -104,7 +119,7 @@ pub struct BuildAction {
     pub timer: Seconds,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site of its drop-off (state 8,
     /// `set_state(8)`'s search).
-    pub site: Option<crate::gathering::DropSiteId>,
+    pub site: Option<DropSiteId>,
 }
 
 /// What a builder's Build task gives its work: the task's work range (`+0x30`; its `MoveTo` to the
@@ -115,7 +130,7 @@ pub struct BuildTask {
     /// The task's work range.
     pub range: Distance,
     /// The task's work value.
-    pub work_value: crate::objects::masters::WorkValue,
+    pub work_value: WorkValue,
     /// The builder's work rate: its master's `work_rate` (`+0x798`) plus its `mWorkRatePowerup`
     /// (`+0xa30`).
     pub work_rate: WorkRate,
@@ -152,7 +167,7 @@ pub struct Construction {
     /// `+0xc60`, `desolid_flag`: no builder has started it; it has no obstruction record.
     pub desolid: bool,
     /// `+0x9e8`, `num_builders`.
-    pub builders: crate::construction::BuilderCount,
+    pub builders: BuilderCount,
     /// Its master's hit points (`+0x530`) and build time (`+0x898`, the first train location's
     /// train time; 0 without one).
     pub hit_points: MasterHitPoints,
@@ -165,7 +180,7 @@ pub struct Construction {
     #[diff(
         gap = "the death's and the teardowns' clearing (FUN_1411dbb70 at 0x1411dda85, FUN_1411d5600, FUN_1411ad250) is not ported"
     )]
-    pub snow: crate::map::Snow,
+    pub snow: Snow,
     /// `+0x788`, `sprite_override_id`, is not −1.
     pub sprite_override: bool,
 }
@@ -179,7 +194,7 @@ pub struct Completion<'a> {
     /// The owner's farm bonus ([`FarmBonus`], attributes 237 to 239).
     pub farm_bonus: FarmBonus,
     /// The owner's masters, whose table `FUN_141659d20` reads.
-    pub masters: Option<&'a crate::objects::masters::Masters>,
+    pub masters: Option<&'a Masters>,
     /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
     pub player_type: PlayerType,
     /// The building has a unit AI (`+0x6b0`): a mule cart's.
@@ -254,7 +269,7 @@ impl Completion<'_> {
                 let attribute = i16::try_from(resource)
                     .ok()
                     .and_then(AttributeId::of_data)
-                    .ok_or(crate::world::NO_ATTRIBUTE)?;
+                    .ok_or(NO_ATTRIBUTE)?;
                 part.attributes.push((attribute, amount));
             }
             // the game mode is not the editor's (4) in a game
@@ -287,18 +302,18 @@ pub struct StackUnit {
 /// 0x28 (`FUN_1413ba880`) sets that sprite's node to the frame its BUILD command chose
 /// (`+0xc54`, [`crate::objects::layers::Building::build_frame`]; slot 9 with it, [`ActiveSprite::set_frame`]).
 pub(crate) fn show_built(
-    sprite: &mut Option<crate::objects::sprite::ActiveSprite>,
-    stats: Option<&mut crate::movement::MoveStats>,
+    sprite: &mut Option<ActiveSprite>,
+    stats: Option<&mut MoveStats>,
     master: &Master,
-    frame: crate::objects::Frame,
-    graphics: &crate::objects::Graphics,
-    sprite_rng: &mut crate::math::rng::Well512,
+    frame: Frame,
+    graphics: &Graphics,
+    sprite_rng: &mut Well512,
 ) {
     let standing = master
         .standing_sprite
         .and_then(|s| graphics.get(s).copied());
     if let Some(g) = standing {
-        crate::objects::sprite::new_sprite(sprite, stats, g, sprite_rng);
+        new_sprite(sprite, stats, g, sprite_rng);
         if let Some(s) = sprite.as_mut().filter(|s| s.graphic.id == g.id) {
             s.set_frame(frame);
         }
@@ -311,6 +326,8 @@ mod built_sprite_tests {
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
 
+    #[cfg(test)]
+    use crate::objects::FacetCount;
     use crate::objects::sprite::{ActiveSprite, Graphic};
 
     /// The completion's sprite (`FUN_1411dbb70`): the foundation's construction sprite gives way
@@ -320,14 +337,14 @@ mod built_sprite_tests {
     fn completed_building_shows_its_standing_sprite_at_its_frame() {
         let g = |id, flags| Graphic {
             id,
-            frames: crate::objects::Frame::of_data(4),
-            facets: crate::objects::FacetCount::of_data(1),
+            frames: Frame::of_data(4),
+            facets: FacetCount::of_data(1),
             speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
             flags,
         };
-        let graphics = crate::objects::Graphics::from([
+        let graphics = Graphics::from([
             (
                 SpriteId::named(10),
                 g(SpriteId::named(10), SpriteFlags::ANIMATED),
@@ -341,7 +358,7 @@ mod built_sprite_tests {
             standing_sprite: Some(SpriteId::named(11)),
             ..Master::default()
         };
-        let mut rng = crate::math::rng::Well512::default();
+        let mut rng = Well512::default();
         let mut sprite = Some(ActiveSprite::start(
             g(SpriteId::named(10), SpriteFlags::ANIMATED),
             &mut rng,
@@ -350,20 +367,16 @@ mod built_sprite_tests {
             &mut sprite,
             None,
             &master,
-            crate::objects::Frame::of_data(2),
+            Frame::of_data(2),
             &graphics,
             &mut rng,
         );
         let s = sprite.unwrap();
         assert_eq!(
             (s.graphic.id, s.frame, s.last_frame),
-            (
-                SpriteId::named(11),
-                crate::objects::Frame::of_data(2),
-                crate::objects::Frame::of_data(2)
-            )
+            (SpriteId::named(11), Frame::of_data(2), Frame::of_data(2))
         );
-        let statics = crate::objects::Graphics::from([(
+        let statics = Graphics::from([(
             SpriteId::named(11),
             g(SpriteId::named(11), SpriteFlags::NONE),
         )]);
@@ -372,13 +385,13 @@ mod built_sprite_tests {
             &mut none,
             None,
             &master,
-            crate::objects::Frame::of_data(3),
+            Frame::of_data(3),
             &statics,
             &mut rng,
         );
         assert_eq!(
             none.map(|s| (s.graphic.id, s.frame)),
-            Some((SpriteId::named(11), crate::objects::Frame::of_data(3)))
+            Some((SpriteId::named(11), Frame::of_data(3)))
         );
     }
 }
@@ -389,7 +402,7 @@ mod built_sprite_tests {
 pub(crate) struct BuildReads {
     /// The foundation (the action's target) when the builder's player holds it with its
     /// construction: the update reads and works it through the world.
-    pub(crate) site: Option<crate::construction::FoundationId>,
+    pub(crate) site: Option<FoundationId>,
     /// The foundation's master, when the builder's player holds the foundation.
     pub(crate) built: Option<MasterId>,
     /// The foundation's `+0xcb0`: the object its completion's stack unit made
@@ -397,10 +410,10 @@ pub(crate) struct BuildReads {
     pub(crate) stack_made: Option<ObjectId>,
     /// The state of each foundation its unit AI's queued build orders name (None for one that
     /// is gone).
-    pub(crate) build_targets: Vec<(Option<ObjectId>, Option<crate::objects::ObjectState>)>,
+    pub(crate) build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)>,
     /// In state 8, what the drop-off reads of its second target ([`BuildAction::site`]): its
     /// state and [`crate::gathering::hunt::DropOff`]; None when the world does not hold it.
-    pub(crate) deposit: Option<(crate::objects::ObjectState, crate::gathering::hunt::DropOff)>,
+    pub(crate) deposit: Option<(ObjectState, DropOff)>,
     /// In state 8, the targets of its unit AI's queued orders 0x2c5, 0x2c9 and 0x2db the world
     /// no longer holds or whose seen state is above 5 (`FUN_140c5de60`).
     pub(crate) gone_orders: Vec<Option<ObjectId>>,
@@ -413,7 +426,7 @@ pub(crate) struct BuildReads {
     /// kind its player has: the end of the work gives its load to its player.
     pub(crate) drop_site: bool,
     /// The builder as the releaser of its targets (slot 0x180's argument).
-    pub(crate) by: crate::objects::release::Releaser,
+    pub(crate) by: Releaser,
 }
 
 /// The fishing ships that work the fish traps they build (`FUN_1411945a0`: 13, 2356, 2171).
@@ -424,15 +437,15 @@ const FISHING_SHIPS: [MasterId; 3] = [
 ];
 
 /// A second builder works at a third of the rate of the first (`DAT_142ed66b0`).
-const EXTRA_BUILDER: f32 = crate::math::image::build::EXTRA_BUILDER;
+const EXTRA_BUILDER: f32 = BUILD_EXTRA_BUILDER;
 /// The progress a started foundation holds before its first work (`0x2edbe6ff`, about 1e-10).
 const STARTED: u32 = 0x2edb_e6ff;
-const WONDER_RATE: f32 = crate::math::image::build::WONDER_RATE;
+const WONDER_RATE: f32 = BUILD_WONDER_RATE;
 
 /// The drop-off's wait after a drop site out of reach (`0xc0400000`).
 const DROP_WAIT: Seconds = Seconds::new(-3.0);
 /// The drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
-const DROP_REACH: f32 = crate::math::image::build::DROP_REACH;
+const DROP_REACH: f32 = BUILD_DROP_REACH;
 /// The orders whose targets gone the unit AI drops after a drop-off (`FUN_140c5de60`: the bits
 /// of `0x400011` over `order - 0x2c5`).
 pub(crate) const DROPPED_ORDERS: [OrderKind; 3] =
@@ -441,6 +454,8 @@ pub(crate) const DROPPED_ORDERS: [OrderKind; 3] =
 #[cfg(test)]
 mod stack_tests {
     use super::*;
+    #[cfg(test)]
+    use crate::construction::MainBuildingId;
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::GroundOffset;
@@ -449,11 +464,17 @@ mod stack_tests {
     use crate::map::TerrainFlags;
     use crate::map::spatial::{Placed, Tiles};
     use crate::map::terrain::TileTerrain;
+    #[cfg(test)]
+    use crate::map::terrain::{Terrain, TerrainKind};
+    #[cfg(test)]
+    use crate::map::{RestrictionId, TerrainMask};
     use crate::movement::MoveAlgorithm;
     use crate::movement::Speed;
     use crate::movement::TurnRate;
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
+    #[cfg(test)]
+    use crate::objects::layers::{Building, Static};
     use crate::objects::lifecycle::{Class, Lifecycle};
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::FlyMode;
@@ -463,12 +484,16 @@ mod stack_tests {
     use crate::objects::masters::{BuildingMaster, Masters};
     use crate::objects::unit::Unit;
     use crate::players::attribute::{self, AttributeId};
+    #[cfg(test)]
+    use crate::players::history::{EntryKind, Event, EventKind, Population, TimeSlice};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::unit_ai::UnitAiType;
     use crate::world::Millis;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::{FrameSeed, Gate};
     use crate::world::{Player, World};
 
     /// A building master of `id`: class 3, radius `r`, height `z`, obstruction `kind`, train
@@ -593,7 +618,7 @@ mod stack_tests {
         let ms = masters();
         let foundation = Unit {
             id: object_id(8759),
-            place: crate::objects::layers::Static::at(Position::new(54.0, 147.0, 0.0)),
+            place: Static::at(Position::new(54.0, 147.0, 0.0)),
             life: Lifecycle {
                 class: Class::Animated,
                 state: ObjectState::Foundation,
@@ -605,25 +630,25 @@ mod stack_tests {
             my_pasture: None,
             ..Unit::default()
         };
-        let layer = crate::objects::layers::Building {
+        let layer = Building {
             construction: Some(Construction {
                 progress: Seconds::new(149.99),
                 desolid: false,
-                builders: crate::construction::BuilderCount::of_data(1),
+                builders: BuilderCount::of_data(1),
                 hit_points: MasterHitPoints::of_data(2400),
                 build_time: WholeSeconds::of_data(150),
                 record: Obstruction {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: crate::map::Snow::None,
+                snow: Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![
@@ -640,11 +665,11 @@ mod stack_tests {
             GridSize::new(200, 200),
             Tiles::new(GridSize::new(200, 200), vec![0; 200 * 200]),
         );
-        t.spatial.terrain = Some(crate::map::terrain::Terrain::new(
+        t.spatial.terrain = Some(Terrain::new(
             GridSize::new(200, 200),
             vec![TileTerrain::of_save(0, 255, -1); 200 * 200],
             vec![
-                crate::map::terrain::TerrainKind {
+                TerrainKind {
                     shown: true,
                     flags: TerrainFlags::NONE,
                     forest: false,
@@ -685,9 +710,9 @@ mod stack_tests {
         let mut t = world();
         t.world_time = WorldTime::from_millis(912_000);
         t.players[1].history.add_entry(
-            crate::players::history::EntryKind::POPULATION,
-            crate::players::history::Population::of_data(3),
-            crate::players::history::Population::ZERO,
+            EntryKind::POPULATION,
+            Population::of_data(3),
+            Population::ZERO,
         );
         for ms in &mut t.masters {
             let castle = building(
@@ -701,17 +726,14 @@ mod stack_tests {
         }
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
         assert_eq!(
-            t.work_building(
-                crate::construction::FoundationId::new(object_id(8759)),
-                Seconds::new(1.0)
-            ),
+            t.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
             Ok(false)
         );
         assert_eq!(
             t.players[1].history.events,
-            [crate::players::history::Event {
-                kind: crate::players::history::EventKind::CASTLE_BUILT,
-                time_slice: crate::players::history::TimeSlice::of_data(1),
+            [Event {
+                kind: EventKind::CASTLE_BUILT,
+                time_slice: TimeSlice::of_data(1),
                 world_time: WorldTime::from_millis(912_000),
                 data1: 1.0,
                 data2: 0.0,
@@ -734,10 +756,7 @@ mod stack_tests {
     fn town_centre_foundation_completes_into_the_town_centre_and_its_annexes() {
         let mut t = world();
         assert_eq!(
-            t.work_building(
-                crate::construction::FoundationId::new(object_id(8759)),
-                Seconds::new(1.0)
-            ),
+            t.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
             Ok(false)
         );
         let ids: Vec<(i32, i16, ObjectState)> = t.players[1]
@@ -777,7 +796,7 @@ mod stack_tests {
                 .parts
                 .building_of(object_id(a))
                 .annex_of
-                .map(crate::construction::MainBuildingId::id)),
+                .map(MainBuildingId::id)),
             [
                 Some(object_id(8768)),
                 Some(object_id(8768)),
@@ -865,7 +884,7 @@ mod stack_tests {
                     m.storage.clear();
                     m.volley_missile = None;
                     // every building holds its movement state
-                    m.moving = Some(crate::movement::MoveStats {
+                    m.moving = Some(MoveStats {
                         fly_mode: FlyMode::GROUND,
                         speed: Speed::ZERO,
                         base: Speed::ZERO,
@@ -873,8 +892,8 @@ mod stack_tests {
                         turn_radius: Distance::ZERO,
                         turn_radius_speed: Speed::MAX,
                         radius: Radii::new(2.0, 2.0, 0.0),
-                        restriction: crate::map::RestrictionId::named(0),
-                        restriction_mask: crate::map::TerrainMask::ALL,
+                        restriction: RestrictionId::named(0),
+                        restriction_mask: TerrainMask::ALL,
                         turn_time: Seconds::ZERO,
                         move_algorithm: MoveAlgorithm::NONE,
                         min_collision: 0.0,
@@ -890,9 +909,9 @@ mod stack_tests {
             t.parts
                 .building_mut(t.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
-                .gate = Some(crate::world::Gate {
+                .gate = Some(Gate {
                 locked,
-                ..crate::world::Gate::default()
+                ..Gate::default()
             });
             t.stack_unit(
                 PlayerId::new(1),
@@ -929,10 +948,7 @@ mod stack_tests {
             .unwrap()
             .attacking_units = vec![object_id(99_999)];
         assert_eq!(
-            gone.work_building(
-                crate::construction::FoundationId::new(object_id(8759)),
-                Seconds::new(1.0)
-            ),
+            gone.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
             Ok(false)
         );
         let mut held = world();
@@ -942,10 +958,7 @@ mod stack_tests {
             .unwrap()
             .attacking_units = vec![first];
         assert_eq!(
-            held.work_building(
-                crate::construction::FoundationId::new(object_id(8759)),
-                Seconds::new(1.0)
-            ),
+            held.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
             Err(GenieError::unsupported(
                 "a stack unit's completion with other players' units on it (+0xce0)"
             ))

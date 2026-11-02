@@ -48,33 +48,42 @@ pub use self::missile_target::{MissileTarget, MissileTargetId};
 pub use self::projectile_type::ProjectileType;
 pub use self::shooter_id::{Shooter, ShooterId};
 pub use self::strike_result::StrikeResult;
+use crate::combat::{AttackCount, Firepower, MissileCount};
+use crate::math::image::missile::{
+    BEYOND as MISSILE_BEYOND, DRAW_SCALE as MISSILE_DRAW_SCALE, HALF as MISSILE_HALF,
+    HEIGHT_SHARE as MISSILE_HEIGHT_SHARE, LANDING as MISSILE_LANDING,
+    QUERY_EDGE as MISSILE_QUERY_EDGE, REACH_MARGIN as MISSILE_REACH_MARGIN,
+    VOLLEY_EPSILON as MISSILE_VOLLEY_EPSILON, VOLLEY_HALF as MISSILE_VOLLEY_HALF,
+    VOLLEY_REACH_MARGIN as MISSILE_VOLLEY_REACH_MARGIN, VOLLEY_SCALE as MISSILE_VOLLEY_SCALE,
+};
+use crate::movement::Acceleration;
 
 /// The missile action's type, which word 9 adds when it is the top action.
 pub const MISSILE: ActionType = ActionType::named(8);
 
 /// A target's height counts a third of its master's height radius (`FUN_140a9c600`,
 /// `DAT_142eb1c98`).
-const HEIGHT_SHARE: f32 = crate::math::image::missile::HEIGHT_SHARE;
+const HEIGHT_SHARE: f32 = MISSILE_HEIGHT_SHARE;
 /// The hit chance's draw scale (`DAT_142eb69cc`) and a missed missile's half spread
 /// (`DAT_142e7f384`).
-const DRAW_SCALE: f32 = crate::math::image::missile::DRAW_SCALE;
-const HALF: f32 = crate::math::image::missile::HALF;
+const DRAW_SCALE: f32 = MISSILE_DRAW_SCALE;
+const HALF: f32 = MISSILE_HALF;
 /// A missile past its reach ends this far beyond its point (`DAT_142eb5be8`).
-const BEYOND: Distance = Distance::new(crate::math::image::missile::BEYOND);
+const BEYOND: Distance = Distance::new(MISSILE_BEYOND);
 /// A missile within this of its point may touch the ground (`DAT_142eb5690`, `+0x994`).
-pub const LANDING: f32 = crate::math::image::missile::LANDING;
+pub const LANDING: f32 = MISSILE_LANDING;
 /// The hit query holds its ends this far inside the map's far edges (`FUN_1411570c0`,
 /// `DAT_142eb5690`).
-pub const QUERY_EDGE: f32 = crate::math::image::missile::QUERY_EDGE;
+pub const QUERY_EDGE: f32 = MISSILE_QUERY_EDGE;
 /// The reach adds this to the shooter's radius and range (`FUN_141081020`, `DAT_142e8c150`).
-const REACH_MARGIN: f32 = crate::math::image::missile::REACH_MARGIN;
+const REACH_MARGIN: f32 = MISSILE_REACH_MARGIN;
 /// A volley's count takes the firepower past this hair (`FUN_141203140`).
-const VOLLEY_EPSILON: f32 = crate::math::image::missile::VOLLEY_EPSILON;
+const VOLLEY_EPSILON: f32 = MISSILE_VOLLEY_EPSILON;
 /// A volley's scatter: the draw's scale and the half spread (`FUN_14120c0a0`).
-const VOLLEY_SCALE: f32 = crate::math::image::missile::VOLLEY_SCALE;
-const VOLLEY_HALF: f32 = crate::math::image::missile::VOLLEY_HALF;
+const VOLLEY_SCALE: f32 = MISSILE_VOLLEY_SCALE;
+const VOLLEY_HALF: f32 = MISSILE_VOLLEY_HALF;
 /// What a volley's extra missile's reach adds to the range (`FUN_141226690`).
-const VOLLEY_REACH_MARGIN: f32 = crate::math::image::missile::VOLLEY_REACH_MARGIN;
+const VOLLEY_REACH_MARGIN: f32 = MISSILE_VOLLEY_REACH_MARGIN;
 
 /// What a missile's master holds for the flight: the `.dat`'s `projectile_type` (`+0x880`, not
 /// saved), `smart_mode` (`+0x881`, the save's `targetting_type`), `hit_mode` (`+0x882`,
@@ -164,7 +173,7 @@ pub struct MissileAction {
     /// `+0x74`, `+0x78`: the arc's vertical speed and acceleration.
     pub ballistic_velocity: Speed,
     /// `+0x78`: the arc's vertical acceleration.
-    pub ballistic_acceleration: crate::movement::Acceleration,
+    pub ballistic_acceleration: Acceleration,
     /// `+0x7c`: the way left to the aimed point.
     pub distance: Distance,
     /// `+0x80`: the master's hit mode, 1 after a miss.
@@ -218,10 +227,7 @@ pub fn reach(radius: Footprint, range: Distance) -> Distance {
 /// `FUN_141203140` (no charge): a volley's missiles, the object's firepower (`+0xa00`, in whole
 /// missiles past a hair) up to its master's `max_attacks_in_volley`.
 #[must_use]
-pub fn volley_count(
-    firepower: crate::combat::Firepower,
-    max_volley: crate::combat::MissileCount,
-) -> i32 {
+pub fn volley_count(firepower: Firepower, max_volley: MissileCount) -> i32 {
     let n = (firepower.get() + VOLLEY_EPSILON) as i64 as i32;
     n.min(max_volley.counted())
 }
@@ -312,7 +318,7 @@ pub struct AimAt<'a> {
     /// The missile's master's id.
     pub master_id: MasterId,
     /// The missile's attack count (`+0x900`).
-    pub attack_count: crate::combat::AttackCount,
+    pub attack_count: AttackCount,
     /// The hit mode, which a miss sets to 1.
     pub hit_mode: &'a mut HitMode,
 }
@@ -358,10 +364,7 @@ pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, Gen
         // the missile's attack count (`+0x900`, its firer's when fired): master 528 strays by its
         // share, 527 and the others by all of it
         // DIVSS hands on a NaN distance quieted, which it is already: its bits stay on any host
-        if crate::combat::AttackCount::ZERO < attack_count
-            && master_id == MASTER_528
-            && !gap.is_nan()
-        {
+        if AttackCount::ZERO < attack_count && master_id == MASTER_528 && !gap.is_nan() {
             gap /= attack_count.as_f32();
         }
         let gap = gap + 0.0;
@@ -438,7 +441,7 @@ impl MissileAction {
             let a = (rise + rise) / (t * t);
             (a, -a * t)
         };
-        self.ballistic_acceleration = crate::movement::Acceleration::new(acceleration);
+        self.ballistic_acceleration = Acceleration::new(acceleration);
         self.ballistic_velocity = Speed::new(velocity);
         self.state = MissileState::Flying;
         Ok(angle)
@@ -532,6 +535,8 @@ mod tests {
     use crate::objects::masters::ids;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use std::iter::once;
 
     /// MarvinBlue/426048731's spear -28 (master 509: speed 7, arc −0.06), fired at the deer 9655
     /// in the update that made the save after 3137: 2.80657 to go when `set_state(3)` ran, and its
@@ -553,7 +558,7 @@ mod tests {
             timer: Distance::ZERO,
             direction: Offset::ZERO,
             ballistic_velocity: Speed::ZERO,
-            ballistic_acceleration: crate::movement::Acceleration::ZERO,
+            ballistic_acceleration: Acceleration::ZERO,
             distance: Distance::ZERO,
             hit_mode: HitMode::TARGET_ALONE,
             result: StrikeResult::NONE,
@@ -606,7 +611,7 @@ mod tests {
                     target,
                     aimer,
                     master_id: master,
-                    attack_count: crate::combat::AttackCount::of_data(count),
+                    attack_count: AttackCount::of_data(count),
                     hit_mode: mode,
                 },
                 &mut || d.next().unwrap(),
@@ -650,7 +655,7 @@ mod tests {
             class: class::CLASS_54,
             ..aimer
         };
-        let mut d = std::iter::once(26213u32);
+        let mut d = once(26213u32);
         let narrow = Some((Radii::new(0.5, 0.5, 0.0), class::BUILDING));
         assert_eq!(
             aim(
@@ -660,7 +665,7 @@ mod tests {
                     target: narrow,
                     aimer: siege,
                     master_id: master_id(4),
-                    attack_count: crate::combat::AttackCount::of_data(0),
+                    attack_count: AttackCount::of_data(0),
                     hit_mode: &mut mode
                 },
                 &mut || d.next().unwrap()

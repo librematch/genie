@@ -6,9 +6,11 @@ use crate::GenieError;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::world::parts::{PartTable, Parts};
+use std::mem::take;
+use std::sync::LazyLock;
 
 /// The action layer of an object the table does not hold: an empty one (a tree's).
-static NO_ACTIONS: std::sync::LazyLock<Action> = std::sync::LazyLock::new(Action::default);
+static NO_ACTIONS: LazyLock<Action> = LazyLock::new(Action::default);
 
 impl PartTable<Action> {
     /// Object `id`'s action layer: an empty one ([`Action::default`]) where the table holds
@@ -51,10 +53,7 @@ impl Parts {
     /// Object `id`'s action layer out of the table for its update, as its row is out of its
     /// list: its slot holds an empty one meanwhile ([`Parts::put_actions`] puts it back).
     pub(crate) fn take_actions(&mut self, id: ObjectId) -> Action {
-        self.actions
-            .get_mut(id)
-            .map(std::mem::take)
-            .unwrap_or_default()
+        self.actions.get_mut(id).map(take).unwrap_or_default()
     }
 
     /// Object `id`'s action layer `layer` in the table: filed where it differs from an empty
@@ -71,12 +70,14 @@ impl Parts {
 #[cfg(test)]
 mod tests {
     use crate::objects::layers::Action;
+    #[cfg(test)]
+    use crate::objects::layers::DefaultTask;
     use crate::test_ids::object_id;
     use crate::world::parts::Parts;
 
     fn flying() -> Action {
         Action {
-            default_task: crate::objects::layers::DefaultTask::Fly,
+            default_task: DefaultTask::Fly,
             ..Action::default()
         }
     }
@@ -85,11 +86,10 @@ mod tests {
     fn an_object_the_table_does_not_hold_reads_an_empty_layer() {
         let mut parts = Parts::default();
         assert_eq!(parts.actions_of(object_id(1)), &Action::default());
-        parts.actions_mut(object_id(1)).unwrap().default_task =
-            crate::objects::layers::DefaultTask::Make;
+        parts.actions_mut(object_id(1)).unwrap().default_task = DefaultTask::Make;
         assert_eq!(
             parts.actions_of(object_id(1)).default_task,
-            crate::objects::layers::DefaultTask::Make
+            DefaultTask::Make
         );
     }
 

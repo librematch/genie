@@ -3,6 +3,7 @@
 //! object (`FUN_140aa0df0`), to a point (`FUN_140aa0d30`) and to none.
 
 use crate::GenieError;
+use crate::combat::abilities::Look;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -12,11 +13,13 @@ use crate::movement::footprint_gap;
 use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveWait, NO_TARGET_GAP, SpriteReads, TargetMoved,
 };
+use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::masters::Master;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -96,10 +99,7 @@ impl<'g> MoveToReads<'g> {
     pub fn of(
         (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
-        (graphics, look): (
-            &'g crate::objects::Graphics,
-            Option<&crate::combat::abilities::Look>,
-        ),
+        (graphics, look): (&'g Graphics, Option<&Look>),
     ) -> Self {
         Self {
             sprites: SpriteReads::of(master, look, graphics),
@@ -253,12 +253,9 @@ impl Unit {
     pub(crate) fn move_to_reads<'g>(
         &self,
         mover: Option<&Mover>,
-        every: crate::objects::masters::MasterTables<'_>,
+        every: MasterTables<'_>,
         player: PlayerId,
-        graphics: (
-            &'g crate::objects::Graphics,
-            Option<&crate::combat::abilities::Look>,
-        ),
+        graphics: (&'g Graphics, Option<&Look>),
     ) -> Result<MoveToReads<'g>, GenieError> {
         Ok(MoveToReads::of(
             (self, mover),
@@ -271,6 +268,8 @@ impl Unit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::construction::build::tests::graphics;
     use crate::movement::move_to::MoveDefaults;
     use crate::test_ids::object_id;
 
@@ -282,7 +281,7 @@ mod tests {
     /// is an error.
     #[test]
     fn sub_move_to_takes_its_sprite_target_and_start() {
-        let graphics = crate::construction::build::tests::graphics();
+        let graphics = graphics();
         let move_reads = MoveToReads {
             sprites: SpriteReads {
                 defaults: MoveDefaults {

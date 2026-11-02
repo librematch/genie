@@ -2,6 +2,8 @@
 //! (x, height, y, [`crate::math::fmath::BVector`]).
 
 use crate::map::Point;
+use crate::map::Tile;
+use crate::math::fmath::BVector;
 
 /// A place on the map: x and y in tiles, z its height. An object holds its place so (`+0x3c8`,
 /// `+0x4c8`, `+0x5a8`), and so do the places the systems pass on; the game's vector routines
@@ -54,7 +56,7 @@ impl Position {
 
     /// The tile its x and y lie in, each cut by `CVTTSS2SI` ([`Point::tile`]).
     #[must_use]
-    pub fn tile(self) -> crate::map::Tile {
+    pub fn tile(self) -> Tile {
         self.ground().tile()
     }
 
@@ -78,9 +80,9 @@ impl Position {
 
     /// The game's vector of this place: x, height, y.
     #[must_use]
-    pub const fn vector(self) -> crate::math::fmath::BVector {
+    pub const fn vector(self) -> BVector {
         let [x, y, z] = self.0;
-        crate::math::fmath::BVector::new(x, z, y)
+        BVector::new(x, z, y)
     }
 }
 
@@ -100,15 +102,14 @@ impl genie_diff::Diff for Position {
 #[cfg(test)]
 mod tests {
     use crate::map::Position;
+    #[cfg(test)]
+    use crate::map::Tile;
     use crate::math::fmath::BVector;
 
     /// A place's tile is its ground point's: x and y cut toward zero, the height left out.
     #[test]
     fn place_tile_is_its_ground_point_s() {
-        assert_eq!(
-            Position::new(3.9, -0.5, 7.0).tile(),
-            crate::map::Tile::new(3, 0)
-        );
+        assert_eq!(Position::new(3.9, -0.5, 7.0).tile(), Tile::new(3, 0));
     }
 
     /// A place's x, y and z keep their bits, and its vector swaps y and the height.

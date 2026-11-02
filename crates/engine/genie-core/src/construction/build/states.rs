@@ -22,8 +22,15 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{ActionKind, OrderKind};
 
+use crate::construction::{BuilderCount, FoundationId};
+use crate::movement::Mover;
+use crate::objects::layers::Action;
+use crate::objects::masters::OwnerMasters;
+use crate::orders::Work;
+use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use std::mem::replace;
 
 impl BuildAction {
     /// The foundation as the update reads it ([`BuildReads::site`]): the builder's player's
@@ -45,7 +52,7 @@ impl BuildAction {
     /// An object of a master its owner lacks.
     pub(super) fn count(
         c: &mut Step<'_>,
-        site: Option<crate::construction::FoundationId>,
+        site: Option<FoundationId>,
         by: i8,
     ) -> Result<(), GenieError> {
         if let Some(id) = c.w.counted_building(site)?
@@ -65,14 +72,12 @@ impl BuildAction {
     /// An object of a master its owner lacks.
     pub(super) fn builders(
         c: &Step<'_>,
-        site: Option<crate::construction::FoundationId>,
-    ) -> Result<crate::construction::BuilderCount, GenieError> {
+        site: Option<FoundationId>,
+    ) -> Result<BuilderCount, GenieError> {
         Ok(c.w
             .counted_building(site)?
             .and_then(|id| c.w.object(id))
-            .map_or(crate::construction::BuilderCount::NONE, |(_, u)| {
-                c.w.parts.repairers_of(u.id)
-            }))
+            .map_or(BuilderCount::NONE, |(_, u)| c.w.parts.repairers_of(u.id)))
     }
 
     /// A counted builder leaves the builders of its foundation ([`BuildAction::count`]) and
@@ -170,7 +175,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
         if c.w.players.player(c.player)?.kind.is_computer() {
@@ -229,7 +234,7 @@ impl BuildAction {
     /// [`World::order_work`]: crate::world::World::order_work
     fn works_it(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         builder: &mut Unit,
     ) -> Result<(), GenieError> {
@@ -240,8 +245,8 @@ impl BuildAction {
                     "a builder's building without a place",
                 ))?
                 .position;
-        let work = crate::orders::Work {
-            target: self.target.map(crate::construction::FoundationId::id),
+        let work = Work {
+            target: self.target.map(FoundationId::id),
             point,
             carry_test: false,
             filter: None,
@@ -265,7 +270,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         // the caller read the foundation, so the player holds it
@@ -278,7 +283,7 @@ impl BuildAction {
             return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
         }
         self.no_more_work()?;
-        crate::world::lets::release(c, builder, target, reads.by)?;
+        release(c, builder, target, reads.by)?;
         builder.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
@@ -296,10 +301,7 @@ impl BuildAction {
     pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
         builder.show_standing(
             c.w.parts.motion.layer_mut(builder.id),
-            crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
             &c.w.graphics,
             c.w.streams.get(Stream::Sprite),
         )
@@ -382,8 +384,8 @@ impl BuildAction {
         &mut self,
         at: Position,
         walk: Option<MoveToAction>,
-        mover: Option<&mut crate::movement::Mover>,
-        builders: Option<&mut crate::construction::BuilderCount>,
+        mover: Option<&mut Mover>,
+        builders: Option<&mut BuilderCount>,
         player_type: PlayerType,
     ) -> Result<(), GenieError> {
         if self.state == BuildState::Work
@@ -419,10 +421,10 @@ impl BuildAction {
     /// The unit's stop that the motion step does not model.
     pub fn retarget(
         &mut self,
-        target: crate::construction::FoundationId,
+        target: FoundationId,
         at: Position,
         walk: Option<MoveToAction>,
-        mover: Option<&mut crate::movement::Mover>,
+        mover: Option<&mut Mover>,
     ) -> Result<(), GenieError> {
         if self.state.move_to().is_some()
             && let Some(m) = mover
@@ -447,16 +449,9 @@ impl BuildAction {
     /// The unit's stop that the motion step does not model.
     pub(crate) fn halt(
         &mut self,
-        mover: Option<&mut crate::movement::Mover>,
-    ) -> Result<
-        (
-            bool,
-            Option<crate::construction::FoundationId>,
-            Option<DropSiteId>,
-        ),
-        GenieError,
-    > {
-        let counted = std::mem::replace(&mut self.added, false);
+        mover: Option<&mut Mover>,
+    ) -> Result<(bool, Option<FoundationId>, Option<DropSiteId>), GenieError> {
+        let counted = replace(&mut self.added, false);
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
@@ -485,8 +480,8 @@ impl BuildAction {
             Self::count(c, target, -1)?;
         }
         Self::stand(c, builder)?;
-        crate::world::lets::release(c, builder, target, reads.by)?;
-        crate::world::lets::release(c, builder, second, reads.by)?;
+        release(c, builder, target, reads.by)?;
+        release(c, builder, second, reads.by)?;
         Ok(())
     }
 

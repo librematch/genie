@@ -5,7 +5,10 @@
 //! the variants in order and allocate an error for every mismatch.
 
 use crate::de::{Error, GenieError};
+use crate::de::{truncated, unknown_op};
 use binrw::binrw;
+use binrw::io::Cursor;
+use std::mem::replace;
 
 /// Op 5 as the first record of a recording.
 #[binrw]
@@ -141,7 +144,7 @@ impl<'a> OpReader<'a> {
     /// The next `n` bytes, or `Truncated` at the start of the current record.
     fn take(&mut self, n: usize, record: usize) -> Result<&'a [u8], Error> {
         if self.remaining() < n {
-            return Err(crate::de::truncated(self.base + record));
+            return Err(truncated(self.base + record));
         }
         let bytes = &self.data[self.pos..self.pos + n];
         self.pos += n;
@@ -159,13 +162,12 @@ impl<'a> OpReader<'a> {
         T: for<'b> binrw::BinRead<Args<'b> = ()>,
     {
         let bytes = self.take(size, record)?;
-        T::read_le(&mut binrw::io::Cursor::new(bytes))
-            .map_err(|_| crate::de::truncated(self.base + record))
+        T::read_le(&mut Cursor::new(bytes)).map_err(|_| truncated(self.base + record))
     }
 
     fn read_op(&mut self) -> Result<Op<'a>, Error> {
         let record = self.pos;
-        let first = std::mem::replace(&mut self.pregame_allowed, false);
+        let first = replace(&mut self.pregame_allowed, false);
         match self.u32(record)? {
             1 => {
                 let len = self.u32(record)? as usize;
@@ -199,7 +201,7 @@ impl<'a> OpReader<'a> {
                 self.done = true;
                 Ok(Op::End { trailer })
             }
-            op => Err(crate::de::unknown_op(op, self.base + record)),
+            op => Err(unknown_op(op, self.base + record)),
         }
     }
 }
@@ -275,7 +277,7 @@ fn write_fixed<T>(value: &T, out: &mut Vec<u8>) -> Result<(), Error>
 where
     T: for<'b> binrw::BinWrite<Args<'b> = ()>,
 {
-    let mut cursor = binrw::io::Cursor::new(out);
+    let mut cursor = Cursor::new(out);
     cursor.set_position(cursor.get_ref().len() as u64);
     value
         .write_le(&mut cursor)
@@ -417,10 +419,7 @@ mod tests {
         let mut body = le(&[2, 20, 1, 10]);
         body.extend([1, 2, 3]);
         let ops = read(&body, false);
-        assert_eq!(
-            ops,
-            vec![Ok(Op::Sync { dt: 20 }), Err(crate::de::truncated(BASE + 8))]
-        );
+        assert_eq!(ops, vec![Ok(Op::Sync { dt: 20 }), Err(truncated(BASE + 8))]);
         let e = ops[1].clone().unwrap_err();
         assert_eq!(
             e.context().collect::<Vec<_>>(),
@@ -432,7 +431,7 @@ mod tests {
     fn an_unknown_op_is_an_error() {
         let body = le(&[9]);
         let ops = read(&body, false);
-        assert_eq!(ops, vec![Err(crate::de::unknown_op(9, BASE))]);
+        assert_eq!(ops, vec![Err(unknown_op(9, BASE))]);
         let e = ops[0].clone().unwrap_err();
         assert_eq!(
             e.context().collect::<Vec<_>>(),

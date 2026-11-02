@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// A Fly's state (`+0x18`, set by `set_state`, `0x140a84a50`) with the data only that state holds
 /// (FD-045-D62): every `set_state` but 4's drops the `MoveTo`, which state 3 makes for the flight
@@ -88,15 +89,19 @@ impl FlyState {
     }
 }
 
-impl std::fmt::Display for FlyState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for FlyState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(test)]
+    use crate::map::Distance;
     use crate::movement::fly::FlyState;
+    #[cfg(test)]
+    use crate::movement::move_to::{MoveTo, MoveToAction};
     use crate::objects::Voice;
 
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
@@ -110,17 +115,12 @@ mod tests {
             }
         }
         assert_eq!(FlyState::Flying { move_to: None }.to_string(), "4");
-        let mut flight = crate::movement::move_to::MoveToAction::sub_in(
-            crate::movement::move_to::MoveTo::Moving,
-        );
+        let mut flight = MoveToAction::sub_in(MoveTo::Moving);
         flight.voice = Voice::Loud;
         let mut flying = FlyState::of_byte(4, Some(flight)).unwrap();
         assert_eq!(flying.move_to(), Some(&flight));
-        flying.move_to_mut().unwrap().range = crate::map::Distance::new(2.0);
-        assert_eq!(
-            flying.move_to().map(|m| m.range),
-            Some(crate::map::Distance::new(2.0))
-        );
+        flying.move_to_mut().unwrap().range = Distance::new(2.0);
+        assert_eq!(flying.move_to().map(|m| m.range), Some(Distance::new(2.0)));
         assert!(FlyState::of_byte(2, Some(flight)).is_err());
         assert_eq!(FlyState::Resting.move_to(), None);
     }

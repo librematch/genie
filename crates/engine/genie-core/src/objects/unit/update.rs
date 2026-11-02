@@ -1,20 +1,28 @@
 //! A unit's update on its owner's turn, action by action.
 
 use crate::GenieError;
+use crate::combat::attack::run_down_attack_timers;
 use crate::math::rng::Stream;
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::actions::Action;
+use crate::objects::facing::SpriteFacets;
+use crate::objects::layers::{Action as LayersAction, Building};
 use crate::objects::lifecycle::Class;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit, loses_actions};
+use crate::ownership::capture::Captured;
 use crate::unit_ai::task_finder::world::wait_progress;
+use crate::world::lets::torn_down;
 use crate::world::others::OthersRef;
+use crate::world::parts::PartTable;
 use crate::world::step::Step;
+use crate::world::{IN_THE_WAY, Unread};
+use std::mem::take;
 
 /// An action below the head after the head's update: its idle update (`FUN_140a78470`: a target
 /// or second target past state 6 let go, its sub-actions' idle update) is not ported, and no list
@@ -24,7 +32,7 @@ const BELOW_HEAD: &str = "an action below the head of the list (its idle update,
 impl Unit {
     pub(crate) fn update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
     ) -> Result<Outcome, GenieError> {
         let Some(leaves) = self.update_to_actions(actions, c)? else {
@@ -41,7 +49,7 @@ impl Unit {
     /// animation and the actions past the unit's life.
     pub(crate) fn update_to_actions(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
     ) -> Result<Option<Outcome>, GenieError> {
         self.death_blast(actions, c)?;
@@ -58,7 +66,7 @@ impl Unit {
         self.building_seconds(c)?;
         // a new object's combat layer (none in the table) has no timer to run down
         if let Some(combat) = c.w.parts.combat.get_mut(self.id) {
-            crate::combat::attack::run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
+            run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
         }
         self.motion_step(actions, c)?;
         let leaves = self.life_step(actions, c)?;
@@ -74,9 +82,9 @@ impl Unit {
     /// follows the actions; the Artifact's capture, which the unit AI's part reads.
     pub(crate) fn update_actions(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
-    ) -> Result<Option<crate::ownership::capture::Captured>, GenieError> {
+    ) -> Result<Option<Captured>, GenieError> {
         let started = self.start_default_task(actions, c)?;
         let captured = if started {
             None
@@ -95,9 +103,9 @@ impl Unit {
     /// one.
     fn update_head(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
-    ) -> Result<Option<crate::ownership::capture::Captured>, GenieError> {
+    ) -> Result<Option<Captured>, GenieError> {
         let me = self.me(actions);
         let mut captured = None;
         let code = self.head_part(actions, c, me, &mut captured)?;
@@ -109,10 +117,10 @@ impl Unit {
     /// `captured`.
     fn head_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
-        captured: &mut Option<crate::ownership::capture::Captured>,
+        captured: &mut Option<Captured>,
     ) -> Result<HeadCode, GenieError> {
         match actions.list.head() {
             None => Ok(HeadCode::Keeps),
@@ -151,7 +159,7 @@ impl Unit {
     /// An action below the head, and the deletion's.
     pub(crate) fn end_head_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         code: HeadCode,
     ) -> Result<(), GenieError> {
@@ -169,7 +177,7 @@ impl Unit {
     /// read and change.
     fn hunter_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -204,7 +212,7 @@ impl Unit {
     /// takes them.
     pub(crate) const fn take_sprite_facets(&self, mover: Option<&mut Mover>) {
         if let (Some(m), Some(s)) = (mover, self.sprite) {
-            m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
+            m.sprite_facets = Some(SpriteFacets {
                 count: s.graphic.facets,
                 turns: s.graphic.flags.contains(SpriteFlags::TURNS),
             });
@@ -240,14 +248,14 @@ impl Unit {
     /// an action the slice does not model fails here.
     pub(crate) fn actions_past_life(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut LayersAction,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         if let Some(e) =
             c.w.parts
                 .unread
                 .get(self.id)
-                .map(crate::world::Unread::error)
+                .map(Unread::error)
                 .filter(|_| self.life.state == ObjectState::Alive)
         {
             return Err(e);
@@ -262,7 +270,7 @@ impl Unit {
                 &mut leaves,
                 by,
             )?;
-            crate::world::lets::torn_down(c, self, (leaves, releases))?;
+            torn_down(c, self, (leaves, releases))?;
         }
         Ok(())
     }
@@ -271,11 +279,7 @@ impl Unit {
     /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
     /// whose walk met others in its way is not modelled.
     pub(crate) fn after_actions(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let Some(pauses) =
-            c.w.parts
-                .mover_mut(self.id)
-                .map(|m| std::mem::take(&mut m.pauses))
-        else {
+        let Some(pauses) = c.w.parts.mover_mut(self.id).map(|m| take(&mut m.pauses)) else {
             return Ok(());
         };
         for (id, pause) in pauses {
@@ -292,7 +296,7 @@ impl Unit {
             .mover_of(self.id)
             .is_some_and(|m| !m.in_the_way.is_empty())
         {
-            return Err(crate::world::IN_THE_WAY);
+            return Err(IN_THE_WAY);
         }
         Ok(())
     }
@@ -311,13 +315,13 @@ impl Unit {
     }
 }
 
-impl crate::objects::layers::Action {
+impl LayersAction {
     /// The wait for a foundation in its update (`FUN_140ae8b70`) on its build points, none when
     /// the world does not hold it; its 1 deletes it (its destructor lets no target go).
     fn wait_solidify_part(
         &self,
         others: OthersRef<'_>,
-        buildings: &crate::world::parts::PartTable<crate::objects::layers::Building>,
+        buildings: &PartTable<Building>,
     ) -> HeadCode {
         let ended = self
             .list

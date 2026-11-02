@@ -1,5 +1,7 @@
 //! A point in the pathing's fixed point ([`FixedPoint`]).
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A point in fixed point, x and y in units of 2^-22 tile ([`crate::pathing::mesh::ONE`] is a
 /// tile): the obstruction mesh's corners and contacts and the short pather's points.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -49,8 +51,8 @@ impl FixedPoint {
     }
 }
 
-impl std::fmt::Display for FixedPoint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for FixedPoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "({}, {})", self.0[0], self.0[1])
     }
 }

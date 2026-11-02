@@ -3,6 +3,7 @@ use crate::header::{
     skip_sent_commanded_units, skip_world_clock,
 };
 use crate::test_support::{Bytes, read_all, skipped_length};
+use crate::test_support::{consumed, header_reader};
 
 /// A particle: its start, facet and update, the sprite, the location and the flags.
 fn particle() -> Bytes {
@@ -67,9 +68,9 @@ fn lobby_player_name_follows_its_length() {
     for _ in 0..8 {
         bytes = bytes.words(&[0, 0, 0]);
     }
-    let mut reader = crate::test_support::header_reader(&bytes.0, 11.32);
+    let mut reader = header_reader(&bytes.0, 11.32);
     skip_lobby_players(&mut reader).unwrap();
-    assert!(crate::test_support::consumed(&mut reader));
+    assert!(consumed(&mut reader));
 }
 
 #[test]

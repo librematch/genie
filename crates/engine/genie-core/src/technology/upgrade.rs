@@ -8,27 +8,37 @@ mod damage;
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::construction::build::BuildTask;
+use crate::construction::repair::RepairTask;
+use crate::gathering::gather::unit::give_load;
+use crate::gathering::hunt::HuntTask;
 use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
 use crate::objects::masters::{Master, Task, master_type, player_master};
+use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
+use crate::technology::effect::{MasterSprites, follow_master};
 use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
+use crate::unit_ai::UnitAi;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
+use std::mem::take;
 
 /// A master's hit points this near 0 give no share (`ABS(x) <= 1.1920929e-07`).
 const NO_HIT_POINTS: f32 = f32::EPSILON;
@@ -140,11 +150,7 @@ impl World {
         if !keep {
             self.object_at_mut(place)?.life.master_id = new.id;
             if master_type::COMBAT <= kind {
-                crate::objects::lifecycle::death_parts::count_class(
-                    &mut self.players.player_mut(p)?.attributes,
-                    new,
-                    1.0,
-                );
+                count_class(&mut self.players.player_mut(p)?.attributes, new, 1.0);
             }
         }
         if class_changed {
@@ -209,11 +215,7 @@ impl World {
     fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> Result<(), GenieError> {
         let kind = old.kind;
         if master_type::COMBAT <= kind {
-            crate::objects::lifecycle::death_parts::count_class(
-                &mut self.players.player_mut(p)?.attributes,
-                old,
-                -1.0,
-            );
+            count_class(&mut self.players.player_mut(p)?.attributes, old, -1.0);
         }
         let u = self.object_at(place)?;
         if master_type::COMBAT <= kind
@@ -230,7 +232,7 @@ impl World {
             };
             let amount = u.life.amount;
             let mut adds = Vec::new();
-            crate::gathering::gather::unit::give_load(
+            give_load(
                 (&self.spatial.relations, self.players.player(p)?.sharing),
                 p,
                 &mut adds,
@@ -358,9 +360,9 @@ impl World {
         master: &Master,
         before: HpPercent,
     ) -> Result<HpPercent, GenieError> {
-        let graphics = std::mem::take(&mut self.graphics);
-        let mut object = std::mem::take(self.streams.get(Stream::Object));
-        let mut sprite = std::mem::take(self.streams.get(Stream::Sprite));
+        let graphics = take(&mut self.graphics);
+        let mut object = take(self.streams.get(Stream::Object));
+        let mut sprite = take(self.streams.get(Stream::Sprite));
         let u = self.players.at_mut(place)?;
         let motion = self.parts.motion_mut(u.id);
         let r = damage_sprites(
@@ -405,7 +407,7 @@ impl World {
             Place::Live(q, i) => self.players.live_mut(q, i)?,
             Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
-        crate::objects::sprite::new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
+        new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
         Ok(())
     }
 
@@ -415,11 +417,11 @@ impl World {
     fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> Result<(), GenieError> {
         let position = self.object_at(place)?.position();
         let made = self.new_object(p, new.id, new, position)?;
-        let ai = new.unit_ai_type(new.id).and_then(|t| {
-            crate::unit_ai::UnitAi::constructed(t, &made, self.streams.get(Stream::Ai))
-        });
+        let ai = new
+            .unit_ai_type(new.id)
+            .and_then(|t| UnitAi::constructed(t, &made, self.streams.get(Stream::Ai)));
         let id = self.object_at(place)?.id;
-        self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;
+        self.set_part(id, Part::UnitAi(ai.map(Box::new)))?;
         Ok(())
     }
 
@@ -448,7 +450,7 @@ impl World {
         let old_task = |id: TaskId| old.tasks.iter().find(|t| t.id == id).copied();
         let graphics = &self.graphics;
         let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
-        let sprites = crate::technology::effect::MasterSprites {
+        let sprites = MasterSprites {
             moving: g(new.move_sprite),
             attack: g(new.attack_sprite),
             standing: g(new.standing_sprite),
@@ -462,21 +464,21 @@ impl World {
             return Ok(());
         };
         if let Some(attack) = actions.list.attack_mut() {
-            crate::technology::effect::follow_master(&mut attack.arms, None, &sprites);
+            follow_master(&mut attack.arms, None, &sprites);
         }
         if let Some(hunt) = actions.list.hunt_mut()
             && let Some(t) = old_task(hunt.task.id).as_ref().and_then(find)
         {
-            hunt.task = crate::gathering::hunt::HuntTask::of(&t);
+            hunt.task = HuntTask::of(&t);
             let task = hunt.task.sprites;
             if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
-                crate::technology::effect::follow_master(&mut attack.arms, Some(task), &sprites);
+                follow_master(&mut attack.arms, Some(task), &sprites);
             }
         }
         if let Some(gather) = actions.list.gather_mut()
             && let Some(t) = old_task(gather.task.id).as_ref().and_then(find)
         {
-            gather.task = crate::gathering::hunt::HuntTask::of(&t);
+            gather.task = HuntTask::of(&t);
         }
         if let Some(make) = actions.list.make_mut()
             && let Some(t) = find(&make.task)
@@ -496,12 +498,12 @@ impl World {
         if let Some(r) = actions.list.repair_mut()
             && let Some(t) = old_task(r.task.id).as_ref().and_then(find)
         {
-            r.task = crate::construction::repair::RepairTask::of(&t);
+            r.task = RepairTask::of(&t);
         }
         if let Some(b) = actions.list.build_mut()
             && let Some(t) = old_task(b.task.id).as_ref().and_then(find)
         {
-            b.task = crate::construction::build::BuildTask::of(&t, b.task.work_rate);
+            b.task = BuildTask::of(&t, b.task.work_rate);
         }
         Ok(())
     }
@@ -534,13 +536,25 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::combat::Firepower;
+    #[cfg(test)]
+    use crate::construction::FoundationId;
+    #[cfg(test)]
+    use crate::construction::build::tests::started;
     use crate::construction::wait_solidify::WaitSolidifyState;
+    #[cfg(test)]
+    use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
     use crate::garrison::ContainerId;
     use crate::gathering::make::MakeState;
+    #[cfg(test)]
+    use crate::gathering::make::{MAKE, MakeAction};
     use crate::map::Distance;
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
+    #[cfg(test)]
+    use crate::map::spatial::{Placed, Spatial};
     use crate::math::rng::Well512;
     use crate::objects::ListIndex;
     use crate::objects::MasterHitPoints;
@@ -548,17 +562,27 @@ mod tests {
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::WorkRate;
+    #[cfg(test)]
+    use crate::objects::layers::Combat;
     use crate::objects::layers::MotionMut;
     use crate::objects::lifecycle::Held;
+    #[cfg(test)]
+    use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ChargeType;
     use crate::objects::masters::DamageSpriteMode;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskSprites;
+    #[cfg(test)]
+    use crate::objects::masters::WorkValue;
     use crate::objects::masters::action_type;
     use crate::objects::masters::{BuildingMaster, DamageGraphic, Masters};
     use crate::objects::masters::{MasterId, ids};
+    #[cfg(test)]
+    use crate::objects::sprite::ActiveSprite;
     use crate::objects::sprite::Graphic;
+    #[cfg(test)]
+    use crate::objects::{FacetCount, Frame, Graphics};
     use crate::ownership::CaptureKind;
     use crate::players::PlayerType;
     use crate::players::attribute;
@@ -573,16 +597,22 @@ mod tests {
     use crate::test_ids::opt_master;
     use crate::vision::TileCount;
     use crate::vision::VisionBits;
+    #[cfg(test)]
+    use crate::vision::visibility::{Seer, Visibility, VisibleMap};
     use crate::world::Millis;
     use crate::world::Seconds;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::tests::forage_world;
+    #[cfg(test)]
+    use crate::world::{FrameSeed, Player};
 
     /// An animated graphic of `frames` frames with a random first frame (flags 5).
     const fn graphic(id: i16) -> Graphic {
         Graphic {
             id: SpriteId::named(id),
-            frames: crate::objects::Frame::of_data(10),
-            facets: crate::objects::FacetCount::of_data(1),
+            frames: Frame::of_data(10),
+            facets: FacetCount::of_data(1),
             speed_multiplier: SpeedMultiplier::ONE,
             frame_duration: Seconds::new(0.1),
             replay_delay: Seconds::ZERO,
@@ -620,11 +650,11 @@ mod tests {
     fn object(id: i32, master: MasterId, state: ObjectState, hp: HitPoints) -> Unit {
         Unit {
             id: object_id(id),
-            life: crate::objects::lifecycle::Lifecycle {
+            life: Lifecycle {
                 master_id: master,
                 state,
                 hp,
-                ..crate::objects::lifecycle::Lifecycle::default()
+                ..Lifecycle::default()
             },
             ..Unit::default()
         }
@@ -637,7 +667,7 @@ mod tests {
     /// does nothing to the simulation for mode 0.
     #[test]
     fn the_damage_sprites_follow_the_share_of_the_hit_points() {
-        let graphics: crate::objects::Graphics = [70, 1070, 2095, 2120, 2145]
+        let graphics: Graphics = [70, 1070, 2095, 2120, 2145]
             .map(|id| (SpriteId::named(id), graphic(id)))
             .into_iter()
             .collect();
@@ -730,10 +760,7 @@ mod tests {
         // mode 2: the entry's sprite, then the standing one when it goes
         let shown = building(70, 100, SPRITE_SHOWN, -1);
         let mut u = Unit {
-            sprite: Some(crate::objects::sprite::ActiveSprite::start(
-                graphic(1070),
-                &mut sprite,
-            )),
+            sprite: Some(ActiveSprite::start(graphic(1070), &mut sprite)),
             ..object_of(HitPoints::new(40.0))
         };
         assert_eq!(
@@ -826,22 +853,19 @@ mod tests {
         };
         let mut house = object(10, ids::HOUSE, ObjectState::Alive, HitPoints::new(275.0));
         let mut sprites = Well512::default();
-        house.sprite = Some(crate::objects::sprite::ActiveSprite::start(
-            graphic(1070),
-            &mut sprites,
-        ));
-        let player = crate::world::Player {
+        house.sprite = Some(ActiveSprite::start(graphic(1070), &mut sprites));
+        let player = Player {
             objects: vec![
                 house,
                 object(11, ids::HOUSE, ObjectState::DyingSprite, HitPoints::ZERO),
                 object(12, master_id(1403), ObjectState::Alive, HitPoints::new(1.0)),
             ]
             .into(),
-            ..crate::world::Player::default()
+            ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -909,7 +933,7 @@ mod tests {
             kind: master_type::COMBAT,
             class: class::VILLAGER,
             hit_points: MasterHitPoints::of_data(25),
-            volley_fire: crate::combat::Firepower::new(1.0),
+            volley_fire: Firepower::new(1.0),
             ..Master::default()
         };
         let new = Master {
@@ -917,7 +941,7 @@ mod tests {
             kind: master_type::COMBAT,
             class: class::CLASS_6,
             hit_points: MasterHitPoints::of_data(50),
-            volley_fire: crate::combat::Firepower::new(3.0),
+            volley_fire: Firepower::new(3.0),
             ..Master::default()
         };
         let mut v = object(
@@ -928,22 +952,22 @@ mod tests {
         );
         (v.life.attribute_type, v.life.amount) =
             (Some(AttributeId::numbered(17)), Amount::new(10.0));
-        let player = crate::world::Player {
+        let player = Player {
             objects: vec![v].into(),
             attributes: vec![Amount::ZERO; 300],
-            ..crate::world::Player::default()
+            ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
         )
         .with_combats([(
             object_id(10),
-            crate::objects::layers::Combat {
-                firepower: crate::combat::Firepower::new(1.0),
+            Combat {
+                firepower: Firepower::new(1.0),
                 ..Default::default()
             },
         )]);
@@ -964,11 +988,7 @@ mod tests {
                 v.life.hp,
                 t.parts.combat_of(v.id).firepower
             ),
-            (
-                master_id(6),
-                HitPoints::new(50.0),
-                crate::combat::Firepower::new(3.0)
-            )
+            (master_id(6), HitPoints::new(50.0), Firepower::new(3.0))
         );
         assert_eq!(v.life.held(), carrying(None, 0.0));
         let a = &t.players[0].attributes;
@@ -994,11 +1014,11 @@ mod tests {
             action_type,
             object_group,
             work_range,
-            work_val1: crate::objects::masters::WorkValue::new((work_range * 2.0).get()),
+            work_val1: WorkValue::new((work_range * 2.0).get()),
             attribute_type: Some(AttributeId::numbered(17)),
             ..Task::default()
         };
-        let mut t = crate::world::tests::forage_world();
+        let mut t = forage_world();
         t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
             .unwrap();
         let mut old = t.masters[1].get(master_id(120)).unwrap().clone();
@@ -1008,15 +1028,10 @@ mod tests {
             Some(class_id(3)),
             Distance::new(0.25),
         ));
-        let make = task(
-            TaskId::test(4),
-            crate::gathering::make::MAKE,
-            None,
-            Distance::ZERO,
-        );
+        let make = task(TaskId::test(4), MAKE, None, Distance::ZERO);
         let waiting = task(
             TaskId::test(9),
-            crate::construction::wait_solidify::WAIT_SOLIDIFY,
+            WAIT_SOLIDIFY,
             Some(class_id(3)),
             Distance::ZERO,
         );
@@ -1044,49 +1059,50 @@ mod tests {
                         Distance::new(1.5),
                     )
                 },
-                task(
-                    TaskId::test(8),
-                    crate::gathering::make::MAKE,
-                    None,
-                    Distance::new(2.0),
-                ),
+                task(TaskId::test(8), MAKE, None, Distance::new(2.0)),
             ],
             ..old.clone()
         };
         let u = &mut t.players[1].objects[ListIndex::new(0)];
         let build = BuildTask {
             range: Distance::new(0.25),
-            work_value: crate::objects::masters::WorkValue::new(0.5),
+            work_value: WorkValue::new(0.5),
             work_rate: WorkRate::new(1.0),
             resource: Some(AttributeId::numbered(17)),
             id: TaskId::test(3),
             moving: None,
         };
-        t.parts.actions.of_mut(u.id).unwrap().list.set_build(Some(
-            crate::construction::build::tests::started(
-                object_id(10028),
-                Position::new(30.0, 88.0, 0.0),
-                Distance::new(1.0),
-                build,
-            ),
-        ));
-        t.parts.actions.of_mut(u.id).unwrap().list.set_make(Some(
-            crate::gathering::make::MakeAction {
-                state: MakeState::New,
-                remaining: Amount::ZERO,
-                total: Amount::ZERO,
-                task: make,
-            },
-        ));
         t.parts
             .actions
             .of_mut(u.id)
             .unwrap()
             .list
-            .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify {
+            .set_build(Some(started(
+                object_id(10028),
+                Position::new(30.0, 88.0, 0.0),
+                Distance::new(1.0),
+                build,
+            )));
+        t.parts
+            .actions
+            .of_mut(u.id)
+            .unwrap()
+            .list
+            .set_make(Some(MakeAction {
+                state: MakeState::New,
+                remaining: Amount::ZERO,
+                total: Amount::ZERO,
+                task: make,
+            }));
+        t.parts
+            .actions
+            .of_mut(u.id)
+            .unwrap()
+            .list
+            .set_wait_solidify(Some(WaitSolidify {
                 state: WaitSolidifyState::Waiting,
                 task: waiting,
-                target: crate::construction::FoundationId::new(object_id(10028)),
+                target: FoundationId::new(object_id(10028)),
             }));
         t.actions_take_master(Place::Live(PlayerId::new(1), ListIndex::new(0)), &old, &new)
             .unwrap();
@@ -1105,7 +1121,7 @@ mod tests {
             t.parts.actions_of(u.id).list.build().copied().unwrap().task,
             BuildTask {
                 range: Distance::new(1.5),
-                work_value: crate::objects::masters::WorkValue::new(3.0),
+                work_value: WorkValue::new(3.0),
                 work_rate: WorkRate::new(1.0),
                 resource: Some(AttributeId::numbered(17)),
                 id: TaskId::test(7),
@@ -1167,7 +1183,7 @@ mod tests {
             ..Master::default()
         };
         let own = object(11, master_id(4), ObjectState::Alive, HitPoints::new(20.0));
-        let player = crate::world::Player {
+        let player = Player {
             objects: vec![
                 object(10, master_id(4), ObjectState::Alive, HitPoints::new(20.0)),
                 own,
@@ -1181,11 +1197,11 @@ mod tests {
             )]
             .into(),
             attributes: vec![Amount::ZERO; 300],
-            ..crate::world::Player::default()
+            ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -1197,7 +1213,7 @@ mod tests {
         ])];
         t.set_part(
             object_id(11),
-            crate::world::parts::Part::OwnMaster(Box::new(soldier(
+            Part::OwnMaster(Box::new(soldier(
                 master_id(4),
                 MasterHitPoints::of_data(40),
             ))),
@@ -1320,14 +1336,14 @@ mod tests {
     /// A world of player 0 holding `objects`, its masters `masters`, its graphics `graphics`
     /// (each animated) and 300 attributes.
     fn one_player(objects: Vec<Unit>, masters: Vec<Master>, graphics: &[i16]) -> World {
-        let player = crate::world::Player {
+        let player = Player {
             objects: objects.into(),
             attributes: vec![Amount::ZERO; 300],
-            ..crate::world::Player::default()
+            ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
@@ -1344,7 +1360,7 @@ mod tests {
     /// for its top Gather stops (the Gather goes); kept, or with a Gather task, it goes on.
     #[test]
     fn an_upgrade_stops_top_action_the_new_master_has_no_task_for() {
-        let mut t = crate::world::tests::forage_world();
+        let mut t = forage_world();
         t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
             .unwrap();
         let old = t.masters[1].get(master_id(120)).unwrap().clone();
@@ -1401,10 +1417,7 @@ mod tests {
         };
         let shown = |at: i16, new: &Master| {
             let mut u = object(10, master_id(4), ObjectState::Alive, HitPoints::new(10.0));
-            u.sprite = Some(crate::objects::sprite::ActiveSprite::start(
-                graphic(at),
-                &mut Well512::default(),
-            ));
+            u.sprite = Some(ActiveSprite::start(graphic(at), &mut Well512::default()));
             let mut t = one_player(vec![u], vec![old.clone()], &[100, 101, 102, 200, 201]);
             t.upgrade_moving_sprite(
                 Place::Live(PlayerId::new(0), ListIndex::new(0)),
@@ -1513,10 +1526,10 @@ mod tests {
             u.place_for_test(Position::new(5.5, 5.5, 0.0));
             u.life.inside = inside.map(ContainerId::new);
             let mut t = one_player(vec![u], vec![old.clone()], &[]);
-            t.spatial = crate::map::spatial::Spatial::new(GridSize::new(20, 20));
+            t.spatial = Spatial::new(GridSize::new(20, 20));
             t.spatial.insert(
                 object_id(10),
-                crate::map::spatial::Placed {
+                Placed {
                     position: Position::new(5.5, 5.5, 0.0),
                     radius: Footprint::new(0.2, 0.2),
                     class: class::CLASS_6,
@@ -1530,11 +1543,11 @@ mod tests {
                     obstruction: None,
                 },
             );
-            let map = || crate::vision::visibility::VisibleMap {
+            let map = || VisibleMap {
                 counts: vec![0; 400],
                 explored: TileCount::ZERO,
             };
-            let mut v = crate::vision::visibility::Visibility::new(
+            let mut v = Visibility::new(
                 GridSize::new(20, 20),
                 vec![map()],
                 vec![VisionBits::NONE; 400],
@@ -1544,7 +1557,7 @@ mod tests {
             );
             v.add_seer(
                 object_id(10),
-                crate::vision::visibility::Seer {
+                Seer {
                     player: PlayerId::new(0),
                     master: master_id(4),
                     los: Distance::new(5.0),
@@ -1624,10 +1637,7 @@ mod tests {
                 ObjectState::DyingSprite,
                 HitPoints::new(20.0),
             );
-            u.sprite = Some(crate::objects::sprite::ActiveSprite::start(
-                graphic(at),
-                &mut Well512::default(),
-            ));
+            u.sprite = Some(ActiveSprite::start(graphic(at), &mut Well512::default()));
             let graphics = [300, 301, 302, 303, 304, 400, 402, 403];
             let mut t = one_player(vec![u], vec![old.clone()], &graphics);
             t.upgrade_hit_points(Place::Live(PlayerId::new(0), ListIndex::new(0)), (old, new))

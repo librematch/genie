@@ -1,6 +1,7 @@
 //! A Make's state: making food.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A Make's state (`+0x18`, set by `set_state`, `FUN_140a99d60`). The bytes without a state have no
 /// case, and no step modelled here sets them.
@@ -38,8 +39,8 @@ impl MakeState {
     }
 }
 
-impl std::fmt::Display for MakeState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MakeState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

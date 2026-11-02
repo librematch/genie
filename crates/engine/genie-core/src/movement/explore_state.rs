@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// An Explore's state (`+0x18`, set by `set_state`, slot 0x80 `0x140a87e30`) with the data only
 /// that state holds (FD-045-D62): every `set_state` drops the sub-actions first, and only state
@@ -99,15 +100,19 @@ impl ExploreState {
     }
 }
 
-impl std::fmt::Display for ExploreState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ExploreState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(test)]
+    use crate::map::{Distance, Position};
     use crate::movement::explore::ExploreState;
+    #[cfg(test)]
+    use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
     use crate::objects::Voice;
 
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
@@ -121,15 +126,15 @@ mod tests {
             }
         }
         assert_eq!(ExploreState::Ended.to_string(), "14");
-        let walk = crate::movement::move_to::MoveToAction {
-            state: crate::movement::move_to::MoveTo::Start,
-            point: crate::map::Position::new(19.0, 84.0, 0.0),
+        let walk = MoveToAction {
+            state: MoveTo::Start,
+            point: Position::new(19.0, 84.0, 0.0),
             target: None,
-            range: crate::map::Distance::ZERO,
+            range: Distance::ZERO,
             sprite: None,
             voice: Voice::Quiet,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-            wait: crate::movement::move_to::MoveWait::NEW,
+            on_target_moved: TargetMoved::Follows,
+            wait: MoveWait::NEW,
         };
         assert_eq!(
             ExploreState::of_byte(11, Some(walk)),
@@ -144,11 +149,8 @@ mod tests {
         assert!(ExploreState::of_byte(3, Some(walk)).is_err());
         assert_eq!(ExploreState::Wait.move_to(), None);
         let mut walking = ExploreState::of_byte(11, Some(walk)).unwrap();
-        walking.move_to_mut().unwrap().range = crate::map::Distance::new(2.0);
-        assert_eq!(
-            walking.move_to().map(|m| m.range),
-            Some(crate::map::Distance::new(2.0))
-        );
+        walking.move_to_mut().unwrap().range = Distance::new(2.0);
+        assert_eq!(walking.move_to().map(|m| m.range), Some(Distance::new(2.0)));
         assert_eq!(ExploreState::Wait.move_to_mut(), None);
     }
 }

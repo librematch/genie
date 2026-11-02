@@ -1,5 +1,7 @@
 //! A player's type as one type: `player+0x10`, the save's class byte.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A player's type (`player+0x10`, the save's `type`): which `WorldPlayer` class the game made
 /// for it. Every byte is a type (a save may hold types the slice does not name).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -35,8 +37,8 @@ impl From<u8> for PlayerType {
     }
 }
 
-impl std::fmt::Display for PlayerType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for PlayerType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

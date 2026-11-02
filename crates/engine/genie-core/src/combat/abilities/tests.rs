@@ -52,7 +52,7 @@ fn feitoria_food() -> Task {
         object_group: None,
         attribute_type2: Some(AttributeId::numbered(205)),
         attribute_type3: Some(attribute::FOOD),
-        work_val1: crate::objects::masters::WorkValue::new(1.6),
+        work_val1: WorkValue::new(1.6),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
     }
@@ -64,7 +64,7 @@ fn keshik_gold() -> Task {
         object_group: Some(class_id(0)),
         attribute_type2: Some(AttributeId::numbered(213)),
         attribute_type3: Some(attribute::GOLD),
-        work_val1: crate::objects::masters::WorkValue::new(0.01),
+        work_val1: WorkValue::new(0.01),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
     }
@@ -116,12 +116,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         })
     };
     // the Attack (9), type 7, the Gather (5) and the Hunt (0x6e), in state 7
-    for kind in [
-        crate::combat::attack::ATTACK,
-        crate::objects::masters::action_type::COMBAT,
-        crate::gathering::gather::GATHER,
-        crate::gathering::hunt::HUNT,
-    ] {
+    for kind in [ATTACK, ACTION_TYPE_COMBAT, GATHER, HUNT] {
         assert!(generates(
             &t,
             COMBAT,
@@ -134,29 +129,21 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         &t,
         COMBAT,
         COMBAT,
-        top(
-            crate::movement::move_to::MOVE_TO,
-            ActionState::new(7),
-            Some(target)
-        ),
+        top(MOVE_TO, ActionState::new(7), Some(target)),
         false
     ));
     assert!(!generates(
         &t,
         COMBAT,
         COMBAT,
-        top(
-            crate::combat::attack::ATTACK,
-            ActionState::new(6),
-            Some(target)
-        ),
+        top(ATTACK, ActionState::new(6), Some(target)),
         false
     ));
     assert!(!generates(
         &t,
         COMBAT,
         COMBAT,
-        top(crate::combat::attack::ATTACK, ActionState::new(7), None),
+        top(ATTACK, ActionState::new(7), None),
         false
     ));
     assert!(!generates(&t, COMBAT, COMBAT, None, false));
@@ -169,11 +156,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         &t,
         COMBAT,
         COMBAT,
-        top(
-            crate::combat::attack::ATTACK,
-            ActionState::new(7),
-            Some(other)
-        ),
+        top(ATTACK, ActionState::new(7), Some(other)),
         false
     ));
     // a dead target counts while its master stores some, never with a NaN
@@ -186,11 +169,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         &t,
         COMBAT,
         COMBAT,
-        top(
-            crate::combat::attack::ATTACK,
-            ActionState::new(7),
-            Some(dead)
-        ),
+        top(ATTACK, ActionState::new(7), Some(dead)),
         false
     ));
     let empty = WorkTarget {
@@ -202,11 +181,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         &t,
         COMBAT,
         COMBAT,
-        top(
-            crate::combat::attack::ATTACK,
-            ActionState::new(7),
-            Some(empty)
-        ),
+        top(ATTACK, ActionState::new(7), Some(empty)),
         false
     ));
     let nan = WorkTarget {
@@ -218,11 +193,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         &t,
         COMBAT,
         COMBAT,
-        top(
-            crate::combat::attack::ATTACK,
-            ActionState::new(7),
-            Some(nan)
-        ),
+        top(ATTACK, ActionState::new(7), Some(nan)),
         false
     ));
 }
@@ -503,8 +474,8 @@ fn the_terrain_mask_is_bitset_of_8() {
 fn longboat_look() -> Task {
     Task {
         terrain: TaskTerrain::of_data(-32),
-        work_val1: crate::objects::masters::WorkValue::new(0.35),
-        work_val2: crate::objects::masters::WorkValue::new(1.0),
+        work_val1: WorkValue::new(0.35),
+        work_val2: WorkValue::new(1.0),
         sprites: TaskSprites::of_data([19601, -1, 19599, 19599]),
         sound_events: SoundEvents::new(19598, 19600),
         ..task(TERRAIN_LOOK)
@@ -553,7 +524,7 @@ fn bounty() -> Task {
     Task {
         attribute_type2: Some(attribute::RELICS_HELD),
         attribute_type3: Some(attribute::GOLD),
-        work_val1: crate::objects::masters::WorkValue::new(10.0),
+        work_val1: WorkValue::new(10.0),
         ..task(REMOVAL_REWARD)
     }
 }
@@ -623,9 +594,23 @@ fn removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_th
     );
 }
 
+use crate::combat::AttackTargetId;
+use crate::combat::attack::{Arms, Attack};
+use crate::gathering::hunt::tests::walker;
 use crate::map::spatial::{Placed, Spatial};
+use crate::map::terrain::{Terrain, TerrainKind};
+use crate::movement::Velocity;
+use crate::movement::move_to::{MOVE_TO, TargetMoved};
+use crate::objects::layers::Static;
+use crate::objects::masters::WorkValue;
 use crate::objects::masters::{Master, Masters};
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
+use crate::players::relation_row;
+use crate::test_ids::{amounts, attributes};
+use crate::vision::visibility::{BuildingSight, Seer, Visibility, VisibleMap};
+use crate::world::FrameSeed;
 use crate::world::Player;
 
 /// Gaia and two enemies, the world's dt half a second, a 20 by 20 map.
@@ -633,7 +618,7 @@ fn world() -> World {
     let player = |relations: Vec<u8>| Player {
         attributes: vec![Amount::ZERO; 600],
         generated: vec![Amount::ZERO; 600],
-        relations: crate::players::relation_row(relations),
+        relations: relation_row(relations),
         ..Player::default()
     };
     let players = vec![
@@ -643,7 +628,7 @@ fn world() -> World {
     ];
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         players,
@@ -678,7 +663,7 @@ fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, ta
 fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Point) {
     let mut u = Unit {
         id: object_id(id),
-        place: crate::objects::layers::Static::at(at.with_height(0.0)),
+        place: Static::at(at.with_height(0.0)),
         ..Unit::default()
     };
     u.life.master_id = m;
@@ -722,11 +707,11 @@ fn rewards(t: &mut World, p: PlayerId, id: i32, leaves: bool) -> Vec<Reward> {
 
 /// The players' sight with `id` a building of player `p` that is `built`.
 fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
-    let map = || crate::vision::visibility::VisibleMap {
+    let map = || VisibleMap {
         counts: vec![0; 400],
         explored: TileCount::ZERO,
     };
-    let mut v = crate::vision::visibility::Visibility::new(
+    let mut v = Visibility::new(
         GridSize::new(20, 20),
         vec![map(), map(), map()],
         vec![VisionBits::NONE; 400],
@@ -736,13 +721,13 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
     );
     v.add_seer(
         object_id(id),
-        crate::vision::visibility::Seer {
+        Seer {
             player: p,
             master: master_id(1021),
             los: Distance::new(6.0),
             state: ObjectState::Alive,
             explored: true,
-            building: Some(crate::vision::visibility::BuildingSight {
+            building: Some(BuildingSight {
                 built,
                 started: true,
             }),
@@ -812,8 +797,8 @@ fn keshik(t: &mut World) {
         HitPoints::new(100.0),
         Point::new(5.5, 5.5),
     );
-    let attack = crate::combat::attack::Attack {
-        target: Some(crate::combat::AttackTargetId::new(object_id(77))),
+    let attack = Attack {
+        target: Some(AttackTargetId::new(object_id(77))),
         target2: None,
         state: AttackState::Swing,
         timer: Seconds::ZERO,
@@ -824,18 +809,18 @@ fn keshik(t: &mut World) {
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
-        arms: crate::combat::attack::Arms {
+        arms: Arms {
             move_sprite: None,
             sprite: None,
             second_sprite: None,
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: crate::objects::Frame::of_data(0),
-            interrupt_frame: crate::objects::Frame::of_data(-1),
+            fire_frame: Frame::of_data(0),
+            interrupt_frame: Frame::of_data(-1),
         },
         voice: Voice::Loud,
-        on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+        on_target_moved: TargetMoved::Follows,
         same_owner: false,
     };
     t.parts
@@ -885,8 +870,8 @@ fn keshik_makes_gold_while_it_fights_target_of_its_task_class() {
 fn trampler(t: &mut World) {
     let trample = Task {
         work_range: Distance::new(2.0),
-        work_val1: crate::objects::masters::WorkValue::new(5.0),
-        work_val2: crate::objects::masters::WorkValue::new(3.0),
+        work_val1: WorkValue::new(5.0),
+        work_val2: WorkValue::new(3.0),
         ..task(MOVEMENT_DAMAGE)
     };
     give_master(t, master_id(9), COMBAT, class::CLASS_12, vec![trample]);
@@ -898,8 +883,8 @@ fn trampler(t: &mut World) {
         HitPoints::new(100.0),
         Point::new(5.5, 5.5),
     );
-    let mut mover = crate::gathering::hunt::tests::walker();
-    mover.velocity = Some(crate::movement::Velocity {
+    let mut mover = walker();
+    mover.velocity = Some(Velocity {
         velocity: BVector::new(1.0, 0.0, 0.0),
         acceleration: BVector::ZERO,
     });
@@ -1011,12 +996,12 @@ fn movement_damage_kill_leaves_0_hit_points_and_counts_the_kill() {
 fn waters(t: &mut World) {
     let mut tiles = vec![(1u8, 255u8, -1i16); 400];
     tiles[6 * 20 + 5] = (2, 255, -1);
-    let kind = |flags| crate::map::terrain::TerrainKind {
+    let kind = |flags| TerrainKind {
         shown: true,
         flags,
         forest: false,
     };
-    t.spatial.terrain = Some(crate::map::terrain::Terrain::new(
+    t.spatial.terrain = Some(Terrain::new(
         GridSize::new(20, 20),
         tiles
             .into_iter()
@@ -1029,10 +1014,10 @@ fn waters(t: &mut World) {
         ],
         Vec::new(),
     ));
-    let g = |id| crate::objects::sprite::Graphic {
+    let g = |id| Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1063,7 +1048,7 @@ fn longboat_takes_its_task_look_on_its_terrains_and_its_master_off_them() {
         HitPoints::new(100.0),
         Point::new(5.5, 6.5),
     );
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     mover.moved_at = Position::new(5.5, 6.5, 0.0);
     t.parts
         .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(mover));
@@ -1156,7 +1141,7 @@ fn an_object_of_another_type_has_no_abilities() {
 #[test]
 fn player_attribute_reads_its_place_and_none_past_the_count() {
     let mut p = Player {
-        attributes: crate::test_ids::attributes(6, [1.0, 2.0, 3.0, 4.0]),
+        attributes: attributes(6, [1.0, 2.0, 3.0, 4.0]),
         ..Player::default()
     };
     p.attributes[5] = Amount::new(9.0);
@@ -1166,16 +1151,10 @@ fn player_attribute_reads_its_place_and_none_past_the_count() {
         Some(Amount::new(9.0))
     );
     assert_eq!(p.attribute(attribute::CURRENT_AGE), None);
-    assert_eq!(
-        p.resources(),
-        crate::test_ids::amounts([1.0, 2.0, 3.0, 4.0])
-    );
+    assert_eq!(p.resources(), amounts([1.0, 2.0, 3.0, 4.0]));
     assert_eq!(p.construction_rate(), Amount::ZERO);
     p.attributes.resize(196, Amount::ZERO);
     p.attributes[attribute::CONSTRUCTION_RATE.index()] = Amount::new(1.5);
     assert_eq!(p.construction_rate(), Amount::new(1.5));
-    assert_eq!(
-        Player::default().resources(),
-        crate::test_ids::amounts([0.0; 4])
-    );
+    assert_eq!(Player::default().resources(), amounts([0.0; 4]));
 }

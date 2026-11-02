@@ -1,11 +1,14 @@
 use super::*;
+use crate::gathering::hunt::tests::walker;
 use crate::groups::MoveReason;
+use crate::groups::{Member, SpecificMove, UnitGroup};
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::RecordId;
+use crate::map::spatial::Tiles;
 use crate::map::spatial::{Gait, Obstruction, Placed};
 use crate::movement::LevelFlags;
 use crate::movement::WaypointLevel;
@@ -16,6 +19,8 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::facing::{angle_of_facet, facet_of_forward};
+use crate::objects::layers::{Action, Motion as LayersMotion, Static};
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
@@ -24,6 +29,10 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::ID_45;
+use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::{Master, Masters};
+use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
 use crate::pathing::PlanCap;
 use crate::pathing::PlanCount;
 use crate::pathing::ShortFound;
@@ -34,7 +43,12 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::unit_ai::UnitStance;
+use crate::vision::visibility::Visibility;
 use crate::world::Millis;
+use crate::world::index::TestObjects;
+use crate::world::parts::Object;
+use crate::world::{FrameSeed, Player, World};
+use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, SQRT_2};
 
 const DT: f32 = 0.02;
 
@@ -42,14 +56,11 @@ const DT: f32 = 0.02;
 /// 0.05 turns 2π / 0.8 a second, 11.25° in a tick of 0.025 s; a villager turns at once.
 #[test]
 fn master_turn_rate_comes_from_its_turn_speed_and_walking_facets() {
-    let rate = turn_rate(
-        Seconds::new(0.05),
-        Some(crate::objects::FacetCount::of_data(16)),
-    );
+    let rate = turn_rate(Seconds::new(0.05), Some(FacetCount::of_data(16)));
     assert_eq!(rate, TurnRate::new(TWO_PI / (16.0f32 * 0.05)));
     assert_eq!(rate.get().to_bits(), 7.853_982f32.to_bits());
     assert_eq!(
-        turn_rate(Seconds::ZERO, Some(crate::objects::FacetCount::of_data(16))),
+        turn_rate(Seconds::ZERO, Some(FacetCount::of_data(16))),
         TurnRate::MAX
     );
     assert_eq!(turn_rate(Seconds::new(0.05), None), TurnRate::MAX);
@@ -67,19 +78,11 @@ fn master_turning_values_follow_its_turn_speed_and_walking_sprite() {
         revolution_rate: TurnRate::new(5.0),
     };
     assert_eq!(
-        turning(
-            Seconds::ZERO,
-            Some(crate::objects::FacetCount::of_data(16)),
-            before
-        ),
+        turning(Seconds::ZERO, Some(FacetCount::of_data(16)), before),
         (Turning::PRESET, false)
     );
     assert_eq!(turning(Seconds::new(0.05), None, before), (before, false));
-    let (after, set) = turning(
-        Seconds::new(0.05),
-        Some(crate::objects::FacetCount::of_data(16)),
-        before,
-    );
+    let (after, set) = turning(Seconds::new(0.05), Some(FacetCount::of_data(16)), before);
     assert!(set);
     let rate = TWO_PI / (16.0f32 * 0.05);
     assert_eq!(
@@ -93,13 +96,9 @@ fn master_turning_values_follow_its_turn_speed_and_walking_sprite() {
     );
     // a sprite of no facets: a revolution of 0, the largest float
     assert_eq!(
-        turning(
-            Seconds::new(0.05),
-            Some(crate::objects::FacetCount::of_data(0)),
-            before
-        )
-        .0
-        .rate,
+        turning(Seconds::new(0.05), Some(FacetCount::of_data(0)), before)
+            .0
+            .rate,
         TurnRate::MAX
     );
 }
@@ -119,8 +118,8 @@ fn stats() -> MoveStats {
         move_algorithm: MoveAlgorithm::NONE,
         min_collision: 1.0,
         fast_turn: false,
-        facets: Some(crate::objects::facing::SpriteFacets {
-            count: crate::objects::FacetCount::of_data(16),
+        facets: Some(SpriteFacets {
+            count: FacetCount::of_data(16),
             turns: true,
         }),
         weapon_range: Distance::ZERO,
@@ -226,7 +225,7 @@ pub(crate) fn builder_9177() -> Mover {
 /// # Panics
 ///
 /// A gait whose path was made without a level, which no unit holds.
-pub(crate) fn unit_with_gait(id: ObjectId, gait: Gait) -> crate::world::parts::Object {
+pub(crate) fn unit_with_gait(id: ObjectId, gait: Gait) -> Object {
     assert!(
         gait.pause.is_some() || gait.path_made.is_none(),
         "a path made without a level"
@@ -255,18 +254,18 @@ pub(crate) fn unit_with_gait(id: ObjectId, gait: Gait) -> crate::world::parts::O
         })
         .into_iter()
         .collect();
-    let mut unit = crate::objects::unit::Unit {
+    let mut unit = Unit {
         id,
         last_human_order: gait.human_order,
-        ..crate::objects::unit::Unit::default()
+        ..Unit::default()
     };
     unit.group.id = gait.group;
     assert_eq!(
-        unit.gait(&crate::objects::layers::Action::default(), Some(&mover)),
+        unit.gait(&Action::default(), Some(&mover)),
         Some(gait),
         "the unit gives the gait"
     );
-    crate::world::parts::Object::moving(unit, mover)
+    Object::moving(unit, mover)
 }
 
 /// `FUN_14114ece0`: the unit, its target, then its own list but itself when the walked
@@ -276,7 +275,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
     let world = world();
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
-    let groups = crate::groups::UnitGroups::default();
+    let groups = UnitGroups::default();
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(16360),
@@ -301,7 +300,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
             plan,
             Some((object_id(10028), &house)),
             line,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
     };
     assert_eq!(
@@ -333,7 +332,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
 fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> Spatial {
     let mut w = Spatial::with_tiles(
         GridSize::new(16, 16),
-        crate::map::spatial::Tiles::new(crate::map::GridSize::new(16, 16), vec![class; 256]),
+        Tiles::new(GridSize::new(16, 16), vec![class; 256]),
     );
     let placed = |at: Point, r: f32, class, player| Placed {
         position: at.with_height(0.0),
@@ -384,7 +383,7 @@ fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> S
 /// none of them.
 #[test]
 fn drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let near = [
         (
             1,
@@ -456,7 +455,7 @@ fn drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
     let mut pathing = Pathing::default();
     pathing.start_mesh(16);
     let mut object = Well512::default();
-    let groups = crate::groups::UnitGroups::default();
+    let groups = UnitGroups::default();
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
@@ -522,12 +521,12 @@ fn the_drop_off_walker_start_is_blocked_in_terrain_its_mask_lacks() {
     let test = |class: u8| {
         let world = Spatial::with_tiles(
             GridSize::new(16, 16),
-            crate::map::spatial::Tiles::new(crate::map::GridSize::new(16, 16), vec![class; 256]),
+            Tiles::new(GridSize::new(16, 16), vec![class; 256]),
         );
         let mut pathing = Pathing::default();
         pathing.start_mesh(16);
         let mut object = Well512::default();
-        let groups = crate::groups::UnitGroups::default();
+        let groups = UnitGroups::default();
         let mut plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
@@ -559,9 +558,9 @@ fn walled(radius: Distance) -> Spatial {
     }
     let mut w = Spatial::with_tiles(
         GridSize::new(20, 20),
-        crate::map::spatial::Tiles::new(crate::map::GridSize::new(20, 20), classes),
+        Tiles::new(GridSize::new(20, 20), classes),
     );
-    w.sight = Some(crate::vision::visibility::Visibility::new(
+    w.sight = Some(Visibility::new(
         GridSize::new(20, 20),
         Vec::new(),
         Vec::new(),
@@ -613,7 +612,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     let mut world = walled(Distance::new(0.6));
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
-    let groups = crate::groups::UnitGroups::default();
+    let groups = UnitGroups::default();
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
@@ -633,14 +632,14 @@ fn big_unit_short_path_takes_the_old_pather() {
     let r = short_path_for(
         walker,
         Point::new(4.5, 5.5),
-        (&mut world, crate::world::index::ObjectsRef::empty()),
+        (&mut world, ObjectsRef::empty()),
         &mut plan,
         goal,
         &[object_id(9171)],
         &mut out,
     );
     let mut pather = HullPather::for_list(
-        (&mut world, crate::world::index::ObjectsRef::empty()),
+        (&mut world, ObjectsRef::empty()),
         &[object_id(9171)],
         TerrainMask::of_bits(6),
         Distance::new(0.6),
@@ -670,7 +669,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     let r = short_path_for(
         walker,
         Point::new(4.5, 5.5),
-        (&mut world, crate::world::index::ObjectsRef::empty()),
+        (&mut world, ObjectsRef::empty()),
         &mut plan,
         (BVector::new(20.5, 0.0, 5.5), Distance::ZERO, None),
         &[object_id(9171)],
@@ -684,7 +683,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     let r = short_path_for(
         small,
         Point::new(4.5, 5.5),
-        (&mut world, crate::world::index::ObjectsRef::empty()),
+        (&mut world, ObjectsRef::empty()),
         &mut plan,
         goal,
         &[object_id(9171)],
@@ -703,7 +702,7 @@ fn big_unit_short_path_takes_the_old_pather() {
 /// it its temporary shape (0x1411547c0..0x141154855) before the test (0x1411549ac).
 #[test]
 fn kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let mut w = world();
     let mut close = *w.get(object_id(9175)).unwrap();
     close.position = Position::new(28.3, 88.9, 0.0);
@@ -721,7 +720,7 @@ fn kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
         group: None,
         action_state: ActionState::NO_ACTION,
     };
-    let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.paths[0].target = Some(object_id(9175));
     let position = m.moved_at.vector();
@@ -792,7 +791,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
             &w,
             &[RecordId::from(object_id(9175))],
             PlayerType::HUMAN,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(Next::Again)
     ));
@@ -806,7 +805,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
             &w,
             &[RecordId::from(object_id(9175))],
             PlayerType::HUMAN,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(Next::Done(Motion::Done))
     ));
@@ -827,7 +826,7 @@ fn map_edge_record_is_hit_without_an_object() {
         group: None,
         action_state: ActionState::NO_ACTION,
     };
-    let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.paths[0].target = Some(object_id(9175));
     let position = m.moved_at.vector();
@@ -837,7 +836,7 @@ fn map_edge_record_is_hit_without_an_object() {
     let avoided = m
         .avoid(
             (place.position(), &me),
-            (&w, None, crate::world::index::ObjectsRef::empty()),
+            (&w, None, ObjectsRef::empty()),
             &[edge],
             projected,
             Seconds::new(DT),
@@ -851,7 +850,7 @@ fn map_edge_record_is_hit_without_an_object() {
     let avoided = m
         .avoid(
             (place.position(), &me),
-            (&w, None, crate::world::index::ObjectsRef::empty()),
+            (&w, None, ObjectsRef::empty()),
             &[edge, RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
@@ -904,10 +903,10 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
 /// goes round it.
 #[test]
 fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let mut w = Spatial::with_tiles(
         GridSize::new(20, 20),
-        crate::map::spatial::Tiles::new(crate::map::GridSize::new(20, 20), vec![4; 400]),
+        Tiles::new(GridSize::new(20, 20), vec![4; 400]),
     );
     let unit = |x: f32, r: f32| Placed {
         position: Position::new(x, 5.5, 0.0),
@@ -942,7 +941,7 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
     };
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
-    let groups = crate::groups::UnitGroups::default();
+    let groups = UnitGroups::default();
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
@@ -956,7 +955,7 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
         to_end: Distance::new(FAR),
     };
     let mut request = |include: &[ObjectId]| {
-        let place = crate::objects::layers::Static::at(Position::new(4.5, 5.5, 0.0));
+        let place = Static::at(Position::new(4.5, 5.5, 0.0));
         let mut m = builder_9177();
         m.stats.radius = Radii::from([0.6; 3]);
         m.moved_at = Position::new(4.5, 5.5, 0.0);
@@ -993,7 +992,7 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
         (start, end),
         (BVector::new(4.5, 0.0, 5.5), BVector::new(8.5, 0.0, 5.5))
     );
-    let off = (0.3 + 0.6) * std::f32::consts::SQRT_2;
+    let off = (0.3 + 0.6) * SQRT_2;
     assert!((by.x() - 6.5).abs() < 1e-5 && (by.y() - (5.5 - off)).abs() < 1e-5);
 }
 
@@ -1008,7 +1007,7 @@ fn world_target() -> Placed {
 fn the_reach_test_starts_where_the_unit_last_moved_to() {
     let mut world = Spatial::with_tiles(
         GridSize::new(40, 40),
-        crate::map::spatial::Tiles::new(crate::map::GridSize::new(40, 40), vec![4; 40 * 40]),
+        Tiles::new(GridSize::new(40, 40), vec![4; 40 * 40]),
     );
     world.insert(
         object_id(9177),
@@ -1031,7 +1030,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     );
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
-    let groups = crate::groups::UnitGroups::default();
+    let groups = UnitGroups::default();
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::ZERO,
@@ -1045,7 +1044,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
         group: None,
         action_state: ActionState::NO_ACTION,
     };
-    let place = crate::objects::layers::Static::at(Position::new(5.5, 5.5, 0.0));
+    let place = Static::at(Position::new(5.5, 5.5, 0.0));
     let mut m = builder_9177();
     m.moved_at = Position::new(5.5, 5.5, 0.0);
     // 25 tiles away on open land: the long pather's answer
@@ -1053,7 +1052,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     assert_eq!(
         m.reaches(
             (place.position(), &me),
-            (&mut world, crate::world::index::ObjectsRef::empty()),
+            (&mut world, ObjectsRef::empty()),
             &mut plan,
             far,
             Distance::ZERO,
@@ -1066,7 +1065,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     assert_eq!(
         m.reaches(
             (place.position(), &me),
-            (&mut world, crate::world::index::ObjectsRef::empty()),
+            (&mut world, ObjectsRef::empty()),
             &mut plan,
             far,
             Distance::ZERO,
@@ -1078,7 +1077,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     assert_eq!(
         m.reaches(
             (place.position(), &me),
-            (&mut world, crate::world::index::ObjectsRef::empty()),
+            (&mut world, ObjectsRef::empty()),
             &mut plan,
             far,
             Distance::ZERO,
@@ -1130,7 +1129,7 @@ fn turn_toward_direction_is_signed_and_clipped_by_the_turn_rate() {
     );
     let (turn, clipped) = m.turn_toward(x, z, Seconds::new(2.0));
     assert!(!clipped);
-    assert_eq!(turn, Angle::new(-std::f32::consts::FRAC_PI_2));
+    assert_eq!(turn, Angle::new(-FRAC_PI_2));
     // a NaN most turns the whole angle (JBE on unordered)
     assert!(!m.turn_toward(x, z, Seconds::new(f32::NAN)).1);
     assert_eq!(m.turn_dt(Seconds::new(0.02)), Seconds::new(0.02));
@@ -1146,19 +1145,15 @@ fn yaw_turns_forward_and_right_and_takes_the_facet_angle() {
     let mut m = builder_9177();
     m.forward = BVector::new(1.0, 0.0, 0.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
-    let facets = crate::objects::facing::SpriteFacets {
-        count: crate::objects::FacetCount::of_data(16),
+    let facets = SpriteFacets {
+        count: FacetCount::of_data(16),
         turns: true,
     };
-    m.yaw(Angle::new(-std::f32::consts::FRAC_PI_2), Some(facets))
-        .unwrap();
+    m.yaw(Angle::new(-FRAC_PI_2), Some(facets)).unwrap();
     assert!(m.forward.x().abs() < 1e-6 && (m.forward.y() - 1.0).abs() < 1e-6);
     assert_eq!(m.right, fmath::normalize(fmath::cross(UP, m.forward)));
-    let facet = crate::objects::facing::facet_of_forward(m.forward, facets);
-    assert_eq!(
-        m.angle,
-        crate::objects::facing::angle_of_facet(facet, facets)
-    );
+    let facet = facet_of_forward(m.forward, facets);
+    assert_eq!(m.angle, angle_of_facet(facet, facets));
     let before = m.angle;
     assert!(m.yaw(Angle::new(0.1), None).is_err());
     assert_eq!(m.angle, before);
@@ -1332,7 +1327,7 @@ fn an_arrived_level_hands_looping_parent_its_next_waypoint() {
 #[test]
 fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     let looping = |waypoint| {
-        let place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
+        let place = Static::at(Position::new(30.0, 88.0, 0.0));
         let mut m = builder_9177();
         m.paths = vec![level(
             2,
@@ -1369,7 +1364,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         None,
         goal,
         WorldTime::ZERO,
-        crate::world::index::ObjectsRef::empty(),
+        ObjectsRef::empty(),
     );
     assert!(matches!(next, Ok(Next::Dispatch)));
     assert_eq!(
@@ -1383,7 +1378,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         None,
         goal,
         WorldTime::ZERO,
-        crate::world::index::ObjectsRef::empty(),
+        ObjectsRef::empty(),
     );
     assert!(matches!(next, Ok(Next::LoopEnd)));
     assert_eq!(
@@ -1391,7 +1386,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
         (0, PathState::WantsPath)
     );
     let (_, mut m) = looping(WaypointIndex::of_data(2));
-    let mut place = crate::objects::layers::Static::at(Position::new(32.0, 89.0, 0.0));
+    let mut place = Static::at(Position::new(32.0, 89.0, 0.0));
     m.moved_at = place.position();
     // no walk ran in the step: the direction it turns toward is zero, at π/2 (426048706's
     // scout 7227 in update 5429 turns by π/2 there)
@@ -1407,7 +1402,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
             Seconds::new(DT),
             &mut world,
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Moving)
     );
@@ -1424,7 +1419,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
 #[test]
 fn walk_whose_target_is_gone_walks_as_to_point() {
     let walk = |target: i32| {
-        let mut place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+        let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
         let mut m = builder_9177();
         for l in &mut m.paths {
             l.target = ObjectId::of_field(target);
@@ -1442,7 +1437,7 @@ fn walk_whose_target_is_gone_walks_as_to_point() {
             Seconds::new(DT),
             &mut Spatial::new(GridSize::new(120, 120)),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         );
         (motion, m.forward, m.velocity)
     };
@@ -1455,7 +1450,7 @@ fn walk_whose_target_is_gone_walks_as_to_point() {
 /// target's is its own.
 #[test]
 fn gate_gap_is_the_least_over_it_and_its_annexes() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let mut world = Spatial::new(GridSize::new(40, 40));
     let wall = |x: f32, class: ClassId| Placed {
         position: Position::new(x, 10.0, 0.0),
@@ -1625,7 +1620,7 @@ fn nan_waypoint_distance_is_short() {
 /// direction is NaN, not the forward vector.
 #[test]
 fn direction_of_nan_length_is_nan() {
-    let m = crate::gathering::hunt::tests::walker();
+    let m = walker();
     let d = m.direction_to(
         BVector::new(f32::NAN, 0.0, 0.0),
         BVector::new(1.0, 0.0, 1.0),
@@ -1698,13 +1693,10 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
     // land of a terrain class the unit's mask (6) has
     let mut w = Spatial::with_tiles(
         GridSize::new(120, 120),
-        crate::map::spatial::Tiles::new(crate::map::GridSize::new(120, 120), vec![2; 14400]),
+        Tiles::new(GridSize::new(120, 120), vec![2; 14400]),
     );
     // on open ground: waypoint 3 is beyond 10 tiles, waypoint 2 within, so it takes 2
-    assert_eq!(
-        m.look_ahead(&me, &mut w, crate::world::index::ObjectsRef::empty()),
-        Ok(true)
-    );
+    assert_eq!(m.look_ahead(&me, &mut w, ObjectsRef::empty()), Ok(true));
     assert_eq!(m.paths.len(), 1);
     assert_eq!(
         (
@@ -1753,10 +1745,7 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
             }),
         },
     );
-    assert_eq!(
-        m.look_ahead(&me, &mut w, crate::world::index::ObjectsRef::empty()),
-        Ok(false)
-    );
+    assert_eq!(m.look_ahead(&me, &mut w, ObjectsRef::empty()), Ok(false));
     assert_eq!(m.paths.len(), 2);
 }
 
@@ -1811,7 +1800,7 @@ fn trade_cart_plans_within_its_owners_budget() {
 /// then the target; a walker in a group lists its group's differentiator units instead.
 #[test]
 fn the_long_pather_lowers_the_walker_or_its_groups_units_and_the_target() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let s = world();
     let moving = Gait {
         moving: true,
@@ -1896,7 +1885,7 @@ pub(crate) fn world() -> Spatial {
 /// pather reads.
 pub(crate) fn tiled_world(classes: Vec<u8>) -> Spatial {
     let objects = world();
-    let tiles = crate::map::spatial::Tiles::new(crate::map::GridSize::new(120, 120), classes);
+    let tiles = Tiles::new(GridSize::new(120, 120), classes);
     let mut s = Spatial::with_tiles(GridSize::new(120, 120), tiles);
     for id in [9175, 9177, 10028] {
         s.insert(
@@ -1927,7 +1916,7 @@ fn unit_closes_in_along_clear_straight_line() {
             BVector::new(28.0, 0.0, 87.0),
             None,
             &mut open,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(true)
     );
@@ -1937,7 +1926,7 @@ fn unit_closes_in_along_clear_straight_line() {
             BVector::new(32.0, 0.0, 89.0),
             None,
             &mut open,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -1947,7 +1936,7 @@ fn unit_closes_in_along_clear_straight_line() {
             BVector::new(32.0, 0.0, 89.0),
             Some(object_id(9175)),
             &mut open,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(true)
     );
@@ -1957,7 +1946,7 @@ fn unit_closes_in_along_clear_straight_line() {
             BVector::new(-1.0, 0.0, 89.0),
             None,
             &mut open,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -1967,7 +1956,7 @@ fn unit_closes_in_along_clear_straight_line() {
             BVector::new(28.0, 0.0, 200.0),
             None,
             &mut open,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -1982,7 +1971,7 @@ fn unit_closes_in_along_clear_straight_line() {
             BVector::new(28.0, 0.0, 87.0),
             None,
             &mut walled,
-            crate::world::index::ObjectsRef::empty()
+            ObjectsRef::empty()
         ),
         Ok(false)
     );
@@ -2036,13 +2025,7 @@ fn long_path_ends_before_its_first_walled_stretch() {
             world.insert(object_id(500), b);
         }
         let mut p = path();
-        let r = m.walled_off(
-            &me,
-            &mut world,
-            None,
-            &mut p,
-            crate::world::index::ObjectsRef::empty(),
-        );
+        let r = m.walled_off(&me, &mut world, None, &mut p, ObjectsRef::empty());
         (r, p.points.len())
     };
     assert_eq!(walled(true, None), (Ok(true), 3));
@@ -2084,7 +2067,7 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
         let mut pathing = Pathing::default();
         pathing.start_mesh(120);
         let mut object = Well512::default();
-        let groups = crate::groups::UnitGroups::default();
+        let groups = UnitGroups::default();
         let plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
@@ -2098,7 +2081,7 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
             group: None,
             action_state: ActionState::NO_ACTION,
         };
-        let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+        let place = Static::at(Position::new(28.0, 89.0, 0.0));
         let mut m = builder_9177();
         let mut path = Path::default();
         let r = m.long_plan(
@@ -2112,7 +2095,7 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
                 target: None,
             },
             &mut path,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         );
         (r, path.points, path.length)
     };
@@ -2201,12 +2184,12 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
 /// path toward house 10028 ([`builder_9177`]), its `MoveTo`'s point the house's, on open
 /// tiles ([`tiled_world`]) with the pather's mesh, a fresh Object stream and no unit groups.
 pub(crate) struct WalkRig {
-    pub(crate) place: crate::objects::layers::Static,
-    pub(crate) motion: crate::objects::layers::Motion,
+    pub(crate) place: Static,
+    pub(crate) motion: LayersMotion,
     pub(crate) world: Spatial,
     pathing: Pathing,
     object: Well512,
-    groups: crate::groups::UnitGroups,
+    groups: UnitGroups,
 }
 
 impl WalkRig {
@@ -2214,12 +2197,12 @@ impl WalkRig {
         let mut pathing = Pathing::default();
         pathing.start_mesh(120);
         Self {
-            place: crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0)),
-            motion: crate::objects::layers::Motion::Moving(builder_9177()),
+            place: Static::at(Position::new(28.0, 89.0, 0.0)),
+            motion: LayersMotion::Moving(builder_9177()),
             world: tiled_world(vec![4; 120 * 120]),
             pathing,
             object: Well512::default(),
-            groups: crate::groups::UnitGroups::default(),
+            groups: UnitGroups::default(),
         }
     }
 
@@ -2232,7 +2215,7 @@ impl WalkRig {
     /// with the world's planners.
     pub(crate) fn walk(&mut self, state: u8) -> Walk<'_> {
         Walk {
-            by_id: crate::world::index::ObjectsRef::empty(),
+            by_id: ObjectsRef::empty(),
             place: &mut self.place,
             motion: Some(&mut self.motion),
             me: Me {
@@ -2257,49 +2240,43 @@ impl WalkRig {
 /// [`WalkRig::on_the_path`] as a world for an action's update on the step: Gaia and `owner` as
 /// player 1, whose first object is the builder 9177 in state 2 (no pasture) on its path toward
 /// house 10028, on the open tiles of [`tiled_world`] with the pather's mesh.
-pub(crate) fn path_world(owner: crate::world::Player) -> crate::world::World {
-    let players = vec![crate::world::Player::default(), owner];
-    let mut t = crate::world::World::new(
+pub(crate) fn path_world(owner: Player) -> World {
+    let players = vec![Player::default(), owner];
+    let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 2],
         players,
     );
     t.spatial = tiled_world(vec![4; 120 * 120]);
     t.pathing.start_mesh(120);
-    let mut unit = crate::objects::unit::Unit {
+    let mut unit = Unit {
         id: object_id(9177),
         pasture: None,
         my_pasture: None,
-        place: crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0)),
-        ..crate::objects::unit::Unit::default()
+        place: Static::at(Position::new(28.0, 89.0, 0.0)),
+        ..Unit::default()
     };
     unit.life.state = ObjectState::Alive;
     let _ = t
-        .push_live(
-            PlayerId::new(1),
-            crate::world::parts::Object::moving(unit, builder_9177()),
-        )
+        .push_live(PlayerId::new(1), Object::moving(unit, builder_9177()))
         .unwrap();
     // the villager's master (the gatherer tests set it) and the default one
-    let master = |id| crate::objects::masters::Master {
+    let master = |id| Master {
         id,
-        kind: crate::objects::masters::master_type::COMBAT,
+        kind: COMBAT,
         class: class::VILLAGER,
-        ..crate::objects::masters::Master::default()
+        ..Master::default()
     };
-    let table = crate::objects::masters::Masters::new([
-        master(ids::VILLAGER_MALE),
-        master(MasterId::default()),
-    ]);
-    t.masters = vec![crate::objects::masters::Masters::new([]), table];
+    let table = Masters::new([master(ids::VILLAGER_MALE), master(MasterId::default())]);
+    t.masters = vec![Masters::new([]), table];
     t
 }
 
 /// One tick of the walker: the velocity step, then the motion step from where it got.
 fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) {
-    let mut place = crate::objects::layers::Static::at(at);
+    let mut place = Static::at(at);
     let at = m.step_velocity(
         at,
         Seconds::new(DT),
@@ -2321,7 +2298,7 @@ fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) 
             Seconds::new(DT),
             world,
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
         .unwrap();
     (at, motion)
@@ -2352,7 +2329,7 @@ fn walk_on_or_past_its_waypoint_counts_it_reached() {
         let mut w = world();
         let mut m = builder_9177();
         m.moved_at = at;
-        let mut place = crate::objects::layers::Static::at(at);
+        let mut place = Static::at(at);
         let motion = m
             .motion(
                 &mut place,
@@ -2360,7 +2337,7 @@ fn walk_on_or_past_its_waypoint_counts_it_reached() {
                 Seconds::new(DT),
                 &mut w,
                 None,
-                crate::world::index::ObjectsRef::empty(),
+                ObjectsRef::empty(),
             )
             .unwrap();
         assert_eq!(motion, Motion::Arrived);
@@ -2538,7 +2515,7 @@ fn the_gap_is_the_distance_between_the_footprints() {
 /// MarvinBlue/426048731's hawk 9926 after tick 679: a flight to a point, no range.
 #[test]
 fn walk_to_point_goes_on_until_its_range() {
-    let mut hawk_place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let mut hawk_place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut hawk = builder_9177();
     for l in &mut hawk.paths {
         l.target = None;
@@ -2557,12 +2534,12 @@ fn walk_to_point_goes_on_until_its_range() {
             Seconds::new(DT),
             &mut Spatial::new(GridSize::new(120, 120)),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Moving)
     );
     // a deer's walk with range 0.5 whose top path ends within it
-    let mut deer_place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let mut deer_place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut deer = builder_9177();
     for l in &mut deer.paths {
         l.target = None;
@@ -2577,7 +2554,7 @@ fn walk_to_point_goes_on_until_its_range() {
             Seconds::new(DT),
             &mut Spatial::new(GridSize::new(120, 120)),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Arrived)
     );
@@ -2606,7 +2583,7 @@ fn walk_to_point_goes_on_until_its_range() {
 /// id yields (427222982, 428355643, 428376971).
 #[test]
 fn top_level_short_of_its_moved_target_arrives() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let walk = |weapon_range: Distance| {
         let mut m = builder_9177();
         m.paths = vec![level(
@@ -2650,7 +2627,7 @@ fn top_level_short_of_its_moved_target_arrives() {
             group: None,
             action_state: ActionState::NO_ACTION,
         };
-        let mut place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
+        let mut place = Static::at(Position::new(30.0, 88.0, 0.0));
         m.paths[0].target = ObjectId::of_field(target_id);
         let goal = Goal {
             target: Some((object_id(target_id), &placed)),
@@ -2705,7 +2682,7 @@ fn top_level_short_of_its_moved_target_arrives() {
 #[test]
 fn next_waypoint_an_object_stands_on_goes() {
     let walk = || {
-        let place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
+        let place = Static::at(Position::new(30.0, 88.0, 0.0));
         let mut m = builder_9177();
         m.paths = vec![level(
             2,
@@ -2761,7 +2738,7 @@ fn next_waypoint_an_object_stands_on_goes() {
             None,
             goal,
             WorldTime::ZERO,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
         .unwrap();
     assert_eq!(
@@ -2783,7 +2760,7 @@ fn next_waypoint_an_object_stands_on_goes() {
             None,
             goal,
             WorldTime::ZERO,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
         .unwrap();
     assert_eq!(m.paths[0].points.len(), 4);
@@ -2798,7 +2775,7 @@ fn next_waypoint_an_object_stands_on_goes() {
             None,
             goal,
             WorldTime::ZERO,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
         .unwrap();
     assert_eq!(m.paths[0].points.len(), 4);
@@ -2816,15 +2793,11 @@ fn reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
         l.target = None;
         l.range = Distance::ZERO;
     }
-    m.forward = BVector::new(
-        -std::f32::consts::FRAC_1_SQRT_2,
-        0.0,
-        std::f32::consts::FRAC_1_SQRT_2,
-    );
+    m.forward = BVector::new(-FRAC_1_SQRT_2, 0.0, FRAC_1_SQRT_2);
     m.velocity.as_mut().unwrap().velocity = BVector::new(0.0, 0.0, 0.8);
     let mut world = Spatial::new(GridSize::new(120, 120));
     m.moved_at = Position::new(29.51, 89.49, 0.0);
-    let mut place = crate::objects::layers::Static::at(Position::new(29.51, 89.49, 0.0));
+    let mut place = Static::at(Position::new(29.51, 89.49, 0.0));
     let me = Me {
         human_order: WorldTime::ZERO,
         id: object_id(9175),
@@ -2838,7 +2811,7 @@ fn reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
             Seconds::new(DT),
             &mut world,
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Moving)
     );
@@ -2853,7 +2826,7 @@ fn reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
             Seconds::new(DT),
             &mut world,
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Arrived)
     );
@@ -2866,7 +2839,7 @@ fn reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
 /// footprint, which the game saves as the top level of its path data.
 #[test]
 fn path_request_makes_the_top_level_from_the_unit_to_its_goal() {
-    let mut place = crate::objects::layers::Static::at(Position::new(30.0, 89.0, 0.0));
+    let mut place = Static::at(Position::new(30.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.request_path(
         Position::new(30.0, 89.0, 0.0),
@@ -2905,7 +2878,7 @@ fn path_request_makes_the_top_level_from_the_unit_to_its_goal() {
             Seconds::new(DT),
             &mut Spatial::new(GridSize::new(120, 120)),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Err(GenieError::unsupported(
             "a path request without the world's planners"
@@ -2915,7 +2888,7 @@ fn path_request_makes_the_top_level_from_the_unit_to_its_goal() {
 
 #[test]
 fn unit_with_no_speed_or_no_path_is_done() {
-    let mut place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.stats.speed = Speed::ZERO;
     let me = Me {
@@ -2931,11 +2904,11 @@ fn unit_with_no_speed_or_no_path_is_done() {
             Seconds::new(DT),
             &mut world(),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Done)
     );
-    let mut place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.paths.clear();
     assert_eq!(
@@ -2945,7 +2918,7 @@ fn unit_with_no_speed_or_no_path_is_done() {
             Seconds::new(DT),
             &mut world(),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Done)
     );
@@ -2955,7 +2928,7 @@ fn unit_with_no_speed_or_no_path_is_done() {
 /// (a bird's); the parent takes the reached mark and the step ends there, the unit flying on.
 #[test]
 fn an_arrived_level_under_one_without_path_ends_the_step() {
-    let mut place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
+    let mut place = Static::at(Position::new(30.0, 88.0, 0.0));
     let mut m = builder_9177();
     m.velocity.as_mut().unwrap().velocity = BVector::new(0.0, 0.0, 1.32);
     m.paths = vec![
@@ -2987,7 +2960,7 @@ fn an_arrived_level_under_one_without_path_ends_the_step() {
             Seconds::new(DT),
             &mut world(),
             None,
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         ),
         Ok(Motion::Done)
     );
@@ -3004,7 +2977,7 @@ fn an_arrived_level_under_one_without_path_ends_the_step() {
 
 #[test]
 fn human_walker_pauses_met_unit_of_an_older_human_order() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     // 9177 meets 9175 of its own player: ordered at the same time, the lower id outranks
     // and 9177 walks on; once 9175's last human order is the older, 9177 pauses it for dt
     // more than its pause (slot 0x5f0)
@@ -3030,7 +3003,7 @@ fn human_walker_pauses_met_unit_of_an_older_human_order() {
             ..walker(WorldTime::from_millis(17000))
         }),
     );
-    let mut walker_9177_place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let mut walker_9177_place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut walker_9177 = builder_9177();
     assert!(
         walker_9177
@@ -3052,7 +3025,7 @@ fn human_walker_pauses_met_unit_of_an_older_human_order() {
             ..walker(WorldTime::from_millis(16000))
         }),
     );
-    let mut walker_9177_place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let mut walker_9177_place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut walker_9177 = builder_9177();
     assert!(
         walker_9177
@@ -3079,7 +3052,7 @@ fn human_walker_pauses_met_unit_of_an_older_human_order() {
 /// group rank by id (the higher id 9177 walks on).
 #[test]
 fn two_members_of_one_group_rank_by_their_places_in_it() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let mut w = world();
     let mut close = *w.get(object_id(9175)).unwrap();
     close.position = Position::new(28.3, 88.9, 0.0);
@@ -3098,25 +3071,22 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
         group: Some(group_id(4)),
         action_state: ActionState::NO_ACTION,
     };
-    let groups = |ids: &[i32]| crate::groups::UnitGroups {
-        groups: vec![crate::groups::UnitGroup {
+    let groups = |ids: &[i32]| UnitGroups {
+        groups: vec![UnitGroup {
             id: group_id(4),
             members: ids
                 .iter()
-                .map(|&id| crate::groups::Member {
+                .map(|&id| Member {
                     id: object_id(id),
-                    ..crate::groups::Member::default()
+                    ..Member::default()
                 })
                 .collect(),
-            ..crate::groups::UnitGroup::default()
+            ..UnitGroup::default()
         }],
-        ..crate::groups::UnitGroups::default()
+        ..UnitGroups::default()
     };
-    let pauses = |w: &Spatial,
-                  me: &Me,
-                  gs: Option<&crate::groups::UnitGroups>,
-                  objects: &crate::world::index::TestObjects| {
-        let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let pauses = |w: &Spatial, me: &Me, gs: Option<&UnitGroups>, objects: &TestObjects| {
+        let place = Static::at(Position::new(28.0, 89.0, 0.0));
         let m = builder_9177();
         let position = m.moved_at.vector();
         let waypoint = m.paths[0].point(WaypointIndex::of_data(1));
@@ -3139,7 +3109,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
     );
     let second = groups(&[9175, 9177]);
     assert_eq!(pauses(&w, &me, Some(&second), &objects), []);
-    let none = crate::groups::UnitGroups::default();
+    let none = UnitGroups::default();
     assert_eq!(pauses(&w, &me, Some(&none), &objects), []);
     objects.set_gait(object_id(9175), Some(walker(None)));
     let loose = Me { group: None, ..me };
@@ -3153,7 +3123,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
 /// (430356142's scout cavalry 9585 walking its own move through goat 34792 at update 291.)
 #[test]
 fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates() {
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     let mut w = world();
     let mut close = *w.get(object_id(9175)).unwrap();
     close.position = Position::new(28.3, 88.9, 0.0);
@@ -3171,23 +3141,23 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
         group: Some(group_id(4)),
         action_state: ActionState::NO_ACTION,
     };
-    let groups = |member: i32, reason: i32| crate::groups::UnitGroups {
-        groups: vec![crate::groups::UnitGroup {
+    let groups = |member: i32, reason: i32| UnitGroups {
+        groups: vec![UnitGroup {
             id: group_id(4),
-            members: vec![crate::groups::Member {
+            members: vec![Member {
                 id: object_id(member),
-                specific_move: crate::groups::SpecificMove {
+                specific_move: SpecificMove {
                     reason: MoveReason::of_data(reason),
-                    ..crate::groups::SpecificMove::default()
+                    ..SpecificMove::default()
                 },
-                ..crate::groups::Member::default()
+                ..Member::default()
             }],
-            ..crate::groups::UnitGroup::default()
+            ..UnitGroup::default()
         }],
-        ..crate::groups::UnitGroups::default()
+        ..UnitGroups::default()
     };
-    let kept = |w: &Spatial, gs: &crate::groups::UnitGroups| {
-        let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let kept = |w: &Spatial, gs: &UnitGroups| {
+        let place = Static::at(Position::new(28.0, 89.0, 0.0));
         let m = builder_9177();
         let position = m.moved_at.vector();
         let waypoint = m.paths[0].point(WaypointIndex::of_data(1));
@@ -3206,10 +3176,7 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
     assert_eq!(kept(&w, &groups(9177, 0)), Vec::new());
     assert_eq!(kept(&w, &groups(9177, 1)), [object_id(9175)]);
     assert_eq!(kept(&w, &groups(9176, 0)), [object_id(9175)]);
-    assert_eq!(
-        kept(&w, &crate::groups::UnitGroups::default()),
-        [object_id(9175)]
-    );
+    assert_eq!(kept(&w, &UnitGroups::default()), [object_id(9175)]);
     for class in [class::BUILDING, class::WALL, class::GATE, class::TOWER] {
         w.insert(object_id(9175), Placed { class, ..close });
         assert_eq!(
@@ -3376,14 +3343,14 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         gap: Distance::new(0.1),
         to_end: Distance::new(FAR),
     };
-    let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     assert_eq!(
         m.in_reach(place.position(), near, start).unwrap(),
         Some(AfterRequest::Again)
     );
     assert_eq!(m.paths[0].state, PathState::Arrived);
-    let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.paths[0].range = Distance::ZERO;
     let floor = Goal {
@@ -3400,7 +3367,7 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         gap: Distance::new(FAR),
         to_end: Distance::new(FAR),
     };
-    let place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
+    let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     assert_eq!(m.in_reach(place.position(), far, start).unwrap(), None);
     assert_eq!(
@@ -3416,7 +3383,7 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         m.paths[0].flags,
         LevelFlags::REACHED | LevelFlags::AT_WAYPOINT
     );
-    let place = crate::objects::layers::Static::at(house.position);
+    let place = Static::at(house.position);
     let mut m = builder_9177();
     let on_house = Goal {
         gap: Distance::new(FAR),
@@ -3593,14 +3560,14 @@ fn mover_that_shows_sprite_has_the_top_speed_of_its_factor() {
     use crate::objects::sprite::Graphic;
     let with = |factor: f32| Graphic {
         id: SpriteId::named(1),
-        frames: crate::objects::Frame::of_data(1),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::of_data(factor),
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
     };
-    let mut m = crate::gathering::hunt::tests::walker();
+    let mut m = walker();
     m.stats.base = Speed::new(0.8);
     m.shows(Some(&with(1.5)));
     assert_eq!(m.stats.speed, Speed::new(0.8 * 1.5));

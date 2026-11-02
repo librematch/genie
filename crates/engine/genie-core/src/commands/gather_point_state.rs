@@ -1,6 +1,7 @@
 //! A gather point's state: a point SET GATHER POINT made, or a byte SET GATHER STATE gave.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 use std::num::NonZeroU8;
 
 /// A building's gather point's state (`+0xc30`, the save's `gather_point_exists`): 1
@@ -46,8 +47,8 @@ impl GatherPointState {
     }
 }
 
-impl std::fmt::Display for GatherPointState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for GatherPointState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

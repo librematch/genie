@@ -4,8 +4,11 @@
 use crate::combat::Charge;
 use crate::combat::attack::{DRAW_SCALE, QUIET_SWINGS};
 use crate::combat::damage::Victim;
+use crate::combat::missile::StrikeResult;
+use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::fmath::at_most_or_unordered;
 use crate::math::rng::Well512;
 use crate::objects::Frame;
 use crate::objects::HitPoints;
@@ -62,7 +65,7 @@ pub(super) fn after_hit(
     fire: Frame,
     frame: Frame,
 ) -> AfterHit {
-    if ranged && crate::math::fmath::at_most_or_unordered(timer.get(), 0.0) {
+    if ranged && at_most_or_unordered(timer.get(), 0.0) {
         if !target {
             return AfterHit::Done;
         }
@@ -84,7 +87,7 @@ pub(super) fn after_hit(
 /// target of the executed action the attacker posts to its unit AI (notify 0x200 with 600).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Struck {
-    pub result: crate::combat::missile::StrikeResult,
+    pub result: StrikeResult,
     pub executed: Option<ObjectId>,
 }
 
@@ -111,13 +114,13 @@ pub(crate) fn strike(
             .damaged
             .push((Some(own.id), [own.id.get(), own.hp.get() as i32, master_hp]));
         return Ok(Struck {
-            result: crate::combat::missile::StrikeResult::SHIELDED,
+            result: StrikeResult::SHIELDED,
             executed: None,
         });
     }
     let a = own.source;
     let mut struck = Struck {
-        result: crate::combat::missile::StrikeResult::HIT,
+        result: StrikeResult::HIT,
         executed: None,
     };
     if MISSILE <= a.kind
@@ -177,5 +180,5 @@ pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<HitPoi
                 .as_ref()
                 .map_or(HitPoints::ZERO, |mb| mb.blast_taken)
         })
-        .ok_or(crate::construction::build::NOT_HELD)
+        .ok_or(NOT_HELD)
 }

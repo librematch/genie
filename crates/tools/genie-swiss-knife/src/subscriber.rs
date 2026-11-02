@@ -6,6 +6,9 @@
 //! `RUST_LOG=genie_core=trace` …) or the command runs with `--verbose` (`debug`). Else none is
 //! installed, and the engine's spans and events cost one comparison each.
 
+use std::env::var;
+use std::io::stderr;
+use tracing::subscriber::set_global_default;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
@@ -29,7 +32,7 @@ pub fn filter(rust_log: Option<&str>, verbose: bool) -> Option<String> {
 ///
 /// When the filter does not parse or a global subscriber is installed already.
 pub fn install(verbose: bool) -> Result<(), String> {
-    let rust_log = std::env::var("RUST_LOG").ok();
+    let rust_log = var("RUST_LOG").ok();
     let Some(filter) = filter(rust_log.as_deref(), verbose) else {
         return Ok(());
     };
@@ -37,11 +40,8 @@ pub fn install(verbose: bool) -> Result<(), String> {
     let subscriber = Registry::default()
         .with(filter)
         .with(JsonStorageLayer)
-        .with(BunyanFormattingLayer::new(
-            "gsk".to_owned(),
-            std::io::stderr,
-        ));
-    tracing::subscriber::set_global_default(subscriber).map_err(|e| e.to_string())
+        .with(BunyanFormattingLayer::new("gsk".to_owned(), stderr));
+    set_global_default(subscriber).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

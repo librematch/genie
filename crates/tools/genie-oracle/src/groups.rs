@@ -27,7 +27,10 @@ use genie_core::world::WorldTime;
 use genie_save::generated::world as saved;
 
 use crate::{object_ids, path_level, vec3};
+use genie_core::movement::PathData;
 use genie_core::objects::masters::ActionType;
+use genie_core::pathing::DelayCount;
+use std::collections::BTreeMap;
 
 /// Four vectors of a saved 48-byte position (point, forward, up, right).
 fn frame(b: &[u8; 48]) -> [BVector; 4] {
@@ -76,7 +79,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
             .collect::<Result<_, _>>()?,
         flags: MotionFlags::from_bits_retain(m.motion_flags_bits),
         maximum_velocity_forward: Speed::new(m.maximum_velocity_forward),
-        number_wait_delays: genie_core::pathing::DelayCount::of_data(m.number_wait_delays),
+        number_wait_delays: DelayCount::of_data(m.number_wait_delays),
         // not saved: the constructor's
         lead: None,
     })
@@ -378,10 +381,9 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
         if a == b {
             continue;
         }
-        let theirs: std::collections::BTreeMap<&str, &str> =
+        let theirs: BTreeMap<&str, &str> =
             b.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-        let ours: std::collections::BTreeMap<&str, &str> =
-            a.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let ours: BTreeMap<&str, &str> = a.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         for (k, v) in &a {
             match theirs.get(k.as_str()) {
                 Some(w) if *w == v.as_str() => {}
@@ -430,7 +432,7 @@ flat_value!(
     i16,
     u16,
     u8,
-    genie_core::movement::PathData,
+    PathData,
     ObjectId,
     GroupId,
     GroupTarget,
@@ -484,7 +486,7 @@ impl Flat for Speed {
 }
 
 /// A wait count flattens as its int, as the save holds it.
-impl Flat for genie_core::pathing::DelayCount {
+impl Flat for DelayCount {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }

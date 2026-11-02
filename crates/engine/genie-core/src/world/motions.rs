@@ -6,8 +6,13 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
+use crate::objects::layers::{Building, Combat};
 use crate::objects::layers::{Motion, MotionMut};
+use crate::objects::masters::{MasterTables, Masters};
+use crate::world::Player;
+use crate::world::index::{ObjectIndex, ObjectsRef};
 use crate::world::parts::{PartTable, Parts};
+use std::mem::replace;
 
 /// A part table read with at most one entry lent out to change ([`PartTable::lend`]): the
 /// others read as the table's, the lent one as none (its object is out for its update, as its
@@ -150,11 +155,8 @@ impl Parts {
     pub(crate) fn building_and_mover_mut(
         &mut self,
         id: ObjectId,
-    ) -> Result<(&mut crate::objects::layers::Building, Option<&mut Mover>), crate::GenieError>
-    {
-        let building = self
-            .building
-            .get_or_insert_with(id, || crate::objects::layers::Building::NONE)?;
+    ) -> Result<(&mut Building, Option<&mut Mover>), crate::GenieError> {
+        let building = self.building.get_or_insert_with(id, || Building::NONE)?;
         Ok((building, self.motion.mover_mut(id)))
     }
 
@@ -167,10 +169,8 @@ impl Parts {
     pub(crate) fn combat_and_motion_mut(
         &mut self,
         id: ObjectId,
-    ) -> Result<(&mut crate::objects::layers::Combat, MotionMut<'_>), crate::GenieError> {
-        let combat = self
-            .combat
-            .get_or_insert_with(id, crate::objects::layers::Combat::default)?;
+    ) -> Result<(&mut Combat, MotionMut<'_>), crate::GenieError> {
+        let combat = self.combat.get_or_insert_with(id, Combat::default)?;
         Ok((combat, self.motion.layer_mut(id)))
     }
 
@@ -180,19 +180,15 @@ impl Parts {
     pub(crate) fn lend_motion<'a>(
         &'a mut self,
         id: ObjectId,
-        (players, index, masters): (
-            &'a [crate::world::Player],
-            &'a crate::world::index::ObjectIndex,
-            &'a [crate::objects::masters::Masters],
-        ),
-    ) -> (MotionMut<'a>, crate::world::index::ObjectsRef<'a>) {
+        (players, index, masters): (&'a [Player], &'a ObjectIndex, &'a [Masters]),
+    ) -> (MotionMut<'a>, ObjectsRef<'a>) {
         let (motion, motions) = self.motion.lend(id);
         (
             MotionMut::new(motion),
-            crate::world::index::ObjectsRef::of_tables(
+            ObjectsRef::of_tables(
                 players,
                 index,
-                crate::objects::masters::MasterTables::new(masters, &self.own_master),
+                MasterTables::new(masters, &self.own_master),
                 (
                     &self.building,
                     &self.combat,
@@ -210,12 +206,8 @@ impl Parts {
     pub(crate) fn lend_mover<'a>(
         &'a mut self,
         id: ObjectId,
-        tables: (
-            &'a [crate::world::Player],
-            &'a crate::world::index::ObjectIndex,
-            &'a [crate::objects::masters::Masters],
-        ),
-    ) -> (Option<&'a mut Mover>, crate::world::index::ObjectsRef<'a>) {
+        tables: (&'a [Player], &'a ObjectIndex, &'a [Masters]),
+    ) -> (Option<&'a mut Mover>, ObjectsRef<'a>) {
         let (motion, by_id) = self.lend_motion(id, tables);
         (motion.into_mover(), by_id)
     }
@@ -245,7 +237,7 @@ impl Parts {
     pub(crate) fn take_mover(&mut self, id: ObjectId) -> Option<Mover> {
         let motion = self.motion.get_mut(id)?;
         let animated = *motion.animated();
-        match std::mem::replace(motion, Motion::Animated(animated)) {
+        match replace(motion, Motion::Animated(animated)) {
             Motion::Moving(m) => Some(m),
             animated @ Motion::Animated(_) => {
                 *motion = animated;
@@ -274,6 +266,8 @@ impl Parts {
 #[cfg(test)]
 mod tests {
     use crate::movement::Speed;
+    #[cfg(test)]
+    use crate::movement::tests::builder_9177;
     use crate::objects::layers::{Animated, Motion};
     use crate::test_ids::object_id;
     use crate::world::parts::Parts;
@@ -282,7 +276,7 @@ mod tests {
     fn taken_mover_leaves_the_animated_layer_and_comes_back_with_it() {
         let id = object_id(7);
         let mut parts = Parts::default();
-        let mut walker = crate::movement::tests::builder_9177();
+        let mut walker = builder_9177();
         walker.animated = Animated::new(Speed::new(1.0));
         let _ = parts.motion.insert(id, Motion::Moving(walker));
         let taken = parts.take_mover(id);

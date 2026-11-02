@@ -6,8 +6,15 @@
 //! to 0. Nothing else changes the prices.
 
 use crate::GenieError;
+use crate::commands::TradeLots;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
+use crate::math::image::market::{
+    FLIP as MARKET_FLIP, FOOD_START as MARKET_FOOD_START, LEAST_COST as MARKET_LEAST_COST,
+    ORE_START as MARKET_ORE_START, PERCENT as MARKET_PERCENT, ROUND as MARKET_ROUND,
+    STONE_START as MARKET_STONE_START, SWING as MARKET_SWING,
+    UNKNOWN_PRICE as MARKET_UNKNOWN_PRICE, WOOD_START as MARKET_WOOD_START,
+};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::ResourceStat;
@@ -18,21 +25,21 @@ use crate::world::slots::PlayerSlots;
 
 /// A commodity's price after its net trades came back to 0 (`DAT_142f03164`, `DAT_14330eb8c`,
 /// `DAT_142f0703c`).
-const FOOD_START: Price = Price::new(crate::math::image::market::FOOD_START);
-const WOOD_START: Price = Price::new(crate::math::image::market::WOOD_START);
-const STONE_START: Price = Price::new(crate::math::image::market::STONE_START);
-const ORE_START: Price = Price::new(crate::math::image::market::ORE_START);
+const FOOD_START: Price = Price::new(MARKET_FOOD_START);
+const WOOD_START: Price = Price::new(MARKET_WOOD_START);
+const STONE_START: Price = Price::new(MARKET_STONE_START);
+const ORE_START: Price = Price::new(MARKET_ORE_START);
 /// A trade's growth of the swing (`DAT_142e8c150`), the hundredths of its step
 /// (`DAT_14330ebcc`) and the sign flip of a negative growth (`DAT_14330ec20`).
-const SWING: f32 = crate::math::image::market::SWING;
-const PERCENT: f32 = crate::math::image::market::PERCENT;
-const FLIP: f32 = crate::math::image::market::FLIP;
+const SWING: f32 = MARKET_SWING;
+const PERCENT: f32 = MARKET_PERCENT;
+const FLIP: f32 = MARKET_FLIP;
 /// The price of an attribute no commodity is (`FUN_1415cd3c0`, `DAT_14330ec20`).
-const UNKNOWN_PRICE: Price = Price::new(crate::math::image::market::UNKNOWN_PRICE);
+const UNKNOWN_PRICE: Price = Price::new(MARKET_UNKNOWN_PRICE);
 /// A purchase costs at least this (`DAT_142f66f34`).
-const LEAST_COST: f32 = crate::math::image::market::LEAST_COST;
+const LEAST_COST: f32 = MARKET_LEAST_COST;
 /// A sale's gold rounds half up (`DAT_142e7f384`).
-const ROUND: f32 = crate::math::image::market::ROUND;
+const ROUND: f32 = MARKET_ROUND;
 
 /// One commodity's state in the world.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -150,7 +157,7 @@ impl World {
         &mut self,
         p: PlayerId,
         commodity: AttributeId,
-        times: crate::commands::TradeLots,
+        times: TradeLots,
     ) -> Result<(), GenieError> {
         for _ in 0..times.get() {
             let volume = self.players.player(p)?.commodity_volume;
@@ -195,7 +202,7 @@ impl World {
         &mut self,
         p: PlayerId,
         commodity: AttributeId,
-        times: crate::commands::TradeLots,
+        times: TradeLots,
     ) -> Result<(), GenieError> {
         for _ in 0..times.get() {
             let volume = self.players.player(p)?.commodity_volume;
@@ -235,7 +242,13 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::players::LotVolume;
     use crate::test_ids::player_id;
+    #[cfg(test)]
+    use crate::test_ids::{amounts, attributes};
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -315,16 +328,16 @@ mod tests {
     /// Player 1 with 100 of each resource, a commodity volume of 100, a fee of 0.3 and the
     /// market above.
     fn trading() -> World {
-        let mut attributes = crate::test_ids::attributes(250, [100.0; 4]);
+        let mut attributes = attributes(250, [100.0; 4]);
         attributes[attribute::MARKET_FEE.index()] = Amount::new(0.3);
         let player = Player {
             attributes,
-            commodity_volume: crate::players::LotVolume::of_data(100),
+            commodity_volume: LotVolume::of_data(100),
             ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![Player::default(), player],
@@ -339,17 +352,10 @@ mod tests {
     #[test]
     fn sale_gives_the_lot_worth_less_the_fee_at_the_old_price() {
         let mut t = trading();
-        t.sell(
-            player_id(1),
-            attribute::WOOD,
-            crate::commands::TradeLots::of_data(2),
-        )
-        .unwrap();
+        t.sell(player_id(1), attribute::WOOD, TradeLots::of_data(2))
+            .unwrap();
         let p = &t.players[1];
-        assert_eq!(
-            p.resources(),
-            crate::test_ids::amounts([100.0, 0.0, 100.0, 170.0])
-        );
+        assert_eq!(p.resources(), amounts([100.0, 0.0, 100.0, 170.0]));
         assert_eq!(
             (p.attributes[49], p.attributes[169]),
             (Amount::new(70.0), Amount::new(70.0))
@@ -367,17 +373,10 @@ mod tests {
     fn purchase_costs_the_lot_worth_and_the_fee_at_least_21() {
         let mut t = trading();
         t.players[1].attributes[attribute::GOLD.index()] = Amount::new(170.0);
-        t.buy(
-            player_id(1),
-            attribute::FOOD,
-            crate::commands::TradeLots::of_data(2),
-        )
-        .unwrap();
+        t.buy(player_id(1), attribute::FOOD, TradeLots::of_data(2))
+            .unwrap();
         let p = &t.players[1];
-        assert_eq!(
-            p.resources(),
-            crate::test_ids::amounts([200.0, 100.0, 100.0, 21.0])
-        );
+        assert_eq!(p.resources(), amounts([200.0, 100.0, 100.0, 21.0]));
         assert_eq!(
             (p.attributes[49], p.attributes[169]),
             (Amount::ZERO, Amount::ZERO)
@@ -387,25 +386,17 @@ mod tests {
             (0.02 + 1.15, 1)
         );
         let mut t = trading();
-        t.players[1].commodity_volume = crate::players::LotVolume::of_data(10);
-        t.buy(
-            player_id(1),
-            attribute::WOOD,
-            crate::commands::TradeLots::of_data(1),
-        )
-        .unwrap();
+        t.players[1].commodity_volume = LotVolume::of_data(10);
+        t.buy(player_id(1), attribute::WOOD, TradeLots::of_data(1))
+            .unwrap();
         assert_eq!(
             t.players[1].attributes[attribute::GOLD.index()],
             Amount::new(100.0 - 21.0)
         );
         // no volume, no purchase
-        t.players[1].commodity_volume = crate::players::LotVolume::of_data(0);
-        t.buy(
-            player_id(1),
-            attribute::WOOD,
-            crate::commands::TradeLots::of_data(1),
-        )
-        .unwrap();
+        t.players[1].commodity_volume = LotVolume::of_data(0);
+        t.buy(player_id(1), attribute::WOOD, TradeLots::of_data(1))
+            .unwrap();
         assert_eq!(
             t.players[1].attributes[attribute::GOLD.index()],
             Amount::new(79.0)

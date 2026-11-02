@@ -2,11 +2,15 @@
 //! combat part.
 
 use crate::Error;
+use genie_core::movement::move_to::MoveWait;
+use genie_core::players::market::{Commodity, Market};
+use genie_core::players::{NetTrades, Price, PriceSwing};
 use genie_core::world::Millis;
 use genie_core::world::Seconds;
 use genie_rec::de;
 use genie_rec::de::Op;
 use genie_save::generated::world::Master;
+use genie_save::generated::world::{Action, RgeMasterCombatObject, World};
 
 /// One frame of the body (FD-007's per-frame record order): the op-2 record that starts a tick, its
 /// dt and, every interval, a checkpoint, then the op-1 commands the tick runs after its `SeedAll`.
@@ -49,9 +53,7 @@ pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<
 /// # Errors
 ///
 /// A saved wait state that names no state.
-pub(super) fn saved_move_wait(
-    sub: &genie_save::generated::world::Action,
-) -> Result<genie_core::movement::move_to::MoveWait, genie_core::GenieError> {
+pub(super) fn saved_move_wait(sub: &Action) -> Result<MoveWait, genie_core::GenieError> {
     use genie_core::movement::move_to::{MoveWait, MoveWaitState};
     sub.rge_action_by_type
         .as_deref()
@@ -70,17 +72,15 @@ pub(super) fn saved_move_wait(
 
 /// The world's market as the save holds it: the save names the int net trades `*_price_delta`
 /// (their bits) and the swings `old_*_price_adj`.
-pub(super) fn market(
-    w: &genie_save::generated::world::World,
-) -> genie_core::players::market::Market {
-    let commodity = |price: f32, trades: f32, swing: f32| genie_core::players::market::Commodity {
-        price: genie_core::players::Price::new(price),
-        trades: genie_core::players::NetTrades::new(trades.to_bits().cast_signed()),
-        swing: genie_core::players::PriceSwing::new(swing),
+pub(super) fn market(w: &World) -> Market {
+    let commodity = |price: f32, trades: f32, swing: f32| Commodity {
+        price: Price::new(price),
+        trades: NetTrades::new(trades.to_bits().cast_signed()),
+        swing: PriceSwing::new(swing),
     };
-    genie_core::players::market::Market {
-        min_price: genie_core::players::Price::new(w.world_min_price),
-        max_price: genie_core::players::Price::new(w.world_max_price),
+    Market {
+        min_price: Price::new(w.world_min_price),
+        max_price: Price::new(w.world_max_price),
         food: commodity(w.world_food_price, w.food_price_delta, w.old_food_price_adj),
         wood: commodity(w.world_wood_price, w.wood_price_delta, w.old_wood_price_adj),
         stone: commodity(
@@ -92,9 +92,7 @@ pub(super) fn market(
     }
 }
 
-pub(super) fn combat_master(
-    m: &Master,
-) -> Option<&genie_save::generated::world::RgeMasterCombatObject> {
+pub(super) fn combat_master(m: &Master) -> Option<&RgeMasterCombatObject> {
     None.or_else(|| {
         m.tribe_master_combat_object
             .as_deref()

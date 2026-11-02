@@ -2,17 +2,22 @@
 
 use crate::GenieError;
 use crate::combat::damage::Victim;
+use crate::gathering::gather::unit::give_load as unit_give_load;
 use crate::math::rng::Well512;
 use crate::movement::move_to::Walk;
 use crate::movement::{Me, Planning};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
 use crate::objects::layers::Action;
+use crate::objects::layers::Static;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
+use crate::unit_ai::Notify;
 use crate::unit_ai::UnitAi;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -21,6 +26,7 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
+use std::mem::{replace, take};
 
 pub(crate) struct Step<'a> {
     /// The world the update reaches (FD-045-D28): its objects by id, every player and the
@@ -51,7 +57,7 @@ pub(crate) struct Step<'a> {
     pub(crate) player: PlayerId,
     /// While the unit AI's side runs ([`Unit::with_side`]: the AI out of the unit), the notifies
     /// the step's calls give that AI, posted to it as the side returns; None otherwise.
-    pub(crate) side_notifies: Option<Vec<(crate::unit_ai::Notify, crate::objects::ObjectState)>>,
+    pub(crate) side_notifies: Option<Vec<(Notify, ObjectState)>>,
 }
 
 /// What a walk takes of the update beside the world: the dt in seconds, the world's time and
@@ -78,7 +84,7 @@ impl World {
     pub(crate) fn walk_beside<'b>(
         &'b mut self,
         pace: Pace,
-        place: &'b mut crate::objects::layers::Static,
+        place: &'b mut Static,
         me: Me,
     ) -> (Walk<'b>, Beside<'b>) {
         let Self {
@@ -110,7 +116,7 @@ impl World {
             by_id: ObjectsRef::of_tables(
                 players,
                 index,
-                crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+                MasterTables::new(masters, &parts.own_master),
                 (
                     &parts.building,
                     &parts.combat,
@@ -152,8 +158,8 @@ impl Step<'_> {
         if side {
             self.w.return_unit_ai(me.id, UnitAi::default());
         }
-        let lent = std::mem::replace(me, Unit::taken_out());
-        self.w.parts.put_actions(self.me, std::mem::take(actions));
+        let lent = replace(me, Unit::taken_out());
+        self.w.parts.put_actions(self.me, take(actions));
         let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
         let i = self.w.live_index(p, self.me).ok_or_else(|| {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
@@ -202,11 +208,7 @@ impl Step<'_> {
     /// # Errors
     ///
     /// A notify the unit AI's queue does not take.
-    pub(crate) fn notify_own(
-        &mut self,
-        me: &Unit,
-        n: crate::unit_ai::Notify,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn notify_own(&mut self, me: &Unit, n: Notify) -> Result<(), GenieError> {
         let state = me.life.state;
         if let Some(ai) = self.w.parts.unit_ai.get_mut(me.id) {
             return ai.post(n, state);
@@ -231,7 +233,7 @@ impl Step<'_> {
         amount: Amount,
     ) -> Result<(), GenieError> {
         let mut adds = Vec::new();
-        crate::gathering::gather::unit::give_load(
+        unit_give_load(
             (
                 &self.w.spatial.relations,
                 self.w.players.player(self.player)?.sharing,
@@ -266,7 +268,7 @@ impl Step<'_> {
     /// An updating player the world has not got.
     pub(crate) fn walk_and_sprites<'b>(
         &'b mut self,
-        place: &'b mut crate::objects::layers::Static,
+        place: &'b mut Static,
         me: Me,
     ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
         let player_type = self.w.players.player(self.player)?.kind;
@@ -290,7 +292,7 @@ impl Step<'_> {
                 by_id: ObjectsRef::of_tables(
                     &self.w.players,
                     &self.w.index,
-                    crate::objects::masters::MasterTables::new(&self.w.masters, &parts.own_master),
+                    MasterTables::new(&self.w.masters, &parts.own_master),
                     (
                         &parts.building,
                         &parts.combat,

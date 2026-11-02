@@ -19,6 +19,8 @@ use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
 
+use crate::garrison::ENTER;
+use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
@@ -103,18 +105,19 @@ impl World {
         if villager {
             self.parts.set_town_bell_flag(unit.id, false);
         }
-        self.parts.actions_mut(unit.id)?.list.set_move_to(Some(
-            crate::movement::move_to::MoveToAction {
+        self.parts
+            .actions_mut(unit.id)?
+            .list
+            .set_move_to(Some(MoveToAction {
                 sprite,
-                state: crate::movement::move_to::MoveTo::Start,
+                state: MoveTo::Start,
                 point,
                 target: None,
                 range: Distance::ZERO,
                 voice: Voice::Loud,
-                on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-                wait: crate::movement::move_to::MoveWait::default(),
-            },
-        ));
+                on_target_moved: TargetMoved::Follows,
+                wait: MoveWait::default(),
+            }));
         Ok(())
     }
 
@@ -245,11 +248,7 @@ impl World {
             target: Some(target),
             point: at,
             carry_test: false,
-            filter: if garrison {
-                Some(crate::garrison::ENTER)
-            } else {
-                None
-            },
+            filter: if garrison { Some(ENTER) } else { None },
             notified: garrison || notified,
         };
         self.order_work(p, new, &work)

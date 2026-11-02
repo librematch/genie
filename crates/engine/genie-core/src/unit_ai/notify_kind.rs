@@ -2,6 +2,7 @@
 //! hit, a search asked for), the value the save's `temp_notify` holds at `+0x8`.
 
 use crate::unit_ai::ai_kinds;
+use std::fmt::{Error, Formatter, LowerHex};
 
 /// A notify's kind (`+0x8` of the save's `temp_notify`): the case of the unit AI's notify
 /// handlers (`processNotify`) it takes. The game posts kinds the slice does not name (the
@@ -77,9 +78,9 @@ impl From<i32> for NotifyKind {
     }
 }
 
-impl std::fmt::LowerHex for NotifyKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::LowerHex::fmt(&self.0, f)
+impl LowerHex for NotifyKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        LowerHex::fmt(&self.0, f)
     }
 }
 

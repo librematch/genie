@@ -16,6 +16,7 @@ use crate::movement::PathState;
 use crate::movement::WaypointLevel;
 use crate::movement::{Planning, footprint_gap, footprint_gap_squared};
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -36,7 +37,7 @@ pub(crate) struct StepWorld<'w, 'p> {
     pub(crate) plan: &'w mut Planning<'p>,
     pub(crate) dt: Seconds,
     /// The objects by id: what the walk reads of the units it meets.
-    pub(crate) by_id: crate::world::index::ObjectsRef<'w>,
+    pub(crate) by_id: ObjectsRef<'w>,
 }
 
 /// `FUN_14104a270` (the path step of `BMotion`'s update) on `motion`, for a group whose lead is

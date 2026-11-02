@@ -2,6 +2,8 @@
 
 use crate::map::Distance;
 use crate::world::Seconds;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};
 
 /// A speed in tiles per second as the game's `f32` holds it: a master's speed, a unit's top
 /// speed and forward speed, a group's most forward speed, a missile's speed, the speed at which a
@@ -30,7 +32,7 @@ impl Speed {
     }
 }
 
-impl std::ops::Add for Speed {
+impl Add for Speed {
     type Output = Self;
 
     /// The `f32` sum.
@@ -39,7 +41,7 @@ impl std::ops::Add for Speed {
     }
 }
 
-impl std::ops::Sub for Speed {
+impl Sub for Speed {
     type Output = Self;
 
     /// The `f32` difference.
@@ -48,14 +50,14 @@ impl std::ops::Sub for Speed {
     }
 }
 
-impl std::ops::AddAssign for Speed {
+impl AddAssign for Speed {
     /// The `f32` sum in place (a master's speed plus a technology's).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::Neg for Speed {
+impl Neg for Speed {
     type Output = Self;
 
     /// The speed negated (its sign bit flipped).
@@ -64,7 +66,7 @@ impl std::ops::Neg for Speed {
     }
 }
 
-impl std::ops::Mul<f32> for Speed {
+impl Mul<f32> for Speed {
     type Output = Self;
 
     /// The speed scaled by `f` (one `f32` product, the speed first).
@@ -73,7 +75,7 @@ impl std::ops::Mul<f32> for Speed {
     }
 }
 
-impl std::ops::Mul<Speed> for f32 {
+impl Mul<Speed> for f32 {
     type Output = Speed;
 
     /// The speed scaled by `self` (one `f32` product, the factor first).
@@ -82,7 +84,7 @@ impl std::ops::Mul<Speed> for f32 {
     }
 }
 
-impl std::ops::MulAssign<f32> for Speed {
+impl MulAssign<f32> for Speed {
     /// The speed scaled by `f` in place (one `f32` product: a master's speed times a
     /// technology's factor).
     fn mul_assign(&mut self, f: f32) {
@@ -90,7 +92,7 @@ impl std::ops::MulAssign<f32> for Speed {
     }
 }
 
-impl std::ops::Div<f32> for Speed {
+impl Div<f32> for Speed {
     type Output = Self;
 
     /// The speed divided by `f` (one `f32` quotient).
@@ -99,7 +101,7 @@ impl std::ops::Div<f32> for Speed {
     }
 }
 
-impl std::ops::Div for Speed {
+impl Div for Speed {
     type Output = f32;
 
     /// The ratio of two speeds (one `f32` quotient).
@@ -108,7 +110,7 @@ impl std::ops::Div for Speed {
     }
 }
 
-impl std::ops::Mul<Seconds> for Speed {
+impl Mul<Seconds> for Speed {
     type Output = Distance;
 
     /// The way the speed covers in `dt` (one `f32` product, the speed first).
@@ -117,7 +119,7 @@ impl std::ops::Mul<Seconds> for Speed {
     }
 }
 
-impl std::ops::Mul<Speed> for Seconds {
+impl Mul<Speed> for Seconds {
     type Output = Distance;
 
     /// The way `speed` covers in the span (one `f32` product, the span first).
@@ -126,8 +128,8 @@ impl std::ops::Mul<Speed> for Seconds {
     }
 }
 
-impl std::fmt::Display for Speed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Speed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

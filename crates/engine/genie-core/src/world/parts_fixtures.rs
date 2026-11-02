@@ -9,9 +9,12 @@ use crate::objects::layers::Combat;
 use crate::objects::layers::Motion;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
+use crate::players::PlayerId;
 use crate::unit_ai::UnitAi;
+use crate::world::Unread;
 use crate::world::World;
 use crate::world::parts::{Object, ObjectParts, Part, PartTable, Parts};
+use std::sync::LazyLock;
 
 /// No own masters: a test's master lookups without a world.
 pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
@@ -20,7 +23,7 @@ pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
 
 /// No parts: a test's reads by id without a world.
 pub(crate) fn no_parts() -> &'static Parts {
-    static NONE: std::sync::LazyLock<Parts> = std::sync::LazyLock::new(Parts::default);
+    static NONE: LazyLock<Parts> = LazyLock::new(Parts::default);
     &NONE
 }
 
@@ -92,7 +95,7 @@ impl Object {
     /// read whole, for `why` ([`crate::world::Unread`]).
     pub(crate) fn unread(unit: impl Into<Self>, why: crate::GenieError) -> Self {
         let mut o = unit.into();
-        o.parts.unread = Some(crate::world::Unread::new(why));
+        o.parts.unread = Some(Unread::new(why));
         o
     }
 
@@ -128,7 +131,7 @@ impl World {
     /// A player the world does not hold.
     pub(crate) fn set_live_for_test(
         &mut self,
-        p: crate::players::PlayerId,
+        p: PlayerId,
         objects: impl IntoIterator<Item = Object>,
     ) {
         let list = &mut self
@@ -245,7 +248,7 @@ impl World {
     ///
     /// An object the world does not hold.
     pub(crate) fn set_unread(&mut self, id: ObjectId, why: crate::GenieError) {
-        self.set_part(id, Part::Unread(Some(crate::world::Unread::new(why))))
+        self.set_part(id, Part::Unread(Some(Unread::new(why))))
             .expect("an unread object the world holds");
     }
 

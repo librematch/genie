@@ -21,15 +21,22 @@ mod release;
 mod send;
 
 pub use self::awake::IDLE_SPAN;
+use crate::construction::repair::REPAIR as CONSTRUCTION_REPAIR;
+use crate::groups::LinePoint;
+use crate::groups::formation::top_path;
+use crate::math::image::facing::QUARTER_PI;
+use crate::math::image::group::{CLOSE as GROUP_CLOSE, FARTHEST as GROUP_FARTHEST, FRONT_SHARE};
+use crate::math::image::missile::VOLLEY_REACH_MARGIN;
+use crate::math::image::movement::LOOK_AHEAD;
+use crate::objects::masters::action_type::BUILD as ACTION_TYPE_BUILD;
 
 /// The group's current command (`mCurrentCommand`, `+0x3a8`) without one.
 const NO_COMMAND: GroupCommandKind = GroupCommandKind::NONE;
 /// The group commands the update tells apart: an attack, a build, a repair, a relic's pick-up
 /// and its delivery.
 const ATTACK: GroupCommandKind = GroupCommandKind::ATTACK;
-const BUILD: GroupCommandKind =
-    GroupCommandKind::of_action(crate::objects::masters::action_type::BUILD);
-const REPAIR: GroupCommandKind = GroupCommandKind::of_action(crate::construction::repair::REPAIR);
+const BUILD: GroupCommandKind = GroupCommandKind::of_action(ACTION_TYPE_BUILD);
+const REPAIR: GroupCommandKind = GroupCommandKind::of_action(CONSTRUCTION_REPAIR);
 const PICK_UP_RELIC: GroupCommandKind = GroupCommandKind::named(0x84);
 const DELIVER_RELIC: GroupCommandKind = GroupCommandKind::named(0x88);
 /// The action types of the tasks that pick up and deliver relics (`FUN_1415c60b0`'s third
@@ -37,20 +44,20 @@ const DELIVER_RELIC: GroupCommandKind = GroupCommandKind::named(0x88);
 const RELIC_PICKUP_ACTION: ActionType = ActionType::named(0x84);
 const RELIC_DELIVERY_ACTION: ActionType = ActionType::named(0x88);
 /// The nearest member's target starts this far (`FUN_141007ca0`, `DAT_14330ebf4`).
-const FARTHEST: f32 = crate::math::image::group::FARTHEST;
+const FARTHEST: f32 = GROUP_FARTHEST;
 /// A follow (`mCurrentCommand` 2).
 const FOLLOW: GroupCommandKind = GroupCommandKind::FOLLOW;
 /// A turn of the motion above this lays the formation out anew (`DAT_142eb6e44`, π/4).
-const TURN_LIMIT: f32 = crate::math::image::facing::QUARTER_PI;
+const TURN_LIMIT: f32 = QUARTER_PI;
 /// How far ahead of the group its front is looked for (`DAT_14330ebcc`).
-const FRONT_AHEAD: Distance = Distance::new(crate::math::image::movement::LOOK_AHEAD);
+const FRONT_AHEAD: Distance = Distance::new(LOOK_AHEAD);
 /// A total spacing above this lays the formation out anew on a changed count
 /// (`DAT_142ec9eb4`).
-const RELAYOUT_SPACING: Distance = Distance::new(crate::math::image::missile::VOLLEY_REACH_MARGIN);
+const RELAYOUT_SPACING: Distance = Distance::new(VOLLEY_REACH_MARGIN);
 /// The share of the lead's line of sight a follow keeps within (`DAT_142e7f384`).
-const FOLLOW_SHARE: f32 = crate::math::image::group::FRONT_SHARE;
+const FOLLOW_SHARE: f32 = FRONT_SHARE;
 /// A follow's target this near the top path's end (squared, `DAT_14330eb8c`) keeps the move.
-const CLOSE: f32 = crate::math::image::group::CLOSE;
+const CLOSE: f32 = GROUP_CLOSE;
 /// The differentiator groups' members the update lists for the members' moves, at most this
 /// many (`DAT_143f15860`: `0x8b < n` ends the list).
 const DIFFERENTIATORS: usize = 0x8c;
@@ -97,8 +104,7 @@ impl UnitGroup {
     /// `FUN_141046500`) or its [`GroupFlags::PATROL`] (`FUN_141017c30`).
     #[must_use]
     pub fn patrols(&self) -> bool {
-        crate::groups::formation::top_path(&self.motion.paths)
-            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS))
+        top_path(&self.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS))
             || self.flags.contains(GroupFlags::PATROL)
     }
 
@@ -111,7 +117,7 @@ impl UnitGroup {
         let g = self;
         if g.motion.flags.contains(MotionFlags::MOVED) {
             let [point, forward, up, right] = g.motion.new_position;
-            g.stored_positions.add_at_front(crate::groups::LinePoint {
+            g.stored_positions.add_at_front(LinePoint {
                 point,
                 forward,
                 up,

@@ -2,6 +2,7 @@
 //! update, its walk and its test beside the shore.
 
 use crate::GenieError;
+use crate::combat::abilities::Look;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::{
@@ -16,20 +17,24 @@ use crate::map::Position;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
 use crate::movement::Mover;
 use crate::movement::PathAsk;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
+use crate::objects::Graphics;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::{Master, TaskId};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::PlayerType;
 use crate::unit_ai::{ActionKind, UnitAi};
+use crate::unit_ai::{NotifyKind, alert_owner};
 use crate::world::World;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
@@ -71,9 +76,7 @@ impl TransportAction {
         shore: &mut impl Shore,
     ) -> Result<Changed, GenieError> {
         let (x, y) = (self.point.x(), self.point.y());
-        let sails = first
-            && crate::math::fmath::at_most_or_unordered(0.0, x)
-            && crate::math::fmath::at_most_or_unordered(0.0, y);
+        let sails = first && at_most_or_unordered(0.0, x) && at_most_or_unordered(0.0, y);
         self.set_state(
             if sails {
                 TransportState::Sail { move_to: None }
@@ -182,16 +185,13 @@ impl TransportAction {
         let zone = shore.zone(point.tile())?;
         let (ux, uy) = (ship.position.x(), ship.position.y());
         // MAXSS 0, gap: the gap when it is not below 0, a NaN gap too
-        let dx = crate::math::fmath::maxss(0.0, (x - ux).abs() - ship.radius.x());
-        let dy = crate::math::fmath::maxss(0.0, (y - uy).abs() - ship.radius.y());
+        let dx = maxss(0.0, (x - ux).abs() - ship.radius.x());
+        let dy = maxss(0.0, (y - uy).abs() - ship.radius.y());
         let near = shore.near(zone, Distance::new(NEAR))?;
-        let within =
-            !crate::math::fmath::below_or_unordered(UNLOAD_REACH_SQUARED, dy * dy + dx * dx);
+        let within = !below_or_unordered(UNLOAD_REACH_SQUARED, dy * dy + dx * dx);
         let state = if near && within {
             TransportState::Unload
-        } else if crate::math::fmath::below_or_unordered(x, 0.0)
-            || crate::math::fmath::below_or_unordered(y, 0.0)
-        {
+        } else if below_or_unordered(x, 0.0) || below_or_unordered(y, 0.0) {
             return Ok(Changed::default());
         } else if by_self {
             TransportState::SailToUnload { move_to: None }
@@ -215,7 +215,7 @@ impl TransportAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         r: &TransportReads,
     ) -> Result<UpdateCode, GenieError> {
@@ -260,7 +260,7 @@ impl TransportAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
     ) -> Result<(), GenieError> {
         if let Some(own) = actions.list.transport_mut() {
             *own = *self;
@@ -317,7 +317,7 @@ impl TransportAction {
                 stand((unit, motion.reborrow()), changed, look)?;
                 unit.post_own(
                     ais,
-                    crate::unit_ai::NotifyKind::ACTION_FAILED,
+                    NotifyKind::ACTION_FAILED,
                     [ActionKind::Transport.value(), 0, 0],
                 )?;
                 return Ok(Updated::Code(UpdateCode::FAILED));
@@ -346,7 +346,7 @@ impl TransportAction {
                 let changed = self.unloaded(ship, shore)?;
                 stand((unit, motion.reborrow()), changed, look)?;
                 if cannot_unload {
-                    crate::unit_ai::alert_owner(player_type)?;
+                    alert_owner(player_type)?;
                 }
                 return Ok(Updated::Code(UpdateCode::UNDER_WAY));
             }
@@ -530,10 +530,7 @@ impl<'a> Ship<'a> {
         (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
         map: GridSize,
-        graphics: (
-            &'a crate::objects::Graphics,
-            Option<&crate::combat::abilities::Look>,
-        ),
+        graphics: (&'a Graphics, Option<&Look>),
         task: Option<TaskId>,
     ) -> Result<Self, GenieError> {
         let walk = MoveToReads::of((unit, mover), master, graphics);

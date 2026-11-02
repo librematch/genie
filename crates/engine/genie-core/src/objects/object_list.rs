@@ -11,6 +11,10 @@
 use crate::GenieError;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::objects::{ListIndex, ObjectId, ObjectKey, Places};
+use std::mem::replace;
+use std::ops::{Index, IndexMut};
+use std::slice::{Iter, IterMut};
+use std::vec::IntoIter as VecIntoIter;
 
 /// A player's live or sleeping objects in their list's order.
 #[derive(Clone, Debug, Default)]
@@ -119,12 +123,12 @@ impl ObjectList {
     }
 
     /// The objects in the list's order.
-    pub fn iter(&self) -> std::slice::Iter<'_, Unit> {
+    pub fn iter(&self) -> Iter<'_, Unit> {
         self.units.iter()
     }
 
     /// The objects in the list's order, to change.
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Unit> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, Unit> {
         self.units.iter_mut()
     }
 
@@ -179,7 +183,7 @@ impl ObjectList {
     /// The list holds no slot `i`.
     pub fn take_out(&mut self, i: ListIndex) -> Result<Unit, GenieError> {
         let slot = self.units.get_mut(i.get()).ok_or_else(|| no_slot(i))?;
-        let unit = std::mem::replace(slot, Unit::taken_out());
+        let unit = replace(slot, Unit::taken_out());
         self.outs.push((unit.id, i));
         Ok(unit)
     }
@@ -333,7 +337,7 @@ impl FromIterator<Unit> for ObjectList {
     }
 }
 
-impl std::ops::Index<ListIndex> for ObjectList {
+impl Index<ListIndex> for ObjectList {
     type Output = Unit;
 
     fn index(&self, i: ListIndex) -> &Unit {
@@ -341,7 +345,7 @@ impl std::ops::Index<ListIndex> for ObjectList {
     }
 }
 
-impl std::ops::IndexMut<ListIndex> for ObjectList {
+impl IndexMut<ListIndex> for ObjectList {
     fn index_mut(&mut self, i: ListIndex) -> &mut Unit {
         &mut self.units[i.get()]
     }
@@ -349,7 +353,7 @@ impl std::ops::IndexMut<ListIndex> for ObjectList {
 
 impl IntoIterator for ObjectList {
     type Item = Unit;
-    type IntoIter = std::vec::IntoIter<Unit>;
+    type IntoIter = VecIntoIter<Unit>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.units.into_iter()
@@ -358,7 +362,7 @@ impl IntoIterator for ObjectList {
 
 impl<'a> IntoIterator for &'a ObjectList {
     type Item = &'a Unit;
-    type IntoIter = std::slice::Iter<'a, Unit>;
+    type IntoIter = Iter<'a, Unit>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.units.iter()
@@ -367,7 +371,7 @@ impl<'a> IntoIterator for &'a ObjectList {
 
 impl<'a> IntoIterator for &'a mut ObjectList {
     type Item = &'a mut Unit;
-    type IntoIter = std::slice::IterMut<'a, Unit>;
+    type IntoIter = IterMut<'a, Unit>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.units.iter_mut()

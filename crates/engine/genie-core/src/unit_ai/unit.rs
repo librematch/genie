@@ -1,6 +1,8 @@
 //! The unit AI's part of the update: its surroundings, its side and its run.
 
 use crate::GenieError;
+use crate::construction::build::CART_TASK;
+use crate::groups::GroupCommandKind;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::math::rng::{Stream, Well512};
@@ -8,25 +10,34 @@ use crate::movement::Speed;
 use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
+use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
+use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
+use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::UnitAiType;
+use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
+use crate::unit_ai::{Attacker, GroupState, NotifyKind, Seen, UnitSeen, UnitSide};
+use crate::vision::visibility::sight_taker;
+use crate::world::UNIT_AI_MASTER;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use std::mem::{replace, take};
 
 /// A unit that runs its unit AI's side where it has none.
 const NO_UNIT_AI: GenieError = GenieError::unreachable("a unit without a unit AI where one runs");
@@ -41,7 +52,7 @@ impl Unit {
     /// 0x230). Then the step the update ends with.
     pub(crate) fn ai_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         (captured, leaves): (Option<Captured>, Outcome),
     ) -> Result<Outcome, GenieError> {
@@ -50,13 +61,12 @@ impl Unit {
         // an object others take over by seeing it (`+0x924` 1) gives it to the first player that
         // sees it ([`crate::vision::visibility::sight_taker`]) when that one has its master
         let mut captured = captured;
-        let combat = crate::objects::masters::master_type::COMBAT
-            <= self.master(c.w.master_tables(), c.player)?.kind;
+        let combat = COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
         if combat
             && let Some(mask) =
                 c.w.spatial
                     .combat_sight(self.id, c.w.parts.building_of(self.id).annex_of)?
-            && let Some(q) = crate::vision::visibility::sight_taker(
+            && let Some(q) = sight_taker(
                 mask,
                 c.player,
                 c.w.settings.game_mode.standard(),
@@ -73,7 +83,7 @@ impl Unit {
                 new: q,
                 main: true,
                 also: Vec::new(),
-                building: std::mem::take(&mut c.building_handover),
+                building: take(&mut c.building_handover),
             });
         }
         let mut after = self.ai_run(actions, c, captured.as_ref(), None)?;
@@ -85,7 +95,7 @@ impl Unit {
                 new,
                 main,
                 also: Vec::new(),
-                building: std::mem::take(&mut c.building_handover),
+                building: take(&mut c.building_handover),
             });
         }
         if let Some(k) = captured {
@@ -106,7 +116,7 @@ impl Unit {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn surroundings(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &Step<'_>,
         view: &OwnerView,
         (master, class): (Option<&Master>, Option<ClassId>),
@@ -135,20 +145,13 @@ impl Unit {
                 None => None,
             },
             combat_level: master.map_or(CombatLevel::NONE, |m| m.combat_level),
-            attack_priority: master
-                .map_or(crate::objects::masters::AttackPriority::PRIORITY_0, |m| {
-                    m.attack_priority
-                }),
+            attack_priority: master.map_or(AttackPriority::PRIORITY_0, |m| m.attack_priority),
             size: master.map_or(Footprint::ZERO, |m| m.radius),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
             search_radius: master.map_or(Distance::ZERO, |m| m.search_radius),
             weapon_range: master.map_or(Distance::ZERO, |m| m.weapon_range),
             interruptible,
-            task_0x99: master.is_some_and(|m| {
-                m.tasks
-                    .iter()
-                    .any(|t| t.action_type == crate::construction::build::CART_TASK)
-            }),
+            task_0x99: master.is_some_and(|m| m.tasks.iter().any(|t| t.action_type == CART_TASK)),
             garrisoned: self.life.inside.is_some(),
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
@@ -183,15 +186,15 @@ impl Unit {
                 view,
                 master,
             )?,
-            group: (self.group.id).and_then(|id| c.w.groups.get(id)).map(|g| {
-                crate::unit_ai::GroupState {
-                    commanded: g.current_command != crate::groups::GroupCommandKind::NONE,
+            group: (self.group.id)
+                .and_then(|id| c.w.groups.get(id))
+                .map(|g| GroupState {
+                    commanded: g.current_command != GroupCommandKind::NONE,
                     idle: g.is_idle(),
                     patrol: g.patrols(),
                     moving: g.motion.moving(),
                     member_moving: c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
-                }
-            }),
+                }),
             top_target: actions
                 .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
@@ -206,12 +209,12 @@ impl Unit {
                 .w
                 .players
                 .get(player.index())
-                .map_or(crate::players::Chance::NONE, |q| q.dodge_chance),
+                .map_or(Chance::NONE, |q| q.dodge_chance),
             keep_distance_chance: c
                 .w
                 .players
                 .get(player.index())
-                .map_or(crate::players::Chance::NONE, |q| q.keep_distance_chance),
+                .map_or(Chance::NONE, |q| q.keep_distance_chance),
             disable_tower_priority: view.ai_settings.disable_tower_priority,
             guest_computer: self.garrison.iter().any(|&g| {
                 c.w.spatial.get(g).is_some_and(|p| {
@@ -240,10 +243,10 @@ impl Unit {
     /// routine the side called while the AI held the stream.
     pub(crate) fn with_side<R>(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         view: &OwnerView,
-        attacker: crate::unit_ai::Attacker,
+        attacker: Attacker,
         (player, player_type): (PlayerId, PlayerType),
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
@@ -264,7 +267,7 @@ impl Unit {
             ai_settings: view.ai_settings,
         };
         let result = f(&mut ai, &mut side, &mut ai_stream);
-        let own = std::mem::replace(&mut c.side_notifies, outer).unwrap_or_default();
+        let own = replace(&mut c.side_notifies, outer).unwrap_or_default();
         let posted = own.into_iter().try_for_each(|(n, state)| ai.post(n, state));
         c.w.return_unit_ai(self.id, ai);
         let stream = c.w.streams.get(Stream::Ai);
@@ -290,12 +293,12 @@ impl Unit {
     /// and what `f` and its calls do not.
     pub(crate) fn run_ai(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         f: impl FnOnce(
             &mut UnitAi,
             &Surroundings,
-            &mut dyn crate::unit_ai::UnitSide,
+            &mut dyn UnitSide,
             PlayerType,
             &mut Well512,
         ) -> Result<(), GenieError>,
@@ -352,13 +355,9 @@ impl Unit {
     /// A unit without a unit AI, and what `f` and its calls do not model.
     pub(crate) fn run_calls<R>(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
-        f: impl FnOnce(
-            &mut UnitAi,
-            &mut dyn crate::unit_ai::UnitSide,
-            &mut Well512,
-        ) -> Result<R, GenieError>,
+        f: impl FnOnce(&mut UnitAi, &mut dyn UnitSide, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let Some(ai_type) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_type) else {
             return Err(GenieError::unreachable(
@@ -412,7 +411,7 @@ impl Unit {
     /// The unit AI's, its surroundings' and its calls'.
     fn ai_run(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
@@ -526,11 +525,7 @@ impl Unit {
     /// player `viewer`'s map ([`crate::world::World::seen`]): none without one, the unit itself
     /// (out of its slot) when it is its own target (an unload's). The unit's update may have
     /// changed the target before (the Build's work order on a resource).
-    fn ai_target(
-        &self,
-        c: &Step<'_>,
-        viewer: PlayerId,
-    ) -> Result<Option<crate::unit_ai::Seen>, GenieError> {
+    fn ai_target(&self, c: &Step<'_>, viewer: PlayerId) -> Result<Option<Seen>, GenieError> {
         match c
             .w
             .parts
@@ -554,19 +549,19 @@ impl Unit {
         others: OthersRef<'_>,
         view: &OwnerView,
         master: Option<&Master>,
-    ) -> Result<Vec<crate::unit_ai::UnitSeen>, GenieError> {
+    ) -> Result<Vec<UnitSeen>, GenieError> {
         let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
             return Ok(Vec::new());
         };
         let damaged = ai
             .notifies
             .iter()
-            .filter(|n| n.kind == crate::unit_ai::NotifyKind::DAMAGED)
+            .filter(|n| n.kind == NotifyKind::DAMAGED)
             .map(|n| n.caller);
         let in_the_way = ai
             .notifies
             .iter()
-            .filter(|n| n.kind == crate::unit_ai::NotifyKind::IN_THE_WAY)
+            .filter(|n| n.kind == NotifyKind::IN_THE_WAY)
             .map(|n| ObjectId::of_field(n.p[0]));
         // none (−1) names no object the world holds
         let mut ids: Vec<ObjectId> = ai
@@ -585,8 +580,8 @@ impl Unit {
                 continue;
             };
             let m = u.master(c.w.master_tables(), owner)?;
-            let me = master.ok_or(crate::world::UNIT_AI_MASTER)?;
-            seen.push(crate::unit_ai::UnitSeen {
+            let me = master.ok_or(UNIT_AI_MASTER)?;
+            seen.push(UnitSeen {
                 id,
                 class: m.class,
                 owner,
@@ -604,12 +599,7 @@ impl Unit {
                 master: u.life.master_id,
                 kind: m.kind,
                 main: c.w.parts.building_of(u.id).annex_of,
-                allied: crate::unit_ai::task_finder::allied(
-                    view.relations(c.w)?,
-                    view.player,
-                    owner,
-                    true,
-                ),
+                allied: allied(view.relations(c.w)?, view.player, owner, true),
             });
         }
         Ok(seen)
@@ -620,7 +610,7 @@ impl Unit {
     pub(crate) fn post_own(
         &self,
         ais: &mut PartTable<UnitAi>,
-        kind: crate::unit_ai::NotifyKind,
+        kind: NotifyKind,
         p: [i32; 3],
     ) -> Result<(), GenieError> {
         ais.inbox(self.id, self.life.state).post(kind, p)
@@ -638,15 +628,9 @@ impl Unit {
         mover: Option<&mut Mover>,
         ais: &mut PartTable<UnitAi>,
     ) -> Result<(), GenieError> {
-        let in_the_way = mover
-            .map(|m| std::mem::take(&mut m.in_the_way))
-            .unwrap_or_default();
+        let in_the_way = mover.map(|m| take(&mut m.in_the_way)).unwrap_or_default();
         for id in in_the_way {
-            self.post_own(
-                ais,
-                crate::unit_ai::NotifyKind::IN_THE_WAY,
-                [id.get(), -1, -1],
-            )?;
+            self.post_own(ais, NotifyKind::IN_THE_WAY, [id.get(), -1, -1])?;
         }
         Ok(())
     }

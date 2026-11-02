@@ -1,5 +1,6 @@
 //! The RGE combat and missile masters' setters: the armor and attack amounts.
 
+use crate::combat::Firepower;
 use crate::combat::missile::{ArcRatio, HitMode, MissSpread, SmartMode, VanishMode};
 use crate::map::Distance;
 use crate::objects::Frame;
@@ -60,7 +61,7 @@ impl Master {
             a::AREA_DAMAGE => self.area_damage = DamageShare::new(v),
             a::DAMAGE_REFLECTION => self.reflection = DamageShare::new(v),
             a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire = DamageShare::new(v),
-            a::GARRISON_FIREPOWER => self.garrison_firepower = crate::combat::Firepower::new(v),
+            a::GARRISON_FIREPOWER => self.garrison_firepower = Firepower::new(v),
             a::DISPLACEMENT_X => self.weapon_offset = self.weapon_offset.with_x(v),
             a::DISPLACEMENT_Y => self.weapon_offset = self.weapon_offset.with_y(v),
             a::DISPLACEMENT_Z => self.weapon_offset = self.weapon_offset.with_z(v),
@@ -147,7 +148,7 @@ impl Master {
             a::AREA_DAMAGE => self.area_damage += DamageShare::new(v),
             a::DAMAGE_REFLECTION => self.reflection += DamageShare::new(v),
             a::FRIENDLY_FIRE_DAMAGE => self.friendly_fire += DamageShare::new(v),
-            a::GARRISON_FIREPOWER => self.garrison_firepower += crate::combat::Firepower::new(v),
+            a::GARRISON_FIREPOWER => self.garrison_firepower += Firepower::new(v),
             a::DISPLACEMENT_X => {
                 self.weapon_offset = self.weapon_offset.with_x(self.weapon_offset.x() + v);
             }

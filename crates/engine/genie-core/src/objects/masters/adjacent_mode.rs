@@ -1,5 +1,7 @@
 //! A building master's adjacent mode (`+0x980`): whether walls and gates join their neighbours.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A building master's adjacent mode (`+0x980`, `adjacent_mode`): walls and gates join their
 /// neighbours (`FUN_1411ce890`). Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -22,8 +24,8 @@ impl AdjacentMode {
     }
 }
 
-impl std::fmt::Display for AdjacentMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for AdjacentMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

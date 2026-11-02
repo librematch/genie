@@ -1,21 +1,27 @@
 //! The game's own tables beside the `.dat`: the linked technologies, the unit lines and the
 //! drop sites.
 
+use genie_core::objects::ObjectState;
 use genie_core::objects::WorkerCount;
+use genie_core::objects::lines::{LineId, UnitLine};
+use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
+use genie_core::technology::Linked;
 use genie_core::technology::TechId;
+use genie_core::unit_ai::task_finder::{DropSite, DropTarget};
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// The game's linked technologies (`resources/_common/dat/linkedTechs.json`): each group's
 /// technologies with the group's kind. A technology of a kind the game does not know, or out of
 /// the ids' range, is left out.
-pub fn linked_techs(
-    json: &str,
-) -> Result<std::collections::BTreeMap<TechId, genie_core::technology::Linked>, serde_json::Error> {
+pub fn linked_techs(json: &str) -> Result<BTreeMap<TechId, Linked>, serde_json::Error> {
     let file: genie_json::LinkedTechs = serde_json::from_str(json)?;
     Ok(file
         .linked_techs
         .iter()
-        .filter_map(|g| genie_core::technology::Linked::of(&g.kind).map(|k| (g, k)))
+        .filter_map(|g| Linked::of(&g.kind).map(|k| (g, k)))
         .flat_map(|(g, k)| {
             g.techs.iter().filter_map(move |&t| {
                 i16::try_from(t)
@@ -36,8 +42,8 @@ pub enum UnitLinesError {
     Value(usize, &'static str),
 }
 
-impl std::fmt::Display for UnitLinesError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UnitLinesError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         match self {
             Self::Json(e) => write!(f, "{e}"),
             Self::Value(i, key) => write!(f, "UnitLines[{i}]: {key} is not what the game reads"),
@@ -45,7 +51,7 @@ impl std::fmt::Display for UnitLinesError {
     }
 }
 
-impl std::error::Error for UnitLinesError {}
+impl Error for UnitLinesError {}
 
 /// The game's unit lines (`resources/_common/dat/unitlines.json`) as `FUN_140fde680` reads each
 /// entry of `UnitLines`: `LineID` (an int), `IDChain` (an array of ints), `Building` (a bool,
@@ -56,7 +62,7 @@ impl std::error::Error for UnitLinesError {}
 /// # Errors
 ///
 /// A file that is not JSON, or a value of another kind than the game reads.
-pub fn unit_lines(json: &str) -> Result<Vec<genie_core::objects::lines::UnitLine>, UnitLinesError> {
+pub fn unit_lines(json: &str) -> Result<Vec<UnitLine>, UnitLinesError> {
     let v: serde_json::Value = serde_json::from_str(json).map_err(UnitLinesError::Json)?;
     let Some(entries) = v.get("UnitLines").and_then(serde_json::Value::as_array) else {
         return Ok(Vec::new());
@@ -98,8 +104,8 @@ pub fn unit_lines(json: &str) -> Result<Vec<genie_core::objects::lines::UnitLine
                     .collect::<Result<Vec<_>, _>>()?,
                 Some(name) => vec![text(i, name)?],
             };
-            Ok(genie_core::objects::lines::UnitLine {
-                line: line.map(genie_core::objects::lines::LineId::of_data),
+            Ok(UnitLine {
+                line: line.map(LineId::of_data),
                 chain,
                 building,
                 identifiers,
@@ -123,8 +129,8 @@ pub enum DropSitesError {
     State(usize),
 }
 
-impl std::fmt::Display for DropSitesError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for DropSitesError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         match self {
             Self::Json(e) => write!(f, "{e}"),
             Self::Class(i, key) => write!(f, "drop_site_list[{i}]: {key} is no master class"),
@@ -135,20 +141,17 @@ impl std::fmt::Display for DropSitesError {
     }
 }
 
-impl std::error::Error for DropSitesError {}
+impl Error for DropSitesError {}
 
 /// A drop-site target's `object_state` (of entry `i`): none for a negative value, which the task
 /// finder reads as any state (`0 <= state`), else the state.
-fn object_state(
-    i: usize,
-    n: i64,
-) -> Result<Option<genie_core::objects::ObjectState>, DropSitesError> {
+fn object_state(i: usize, n: i64) -> Result<Option<ObjectState>, DropSitesError> {
     if n < 0 {
         return Ok(None);
     }
     u8::try_from(n)
         .ok()
-        .and_then(|n| genie_core::objects::ObjectState::of_byte(n).ok())
+        .and_then(|n| ObjectState::of_byte(n).ok())
         .map(Some)
         .ok_or(DropSitesError::State(i))
 }
@@ -161,9 +164,7 @@ fn object_state(
 ///
 /// A file that is not JSON, a target's `object_group` or an entry's `worker_object_group`
 /// that is neither a class nor (the worker group only) -1, or a target's `object_state` past 8.
-pub fn drop_sites(
-    json: &str,
-) -> Result<Vec<genie_core::unit_ai::task_finder::DropSite>, DropSitesError> {
+pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
     use genie_core::objects::masters::{ClassId, MasterId};
     let v: serde_json::Value = serde_json::from_str(json).map_err(DropSitesError::Json)?;
     let num = |v: &serde_json::Value| v.as_i64().unwrap_or(-1);
@@ -195,7 +196,7 @@ pub fn drop_sites(
                 .iter()
                 .map(|t| {
                     let field = |key: &str| t.get(key).map_or(-1, num);
-                    Ok(genie_core::unit_ai::task_finder::DropTarget {
+                    Ok(DropTarget {
                         class: class(i, "object_group", field("object_group"))?,
                         workers: WorkerCount::of_data(field("worker_num") as i32),
                         state: object_state(i, field("object_state"))?,
@@ -204,7 +205,7 @@ pub fn drop_sites(
                     })
                 })
                 .collect::<Result<Vec<_>, DropSitesError>>()?;
-            Ok(genie_core::unit_ai::task_finder::DropSite {
+            Ok(DropSite {
                 building: MasterId::try_from(num(&e["building_id"]) as i16)
                     .map_err(|_| DropSitesError::Building(i))?,
                 worker_class,
@@ -214,7 +215,7 @@ pub fn drop_sites(
                     .collect(),
                 civs: list(e, "target_civs")
                     .into_iter()
-                    .map(|c| genie_core::players::CivId::new(c as u8))
+                    .map(|c| CivId::new(c as u8))
                     .collect(),
                 auto_work: e.get("auto_work").and_then(serde_json::Value::as_bool) != Some(false),
                 targets,

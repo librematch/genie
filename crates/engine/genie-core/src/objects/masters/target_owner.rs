@@ -1,5 +1,7 @@
 //! A task's owner type (`+0x18`): whose targets the task is for.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A task's owner type (`+0x18`, `owner_type`; the `.dat`'s `target_diplomacy`): whose targets
 /// it is for, as the task's test on a target reads it (`FUN_1411a8620`). Every byte is kept;
 /// one not named here is for anyone's.
@@ -35,8 +37,8 @@ impl TargetOwner {
     }
 }
 
-impl std::fmt::Display for TargetOwner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TargetOwner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.0)
     }
 }

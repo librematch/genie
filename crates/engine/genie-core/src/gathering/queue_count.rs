@@ -1,6 +1,7 @@
 //! The count of farms or fish traps a queue paid for.
 
 use crate::production::CostCount;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// The farms (`farm_queue_count`, `+0x141c`) or fish traps (`fishTrapQueueCount`, `+0x1420`) a
 /// player's queue paid for (saved), and the count a GAME command buys or takes back.
@@ -38,7 +39,7 @@ impl QueueCount {
     }
 }
 
-impl std::ops::Add for QueueCount {
+impl Add for QueueCount {
     type Output = Self;
 
     /// The int sum.
@@ -47,13 +48,13 @@ impl std::ops::Add for QueueCount {
     }
 }
 
-impl std::ops::AddAssign for QueueCount {
+impl AddAssign for QueueCount {
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::Sub for QueueCount {
+impl Sub for QueueCount {
     type Output = Self;
 
     /// The int difference.
@@ -62,7 +63,7 @@ impl std::ops::Sub for QueueCount {
     }
 }
 
-impl std::ops::SubAssign for QueueCount {
+impl SubAssign for QueueCount {
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }

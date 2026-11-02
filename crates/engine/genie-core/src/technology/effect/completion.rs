@@ -2,16 +2,20 @@
 //! it, a built building's technologies, the cost modifier and the disable and enable commands.
 
 use crate::GenieError;
+use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{master_type, player_master};
 use crate::players::Amount;
+use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::players::attribute::RELICS_HELD;
 use crate::players::attribute::RESEARCH_SPENT;
 use crate::players::attribute::TECHS_RESEARCHED;
+use crate::players::history::EventKind;
 use crate::production::LocationButton;
 use crate::technology::ChangeMode;
 use crate::technology::DisabledTech;
@@ -21,6 +25,8 @@ use crate::technology::TechId;
 use crate::technology::TechMode;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER};
 use crate::technology::{EffectCommand, ObjectsKind, Party};
+use crate::technology::{Location, TechDef, TechState, TechType, factors};
+use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -55,7 +61,7 @@ impl World {
         if !(ResearchState::Unavailable..=ResearchState::Researching).contains(&state.state) {
             return Ok(false);
         }
-        if def.costs[0].attribute == Some(crate::players::attribute::RELICS_HELD) {
+        if def.costs[0].attribute == Some(RELICS_HELD) {
             return Err(GenieError::unsupported(
                 "a research paid in relics (FUN_1413d0e70)",
             ));
@@ -69,7 +75,7 @@ impl World {
         let location = building.map_or_else(|| state.locations.first(), |b| state.location(b));
         if location.is_some_and(|l| l.building.is_some() && l.button != LocationButton::NONE) {
             let get = |k: AttributeId| owner.get(k);
-            let factors = crate::technology::factors(tech, &get)?;
+            let factors = factors(tech, &get)?;
             let listed = state.listed_costs(&def, factors)?;
             let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
             let owner = self.players.player_mut(p)?;
@@ -77,9 +83,9 @@ impl World {
             owner.add_attribute(RESEARCH_SPENT, Amount::new(spent))?;
         }
         let age = match t {
-            101 => Some(crate::players::history::EventKind::FEUDAL_AGE),
-            102 => Some(crate::players::history::EventKind::CASTLE_AGE),
-            103 => Some(crate::players::history::EventKind::IMPERIAL_AGE),
+            101 => Some(EventKind::FEUDAL_AGE),
+            102 => Some(EventKind::CASTLE_AGE),
+            103 => Some(EventKind::IMPERIAL_AGE),
             _ => None,
         };
         if let Some(kind) = age {
@@ -106,7 +112,7 @@ impl World {
             // FUN_1413d1020 tests the whole id
             tech.whole()
                 .and_then(|d| self.techs.get(d.index()))
-                .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
+                .is_some_and(|d| d.kind == TechType::SHARED)
         };
         // the player's own enable for one building and upgrade of the object (kinds 2 and 3),
         // the disable of a shared technology, the object's kinds 203 to 206
@@ -222,12 +228,12 @@ impl World {
     fn update_dependent(
         &mut self,
         p: PlayerId,
-        civ: crate::players::CivId,
+        civ: CivId,
         (d, t): (usize, TechId),
     ) -> Result<i32, GenieError> {
         let mut counted = 0;
         let def = self.techs.checked(d)?;
-        if !def.required.contains(&Some(t)) || def.kind == crate::technology::TechType::SHARED {
+        if !def.required.contains(&Some(t)) || def.kind == TechType::SHARED {
             return Ok(counted);
         }
         let Some(state) = self.players.player(p)?.techs.get(d) else {
@@ -274,11 +280,7 @@ impl World {
     /// Whether the technology `def` is out of reach for a player of civ `civ`: another civ's (or
     /// the civ's own under the full tech tree, unless of mode 1), or for other game modes
     /// (`FUN_1413cf2f0`).
-    fn dependent_disabled(
-        &self,
-        def: &crate::technology::TechDef,
-        civ: crate::players::CivId,
-    ) -> Result<bool, GenieError> {
+    fn dependent_disabled(&self, def: &TechDef, civ: CivId) -> Result<bool, GenieError> {
         // another civ's: −1; the civ's own too under the full tech tree (the option +0x63)
         // unless of mode 1
         let other_civ = match def.civ {
@@ -296,7 +298,7 @@ impl World {
     fn finish_dependent(&mut self, p: PlayerId, d: usize) -> Result<i32, GenieError> {
         let mut counted = 0;
         let state = self.players.player_mut(p)?.techs.checked_mut(d)?;
-        let reached = |l: &crate::technology::Location| {
+        let reached = |l: &Location| {
             let at = l
                 .building
                 .and_then(|b| state.location(b))
@@ -357,14 +359,13 @@ impl World {
                 ChangeMode::SCALE => {
                     let half = if amount < 1.0 { -0.5 } else { 0.5 };
                     let delta = (amount - 1.0) * cost.amount.as_f32() + half;
-                    adj.plus(crate::math::conversions::cvttss2si(delta) as i16)
+                    adj.plus(cvttss2si(delta) as i16)
                 }
                 // CVTTSS2SI's 32 bits, the low word added (0x1413d11a6, 0x1413d11be)
-                ChangeMode::SET => CostAmount::of_data(
-                    (crate::math::conversions::cvttss2si(amount) as i16)
-                        .wrapping_sub(cost.amount.get()),
-                ),
-                _ => adj.plus(crate::math::conversions::cvttss2si(amount) as i16),
+                ChangeMode::SET => {
+                    CostAmount::of_data((cvttss2si(amount) as i16).wrapping_sub(cost.amount.get()))
+                }
+                _ => adj.plus(cvttss2si(amount) as i16),
             };
             if resource.is_some() {
                 return Ok(());
@@ -390,7 +391,7 @@ impl World {
         if held.is_some_and(|t| {
             self.techs
                 .get(t)
-                .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
+                .is_some_and(|d| d.kind == TechType::SHARED)
         }) {
             let building = match object.and_then(|id| self.object(id)) {
                 Some((q, u)) => u.master(self.master_tables(), q)?.kind == master_type::BUILDING,
@@ -403,13 +404,11 @@ impl World {
             }
             return Ok(());
         }
-        let disable = |defs: &[crate::technology::TechDef],
-                       states: &mut [crate::technology::TechState],
-                       t: usize| {
+        let disable = |defs: &[TechDef], states: &mut [TechState], t: usize| {
             let (Some(def), Some(state)) = (defs.get(t), states.get_mut(t)) else {
                 return;
             };
-            if def.kind == crate::technology::TechType::REENABLED {
+            if def.kind == TechType::REENABLED {
                 state.state = ResearchState::Available;
             // A researched technology's state, which a disable command keeps (`FUN_1413cdb00`).
             } else if state.state != ResearchState::Researched {
@@ -453,7 +452,7 @@ impl World {
         if enable == 1 && master == MODE_TESTED_MASTER {
             // game mode 11 never enables it; any other asks a settings flag (their `+0x18`'s
             // `+0x7c`, bit 1, FUN_141324b60), which is not held
-            if self.settings.game_mode == crate::world::GameMode::SUDDEN_DEATH {
+            if self.settings.game_mode == GameMode::SUDDEN_DEATH {
                 return Ok(());
             }
             return Err(GenieError::unsupported(

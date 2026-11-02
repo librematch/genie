@@ -13,9 +13,12 @@ use crate::groups::steer::{ASIDE_TIMER, CLEARANCE, EPSILON, KEEPS_MOVING, MOST_F
 use crate::map::Distance;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{BVector, below_or_unordered};
+use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::masters::master_type::ACTION;
+use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -129,12 +132,7 @@ impl World {
             return Ok(());
         };
         let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
-        if keeps_moving
-            || !self
-                .parts
-                .mover_of(u.id)
-                .is_some_and(crate::movement::Mover::is_moving)
-        {
+        if keeps_moving || !self.parts.mover_of(u.id).is_some_and(Mover::is_moving) {
             return Ok(());
         }
         if self.object(id).is_some()
@@ -156,8 +154,8 @@ impl World {
     pub(in crate::groups) fn action_list(
         &self,
         p: PlayerId,
-        u: &crate::objects::unit::Unit,
-        actions: &crate::objects::layers::Action,
+        u: &Unit,
+        actions: &Action,
     ) -> Result<(bool, ActionState), GenieError> {
         if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok((false, ActionState::NO_ACTION));
@@ -361,12 +359,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
-        if !keeps_moving
-            && self
-                .parts
-                .mover_of(u.id)
-                .is_some_and(crate::movement::Mover::is_moving)
-        {
+        if !keeps_moving && self.parts.mover_of(u.id).is_some_and(Mover::is_moving) {
             self.stop_member(id)?;
         }
         let g = self.groups.held_mut(group)?;

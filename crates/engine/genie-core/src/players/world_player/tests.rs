@@ -1,6 +1,8 @@
 use super::*;
 use crate::map::GridSize;
 use crate::map::Tile;
+use crate::math::fmath::log;
+use crate::movement::explore::InfluenceMap;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -14,14 +16,18 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::{BuildingMaster, Master, Masters};
 use crate::objects::unit::Unit;
 use crate::players::CivId;
+use crate::players::EscrowShare;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::ResourceStat;
 use crate::players::attribute;
 use crate::players::game_status::GameStatus;
+use crate::players::history::HistoryUpdates;
 use crate::players::relation_row;
 use crate::players::tracker::Key;
 use crate::technology::ResearchState;
+use crate::technology::TechState;
+use crate::test_ids::amounts;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::vision::TileCount;
@@ -30,6 +36,8 @@ use crate::vision::visibility::{Visibility, VisibleMap};
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
+use crate::world::settings::Settings;
+use crate::world::{Age, FrameSeed, GameMode, SubModeFlags, Visibility as WorldVisibility};
 
 /// Attributes 0 to 299, all 0.
 fn attributes() -> Vec<Amount> {
@@ -60,7 +68,7 @@ fn world() -> World {
     };
     let mut t = World::new(
         WorldTime::from_millis(10_000),
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         vec![gaia, human(), human(), human()],
@@ -105,7 +113,7 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
     );
     assert_eq!(
         t.players[1].history.update_count,
-        crate::players::history::HistoryUpdates::of_data(1)
+        HistoryUpdates::of_data(1)
     );
     t.dt_seconds = Seconds::new(2.5);
     t.players[2].update_time = Seconds::ZERO;
@@ -113,7 +121,7 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
     assert_eq!(t.players[2].update_time, Seconds::new(0.5));
     assert_eq!(
         t.players[2].history.update_count,
-        crate::players::history::HistoryUpdates::of_data(2)
+        HistoryUpdates::of_data(2)
     );
     // below a second, or NaN, no loop
     t.dt_seconds = Seconds::new(0.5);
@@ -121,7 +129,7 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
     t.update_world_player(PlayerId::new(3)).unwrap();
     assert_eq!(
         t.players[3].history.update_count,
-        crate::players::history::HistoryUpdates::of_data(0)
+        HistoryUpdates::of_data(0)
     );
     // Gaia: its own update time, no loop
     t.update_world_player(PlayerId::new(0)).unwrap();
@@ -131,7 +139,7 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
     );
     assert_eq!(
         t.players[0].history.update_count,
-        crate::players::history::HistoryUpdates::of_data(0)
+        HistoryUpdates::of_data(0)
     );
 }
 
@@ -165,7 +173,7 @@ fn attribute_22_is_the_explored_share_in_percent() {
         t.players[1].attributes[22],
         Amount::new(37.0 / 100.0 * 100.0)
     );
-    t.settings.visibility_type = crate::world::Visibility::of_data(2);
+    t.settings.visibility_type = WorldVisibility::of_data(2);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].attributes[22], Amount::new(100.0));
 }
@@ -202,13 +210,10 @@ fn the_trickles_give_sixtieth_of_their_rate_each_second() {
     );
     t.update_world_player(PlayerId::new(1)).unwrap();
     let p = &t.players[1];
-    assert_eq!(
-        p.resources(),
-        crate::test_ids::amounts([6.0 / 60.0, 0.0, 0.0, 1.0])
-    );
+    assert_eq!(p.resources(), amounts([6.0 / 60.0, 0.0, 0.0, 1.0]));
     assert_eq!(
         [166, 167, 168, 169, 49].map(|k| p.attributes[k]),
-        crate::test_ids::amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
+        amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
     );
     t.players[1].game_status = GameStatus::LOST;
     t.update_world_player(PlayerId::new(1)).unwrap();
@@ -250,7 +255,7 @@ fn mill_livestock_makes_food() {
             .livestock_summation = Amount::new(sum);
     }
     t.update_world_player(PlayerId::new(1)).unwrap();
-    let grows = crate::math::fmath::log(400.0 / 200.0 + 1.0);
+    let grows = log(400.0 / 200.0 + 1.0);
     let food = 15.0 / 60.0 * (1.5 * grows);
     assert_eq!(t.players[1].attributes[0], Amount::new(food));
     assert_eq!(t.players[1].attributes[166], Amount::new(food));
@@ -263,7 +268,7 @@ fn mill_livestock_makes_food() {
 fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
     let mut t = world();
     t.players[1].kind = PlayerType::COMPUTER;
-    t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(crate::players::EscrowShare::of_data);
+    t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(EscrowShare::of_data);
     t.add_resource(
         PlayerId::new(1),
         attribute::FOOD,
@@ -330,7 +335,7 @@ fn player_without_an_object_that_keeps_it_loses() {
         master(ids::WONDER, master_type::BUILDING, class::BUILDING),
         Master {
             storage: vec![
-                (Some(attribute::POPULATION), Amount::new(1.0), 0x20),
+                (Some(POPULATION), Amount::new(1.0), 0x20),
                 (None, Amount::ZERO, 0),
                 (None, Amount::ZERO, 0),
             ],
@@ -344,7 +349,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     let keeps = |objects: Vec<Unit>, game_mode: i32| {
         let mut t = world();
         t.masters = vec![masters.clone(); 4];
-        t.settings.game_mode = crate::world::GameMode::of_data(game_mode);
+        t.settings.game_mode = GameMode::of_data(game_mode);
         t.players[1].objects = objects.into();
         t.reindex();
         let p = &t.players[1];
@@ -492,7 +497,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
     };
     let mut t = world();
     t.masters = vec![masters.clone(); 4];
-    t.settings.game_mode = crate::world::GameMode::of_data(11);
+    t.settings.game_mode = GameMode::of_data(11);
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![
         object(1, ids::VILLAGER_MALE, ObjectState::Alive),
@@ -513,13 +518,13 @@ fn sudden_death_and_regicide_end_player_their_ways() {
     // regicide (sub-mode bit 2): no king, a villager notwithstanding
     let mut t = world();
     t.masters = vec![masters; 4];
-    t.settings.sub_game_mode_flag = crate::world::SubModeFlags::from_bits_retain(4);
+    t.settings.sub_game_mode_flag = SubModeFlags::from_bits_retain(4);
     t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
     t.reindex();
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].game_status, GameStatus::LOST);
     let mut t2 = world();
-    t2.settings.game_mode = crate::world::GameMode::of_data(1);
+    t2.settings.game_mode = GameMode::of_data(1);
     t2.players[1].tracker.add(
         object_id(7),
         Key {
@@ -606,18 +611,18 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
             vec![TreeBuilding {
                 id: TreeMaster::of_data(12),
                 units: vec![
-                    unit(74, 75, crate::world::Age::of_data(1), 87),
-                    unit(93, -1, crate::world::Age::of_data(3), 197),
+                    unit(74, 75, Age::of_data(1), 87),
+                    unit(93, -1, Age::of_data(3), 197),
                 ],
             }],
             vec![TreeBuilding {
                 id: TreeMaster::of_data(87),
-                units: vec![unit(4, 24, crate::world::Age::of_data(2), -1)],
+                units: vec![unit(4, 24, Age::of_data(2), -1)],
             }],
         ],
         unique_units: Vec::new(),
     };
-    let settings = crate::world::settings::Settings::default();
+    let settings = Settings::default();
     let q = |civ, building, unit, ages_out| TreeQuery {
         civ,
         building: TreeMaster::of_data(building),
@@ -649,9 +654,9 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
         TreeTech::of_data(0)
     );
     // the last age 3: age 3 is out
-    let early = crate::world::settings::Settings {
-        ending_age: crate::world::Age::of_data(3),
-        ..crate::world::settings::Settings::default()
+    let early = Settings {
+        ending_age: Age::of_data(3),
+        ..Settings::default()
     };
     let late = TreeQuery {
         settings: &early,
@@ -659,9 +664,9 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     };
     assert!(!tree.has(&late));
     // the full tech tree: civilisation 1 lacks the barracks, the fallback 0 has it
-    let full = crate::world::settings::Settings {
+    let full = Settings {
         full_tech_tree: true,
-        ..crate::world::settings::Settings::default()
+        ..Settings::default()
     };
     let fell = TreeQuery {
         settings: &full,
@@ -692,7 +697,7 @@ fn the_upgradable_count_follows_the_tech_tree() {
     ]);
     t.masters = vec![masters; 4];
     t.players[1].civ = CivId::new(0);
-    t.players[1].techs = vec![crate::technology::TechState::default(); 200];
+    t.players[1].techs = vec![TechState::default(); 200];
     t.tech_tree = TechTree {
         civs: vec![vec![TreeBuilding {
             id: TreeMaster::of_data(12),
@@ -700,13 +705,13 @@ fn the_upgradable_count_follows_the_tech_tree() {
                 TreeUnit {
                     id: TreeMaster::of_data(74),
                     link: TreeMaster::NONE,
-                    age: crate::world::Age::of_data(1),
+                    age: Age::of_data(1),
                     tech: TreeTech::of_data(-1),
                 },
                 TreeUnit {
                     id: TreeMaster::of_data(75),
                     link: TreeMaster::of_data(74),
-                    age: crate::world::Age::of_data(2),
+                    age: Age::of_data(2),
                     tech: TreeTech::of_data(150),
                 },
             ],
@@ -749,7 +754,7 @@ fn the_scout_map_takes_the_new_tiles() {
     t.world_player_tail(PlayerId::new(1)).unwrap();
     t.spatial.set_scout_map(
         PlayerId::new(1),
-        crate::movement::explore::InfluenceMap::new(GridSize::new(10, 10), 0),
+        InfluenceMap::new(GridSize::new(10, 10), 0),
     );
     t.world_time = WorldTime::from_millis(4999);
     t.world_player_tail(PlayerId::new(1)).unwrap();

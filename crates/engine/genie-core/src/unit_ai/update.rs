@@ -2,8 +2,10 @@
 //! searches.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
@@ -411,9 +413,9 @@ impl UnitAi {
                         state: None,
                         master: None,
                         workers: if class == class::FARM {
-                            crate::objects::WorkerCount::ONE
+                            WorkerCount::ONE
                         } else {
-                            crate::objects::WorkerCount::NO_CAP
+                            WorkerCount::NO_CAP
                         },
                         spared: None,
                         reach: true,
@@ -438,11 +440,11 @@ impl UnitAi {
                 side.closest_resource(ResourceSearch {
                     kind,
                     cap: if kind == GatherGroup::WOOD {
-                        crate::objects::WorkerCount::of_data(2)
+                        WorkerCount::of_data(2)
                     } else {
-                        crate::objects::WorkerCount::NO_CAP
+                        WorkerCount::NO_CAP
                     },
-                    site: crate::gathering::DropSiteId::of_field(n.p[2]),
+                    site: DropSiteId::of_field(n.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,
@@ -505,7 +507,7 @@ impl UnitAi {
                         relation: None,
                         state: None,
                         master: None,
-                        workers: crate::objects::WorkerCount::NO_CAP,
+                        workers: WorkerCount::NO_CAP,
                         spared,
                         reach: true,
                     },
@@ -526,14 +528,14 @@ impl UnitAi {
             }
             Some(kind) => {
                 let cap = if matches!(kind, GatherGroup::STONE | GatherGroup::GOLD) {
-                    crate::objects::WorkerCount::of_data(4)
+                    WorkerCount::of_data(4)
                 } else {
-                    crate::objects::WorkerCount::NO_CAP
+                    WorkerCount::NO_CAP
                 };
                 side.closest_resource(ResourceSearch {
                     kind,
                     cap,
-                    site: crate::gathering::DropSiteId::of_field(n.p[2]),
+                    site: DropSiteId::of_field(n.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,

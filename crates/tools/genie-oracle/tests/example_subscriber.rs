@@ -8,6 +8,8 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use genie_core::trace::{STATE, UNSUPPORTED};
+use std::io::Error;
+use tracing::subscriber::with_default;
 use tracing_subscriber::fmt::MakeWriter;
 
 /// The lines a subscriber writes, kept for the test to read.
@@ -21,11 +23,11 @@ impl Lines {
 }
 
 impl Write for Lines {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         self.0.lock().unwrap().write(buf)
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -59,7 +61,7 @@ fn an_unsupported_case_prints_as_one_plain_line_without_time() {
         .unwrap();
     let lines = Lines::default();
     let subscriber = support::subscriber(filter, lines.clone());
-    tracing::subscriber::with_default(subscriber, || {
+    with_default(subscriber, || {
         tracing::warn!(
             target: UNSUPPORTED,
             tick = 1154,

@@ -14,7 +14,9 @@
 //! (never).
 
 use crate::combat::abilities::Look;
+use crate::math::conversions::cvttss2si;
 use crate::math::fmath;
+use crate::math::image::sprite::{EPSILON as SPRITE_EPSILON, SHORTEST as SPRITE_SHORTEST};
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
@@ -68,9 +70,9 @@ impl Graphic {
 }
 
 /// The shortest frame interval (`0x3a83126f`, also `DAT_142eb1e9c`).
-const SHORTEST: f32 = crate::math::image::sprite::SHORTEST;
+const SHORTEST: f32 = SPRITE_SHORTEST;
 /// The gap below which a speed multiplier counts as none (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::sprite::EPSILON;
+const EPSILON: f32 = SPRITE_EPSILON;
 
 /// A moving object's top speed (slot 65, `FUN_14114d1d0`) with the sprite `shown`: its master's
 /// speed `base` (slot 0x1d0's `+0x740`), times the sprite's speed factor (`+0xc`) when that is
@@ -297,8 +299,7 @@ impl ActiveSprite {
         self.changed = true;
         self.last_frame = start;
         // CVTTSS2SI EDX, MOVSX EAX, DX (0x1413b5177)
-        let steps =
-            Frame::of_data(crate::math::conversions::cvttss2si(time.get() / interval.get()) as i16);
+        let steps = Frame::of_data(cvttss2si(time.get() / interval.get()) as i16);
         self.last = time - Seconds::new(steps.as_f32() * interval.get());
         if Speed::ZERO < speed || g.speed_multiplier == SpeedMultiplier::ZERO {
             let f = start + if forward { steps } else { -steps };
@@ -436,7 +437,7 @@ pub fn building_death(
     look: Option<&Look>,
     build_points: Seconds,
 ) -> Option<SpriteId> {
-    let points = crate::math::conversions::cvttss2si(build_points.get()).to_le_bytes();
+    let points = cvttss2si(build_points.get()).to_le_bytes();
     if i16::from_le_bytes([points[0], points[1]]) < master.build_time.get() {
         let destruction = master.building.as_ref().and_then(|b| b.destruction_sprite);
         return destruction.or(master.death_sprite);
@@ -447,9 +448,13 @@ pub fn building_death(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
     use crate::movement::Speed;
     use crate::objects::masters::TaskSprites;
     use crate::objects::masters::master_type;
+    #[cfg(test)]
+    use crate::objects::masters::{BuildingMaster, Task};
     use crate::test_ids::master_id;
     use crate::world::WholeSeconds;
 
@@ -495,7 +500,7 @@ mod tests {
             flags: SpriteFlags::ANIMATED | SpriteFlags::RANDOM_FIRST_FRAME,
             ..CHOP
         };
-        let mut stats = crate::gathering::hunt::tests::walker().stats;
+        let mut stats = walker().stats;
         stats.base = Speed::new(0.8);
         stats.speed = Speed::ZERO;
         let mut rng = Well512::default();
@@ -723,10 +728,10 @@ mod tests {
             run_sprite: Some(SpriteId::named(11)),
             attack_sprite: Some(SpriteId::named(12)),
             build_time: WholeSeconds::of_data(50),
-            building: Some(crate::objects::masters::BuildingMaster {
+            building: Some(BuildingMaster {
                 destruction_sprite: Some(SpriteId::named(389)),
                 construction_sprite: None,
-                ..crate::objects::masters::BuildingMaster::default()
+                ..BuildingMaster::default()
             }),
             ..Master::default()
         }
@@ -764,13 +769,13 @@ mod tests {
 
     #[test]
     fn loaded_trade_cart_shows_its_trade_task_carrying_sprite() {
-        let trade = crate::objects::masters::Task {
+        let trade = Task {
             action_type: action_type::TRADE,
             object_id: Some(master_id(0x54)),
             sprites: TaskSprites::of_data([1, 2, 3, 4]),
-            ..crate::objects::masters::Task::default()
+            ..Task::default()
         };
-        let other = crate::objects::masters::Task {
+        let other = Task {
             object_id: Some(master_id(0x55)),
             sprites: TaskSprites::of_data([9; 4]),
             ..trade

@@ -1,6 +1,7 @@
 //! A missile's state: launched, flying, ended.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A missile action's state (`+0x18`, set by `set_state`, `FUN_140a9de70`): its update flies in
 /// state 4. The bytes without a state have no case, and no step modelled here sets them.
@@ -41,8 +42,8 @@ impl MissileState {
     }
 }
 
-impl std::fmt::Display for MissileState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MissileState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

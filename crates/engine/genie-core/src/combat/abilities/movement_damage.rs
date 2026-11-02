@@ -3,11 +3,16 @@
 
 use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own, STRUCK_BUILDING_CLASSES};
 use crate::combat::damage::Victim;
+use crate::combat::damage::lose;
+use crate::combat::victims::victim_of;
+use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::math::conversions::cvttss2si;
+use crate::movement::footprint_gap_squared;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -22,6 +27,8 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::DOPPELGANGER;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::unit_ai::task_finder::allied;
+use crate::vision::ghost::GHOST_MASTER;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -49,13 +56,13 @@ pub fn movement_damage_due(timer: &mut Seconds, dt: Seconds) -> bool {
 /// the high corner.
 #[must_use]
 pub fn reach(position: Position, range: Distance, map: GridSize) -> (Tile, Tile) {
-    let r = crate::math::conversions::cvttss2si(range.get());
+    let r = cvttss2si(range.get());
     let low = |v: f32| {
-        let d = crate::math::conversions::cvttss2si(v).wrapping_sub(r);
+        let d = cvttss2si(v).wrapping_sub(r);
         if d < 0 { 0 } else { d }
     };
     let high = |v: f32, size: i32| {
-        let d = crate::math::conversions::cvttss2si(v).wrapping_add(r);
+        let d = cvttss2si(v).wrapping_add(r);
         if size < d { size } else { d }
     };
     (
@@ -123,12 +130,7 @@ pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander) -> bool {
     if !(ALWAYS_REACHED <= b.blast_defense || hitter.blast_level.reaches(b.blast_defense)) {
         return false;
     }
-    let d2 = crate::movement::footprint_gap_squared(
-        hitter.position,
-        hitter.radius,
-        b.position,
-        b.radius,
-    );
+    let d2 = footprint_gap_squared(hitter.position, hitter.radius, b.position, b.radius);
     fmath::at_most_or_unordered(d2.get(), range.squared().get())
 }
 
@@ -239,7 +241,7 @@ impl World {
         owner: PlayerId,
     ) -> Result<Option<Bystander>, GenieError> {
         let relations = &self.players.player(owner)?.relations;
-        let allied = |q: PlayerId| crate::unit_ai::task_finder::allied(relations, owner, q, true);
+        let allied = |q: PlayerId| allied(relations, owner, q, true);
         if let Some((q, u)) = self.object(id) {
             let m = u.master(self.master_tables(), q)?;
             return Ok(Some(Bystander {
@@ -256,7 +258,7 @@ impl World {
         }
         for (q, player) in PlayerId::each(self.players.len()).zip(&self.players) {
             if let Some(g) = player.ghosts.iter().find(|g| g.id == id) {
-                let m = self.master(q, crate::vision::ghost::GHOST_MASTER)?;
+                let m = self.master(q, GHOST_MASTER)?;
                 return Ok(Some(Bystander {
                     id,
                     player: q,
@@ -270,7 +272,7 @@ impl World {
                 }));
             }
         }
-        Err(crate::construction::build::NOT_HELD)
+        Err(NOT_HELD)
     }
 
     /// A movement damage's hit of `b` by player `owner`'s hitter: `damage` hit points off (slot
@@ -285,10 +287,10 @@ impl World {
             return Ok(());
         }
         let Some((q, u)) = self.object(b.id) else {
-            return Err(crate::construction::build::NOT_HELD);
+            return Err(NOT_HELD);
         };
         let m = u.master(self.master_tables(), q)?;
-        let mut v = crate::combat::victims::victim_of(
+        let mut v = victim_of(
             (
                 u,
                 self.parts.unit_ai.contains(u.id),
@@ -303,11 +305,9 @@ impl World {
             self.spatial.terrain.as_ref(),
             self.mode_680,
         );
-        crate::combat::damage::lose(&mut v, damage);
+        lose(&mut v, damage);
         let killed = finish(&mut v);
-        let (_, u) = self
-            .object_mut(b.id)
-            .ok_or(crate::construction::build::NOT_HELD)?;
+        let (_, u) = self.object_mut(b.id).ok_or(NOT_HELD)?;
         u.life.hp = v.hp;
         u.life.amount = v.amount;
         if let Some(a) = v.armored.as_ref() {

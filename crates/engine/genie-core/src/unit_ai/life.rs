@@ -4,8 +4,10 @@ use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::rng::Well512;
 use crate::movement::PathAsk;
+use crate::movement::{PathFlags, WaypointIndex};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -176,7 +178,7 @@ impl UnitAi {
             alert_mode: false,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
-            patrol_waypoint: crate::movement::WaypointIndex::FIRST,
+            patrol_waypoint: WaypointIndex::FIRST,
             stop_after_kill: false,
             home: None,
             hunted: None,
@@ -270,7 +272,7 @@ impl UnitAi {
     /// `zeroPatrolInformation` (`FUN_140c68de0`): the saved patrol goes and its waypoint is 0.
     pub fn zero_patrol(&mut self) {
         self.patrol_path = None;
-        self.patrol_waypoint = crate::movement::WaypointIndex::FIRST;
+        self.patrol_waypoint = WaypointIndex::FIRST;
     }
 
     /// `savePatrolInformation` (`FUN_140c63d20`): the saved patrol goes; the unit's slot 0x468
@@ -278,7 +280,7 @@ impl UnitAi {
     pub(super) fn save_patrol(&mut self, side: &dyn UnitSide) {
         let (path, waypoint) = side.patrol_information().unzip();
         self.patrol_path = path;
-        self.patrol_waypoint = waypoint.unwrap_or(crate::movement::WaypointIndex::FIRST);
+        self.patrol_waypoint = waypoint.unwrap_or(WaypointIndex::FIRST);
     }
 
     /// `restorePatrolInformation` (`FUN_140c5e5b0`): without a saved patrol, false. Else the unit
@@ -339,14 +341,12 @@ impl UnitAi {
             ask.patrol = true;
             if let Some(saved) = ai.patrol_path.as_ref() {
                 ask.resume = ai.patrol_waypoint;
-                ask.back_and_forth = saved
-                    .flags
-                    .contains(crate::movement::PathFlags::BACK_AND_FORTH);
+                ask.back_and_forth = saved.flags.contains(PathFlags::BACK_AND_FORTH);
                 ai.zero_patrol();
             } else {
                 let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
-                let d = crate::math::fmath::sqrt(dy * dy + dx * dx);
-                ask.back_and_forth = crate::math::fmath::at_most_or_unordered(PATROL_TURN_REACH, d);
+                let d = sqrt(dy * dy + dx * dx);
+                ask.back_and_forth = at_most_or_unordered(PATROL_TURN_REACH, d);
             }
         }
         ask.attack_move = ai

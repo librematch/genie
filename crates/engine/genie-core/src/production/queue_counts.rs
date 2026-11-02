@@ -1,6 +1,8 @@
 //! A production queue's counts: the units an entry makes, the entries, the serials and the
 //! changes.
 
+use std::iter::Sum;
+
 /// How many units a queue entry makes (an entry's `+0x2`, `mUnitCount`) and their sum over the
 /// queue (`+0xbf4`, `mProductionQueueTotalUnits`): shorts, the game's 16-bit arithmetic.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -43,7 +45,7 @@ impl QueuedUnits {
     }
 }
 
-impl std::iter::Sum for QueuedUnits {
+impl Sum for QueuedUnits {
     /// The 16-bit sum.
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::ZERO, Self::plus)

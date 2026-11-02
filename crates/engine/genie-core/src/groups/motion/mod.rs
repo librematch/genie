@@ -34,32 +34,40 @@ use self::request::request;
 use self::step::Pass;
 pub(crate) use self::step::{StepWorld, path_step};
 use self::walk::{SHORT_IGNORED, steer};
+use crate::groups::{GroupFlags, WorldObject};
 #[cfg(test)]
 use crate::map::spatial::Spatial;
+use crate::math::image::group::{
+    CLOSE as GROUP_CLOSE, EPSILON as GROUP_EPSILON, NEAR as GROUP_NEAR,
+    PULL_DISTANCE as GROUP_PULL_DISTANCE, PULL_KEEP as GROUP_PULL_KEEP,
+    PULL_SHARE as GROUP_PULL_SHARE, SHORT_LENGTH as GROUP_SHORT_LENGTH,
+    SHORT_REACH as GROUP_SHORT_REACH,
+};
+use crate::movement::{LONG_PATH_MOVER, PlanTries};
 #[cfg(test)]
 use crate::movement::{PathData, Planning};
 
 /// A move or a turn below this counts as none (`DAT_142eb0c60`).
-const EPSILON: f32 = crate::math::image::group::EPSILON;
+const EPSILON: f32 = GROUP_EPSILON;
 /// How near a point the walk counts as there (`DAT_142eb5690`).
-const NEAR: f32 = crate::math::image::group::NEAR;
+const NEAR: f32 = GROUP_NEAR;
 /// A waypoint or a target nearer than this takes the straight way when nothing stands on it
 /// (`DAT_14330eb8c`).
-const CLOSE: f32 = crate::math::image::group::CLOSE;
+const CLOSE: f32 = GROUP_CLOSE;
 /// A path shorter than this is no path (`DAT_142eb99cc`).
-const SHORT_LENGTH: Distance = Distance::new(crate::math::image::group::SHORT_LENGTH);
+const SHORT_LENGTH: Distance = Distance::new(GROUP_SHORT_LENGTH);
 /// The short pather serves a waypoint this near (`DAT_142eb0f4c`).
-const SHORT_REACH: f32 = crate::math::image::group::SHORT_REACH;
+const SHORT_REACH: f32 = GROUP_SHORT_REACH;
 /// The members' centre pulls the group when it is this far (squared, `DAT_142eb0f48`) ...
-const PULL_DISTANCE: f32 = crate::math::image::group::PULL_DISTANCE;
+const PULL_DISTANCE: f32 = GROUP_PULL_DISTANCE;
 /// ... by this share (`DAT_142eae8d0`), the group keeping this much of its place
 /// (`DAT_142ecb878`).
-const PULL_SHARE: f32 = crate::math::image::group::PULL_SHARE;
-const PULL_KEEP: f32 = crate::math::image::group::PULL_KEEP;
+const PULL_SHARE: f32 = GROUP_PULL_SHARE;
+const PULL_KEEP: f32 = GROUP_PULL_KEEP;
 /// The passes of one step (`0x14 < local_7e0` ends it).
 const PASSES: u32 = 20;
 /// A level with fewer plans left than this gives up rather than wait (`FUN_140f95bf0 < 3`).
-const LAST_TRIES: crate::movement::PlanTries = crate::movement::PlanTries::of_data(3);
+const LAST_TRIES: PlanTries = PlanTries::of_data(3);
 /// A patrolling group at its last waypoint pauses this long (the immediate `0x3f000000`).
 const PATROL_PAUSE: Seconds = Seconds::new(0.5);
 /// A group without a path left pauses this long (the immediate `0x3dcccccd`).
@@ -91,7 +99,7 @@ pub(crate) struct Lead {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct LeadGroup {
     /// `mGroupFlags` ([`GroupFlags::PATROL`] marks a patrol).
-    pub(crate) flags: crate::groups::GroupFlags,
+    pub(crate) flags: GroupFlags,
     /// The members (`+0xf0`).
     pub(crate) members: Vec<ObjectId>,
     /// The differentiator groups' members, at most 128 (`FUN_14100bbe0` with `0x80`).
@@ -102,7 +110,7 @@ pub(crate) struct LeadGroup {
 
 impl LeadGroup {
     const fn patrols(&self) -> bool {
-        self.flags.contains(crate::groups::GroupFlags::PATROL)
+        self.flags.contains(GroupFlags::PATROL)
     }
 }
 
@@ -161,7 +169,7 @@ impl Motion {
         if level.level == WaypointLevel::TOP {
             level.waypoint = WaypointIndex::SECOND;
             level.state = PathState::WantsPath;
-            level.continue_counter = crate::movement::PlanTries::FULL;
+            level.continue_counter = PlanTries::FULL;
         } else {
             reset_level(&mut self.paths)?;
         }
@@ -251,7 +259,7 @@ impl World {
     /// `FUN_1410465d0`: the object the world's table holds for `motion`'s lead (`+0xc4`,
     /// [`World::world_object`]). The constructor's lead −1 finds none: the table's slot for −1
     /// stays empty, as the world's reusable ids start at −2 ([`crate::world::Recycling`]).
-    pub(crate) fn lead_object(&self, motion: &Motion) -> Option<crate::groups::WorldObject<'_>> {
+    pub(crate) fn lead_object(&self, motion: &Motion) -> Option<WorldObject<'_>> {
         self.world_object(motion.lead)
     }
 
@@ -274,8 +282,7 @@ impl World {
             walker: mover.walker(id),
             position: u.position(),
             radius: mover.stats.radius.ground(),
-            moves: mover.stats.speed != Speed::ZERO
-                || u.life.master_id == crate::movement::LONG_PATH_MOVER,
+            moves: mover.stats.speed != Speed::ZERO || u.life.master_id == LONG_PATH_MOVER,
             solid: mover.stats.radius.sized(),
             ignore_units: mover.ignore_units.clone(),
             player: p,

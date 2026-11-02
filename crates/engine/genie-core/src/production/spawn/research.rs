@@ -2,22 +2,27 @@
 //! its destructor.
 
 use crate::GenieError;
+use crate::math::conversions::cvttss2si;
 use crate::objects::ListIndex;
 use crate::objects::UpdateCode;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{RESEARCH_TIME_MODIFIER, WORLD_EFFECT};
+use crate::production::{Entry, Production, refund_tech};
 use crate::production::{MakeTech, MakeTechState, Making};
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::{Location, ResearchCount, TechDef, TechType, is_age};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
+use crate::world::PlayState;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use std::mem::take;
 
 /// A building the research step runs for, whose action is no Research.
 const NO_RESEARCH_ACTION: GenieError =
@@ -31,7 +36,7 @@ impl World {
     /// readers, the object search `FUN_1411650e0` and the masters' slot 0xc0, are not
     /// modelled); the human player's sound is the interface's. Not held: the start time
     /// (`+0x74`).
-    pub(super) fn make_research(first: &crate::production::Entry) -> Result<Making, GenieError> {
+    pub(super) fn make_research(first: &Entry) -> Result<Making, GenieError> {
         let tech = first.tech.ok_or(GenieError::missing_data(
             "a research entry without a technology",
         ))?;
@@ -50,7 +55,7 @@ impl World {
         &self,
         p: PlayerId,
         tech: TechId,
-    ) -> Result<(usize, &crate::technology::TechDef), GenieError> {
+    ) -> Result<(usize, &TechDef), GenieError> {
         let tree = self.players.player(p)?.techs.len();
         let t = Some(tech.index())
             .filter(|&t| t < tree)
@@ -102,7 +107,7 @@ impl World {
             self.parts.combat_of(building.id).work_rate_powerup + self.master(p, master)?.work_rate;
         let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, false);
-        let shared = def.kind == crate::technology::TechType::SHARED;
+        let shared = def.kind == TechType::SHARED;
         let time_modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
         let location = state
             .location(master)
@@ -167,7 +172,7 @@ impl World {
                 .find(|l| l.0 == Some(master))
                 .map_or(-1.0, |l| Seconds::of_master(l.1).get());
             let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
-            if !crate::technology::is_age(tech) && Amount::ZERO < modifier {
+            if !is_age(tech) && Amount::ZERO < modifier {
                 time *= modifier.get();
             }
             let adjustment = state
@@ -197,9 +202,7 @@ impl World {
         // attribute 269, cut by CVTTSS2SI and its low short above 0, names an effect of the
         // world's table the player gets with the building as its object (its slot 0x10,
         // `TRIBE_Effects::do_effect`, which skips an id the table does not hold)
-        let reward =
-            crate::math::conversions::cvttss2si((self.players.player(p)?.get(WORLD_EFFECT)?).get())
-                as i16;
+        let reward = cvttss2si((self.players.player(p)?.get(WORLD_EFFECT)?).get()) as i16;
         if 0 < reward
             && let Some(effect) = usize::try_from(reward)
                 .ok()
@@ -225,8 +228,8 @@ impl World {
         if !r.paid {
             let def = self.techs.checked(t)?;
             let owner = self.players.player_mut(p)?;
-            let mut state = std::mem::take(owner.techs.checked_mut(t)?);
-            let done = crate::production::refund_tech(&mut state, def, r.tech, owner);
+            let mut state = take(owner.techs.checked_mut(t)?);
+            let done = refund_tech(&mut state, def, r.tech, owner);
             *owner.techs.checked_mut(t)? = state;
             let _ = done?;
         }
@@ -265,17 +268,17 @@ impl World {
     ) -> Result<(), GenieError> {
         use crate::technology::Attributes;
         let (t, _) = self.research_tech(p, r.tech)?;
-        if r.state != MakeTechState::Done && self.game_state == crate::world::PlayState::PLAYING {
+        if r.state != MakeTechState::Done && self.game_state == PlayState::PLAYING {
             self.research_failed(p, i, r, t)?;
         }
         let def = self.techs.checked(t)?;
         let owner = self.players.player(p)?;
         let state = owner.techs.checked(t)?;
-        if def.kind == crate::technology::TechType::SHARED {
+        if def.kind == TechType::SHARED {
             let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
             state.state = ResearchState::Available;
-            state.times_researched = crate::technology::ResearchCount::ZERO;
-            state.pending = crate::technology::ResearchCount::ZERO;
+            state.times_researched = ResearchCount::ZERO;
+            state.pending = ResearchCount::ZERO;
             return Ok(());
         }
         let cap = state.research_cap.limit();
@@ -293,7 +296,7 @@ impl World {
             .location(master)
             .map_or(Seconds::ZERO, |l| l.adjustment);
         let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
-        if !crate::technology::is_age(r.tech) && Amount::ZERO < modifier {
+        if !is_age(r.tech) && Amount::ZERO < modifier {
             time *= modifier.get();
         }
         let done = adjustment + Seconds::new(time) <= r.progress;
@@ -315,7 +318,7 @@ impl World {
 }
 
 /// The research action of a building's `production` takes the progress `progress`.
-fn set_progress(production: Option<&mut crate::production::Production>, progress: Seconds) {
+fn set_progress(production: Option<&mut Production>, progress: Seconds) {
     if let Some(Some(Making::Research(r))) = production.map(|q| q.action.as_mut()) {
         r.progress = progress;
     }
@@ -324,13 +327,9 @@ fn set_progress(production: Option<&mut crate::production::Production>, progress
 /// The progress a research of `tech` at `location` is done at: the location's time, times the
 /// research time modifier `time_modifier` (attribute 86, above 0 and not an age), plus its
 /// adjustment.
-fn research_time(
-    location: &crate::technology::Location,
-    tech: TechId,
-    time_modifier: Amount,
-) -> Seconds {
+fn research_time(location: &Location, tech: TechId, time_modifier: Amount) -> Seconds {
     let mut time = Seconds::of_master(location.time).get();
-    if !crate::technology::is_age(tech) && Amount::ZERO < time_modifier {
+    if !is_age(tech) && Amount::ZERO < time_modifier {
         time *= time_modifier.get();
     }
     location.adjustment + Seconds::new(time)

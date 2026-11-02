@@ -9,10 +9,14 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
+use crate::production::{Queue, as_entry_costs, same_costs};
 use crate::technology::TechId;
+use crate::technology::{Attributes, TechDef, factors};
 use crate::world::World;
+use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+use std::mem::take;
 
 impl World {
     /// `FUN_1411cbc40`'s technology branch: the count is held to the technology's cap less its
@@ -53,12 +57,12 @@ impl World {
         if n <= 0 {
             return Ok(false);
         }
-        let get = |k: AttributeId| crate::technology::Attributes::get(&*owner, k);
+        let get = |k: AttributeId| Attributes::get(&*owner, k);
         let listed = owner
             .techs
             .checked(t)?
-            .listed_costs(def, crate::technology::factors(tech, &get)?)?;
-        let costs = crate::production::as_entry_costs(listed);
+            .listed_costs(def, factors(tech, &get)?)?;
+        let costs = as_entry_costs(listed);
         let id = owner.objects.checked(i)?.id;
         let production = self.production_or_new(id)?;
         if join_last(&mut production.queue, tech, &costs, n)? {
@@ -89,8 +93,8 @@ impl World {
 /// definition `def`) at a building of master `building`: each is paid until one cannot be; the
 /// count paid.
 fn pay_researches(
-    owner: &mut crate::world::player::Player,
-    (def, tech): (&crate::technology::TechDef, TechId),
+    owner: &mut Player,
+    (def, tech): (&TechDef, TechId),
     repeat: bool,
     building: MasterId,
     n: i16,
@@ -98,9 +102,9 @@ fn pay_researches(
     let t = tech.index();
     let mut paid = 0i16;
     while paid < n {
-        let get = |k: AttributeId| crate::technology::Attributes::get(&*owner, k);
-        let factors = crate::technology::factors(tech, &get)?;
-        let mut state = std::mem::take(owner.techs.checked_mut(t)?);
+        let get = |k: AttributeId| Attributes::get(&*owner, k);
+        let factors = factors(tech, &get)?;
+        let mut state = take(owner.techs.checked_mut(t)?);
         let ok = state.pay(def, factors, repeat, building, owner);
         *owner.techs.checked_mut(t)? = state;
         if !ok? {
@@ -115,7 +119,7 @@ fn pay_researches(
 /// that technology and its costs are `costs` (`FUN_1411c81a0` -> `FUN_1413d4a00`): its count,
 /// the total and the change counter grow. Whether they joined.
 fn join_last(
-    queue: &mut crate::production::Queue,
+    queue: &mut Queue,
     tech: TechId,
     costs: &[(Option<AttributeId>, Amount); 3],
     n: i16,
@@ -123,7 +127,7 @@ fn join_last(
     let Some(last) = queue.last() else {
         return Ok(false);
     };
-    if last.tech != Some(tech) || !crate::production::same_costs(&last.costs, costs) {
+    if last.tech != Some(tech) || !same_costs(&last.costs, costs) {
         return Ok(false);
     }
     let k = (queue.count.get() - 1) as usize;

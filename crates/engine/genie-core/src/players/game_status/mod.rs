@@ -12,9 +12,12 @@ mod cancels;
 mod stops;
 mod victory;
 
+use crate::math::image::game_status::ONE_UNIT_AGE as GAME_STATUS_ONE_UNIT_AGE;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::action_type::{PACK, UNPACK};
 use crate::players::PlayerId;
+use crate::players::Relation;
 #[cfg(test)]
 use crate::world::World;
 use crate::world::WorldTime;
@@ -112,10 +115,7 @@ const DEFEAT_IDS: usize = 25;
 /// The first of the attributes a defeat's event reads (300 + a player's id).
 const KILLS_OF: usize = 300;
 /// The action types whose stop keeps a value of the unit's (`+0x88a`, `FUN_14106fa60`).
-const KEEPING_TYPES: [ActionType; 2] = [
-    crate::objects::masters::action_type::PACK,
-    crate::objects::masters::action_type::UNPACK,
-];
+const KEEPING_TYPES: [ActionType; 2] = [PACK, UNPACK];
 /// The buildings a stop leaves alone (`FUN_1411e6290`).
 const UNSTOPPED_BUILDINGS: [MasterId; 4] = [
     MasterId::named(50),
@@ -124,7 +124,7 @@ const UNSTOPPED_BUILDINGS: [MasterId; 4] = [
     MasterId::named(1187),
 ];
 /// That attribute's bound (`DAT_14330eb8c`).
-const ONE_UNIT_AGE: f32 = crate::math::image::game_status::ONE_UNIT_AGE;
+const ONE_UNIT_AGE: f32 = GAME_STATUS_ONE_UNIT_AGE;
 
 /// What the world's checks count of the players (Gaia aside): those still playing and whether
 /// they form one side (0 none, 1 one, −1 more), and those who won and lost.
@@ -146,7 +146,7 @@ impl Count {
         i: PlayerId,
         status: GameStatus,
         allied_victory: u8,
-        relations: (crate::players::Relation, crate::players::Relation),
+        relations: (Relation, Relation),
     ) {
         match status {
             GameStatus::PLAYING => {
@@ -154,8 +154,8 @@ impl Count {
                 if self.first != PlayerId::GAIA && self.side != 0 {
                     // another side unless the two count each other's victory as their own
                     if allied_victory == 0
-                        || !matches!(relations.0, crate::players::Relation::ALLY)
-                        || !matches!(relations.1, crate::players::Relation::ALLY)
+                        || !matches!(relations.0, Relation::ALLY)
+                        || !matches!(relations.1, Relation::ALLY)
                     {
                         self.side = -1;
                     }

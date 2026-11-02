@@ -2,22 +2,31 @@
 //! herded sheep.
 
 use crate::GenieError;
+use crate::gathering::DropSiteId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::map::spatial::BLOCKED;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::movement::Planning;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
+use crate::objects::{ObjectState, WorkerCount};
+use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::pathing::zones::{UNKNOWN_RESTRICTION, Zones};
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{Foreign, UnitView};
+use crate::unit_ai::{Gatherable, NO_POINT, ResourceSearch};
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -26,10 +35,10 @@ use crate::world::step::Step;
 pub(crate) struct ResourceWorld<'a, 'b> {
     pub(crate) player: PlayerId,
     pub(crate) spatial: &'a mut Spatial,
-    pub(crate) zones: &'a mut crate::pathing::zones::Zones,
+    pub(crate) zones: &'a mut Zones,
     pub(crate) foreign: Foreign<'a>,
-    pub(crate) every: crate::objects::masters::MasterTables<'a>,
-    pub(crate) masters: crate::objects::masters::OwnerMasters<'a>,
+    pub(crate) every: MasterTables<'a>,
+    pub(crate) masters: OwnerMasters<'a>,
     pub(crate) plan: Planning<'b>,
 }
 
@@ -54,16 +63,12 @@ pub(crate) fn search_origin(point: Point, has_site: bool, unit: Position) -> Pos
 /// footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45 and
 /// 2172, `0x140c49d17`); the answer and the out argument's steps.
 pub(crate) fn closest_resource_of(
-    (unit, actions, mover): (&Unit, &crate::objects::layers::Action, Option<&Mover>),
+    (unit, actions, mover): (&Unit, &Action, Option<&Mover>),
     c: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
-    (kind, cap, site): (
-        GatherGroup,
-        crate::objects::WorkerCount,
-        Option<crate::gathering::DropSiteId>,
-    ),
-    (current, min_state, point): (Option<ObjectId>, crate::objects::ObjectState, Point),
-    by_id: crate::world::index::ObjectsRef<'_>,
+    (kind, cap, site): (GatherGroup, WorkerCount, Option<DropSiteId>),
+    (current, min_state, point): (Option<ObjectId>, ObjectState, Point),
+    by_id: ObjectsRef<'_>,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
     /// The site masters whose search starts from their footprint in any zone.
@@ -93,7 +98,7 @@ pub(crate) fn closest_resource_of(
                 ))?;
                 let values = terrain
                     .restriction(restriction)
-                    .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+                    .ok_or(UNKNOWN_RESTRICTION)?;
                 let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
                 let zone = |p: Position| zones.zone(Tile::new(p.x() as i32, p.y() as i32));
                 zone(s.position()) == zone(unit.position())
@@ -164,7 +169,7 @@ pub(crate) fn closest_resource_of(
     let me_at = unit.position();
     let master_id = unit.life.master_id;
     let plan = &mut c.plan;
-    let blocked = mask.blocked() | crate::map::spatial::BLOCKED;
+    let blocked = mask.blocked() | BLOCKED;
     gather_search::closest_resource_at(
         &seeker,
         site.as_ref(),
@@ -193,9 +198,9 @@ pub(crate) fn closest_resource_of(
 /// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`): the object's top action is the Artifact
 /// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1); `by_id` reads its
 /// action layer.
-pub(crate) fn herded(by_id: crate::world::index::ObjectsRef<'_>, id: ObjectId) -> bool {
+pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
     by_id.actions(id).is_some_and(|a| {
-        a.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE)
+        a.top_action_kind() == Some(ARTIFACT_TYPE)
             && a.list
                 .artifact()
                 .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
@@ -207,9 +212,9 @@ impl UnitView<'_, '_> {
     /// ([`crate::unit_ai::UnitSide::closest_resource`]): what it found, with its place and class.
     pub(crate) fn closest_gatherable(
         &mut self,
-        search: crate::unit_ai::ResourceSearch,
-    ) -> Result<Option<crate::unit_ai::Gatherable>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
+        search: ResourceSearch,
+    ) -> Result<Option<Gatherable>, GenieError> {
+        let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
             &self.c.w.masters,
@@ -226,11 +231,8 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
-            masters: crate::objects::masters::OwnerMasters::new(
+            every: MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            masters: OwnerMasters::new(
                 &self.c.w.parts.own_master,
                 self.c.w.masters.of(self.player),
             ),
@@ -273,7 +275,7 @@ impl UnitView<'_, '_> {
             "a resource found that the slice does not hold",
         ))?;
         let class = u.master(self.c.w.master_tables(), owner)?.class;
-        Ok(Some(crate::unit_ai::Gatherable {
+        Ok(Some(Gatherable {
             id,
             position: u.position(),
             class,
@@ -289,10 +291,10 @@ impl Unit {
     /// stand on; None for none.
     pub(crate) fn resource_search(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
         kind: GatherGroup,
-        cap: crate::objects::WorkerCount,
+        cap: WorkerCount,
     ) -> Result<Option<ObjectId>, GenieError> {
         self.resource_search_from(actions, c, kind, cap, None)
     }
@@ -303,18 +305,13 @@ impl Unit {
     /// unit's zone of its restriction, or a dock: masters 45 and 2172, `0x140c49d17`).
     pub(crate) fn resource_search_from(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
         kind: GatherGroup,
-        cap: crate::objects::WorkerCount,
-        site: Option<crate::gathering::DropSiteId>,
+        cap: WorkerCount,
+        site: Option<DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current =
             c.w.parts
@@ -329,11 +326,8 @@ impl Unit {
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             foreign: others.players(),
-            every: crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
-            masters: crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            every: MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            masters: OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
             plan: Planning {
                 pathing: &mut c.w.pathing,
                 now: c.w.world_time,
@@ -342,11 +336,7 @@ impl Unit {
                 groups: &c.w.groups,
             },
         };
-        let search = (
-            current,
-            crate::objects::ObjectState::Alive,
-            crate::unit_ai::NO_POINT,
-        );
+        let search = (current, ObjectState::Alive, NO_POINT);
         closest_resource_of(
             (self, actions, c.w.parts.mover_of(self.id)),
             &mut w,

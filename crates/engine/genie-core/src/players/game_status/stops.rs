@@ -2,15 +2,31 @@
 //! halt by kind.
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
+use crate::combat::missile::MISSILE;
+use crate::construction::FoundationId;
+use crate::construction::repair::REPAIR;
+use crate::construction::wait_solidify::WAIT_SOLIDIFY;
+use crate::garrison::ENTER;
 use crate::gathering::DropSiteId;
+use crate::gathering::HuntTargetId;
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::{HUNT, HuntState, stand_sprite};
+use crate::gathering::make::MAKE;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
+use crate::movement::explore::EXPLORE;
+use crate::movement::fly::FLY;
+use crate::movement::move_to::MOVE_TO;
 use crate::objects::ListIndex;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::release::Releaser;
+use crate::objects::sprite::new_sprite;
+use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
 use crate::players::game_status::{KEEPING_TYPES, UNSTOPPED_BUILDINGS};
 use crate::unit_ai::ActionKind;
@@ -104,7 +120,7 @@ impl World {
         // slot 0x438 is the top action's type: a trade (0x6f) with a load held (COMISS 0, held;
         // JNC at 0x14108c11e: a NaN load counts) keeps the unit AI going
         let trading = self.parts.actions_of(unit.id).top_action_kind() == Some(action_type::TRADE)
-            && crate::math::fmath::below_or_unordered(0.0, unit.life.amount.get())
+            && below_or_unordered(0.0, unit.life.amount.get())
             && unit.life.attribute_type.is_some();
         let Some(ai) = self.parts.unit_ai.get(unit.id) else {
             return Ok(());
@@ -144,16 +160,10 @@ impl World {
             return Ok(false);
         };
         match kind {
-            crate::movement::move_to::MOVE_TO
-            | crate::movement::explore::EXPLORE
-            | crate::garrison::ENTER
-            | crate::movement::fly::FLY
-            | crate::combat::missile::MISSILE
-            | crate::gathering::make::MAKE
-            | crate::construction::wait_solidify::WAIT_SOLIDIFY => {
+            MOVE_TO | EXPLORE | ENTER | FLY | MISSILE | MAKE | WAIT_SOLIDIFY => {
                 return Ok(false);
             }
-            crate::gathering::hunt::HUNT => {}
+            HUNT => {}
             _ => return self.halt_other(p, idx, kind),
         }
         if player_type.is_computer() {
@@ -169,16 +179,11 @@ impl World {
             .hunt_mut()
             .ok_or(NO_TOP_ACTION)?;
         hunt.tear_down(self.parts.motion.mover_mut(unit.id))?;
-        hunt.state = crate::gathering::hunt::HuntState::Idle;
-        let sprite = crate::gathering::hunt::stand_sprite(
-            &hunt.task,
-            standing,
-            unit.life.held(),
-            &self.graphics,
-        );
+        hunt.state = HuntState::Idle;
+        let sprite = stand_sprite(&hunt.task, standing, unit.life.held(), &self.graphics);
         // the target, then the second target
         let released = [
-            hunt.target.map(crate::gathering::HuntTargetId::id),
+            hunt.target.map(HuntTargetId::id),
             hunt.carry_to.map(DropSiteId::id),
         ];
         hunt.set_target(None);
@@ -186,7 +191,7 @@ impl World {
         hunt.point = Position::from([-1.0; 3]);
         hunt.timer = Seconds::ZERO;
         if let Some(g) = sprite {
-            crate::objects::sprite::new_sprite(
+            new_sprite(
                 &mut unit.sprite,
                 self.parts.move_stats_mut(unit.id),
                 g,
@@ -224,10 +229,10 @@ impl World {
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
         match kind {
-            crate::gathering::gather::GATHER => self.halt_gather(p, idx, standing, by)?,
+            GATHER => self.halt_gather(p, idx, standing, by)?,
             action_type::BUILD => self.halt_build(p, idx, by)?,
-            crate::construction::repair::REPAIR => self.halt_repair(p, idx)?,
-            crate::combat::attack::ATTACK => {
+            REPAIR => self.halt_repair(p, idx)?,
+            ATTACK => {
                 let unit = self.players.live_mut(p, idx)?;
                 let attack = self
                     .parts
@@ -242,7 +247,7 @@ impl World {
                     self.streams.get(Stream::Sprite),
                 )?;
             }
-            crate::ownership::artifact::ARTIFACT_TYPE => self.halt_artifact(p, idx, by)?,
+            ARTIFACT_TYPE => self.halt_artifact(p, idx, by)?,
             _ => {
                 return Err(GenieError::unsupported(
                     "a stop of an action whose slot 0x38 is not modelled",
@@ -270,12 +275,7 @@ impl World {
             .list
             .gather_mut()
             .ok_or(NO_TOP_ACTION)?;
-        let stand = crate::gathering::hunt::stand_sprite(
-            &gather.task,
-            standing,
-            unit.life.held(),
-            &self.graphics,
-        );
+        let stand = stand_sprite(&gather.task, standing, unit.life.held(), &self.graphics);
         let released = gather.halt(
             self.parts.motion.mover_mut(unit.id),
             stand,
@@ -310,10 +310,7 @@ impl World {
             self.leave_builders(foundation)?;
         }
         self.standing_sprite(p, idx)?;
-        let targets = [
-            target.map(crate::construction::FoundationId::id),
-            site.map(DropSiteId::id),
-        ];
+        let targets = [target.map(FoundationId::id), site.map(DropSiteId::id)];
         for t in targets.into_iter().flatten() {
             self.release(t, by)?;
         }

@@ -6,6 +6,7 @@ use crate::unit_type::UnitTypeId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{TechId, read_opt_u32};
 use std::convert::{TryFrom, TryInto};
+use std::error::Error;
 use std::io::{Read, Result, Write};
 
 /// An age node of the tech tree.
@@ -90,7 +91,7 @@ where
     R: Read,
     T: TryFrom<i32>,
     // so `invalid_data` can convert it
-    T::Error: std::error::Error + Send + Sync + 'static,
+    T::Error: Error + Send + Sync + 'static,
 {
     let num = input.read_u8()?;
     let mut list = vec![];

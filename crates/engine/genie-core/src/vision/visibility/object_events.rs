@@ -14,6 +14,7 @@ use crate::players::PlayerId;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::VisionBits;
+use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Visibility;
 use crate::world::player::Player;
@@ -111,7 +112,7 @@ impl Visibility {
         }
         registry
             .entries
-            .get_or_insert_with(id, crate::vision::registry::Entry::default)?
+            .get_or_insert_with(id, Entry::default)?
             .mask = mask;
         registry.update_unit(UnitUpdate {
             id,

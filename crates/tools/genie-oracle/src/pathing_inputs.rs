@@ -9,6 +9,9 @@ use genie_core::pathing::{ShapeId, ShapeSide};
 
 use crate::masters::TerrainTable;
 use crate::{Error, live, spatial};
+use genie_core::map::{Restriction, RestrictionId, TerrainId};
+use genie_core::pathing::mesh::{Contact, Mesh};
+use genie_core::pathing::tile_path::Planner;
 use genie_rec::de;
 
 /// The obstruction manager's shape mesh as the tick oracle dumps it (`load_oracle/probes/mesh.py`):
@@ -20,7 +23,7 @@ use genie_rec::de;
 ///
 /// When a contact line of the dump does not hold numbers (the dump's own format).
 #[must_use]
-pub fn mesh_from_dump(text: &str) -> Option<genie_core::pathing::mesh::Mesh> {
+pub fn mesh_from_dump(text: &str) -> Option<Mesh> {
     use genie_core::pathing::mesh::Mesh;
     let mut mesh: Option<Mesh> = None;
     for line in text.lines() {
@@ -73,13 +76,13 @@ pub fn mesh_from_dump(text: &str) -> Option<genie_core::pathing::mesh::Mesh> {
 /// the side's axis, the start flag (its byte, 0 or 1: the game writes the byte and leaves the
 /// word's upper bytes as the stack held them) and the half overlap; None for a side past 3 or
 /// another flag.
-fn contact_from_words(w: &[u32]) -> Option<genie_core::pathing::mesh::Contact> {
+fn contact_from_words(w: &[u32]) -> Option<Contact> {
     let at_side_start = match w.get(5)? & 0xff {
         0 => false,
         1 => true,
         _ => return None,
     };
-    Some(genie_core::pathing::mesh::Contact {
+    Some(Contact {
         other: ShapeId::new(*w.first()?),
         side: ShapeSide::of_word(*w.get(1)?).ok()?,
         at: FixedPoint::new(*w.get(2)? as i32, *w.get(3)? as i32),
@@ -106,10 +109,7 @@ pub fn mesh_owners_from_dump(text: &str) -> Vec<(ObjectId, ShapeId)> {
 
 /// What the tile pathfinder reads of object `id` in a save: its master's x radius and terrain
 /// restriction (master `+0x5d8`, `+0x606`). None for an object the save does not hold.
-pub fn unit_terrain(
-    save: &[u8],
-    id: i32,
-) -> Result<Option<(f32, genie_core::map::RestrictionId)>, Error> {
+pub fn unit_terrain(save: &[u8], id: i32) -> Result<Option<(f32, RestrictionId)>, Error> {
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
     for section in header.players() {
@@ -125,8 +125,7 @@ pub fn unit_terrain(
                 return Ok(None);
             };
             return Ok(
-                genie_core::map::RestrictionId::of_data(m.terrain_restriction_mask_id)
-                    .map(|r| (m.radius_x, r)),
+                RestrictionId::of_data(m.terrain_restriction_mask_id).map(|r| (m.radius_x, r))
             );
         }
     }
@@ -139,25 +138,21 @@ pub fn unit_terrain(
 pub fn planner_from_save(
     save: &[u8],
     terrain: &TerrainTable,
-    passable: genie_core::map::Restriction,
-) -> Result<genie_core::pathing::tile_path::Planner, Error> {
+    passable: Restriction,
+) -> Result<Planner, Error> {
     use genie_core::map::spatial::BLOCKED;
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
-    let terrain_ids: Vec<genie_core::map::TerrainId> = map
+    let terrain_ids: Vec<TerrainId> = map
         .rows
         .iter()
-        .flat_map(|r| {
-            r.tiles
-                .iter()
-                .map(|t| genie_core::map::TerrainId::named(t.terrain_type))
-        })
+        .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_type)))
         .collect();
     let spatial = spatial(&header, terrain).map_err(Error::Unmodelled)?;
     let tiles = spatial.tiles();
     let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
-    Ok(genie_core::pathing::tile_path::Planner::new(
+    Ok(Planner::new(
         GridSize::new(map.map_width, map.map_height),
         terrain_ids,
         passable,

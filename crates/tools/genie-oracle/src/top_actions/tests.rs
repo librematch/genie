@@ -8,11 +8,18 @@ use crate::test_ids::class_id;
 use crate::test_ids::object_id;
 use crate::top_actions::saved_actions;
 use genie_core::GenieError;
+use genie_core::combat::attack::ATTACK;
 use genie_core::combat::missile::ShooterId;
+use genie_core::combat::missile::{HitMode, LANDING, MISSILE, MissileState};
+use genie_core::construction::FoundationId;
+use genie_core::construction::build::BuildState;
 use genie_core::construction::build::BuildTask;
+use genie_core::garrison::transport::TransportMode;
 use genie_core::gathering::DropSiteId;
+use genie_core::gathering::FarmStops;
 use genie_core::map::Distance;
 use genie_core::map::Position;
+use genie_core::movement::explore::EXPLORE;
 use genie_core::movement::move_to::MoveWaitState;
 use genie_core::movement::move_to::{Goal, MOVE_TO, MoveTo};
 use genie_core::objects::FacetCount;
@@ -23,6 +30,7 @@ use genie_core::objects::Voice;
 use genie_core::objects::WorkRate;
 use genie_core::objects::layers;
 use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TargetOwner;
 use genie_core::objects::masters::TaskFlags;
@@ -33,6 +41,7 @@ use genie_core::objects::masters::WorkValue;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
+use genie_core::objects::{Graphics, SpeedMultiplier};
 use genie_core::ownership::artifact::{ARTIFACT_TYPE, ArtifactState};
 use genie_core::players::attribute;
 use genie_core::world::Seconds;
@@ -145,7 +154,7 @@ fn import(
 fn import_drawn(
     object: &genie_save::Object,
     objects: &PlayerObjects,
-    graphics: Option<&genie_core::objects::Graphics>,
+    graphics: Option<&Graphics>,
 ) -> Result<layers::Action, GenieError> {
     let mut actions = layers::Action::default();
     let s = object.static_part().expect("a test object's static part");
@@ -183,7 +192,7 @@ fn bits3(v: Position) -> [u32; 3] {
 #[test]
 fn an_action_without_its_base_is_unsupported() {
     assert_eq!(
-        imported(genie_core::movement::explore::EXPLORE, Action::default()).unwrap_err(),
+        imported(EXPLORE, Action::default()).unwrap_err(),
         GenieError::unsupported("a saved action without its base")
     );
 }
@@ -195,7 +204,7 @@ fn second_target_or_an_unknown_action_is_unsupported() {
     let mut b = base(3);
     b.target2_id = 9;
     assert_eq!(
-        imported(genie_core::movement::explore::EXPLORE, explore(b)).unwrap_err(),
+        imported(EXPLORE, explore(b)).unwrap_err(),
         GenieError::unsupported("a saved action with a second target")
     );
     assert_eq!(
@@ -215,7 +224,7 @@ fn second_saved_action_is_refused() {
         .rge_action_object
         .actions = action_list(vec![
         (MOVE_TO, move_to(2, 0.5)),
-        (genie_core::movement::explore::EXPLORE, explore(base(0))),
+        (EXPLORE, explore(base(0))),
     ]);
     let err = import(&object, &PlayerObjects::default()).unwrap_err();
     assert_eq!(
@@ -224,10 +233,7 @@ fn second_saved_action_is_refused() {
     );
     assert_eq!(
         err.context().collect::<Vec<_>>(),
-        [(
-            "below the head",
-            genie_core::movement::explore::EXPLORE.to_string().as_str()
-        )]
+        [("below the head", EXPLORE.to_string().as_str())]
     );
 }
 
@@ -306,12 +312,12 @@ fn move_to_takes_its_sprite_from_the_sprites_table() {
         id: SpriteId::named(5),
         frames: Frame::of_data(10),
         facets: FacetCount::of_data(16),
-        speed_multiplier: genie_core::objects::SpeedMultiplier::of_data(1.5),
+        speed_multiplier: SpeedMultiplier::of_data(1.5),
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics = genie_core::objects::Graphics::from([(walking.id, walking)]);
+    let graphics = Graphics::from([(walking.id, walking)]);
     let mut action = move_to(4, 0.5);
     let mut shown = |sprite: i16, graphics| {
         let parts = action.rge_action_by_type.as_deref_mut().unwrap();
@@ -453,11 +459,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     assert_eq!(
         imported(
             ARTIFACT_TYPE,
-            artifact(with_sub(
-                b,
-                genie_core::movement::explore::EXPLORE,
-                explore(base(3))
-            ))
+            artifact(with_sub(b, EXPLORE, explore(base(3))))
         )
         .unwrap_err(),
         GenieError::unsupported("a saved Artifact action with another sub-action")
@@ -471,7 +473,7 @@ fn missile() -> genie_save::Object {
 
 /// [`missile`] `distance` from its point, a charge projectile for `charge` 1.
 fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
-    let mut b = base(genie_core::combat::missile::MissileState::Flying.get());
+    let mut b = base(MissileState::Flying.get());
     b.target2_id = 900;
     let action = by_type(|t| {
         t.rge_action_missile = Some(Box::new(RgeActionMissile {
@@ -487,8 +489,7 @@ fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
         is_charge_projectile: charge,
         ..RgeMissileObject::default()
     };
-    flying.rge_combat_object.rge_action_object.actions =
-        action_list(vec![(genie_core::combat::missile::MISSILE, action)]);
+    flying.rge_combat_object.rge_action_object.actions = action_list(vec![(MISSILE, action)]);
     flying
         .rge_combat_object
         .rge_action_object
@@ -515,7 +516,7 @@ fn missile_flies_with_its_actions_course() {
     );
     assert!(m.flying && !m.charge);
     // a charge projectile; one at the landing distance has landed
-    let landing = genie_core::combat::missile::LANDING;
+    let landing = LANDING;
     let m = saved_missile(&missile_of(landing, 1)).unwrap();
     assert!(m.charge && !m.flying);
     let action = import(&missile(), &PlayerObjects::default())
@@ -527,19 +528,19 @@ fn missile_flies_with_its_actions_course() {
     assert_eq!(
         (action.state, action.fired_from, action.hit_mode),
         (
-            genie_core::combat::missile::MissileState::Flying,
+            MissileState::Flying,
             Some(ShooterId::new(object_id(900))),
-            genie_core::combat::missile::HitMode::TARGET_ALONE
+            HitMode::TARGET_ALONE
         )
     );
     assert_eq!(action.ballistic_velocity.get().to_bits(), 3.0_f32.to_bits());
     assert_eq!(
-        imported(genie_core::combat::missile::MISSILE, explore(base(2))).unwrap_err(),
+        imported(MISSILE, explore(base(2))).unwrap_err(),
         GenieError::unsupported("a saved missile action without its part")
     );
     let not_missile = by_type(|t| t.rge_action_missile = Some(Box::default()));
     assert_eq!(
-        imported(genie_core::combat::missile::MISSILE, not_missile).unwrap_err(),
+        imported(MISSILE, not_missile).unwrap_err(),
         GenieError::unsupported("a missile action of an object that is not a missile")
     );
 }
@@ -609,15 +610,7 @@ fn birds_fly_takes_its_home_and_move_to() {
         (None, bits3(Position::new(1.0, 2.0, 0.0)))
     );
     assert_eq!(
-        imported(
-            FLY,
-            bird(with_sub(
-                base(3),
-                genie_core::movement::explore::EXPLORE,
-                explore(base(3))
-            ))
-        )
-        .unwrap_err(),
+        imported(FLY, bird(with_sub(base(3), EXPLORE, explore(base(3))))).unwrap_err(),
         GenieError::unsupported("a saved Fly action with another sub-action")
     );
     // state 3 drops the MoveTo and makes the flight's only as it flies (4)
@@ -659,7 +652,7 @@ fn build_takes_its_task_move_to_and_site() {
     assert_eq!(
         (a.target, a.site, walk.target, walk.state, walk.voice),
         (
-            Some(genie_core::construction::FoundationId::new(object_id(30))),
+            Some(FoundationId::new(object_id(30))),
             Some(DropSiteId::new(object_id(31))),
             None,
             MoveTo::Moving,
@@ -674,7 +667,7 @@ fn build_takes_its_task_move_to_and_site() {
     // a MoveTo without a sprite (−1) keeps none
     assert_eq!(walk.sprite, None);
     let mut dropping = b.clone();
-    dropping.state = genie_core::construction::build::BuildState::Drop { move_to: None }.get();
+    dropping.state = BuildState::Drop { move_to: None }.get();
     // the drop-off's MoveTo with the carrying sprite 12 (its `+0x58`)
     let mut carrying = move_to(4, 0.75);
     carrying
@@ -689,12 +682,12 @@ fn build_takes_its_task_move_to_and_site() {
         id: SpriteId::named(12),
         frames: Frame::of_data(10),
         facets: FacetCount::of_data(16),
-        speed_multiplier: genie_core::objects::SpeedMultiplier::ONE,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let graphics = genie_core::objects::Graphics::from([(carried.id, carried)]);
+    let graphics = Graphics::from([(carried.id, carried)]);
     let a = import_drawn(&acting(BUILD, build(dropping)), &objects, Some(&graphics))
         .unwrap()
         .list
@@ -714,15 +707,7 @@ fn build_takes_its_task_move_to_and_site() {
     // without a MoveTo, the task's moving sprite for the next
     assert_eq!(a.task.moving, Some(SpriteId::named(9)));
     assert_eq!(
-        imported(
-            BUILD,
-            build(with_sub(
-                b,
-                genie_core::movement::explore::EXPLORE,
-                explore(base(3))
-            ))
-        )
-        .unwrap_err(),
+        imported(BUILD, build(with_sub(b, EXPLORE, explore(base(3))))).unwrap_err(),
         OTHER_SUB_ACTION
     );
 }
@@ -772,15 +757,7 @@ fn repair_takes_its_task_and_counts_its_builder() {
         .unwrap();
     assert_eq!(r.state.move_to().copied(), None);
     assert_eq!(
-        imported(
-            REPAIR,
-            repair(with_sub(
-                b,
-                genie_core::movement::explore::EXPLORE,
-                explore(base(3))
-            ))
-        )
-        .unwrap_err(),
+        imported(REPAIR, repair(with_sub(b, EXPLORE, explore(base(3))))).unwrap_err(),
         OTHER_SUB_ACTION
     );
     assert_eq!(
@@ -870,7 +847,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
             HUNT,
             hunt(with_sub(
                 base(HuntState::Attack { attack: None }.get()),
-                genie_core::combat::attack::ATTACK,
+                ATTACK,
                 attack
             ))
         )
@@ -882,7 +859,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
             HUNT,
             hunt(with_sub(
                 base(HuntState::Walk { move_to: None }.get()),
-                genie_core::movement::explore::EXPLORE,
+                EXPLORE,
                 explore(base(3))
             ))
         )
@@ -934,8 +911,8 @@ fn gather_takes_its_stops_and_move_to() {
     assert_eq!(
         (g.target_class, g.stops, g.task.id),
         (
-            Some(genie_core::objects::masters::ClassId::try_from(5).unwrap()),
-            genie_core::gathering::FarmStops::of_data(2),
+            Some(ClassId::try_from(5).unwrap()),
+            FarmStops::of_data(2),
             TaskId::of_task(0)
         )
     );
@@ -970,7 +947,7 @@ fn gather_takes_its_stops_and_move_to() {
             GATHER,
             gather(with_sub(
                 base(GatherState::Walk { move_to: None }.get()),
-                genie_core::movement::explore::EXPLORE,
+                EXPLORE,
                 explore(base(3))
             ))
         )
@@ -1030,15 +1007,7 @@ fn an_enter_takes_its_task_and_retry() {
         (2.0_f32.to_bits(), MoveWaitState::AskedAgain)
     );
     assert_eq!(
-        imported(
-            ENTER,
-            enter(with_sub(
-                b,
-                genie_core::movement::explore::EXPLORE,
-                explore(base(3))
-            ))
-        )
-        .unwrap_err(),
+        imported(ENTER, enter(with_sub(b, EXPLORE, explore(base(3))))).unwrap_err(),
         GenieError::unsupported("a saved Enter with another sub-action")
     );
     assert_eq!(
@@ -1081,22 +1050,13 @@ fn transport_takes_its_base_alone() {
     let m = t.state.move_to().copied().unwrap();
     assert_eq!(
         (t.state.bare(), t.mode, m.state, m.voice),
-        (
-            sailing,
-            genie_core::garrison::transport::TransportMode::NEW,
-            MoveTo::Moving,
-            Voice::Quiet
-        )
+        (sailing, TransportMode::NEW, MoveTo::Moving, Voice::Quiet)
     );
     assert!(!t.retarget);
     assert_eq!(
         imported(
             TRANSPORT,
-            transport(with_sub(
-                base(2),
-                genie_core::movement::explore::EXPLORE,
-                explore(base(3))
-            ))
+            transport(with_sub(base(2), EXPLORE, explore(base(3))))
         )
         .unwrap_err(),
         GenieError::unreachable("a saved Transport with another sub-action")
@@ -1186,7 +1146,7 @@ fn an_attack_needs_the_sprites_table() {
         }));
     });
     assert_eq!(
-        imported(genie_core::combat::attack::ATTACK, attack).unwrap_err(),
+        imported(ATTACK, attack).unwrap_err(),
         GenieError::unsupported("a saved Attack without the sprites' table")
     );
 }
@@ -1232,17 +1192,17 @@ fn wait_solidify_waits_for_its_foundation() {
 }
 
 /// The sprites' table of the Attack tests: an attack sprite 21 of ten frames of 0.1 s.
-fn swing_sprites() -> genie_core::objects::Graphics {
+fn swing_sprites() -> Graphics {
     let swing = Graphic {
         id: SpriteId::named(21),
         frames: Frame::of_data(10),
         facets: FacetCount::of_data(8),
-        speed_multiplier: genie_core::objects::SpeedMultiplier::ONE,
+        speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    genie_core::objects::Graphics::from([(swing.id, swing)])
+    Graphics::from([(swing.id, swing)])
 }
 
 /// An Attack in state `state` that walks with sprite `walk` (`short_val`) and swings sprite 21

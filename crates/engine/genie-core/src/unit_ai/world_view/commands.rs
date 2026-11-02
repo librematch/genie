@@ -1,23 +1,35 @@
 //! The repair and enter commands of the unit AI and the auto scout's area.
 
 use crate::GenieError;
+use crate::construction::repair::{REPAIR, REPAIRERS};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
+use crate::map::spatial::TileSight;
+use crate::math::fmath::sqrt;
+use crate::math::image::explore::LOS_MARGIN as EXPLORE_LOS_MARGIN;
 use crate::math::rng::Stream;
+use crate::movement::explore::Area;
 use crate::movement::{Me, Mover, Planning};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
+use crate::orders::GARRISON;
+use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::ai_module::SearchArea;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{EnterOrder, RepairOrder, UnitView};
+use crate::world::UNIT_AI_MASTER;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -60,7 +72,7 @@ impl UnitView<'_, '_> {
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
-        if self.actions.top_action_kind() == Some(crate::construction::repair::REPAIR) {
+        if self.actions.top_action_kind() == Some(REPAIR) {
             let order = RepairOrder::Retake(target);
             self.c
                 .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
@@ -73,9 +85,9 @@ impl UnitView<'_, '_> {
             .w
             .masters
             .get(self.player.index())
-            .ok_or(crate::world::UNIT_AI_MASTER)?;
+            .ok_or(UNIT_AI_MASTER)?;
         let own = unit.master(self.c.w.master_tables(), self.player)?;
-        let switch = crate::construction::repair::REPAIRERS
+        let switch = REPAIRERS
             .iter()
             .find(|&&(group, _)| group == own.task_by_group)
             .and_then(|&(_, id)| masters.get(id));
@@ -85,20 +97,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Err(GenieError::unreachable(
@@ -127,15 +133,7 @@ impl UnitView<'_, '_> {
             foreign,
             drop_sites: &self.c.w.drop_sites,
         };
-        let found = task_search(
-            masters,
-            &actor,
-            &t,
-            &general,
-            terrain,
-            Some(crate::construction::repair::REPAIR),
-            &dip,
-        )?;
+        let found = task_search(masters, &actor, &t, &general, terrain, Some(REPAIR), &dip)?;
         if switch.is_none() && found.is_none() {
             return Ok(false);
         }
@@ -189,14 +187,13 @@ impl UnitView<'_, '_> {
         let Some((_, target_unit)) = find(target) else {
             return Ok(false);
         };
-        let under_artifact =
-            self.actions.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE);
+        let under_artifact = self.actions.top_action_kind() == Some(ARTIFACT_TYPE);
         let masters = self
             .c
             .w
             .masters
             .get(self.player.index())
-            .ok_or(crate::world::UNIT_AI_MASTER)?;
+            .ok_or(UNIT_AI_MASTER)?;
         let own = unit.master(self.c.w.master_tables(), self.player)?;
         let (Some(t), Some(general)) = (
             task_target_with(
@@ -204,20 +201,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
                 &self.c.w.parts,
-                crate::objects::masters::MasterTables::new(
-                    &self.c.w.masters,
-                    &self.c.w.parts.own_master,
-                ),
+                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Err(GenieError::unreachable(
@@ -248,15 +239,8 @@ impl UnitView<'_, '_> {
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
-        let Some((task, switch)) = task_search(
-            masters,
-            &actor,
-            &t,
-            &general,
-            terrain,
-            Some(crate::orders::GARRISON),
-            &dip,
-        )?
+        let Some((task, switch)) =
+            task_search(masters, &actor, &t, &general, terrain, Some(GARRISON), &dip)?
         else {
             return Ok(false);
         };
@@ -281,10 +265,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, Distance), GenieError> {
         let unit = &*self.unit;
         let master = unit.master(
-            crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             self.player,
         )?;
         let mover = self
@@ -307,12 +288,12 @@ impl UnitView<'_, '_> {
             ))?;
         let values = terrain
             .restriction(mover.stats.restriction)
-            .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+            .ok_or(UNKNOWN_RESTRICTION)?;
         let zones = self.c.w.zones.of(map, &terrain.kinds, values)?;
         let me = unit.me(self.actions);
         let area = ScoutArea {
             spatial: &mut self.c.w.spatial,
-            by_id: crate::world::index::ObjectsRef::new(
+            by_id: ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
                 &self.c.w.masters,
@@ -341,7 +322,7 @@ impl UnitView<'_, '_> {
 
 /// The auto scout's search reaches within its line of sight less this (`FUN_140c65490`,
 /// `DAT_14330eb8c`).
-pub(crate) const LOS_MARGIN: Distance = Distance::new(crate::math::image::explore::LOS_MARGIN);
+pub(crate) const LOS_MARGIN: Distance = Distance::new(EXPLORE_LOS_MARGIN);
 
 /// The masters of a town centre (`FUN_1416597e0`: 109, then 444).
 pub(crate) const TOWN_CENTRES: [MasterId; 2] = [MasterId::named(109), MasterId::named(444)];
@@ -370,11 +351,11 @@ pub(crate) fn town_centre_unit(units: OthersRef<'_>) -> Result<Option<&Unit>, Ge
     Ok(None)
 }
 
-impl crate::players::ai_module::SearchArea for ScoutArea<'_> {
+impl SearchArea for ScoutArea<'_> {
     fn visible_now(&self, tile: Tile) -> bool {
         self.spatial
             .scout_sight(self.player, tile)
-            .is_some_and(crate::map::spatial::TileSight::seen)
+            .is_some_and(TileSight::seen)
     }
 }
 
@@ -382,8 +363,8 @@ impl crate::players::ai_module::SearchArea for ScoutArea<'_> {
 pub(crate) struct ScoutArea<'a> {
     pub(crate) spatial: &'a mut Spatial,
     /// The world's objects, whose gaits the stand and reach tests read.
-    pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
-    pub(crate) zones: &'a crate::pathing::zones::ZoneMap,
+    pub(crate) by_id: ObjectsRef<'a>,
+    pub(crate) zones: &'a ZoneMap,
     pub(crate) plan: Planning<'a>,
     pub(crate) mover: &'a Mover,
     /// The scout's place (its row's static layer), which the search does not move.
@@ -398,7 +379,7 @@ pub(crate) struct ScoutArea<'a> {
     pub(crate) scouted: bool,
 }
 
-impl crate::movement::explore::Area for ScoutArea<'_> {
+impl Area for ScoutArea<'_> {
     fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
         if self.scouted {
             return self
@@ -411,11 +392,11 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
         self.spatial.explored(self.player, tile)
     }
 
-    fn zone(&mut self, tile: Tile) -> crate::pathing::zones::ZoneId {
+    fn zone(&mut self, tile: Tile) -> ZoneId {
         self.zones.zone(tile)
     }
 
-    fn own_zone(&mut self) -> crate::pathing::zones::ZoneId {
+    fn own_zone(&mut self) -> ZoneId {
         let (x, y) = (self.at.x(), self.at.y());
         self.zones.zone(Tile::new(x as i32, y as i32))
     }
@@ -451,6 +432,6 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
         };
         let gx = gap(tile.x() as f32 - self.at.x(), self.radius.x());
         let gy = gap(tile.y() as f32 - self.at.y(), self.radius.y());
-        crate::math::fmath::sqrt(gy * gy + gx * gx)
+        sqrt(gy * gy + gx * gx)
     }
 }

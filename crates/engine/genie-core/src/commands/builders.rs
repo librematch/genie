@@ -5,8 +5,10 @@ use crate::GenieError;
 use crate::commands::FOUNDATION_GONE;
 use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildTask};
+use crate::construction::wait_solidify::WaitSolidify;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::footprint_gap;
@@ -20,15 +22,21 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
+use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::player_master;
+use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::orders::{Work, readiness};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::world::{TaskWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::task_finder::{Actor, TaskTarget};
+use crate::unit_ai::task_finder::{TaskOn, enabled};
 use crate::unit_ai::world_view::Wait;
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 use crate::world::{STATIC_TYPES_END, World};
 
@@ -70,7 +78,7 @@ impl World {
             let m = unit.master(self.master_tables(), q)?;
             let speed = m.moving.map_or(Speed::ZERO, |s| s.speed);
             let kind = m.kind;
-            let moves = MOVING <= kind && crate::math::fmath::below_or_unordered(0.0, speed.get());
+            let moves = MOVING <= kind && below_or_unordered(0.0, speed.get());
             if !moves && !queued {
                 continue;
             }
@@ -79,7 +87,7 @@ impl World {
                 .unit_ai
                 .get(unit.id)
                 .is_some_and(|ai| queued || (commits && ai.has_unready_order()));
-            let Some(crate::world::index::Place::Live(q, idx)) = self.place(id) else {
+            let Some(Place::Live(q, idx)) = self.place(id) else {
                 // a sleeping object is a static one without a unit AI: its slot 0x128 does
                 // nothing
                 continue;
@@ -110,7 +118,7 @@ impl World {
             self.empty_queue_for_work(q, idx, kind)?;
             // another player's unit: slot 0x128's slot 0x7e8 finds whatever task it has on
             // the foundation (a Build on an ally's), the work command's general path
-            let work = crate::orders::Work {
+            let work = Work {
                 target: Some(foundation.id()),
                 point: Position::new(position.x(), position.y(), 0.0),
                 carry_test: false,
@@ -135,7 +143,7 @@ impl World {
     ) -> Result<(), GenieError> {
         self.queue_build(q, idx, site, position)?;
         if commits && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id) {
-            crate::orders::readiness(&mut ai.orders, false);
+            readiness(&mut ai.orders, false);
         }
         Ok(())
     }
@@ -150,7 +158,7 @@ impl World {
         idx: ListIndex,
         kind: MasterKind,
     ) -> Result<(), GenieError> {
-        if crate::objects::masters::master_type::COMBAT <= kind
+        if COMBAT <= kind
             && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
         {
             ai.orders.clear();
@@ -208,17 +216,14 @@ impl World {
         }
         let actor = Actor {
             id,
-            master: unit.master_in(crate::objects::masters::OwnerMasters::new(
-                &self.parts.own_master,
-                Some(masters),
-            ))?,
+            master: unit.master_in(OwnerMasters::new(&self.parts.own_master, Some(masters)))?,
             player: q,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
             civ: owner.civ,
         };
         // the work command's point: BUILD's x and y on the ground
-        let on = crate::unit_ai::task_finder::TaskOn {
+        let on = TaskOn {
             target: Some(&target),
             general: Some(&target),
             terrain: self.task_terrain(Position::new(position.x(), position.y(), 0.0)),
@@ -234,7 +239,7 @@ impl World {
                 "a builder whose task for its foundation is not Build",
             ));
         }
-        if !crate::unit_ai::task_finder::enabled(&owner.attributes, task.enablement) {
+        if !enabled(&owner.attributes, task.enablement) {
             return Err(GenieError::unsupported(
                 "a builder whose Build task is not enabled",
             ));
@@ -280,17 +285,17 @@ impl World {
             m.ignore_units.clear();
         }
         let state = unit.life.state;
-        let order = crate::unit_ai::QueuedOrder {
-            issuer: Some(crate::unit_ai::Issuer::Player(q)),
+        let order = QueuedOrder {
+            issuer: Some(Issuer::Player(q)),
             order: OrderKind::Build,
-            priority: crate::unit_ai::OrderPriority::COMMAND,
+            priority: OrderPriority::COMMAND,
             target: Some(foundation.id()),
             target_owner: Some(fp),
             point: Position::new(position.x(), position.y(), 0.0),
             range: Distance::ZERO,
             shown: position.ground(),
             ready: true,
-            target_type: Some(crate::unit_ai::OrderTargetType::of_master(master)),
+            target_type: Some(OrderTargetType::of_master(master)),
         };
         let ai = self
             .parts
@@ -376,10 +381,7 @@ impl World {
         self.parts
             .actions_mut(self.players.live(player, idx)?.id)?
             .list
-            .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify::new(
-                wait.task,
-                wait.target,
-            )));
+            .set_wait_solidify(Some(WaitSolidify::new(wait.task, wait.target)));
         Ok(())
     }
 
@@ -419,7 +421,7 @@ impl World {
             1,
             &find,
             &self.parts,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
         let general = task_target_with(
@@ -427,7 +429,7 @@ impl World {
             2,
             &find,
             &self.parts,
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
         let masters = self
@@ -442,10 +444,7 @@ impl World {
         let unit = owner.objects.checked(idx)?;
         let actor = Actor {
             id: unit.id,
-            master: unit.master_in(crate::objects::masters::OwnerMasters::new(
-                &self.parts.own_master,
-                Some(masters),
-            ))?,
+            master: unit.master_in(OwnerMasters::new(&self.parts.own_master, Some(masters)))?,
             player,
             held: unit.life.held(),
             attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),

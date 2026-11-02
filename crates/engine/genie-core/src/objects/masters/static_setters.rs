@@ -1,6 +1,8 @@
 //! The static, animated, moving and action masters' setters.
 
 use crate::map::Distance;
+use crate::map::RestrictionId;
+use crate::math::fmath::at_most_or_unordered;
 use crate::movement::Speed;
 use crate::objects::MasterHitPoints;
 use crate::objects::WorkRate;
@@ -61,7 +63,7 @@ impl Master {
                 self.blast_defense = BlastDefense::new(low8(v));
             }
             a::TERRAIN_RESTRICTION_ID => {
-                self.terrain_restriction = crate::map::RestrictionId::of_data(low16(v));
+                self.terrain_restriction = RestrictionId::of_data(low16(v));
             }
             // `CVTTSS2SI RAX`, the low 32 bits
             a::UNIT_TRAIT => {
@@ -366,7 +368,7 @@ impl Master {
         } else {
             SPEED_CAP
         };
-        if capped && !crate::math::fmath::at_most_or_unordered(self.max_speed.get(), cap) {
+        if capped && !at_most_or_unordered(self.max_speed.get(), cap) {
             self.max_speed = Speed::new(cap);
         }
     }

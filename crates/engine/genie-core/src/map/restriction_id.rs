@@ -1,6 +1,7 @@
 //! A terrain restriction's id: which terrains an object may stand on.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A terrain restriction (the `.dat`'s table; a master's `+0x606`, the save's
 /// `terrain_restriction_mask_id`): its place in the restrictions' tables, each the terrains'
@@ -53,8 +54,8 @@ impl RestrictionId {
     }
 }
 
-impl std::fmt::Display for RestrictionId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for RestrictionId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.0)
     }
 }

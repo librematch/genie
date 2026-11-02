@@ -8,7 +8,10 @@ use crate::GenieError;
 use crate::commands::Command;
 use crate::math::rng::Stream;
 use crate::players::PlayerId;
+use crate::trace::UPDATE;
+use crate::world::FrameSeed;
 use crate::world::World;
+use std::mem::take;
 
 /// A step the world update runs once, before or after the players' steps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -207,7 +210,7 @@ impl World {
         observe: &mut dyn FnMut(&Self, UpdateStep),
     ) {
         let _update = tracing::debug_span!(
-            target: crate::trace::UPDATE,
+            target: UPDATE,
             "update",
             tick = self.ticks.get() + 1,
             world_time = self.world_time.after(dt).millis()
@@ -227,12 +230,10 @@ impl World {
         for player in self.player_ids() {
             let p = player;
             let _player =
-                tracing::debug_span!(target: crate::trace::UPDATE, "player", player = p.index())
-                    .entered();
+                tracing::debug_span!(target: UPDATE, "player", player = p.index()).entered();
             for step in EACH_PLAYER {
                 let _step =
-                    tracing::trace_span!(target: crate::trace::UPDATE, "step", step = %step.name())
-                        .entered();
+                    tracing::trace_span!(target: UPDATE, "step", step = %step.name()).entered();
                 if let Err(e) = self.player_step(step, &mut run, p) {
                     self.stop_player(p, e);
                 }
@@ -271,8 +272,7 @@ impl World {
 
     /// World step `step`; its error stops every player.
     fn world_step(&mut self, step: WorldStep, run: &mut UpdateRun<'_>) {
-        let _step = tracing::trace_span!(target: crate::trace::UPDATE, "step", step = %step.name())
-            .entered();
+        let _step = tracing::trace_span!(target: UPDATE, "step", step = %step.name()).entered();
         if let Err(e) = self.run_world_step(step, run) {
             for p in PlayerId::each(self.players.len()) {
                 self.stop_player(p, e.clone());
@@ -289,7 +289,7 @@ impl World {
         match step {
             WorldStep::Commands => {
                 self.command_phase(run.dt, run.commands);
-                run.start_work = std::mem::take(&mut self.start_work_due);
+                run.start_work = take(&mut self.start_work_due);
             }
             WorldStep::Draw => {
                 self.grow_unknown(run.dt.seconds());
@@ -320,8 +320,7 @@ impl World {
             }
             WorldStep::Victory => self.victory_check()?,
             WorldStep::FrameSeed => {
-                self.frame_seed =
-                    crate::world::FrameSeed::of_data(self.streams.get(Stream::World).rand15());
+                self.frame_seed = FrameSeed::of_data(self.streams.get(Stream::World).rand15());
             }
             // setLastRandoms (0x140d3ce20): the multiplayer sync's draws
             WorldStep::LastRandoms => {
@@ -388,6 +387,8 @@ impl World {
 #[cfg(test)]
 mod tests {
     use crate::players::PlayerId;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::World;
     use crate::world::WorldTime;
@@ -400,7 +401,7 @@ mod tests {
     fn bare(n: usize) -> World {
         World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(29910),
+            FrameSeed::of_data(29910),
             PlayerId::new(1),
             vec![Millis::ZERO; n],
             vec![Player::default(); n],

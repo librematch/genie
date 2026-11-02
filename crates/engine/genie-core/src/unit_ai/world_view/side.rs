@@ -6,6 +6,8 @@
 //! and the resource search in `gathering/closest_resource.rs`.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
+use crate::gathering::DropSiteId;
 use crate::gathering::closest_resource::herded;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -14,28 +16,45 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::map::spatial::TileSight;
 use crate::map::spatial::{Placed, SearchQuery, Spatial};
+use crate::math::image::unit_ai::HELP_REACH as UNIT_AI_HELP_REACH;
 use crate::math::rng::{Stream, Well512};
+use crate::movement::WaypointIndex;
+use crate::movement::explore::{
+    InfluenceMap, SCOUT_MAP_SIZE, Seeker, beyond_sight, closest_undiscovered, unexplored_area,
+};
 use crate::movement::{Planning, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::player_master;
+use crate::orders::nearest_table_site;
 use crate::orders::object_gone;
 use crate::players::PlayerId;
 use crate::players::UnitRelation;
+use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker, patrol_information, town_centre};
+use crate::unit_ai::{
+    Attacked, Duel, Effect, Found, Gatherable, NearestAttacker, Notify, OffFootprint, PatrolPath,
+    Pick, ResourceSearch, Seeker as UnitAiSeeker, TargetFlags, UNMODELLED_COMMAND, UnitCommand,
+    UnitSeen, UnitSide, helper_answers,
+};
 use crate::unit_ai::{Search, UnitAi};
 use crate::world::PETARD;
+use crate::world::index::ObjectsRef;
+use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use std::mem::{swap, take};
 
-impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
-    fn table_drop_site(&mut self) -> Result<Option<crate::gathering::DropSiteId>, GenieError> {
+impl UnitSide for UnitView<'_, '_> {
+    fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
         let class = self
             .unit
             .master(self.c.w.master_tables(), self.player)?
@@ -48,7 +67,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             self.new_owner,
         )?;
         let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
-        Ok(crate::orders::nearest_table_site(
+        Ok(nearest_table_site(
             (
                 &self.c.w.drop_sites,
                 self.civ,
@@ -59,9 +78,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         ))
     }
 
-    fn patrol_information(
-        &self,
-    ) -> Option<(crate::unit_ai::PatrolPath, crate::movement::WaypointIndex)> {
+    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
         patrol_information(self.c.w.parts.mover_of(self.unit.id))
     }
 
@@ -79,7 +96,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             .ok_or(GenieError::unsupported(
                 "a stand test of a unit without movement state",
             ))?;
-        let by_id = crate::world::index::ObjectsRef::new(
+        let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
             &self.c.w.masters,
@@ -96,9 +113,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
 
     fn off_footprint(
         &mut self,
-        site: crate::construction::FoundationId,
+        site: FoundationId,
         radius: Footprint,
-    ) -> Result<crate::unit_ai::OffFootprint, GenieError> {
+    ) -> Result<OffFootprint, GenieError> {
         self.spot_off_footprint(site, radius)
     }
 
@@ -112,8 +129,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         /// The siege tower master (`FUN_141194f10`'s 0x451).
         const SIEGE_TOWER: MasterId = MasterId::named(0x451);
         /// `AskForHelp`'s reach (`DAT_142ecccc4`): the squared footprint gap of 3 tiles.
-        const HELP_REACH: DistanceSquared =
-            DistanceSquared::new(crate::math::image::unit_ai::HELP_REACH);
+        const HELP_REACH: DistanceSquared = DistanceSquared::new(UNIT_AI_HELP_REACH);
         let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
             "a search that reads the registry's last answer (before any query)",
         ))?;
@@ -162,12 +178,12 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             if !self.helper_free(owner, u, self.c.w.parts.actions_of(u.id), m, attacker)? {
                 continue;
             }
-            return crate::unit_ai::helper_answers();
+            return helper_answers();
         }
         Ok(())
     }
 
-    fn duel(&mut self, other: ObjectId) -> Result<crate::unit_ai::Duel, GenieError> {
+    fn duel(&mut self, other: ObjectId) -> Result<Duel, GenieError> {
         self.picker(None)?.duel(&self.c.w.spatial, other)
     }
 
@@ -175,24 +191,20 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         self.picker(None)?.harmless(&self.c.w.spatial, attacker)
     }
 
-    fn defended_attacker(
-        &mut self,
-        target: ObjectId,
-    ) -> Result<crate::unit_ai::NearestAttacker, GenieError> {
+    fn defended_attacker(&mut self, target: ObjectId) -> Result<NearestAttacker, GenieError> {
         self.picker(None)?.nearest_attacker_of(target)
     }
 
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<crate::unit_ai::UnitSeen>, GenieError> {
+    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
         let Some(p) = self.c.w.spatial.get(id) else {
             return Ok(None);
         };
-        let (owner, u) =
-            crate::world::others::OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
-                .find(id)
-                .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
+        let (owner, u) = OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
+            .find(id)
+            .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
         let m = u.master(self.c.w.master_tables(), owner)?;
         let me = self.unit.master(self.c.w.master_tables(), self.player)?;
-        Ok(Some(crate::unit_ai::UnitSeen {
+        Ok(Some(UnitSeen {
             id,
             class: m.class,
             owner,
@@ -216,7 +228,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             master: u.life.master_id,
             kind: m.kind,
             main: self.c.w.parts.building_of(u.id).annex_of,
-            allied: crate::unit_ai::task_finder::allied(
+            allied: allied(
                 &self.c.w.players.player(self.player)?.relations,
                 self.player,
                 owner,
@@ -227,8 +239,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
 
     fn closest_resource(
         &mut self,
-        search: crate::unit_ai::ResourceSearch,
-    ) -> Result<Option<crate::unit_ai::Gatherable>, GenieError> {
+        search: ResourceSearch,
+    ) -> Result<Option<Gatherable>, GenieError> {
         self.closest_gatherable(search)
     }
 
@@ -267,7 +279,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             .ok_or(GenieError::unsupported(
                 "a reach test of a unit that does not move",
             ))?;
-        let by_id = crate::world::index::ObjectsRef::new(
+        let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
             &self.c.w.masters,
@@ -283,9 +295,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         )
     }
 
-    fn closest(&mut self, search: &Search<'_>) -> Result<crate::unit_ai::Found, GenieError> {
+    fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
         let seeker = match search.pick {
-            crate::unit_ai::Pick::Attack { seeker, .. } => Some(seeker),
+            Pick::Attack { seeker, .. } => Some(seeker),
             _ => None,
         };
         let mut picker = WorldPicker {
@@ -306,12 +318,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: crate::objects::masters::MasterTables::new(
-                &self.c.w.masters,
-                &self.c.w.parts.own_master,
-            ),
+            every: MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
             parts: &self.c.w.parts,
-            by_id: crate::world::index::ObjectsRef::new(
+            by_id: ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
                 &self.c.w.masters,
@@ -353,7 +362,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             unit.life.master_id,
             unit.position(),
         );
-        let by_id = crate::world::index::ObjectsRef::new(
+        let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
             &self.c.w.masters,
@@ -397,7 +406,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     fn may_attack(
         &mut self,
         target: ObjectId,
-        seeker: &crate::unit_ai::Seeker,
+        seeker: &UnitAiSeeker,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
         if !self.view_holds(target)? {
             return Ok(None);
@@ -410,7 +419,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         target: ObjectId,
         force: bool,
         ai: &UnitAi,
-    ) -> Result<crate::unit_ai::Attacked, GenieError> {
+    ) -> Result<Attacked, GenieError> {
         self.start_attack_now(target, force, ai)
     }
 
@@ -425,7 +434,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     /// [`Unit::run_effect`]: crate::objects::unit::Unit::run_effect
     fn effect_now(
         &mut self,
-        e: crate::unit_ai::Effect,
+        e: Effect,
         ai: &mut UnitAi,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
@@ -433,8 +442,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let posted = held
             .into_iter()
             .try_for_each(|(n, state)| ai.post(n, state));
-        self.c.w.return_unit_ai(self.unit.id, std::mem::take(ai));
-        std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
+        self.c.w.return_unit_ai(self.unit.id, take(ai));
+        swap(self.c.w.streams.get(Stream::Ai), rng);
         let class = self
             .unit
             .master(self.c.w.master_tables(), self.c.player)
@@ -442,7 +451,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let done = class.and_then(|class| {
             posted.and_then(|()| self.unit.run_effect(self.actions, e, Some(class), self.c))
         });
-        std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
+        swap(self.c.w.streams.get(Stream::Ai), rng);
         self.c.side_notifies = Some(Vec::new());
         *ai = self.c.w.lend_unit_ai(self.unit.id).ok_or_else(|| {
             GenieError::unreachable("a call of the unit AI took the unit's AI")
@@ -478,23 +487,21 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         // the search about the town centre only while the player has no scout map
         let scout_map = self.c.w.spatial.scout_map(self.player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
-        if !scout_map
-            && let Some(p) = crate::movement::explore::unexplored_area(tc, map, &mut area)?
-        {
+        if !scout_map && let Some(p) = unexplored_area(tc, map, &mut area)? {
             return Ok(Some(p));
         }
         // none about the town centre: the unit AI's own search (slot 0x90)
-        let seeker = crate::movement::explore::Seeker {
+        let seeker = Seeker {
             at,
             line_of_sight,
             order: ai.current_order,
             target_point: ai.target_point.ground(),
             player_type,
         };
-        crate::movement::explore::closest_undiscovered(&mut area, seeker, map, rng)
+        closest_undiscovered(&mut area, seeker, map, rng)
     }
 
-    fn owner_hears(&mut self, n: crate::unit_ai::Notify) -> Result<(), GenieError> {
+    fn owner_hears(&mut self, n: Notify) -> Result<(), GenieError> {
         self.hears(n)
     }
 
@@ -503,7 +510,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let scouted = self.c.w.spatial.scout_map(player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
         area.scouted = scouted;
-        let found = crate::movement::explore::beyond_sight(&mut area, at, line_of_sight, map, rng)?;
+        let found = beyond_sight(&mut area, at, line_of_sight, map, rng)?;
         // the point found is marked in the scout map (FUN_140f4d5e0 with 1)
         if let Some(t) = found {
             self.c.w.spatial.scout(player, t);
@@ -515,8 +522,8 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     /// a new `InfluenceMap` of 480 by 480 (`FUN_140f4a240`, the old one goes, `+0x1368` 1) marks
     /// every tile the player sees now (its visible map's `FUN_141285350` 0xf) with 1.
     fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        let size = crate::movement::explore::SCOUT_MAP_SIZE;
-        let mut m = crate::movement::explore::InfluenceMap::new(GridSize::new(size, size), 0);
+        let size = SCOUT_MAP_SIZE;
+        let mut m = InfluenceMap::new(GridSize::new(size, size), 0);
         let (w, h) = (self.c.w.spatial.map.width(), self.c.w.spatial.map.height());
         for y in 0..h {
             for x in 0..w {
@@ -525,7 +532,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                     .w
                     .spatial
                     .scout_sight(self.player, Tile::new(x, y))
-                    .is_some_and(crate::map::spatial::TileSight::seen)
+                    .is_some_and(TileSight::seen)
                 {
                     m.set(Tile::new(x, y), 1);
                 }
@@ -541,12 +548,12 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     /// type (`0xffff`) and the switch ([`task_search`] on the target and its main building);
     /// with a task the new wait replaces the unit's actions, which the caller makes after the
     /// update ([`Wait`], [`World::wait_for_foundation`]).
-    fn command(&mut self, command: crate::unit_ai::UnitCommand) -> Result<bool, GenieError> {
+    fn command(&mut self, command: UnitCommand) -> Result<bool, GenieError> {
         match command {
-            crate::unit_ai::UnitCommand::Repair(target) => self.repair_command(target),
-            crate::unit_ai::UnitCommand::Enter(target) => self.enter_command(target),
+            UnitCommand::Repair(target) => self.repair_command(target),
+            UnitCommand::Enter(target) => self.enter_command(target),
             // slot 0x3a8 (FUN_14108d050): its Transport, made at once, answers 1
-            crate::unit_ai::UnitCommand::Unload {
+            UnitCommand::Unload {
                 to,
                 over_wall: false,
             } => {
@@ -556,11 +563,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                     })?;
                 Ok(true)
             }
-            _ => Err(crate::unit_ai::UNMODELLED_COMMAND),
+            _ => Err(UNMODELLED_COMMAND),
         }
     }
 
-    fn builds(&self, foundation: crate::construction::FoundationId) -> Result<bool, GenieError> {
+    fn builds(&self, foundation: FoundationId) -> Result<bool, GenieError> {
         self.builds_on(foundation)
     }
 
@@ -598,10 +605,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
 
     /// The object as the full update's tail reads it, found as [`UnitSide::seen_unit`] finds
     /// it.
-    fn target_flags(
-        &mut self,
-        id: ObjectId,
-    ) -> Result<Option<crate::unit_ai::TargetFlags>, GenieError> {
+    fn target_flags(&mut self, id: ObjectId) -> Result<Option<TargetFlags>, GenieError> {
         let Some(seen) = self.seen_unit(id)? else {
             return Ok(None);
         };
@@ -614,7 +618,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         .get(id)
         .ok_or_else(|| object_gone(id))?;
         let kind = u.master(self.c.w.master_tables(), seen.owner)?.kind;
-        Ok(Some(crate::unit_ai::TargetFlags {
+        Ok(Some(TargetFlags {
             owner: seen.owner,
             kind,
             capture: self.c.w.parts.combat_of(u.id).capture_flag,

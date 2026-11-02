@@ -14,8 +14,11 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
+use crate::objects::facing::{SpriteFacets, angle_of_facet, drawn_angle, draws_angle};
+use crate::objects::layers::{Animated, Motion, Static};
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
@@ -27,6 +30,7 @@ use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::master_type::STATIC;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
+use crate::objects::{Facet, FacetCount};
 use crate::players::PlayerId;
 use crate::production::spawn::{
     Facing, NOT_MOVING, Placing, Site, WorldMap, corner_tiles, placement, spawn_point,
@@ -35,6 +39,7 @@ use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
+use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -46,7 +51,7 @@ impl World {
         &self,
         p: PlayerId,
         i: ListIndex,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         toward: Option<Point>,
     ) -> Result<Point, GenieError> {
         let building = &self.players.live(p, i)?;
@@ -113,7 +118,7 @@ impl World {
         p: PlayerId,
         master: MasterId,
         at: Position,
-        facet: Option<crate::objects::Facet>,
+        facet: Option<Facet>,
     ) -> Result<(), GenieError> {
         let made = self.master(p, master)?.clone();
         if made.kind == BUILDING {
@@ -129,17 +134,17 @@ impl World {
                     .and_then(|s| self.graphics.get(s))
                     .copied();
                 let own = standing.map_or(
-                    crate::objects::facing::SpriteFacets {
-                        count: crate::objects::FacetCount::NONE,
+                    SpriteFacets {
+                        count: FacetCount::NONE,
                         turns: false,
                     },
-                    |g| crate::objects::facing::SpriteFacets {
+                    |g| SpriteFacets {
                         count: g.facets,
                         turns: g.flags.contains(SpriteFlags::TURNS),
                     },
                 );
                 if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {
-                    m.angle = crate::objects::facing::angle_of_facet(facet, own);
+                    m.angle = angle_of_facet(facet, own);
                 }
             }
             return Ok(());
@@ -153,7 +158,7 @@ impl World {
         &mut self,
         id: ObjectId,
         (p, master): (PlayerId, MasterId),
-        made: &crate::objects::masters::Master,
+        made: &Master,
         at: Position,
     ) -> Result<(), GenieError> {
         if let Some(v) = self.spatial.sight.as_mut() {
@@ -200,7 +205,7 @@ impl World {
         &mut self,
         p: PlayerId,
         master: MasterId,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         at: Position,
         facing: Facing,
     ) -> Result<ListIndex, GenieError> {
@@ -219,16 +224,16 @@ impl World {
                 let _ = self.streams.get(Stream::Object).rand15();
             }
         }
-        let facets = standing.map(|g| crate::objects::facing::SpriteFacets {
+        let facets = standing.map(|g| SpriteFacets {
             count: g.facets,
             turns: g.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
         let moving = if MOVING <= made.kind {
             // the moving setup's angle draw (FUN_141141640, "setup" line 0x2c3)
-            let drawn = if crate::objects::facing::draws_angle(facets) {
+            let drawn = if draws_angle(facets) {
                 let r = self.streams.get(Stream::Object).rand15();
-                facets.map(|f| crate::objects::facing::drawn_angle(r, f))
+                facets.map(|f| drawn_angle(r, f))
             } else {
                 None
             };
@@ -241,11 +246,11 @@ impl World {
                     let facet = facet.ok_or(GenieError::unsupported(
                         "moving remains of an object without a facet the slice holds",
                     ))?;
-                    let own = facets.unwrap_or(crate::objects::facing::SpriteFacets {
-                        count: crate::objects::FacetCount::NONE,
+                    let own = facets.unwrap_or(SpriteFacets {
+                        count: FacetCount::NONE,
                         turns: false,
                     });
-                    crate::objects::facing::angle_of_facet(facet, own)
+                    angle_of_facet(facet, own)
                 }
             };
             Some(made.moving.ok_or(GenieError::unsupported(
@@ -313,24 +318,24 @@ impl World {
                 master_id: master,
                 master: made.life,
             },
-            place: crate::objects::layers::Static::at(at),
+            place: Static::at(at),
             attackable: true,
             pasture: None,
             my_pasture: None,
             sprite: sprite.filter(|_| facing == Facing::Drawn),
             ..Unit::default()
         };
-        let parts = crate::world::parts::ObjectParts {
+        let parts = ObjectParts {
             // an animated one's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            motion: crate::objects::layers::Motion::of(
-                (ANIMATED <= made.kind).then(crate::objects::layers::Animated::default),
+            motion: Motion::of(
+                (ANIMATED <= made.kind).then(Animated::default),
                 moving.map(|stats| {
                     Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)
                 }),
             ),
             ..Default::default()
         };
-        let idx = self.push_live(p, crate::world::parts::Object { unit, parts })?;
+        let idx = self.push_live(p, Object { unit, parts })?;
         // the static init's add to its player (slot 0x2d0) files it in the tracker
         self.track_add(p, id, master).map(|()| idx)
     }
@@ -400,7 +405,7 @@ impl World {
     pub(super) fn new_building(
         &mut self,
         p: PlayerId,
-        made: &crate::objects::masters::Master,
+        made: &Master,
         at: Position,
     ) -> Result<(), GenieError> {
         if self.players.player(p)?.kind.is_computer() {
@@ -416,7 +421,7 @@ impl World {
 
 /// Remains the slice models: a static object of 10 or 20 to 39 without hit points, of a master
 /// that is not recyclable.
-fn remains_supported(made: &crate::objects::masters::Master) -> Result<(), GenieError> {
+fn remains_supported(made: &Master) -> Result<(), GenieError> {
     if made.kind != STATIC && !(ANIMATED..master_type::ACTION).contains(&made.kind) {
         return Err(GenieError::unsupported(
             "remains of a type other than 10 and 20 to 39",

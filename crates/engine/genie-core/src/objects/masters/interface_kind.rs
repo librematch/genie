@@ -1,5 +1,7 @@
 //! A master's interface kind (`+0x62f`): which command panel its objects show.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's interface kind (`unit_level`, `+0x62f`; the `.dat`'s `interface_kind`, openage's
 /// names): the command panel a selected object of it shows. The simulation only keeps it; every
 /// byte is kept.
@@ -37,8 +39,8 @@ impl InterfaceKind {
     }
 }
 
-impl std::fmt::Display for InterfaceKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for InterfaceKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

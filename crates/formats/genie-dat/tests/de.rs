@@ -4,12 +4,14 @@
 
 use flate2::read::DeflateDecoder;
 use genie_dat::de::{DatFile, Version};
+use std::env::var_os;
+use std::fs::read;
 use std::io::Read;
 
 /// The file's inflated bytes: compressed as the game ships it, or already inflated (starting with
 /// its version string, as the load oracle's VER 8.8 rewrite).
 fn inflated() -> Option<Vec<u8>> {
-    let raw = std::fs::read(std::env::var_os("GENIE_DAT")?).unwrap();
+    let raw = read(var_os("GENIE_DAT")?).unwrap();
     if raw.starts_with(b"VER ") {
         return Some(raw);
     }

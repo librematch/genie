@@ -11,6 +11,7 @@ use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::PlanTries;
 use crate::movement::Speed;
 use crate::movement::StepPlans;
 use crate::movement::WaitDelays;
@@ -25,6 +26,7 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::objects::masters::class;
 use crate::pathing::tile_path::Path;
+use crate::world::index::ObjectsRef;
 
 /// What the long pather is asked for a far waypoint ([`Mover::long_plan`]'s arguments after the
 /// planning state).
@@ -55,7 +57,7 @@ impl Mover {
     pub(super) fn request(
         &mut self,
         (at, me): (Position, &Me),
-        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         goal: Goal<'_>,
         plans: &mut StepPlans,
@@ -198,7 +200,7 @@ impl Mover {
                 && !level.waypoint.at_or_past_last(level.points.len())
             {
                 level.flags |= LevelFlags::REACHED;
-                level.continue_counter = crate::movement::PlanTries::FULL;
+                level.continue_counter = PlanTries::FULL;
                 return Ok(Some(AfterRequest::Again));
             }
             self.reset_level()?;
@@ -247,7 +249,7 @@ impl Mover {
         plan: &Planning<'_>,
         ask: LongAsk<'_>,
         path: &mut Path,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
         let LongAsk {
             waypoint,
@@ -311,7 +313,7 @@ impl Mover {
         world: &mut Spatial,
         target_id: Option<ObjectId>,
         path: &mut Path,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let me_at = world.get(me.id);
         if me_at.is_some_and(|p| p.class == class::VILLAGER) {

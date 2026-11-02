@@ -5,7 +5,9 @@
 //! The lines carry no time and no colours: two runs of one recording give the same log, so two
 //! logs can be compared line by line, and a log attached to a bug report reads as plain text.
 
+use std::io::stderr;
 use tracing::Subscriber;
+use tracing::subscriber::set_global_default;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::MakeWriter;
 
@@ -47,6 +49,5 @@ pub fn install(rust_log: Option<&str>) -> Result<(), String> {
     let Some(filter) = filter(rust_log)? else {
         return Ok(());
     };
-    tracing::subscriber::set_global_default(subscriber(filter, std::io::stderr))
-        .map_err(|e| e.to_string())
+    set_global_default(subscriber(filter, stderr)).map_err(|e| e.to_string())
 }

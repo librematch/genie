@@ -1,6 +1,7 @@
 //! The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed
 //! control.
 
+use crate::construction::MainBuildingId;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::spatial::{RecordId, Spatial};
@@ -14,10 +15,12 @@ use crate::movement::{
     ALLY_PAUSE, EPSILON, FAST_TURN, Me, Motion, Mover, Next, OTHER_PAUSE, UP, Velocity,
 };
 use crate::objects::ObjectKey;
+use crate::objects::facing::{SpriteFacets, angle_of_facet, facet_of_forward};
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::{GenieError, math::fmath};
 
 impl Mover {
@@ -38,7 +41,7 @@ impl Mover {
         world: &Spatial,
         hits: &[RecordId],
         player_type: PlayerType,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let level = self.paths.walked()?;
         let player = world
@@ -48,7 +51,7 @@ impl Mover {
         for &hit in hits {
             let Some(id) = by_id
                 .annex_of(hit)
-                .map(crate::construction::MainBuildingId::id)
+                .map(MainBuildingId::id)
                 .or_else(|| hit.key())
             else {
                 continue;
@@ -119,7 +122,7 @@ impl Mover {
     /// The facets of the unit's current sprite ([`Mover::sprite_facets`]), else its master's when
     /// every sprite it shows has the same.
     #[must_use]
-    pub fn facets(&self) -> Option<crate::objects::facing::SpriteFacets> {
+    pub fn facets(&self) -> Option<SpriteFacets> {
         self.sprite_facets.or(self.stats.facets)
     }
 
@@ -191,7 +194,7 @@ impl Mover {
     pub(crate) fn yaw(
         &mut self,
         turn: Angle,
-        facets: Option<crate::objects::facing::SpriteFacets>,
+        facets: Option<SpriteFacets>,
     ) -> Result<(), GenieError> {
         let m = fmath::rotation(turn.get(), UP);
         let forward = fmath::normalize(fmath::rotate(&m, self.forward));
@@ -199,8 +202,8 @@ impl Mover {
         let facets = facets.ok_or(GenieError::unsupported(
             "the yaw of a unit whose sprites differ in their facets",
         ))?;
-        let facet = crate::objects::facing::facet_of_forward(forward, facets);
-        self.angle = crate::objects::facing::angle_of_facet(facet, facets);
+        let facet = facet_of_forward(forward, facets);
+        self.angle = angle_of_facet(facet, facets);
         Ok(())
     }
 

@@ -1,6 +1,7 @@
 //! A unit's make action's state: making the unit its building trains.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A unit's make action's state (`+0x18`, set by `set_state`, `FUN_140acfec0`): its update
 /// (`0x140ad0490`) is done in 1, works in 6 and counts its timer down in 10, and its destructor
@@ -49,8 +50,8 @@ impl MakeObjState {
     }
 }
 
-impl std::fmt::Display for MakeObjState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MakeObjState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

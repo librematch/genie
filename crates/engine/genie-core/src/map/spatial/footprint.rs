@@ -14,7 +14,12 @@ use crate::world::slots::CheckedIndex;
 use std::collections::BTreeMap;
 
 use crate::GenieError;
+use crate::construction::FoundationId;
+use crate::construction::build::ClearLook;
+use crate::map::TerrainMask;
 use crate::map::spatial::{Placed, QUERY_HITS, RecordId, Spatial, tile_record_id};
+use crate::math::image::spatial::{FOOTPRINT_EDGE, NO_SPOT as SPATIAL_NO_SPOT, TILE_CENTRE};
+use crate::world::index::ObjectsRef;
 
 impl Spatial {
     /// `FUN_1411566b0`: the tile beside a footprint at `at` of radii `radius` a unit at `from`
@@ -32,17 +37,17 @@ impl Spatial {
         &mut self,
         from: Position,
         (me, radius_x): (ObjectId, f32),
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         (at, radius): (Position, Footprint),
         farthest: bool,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
         /// The footprint's last tile stops short of its edge by this (`DAT_142eb1e9c`).
-        const EDGE: f32 = crate::math::image::spatial::FOOTPRINT_EDGE;
+        const EDGE: f32 = FOOTPRINT_EDGE;
         /// A tile's centre (`DAT_142e7f384`).
-        const CENTRE: f32 = crate::math::image::spatial::TILE_CENTRE;
+        const CENTRE: f32 = TILE_CENTRE;
         /// The closest search's first best (`DAT_14330ebf4`).
-        const NO_SPOT: f32 = crate::math::image::spatial::NO_SPOT;
+        const NO_SPOT: f32 = SPATIAL_NO_SPOT;
         let (tx, ty) = (at.x(), at.y());
         let (rx, ry) = (radius.x(), radius.y());
         let size = (((ry + rx) as i32) + 2).max(1) * 2;
@@ -124,10 +129,10 @@ impl Spatial {
     /// state 2 or 6) passes the state and foundation tests.
     pub fn footprint_occupants(
         &self,
-        site_id: crate::construction::FoundationId,
+        site_id: FoundationId,
         site: &Placed,
         obstructs: bool,
-        looks: &BTreeMap<ObjectId, crate::construction::build::ClearLook>,
+        looks: &BTreeMap<ObjectId, ClearLook>,
     ) -> Result<Vec<ObjectId>, GenieError> {
         use crate::objects::masters::master_type::BUILDING;
         let (sx, sy) = (site.position.x(), site.position.y());
@@ -197,8 +202,8 @@ impl Spatial {
         me: ObjectId,
         point: Point,
         grow: Distance,
-        mask: crate::map::TerrainMask,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        mask: TerrainMask,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (x, y) = (point.x(), point.y());
         let (tx, ty) = (x as i32, y as i32);
@@ -231,9 +236,9 @@ impl Spatial {
         me: ObjectId,
         point: Point,
         grow: Distance,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         ignore: &[ObjectId],
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         // CVTTSS2SI: a NaN or huge coordinate is i32::MIN, off the map
         let Some(word) = self.tiles.word(point.tile()) else {
@@ -274,7 +279,7 @@ impl Spatial {
         grow: Distance,
         ignore: &[RecordId],
         still: bool,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::between(point, point).grown(grow);
         if rect.leaves_map(self.map) && !self.edge_records(rect, QUERY_HITS).is_empty() {
@@ -308,7 +313,7 @@ impl Spatial {
         grow: Distance,
         ignore: &[RecordId],
         still: bool,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::between(point, point).grown(grow);
         self.check_known_records(rect)?;
@@ -333,7 +338,7 @@ impl Spatial {
     /// (`FUN_1410510c0`): the tile is on the map and its word holds neither a terrain class of
     /// `mask` nor a temporary record's bit 0x80 (`mask & 0x7f | 0x80`).
     #[must_use]
-    pub fn makes_tile_record(&self, point: Point, mask: crate::map::TerrainMask) -> bool {
+    pub fn makes_tile_record(&self, point: Point, mask: TerrainMask) -> bool {
         let (x, y) = (point.x() as i32, point.y() as i32);
         self.tiles
             .word(Tile::new(x, y))

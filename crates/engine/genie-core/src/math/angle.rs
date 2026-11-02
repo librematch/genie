@@ -1,5 +1,8 @@
 //! An angle in radians ([`Angle`]), with the game's `f32` operations.
 
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, Div, Mul, Neg, Sub};
+
 /// An angle on the map in radians, as the game's `f32` holds it: where an object faces
 /// (`+0x7e8`, 0 to 2π, [`crate::objects::facing`]), a turn or a yaw, a missile's spawn angle,
 /// a blast's cone. Each operator is the one `f32` operation the game does, in its order; a
@@ -24,7 +27,7 @@ impl Angle {
     }
 }
 
-impl std::ops::Add for Angle {
+impl Add for Angle {
     type Output = Self;
 
     /// The `f32` sum (a turn added).
@@ -33,7 +36,7 @@ impl std::ops::Add for Angle {
     }
 }
 
-impl std::ops::Sub for Angle {
+impl Sub for Angle {
     type Output = Self;
 
     /// The `f32` difference.
@@ -42,7 +45,7 @@ impl std::ops::Sub for Angle {
     }
 }
 
-impl std::ops::Neg for Angle {
+impl Neg for Angle {
     type Output = Self;
 
     /// The angle negated (its sign bit flipped: the turn the other way).
@@ -51,7 +54,7 @@ impl std::ops::Neg for Angle {
     }
 }
 
-impl std::ops::Mul<f32> for Angle {
+impl Mul<f32> for Angle {
     type Output = Self;
 
     /// The angle scaled by `f` (one `f32` product, the angle first).
@@ -60,7 +63,7 @@ impl std::ops::Mul<f32> for Angle {
     }
 }
 
-impl std::ops::Div<f32> for Angle {
+impl Div<f32> for Angle {
     type Output = Self;
 
     /// The angle divided by `f` (one `f32` quotient: a facet's share of a turn).
@@ -69,8 +72,8 @@ impl std::ops::Div<f32> for Angle {
     }
 }
 
-impl std::fmt::Display for Angle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Angle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

@@ -1,5 +1,7 @@
 //! A missile master's arc.
 
+use std::ops::{AddAssign, MulAssign};
+
 /// A missile master's arc (the `.dat`'s `projectile_arc`, `+0x888`, the save's
 /// `ballistics_ratio`): 0 flies flat; else the launch makes the arc's rise of it and the way
 /// (`−arc × way × way` for one at most 0, `−arc × way` above).
@@ -29,14 +31,14 @@ impl ArcRatio {
     }
 }
 
-impl std::ops::AddAssign for ArcRatio {
+impl AddAssign for ArcRatio {
     /// An add effect's sum (one `f32` add).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for ArcRatio {
+impl MulAssign<f32> for ArcRatio {
     /// A multiply effect's product (one `f32` product).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;

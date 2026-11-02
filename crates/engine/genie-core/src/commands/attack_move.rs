@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::{UnitList, Waypoints};
+use crate::orders::Sweep;
 use crate::players::PlayerId;
 use crate::world::World;
 
@@ -38,7 +39,7 @@ impl AttackMoveCommand {
         let Some(waypoints) = self.waypoints.used() else {
             return Ok(());
         };
-        let sweep = crate::orders::Sweep {
+        let sweep = Sweep {
             patrol: false,
             reset: self.reset,
             queued: self.queued,

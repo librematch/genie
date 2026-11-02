@@ -2,7 +2,9 @@
 
 use crate::GenieError;
 use crate::gathering::QueueCount;
+use crate::math::fmath::below_or_unordered;
 use crate::objects::ListIndex;
+use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::masters::action_type;
 use crate::objects::masters::player_master;
@@ -15,10 +17,13 @@ use crate::players::attribute::QUEUED;
 use crate::production::{
     MakeObj, MakeObjState, MakeTech, MakeTechState, Making, housed, population,
 };
+use crate::production::{NO_COSTS, QueueLength, refund_master};
 use crate::technology::ResearchState;
+use crate::technology::{TechType, factors};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
+use crate::world::PlayState;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -49,7 +54,7 @@ impl World {
         i: ListIndex,
         dt_seconds: Seconds,
     ) -> Result<(), GenieError> {
-        if crate::objects::ObjectState::Alive < self.players.live(p, i)?.life.state {
+        if ObjectState::Alive < self.players.live(p, i)?.life.state {
             return self.cancel_queue(p, i);
         }
         self.produce(p, i, dt_seconds)
@@ -86,9 +91,7 @@ impl World {
         let Some(production) = self.parts.production.get(unit.id) else {
             return Ok(());
         };
-        if !production.queue.enabled
-            || production.queue.count == crate::production::QueueLength::ZERO
-        {
+        if !production.queue.enabled || production.queue.count == QueueLength::ZERO {
             return Ok(());
         }
         let busy = !self.players.player(p)?.kind.is_computer()
@@ -191,7 +194,7 @@ impl World {
             && self
                 .techs
                 .get(tech.index())
-                .is_some_and(|d| d.kind == crate::technology::TechType::SHARED)
+                .is_some_and(|d| d.kind == TechType::SHARED)
             && tech.index() < self.players.player(p)?.techs.len()
             && let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id)
         {
@@ -216,7 +219,7 @@ impl World {
         i: ListIndex,
         making: Making,
     ) -> Result<(), GenieError> {
-        if crate::objects::ObjectState::Dying <= self.players.live(p, i)?.life.state {
+        if ObjectState::Dying <= self.players.live(p, i)?.life.state {
             return self.destroy_action(p, i, making);
         }
         let mut making = making;
@@ -249,13 +252,13 @@ impl World {
         let (t, def) = self.research_tech(p, r.tech)?;
         let owner = self.players.player(p)?;
         let get = |k: AttributeId| owner.get(k);
-        let factors = crate::technology::factors(r.tech, &get)?;
+        let factors = factors(r.tech, &get)?;
         let paid = self
             .parts
             .production
             .get(owner.objects.checked(i)?.id)
             .and_then(|q| q.queue.first())
-            .map_or(crate::production::NO_COSTS, |e| e.costs);
+            .map_or(NO_COSTS, |e| e.costs);
         if !owner
             .techs
             .checked(t)?
@@ -333,7 +336,7 @@ impl World {
         {
             m.progress = progress;
         }
-        if crate::math::fmath::below_or_unordered(progress.get(), time) {
+        if below_or_unordered(progress.get(), time) {
             return Ok(UpdateCode::UNDER_WAY);
         }
         let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
@@ -392,7 +395,7 @@ impl World {
             Making::Research(r) => return self.research_destroyed(p, i, &r),
         };
         if matches!(make.state, MakeObjState::Making | MakeObjState::NoSpot)
-            && self.game_state == crate::world::PlayState::PLAYING
+            && self.game_state == PlayState::PLAYING
         {
             let made = make.master.and_then(|m| player_master(&self.masters, p, m));
             let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
@@ -400,7 +403,7 @@ impl World {
             let owner = self.players.player_mut(p)?;
             owner.add_attribute(IN_PRODUCTION, -pop)?;
             if let Some(m) = refund {
-                crate::production::refund_master(&m, QueueCount::ONE, owner)?;
+                refund_master(&m, QueueCount::ONE, owner)?;
             }
         }
         let building = self.players.live_mut(p, i)?;

@@ -4,6 +4,7 @@
 //! (`0x140ab0370` case 0xdf).
 
 use crate::GenieError;
+use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -11,9 +12,17 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::map::TileOffset;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::sqrt;
+use crate::math::image::gather_search::{
+    DIAGONAL as GATHER_SEARCH_DIAGONAL, ROUNDING as GATHER_SEARCH_ROUNDING,
+    SITE_SHARE as GATHER_SEARCH_SITE_SHARE, TILE_CENTRE as GATHER_SEARCH_TILE_CENTRE,
+    UNIT_SHARE as GATHER_SEARCH_UNIT_SHARE,
+};
 use crate::math::msvc;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
@@ -25,6 +34,8 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::task_finder::DropSite;
 use crate::vision::SightTiles;
 use crate::world::slots::CheckedIndex;
+use std::fmt::{Debug, Error, Formatter};
+use std::mem::take;
 
 /// What the searches read of an object in a map tile's list.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,11 +51,11 @@ pub struct Candidate {
     /// `+0x640`.
     pub state: ObjectState,
     /// `+0x644`, `worker_num`.
-    pub workers: crate::objects::WorkerCount,
+    pub workers: WorkerCount,
     /// x, y, z.
     pub position: Position,
     /// `+0x790`, `parent_pasture_id`.
-    pub pasture: Option<crate::gathering::PastureId>,
+    pub pasture: Option<PastureId>,
     /// `+0x689` is 0 ([`crate::objects::unit::Unit::untargetable`]).
     pub untargetable: bool,
     /// `+0x308`, `attribute_type_held`, none for −1.
@@ -128,7 +139,7 @@ pub fn more_work(
         None => None,
     };
     // gold, stone, food, wood: (the object, its workers, the group's least distance)
-    let mut groups: [Option<(Candidate, crate::objects::WorkerCount)>; 4] = [None; 4];
+    let mut groups: [Option<(Candidate, WorkerCount)>; 4] = [None; 4];
     let mut least = [90.0f32; 4];
     for x in x0..=x1 {
         for y in y0..=y1 {
@@ -161,10 +172,8 @@ pub fn more_work(
                 };
                 let dx = o.position.x() - builder.position.x();
                 let dy = o.position.y() - builder.position.y();
-                let d = crate::math::conversions::cvttss2si(crate::math::fmath::sqrt(
-                    dy * dy + dx * dx,
-                )) as f32;
-                let workers = o.workers.plus(-1).max(crate::objects::WorkerCount::ZERO);
+                let d = cvttss2si(sqrt(dy * dy + dx * dx)) as f32;
+                let workers = o.workers.plus(-1).max(WorkerCount::ZERO);
                 keep(
                     groups.checked_mut(g)?,
                     least.checked_mut(g)?,
@@ -192,9 +201,9 @@ const fn group_of(resource: AttributeId) -> Option<usize> {
 /// keeps none, or `o` is nearer than its least distance `low`, or as near or nearer with fewer
 /// workers; the least distance falls to `d`.
 fn keep(
-    group: &mut Option<(Candidate, crate::objects::WorkerCount)>,
+    group: &mut Option<(Candidate, WorkerCount)>,
     low: &mut f32,
-    (o, workers): (Candidate, crate::objects::WorkerCount),
+    (o, workers): (Candidate, WorkerCount),
     d: f32,
 ) {
     let take = match *group {
@@ -210,10 +219,7 @@ fn keep(
 }
 
 /// [`more_work`]'s pick: gold, then stone, food and wood, each at a lesser least distance.
-fn pick(
-    groups: &[Option<(Candidate, crate::objects::WorkerCount)>; 4],
-    least: &[f32; 4],
-) -> Option<Candidate> {
+fn pick(groups: &[Option<(Candidate, WorkerCount)>; 4], least: &[f32; 4]) -> Option<Candidate> {
     let mut best: Option<(Candidate, f32)> = None;
     for (group, &low) in groups.iter().zip(least) {
         if let Some((o, _)) = *group
@@ -251,7 +257,7 @@ pub fn reached(
     let mut todo = vec![start];
     let mut first = true;
     while let Some(t) = todo.pop() {
-        if !std::mem::take(&mut first) && blocked(t)? {
+        if !take(&mut first) && blocked(t)? {
             continue;
         }
         for n in t.beside() {
@@ -281,7 +287,7 @@ pub struct Seeker {
     /// Its unit AI's current target (`+0x48`), which the search passes over.
     pub current_target: Option<ObjectId>,
     /// `+0x794`, `my_pasture_id`.
-    pub my_pasture: Option<crate::gathering::PastureId>,
+    pub my_pasture: Option<PastureId>,
     /// `param_6`: below this state the unit finds nothing (2 for the unit AIs' searches, 0 for
     /// a mule cart's).
     pub min_state: ObjectState,
@@ -350,8 +356,8 @@ pub struct ResourceWorld<'a, W> {
     pub reach: &'a mut Reaches<'a, W>,
 }
 
-impl<W> std::fmt::Debug for ResourceWorld<'_, W> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<W> Debug for ResourceWorld<'_, W> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("ResourceWorld")
             .field("map", &self.map)
             .finish_non_exhaustive()
@@ -382,7 +388,7 @@ impl<W> std::fmt::Debug for ResourceWorld<'_, W> {
 pub fn closest_resource<W>(
     seeker: &Seeker,
     kind: GatherGroup,
-    max_workers: crate::objects::WorkerCount,
+    max_workers: WorkerCount,
     reads: ResourceWorld<'_, W>,
 ) -> Result<Option<ObjectId>, GenieError> {
     closest_resource_at(seeker, None, kind, max_workers, reads).map(|(id, _)| id)
@@ -411,12 +417,12 @@ pub fn closest_resource_at<W>(
     seeker: &Seeker,
     site: Option<&SearchSite>,
     kind: GatherGroup,
-    max_workers: crate::objects::WorkerCount,
+    max_workers: WorkerCount,
     reads: ResourceWorld<'_, W>,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     /// The fallback's steps before it has one (`1000000`).
     const NO_STEPS: i32 = 1_000_000;
-    const TILE_CENTRE: f32 = crate::math::image::gather_search::TILE_CENTRE;
+    const TILE_CENTRE: f32 = GATHER_SEARCH_TILE_CENTRE;
     let ResourceWorld {
         map,
         world,
@@ -448,8 +454,8 @@ pub fn closest_resource_at<W>(
         d(a) < d(b)
     };
     let passes = search_passes(site, map, &|t| passable(world, t), unit_tile, los, &nearer)?;
-    let cap = if max_workers == crate::objects::WorkerCount::NO_CAP {
-        crate::objects::WorkerCount::of_data(i32::MAX)
+    let cap = if max_workers == WorkerCount::NO_CAP {
+        WorkerCount::of_data(i32::MAX)
     } else {
         max_workers
     };
@@ -580,8 +586,8 @@ fn push_neighbours(
 /// three times its line of sight plus 10; with one the point a quarter of the way from the
 /// site's place to the unit's, and for a footprint search the larger line of sight of the two.
 fn sort_point_and_side(at: Point, los: SightTiles, site: Option<&SearchSite>) -> ((f32, f32), i32) {
-    const SITE_SHARE: f32 = crate::math::image::gather_search::SITE_SHARE;
-    const UNIT_SHARE: f32 = crate::math::image::gather_search::UNIT_SHARE;
+    const SITE_SHARE: f32 = GATHER_SEARCH_SITE_SHARE;
+    const UNIT_SHARE: f32 = GATHER_SEARCH_UNIT_SHARE;
     let (ux, uy) = (at.x(), at.y());
     let box_side = |los: i32| los.wrapping_add(10).wrapping_mul(3);
     let los = los.get();
@@ -636,8 +642,8 @@ fn footprint_seeds(s: &SearchSite, map: GridSize, passable: &dyn Fn(Tile) -> boo
 /// The search's distance of `tile` from a pass's origin: the longer axis plus the shorter one
 /// times 1.4 rounded down, less the shorter one (`DIAGONAL` plus `ROUNDING`, truncated).
 fn pass_distance(origin: Tile, tile: Tile) -> i32 {
-    const DIAGONAL: f32 = crate::math::image::gather_search::DIAGONAL;
-    const ROUNDING: f32 = crate::math::image::gather_search::ROUNDING;
+    const DIAGONAL: f32 = GATHER_SEARCH_DIAGONAL;
+    const ROUNDING: f32 = GATHER_SEARCH_ROUNDING;
     let (dx, dy) = ((origin.x() - tile.x()).abs(), (origin.y() - tile.y()).abs());
     if dy < dx {
         ((dy as f32 * DIAGONAL + ROUNDING) as i32 - dy) + dx
@@ -672,7 +678,7 @@ fn first_resource(
 /// the Build's search for more work lets an object of it have (`0x140ab0c57`): food (0, 15 to 17)
 /// forage (1) and 6, wood (0) and 2, stone (3) and 3, gold (4) and 3, the rest fish (2) and 2.
 #[must_use]
-pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, crate::objects::WorkerCount) {
+pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, WorkerCount) {
     let kind = match attribute.and_then(AttributeId::load_resource) {
         Some(attribute::FOOD) => GatherGroup::FORAGE,
         Some(attribute::WOOD) => GatherGroup::WOOD,
@@ -680,7 +686,7 @@ pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, crate::obje
         Some(attribute::GOLD) => GatherGroup::GOLD,
         _ => GatherGroup::FISH,
     };
-    let workers = crate::objects::WorkerCount::of_data(match kind {
+    let workers = WorkerCount::of_data(match kind {
         GatherGroup::FORAGE => 6,
         GatherGroup::STONE | GatherGroup::GOLD => 3,
         _ => 2,
@@ -704,7 +710,7 @@ mod tests {
             class: class::TREE,
             master: master_id(349),
             state: ObjectState::Alive,
-            workers: crate::objects::WorkerCount::of_data(0),
+            workers: WorkerCount::of_data(0),
             position: Position::new(x, y, 0.0),
             pasture: None,
             untargetable: false,
@@ -724,7 +730,7 @@ mod tests {
             auto_work: true,
             targets: vec![DropTarget {
                 class: class::TREE,
-                workers: crate::objects::WorkerCount::of_data(-1),
+                workers: WorkerCount::of_data(-1),
                 state: None,
                 attribute: Some(attribute::WOOD),
             }],
@@ -767,7 +773,7 @@ mod tests {
         // 3 and 4 both 3 tiles away (truncated): x outer, so 3 (x 7) comes first; 4 is as far
         // with fewer workers than 3's kept 1 and takes over
         let mut trees = [tree(3, 7.5, 10.5), tree(4, 13.5, 10.5)];
-        trees[0].workers = crate::objects::WorkerCount::of_data(2);
+        trees[0].workers = WorkerCount::of_data(2);
         let objects = |tile: Tile| {
             Ok(trees
                 .iter()
@@ -790,7 +796,7 @@ mod tests {
         let mut entry = lumber_camp();
         entry.targets.push(DropTarget {
             class: class::CLASS_32,
-            workers: crate::objects::WorkerCount::of_data(-1),
+            workers: WorkerCount::of_data(-1),
             state: None,
             attribute: Some(attribute::GOLD),
         });
@@ -870,7 +876,7 @@ mod tests {
         let found = closest_resource(
             &seeker,
             GatherGroup::WOOD,
-            crate::objects::WorkerCount::of_data(2),
+            WorkerCount::of_data(2),
             ResourceWorld {
                 map: GridSize::new(40, 40),
                 world: &mut (),
@@ -893,7 +899,7 @@ mod tests {
         let found = closest_resource(
             &busy,
             GatherGroup::WOOD,
-            crate::objects::WorkerCount::of_data(2),
+            WorkerCount::of_data(2),
             ResourceWorld {
                 map: GridSize::new(40, 40),
                 world: &mut (),
@@ -941,7 +947,7 @@ mod tests {
                 &seeker,
                 site,
                 GatherGroup::WOOD,
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 ResourceWorld {
                     map: GridSize::new(40, 40),
                     world: &mut (),
@@ -995,7 +1001,7 @@ mod tests {
     fn search_trees(
         seeker: &Seeker,
         trees: &[Candidate],
-        max_workers: crate::objects::WorkerCount,
+        max_workers: WorkerCount,
         explored: &Explored<'_, ()>,
         reach: &[ObjectId],
     ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
@@ -1033,7 +1039,7 @@ mod tests {
             search_trees(
                 &low,
                 &trees,
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 &|&(), _| Ok(true),
                 &[object_id(1)]
             ),
@@ -1047,7 +1053,7 @@ mod tests {
             search_trees(
                 &tending,
                 &trees,
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 &|&(), _| Ok(true),
                 &[object_id(1)]
             ),
@@ -1061,7 +1067,7 @@ mod tests {
     fn full_resource_is_the_fallback_and_minus_1_workers_has_no_cap() {
         // a full tree (3 workers) 2 east, a free one 5 east
         let full = Candidate {
-            workers: crate::objects::WorkerCount::of_data(3),
+            workers: WorkerCount::of_data(3),
             ..tree(1, 12.5, 10.5)
         };
         let both = [full, tree(2, 15.5, 10.5)];
@@ -1071,7 +1077,7 @@ mod tests {
             search_trees(
                 &SEEKER,
                 &both,
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 &all,
                 &[object_id(1), object_id(2)]
             ),
@@ -1082,7 +1088,7 @@ mod tests {
             search_trees(
                 &SEEKER,
                 &both,
-                crate::objects::WorkerCount::of_data(-1),
+                WorkerCount::of_data(-1),
                 &all,
                 &[object_id(1), object_id(2)]
             ),
@@ -1093,7 +1099,7 @@ mod tests {
             search_trees(
                 &SEEKER,
                 &[full],
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 &all,
                 &[object_id(1)]
             ),
@@ -1101,13 +1107,7 @@ mod tests {
         );
         // a fallback must be reachable
         assert_eq!(
-            search_trees(
-                &SEEKER,
-                &[full],
-                crate::objects::WorkerCount::of_data(2),
-                &all,
-                &[]
-            ),
+            search_trees(&SEEKER, &[full], WorkerCount::of_data(2), &all, &[]),
             Ok((None, None))
         );
     }
@@ -1120,7 +1120,7 @@ mod tests {
             search_trees(
                 &SEEKER,
                 &both,
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 &dark,
                 &[object_id(1), object_id(2)]
             ),
@@ -1143,7 +1143,7 @@ mod tests {
             search_trees(
                 &SEEKER,
                 &trees,
-                crate::objects::WorkerCount::of_data(2),
+                WorkerCount::of_data(2),
                 &|&(), _| Ok(true),
                 &[object_id(99)],
             )
@@ -1158,23 +1158,23 @@ mod tests {
     fn held_resource_names_its_gather_group_and_the_workers_the_build_lets_it_have() {
         assert_eq!(
             gather_group(Some(attribute::WOOD)),
-            (GatherGroup::WOOD, crate::objects::WorkerCount::of_data(2))
+            (GatherGroup::WOOD, WorkerCount::of_data(2))
         );
         assert_eq!(
             gather_group(Some(attribute::FARM_FOOD)),
-            (GatherGroup::FORAGE, crate::objects::WorkerCount::of_data(6))
+            (GatherGroup::FORAGE, WorkerCount::of_data(6))
         );
         assert_eq!(
             gather_group(Some(attribute::STONE)),
-            (GatherGroup::STONE, crate::objects::WorkerCount::of_data(3))
+            (GatherGroup::STONE, WorkerCount::of_data(3))
         );
         assert_eq!(
             gather_group(Some(attribute::GOLD)),
-            (GatherGroup::GOLD, crate::objects::WorkerCount::of_data(3))
+            (GatherGroup::GOLD, WorkerCount::of_data(3))
         );
         assert_eq!(
             gather_group(None),
-            (GatherGroup::FISH, crate::objects::WorkerCount::of_data(2))
+            (GatherGroup::FISH, WorkerCount::of_data(2))
         );
     }
 }

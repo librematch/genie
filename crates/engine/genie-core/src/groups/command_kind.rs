@@ -1,6 +1,7 @@
 //! A group command's kind ([`GroupCommandKind`]): a move, a follow, or the action type of the
 //! task the group's members carry out.
 
+use crate::combat::attack::ATTACK as COMBAT_ATTACK;
 use crate::objects::masters::ActionType;
 
 /// A group command's kind (`mCommand` of an order or of a queued command, the group's
@@ -18,7 +19,7 @@ impl GroupCommandKind {
     /// A follow (2).
     pub const FOLLOW: Self = Self(2);
     /// An attack: the attack task's action type (9).
-    pub const ATTACK: Self = Self::of_action(crate::combat::attack::ATTACK);
+    pub const ATTACK: Self = Self::of_action(COMBAT_ATTACK);
 
     /// The kind of value `value`, as the save and the game's memory hold it.
     #[must_use]

@@ -1,5 +1,7 @@
 //! How far a missed missile strays.
 
+use std::ops::{AddAssign, MulAssign};
+
 /// How far a missed missile strays per tile of the way (a master's `missed_missile_spread`,
 /// `+0x860`, the attribute "Attack Dispersion"), which a miss multiplies its gap by.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
@@ -22,14 +24,14 @@ impl MissSpread {
     }
 }
 
-impl std::ops::AddAssign for MissSpread {
+impl AddAssign for MissSpread {
     /// An add effect's sum (one `f32` add).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for MissSpread {
+impl MulAssign<f32> for MissSpread {
     /// A multiply effect's product (one `f32` product).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;

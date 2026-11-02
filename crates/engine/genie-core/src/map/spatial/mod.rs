@@ -54,17 +54,35 @@ use self::pather::{box_meets_segment, ccw};
 pub use self::record_id::RecordId;
 pub use self::search::SearchQuery;
 pub use self::tile_sight::TileSight;
+use crate::gathering::PastureId;
+use crate::groups::GroupId;
+use crate::map::terrain::Terrain;
+use crate::math::image::spatial::{
+    CLOSEST_RANGE as SPATIAL_CLOSEST_RANGE, SEARCH_REUSE_SQUARED as SPATIAL_SEARCH_REUSE_SQUARED,
+};
+use crate::movement::explore::InfluenceMap;
+use crate::objects::masters::class::{FARM, LIVESTOCK};
+use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
+#[cfg(test)]
+use crate::objects::unit::TAKEN_OUT;
+use crate::objects::{IdTable, WorkerCount};
+use crate::players::{ByPlayer, Relations, UnitRelations};
+use crate::unit_ai::AttackPicker;
+use crate::unit_ai::best_target::{AttackCategory, Battlefield, Candidate, Thing};
+use crate::vision::VisionMasks;
+use std::collections::BTreeSet;
+use std::ops::RangeInclusive;
 
 /// The range of `ClosestObject`'s reachability check (`FUN_140c488b0`, `DAT_142eb5690`).
-const CLOSEST_RANGE: Distance = Distance::new(crate::math::image::spatial::CLOSEST_RANGE);
+const CLOSEST_RANGE: Distance = Distance::new(SPATIAL_CLOSEST_RANGE);
 
 /// How near (squared) a unit AI's search comes to the last one's place to skip its query
 /// (`FUN_140c63e20`).
-const SEARCH_REUSE_SQUARED: f32 = crate::math::image::spatial::SEARCH_REUSE_SQUARED;
+const SEARCH_REUSE_SQUARED: f32 = SPATIAL_SEARCH_REUSE_SQUARED;
 
 /// The pasture and livestock classes `ClosestObject` treats apart.
-const PASTURE_CLASS: ClassId = crate::objects::masters::class::FARM;
-const LIVESTOCK_CLASS: ClassId = crate::objects::masters::class::LIVESTOCK;
+const PASTURE_CLASS: ClassId = FARM;
+const LIVESTOCK_CLASS: ClassId = LIVESTOCK;
 
 /// The caller's reachability check of a found object (slot 0x3d0 within a range): it paths over
 /// the spatial index the search reads, which the check's queries write, so the search hands it
@@ -74,17 +92,14 @@ pub type Reach<'a> = dyn FnMut(&mut Spatial, ObjectId, Distance) -> Result<bool,
 /// `bestUnitToAttack`'s world ([`crate::unit_ai::best_target::Battlefield`]): the unit AI's picker for its
 /// reads and tests, the search's reachability for its paths (slot 0x3d0).
 struct AttackField<'p, 'r> {
-    picker: &'p mut dyn crate::unit_ai::AttackPicker,
+    picker: &'p mut dyn AttackPicker,
     reach: &'p mut Reach<'r>,
     /// The spatial index the search and the picker's reads go through.
     world: &'p mut Spatial,
 }
 
-impl crate::unit_ai::best_target::Battlefield for AttackField<'_, '_> {
-    fn thing(
-        &mut self,
-        id: ObjectId,
-    ) -> Result<Option<crate::unit_ai::best_target::Thing>, GenieError> {
+impl Battlefield for AttackField<'_, '_> {
+    fn thing(&mut self, id: ObjectId) -> Result<Option<Thing>, GenieError> {
         self.picker.thing(self.world, id)
     }
 
@@ -108,8 +123,8 @@ impl crate::unit_ai::best_target::Battlefield for AttackField<'_, '_> {
         &mut self,
         id: ObjectId,
         distance: Distance,
-        category: Option<crate::unit_ai::best_target::AttackCategory>,
-    ) -> Result<crate::unit_ai::best_target::Candidate, GenieError> {
+        category: Option<AttackCategory>,
+    ) -> Result<Candidate, GenieError> {
         self.picker.candidate(self.world, id, distance, category)
     }
 
@@ -143,7 +158,7 @@ struct Filter {
     relation: Option<QueryRelation>,
     state: Option<ObjectState>,
     master: Option<MasterId>,
-    workers: crate::objects::WorkerCount,
+    workers: WorkerCount,
     /// The relation passed over (argument 9, `FUN_140c32b50`; −1 none).
     spared: Option<QueryRelation>,
     /// Argument 8: only objects the unit reaches count (slot 0x3d0).
@@ -165,10 +180,7 @@ fn players_seen(found: &ByRelation<Vec<Record>>) -> u32 {
 
 /// The pastures, whose workers and livestock `ClosestObject` counts (`FUN_140c488b0`, raw
 /// `0x6801`, `0x6805`).
-const PASTURES: [MasterId; 2] = [
-    crate::objects::masters::ids::PASTURE_MANGROVE,
-    crate::objects::masters::ids::PASTURE,
-];
+const PASTURES: [MasterId; 2] = [PASTURE_MANGROVE, PASTURE];
 /// The fishing ships' masters (`FUN_1411945a0`: 13, 2356, 2171).
 const TRAPPERS: [MasterId; 3] = [
     MasterId::named(13),
@@ -200,7 +212,7 @@ pub struct Gait {
     pub path_made: Option<WorldTime>,
     /// Its unit group (`mGroupID`, `+0x6d0`), none for −1: a walker of the same group ranks it by
     /// the group's member order.
-    pub group: Option<crate::groups::GroupId>,
+    pub group: Option<GroupId>,
 }
 
 /// One object as movement sees it.
@@ -458,16 +470,13 @@ impl Tiles {
     #[cfg(test)]
     pub(crate) fn add_tall_for_test(&mut self, tile: Tile) {
         let i = self.size.index(tile).expect("a tile on the map");
-        self.lists[i].push(crate::objects::unit::TAKEN_OUT);
+        self.lists[i].push(TAKEN_OUT);
         self.tall[i] += 1;
     }
 
     /// The tiles a static record covers (`FUN_141056460`): from the box's low edge to its high
     /// edge less 0.001, held on the map.
-    fn covered(
-        &self,
-        p: &Placed,
-    ) -> (std::ops::RangeInclusive<i32>, std::ops::RangeInclusive<i32>) {
+    fn covered(&self, p: &Placed) -> (RangeInclusive<i32>, RangeInclusive<i32>) {
         let (x, y) = (p.position.x(), p.position.y());
         let (rx, ry) = (p.radius.x(), p.radius.y());
         let hold = |v: i32, size: i32| v.clamp(0, size - 1);
@@ -484,10 +493,7 @@ impl Tiles {
         let (xs, ys) = if on_map {
             self.covered(p)
         } else {
-            (
-                std::ops::RangeInclusive::new(1, 0),
-                std::ops::RangeInclusive::new(1, 0),
-            )
+            (RangeInclusive::new(1, 0), RangeInclusive::new(1, 0))
         };
         ys.flat_map(move |y| xs.clone().map(move |x| (y * width + x) as usize))
     }
@@ -552,8 +558,8 @@ impl Tiles {
 struct RecordCells {
     /// The ids by cell, in (level, x, y) order: a query that visits more cells than are held
     /// walks one level's range of them.
-    cells: BTreeMap<(i32, i32, i32), std::collections::BTreeSet<ObjectId>>,
-    filed: crate::objects::IdTable<(i32, i32, i32)>,
+    cells: BTreeMap<(i32, i32, i32), BTreeSet<ObjectId>>,
+    filed: IdTable<(i32, i32, i32)>,
 }
 
 /// The world's objects by id, the map's size in tiles and what the game keeps per tile.
@@ -571,26 +577,26 @@ pub struct Spatial {
     /// id [`tile_record_id`], on the list `+0x70` with the count `+0x78`, bit 0x80 in the tile's
     /// word), as (y, x): [`Spatial::put_tile_records`] puts them, and they stay for every query
     /// until [`Spatial::clear_tile_records`] removes them all.
-    tile_records: std::collections::BTreeSet<(i32, i32)>,
+    tile_records: BTreeSet<(i32, i32)>,
     /// The obstruction manager's buffer (`+0x57` set, `+0x58` the radius its queries grow the
     /// records by) as the last `FUN_1410562d0` left it, None when not set: the routines that
     /// set it reset it at their end but `FindShortPath`'s quick-only exit, and the queries that
     /// set none read what is left ([`Spatial::manager_grow`]).
     manager_buffer: Option<Distance>,
     /// The placed objects by id (T7: a dense column, walked in the ids' order).
-    objects: crate::objects::IdTable<Placed>,
+    objects: IdTable<Placed>,
     /// The cell of each object's record ([`RecordCells`]), kept with `objects`
     /// ([`Spatial::refile`]).
     records: RecordCells,
     /// The objects inside others (`+0x2f0`): off the tiles' lists and the obstruction manager,
     /// without a record, at their container's x and y; a lookup by id still finds them.
-    inside: crate::objects::IdTable<Placed>,
+    inside: IdTable<Placed>,
     tiles: Tiles,
     /// The tile rectangles (x0, y0, x1, y1) whose static marks changed, for the planners
     /// ([`Spatial::take_changes`]).
     changed: Vec<PlanRect>,
     /// The seconds since each frozen object froze.
-    frozen_for: crate::objects::IdTable<Seconds>,
+    frozen_for: IdTable<Seconds>,
     /// What a stopped player's units may have done since: the fastest any of the players' unit
     /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
     /// range), for [`Spatial::check_known`]. 0 when not set.
@@ -598,14 +604,14 @@ pub struct Spatial {
     /// The farthest any of the players' units acts beyond its footprint.
     pub reach: Distance,
     /// Each player's scout map (`player+0x1370`, `mIsScoutMapEnabled` `+0x1368`), once made.
-    scout_maps: BTreeMap<PlayerId, crate::movement::explore::InfluenceMap>,
+    scout_maps: BTreeMap<PlayerId, InfluenceMap>,
     /// `relation[i]` of each player (`player+0x260`), for the walk's query's allies.
-    pub relations: crate::players::ByPlayer<crate::players::Relations>,
+    pub relations: ByPlayer<Relations>,
     /// What each player's queries make of the other players' objects (`player+0x278`, the
     /// save's `unit_diplomacy`): none for a saved value past the five relations.
     /// Loaded, not derived: the slice runs no diplomacy change (command 0x76), whose handler
     /// would write it with `relation`.
-    pub unit_diplomacy: crate::players::ByPlayer<crate::players::UnitRelations>,
+    pub unit_diplomacy: ByPlayer<UnitRelations>,
     /// Each player's masters with a task of action type 0x99, which a building's slot 0x4f0
     /// reads (`FUN_1411d4980` -> `FUN_1415c60b0`): a drop-off walker counts such a building
     /// among the workers near it.
@@ -615,9 +621,9 @@ pub struct Spatial {
     pub sight: Option<Visibility>,
     /// Each player's vision masks, visible (`+0x2a8`) and explored (`+0x2a0`), as the world's
     /// rebuild sets them ([`crate::vision`]); a player without them sees with its own bits.
-    pub vision: crate::players::ByPlayer<crate::vision::VisionMasks>,
+    pub vision: ByPlayer<VisionMasks>,
     /// The map's terrain, when the slice holds it.
-    pub terrain: Option<crate::map::terrain::Terrain>,
+    pub terrain: Option<Terrain>,
     /// The unit AIs' search cache ([`SearchCache`]).
     search_cache: SearchCache,
     /// The obstruction manager's grid, from the map's size.
@@ -661,12 +667,7 @@ type ClosestChecks<'a> = (
 
 /// What `ClosestObject` reads of a farm it found: its workers (`+0x644`) and the pasture it is in
 /// (`+0x790`, `parent_pasture_id`); None for an object the caller does not hold.
-pub type FarmLook<'a> = dyn Fn(
-        ObjectId,
-    ) -> Option<(
-        crate::objects::WorkerCount,
-        Option<crate::gathering::PastureId>,
-    )> + 'a;
+pub type FarmLook<'a> = dyn Fn(ObjectId) -> Option<(WorkerCount, Option<PastureId>)> + 'a;
 
 #[cfg(test)]
 mod tests;

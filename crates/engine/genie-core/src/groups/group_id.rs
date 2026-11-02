@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A unit group's id (`mID`, `+0xd8`): the world's group counter (`mUnitGroupCounter`,
 /// `world+0x5c`) as the group was created (`FUN_14152efc0`). A unit's link (`mGroupID`, `+0x6d0`)
@@ -47,8 +48,8 @@ impl GroupId {
     }
 }
 
-impl std::fmt::Display for GroupId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for GroupId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

@@ -8,6 +8,8 @@ use crate::de::{
 use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
 use flate2::read::DeflateDecoder;
 use genie_error::GenieError;
+use std::borrow::Cow;
+use std::io::Seek as IoSeek;
 use std::io::{Cursor, Read, Write};
 
 /// genieutils' `GameVersion` ordinal of a DE file: VER 7.1 is C14, VER 8.9 is C32.
@@ -63,7 +65,7 @@ pub struct DebugString {
 impl DebugString {
     /// The bytes as text; invalid UTF-8 sequences become U+FFFD.
     #[must_use]
-    pub fn as_str(&self) -> std::borrow::Cow<'_, str> {
+    pub fn as_str(&self) -> Cow<'_, str> {
         String::from_utf8_lossy(&self.bytes)
     }
 }
@@ -78,7 +80,7 @@ pub(super) fn read_present<T, A, R>(
 where
     T: for<'a> BinRead<Args<'a> = A>,
     A: Clone,
-    R: Read + std::io::Seek,
+    R: Read + IoSeek,
 {
     pointers
         .iter()
@@ -98,7 +100,7 @@ pub(super) fn write_present<T, W>(
 ) -> BinResult<()>
 where
     T: for<'a> BinWrite<Args<'a> = ()>,
-    W: Write + std::io::Seek,
+    W: Write + IoSeek,
 {
     for entry in list.iter().flatten() {
         entry.write_options(writer, endian, ())?;

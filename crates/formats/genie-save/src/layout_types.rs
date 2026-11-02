@@ -7,6 +7,9 @@
 
 use binrw::io::{Read, Seek, Write};
 use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
+use std::error::Error;
+use std::fmt::{Display, Error as FmtError, Formatter};
+use std::ops::Deref;
 
 /// A u16 length, then that many bytes (158041: `0x140933990`, `SRead<short> &requiredBufSize`).
 #[binrw]
@@ -140,13 +143,13 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnsupportedFeature(pub &'static str);
 
-impl std::fmt::Display for UnsupportedFeature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UnsupportedFeature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(f, "unsupported: {}", self.0)
     }
 }
 
-impl std::error::Error for UnsupportedFeature {}
+impl Error for UnsupportedFeature {}
 
 /// The part named by an [`UnsupportedFeature`] anywhere in a read error, with its position.
 #[must_use]
@@ -206,7 +209,7 @@ pub struct Positioned<T> {
     pub val: T,
 }
 
-impl<T> std::ops::Deref for Positioned<T> {
+impl<T> Deref for Positioned<T> {
     type Target = T;
 
     fn deref(&self) -> &T {

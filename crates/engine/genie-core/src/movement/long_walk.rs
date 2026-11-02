@@ -13,16 +13,23 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
+use crate::map::spatial::SmoothingWalls;
 use crate::map::spatial::{Placed, RecordId, Spatial};
+use crate::map::{RestrictionId, TerrainMask};
 use crate::math::fmath::BVector;
+use crate::movement::WaitDelays;
 use crate::movement::{
     EPSILON, INCLUDED, NEW_PATHER_RADIUS, PLANS, Planning, footprint_gap, footprint_gap_squared,
 };
 use crate::pathing::hull_path::HullPather;
+use crate::pathing::long_path::{LongRequest, LongTarget, path};
 use crate::pathing::short_path::{Call, Entry, Listed};
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::pathing::{Pathing, PlanBudget, ShortFound};
+use crate::players::PlayerSet;
+use crate::world::index::ObjectsRef;
 use crate::{GenieError, math::fmath, pathing::short_path};
+use std::iter::once;
 
 /// How a step relates to its waypoint (slot 196, `0x14114f400`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -69,7 +76,7 @@ pub(crate) struct LongWalker<'a> {
     pub(crate) id: ObjectId,
     pub(crate) position: Position,
     pub(crate) radius: Footprint,
-    pub(crate) mask: crate::map::TerrainMask,
+    pub(crate) mask: TerrainMask,
     pub(crate) moves: bool,
     pub(crate) ignore_units: &'a [ObjectId],
     /// For a walker in a group the world holds (`+0x6d0`, `FUN_14152ff40`), its group's
@@ -85,12 +92,12 @@ pub(crate) fn lowered_units(
     walker: &LongWalker<'_>,
     world: &Spatial,
     target: Option<ObjectId>,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Vec<ObjectId> {
     /// The list's room for the walker's ignore units (`0xfe < lVar26` breaks).
     const IGNORED: usize = 254;
     let own = || {
-        std::iter::once(walker.id)
+        once(walker.id)
             .chain(
                 walker
                     .ignore_units
@@ -131,12 +138,12 @@ pub(crate) fn long_path_for(
     player_type: PlayerType,
     (to, range): (BVector, f32),
     target: Option<(ObjectId, &Placed)>,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(bool, Path), GenieError> {
     let long_target = target.map(|(_, t)| {
         let gap2 = footprint_gap_squared(walker.position, walker.radius, t.position, t.radius);
         let gap = footprint_gap(walker.position, walker.radius, t.position, t.radius);
-        crate::pathing::long_path::LongTarget::new(t.position, t.radius, gap, gap2)
+        LongTarget::new(t.position, t.radius, gap, gap2)
     });
     let listed = lowered_units(walker, world, target.map(|(id, _)| id), by_id);
     let lowered = listed
@@ -145,7 +152,7 @@ pub(crate) fn long_path_for(
         .filter(|p| p.tall)
         .map(|p| Tile::new(p.position.x() as i32, p.position.y() as i32))
         .collect();
-    let req = crate::pathing::long_path::LongRequest {
+    let req = LongRequest {
         from: Tile::new(from.x() as i32, from.y() as i32),
         to: Tile::new(to.x() as i32, to.y() as i32),
         range: Distance::new(range),
@@ -158,13 +165,11 @@ pub(crate) fn long_path_for(
         near_player: false,
         allies: world
             .get(walker.id)
-            .map_or(crate::players::PlayerSet::NONE, |p| {
-                world.allies_of(p.player)
-            }),
+            .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
     };
     let player = world.get(walker.id).map(|p| p.player);
     let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
-    crate::pathing::long_path::path(
+    path(
         world.tiles(),
         world.map,
         (&req, &gates),
@@ -217,7 +222,7 @@ pub(crate) fn tile_plan_for(
     walker: Walker,
     from: Point,
     level_target: Option<ObjectId>,
-    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+    (world, by_id): (&mut Spatial, ObjectsRef<'_>),
     plan: &mut Planning<'_>,
     ask: TileAsk<'_>,
     out: &mut Path,
@@ -257,7 +262,7 @@ pub(crate) fn tile_plan_for(
         return Ok(None);
     };
     let ignore: Vec<RecordId> = ignore.into_iter().map(RecordId::from).collect();
-    let mut walls = crate::map::spatial::SmoothingWalls::new(world, radius, mask, &ignore);
+    let mut walls = SmoothingWalls::new(world, radius, mask, &ignore);
     let found = planner.plan::<GenieError>(&req, target_box, out, Some(&mut walls))?;
     if walls.ran {
         plan.pathing.smoothing_ran(slots);
@@ -273,7 +278,7 @@ pub(crate) fn tile_plan_for(
 pub(super) fn may_plan(
     trade_cart: bool,
     budget: Option<PlanBudget>,
-    wait_delays: crate::movement::WaitDelays,
+    wait_delays: WaitDelays,
     plans: StepPlans,
 ) -> bool {
     let allowed = !trade_cart || budget.is_none_or(|b| b.allows(wait_delays.count()));
@@ -286,8 +291,8 @@ pub(super) fn may_plan(
 pub(crate) struct Walker {
     pub(crate) id: ObjectId,
     pub(crate) radius: Distance,
-    pub(crate) restriction: crate::map::RestrictionId,
-    pub(crate) mask: crate::map::TerrainMask,
+    pub(crate) restriction: RestrictionId,
+    pub(crate) mask: TerrainMask,
 }
 
 /// The walk's kept hits (`0x141150f00`'s first hit loop, 0x1411547c0..0x141154855): each joins
@@ -345,7 +350,7 @@ pub(super) fn old_pather_for(radius: Distance) -> bool {
 pub(crate) fn short_path_for(
     walker: Walker,
     from: Point,
-    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+    (world, by_id): (&mut Spatial, ObjectsRef<'_>),
     plan: &mut Planning<'_>,
     goal: (BVector, Distance, Option<ObjectId>),
     ignore: &[ObjectId],
@@ -387,7 +392,7 @@ pub(super) fn owner_number(world: &Spatial, id: ObjectId) -> Option<PlayerId> {
 pub(crate) fn short_path_including(
     walker: Walker,
     from: Point,
-    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+    (world, by_id): (&mut Spatial, ObjectsRef<'_>),
     plan: &mut Planning<'_>,
     ask: ShortAsk<'_>,
     player: Option<PlayerId>,

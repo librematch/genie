@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::attack::Attack;
 use crate::movement::move_to::MoveToAction;
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// A Hunt's state (`+0x18`, set by `set_state`) with the data only that state holds
 /// (FD-045-D62): every `set_state` drops the sub-actions first (`FUN_140a98620`), the four
@@ -199,15 +200,21 @@ impl HuntState {
     }
 }
 
-impl std::fmt::Display for HuntState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for HuntState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(test)]
+    use crate::combat::attack::AttackState;
+    #[cfg(test)]
+    use crate::combat::attack::tests::own_attack;
     use crate::gathering::hunt::HuntState;
+    #[cfg(test)]
+    use crate::map::Distance;
     use crate::movement::move_to::{MoveTo, MoveToAction};
 
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
@@ -233,11 +240,7 @@ mod tests {
         for b in [2, 12] {
             assert!(HuntState::of_byte(b, Some(walk), None).is_err(), "{b}");
         }
-        let attack = crate::combat::attack::tests::own_attack(
-            5,
-            crate::combat::attack::AttackState::New,
-            crate::map::Distance::ZERO,
-        );
+        let attack = own_attack(5, AttackState::New, Distance::ZERO);
         let mut s = HuntState::of_byte(12, None, Some(attack)).unwrap();
         assert_eq!((s.attack(), s.move_to()), (Some(&attack), None));
         assert_eq!(s.bare().attack(), None);

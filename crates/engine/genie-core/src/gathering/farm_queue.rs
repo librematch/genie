@@ -9,14 +9,22 @@
 //! ([`crate::production::refund_master`]).
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::gathering::QueueCount;
+use crate::gathering::hunt::stand_sprite;
+use crate::math::image::farm_queue::{
+    NO_FARM as FARM_QUEUE_NO_FARM, ONE_FARM as FARM_QUEUE_ONE_FARM,
+};
+use crate::math::rng::Stream;
 use crate::objects::ListIndex;
+use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
+use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -32,10 +40,10 @@ pub const QUEUE_LIMIT: QueueCount = QueueCount::of_data(40);
 pub const PASTURE: MasterId = MasterId::named(0x761);
 
 /// A reseeding gatherer's farm spot of none (`DAT_14330ec20`, −1.0, read at `0x140a8aa9e`).
-const NO_FARM: f32 = crate::math::image::farm_queue::NO_FARM;
+const NO_FARM: f32 = FARM_QUEUE_NO_FARM;
 /// The one farm or fish trap a reseed pays (`DAT_14330eb8c`, 1.0, read at `0x140a8ac75` and
 /// `0x140a8b025`).
-const ONE_FARM: CostCount = CostCount::new(crate::math::image::farm_queue::ONE_FARM);
+const ONE_FARM: CostCount = CostCount::new(FARM_QUEUE_ONE_FARM);
 
 /// Which of a player's queues.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,7 +183,7 @@ impl World {
             return Ok(false);
         };
         let mut base = m.base_id;
-        if based.kind == crate::objects::masters::master_type::BUILDING
+        if based.kind == BUILDING
             && let Some(head) = based.building.as_ref().and_then(|b| b.head_unit)
         {
             let Some(h) = ms.get(head) else {
@@ -263,10 +271,7 @@ impl World {
         {
             own.push(target.id());
             let is_building = match self.object(target) {
-                Some((q, t)) => {
-                    t.master(self.master_tables(), q)?.kind
-                        == crate::objects::masters::master_type::BUILDING
-                }
+                Some((q, t)) => t.master(self.master_tables(), q)?.kind == BUILDING,
                 None => false,
             };
             if is_building {
@@ -301,11 +306,7 @@ impl World {
             }
         }
         let id = self.players.live(p, idx)?.id;
-        let site = (
-            p,
-            crate::construction::FoundationId::new(foundation),
-            master,
-        );
+        let site = (p, FoundationId::new(foundation), master);
         let task = self.build_task(p, id, site, at)?;
         self.build_directly(p, idx, task, site, at)?;
         Ok(true)
@@ -316,7 +317,7 @@ impl World {
     fn reseed_choice(
         &self,
         p: PlayerId,
-        class: crate::objects::masters::ClassId,
+        class: ClassId,
     ) -> Result<Option<(MasterId, bool, Queue)>, GenieError> {
         let owner = self.players.player(p)?;
         let choice =
@@ -387,19 +388,14 @@ impl World {
         let Some(gather) = self.parts.actions.of_mut(unit.id)?.list.gather_mut() else {
             return Ok(());
         };
-        let stand = crate::gathering::hunt::stand_sprite(
-            &gather.task,
-            standing,
-            unit.life.held(),
-            &self.graphics,
-        );
+        let stand = stand_sprite(&gather.task, standing, unit.life.held(), &self.graphics);
         let released = gather.after_reseed(
             arrived,
             player_type,
             self.parts.motion.mover_mut(unit.id),
             stand,
             &mut unit.sprite,
-            self.streams.get(crate::math::rng::Stream::Sprite),
+            self.streams.get(Stream::Sprite),
         )?;
         for t in released.into_iter().flatten() {
             self.release(t, by)?;
@@ -420,6 +416,8 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::objects::masters::BuildingMaster;
     use crate::objects::masters::ClassId;
     use crate::objects::masters::ids;
     use crate::objects::masters::{Master, Masters, master_type};
@@ -428,6 +426,10 @@ mod tests {
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::opt_master;
+    #[cfg(test)]
+    use crate::test_ids::{amounts, attributes};
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -446,12 +448,12 @@ mod tests {
     /// food entry unpaid) and the fish trap (100 wood).
     fn world(wood: f32) -> World {
         let player = Player {
-            attributes: crate::test_ids::attributes(300, [0.0, wood, 0.0, 0.0]),
+            attributes: attributes(300, [0.0, wood, 0.0, 0.0]),
             ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![Player::default(), player],
@@ -500,19 +502,13 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(1));
-        assert_eq!(
-            t.players[1].resources(),
-            crate::test_ids::amounts([99.0, 900.0, 0.0, 0.0])
-        );
+        assert_eq!(t.players[1].resources(), amounts([99.0, 900.0, 0.0, 0.0]));
         t.players[1].attributes[0] = Amount::new(100.0);
         assert!(
             t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE)
                 .unwrap()
         );
-        assert_eq!(
-            t.players[1].resources(),
-            crate::test_ids::amounts([100.0, 700.0, 0.0, 0.0])
-        );
+        assert_eq!(t.players[1].resources(), amounts([100.0, 700.0, 0.0, 0.0]));
         t.players[1].farm_queue = QueueCount::of_data(2);
         assert!(
             t.queue_fish_traps(PlayerId::new(1), QueueCount::of_data(3))
@@ -562,15 +558,15 @@ mod tests {
     ) -> Master {
         Master {
             id,
-            kind: master_type::BUILDING,
+            kind: BUILDING,
             class,
             base_id: Some(base),
             available,
-            building: Some(crate::objects::masters::BuildingMaster {
+            building: Some(BuildingMaster {
                 head_unit: opt_master(head),
                 stack_unit: None,
                 annexes: [None; 4],
-                ..crate::objects::masters::BuildingMaster::default()
+                ..BuildingMaster::default()
             }),
             ..Master::default()
         }
@@ -656,10 +652,7 @@ mod tests {
             t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(1), PASTURE)
                 .unwrap()
         );
-        assert_eq!(
-            t.players[1].resources(),
-            crate::test_ids::amounts([0.0, 280.0, 0.0, 0.0])
-        );
+        assert_eq!(t.players[1].resources(), amounts([0.0, 280.0, 0.0, 0.0]));
         t.players[1].fish_trap_queue = QueueCount::of_data(1);
         assert!(
             !t.unqueue_fish_traps(PlayerId::new(1), QueueCount::of_data(0))

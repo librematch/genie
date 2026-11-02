@@ -1,5 +1,7 @@
 //! A master's `create_doppelganger_on_death` (`+0x682`): whether its objects leave ghosts.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's `create_doppelganger_on_death` (`+0x682`): whether its dying objects leave ghosts in
 /// the other players' fog. Every byte is kept; only 2 leaves them.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -24,8 +26,8 @@ impl GhostMode {
     }
 }
 
-impl std::fmt::Display for GhostMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for GhostMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

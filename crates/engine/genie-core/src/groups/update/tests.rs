@@ -1,7 +1,10 @@
 use crate::combat::Charge;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::{Arms, Attack};
 use crate::construction::MainBuildingId;
 use crate::garrison::ContainerId;
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::tests::{walker, walking};
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
@@ -12,18 +15,28 @@ use crate::groups::MoveReason;
 use crate::groups::SlotState;
 use crate::groups::TransformType;
 use crate::groups::UnitType;
+use crate::groups::update::TRADE_CART_SPRITES;
+use crate::groups::{
+    Formation, FormationLine, GroupCommand, GroupOrder, Slot, SpecificMove, TargetData,
+    UnitTypeStatistic,
+};
 use crate::groups::{GroupTarget, Member, UnitGroup, UnitGroups};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Restriction;
+use crate::map::RestrictionId;
 use crate::map::TerrainFlags;
+use crate::map::spatial::{Placed, Spatial};
 use crate::map::terrain::TileTerrain;
 use crate::math::fmath::BVector;
+use crate::math::rng::Stream;
 use crate::movement::GroupSpeed;
 use crate::movement::PathState;
 use crate::movement::Speed;
+use crate::movement::move_to::TargetMoved;
+use crate::movement::{Mover, PathData, Velocity};
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
@@ -33,6 +46,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
@@ -40,13 +54,17 @@ use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionType;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::SpecialAttack;
+use crate::objects::masters::action_type::{DEPOSIT, PICK_UP};
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
+use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
+use crate::objects::{AnimateState, FacetCount, Frame};
 use crate::pathing::DelayCount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
@@ -59,18 +77,22 @@ use crate::test_ids::object_id_list;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
+use crate::unit_ai::{QueuedOrder, SOLDIER_AI};
 use crate::vision::VisionBits;
+use crate::vision::registry::Registry;
+use crate::vision::visibility::Visibility;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::parts::Object;
+use crate::world::{FrameSeed, OBJECT_MASTER};
 use crate::world::{Player, World};
 
 /// A unit of master 4 at (`x`, `y`) in state 2 with 50 hit points (its unit AI [`soldier_ai`]).
 fn soldier(id: i32, x: f32, y: f32) -> Unit {
     let mut u = Unit {
         id: object_id(id),
-        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+        place: Static::at(Position::new(x, y, 0.0)),
         ..Unit::default()
     };
     u.life.master_id = master_id(4);
@@ -115,7 +137,7 @@ fn world() -> World {
     ];
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(0),
+        FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO; 4],
         players,
@@ -123,7 +145,7 @@ fn world() -> World {
     .with_ais([10, 11, 12, 20, 30].map(|id| (object_id(id), soldier_ai())));
     let master = Master {
         id: master_id(4),
-        terrain_restriction: Some(crate::map::RestrictionId::named(0)),
+        terrain_restriction: Some(RestrictionId::named(0)),
         kind: master_type::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(60),
@@ -135,7 +157,7 @@ fn world() -> World {
         ..Master::default()
     };
     t.masters = vec![Masters::new([master]); 4];
-    let mut s = crate::map::spatial::Spatial::new(GridSize::new(8, 8));
+    let mut s = Spatial::new(GridSize::new(8, 8));
     s.relations = ByPlayer::new(vec![
         relation_row([0, 3, 3, 3]),
         relation_row([0, 0, 3, 0]),
@@ -148,7 +170,7 @@ fn world() -> World {
         relations([0, 4, 1, 4]),
         relations([0, 2, 4, 1]),
     ]);
-    s.sight = Some(crate::vision::visibility::Visibility::new(
+    s.sight = Some(Visibility::new(
         GridSize::new(8, 8),
         Vec::new(),
         vec![VisionBits::NONE; 64],
@@ -205,8 +227,7 @@ fn lost_members_leave_the_group_and_stop() {
     mute.group.id = Some(group_id(1));
     let _ = t.push_live(PlayerId::new(1), mute).unwrap();
     for u in &mut t.players[1].objects {
-        t.parts
-            .put_mover(u.id, Some(crate::gathering::hunt::tests::walker()));
+        t.parts.put_mover(u.id, Some(walker()));
     }
     let g = t.groups.get_mut(group_id(1)).unwrap();
     for id in [13, 99] {
@@ -257,7 +278,7 @@ fn hibernating_group_waits_runs_its_queue_or_goes() {
         // the target alone: the constructor's kind −1 stays
         g.current_target.target = GroupTarget::of_saved(target, -1);
         g.command_queue = if queued {
-            vec![crate::groups::GroupCommand::default()]
+            vec![GroupCommand::default()]
         } else {
             Vec::new()
         };
@@ -395,10 +416,7 @@ fn relic_carriers_keep_their_command_pending() {
         a.current_target = ObjectId::of_field(target);
     };
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x84);
-    set_masters(
-        &mut t,
-        vec![task(crate::objects::masters::action_type::PICK_UP)],
-    );
+    set_masters(&mut t, vec![task(PICK_UP)]);
     ai(&mut t, Some(OrderKind::OnTarget), None, 40);
     assert!(t.target_pending(group_id(1)).unwrap());
     ai(&mut t, None, Some(ActionKind::OnTarget), 40);
@@ -407,27 +425,18 @@ fn relic_carriers_keep_their_command_pending() {
     assert!(!t.target_pending(group_id(1)).unwrap());
     ai(&mut t, Some(OrderKind::OnTarget), None, -1);
     assert!(!t.target_pending(group_id(1)).unwrap());
-    set_masters(
-        &mut t,
-        vec![task(crate::objects::masters::action_type::DEPOSIT)],
-    );
+    set_masters(&mut t, vec![task(DEPOSIT)]);
     assert!(t.target_pending(group_id(1)).unwrap());
     ai(&mut t, Some(OrderKind::OnTarget), None, 41);
     assert!(!t.target_pending(group_id(1)).unwrap());
     // the delivery: on the monastery, with either task
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x88);
     assert!(t.target_pending(group_id(1)).unwrap());
-    set_masters(
-        &mut t,
-        vec![task(crate::objects::masters::action_type::PICK_UP)],
-    );
+    set_masters(&mut t, vec![task(PICK_UP)]);
     assert!(t.target_pending(group_id(1)).unwrap());
-    set_masters(&mut t, vec![task(crate::gathering::gather::GATHER)]);
+    set_masters(&mut t, vec![task(GATHER)]);
     assert!(!t.target_pending(group_id(1)).unwrap());
-    set_masters(
-        &mut t,
-        vec![task(crate::objects::masters::action_type::DEPOSIT)],
-    );
+    set_masters(&mut t, vec![task(DEPOSIT)]);
     ai(&mut t, Some(OrderKind::OnTarget), None, 40);
     assert!(!t.target_pending(group_id(1)).unwrap());
 }
@@ -461,7 +470,7 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
         .set_unit_ai(t.players[1].objects[ListIndex::new(0)].id, None);
     assert!(t.member_idle(object_id(10)).unwrap());
     // an Attack in state 2 is not free, in state 13 it is; a state 4 is not
-    let attack = |state| crate::combat::attack::Attack {
+    let attack = |state| Attack {
         target: None,
         target2: None,
         state,
@@ -473,18 +482,18 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
-        arms: crate::combat::attack::Arms {
+        arms: Arms {
             move_sprite: None,
             sprite: None,
             second_sprite: None,
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: crate::objects::Frame::of_data(-1),
-            interrupt_frame: crate::objects::Frame::of_data(-1),
+            fire_frame: Frame::of_data(-1),
+            interrupt_frame: Frame::of_data(-1),
         },
         voice: Voice::Loud,
-        on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+        on_target_moved: TargetMoved::Follows,
         same_owner: false,
     };
     for (state, free) in [
@@ -522,10 +531,8 @@ fn group_rests_without_command_motion_or_moving_member() {
     let mut t = world();
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::NONE;
     assert!(t.at_rest(group_id(1)));
-    t.parts.put_mover(
-        t.players[1].objects[ListIndex::new(1)].id,
-        Some(crate::gathering::hunt::tests::walker()),
-    );
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(1)].id, Some(walker()));
     assert!(!t.at_rest(group_id(1)));
     t.parts
         .put_mover(t.players[1].objects[ListIndex::new(1)].id, None);
@@ -544,15 +551,13 @@ fn group_rests_without_command_motion_or_moving_member() {
 fn kept_apart_units_leave_unless_busy() {
     let mut t = world();
     let apart = soldier(15, 6.0, 6.0);
-    t.parts
-        .put_mover(apart.id, Some(crate::gathering::hunt::tests::walking()));
+    t.parts.put_mover(apart.id, Some(walking()));
     let apart_ai = UnitAi {
-        orders: vec![crate::unit_ai::QueuedOrder::default()],
+        orders: vec![QueuedOrder::default()],
         ..soldier_ai()
     };
     let free = soldier(16, 6.0, 6.0);
-    t.parts
-        .put_mover(free.id, Some(crate::gathering::hunt::tests::walking()));
+    t.parts.put_mover(free.id, Some(walking()));
     let attacker = soldier(17, 7.0, 7.0);
     let attacker_ai = UnitAi {
         current_action: Some(ActionKind::Attack),
@@ -595,8 +600,7 @@ fn kept_apart_units_leave_unless_busy() {
 fn deleted_group_lets_its_members_go() {
     let mut t = world();
     for u in &mut t.players[1].objects {
-        t.parts
-            .put_mover(u.id, Some(crate::gathering::hunt::tests::walking()));
+        t.parts.put_mover(u.id, Some(walking()));
     }
     t.parts
         .unit_ai
@@ -638,7 +642,7 @@ fn deleted_group_lets_its_members_go() {
 #[test]
 fn unit_shows_its_standing_walking_or_running_sprite() {
     let mut t = world();
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     t.parts
         .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(walker));
     let speed = |t: &World| t.parts.mover_of(object_id(10)).unwrap().stats.speed;
@@ -665,10 +669,10 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
     master(&mut t, class::CLASS_6, [6, 7, 8]);
     // the sprites' factors on the walker's top speed 0.8
     for (id, factor) in [(6, 0.125), (7, 1.125), (8, 1.875)] {
-        let graphic = crate::objects::sprite::Graphic {
+        let graphic = Graphic {
             id: SpriteId::named(id),
-            frames: crate::objects::Frame::of_data(1),
-            facets: crate::objects::FacetCount::of_data(8),
+            frames: Frame::of_data(1),
+            facets: FacetCount::of_data(8),
             speed_multiplier: SpeedMultiplier::of_data(factor),
             frame_duration: Seconds::ZERO,
             replay_delay: Seconds::ZERO,
@@ -684,29 +688,29 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
     assert_eq!(speed(&t), Speed::new(0.8 * 0.125));
     // a held sprite needs the graphic
     t.graphics.clear();
-    let graphic = crate::objects::sprite::Graphic {
+    let graphic = Graphic {
         id: SpriteId::named(1),
-        frames: crate::objects::Frame::of_data(1),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
     };
-    t.players[1].objects[ListIndex::new(0)].sprite = Some(crate::objects::sprite::ActiveSprite {
+    t.players[1].objects[ListIndex::new(0)].sprite = Some(ActiveSprite {
         graphic,
-        frame: crate::objects::Frame::of_data(0),
+        frame: Frame::of_data(0),
         interval: Seconds::ZERO,
         last: Seconds::ZERO,
-        last_frame: crate::objects::Frame::of_data(0),
+        last_frame: Frame::of_data(0),
         changed: false,
         looped: false,
-        animate: crate::objects::AnimateState::of_data(0),
+        animate: AnimateState::of_data(0),
         speed: Speed::new(0.0),
     });
     assert!(t.show_walking(object_id(10)).is_err());
     master(&mut t, class::TRADE_CART, [6, 7, 8]);
-    let trade = crate::groups::update::TRADE_CART_SPRITES;
+    let trade = TRADE_CART_SPRITES;
     assert_eq!(t.show_walking(object_id(10)), Err(trade.clone()));
     assert_eq!(t.show_standing(object_id(10)), Err(trade));
     t.players[1].objects[ListIndex::new(0)].sprite = None;
@@ -798,15 +802,15 @@ fn each_line_takes_its_units_least_range() {
     ];
     t.players[1].objects[ListIndex::new(1)].life.master_id = master_id(5);
     t.players[1].objects[ListIndex::new(2)].life.master_id = ids::ID_6;
-    let slot = |unit| crate::groups::Slot {
+    let slot = |unit| Slot {
         unit_id: unit,
-        ..crate::groups::Slot::default()
+        ..Slot::default()
     };
-    let line = |indices: Vec<u32>| crate::groups::FormationLine {
+    let line = |indices: Vec<u32>| FormationLine {
         indices,
-        ..crate::groups::FormationLine::default()
+        ..FormationLine::default()
     };
-    t.groups.get_mut(group_id(1)).unwrap().current_formation = Some(crate::groups::Formation {
+    t.groups.get_mut(group_id(1)).unwrap().current_formation = Some(Formation {
         slots: vec![
             slot(Some(object_id(10))),
             slot(Some(object_id(11))),
@@ -820,7 +824,7 @@ fn each_line_takes_its_units_least_range() {
             line(vec![0]),
         ],
         number_lines: 3,
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     t.line_ranges(group_id(1)).unwrap();
     let f = t
@@ -890,9 +894,9 @@ fn the_relayout_follows_the_count_and_the_spacing() {
     );
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::ATTACK;
-    g.current_formation = Some(crate::groups::Formation {
+    g.current_formation = Some(Formation {
         kind: FormationKind::TYPE_6,
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     set(&mut t, 0, 6.0);
     assert_eq!(t.relayout_choice(group_id(1), 4).unwrap(), (false, true));
@@ -933,8 +937,7 @@ fn follow_moves_to_its_target_when_it_strays() {
     assert_eq!(g.motion.lead, Some(object_id(12)));
     t.groups.get_mut(group_id(1)).unwrap().current_target.target = GroupTarget::of_saved(77, -1);
     assert!(!t.command_update(group_id(1), &mut relayout).unwrap());
-    t.groups.get_mut(group_id(1)).unwrap().command_queue =
-        vec![crate::groups::GroupCommand::default()];
+    t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand::default()];
     assert!(t.command_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(t.groups.get(group_id(1)).unwrap().hibernating, 1);
     assert!(!relayout);
@@ -965,7 +968,7 @@ fn moving_group_move_waits_or_follows() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.flags = GroupFlags::FOLLOWED;
     g.current_target.target = GroupTarget::of_saved(20, -1);
-    let mut path = crate::movement::PathData::without_path();
+    let mut path = PathData::without_path();
     path.has_path = true;
     path.points = vec![BVector::ZERO, BVector::new(3.5, 0.0, 3.5)];
     g.motion.paths = vec![path];
@@ -1025,7 +1028,7 @@ fn standing_group_move_ends_or_goes_on() {
         (GroupCommandKind::NONE, GroupFlags::MEMBERS_SENT)
     );
     let walked = || {
-        let mut path = crate::movement::PathData::without_path();
+        let mut path = PathData::without_path();
         path.has_path = true;
         path.points = vec![BVector::ZERO, BVector::new(3.5, 0.0, 3.5)];
         path
@@ -1049,21 +1052,21 @@ fn standing_group_move_ends_or_goes_on() {
     );
     // every slot in place: its units leave and the command ends
     let mut t = world();
-    let slot = |unit, state| crate::groups::Slot {
+    let slot = |unit, state| Slot {
         unit_id: unit,
         state,
-        ..crate::groups::Slot::default()
+        ..Slot::default()
     };
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::MOVE;
     g.motion.flags = MotionFlags::NONE;
-    g.current_formation = Some(crate::groups::Formation {
+    g.current_formation = Some(Formation {
         kind: FormationKind::COLUMN,
         slots: vec![
             slot(Some(object_id(10)), SlotState::InPlace),
             slot(Some(object_id(11)), SlotState::InPlace),
         ],
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     assert!(t.move_update(group_id(1), &mut relayout).unwrap());
     let g = t.groups.get(group_id(1)).unwrap();
@@ -1080,10 +1083,10 @@ fn standing_group_move_ends_or_goes_on() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::MOVE;
     g.motion.flags = MotionFlags::NONE;
-    g.current_formation = Some(crate::groups::Formation {
+    g.current_formation = Some(Formation {
         kind: FormationKind::COLUMN,
         slots: vec![slot(Some(object_id(10)), SlotState::Steering)],
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     assert!(!t.move_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(
@@ -1098,24 +1101,24 @@ fn standing_group_move_ends_or_goes_on() {
 #[test]
 fn units_out_of_their_places_get_paths() {
     let mut t = world();
-    let slot = |unit, state| crate::groups::Slot {
+    let slot = |unit, state| Slot {
         unit_id: unit,
         state,
-        ..crate::groups::Slot::default()
+        ..Slot::default()
     };
     t.parts
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(1)].id)
         .unwrap()
         .current_action = Some(ActionKind::Move);
-    t.groups.get_mut(group_id(1)).unwrap().current_formation = Some(crate::groups::Formation {
+    t.groups.get_mut(group_id(1)).unwrap().current_formation = Some(Formation {
         slots: vec![
             slot(None, SlotState::Steering),
             slot(Some(object_id(99)), SlotState::Steering),
             slot(Some(object_id(11)), SlotState::Steering),
             slot(Some(object_id(10)), SlotState::InPlace),
         ],
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     t.move_to_desired_positions(group_id(1), GroupCommandKind::MOVE, None)
         .unwrap();
@@ -1147,15 +1150,14 @@ fn member_moved_aside_waits_out_its_timer() {
     let mut t = world();
     t.dt_seconds = Seconds::new(0.5);
     for u in &mut t.players[1].objects {
-        t.parts
-            .put_mover(u.id, Some(crate::gathering::hunt::tests::walking()));
+        t.parts.put_mover(u.id, Some(walking()));
     }
-    let aside = crate::groups::SpecificMove {
+    let aside = SpecificMove {
         active: 1,
         path_id: MovePath::of_data(4),
         reason: MoveReason::ASIDE,
         timer: Seconds::new(0.75),
-        ..crate::groups::SpecificMove::default()
+        ..SpecificMove::default()
     };
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.members[0].specific_move = aside;
@@ -1175,15 +1177,15 @@ fn member_moved_aside_waits_out_its_timer() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
         g.members[0].specific_move,
-        crate::groups::SpecificMove {
+        SpecificMove {
             path_id: MovePath::NONE,
             reason: MoveReason::NONE,
-            ..crate::groups::SpecificMove::default()
+            ..SpecificMove::default()
         }
     );
     // a NaN timer keeps the move
     let g = t.groups.get_mut(group_id(1)).unwrap();
-    g.members[0].specific_move = crate::groups::SpecificMove {
+    g.members[0].specific_move = SpecificMove {
         timer: Seconds::new(f32::NAN),
         ..aside
     };
@@ -1216,7 +1218,7 @@ fn member_moved_aside_waits_out_its_timer() {
 fn member_own_move_walks_its_path() {
     let mut t = world();
     t.dt_seconds = Seconds::new(0.5);
-    let mut walker = crate::gathering::hunt::tests::walker();
+    let mut walker = walker();
     walker.moved_at = Position::new(1.0, 1.0, 0.0);
     walker.take_record_path(
         vec![BVector::new(1.0, 0.0, 1.0), BVector::new(5.0, 0.0, 1.0)],
@@ -1228,7 +1230,7 @@ fn member_own_move_walks_its_path() {
         .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(walker));
     t.spatial.insert(
         object_id(10),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(1.0, 1.0, 0.0),
             radius: Footprint::new(0.2, 0.2),
             class: class::CLASS_6,
@@ -1242,14 +1244,14 @@ fn member_own_move_walks_its_path() {
             obstruction: None,
         },
     );
-    t.groups.get_mut(group_id(1)).unwrap().members[0].specific_move = crate::groups::SpecificMove {
+    t.groups.get_mut(group_id(1)).unwrap().members[0].specific_move = SpecificMove {
         active: 1,
         path_id: MovePath::NONE,
         reason: MoveReason::DETOUR,
         timer: Seconds::new(3.0),
         distance: Distance::new(3.0),
         last_position: BVector::new(1.0, 0.0, 0.0),
-        ..crate::groups::SpecificMove::default()
+        ..SpecificMove::default()
     };
     t.specific_moves_step(group_id(1)).unwrap();
     let (_, u) = t.object(object_id(10)).unwrap();
@@ -1269,7 +1271,7 @@ fn member_own_move_walks_its_path() {
 #[test]
 fn group_update_leaves_its_members_gaits_current() {
     let mut t = world();
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     for u in &mut t.players[1].objects {
         t.parts.put_mover(u.id, Some(walker.clone()));
         t.parts.mover_mut(u.id).unwrap().moved_at = u.position();
@@ -1287,9 +1289,9 @@ fn group_update_leaves_its_members_gaits_current() {
 fn due_orders_leave_the_queue() {
     let mut t = world();
     t.world_time = WorldTime::from_millis(100);
-    let order = |execute_time| crate::groups::GroupOrder {
+    let order = |execute_time| GroupOrder {
         execute_time,
-        ..crate::groups::GroupOrder::default()
+        ..GroupOrder::default()
     };
     t.groups.get_mut(group_id(1)).unwrap().order_queue = vec![
         order(WorldTime::from_millis(99)),
@@ -1316,7 +1318,7 @@ fn the_idle_timer_counts_while_idle() {
         Millis::new(3000)
     );
     let mut streams = t.streams.clone();
-    let draw = streams.get(crate::math::rng::Stream::World).rand15();
+    let draw = streams.get(Stream::World).rand15();
     t.idle_timer_step(group_id(1)).unwrap();
     assert_eq!(
         t.groups.get(group_id(1)).unwrap().idle_timer,
@@ -1341,13 +1343,13 @@ fn an_idle_group_goes() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::NONE;
     g.flags = GroupFlags::NONE;
-    g.current_formation = Some(crate::groups::Formation {
+    g.current_formation = Some(Formation {
         kind: FormationKind::COLUMN,
-        slots: vec![crate::groups::Slot {
+        slots: vec![Slot {
             state: SlotState::InPlace,
-            ..crate::groups::Slot::default()
+            ..Slot::default()
         }],
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     assert!(!t.group_update(group_id(1)).unwrap());
     let mut t = world();
@@ -1372,7 +1374,7 @@ fn an_idle_group_goes() {
 #[test]
 fn player_groups_update_before_its_objects() {
     let mut t = world();
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     for u in &mut t.players[1].objects {
         t.parts.put_mover(u.id, Some(walker.clone()));
         t.parts.mover_mut(u.id).unwrap().moved_at = u.position();
@@ -1403,11 +1405,11 @@ fn player_groups_update_before_its_objects() {
 #[test]
 fn group_steers_its_free_members_speeds_in_their_own_update() {
     let mut t = world();
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     for u in &mut t.players[1].objects {
         let mut m = walker.clone();
         m.moved_at = u.position();
-        m.velocity = Some(crate::movement::Velocity {
+        m.velocity = Some(Velocity {
             velocity: BVector::new(0.0, 0.0, 1.0),
             acceleration: BVector::ZERO,
         });
@@ -1416,10 +1418,10 @@ fn group_steers_its_free_members_speeds_in_their_own_update() {
     t.parts
         .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
-        .paths = vec![crate::movement::PathData {
+        .paths = vec![PathData {
         state: PathState::Walking,
         pause_time: Seconds::new(0.5),
-        ..crate::movement::PathData::without_path()
+        ..PathData::without_path()
     }];
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.owner = Some(PlayerId::new(9));
@@ -1462,13 +1464,13 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
     let t = world();
     let mut g = t.groups.get(group_id(1)).unwrap().clone();
     g.motion.maximum_velocity_forward = Speed::new(0.9);
-    g.current_formation = Some(crate::groups::Formation {
-        slots: vec![crate::groups::Slot {
+    g.current_formation = Some(Formation {
+        slots: vec![Slot {
             unit_id: Some(object_id(10)),
             state: SlotState::InPlace,
-            ..crate::groups::Slot::default()
+            ..Slot::default()
         }],
-        ..crate::groups::Formation::default()
+        ..Formation::default()
     });
     g.members[0].specific_move.reason = MoveReason::ASIDE;
     g.members[1].specific_move.reason = MoveReason::NONE;
@@ -1477,8 +1479,7 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
         groups: vec![g],
         ..UnitGroups::default()
     };
-    let masters =
-        crate::objects::masters::OwnerMasters::new(&t.parts.own_master, Some(&t.masters[1]));
+    let masters = OwnerMasters::new(&t.parts.own_master, Some(&t.masters[1]));
     let of = |groups: &UnitGroups, id| {
         let u = t.object(object_id(id)).unwrap().1;
         u.group_speed(
@@ -1535,10 +1536,10 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
         lost.group_speed(
             (t.parts.actions_of(lost.id), t.parts.unread.get(lost.id)),
             &groups,
-            crate::objects::masters::OwnerMasters::new(&t.parts.own_master, None),
+            OwnerMasters::new(&t.parts.own_master, None),
             t.parts.unit_ai.get(lost.id)
         ),
-        Err(crate::world::OBJECT_MASTER)
+        Err(OBJECT_MASTER)
     );
 }
 
@@ -1573,7 +1574,7 @@ fn the_update_end_stores_moved_group_new_position() {
 fn the_lead_is_the_member_nearest_the_targets_place() {
     let at = |id, x: f32, y: f32| Unit {
         id,
-        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+        place: Static::at(Position::new(x, y, 0.0)),
         ..Unit::default()
     };
     let player = Player {
@@ -1587,7 +1588,7 @@ fn the_lead_is_the_member_nearest_the_targets_place() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1628,7 +1629,7 @@ fn group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
@@ -1649,7 +1650,7 @@ fn group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     assert!(!t.any_member_held(group_id(2)));
     // the World stream's next draw, modulo 750
     let mut streams = t.streams.clone();
-    let draw = streams.get(crate::math::rng::Stream::World).rand15();
+    let draw = streams.get(Stream::World).rand15();
     t.reset_idle_timer(group_id(1));
     assert_eq!(t.groups.groups[0].idle_timer, Millis::new(draw % 750));
     assert_eq!(t.streams, streams);
@@ -1671,7 +1672,7 @@ fn group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
 #[test]
 fn emptying_the_command_queue_wakes_hibernating_group() {
     let mut g = UnitGroup::new(group_id(1));
-    g.command_queue = vec![crate::groups::GroupCommand::default()];
+    g.command_queue = vec![GroupCommand::default()];
     g.hibernating = 1;
     g.clear_command_queue();
     assert_eq!(g.command_queue, Vec::new());
@@ -1726,23 +1727,22 @@ fn grounded() -> World {
         kinds,
         vec![Restriction::new(vec![1.0])],
     ));
-    t.spatial.sight.as_mut().unwrap().registry =
-        Some(crate::vision::registry::Registry::new(4, 65));
+    t.spatial.sight.as_mut().unwrap().registry = Some(Registry::new(4, 65));
     for p in PlayerId::each(4).skip(1) {
         for u in &mut t.players[p.index()].objects {
-            t.parts.unit_ai.get_mut(u.id).unwrap().ai_type = crate::unit_ai::SOLDIER_AI;
+            t.parts.unit_ai.get_mut(u.id).unwrap().ai_type = SOLDIER_AI;
             t.parts.put_mover(
                 u.id,
-                Some(crate::movement::Mover {
+                Some(Mover {
                     moved_at: u.position(),
-                    ..crate::gathering::hunt::tests::walker()
+                    ..walker()
                 }),
             );
         }
         for u in t.players[p.index()].objects.clone() {
             t.spatial.insert(
                 u.id,
-                crate::map::spatial::Placed {
+                Placed {
                     position: u.position(),
                     radius: Footprint::new(0.2, 0.2),
                     class: class::CLASS_6,
@@ -1813,7 +1813,7 @@ fn an_awake_group_without_command_places_itself_and_turns_its_formation() {
 fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
     let run = |flags, motion_flags| {
         let mut t = grounded();
-        let slot = |x: f32| crate::groups::Slot {
+        let slot = |x: f32| Slot {
             unit_id: ObjectId::of_field(9 + x as i32),
             offset: BVector::new(x - 2.0, 0.0, 0.0),
             transform_position: BVector::new(x + 2.0, 0.0, 4.0),
@@ -1821,18 +1821,18 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
             desired_sub_category: UnitType::NONE,
             active: 1,
             transformed: 1,
-            ..crate::groups::Slot::default()
+            ..Slot::default()
         };
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.current_formation = Some(crate::groups::Formation {
+        g.current_formation = Some(Formation {
             kind: FormationKind::LINE,
             transform_type: TransformType::TURNED,
             transform_orientation: BVector::new(0.0, 0.0, 1.0),
             slots: vec![slot(1.0), slot(2.0), slot(3.0)],
-            ..crate::groups::Formation::new()
+            ..Formation::new()
         });
         (g.flags, g.motion.flags) = (flags, motion_flags);
-        g.order_queue.push(crate::groups::GroupOrder::default());
+        g.order_queue.push(GroupOrder::default());
         t.build_mesh().unwrap();
         assert_eq!(t.group_update(group_id(1)), Ok(true));
         assert_eq!(t.groups.get(group_id(1)).unwrap().order_queue.len(), 0);
@@ -1902,15 +1902,15 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
 fn attacking(t: &mut World) {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::ATTACK;
-    g.current_target = crate::groups::TargetData {
+    g.current_target = TargetData {
         target: GroupTarget::Object(object_id(20)),
         original_position: BVector::new(3.5, 0.0, 3.5),
-        ..crate::groups::TargetData::default()
+        ..TargetData::default()
     };
-    g.unit_types = vec![crate::groups::UnitTypeStatistic {
+    g.unit_types = vec![UnitTypeStatistic {
         formation_category: FormationCategory::named(1),
         units: vec![object_id(10), object_id(11), object_id(12)],
-        ..crate::groups::UnitTypeStatistic::default()
+        ..UnitTypeStatistic::default()
     }];
     g.flags = GroupFlags::NONE;
     g.motion.maximum_velocity_forward = Speed::new(1.0);
@@ -1919,14 +1919,14 @@ fn attacking(t: &mut World) {
 /// Every object of every player in the spatial index at its place (`FUN_14118f8c0`-style gaps and
 /// the work command's reach read it).
 fn register(t: &mut World) {
-    let placed: Vec<(i32, crate::map::spatial::Placed)> = PlayerId::each(t.players.len())
+    let placed: Vec<(i32, Placed)> = PlayerId::each(t.players.len())
         .zip(&t.players)
         .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
         .filter_map(|(p, u)| {
             let m = t.masters.of(p)?.get(u.life.master_id)?;
             Some((
                 u.id.get(),
-                crate::map::spatial::Placed {
+                Placed {
                     position: u.position(),
                     radius: m.radius,
                     class: m.class,
@@ -1956,8 +1956,7 @@ fn register(t: &mut World) {
 fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
     let mut t = world();
     attacking(&mut t);
-    t.groups.get_mut(group_id(1)).unwrap().command_queue =
-        vec![crate::groups::GroupCommand::default()];
+    t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand::default()];
     let mut relayout = false;
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(
@@ -1971,9 +1970,9 @@ fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
         (g.current_command, g.current_target),
         (
             GroupCommandKind::NONE,
-            crate::groups::TargetData {
+            TargetData {
                 target: GroupTarget::None,
-                ..crate::groups::TargetData::default()
+                ..TargetData::default()
             }
         )
     );
@@ -1983,8 +1982,7 @@ fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
     assert!(!relayout);
     // a far target: back to the first place
     attacking(&mut t);
-    t.players[2].objects[ListIndex::new(0)].place =
-        crate::objects::layers::Static::at(Position::new(7.5, 7.5, 0.0));
+    t.players[2].objects[ListIndex::new(0)].place = Static::at(Position::new(7.5, 7.5, 0.0));
     assert!(!t.attack_update(group_id(1), &mut relayout).unwrap());
     assert!(relayout);
     assert_eq!(
@@ -2069,8 +2067,7 @@ fn an_attack_releases_category_in_reach_or_arrived() {
 fn unit_in_contact_releases_its_category() {
     let mut t = world();
     attacking(&mut t);
-    t.players[1].objects[ListIndex::new(0)].place =
-        crate::objects::layers::Static::at(Position::new(3.0, 3.0, 0.0));
+    t.players[1].objects[ListIndex::new(0)].place = Static::at(Position::new(3.0, 3.0, 0.0));
     register(&mut t);
     light(&mut t, 1, 3, 3, true);
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
@@ -2185,10 +2182,8 @@ fn gate_out_of_reach_is_struck_at_its_nearest_part() {
 #[test]
 fn unit_speed_is_its_movers_unless_charge_runs() {
     let mut t = world();
-    t.parts.put_mover(
-        t.players[1].objects[ListIndex::new(0)].id,
-        Some(crate::gathering::hunt::tests::walker()),
-    );
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(walker()));
     let speed = |t: &World, id| {
         let (p, u) = t.object(object_id(id)).unwrap();
         t.unit_speed(p, u)
@@ -2218,20 +2213,17 @@ fn released_special_unit_draws_its_retarget_timer() {
     attacking(&mut t);
     register(&mut t);
     light(&mut t, 1, 3, 3, true);
-    t.parts.put_mover(
-        t.players[1].objects[ListIndex::new(1)].id,
-        Some(crate::gathering::hunt::tests::walker()),
-    );
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(1)].id, Some(walker()));
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.special_units = vec![object_id(11)];
     g.current_target.disable_retargeting = 1;
     for u in &mut t.players[1].objects {
-        t.parts.unit_ai.get_mut(u.id).unwrap().orders =
-            vec![crate::unit_ai::QueuedOrder::default()];
+        t.parts.unit_ai.get_mut(u.id).unwrap().orders = vec![QueuedOrder::default()];
         t.parts.unit_ai.get_mut(u.id).unwrap().retarget_timer = Millis::new(7);
     }
     let mut reference = t.streams.clone();
-    let draw = reference.get(crate::math::rng::Stream::Ai).rand15();
+    let draw = reference.get(Stream::Ai).rand15();
     t.release_units(group_id(1), &[object_id(10), object_id(11)], object_id(20))
         .unwrap();
     let timers: Vec<u32> = t.players[1]

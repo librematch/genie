@@ -15,24 +15,32 @@ use crate::world::slots::CheckedIndex;
 /// No active slot lies nearer than `f32::MAX`: the game reads the slot before the array then.
 const NO_NEAREST_SLOT: GenieError =
     GenieError::unreachable("no active slot lies nearer than f32::MAX");
+use crate::map::TerrainMask;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{BVector, scale, sub};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, rotation};
 use crate::math::image::group::{FARTHEST, SLOT_NUDGE_X, SLOT_NUDGE_Z};
+use crate::math::image::group::{
+    PASS_FAR as GROUP_PASS_FAR, PASS_HALF as GROUP_PASS_HALF,
+    PASS_HALF_MARGIN as GROUP_PASS_HALF_MARGIN, PASS_MARGIN as GROUP_PASS_MARGIN,
+    PASS_ONE as GROUP_PASS_ONE, PASS_SHARE as GROUP_PASS_SHARE,
+};
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 
 /// The passability's box starts at this (`DAT_142eea788`) on its low sides, 0 on its high ones.
-pub(super) const PASS_FAR: f32 = crate::math::image::group::PASS_FAR;
+pub(super) const PASS_FAR: f32 = GROUP_PASS_FAR;
 /// The passability's grid holds the box plus this (`DAT_142eb0f50`) and one more cell
 /// ([`PASS_ONE`]) a side.
-pub(super) const PASS_MARGIN: f32 = crate::math::image::group::PASS_MARGIN;
+pub(super) const PASS_MARGIN: f32 = GROUP_PASS_MARGIN;
 /// The grid starts this far below the box (`DAT_142ed6f20`).
-pub(super) const PASS_HALF_MARGIN: f32 = crate::math::image::group::PASS_HALF_MARGIN;
+pub(super) const PASS_HALF_MARGIN: f32 = GROUP_PASS_HALF_MARGIN;
 /// Below this share of the slots' array reachable (`DAT_142eae8d0`), only the nearest slot is.
-pub(super) const PASS_SHARE: f32 = crate::math::image::group::PASS_SHARE;
+pub(super) const PASS_SHARE: f32 = GROUP_PASS_SHARE;
 /// The grid's extra cell, and the spacing below which slots are nudged (`DAT_14330eb8c`).
-pub(super) const PASS_ONE: f32 = crate::math::image::group::PASS_ONE;
+pub(super) const PASS_ONE: f32 = GROUP_PASS_ONE;
 /// A slot lies in its cell's middle (`DAT_142e7f384`).
-pub(super) const PASS_HALF: f32 = crate::math::image::group::PASS_HALF;
+pub(super) const PASS_HALF: f32 = GROUP_PASS_HALF;
 /// The grid's sides are at most this many cells (the literal `0x64` at `0x14103bf01`).
 pub(super) const PASS_CELLS: i32 = 100;
 /// The grid's bytes (`local_2948`, cleared by the literal `0x2710` at `0x14103bf36`).
@@ -97,7 +105,7 @@ impl World {
             .motion
             .calculate_yaw_angle(canon, formation.transform_orientation, dt, false);
         let flips = RIGHT_ANGLE < (yaw - old).get().abs() && g.unit_types.len() < 2;
-        let rotation = crate::math::fmath::rotation(yaw.get(), up);
+        let rotation = rotation(yaw.get(), up);
         formation.transform_orientation = forward;
         for s in formation.every_slot_mut() {
             s.transformed = 0;
@@ -120,7 +128,7 @@ impl World {
                     if 0 < i {
                         back = line.distance_back.get();
                         // COMISS/JA at 0x14103a850: a NaN distance back takes the spacing too
-                        if crate::math::fmath::at_most_or_unordered(back, 0.0) {
+                        if at_most_or_unordered(back, 0.0) {
                             back = i as f32 * g.desired_spacing.get();
                         }
                     }
@@ -213,7 +221,7 @@ impl World {
             let (x, y) = (tile.x(), tile.y());
             let s = formation.slots.checked_mut(u)?;
             // COMISS/JC at 0x14103cde3: a NaN spacing nudges too
-            if crate::math::fmath::below_or_unordered(un.spacing.get(), PASS_ONE) {
+            if below_or_unordered(un.spacing.get(), PASS_ONE) {
                 s.transform_position = s
                     .transform_position
                     .with_x(x as f32 + PASS_HALF + SLOT_NUDGE.checked(nudge)?.x())
@@ -379,12 +387,7 @@ impl World {
                 p.ground(),
                 grow,
                 members,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
+                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
             )? {
                 unreachable.push(j);
             } else {
@@ -405,7 +408,7 @@ impl World {
         grid: &mut PassGrid,
         visited: &mut [u8],
         (gx, gy): (i32, i32),
-        unit_mask: crate::map::TerrainMask,
+        unit_mask: TerrainMask,
     ) -> Option<(Tile, usize)> {
         let (w, h) = (grid.size.width(), grid.size.height());
         let (ox, oz) = (grid.origin.x(), grid.origin.y());
@@ -496,12 +499,7 @@ impl World {
                 Point::new((ddx + fx) as f32 + PASS_HALF, (fy + ddy) as f32 + PASS_HALF),
                 grow,
                 members,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
+                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
             )?
         {
             *grid.cells.checked_mut(cell)? = count_up(b);

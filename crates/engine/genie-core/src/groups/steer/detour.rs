@@ -5,6 +5,7 @@ use crate::groups::GroupId;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
+use crate::groups::SpecificMove;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
 use crate::groups::steer::{
     EPSILON, ROUND_LENGTH, ROUND_RADIUS, ROUND_REACH, ROUND_STILL, ROUND_TIMER,
@@ -14,13 +15,20 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::{RestrictionId, TerrainMask};
 use crate::math::fmath::{BVector, at_most_or_unordered};
+use crate::math::rng::Stream;
 use crate::movement::Speed;
+use crate::movement::{
+    LONG_PATH_MOVER, LongWalker, OUTSIDE_PATH, Planning, Walker, long_path_for, short_path_for,
+};
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
+use crate::pathing::tile_path::Request;
 use crate::pathing::tile_path::{Found, Path};
 use crate::players::PlayerType;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -115,7 +123,7 @@ impl World {
         &mut self,
         group: GroupId,
         index: usize,
-    ) -> Result<&mut crate::groups::SpecificMove, GenieError> {
+    ) -> Result<&mut SpecificMove, GenieError> {
         Ok(&mut self
             .groups
             .held_mut(group)?
@@ -168,7 +176,7 @@ impl World {
         let grow = master.radius.x() * ROUND_RADIUS;
         Ok(Rounder {
             id,
-            walker: crate::movement::Walker {
+            walker: Walker {
                 radius: Distance::new(grow),
                 ..mover.walker(id)
             },
@@ -193,12 +201,7 @@ impl World {
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
     fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> Result<bool, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         self.spatial
             .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
     }
@@ -362,27 +365,22 @@ impl World {
     /// its ignore list; the record measured after (`FUN_140f95a60`). Its result.
     pub(super) fn round_short(
         &mut self,
-        walker: crate::movement::Walker,
+        walker: Walker,
         player_type: PlayerType,
         from: Point,
         to: BVector,
         ignore: &[ObjectId],
         record: &mut Path,
     ) -> Result<ShortFound, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
-        let mut plan = crate::movement::Planning {
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
             player_type,
-            object: self.streams.get(crate::math::rng::Stream::Object),
+            object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };
-        let r = crate::movement::short_path_for(
+        let r = short_path_for(
             walker,
             from,
             (&mut self.spatial, by_id),
@@ -410,29 +408,23 @@ impl World {
             .players
             .get(p.index())
             .map_or(PlayerType::PHANTOM, |q| q.kind);
-        let walker = crate::movement::LongWalker {
+        let walker = LongWalker {
             id,
             position: u.position(),
             radius: mover.stats.radius.ground(),
             mask: mover.stats.restriction_mask,
-            moves: mover.stats.speed != Speed::ZERO
-                || u.life.master_id == crate::movement::LONG_PATH_MOVER,
+            moves: mover.stats.speed != Speed::ZERO || u.life.master_id == LONG_PATH_MOVER,
             ignore_units: &mover.ignore_units,
             group_units: self.groups.group_units(u.group.id),
         };
-        crate::movement::long_path_for(
+        long_path_for(
             &walker,
             from,
             &self.spatial,
             player_type,
             (to, 0.0),
             None,
-            crate::world::index::ObjectsRef::new(
-                &self.players,
-                &self.index,
-                &self.masters,
-                &self.parts,
-            ),
+            ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
         )
     }
 
@@ -441,7 +433,7 @@ impl World {
     /// record; its result, None without a planner.
     pub(super) fn round_plan(
         &mut self,
-        restriction: crate::map::RestrictionId,
+        restriction: RestrictionId,
         from: Point,
         to: BVector,
         record: &mut Path,
@@ -451,7 +443,7 @@ impl World {
             return Ok(None);
         };
         record.points.clear();
-        let req = crate::pathing::tile_path::Request {
+        let req = Request {
             from,
             to: to.ground(),
             radii: Distance::ZERO,
@@ -471,12 +463,12 @@ impl World {
 /// footprint and a height (`FUN_141194060`) and the ignore list.
 pub(super) struct Rounder<'d> {
     pub(super) id: ObjectId,
-    pub(super) walker: crate::movement::Walker,
+    pub(super) walker: Walker,
     pub(super) player_type: PlayerType,
     pub(super) at: BVector,
     pub(super) here: Position,
-    pub(super) mask: crate::map::TerrainMask,
-    pub(super) restriction: crate::map::RestrictionId,
+    pub(super) mask: TerrainMask,
+    pub(super) restriction: RestrictionId,
     pub(super) grow: Distance,
     pub(super) radius: Footprint,
     pub(super) height: Distance,
@@ -553,11 +545,7 @@ pub(super) fn one_step_toward(
 /// `FUN_140f9bcd0` outside the path (its static point): the way's end lies farther than `gap`
 /// from the slot `to` on the ground.
 pub(super) fn ends_farther(record: &Path, to: BVector, gap: Distance) -> bool {
-    let end = record
-        .points
-        .last()
-        .copied()
-        .unwrap_or(crate::movement::OUTSIDE_PATH);
+    let end = record.points.last().copied().unwrap_or(OUTSIDE_PATH);
     let mut d = fmath::sub(to, end);
     d = d.with_height(0.0);
     gap < Distance::new(fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))

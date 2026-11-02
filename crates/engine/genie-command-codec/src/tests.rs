@@ -11,18 +11,28 @@ use genie_core::commands::{
     TributeCommand, UnitAiStateCommand, UnitList, UnitOrderAction, UnitOrderCommand, UnloadCommand,
     UnloadPick, UnmodelledCommand, Waypoints,
 };
+use genie_core::commands::{
+    GameSub, GatherPointState, QueueId, ResourceWord, SpriteOverride, TradeLots,
+};
+use genie_core::garrison::ENTER;
 use genie_core::groups::FormationKind;
 use genie_core::map::Point;
+use genie_core::map::Tile;
+use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
 use genie_core::orders::{Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
+use genie_core::players::TributeFee;
 use genie_core::players::tribute::Gift;
 use genie_core::production::QueueButton;
+use genie_core::production::{QueuedUnits, UnitIndex};
+use genie_core::technology::TechId;
 use genie_core::unit_ai::UnitStance;
 use genie_core::{ErrorKind, GenieError};
 use genie_rec::de::command as packets;
+use std::array::from_fn;
 
 /// The object id `value` (not −1).
 fn object_id(value: i32) -> ObjectId {
@@ -103,7 +113,7 @@ fn an_interact_keeps_its_order_and_units() {
         queued: false,
         direct: true,
         human: true,
-        filter: Some(genie_core::garrison::ENTER),
+        filter: Some(ENTER),
     };
     assert_eq!(
         round_trip(&interact(2, 1, vec![10, 11, 12])),
@@ -380,7 +390,7 @@ fn the_unit_lists_keep_their_counted_ids() {
         Command::SetGatherState(SetGatherStateCommand {
             player: player_id(4),
             units: unit_list(object_ids([39, 40])),
-            state: Some(genie_core::commands::GatherPointState::KEPT),
+            state: Some(GatherPointState::KEPT),
         })
     );
     let stop = packets::Stop {
@@ -479,7 +489,7 @@ fn patrol_and_attack_move_keep_every_waypoint_slot() {
             units: unit_list(object_ids([5])),
             waypoints: Waypoints {
                 count: 2,
-                points: std::array::from_fn(|i| match i {
+                points: from_fn(|i| match i {
                     0 => Point::new(1.0, 2.0),
                     1 => Point::new(7.0, 0.0),
                     9 => Point::new(0.0, 8.0),
@@ -551,11 +561,11 @@ fn unload_and_unit_order_keep_their_lists_and_counts() {
             units: unit_list(object_ids([61])),
             target: Some(object_id(70)),
             point: Point::new(3.0, 4.0),
-            queue_id: genie_core::commands::QueueId::of_data(71),
+            queue_id: QueueId::of_data(71),
             through_ai: true,
             nearby: false,
             action: UnitOrderAction::Garrison,
-            param: genie_core::production::UnitIndex::of_data(u32::MAX),
+            param: UnitIndex::of_data(u32::MAX),
             human: true,
         })
     );
@@ -625,12 +635,12 @@ fn build_and_build_wall_keep_their_fields() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(10.5, 11.5),
-            queue_id: genie_core::commands::QueueId::of_data(-1),
-            sprite_override: genie_core::commands::SpriteOverride::of_data(0x2c9),
+            queue_id: QueueId::of_data(-1),
+            sprite_override: SpriteOverride::of_data(0x2c9),
             builders: unit_list(object_ids([9])),
             queued: true,
             commits: false,
-            frame: genie_core::objects::Frame::of_data(3),
+            frame: Frame::of_data(3),
         })
     );
     let wall = packets::BuildWall {
@@ -655,9 +665,9 @@ fn build_and_build_wall_keep_their_fields() {
         Command::BuildWall(BuildWallCommand {
             player: player_id(1),
             master: master_id(72),
-            from: genie_core::map::Tile::new(1, 2),
-            to: genie_core::map::Tile::new(3, 4),
-            queue_id: genie_core::commands::QueueId::of_data(-1),
+            from: Tile::new(1, 2),
+            to: Tile::new(3, 4),
+            queue_id: QueueId::of_data(-1),
             builders: unit_list(object_ids([9])),
             queued: false,
             commits: true,
@@ -687,7 +697,7 @@ fn queue_and_research_keep_their_fields() {
             buildings: unit_list(object_ids([9])),
             building_master: master_id(109),
             unit: master_id(83),
-            amount: genie_core::production::QueuedUnits::of_data(5),
+            amount: QueuedUnits::of_data(5),
             button: QueueButton::of_data(2),
         })
     );
@@ -709,8 +719,8 @@ fn queue_and_research_keep_their_fields() {
             building: Some(object_id(90)),
             count: 1,
             buildings: object_ids([90]),
-            tech: genie_core::technology::TechId::of_data(22),
-            queue_id: genie_core::commands::QueueId::of_data(-1),
+            tech: TechId::of_data(22),
+            queue_id: QueueId::of_data(-1),
             shift: true,
         })
     );
@@ -851,8 +861,8 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Trade(TradeCommand {
                 player: player_id(2),
-                attribute: genie_core::commands::ResourceWord::of_data(1),
-                times: genie_core::commands::TradeLots::of_data(2),
+                attribute: ResourceWord::of_data(1),
+                times: TradeLots::of_data(2),
                 market: Some(object_id(96)),
                 buy: true,
             }),
@@ -868,8 +878,8 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Trade(TradeCommand {
                 player: player_id(2),
-                attribute: genie_core::commands::ResourceWord::of_data(0x0102),
-                times: genie_core::commands::TradeLots::of_data(1),
+                attribute: ResourceWord::of_data(0x0102),
+                times: TradeLots::of_data(1),
                 market: Some(object_id(97)),
                 buy: false,
             }),
@@ -888,7 +898,7 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Game(GameCommand {
                 issuer: player_id(2),
-                sub: genie_core::commands::GameSub::SPEED,
+                sub: GameSub::SPEED,
                 player: 3,
                 a: -1,
                 speed: 1.7,
@@ -923,9 +933,9 @@ fn tribute_keeps_its_four_gifts() {
     .encode()
     .unwrap();
     let gift = |attribute, amount, fee| Gift {
-        attribute: genie_core::commands::ResourceWord::of_data(attribute),
+        attribute: ResourceWord::of_data(attribute),
         amount,
-        fee: genie_core::players::TributeFee::of_data(fee),
+        fee: TributeFee::of_data(fee),
     };
     assert_eq!(
         round_trip(&tribute),

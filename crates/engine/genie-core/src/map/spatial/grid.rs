@@ -3,14 +3,18 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
+use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::{
     Placed, QUERY_HITS, RecordId, Spatial, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
+use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionType;
 use crate::players::PlayerId;
+use crate::players::{NO_RELATIONS, PlayerSet};
+use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::index::ObjectsRef;
 
 /// A walk's obstruction query ([`Spatial::walk_hits`]'s arguments).
@@ -186,12 +190,12 @@ impl Spatial {
     /// a tile's edge (`RGE_Static_Object::new_position`, `0x1411a58b0`).
     /// Player `player`'s scout map, once made (`player+0x1370`).
     #[must_use]
-    pub fn scout_map(&self, player: PlayerId) -> Option<&crate::movement::explore::InfluenceMap> {
+    pub fn scout_map(&self, player: PlayerId) -> Option<&InfluenceMap> {
         self.scout_maps.get(&player)
     }
 
     /// Player `player`'s scout map becomes `map` (the old one goes).
-    pub fn set_scout_map(&mut self, player: PlayerId, map: crate::movement::explore::InfluenceMap) {
+    pub fn set_scout_map(&mut self, player: PlayerId, map: InfluenceMap) {
         let _ = self.scout_maps.insert(player, map);
     }
 
@@ -210,22 +214,17 @@ impl Spatial {
 
     /// The players `from` counts as allies ([`Spatial::allied_with`]), of the 32 a set holds.
     #[must_use]
-    pub fn allies_of(&self, from: PlayerId) -> crate::players::PlayerSet {
+    pub fn allies_of(&self, from: PlayerId) -> PlayerSet {
         PlayerId::each(32)
             .filter(|&to| self.allied(from, to))
-            .fold(crate::players::PlayerSet::NONE, |set, to| {
-                set | crate::players::PlayerSet::of(to)
-            })
+            .fold(PlayerSet::NONE, |set, to| set | PlayerSet::of(to))
     }
 
     /// `FUN_141663dc0` with the ally flag: `to` counts for `from` when it is `from`, or `from`
     /// stands to it in relation 0 or 4; Gaia counts for no one else.
     pub(super) fn allied(&self, from: PlayerId, to: PlayerId) -> bool {
-        let relations = self
-            .relations
-            .get(from)
-            .unwrap_or(&crate::players::NO_RELATIONS);
-        crate::unit_ai::task_finder::allied(relations, from, to, true)
+        let relations = self.relations.get(from).unwrap_or(&NO_RELATIONS);
+        task_finder_allied(relations, from, to, true)
     }
 
     /// `FUN_1410562e0` on the obstruction manager: its ignore list becomes `ids` (none for an
@@ -353,7 +352,7 @@ impl Spatial {
         from: Point,
         to: Point,
         grow: Distance,
-        mask: Option<crate::map::TerrainMask>,
+        mask: Option<TerrainMask>,
         ignore: &[RecordId],
     ) -> Result<Vec<RecordId>, GenieError> {
         self.set_manager_ignore(ignore);

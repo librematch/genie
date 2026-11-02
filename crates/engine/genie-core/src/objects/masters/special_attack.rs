@@ -1,5 +1,7 @@
 //! A master's special attack (`+0x8d8`): what a hit on its objects or their charge does.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's special attack (`special_attack_flag`, `+0x8d8`), as a hit on its object reads it
 /// (`FUN_1412108e0`). Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -28,8 +30,8 @@ impl SpecialAttack {
     }
 }
 
-impl std::fmt::Display for SpecialAttack {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for SpecialAttack {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

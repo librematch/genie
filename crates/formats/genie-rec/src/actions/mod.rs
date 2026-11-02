@@ -33,6 +33,7 @@ pub use self::tasks::{
     RepairCommand, SellResourceCommand, SetGatherPointCommand, UngarrisonCommand, UnitOrderCommand,
     Unknown7fCommand,
 };
+use std::io::{copy, sink};
 
 /// A location with an X and Y coordinate.
 pub type Location2 = (f32, f32);
@@ -248,7 +249,7 @@ impl Command {
             read_building_command(id, &mut cursor)
         };
         // Consume any excess bytes; how many there were does not matter.
-        let _ = std::io::copy(&mut cursor, &mut std::io::sink())?;
+        let _ = copy(&mut cursor, &mut sink())?;
 
         let _world_time = input.read_u32::<LE>()?;
         command

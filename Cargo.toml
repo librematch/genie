@@ -166,6 +166,10 @@ match_same_arms = "warn"
 semicolon_if_nothing_returned = "warn"
 trivially_copy_pass_by_ref = "warn"
 module_name_repetitions = "allow"
+# C-CASE (CODING_STYLE.md section 3): an acronym is one word in a type's or variant's name
+upper_case_acronyms = "warn"
+# an item comes in with a `use` of its path from the crate root, never by its whole path
+absolute_paths = "deny"
 
 [workspace.lints.rustdoc]
 # We run rustdoc with `--document-private-items` so we can document private items

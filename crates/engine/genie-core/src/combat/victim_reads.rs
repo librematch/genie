@@ -1,22 +1,27 @@
 //! What a hit reads of its victim: the object's values and its relations to the attacker.
 
+use crate::combat::abilities::REMOVAL_REWARD;
 use crate::combat::damage::Allied;
+use crate::combat::damage::{Armored, Attacker, BONUS_DAMAGE, Building as DamageBuilding};
 use crate::combat::damage::{ElevationBonus, Victim};
 use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
+use crate::map::terrain::Terrain;
 use crate::objects::HitPoints;
 use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
+use crate::objects::masters::action_type::LOOT;
 use crate::objects::masters::master_type::{BUILDING, RGE_COMBAT};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
+use crate::world::{Mode680, Unread};
 
 /// What a hit of an attacker of player `attacker` reads of the object `u` of player `p`, of
 /// `master`, its player's `attributes` ([`victim_of`]): its relations to the attacker's player
@@ -30,12 +35,12 @@ pub(crate) fn victim_in(
         &Building,
         &Combat,
         &Action,
-        Option<&crate::world::Unread>,
+        Option<&Unread>,
     ),
     (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
-    mode_680: crate::world::Mode680,
+    mode_680: Mode680,
 ) -> Victim {
     let mut v = victim_of(
         (u, unit_ai, building, combat, actions, unread),
@@ -68,13 +73,13 @@ pub(crate) fn victim_of(
         &Building,
         &Combat,
         &Action,
-        Option<&crate::world::Unread>,
+        Option<&Unread>,
     ),
     master: &Master,
     attributes: &[Amount],
     p: PlayerId,
-    terrain: Option<&crate::map::terrain::Terrain>,
-    mode_680: crate::world::Mode680,
+    terrain: Option<&Terrain>,
+    mode_680: Mode680,
 ) -> Victim {
     let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
     let kind = master.kind;
@@ -126,7 +131,7 @@ pub(crate) fn victim_of(
         allied: Allied::NONE,
         uncertain: false,
         inside: u.life.inside.is_some(),
-        source: crate::combat::damage::Attacker {
+        source: Attacker {
             id: u.id,
             kind,
             class: master.class,
@@ -146,7 +151,7 @@ pub(crate) fn victim_of(
             attack_powerup: combat.attack_powerup,
             mode_680,
             player: p,
-            kill_bonus_tasks: tasks(crate::objects::masters::action_type::LOOT),
+            kill_bonus_tasks: tasks(LOOT),
             // a missile's own (its part): its own strike sets it ([`Unit::own_strike`])
             fired_from: None,
         },
@@ -155,11 +160,11 @@ pub(crate) fn victim_of(
         bonus_tasks: master
             .tasks
             .iter()
-            .filter(|t| t.action_type == crate::combat::damage::BONUS_DAMAGE)
+            .filter(|t| t.action_type == BONUS_DAMAGE)
             .copied()
             .collect(),
         // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)
-        armored: (RGE_COMBAT <= kind).then(|| crate::combat::damage::Armored {
+        armored: (RGE_COMBAT <= kind).then(|| Armored {
             armors: master.armors.clone(),
             base_armor: master.base_armor,
             terrain_bonus: master.terrain_bonus,
@@ -174,10 +179,10 @@ pub(crate) fn victim_of(
             armor_powerups: combat.armor_powerups,
             armor_removed: combat.armor_removed,
             hp_powerup: combat.hp_powerup,
-            kill_tasks: master.tasks.iter().any(|t| {
-                t.action_type == crate::combat::abilities::REMOVAL_REWARD
-                    && 1e-7 < t.work_val1.get()
-            }),
+            kill_tasks: master
+                .tasks
+                .iter()
+                .any(|t| t.action_type == REMOVAL_REWARD && 1e-7 < t.work_val1.get()),
             busy: actions.top_action_kind().is_some() || unread.is_some(),
             unit_ai,
             alert_idle: None,
@@ -186,7 +191,7 @@ pub(crate) fn victim_of(
         damaged: Vec::new(),
         killed: None,
         // a building's slot 0xe8 is FUN_1411cea90
-        building: (kind == BUILDING).then(|| crate::combat::damage::Building {
+        building: (kind == BUILDING).then(|| DamageBuilding {
             main: building.annex_of,
             // the caller's, which holds the world's annex links
             annexes: Vec::new(),

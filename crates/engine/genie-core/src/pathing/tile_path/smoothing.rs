@@ -3,19 +3,23 @@
 
 use crate::map::Distance;
 use crate::map::Point;
+use crate::math::conversions::cvttss2si;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
+use crate::math::image::tile_path::{
+    SHORTCUT_REACH as TILE_PATH_SHORTCUT_REACH, SMOOTH_STEP as TILE_PATH_SMOOTH_STEP,
+    TILE_SEARCH_LENGTH as TILE_PATH_TILE_SEARCH_LENGTH,
+};
 use crate::pathing::tile_path::Path;
 
 /// The longest step between the points the smoothing puts on a straight stretch
 /// (`DAT_142f430e8`).
-pub(super) const SMOOTH_STEP: f32 = crate::math::image::tile_path::SMOOTH_STEP;
+pub(super) const SMOOTH_STEP: f32 = TILE_PATH_SMOOTH_STEP;
 /// The level-0 search runs only for paths shorter than this (`DAT_142f430ec`).
-pub(super) const TILE_SEARCH_LENGTH: Distance =
-    Distance::new(crate::math::image::tile_path::TILE_SEARCH_LENGTH);
+pub(super) const TILE_SEARCH_LENGTH: Distance = Distance::new(TILE_PATH_TILE_SEARCH_LENGTH);
 /// The squared distance from the start within which the planner looks for a shorter first
 /// stretch (`DAT_14330ebcc`).
-pub(super) const SHORTCUT_REACH: f32 = crate::math::image::tile_path::SHORTCUT_REACH;
+pub(super) const SHORTCUT_REACH: f32 = TILE_PATH_SHORTCUT_REACH;
 
 /// The obstruction manager as the smoothing asks it for a unit (`FUN_140f7dbb0`).
 pub trait SegmentTest<E> {
@@ -52,7 +56,7 @@ pub(super) fn straighten(path: &mut Path, first: i32, last: i32) -> i32 {
     let a = point_at(path, first);
     let d = fmath::sub(point_at(path, last), a);
     let length = fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
-    let steps = crate::math::conversions::cvttss2si(length / SMOOTH_STEP);
+    let steps = cvttss2si(length / SMOOTH_STEP);
     let fewer = between - steps;
     let at = (first + 1) as usize;
     if fewer < 0 {

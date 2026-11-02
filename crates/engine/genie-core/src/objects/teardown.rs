@@ -3,15 +3,19 @@
 
 use crate::GenieError;
 use crate::combat::missile::ShooterId;
+use crate::construction::FoundationId;
 use crate::garrison::ContainerId;
 use crate::gathering::DropSiteId;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::actions::{Action, ActionList};
 use crate::objects::layers::MotionMut;
 use crate::objects::release::Releaser;
+use crate::objects::unit::Unit;
+use crate::world::lets::torn_down;
 use crate::world::step::Step;
 
 /// What an action's destructor leaves its unit's world: the targets it lets go (slot 0x180),
@@ -26,7 +30,7 @@ pub(crate) struct TornDown {
 
 impl TornDown {
     /// `target` let go, unless it is none (−1).
-    fn release(&mut self, target: impl crate::objects::ObjectKey) {
+    fn release(&mut self, target: impl ObjectKey) {
         if let Some(target) = target.key() {
             self.releases.push(target);
         }
@@ -41,11 +45,11 @@ impl TornDown {
     pub(crate) fn let_go(
         self,
         c: &mut Step<'_>,
-        me: &mut crate::objects::unit::Unit,
+        me: &mut Unit,
         by: Releaser,
     ) -> Result<(), GenieError> {
         let releases = self.releases.into_iter().map(|t| (t, by)).collect();
-        crate::world::lets::torn_down(c, me, (self.builder_leaves, releases))
+        torn_down(c, me, (self.builder_leaves, releases))
     }
 }
 
@@ -99,7 +103,7 @@ impl Action {
                 {
                     torn.builder_leaves.push(target.id());
                 }
-                torn.release(b.target.map(crate::construction::FoundationId::id));
+                torn.release(b.target.map(FoundationId::id));
                 torn.release(b.site.map(DropSiteId::id));
                 stop_if_moving(motion, b.state.move_to().is_some())?;
             }
@@ -222,21 +226,33 @@ impl ActionList {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::construction::build::BuildState;
+    #[cfg(test)]
+    use crate::construction::build::tests::started;
     use crate::construction::build::{BuildAction, BuildTask};
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
     use crate::map::Distance;
     use crate::map::Position;
     use crate::math::fmath::BVector;
+    #[cfg(test)]
+    use crate::movement::Velocity;
+    #[cfg(test)]
+    use crate::movement::move_to::MoveTo;
     use crate::movement::move_to::MoveToAction;
     use crate::objects::UpdateCode;
     use crate::objects::WorkRate;
     use crate::objects::layers::Motion;
     use crate::objects::masters::TaskId;
+    #[cfg(test)]
+    use crate::objects::masters::WorkValue;
     use crate::test_ids::object_id;
 
     /// A moving object's motion layer, moving (its velocity and animation speed set).
     fn moving() -> Motion {
-        let mut m = crate::gathering::hunt::tests::walker();
-        m.velocity = Some(crate::movement::Velocity {
+        let mut m = walker();
+        m.velocity = Some(Velocity {
             velocity: BVector::new(0.0, 0.0, 0.7),
             acceleration: BVector::new(0.0, 0.0, 1.0),
         });
@@ -249,13 +265,13 @@ mod tests {
     fn build() -> BuildAction {
         let task = BuildTask {
             range: Distance::ZERO,
-            work_value: crate::objects::masters::WorkValue::new(1.0),
+            work_value: WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,
         };
-        crate::construction::build::tests::started(
+        started(
             object_id(10028),
             Position::new(30.0, 88.0, 0.0),
             Distance::ZERO,
@@ -290,10 +306,8 @@ mod tests {
         let mut b = build();
         (b.added, b.state) = (
             true,
-            crate::construction::build::BuildState::Move {
-                move_to: Some(MoveToAction::sub_in(
-                    crate::movement::move_to::MoveTo::Moving,
-                )),
+            BuildState::Move {
+                move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
             },
         );
         let torn = Action::Build(b).tear_down(motion.lent()).unwrap();
@@ -307,7 +321,7 @@ mod tests {
         assert!(!moves(&motion));
         (b.added, b.state, b.site) = (
             false,
-            crate::construction::build::BuildState::Move { move_to: None },
+            BuildState::Move { move_to: None },
             Some(DropSiteId::new(object_id(10050))),
         );
         let torn = Action::Build(b).tear_down(moving().lent()).unwrap();

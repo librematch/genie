@@ -54,16 +54,22 @@ pub(crate) use self::sprites::{asked_drop_off, resource_kind, stand_sprite};
 pub use self::start::{HuntMove, HuntRetarget, HuntStart, PointWalk, PointWalker};
 #[cfg(test)]
 use crate::combat::damage::Victim;
+use crate::gathering::{DropSiteId, HuntTargetId};
+use crate::math::image::hunt::{
+    GAP as HUNT_GAP, HERD_REACH as HUNT_HERD_REACH, LAST_BIT as HUNT_LAST_BIT,
+    OWN_LIVESTOCK_RANGE as HUNT_OWN_LIVESTOCK_RANGE, REMAINDER as HUNT_REMAINDER,
+};
 #[cfg(test)]
 use crate::movement::Mover;
 pub use crate::movement::move_to::Shown;
+use crate::objects::masters::WorkValue;
 
 /// The Hunt action's type, which word 9 adds.
 pub const HUNT: ActionType = ActionType::named(110);
 
 /// Own livestock farther than this squared from its drop site is led there first
 /// (`DAT_142ecccc4`).
-const HERD_REACH: DistanceSquared = DistanceSquared::new(crate::math::image::hunt::HERD_REACH);
+const HERD_REACH: DistanceSquared = DistanceSquared::new(HUNT_HERD_REACH);
 /// Own livestock this far squared from its drop site or farther is slaughtered where it stands
 /// (`DAT_142eb0f64`).
 const HERD_FAR: DistanceSquared = DistanceSquared::new(900.0);
@@ -73,23 +79,23 @@ const LEAD_REACH: DistanceSquared = DistanceSquared::new(2.25);
 /// The wait of a herder leading livestock (`set_state(10)`'s timer, `0xbf800000`).
 const LEAD_WAIT: Seconds = Seconds::new(-1.0);
 /// A face on dead livestock beyond the task's range plus this walks again (`DAT_142eb5690`).
-const GAP: f32 = crate::math::image::hunt::GAP;
+const GAP: f32 = HUNT_GAP;
 /// Below this a target's or a load's remainder counts as nothing (`DAT_142eb5690`).
-const REMAINDER: Amount = Amount::new(crate::math::image::hunt::REMAINDER);
+const REMAINDER: Amount = Amount::new(HUNT_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).
-const LAST_BIT: f32 = crate::math::image::hunt::LAST_BIT;
+const LAST_BIT: f32 = HUNT_LAST_BIT;
 /// A task whose `attribute_type4` is this (`0x124`) stops its target's decay under player
 /// attribute 292 (`FUN_140ac44b0`).
 const DECAY_TASK: AttributeId = AttributeId::numbered(0x124);
 
 /// The range of the walk to the hunter's own player's livestock (`DAT_142eb4838`).
-const OWN_LIVESTOCK_RANGE: f32 = crate::math::image::hunt::OWN_LIVESTOCK_RANGE;
+const OWN_LIVESTOCK_RANGE: f32 = HUNT_OWN_LIVESTOCK_RANGE;
 
 /// The Hunt action of a gatherer (`TRIBE_Action_Hunt`, type 110).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct HuntAction {
     /// The target object (`+0x20`, its id at `+0x30`).
-    pub target: Option<crate::gathering::HuntTargetId>,
+    pub target: Option<HuntTargetId>,
     /// The action state (`+0x18`), which word 9 adds, with its sub-action: the walks' quiet
     /// `MoveTo` and the attack's Attack ([`HuntState`]).
     pub state: HuntState,
@@ -100,10 +106,10 @@ pub struct HuntAction {
     /// `+0x48`: its task.
     pub task: HuntTask,
     /// `+0x70`: the drop site its own livestock is led to, none yet.
-    pub drop_site: Option<crate::gathering::DropSiteId>,
+    pub drop_site: Option<DropSiteId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
-    pub carry_to: Option<crate::gathering::DropSiteId>,
+    pub carry_to: Option<DropSiteId>,
     /// `+0x44`: the state's timer (state 8 waits with it below 0 before it tries again).
     pub timer: Seconds,
     /// What it keeps of the livestock it leads to its drop site.
@@ -149,7 +155,7 @@ pub struct Herd {
     pub own: bool,
     /// For its own livestock, the drop site (the hunt's, else the nearest that takes livestock,
     /// `FUN_1411671e0`) and the gap between it and the target squared (`FUN_14118f8c0`).
-    pub drop_site: Option<(crate::gathering::DropSiteId, DistanceSquared)>,
+    pub drop_site: Option<(DropSiteId, DistanceSquared)>,
     /// The Attack `set_state(12)` starts.
     pub engagement: Engagement,
     /// The Attack's sprites and frames.
@@ -176,7 +182,7 @@ pub struct HuntTask {
     /// Its moving, proceeding, working and carrying sprites (`+0x40`..`+0x58`).
     pub sprites: TaskSprites,
     /// `+0x28`, `work_val1`: what one work gathers per second and work rate.
-    pub work_value: crate::objects::masters::WorkValue,
+    pub work_value: WorkValue,
     /// `+0x22`, `attribute_type2`: the player's attribute that scales the gathering, -1 none.
     pub productivity: Option<AttributeId>,
     /// `+0x26`, `attribute_type4`.

@@ -4,11 +4,15 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
+use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::{QUERY_HITS, RecordId, Spatial};
 use crate::map::{Rect, Segment};
+use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
+use crate::pathing::tile_path::SegmentTest;
+use crate::world::index::ObjectsRef;
 
 /// A record a pather query met (an entry of `FUN_141051900`'s list): an object's, a temporary
 /// tile record's or a map edge's ([`RecordId`]), with its box (`+0x20`..`+0x2c`).
@@ -49,8 +53,8 @@ impl Spatial {
         a: Point,
         b: Point,
         buffer: Option<Distance>,
-        mask: crate::map::TerrainMask,
-        (ignore, by_id): (&[RecordId], crate::world::index::ObjectsRef<'_>),
+        mask: TerrainMask,
+        (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
         first: bool,
     ) -> Result<Vec<Hit>, GenieError> {
         const MOST_HITS: usize = 25;
@@ -134,9 +138,9 @@ impl Spatial {
         a: Point,
         b: Point,
         buffer: Option<Distance>,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         ignore: &[RecordId],
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         Ok(!self
             .pather_query(a, b, buffer, mask, (ignore, by_id), true)?
@@ -150,9 +154,9 @@ impl Spatial {
         a: Point,
         b: Point,
         buffer: Option<Distance>,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         ignore: &[RecordId],
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Vec<Hit>, GenieError> {
         self.pather_query(a, b, buffer, mask, (ignore, by_id), false)
     }
@@ -241,7 +245,7 @@ pub(super) fn ccw(p0: Point, p1: Point, p2: Point) -> i32 {
 pub struct SmoothingWalls<'a> {
     pub(super) world: &'a mut Spatial,
     pub(super) radius: Distance,
-    pub(super) mask: crate::map::TerrainMask,
+    pub(super) mask: TerrainMask,
     pub(super) ignore: &'a [RecordId],
     /// Whether a walk was tested.
     pub ran: bool,
@@ -254,7 +258,7 @@ impl<'a> SmoothingWalls<'a> {
     pub const fn new(
         world: &'a mut Spatial,
         radius: Distance,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         ignore: &'a [RecordId],
     ) -> Self {
         Self {
@@ -267,7 +271,7 @@ impl<'a> SmoothingWalls<'a> {
     }
 }
 
-impl<E> crate::pathing::tile_path::SegmentTest<E> for SmoothingWalls<'_> {
+impl<E> SegmentTest<E> for SmoothingWalls<'_> {
     fn blocked(&mut self, a: Point, b: Point) -> Result<bool, E> {
         self.ran = true;
         // the pass's buffer, the unit's radius (FUN_1410562d0 with 1)
@@ -383,10 +387,10 @@ pub(super) fn segment_meets_box(b: Rect, r: f32, walk: Segment, inside: Rect) ->
     // COMISS/JC (0x141052fb8..0x141052ff9, 0x1410530dc..0x141053119; 0x1410514ad..0x141051620,
     // 0x14105189e..0x1410518f2): a NaN coordinate is out
     let outside = |p: Point| {
-        crate::math::fmath::below_or_unordered(p.x(), lo_x - r)
-            || crate::math::fmath::below_or_unordered(r + hi_x, p.x())
-            || crate::math::fmath::below_or_unordered(p.y(), lo_y - r)
-            || crate::math::fmath::below_or_unordered(r + hi_y, p.y())
+        below_or_unordered(p.x(), lo_x - r)
+            || below_or_unordered(r + hi_x, p.x())
+            || below_or_unordered(p.y(), lo_y - r)
+            || below_or_unordered(r + hi_y, p.y())
     };
     !(outside(start) && outside(end))
 }

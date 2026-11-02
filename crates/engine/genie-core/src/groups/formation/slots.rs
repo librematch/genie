@@ -14,6 +14,8 @@ use crate::world::slots::CheckedIndex;
 /// A line order that lacks a place up to the list's length: the game reads past the order.
 const NO_PLACE_IN_ORDER: GenieError =
     GenieError::unreachable("a line order that lacks a place up to the list's length");
+use crate::groups::WorldObject;
+use crate::math::fmath::sqrt;
 use crate::math::fmath::{BVector, sub};
 use crate::math::image::group::FARTHEST;
 use crate::world::World;
@@ -48,7 +50,7 @@ impl World {
     /// An object of a master the slice does not have.
     pub(crate) fn unit_category(
         &self,
-        object: Option<crate::groups::WorldObject<'_>>,
+        object: Option<WorldObject<'_>>,
     ) -> Result<FormationCategory, GenieError> {
         let Some(object) = object else {
             return Ok(FormationCategory::ANY);
@@ -112,9 +114,7 @@ impl World {
         let object = self.world_object(id)?;
         let mut d = sub(at, object.moved_vector());
         d = d.with_height(0.0);
-        Some(Distance::new(crate::math::fmath::sqrt(
-            d.x() * d.x() + 0.0 + d.y() * d.y(),
-        )))
+        Some(Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())))
     }
 
     /// `FUN_141009760` of `formation` for group `g` without the settings' flag `DAT_143f01834`

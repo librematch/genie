@@ -1,6 +1,9 @@
 //! A distance on the map in tiles ([`Distance`]) and its square ([`DistanceSquared`]), each
 //! with the game's `f32` operations.
 
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+
 /// A distance on the map in tiles as the game's `f32` holds it: a master's range, minimum range,
 /// work range, search radius and line of sight, a reach, a gap between two footprints, a group's
 /// ranges. Each operator is the one `f32` operation the game does, in its order; a comparison is
@@ -33,7 +36,7 @@ impl Distance {
     }
 }
 
-impl std::ops::Add for Distance {
+impl Add for Distance {
     type Output = Self;
 
     /// The `f32` sum.
@@ -42,7 +45,7 @@ impl std::ops::Add for Distance {
     }
 }
 
-impl std::ops::Sub for Distance {
+impl Sub for Distance {
     type Output = Self;
 
     /// The `f32` difference.
@@ -51,21 +54,21 @@ impl std::ops::Sub for Distance {
     }
 }
 
-impl std::ops::AddAssign for Distance {
+impl AddAssign for Distance {
     /// The `f32` sum in place.
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::SubAssign for Distance {
+impl SubAssign for Distance {
     /// The `f32` difference in place.
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }
 
-impl std::ops::Neg for Distance {
+impl Neg for Distance {
     type Output = Self;
 
     /// The distance negated (its sign bit flipped).
@@ -74,7 +77,7 @@ impl std::ops::Neg for Distance {
     }
 }
 
-impl std::ops::Mul<f32> for Distance {
+impl Mul<f32> for Distance {
     type Output = Self;
 
     /// The distance scaled by `f` (one `f32` product, the distance first).
@@ -83,7 +86,7 @@ impl std::ops::Mul<f32> for Distance {
     }
 }
 
-impl std::ops::Mul<Distance> for f32 {
+impl Mul<Distance> for f32 {
     type Output = Distance;
 
     /// The distance scaled by `self` (one `f32` product, the factor first).
@@ -92,7 +95,7 @@ impl std::ops::Mul<Distance> for f32 {
     }
 }
 
-impl std::ops::MulAssign<f32> for Distance {
+impl MulAssign<f32> for Distance {
     /// The distance scaled by `f` in place (one `f32` product, the distance first: a master's
     /// range times a technology's factor).
     fn mul_assign(&mut self, f: f32) {
@@ -100,7 +103,7 @@ impl std::ops::MulAssign<f32> for Distance {
     }
 }
 
-impl std::ops::Div<f32> for Distance {
+impl Div<f32> for Distance {
     type Output = Self;
 
     /// The distance divided by `f` (one `f32` quotient).
@@ -109,7 +112,7 @@ impl std::ops::Div<f32> for Distance {
     }
 }
 
-impl std::ops::Div for Distance {
+impl Div for Distance {
     type Output = f32;
 
     /// The ratio of two distances (one `f32` quotient).
@@ -118,8 +121,8 @@ impl std::ops::Div for Distance {
     }
 }
 
-impl std::fmt::Display for Distance {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Distance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
@@ -185,8 +188,8 @@ impl DistanceSquared {
     }
 }
 
-impl std::fmt::Display for DistanceSquared {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for DistanceSquared {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

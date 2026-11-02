@@ -1,5 +1,7 @@
 //! A master's hill mode (`+0x604`): how much its site's tiles may differ in height.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's hill mode (`+0x604`, the `.dat`'s `hill_mode`): which tiles a site of it may stand on
 /// in the placement test ([`crate::production::spawn`]'s hill test, `FUN_141123f80`). Every byte
 /// is kept; one not named takes any tile.
@@ -30,8 +32,8 @@ impl HillMode {
     }
 }
 
-impl std::fmt::Display for HillMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for HillMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

@@ -17,6 +17,7 @@ use crate::map::Point;
 use crate::math::fmath;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::math::image::group::{CHASING_SLACK, CLOSE, CONTACT_SLACK, FARTHEST, RANGED_SLACK};
+use crate::movement::Mover;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -233,10 +234,7 @@ impl World {
             .ok_or_else(|| member_gone(target))?;
         let master = self.master(t.player(), t.master_id())?;
         let moves = match t {
-            WorldObject::Unit(_, u, _) => self
-                .parts
-                .mover_of(u.id)
-                .is_some_and(crate::movement::Mover::is_moving),
+            WorldObject::Unit(_, u, _) => self.parts.mover_of(u.id).is_some_and(Mover::is_moving),
             WorldObject::Ghost(..) => false,
         };
         let outranged =

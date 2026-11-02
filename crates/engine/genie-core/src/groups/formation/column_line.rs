@@ -12,6 +12,7 @@ use crate::groups::layout::{clear_line, reset_line};
 use crate::groups::{Formation, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
+use crate::math::fmath::sqrt;
 use crate::math::fmath::{BVector, add, scale, sub};
 use crate::world::World;
 use crate::world::WorldTime;
@@ -35,7 +36,7 @@ pub(super) struct Category {
 /// the columns (a column's), then fewer lines until a line is at least twice as wide as the
 /// formation is deep (a column the reverse). Returns (lines, columns).
 pub(super) fn sizes(count: i32, by_line: bool) -> (i32, i32) {
-    let root = cvttss2si(crate::math::fmath::sqrt(count as f32).ceil());
+    let root = cvttss2si(sqrt(count as f32).ceil());
     let root = root.max(1);
     let per = |a: i32| {
         let b = count / a;

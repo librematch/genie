@@ -1,5 +1,7 @@
 //! A master's fog visibility (`+0x605`): whether its objects show in the fog of war.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's fog visibility (`+0x605`, the `.dat`'s `fog_visibility`; openage's names): an Attack
 /// goes on against an object of any but [`FogVisibility::INVISIBLE`] in the fog. Every byte is
 /// kept.
@@ -31,8 +33,8 @@ impl FogVisibility {
     }
 }
 
-impl std::fmt::Display for FogVisibility {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for FogVisibility {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

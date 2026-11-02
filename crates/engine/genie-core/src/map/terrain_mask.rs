@@ -1,5 +1,7 @@
 //! The terrain classes an object may stand on, as the obstruction manager's tile words test them.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// The terrain classes an object may stand on (its terrain restriction's, `FUN_141054630`'s
 /// table): a bit per class of the obstruction manager's tile word, whose low byte holds the
 /// tile's class ([`crate::map::terrain::terrain_class`]); bit 7 of the word is a temporary
@@ -46,8 +48,8 @@ impl TerrainMask {
     }
 }
 
-impl std::fmt::Display for TerrainMask {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TerrainMask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{:#04x}", self.0)
     }
 }

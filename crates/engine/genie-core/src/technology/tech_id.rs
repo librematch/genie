@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A technology's id (the `.dat`'s technology index, the place in a player's technologies), 0
 /// or more. A field that holds −1 for none holds `Option<TechId>` ([`TechId::of_field`]).
@@ -76,8 +77,8 @@ impl TechId {
     }
 }
 
-impl std::fmt::Display for TechId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TechId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

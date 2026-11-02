@@ -10,6 +10,7 @@ use crate::math::fmath;
 use crate::math::fmath::BVector;
 use crate::movement::LevelFlags;
 use crate::movement::PathData;
+use crate::movement::WaypointIndex;
 use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
@@ -45,7 +46,7 @@ pub(super) fn reset_level(paths: &mut Vec<PathData>) -> Result<(), GenieError> {
 }
 
 /// The waypoint at `index` (`FUN_140f9bcd0`), the game's static zero point outside the path.
-pub(super) fn point(level: &PathData, index: crate::movement::WaypointIndex) -> BVector {
+pub(super) fn point(level: &PathData, index: WaypointIndex) -> BVector {
     index
         .slot()
         .and_then(|i| level.points.get(i))

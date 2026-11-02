@@ -3,6 +3,7 @@ use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{DecodeStringError, ReadStringError, ReadStringsExt, write_i32_str};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
+use std::result::Result as StdResult;
 
 /// The error code of an AI script that failed to compile, as the game's AI rule parser reports it.
 #[derive(
@@ -75,7 +76,7 @@ pub struct AiErrorInfo {
     error_code: AiErrorCode,
 }
 
-fn parse_bytes(bytes: &[u8]) -> std::result::Result<String, ReadStringError> {
+fn parse_bytes(bytes: &[u8]) -> StdResult<String, ReadStringError> {
     let mut bytes = bytes.to_vec();
     if let Some(end) = bytes.iter().position(|&byte| byte == 0) {
         bytes.truncate(end);

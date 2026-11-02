@@ -2,12 +2,16 @@
 //! against every tier-1 recording of the corpus. Needs `GENIE_REC_CORPUS`; skips without it.
 
 use genie_rec::de;
+use genie_save::generated::world::RgeMasterStaticObject;
+use std::collections::BTreeMap;
+use std::env::var_os;
+use std::fs::{read, read_dir};
 use std::path::{Path, PathBuf};
 
 const FIXTURE: &str = include_str!("fixtures/marvinblue-426048731-header-offsets.txt");
 
 fn corpus() -> Option<PathBuf> {
-    std::env::var_os("GENIE_REC_CORPUS").map(PathBuf::from)
+    var_os("GENIE_REC_CORPUS").map(PathBuf::from)
 }
 
 /// The expected end offset of a named section.
@@ -51,7 +55,7 @@ fn expected_count(section: &str) -> usize {
 }
 
 fn header_of(path: &Path) -> Vec<u8> {
-    let data = std::fs::read(path).unwrap();
+    let data = read(path).unwrap();
     de::chapters(&data).unwrap()[0].inflate_header().unwrap()
 }
 
@@ -138,10 +142,7 @@ fn marvinblue_player_masters_are_found_by_id() {
         (332, 1751, -1)
     );
     // the empty town-centre annex, a building
-    assert_eq!(
-        static_part(890).map(genie_save::generated::world::RgeMasterStaticObject::id),
-        Some(890)
-    );
+    assert_eq!(static_part(890).map(RgeMasterStaticObject::id), Some(890));
     assert!(objects.master(i16::MAX).is_none());
 }
 
@@ -173,7 +174,7 @@ fn an_objects_own_master_is_its_static_master() {
 }
 
 fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).unwrap().map(Result::unwrap) {
+    for entry in read_dir(dir).unwrap().map(Result::unwrap) {
         let path = entry.path();
         if path.is_dir() {
             recordings(&path, out);
@@ -193,11 +194,11 @@ fn every_corpus_header_parses() {
     };
     let mut paths = Vec::new();
     recordings(&dir, &mut paths);
-    let mut tier1 = std::collections::BTreeMap::<String, usize>::new();
-    let mut others = std::collections::BTreeMap::<String, usize>::new();
+    let mut tier1 = BTreeMap::<String, usize>::new();
+    let mut others = BTreeMap::<String, usize>::new();
     let mut tier1_failures = Vec::new();
     for path in &paths {
-        let data = std::fs::read(path).unwrap();
+        let data = read(path).unwrap();
         let chapter = de::chapters(&data).unwrap()[0];
         let version = chapter.save_version().unwrap();
         let is_tier1 = (version.hundredths(), version.build) == (6660, 158_041);

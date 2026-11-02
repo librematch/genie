@@ -2,13 +2,16 @@
 //! and the world's victory check.
 
 use crate::GenieError;
+use crate::math::conversions::cvttss2si;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::game_status::VictoryState;
 use crate::players::game_status::{Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_AFTER_MS};
+use crate::players::history::EventKind;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::world::{GameMode, PlayState};
 
 impl World {
     /// The relations of players `a` and `b` each way (`player+0x260`).
@@ -28,7 +31,7 @@ impl World {
     /// under the conquest victory, the players still playing form one side with someone lost,
     /// or nobody plays. A player's `+0x8a`, which would count it lost, is not held (0).
     pub(crate) fn game_ended(&self) -> bool {
-        if self.game_state == crate::world::PlayState::OVER {
+        if self.game_state == PlayState::OVER {
             return true;
         }
         let mut count = Count::default();
@@ -87,7 +90,7 @@ impl World {
             // refresh (FUN_140c80bb0) is not held
             self.spatial.reveal_to(p);
         }
-        if self.settings.game_mode == crate::world::GameMode::BATTLE_ROYALE {
+        if self.settings.game_mode == GameMode::BATTLE_ROYALE {
             return Err(GenieError::unsupported(
                 "a status change in a battle royale (game mode 12)",
             ));
@@ -101,7 +104,7 @@ impl World {
             }
             if old != GameStatus::LOST
                 && self.players.player(p)?.fealty.names_player()
-                && self.game_state == crate::world::PlayState::PLAYING
+                && self.game_state == PlayState::PLAYING
             {
                 return Err(GenieError::unsupported(
                     "a defeated player's fealty (its resources and units given away)",
@@ -132,13 +135,13 @@ impl World {
                 .copied()
                 .unwrap_or(Amount::ZERO);
             if v > Amount::new(most as f32) {
-                most = crate::math::conversions::cvttss2si(v.get());
+                most = cvttss2si(v.get());
                 killer = i as u8;
             }
         }
         let now = self.world_time;
         self.players.player_mut(p)?.history.add_event(
-            crate::players::history::EventKind::DEFEAT,
+            EventKind::DEFEAT,
             f32::from(killer),
             most as f32,
             0,
@@ -194,7 +197,7 @@ impl World {
         } else {
             return Ok(());
         };
-        self.game_state = crate::world::PlayState::OVER;
+        self.game_state = PlayState::OVER;
         for i in PlayerId::each(self.players.len()).skip(1) {
             if self.players.player(i)?.game_status == GameStatus::PLAYING
                 && let Err(e) = self.set_status(i, outcome)

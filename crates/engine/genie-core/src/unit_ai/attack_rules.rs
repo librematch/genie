@@ -7,17 +7,26 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, maxss, powf, sqrt};
+use crate::math::image::unit_ai::{
+    DEFEND_PATROL_LEASH as UNIT_AI_DEFEND_PATROL_LEASH, FULL_FAITH as UNIT_AI_FULL_FAITH,
+    GAIA_TARGET_REACH as UNIT_AI_GAIA_TARGET_REACH, PATROL_FARTHEST as UNIT_AI_PATROL_FARTHEST,
+    STAND_GROUND_PATROL_LEASH as UNIT_AI_STAND_GROUND_PATROL_LEASH,
+};
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::Task;
+use crate::objects::masters::action_type::{CONVERT, PACK, UNPACK};
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
@@ -41,7 +50,7 @@ pub struct Converter<'a> {
     /// Its owner's attributes (`player+0x100`, count `+0x90`).
     pub attributes: &'a [Amount],
     /// Its master's tasks (`+0x788`).
-    pub tasks: &'a [crate::objects::masters::Task],
+    pub tasks: &'a [Task],
 }
 
 /// What the conversion test reads of the object: its owner, its master's class, id and hero
@@ -59,7 +68,7 @@ pub struct Convertee {
 }
 
 /// The faith a priest's conversion asks unless `any` (`DAT_14330ebcc`).
-pub(super) const FULL_FAITH: Amount = Amount::new(crate::math::image::unit_ai::FULL_FAITH);
+pub(super) const FULL_FAITH: Amount = Amount::new(UNIT_AI_FULL_FAITH);
 /// The town centres a priest never converts (109, 618 to 621), the relic cart's master 159, the
 /// farms and fish trap (50, 1187, 199).
 pub(super) const NEVER_CONVERTED: [MasterId; 9] = [
@@ -122,11 +131,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
         return false;
     }
     let mut task = None;
-    for k in p
-        .tasks
-        .iter()
-        .filter(|k| k.action_type == crate::objects::masters::action_type::CONVERT)
-    {
+    for k in p.tasks.iter().filter(|k| k.action_type == CONVERT) {
         if k.object_group.is_none() && k.object_id.is_none() {
             task = Some(k);
         }
@@ -138,7 +143,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
     if let Some(k) = task
         && let Some(i) = k.attribute_type4
         && let Some(&a) = p.attributes.get(i.index())
-        && crate::math::fmath::at_most_or_unordered(a.get(), 0.0)
+        && at_most_or_unordered(a.get(), 0.0)
     {
         return false;
     }
@@ -305,20 +310,18 @@ pub(super) const TREBUCHET_TARGETS: [ClassId; 7] = [
 pub(super) const SIEGE_BUILDING_MASTERS: [MasterId; 2] =
     [MasterId::named(1744), MasterId::named(1746)];
 /// A Gaia target lets the siege unit's range grow by this (`DAT_142eb4838`).
-pub(super) const GAIA_TARGET_REACH: Distance =
-    Distance::new(crate::math::image::unit_ai::GAIA_TARGET_REACH);
+pub(super) const GAIA_TARGET_REACH: Distance = Distance::new(UNIT_AI_GAIA_TARGET_REACH);
 /// The packed unit's class (51), which a human player's siege attack check passes over unless
 /// asked for any target.
 pub(super) const PACKED_UNIT_CLASS: ClassId = class::CLASS_51;
 
 /// The defend stance's leash from a saved patrol's path (`DAT_14330ebb8`, 5).
-pub(super) const DEFEND_PATROL_LEASH: Distance =
-    Distance::new(crate::math::image::unit_ai::DEFEND_PATROL_LEASH);
+pub(super) const DEFEND_PATROL_LEASH: Distance = Distance::new(UNIT_AI_DEFEND_PATROL_LEASH);
 /// Stand ground's leash from a saved patrol's path (`DAT_142e7f384`, 0.5).
 pub(super) const STAND_GROUND_PATROL_LEASH: Distance =
-    Distance::new(crate::math::image::unit_ai::STAND_GROUND_PATROL_LEASH);
+    Distance::new(UNIT_AI_STAND_GROUND_PATROL_LEASH);
 /// `FUN_140f95e10`'s first least distance (`DAT_14330ebf4`, the largest f32).
-pub(super) const PATROL_FARTHEST: f32 = crate::math::image::unit_ai::PATROL_FARTHEST;
+pub(super) const PATROL_FARTHEST: f32 = UNIT_AI_PATROL_FARTHEST;
 
 /// `FUN_14087e7c0`: the distance from `p` to the line through `a` and `b` (the cross product's
 /// length over the direction's, its squares divided before `sqrtf`, in the routine's order).
@@ -331,7 +334,7 @@ pub(super) fn line_distance(p: BVector, a: BVector, b: BVector) -> Distance {
     let c2 = pz * dx - px * dz;
     let cross = c2 * c2 + c1 * c1 + c3 * c3;
     let length = dy * dy + dx * dx + dz * dz;
-    Distance::new(crate::math::fmath::sqrt(cross / length))
+    Distance::new(sqrt(cross / length))
 }
 
 /// `FUN_140f95e10`: the least distance from `point` to the lines through a path's consecutive
@@ -357,9 +360,9 @@ pub(crate) fn patrol_distance(points: &[BVector], point: BVector) -> Result<Dist
 /// `FUN_14118faf0`: the gap from an object at `at` with radii `radius` to `point`: each axis's
 /// distance less the radius, `MAXSS` 0 (an unordered one is 0), then the length (`sqrtf`).
 pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point) -> Distance {
-    let gx = crate::math::fmath::maxss((point.x() - at.x()).abs() - radius.x(), 0.0);
-    let gy = crate::math::fmath::maxss((point.y() - at.y()).abs() - radius.y(), 0.0);
-    Distance::new(crate::math::fmath::sqrt(gy * gy + gx * gx))
+    let gx = maxss((point.x() - at.x()).abs() - radius.x(), 0.0);
+    let gy = maxss((point.y() - at.y()).abs() - radius.y(), 0.0);
+    Distance::new(sqrt(gy * gy + gx * gx))
 }
 
 /// The siege unit's attack check (slot 0xa0, `FUN_140c19190`) with `any` (its third argument):
@@ -402,13 +405,7 @@ pub fn siege_can_attack(
     if !me.player_type.is_computer() && !any && me.class == Some(PACKED_UNIT_CLASS) {
         return Ok(false);
     }
-    if matches!(
-        me.top_action,
-        Some(
-            crate::objects::masters::action_type::PACK
-                | crate::objects::masters::action_type::UNPACK
-        )
-    ) {
+    if matches!(me.top_action, Some(PACK | UNPACK)) {
         return Ok(false);
     }
     Ok(any || siege_chooses(me, s, t))
@@ -423,9 +420,7 @@ pub fn siege_can_attack(
 /// A defending unit's patrol range.
 pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool, GenieError> {
     // `powf` with 2 (`DAT_142e8c150`), y's first
-    let diagonal = crate::math::fmath::sqrt(
-        crate::math::fmath::powf(me.radius.y(), 2.0) + crate::math::fmath::powf(me.radius.x(), 2.0),
-    );
+    let diagonal = sqrt(powf(me.radius.y(), 2.0) + powf(me.radius.x(), 2.0));
     let gap = footprint_point_gap(t.position, t.radius, s.state_position) - Distance::new(diagonal);
     let mut range = me.range;
     if t.owner == PlayerId::GAIA {
@@ -434,7 +429,7 @@ pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
     match s.stance {
         UnitStance::STAND_GROUND
             if s.order != Some(OrderKind::Defend)
-                && !crate::math::fmath::at_most_or_unordered(gap.get(), range.get()) =>
+                && !at_most_or_unordered(gap.get(), range.get()) =>
         {
             Ok(false)
         }
@@ -443,7 +438,7 @@ pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
                 defend_patrol_range()?;
             }
             // `JA` rejects: an unordered gap passes
-            Ok(crate::math::fmath::at_most_or_unordered(
+            Ok(at_most_or_unordered(
                 gap.get(),
                 me.range.get() + DEFEND_GROWTH,
             ))
@@ -527,5 +522,5 @@ pub struct Attacked {
     /// The unit attacks the target.
     pub attacks: bool,
     /// The notifies posted, in order.
-    pub posted: Vec<(crate::unit_ai::NotifyKind, [i32; 3])>,
+    pub posted: Vec<(NotifyKind, [i32; 3])>,
 }

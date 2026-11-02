@@ -2,6 +2,7 @@
 //! the meeting point and the reach.
 
 use crate::GenieError;
+use crate::garrison::transport::TRANSPORT;
 use crate::garrison::{EnterAction, EnterTarget, NO_SPEED, WalkStart};
 use crate::map::Distance;
 use crate::map::GroundOffset;
@@ -10,25 +11,34 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::conversions::cvttss2si;
+use crate::math::image::garrison::{
+    ENTER_NEAR as GARRISON_ENTER_NEAR, HALF_TILE as GARRISON_HALF_TILE,
+};
 use crate::movement::MoveStats;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::footprint_gap_squared;
+use crate::movement::move_to::MOVE_TO;
+use crate::movement::{Planning, footprint_gap};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, Masters, class, player_master};
+use crate::objects::unit::Unit;
+use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, Zones};
+use crate::world::Unread;
+use crate::world::index::ObjectsRef;
 
 /// How near the point a transport must reach for an Enter (slot 0x3d8's range), and the range up
 /// to which an Enter's reach of a target with speed tests the tiles about the two
 /// (`FUN_140a85c30`): `DAT_14330eb8c`, 1.0.
-pub(super) const ENTER_NEAR: Distance = Distance::new(crate::math::image::garrison::ENTER_NEAR);
+pub(super) const ENTER_NEAR: Distance = Distance::new(GARRISON_ENTER_NEAR);
 /// Half a tile (`DAT_142e7f384`, 0.5): what an Enter's meeting point adds to a tile or to a
 /// place before `floorf` (`FUN_140a85f30`), and how far a target leaves its point before the
 /// Enter walks again (`FUN_140a7bd10`).
-pub(super) const HALF_TILE: f32 = crate::math::image::garrison::HALF_TILE;
+pub(super) const HALF_TILE: f32 = GARRISON_HALF_TILE;
 
 /// An Enter whose transport cannot reach where it meets the unit (`set_state(13)` in
 /// `set_state(4)`), which is not modelled.
@@ -157,7 +167,7 @@ pub fn walled_off(
     spatial: &mut Spatial,
     masters: &[Masters],
     (id, stats): (ObjectId, &MoveStats),
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
     let map = spatial.map;
     let (mx, my) = (cvttss2si(me.x()), cvttss2si(me.y()));
@@ -216,9 +226,9 @@ fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<us
 /// does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
     (t, target_actions, target_unread, target_mover): (
-        &crate::objects::unit::Unit,
+        &Unit,
         &Action,
-        Option<&crate::world::Unread>,
+        Option<&Unread>,
         Option<&Mover>,
     ),
     tm: &Master,
@@ -231,9 +241,9 @@ pub(crate) fn meeting_target(
         target_actions.top_action_kind(),
         target_actions.list.move_to().copied(),
     ) {
-        (Some(crate::movement::move_to::MOVE_TO), Some(m)) => Ok(m.point.ground()),
+        (Some(MOVE_TO), Some(m)) => Ok(m.point.ground()),
         // the Transport's point (+0x38, +0x3c), where it sails
-        (Some(crate::garrison::transport::TRANSPORT), _) => target_actions
+        (Some(TRANSPORT), _) => target_actions
             .list
             .transport()
             .map(|tr| tr.point.ground())
@@ -268,8 +278,8 @@ pub(crate) fn meeting_point(
     t: &MeetingTarget,
     unit: (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
-    zones: &mut crate::pathing::zones::Zones,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    zones: &mut Zones,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(Point, u8), GenieError> {
     match meet_at(t) {
         MeetAt::Place => Ok((t.position, 0)),
@@ -290,8 +300,8 @@ fn shore_or_beach(
     t: &MeetingTarget,
     unit: (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
-    zones: &mut crate::pathing::zones::Zones,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    zones: &mut Zones,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(Point, u8), GenieError> {
     let (ux, uy) = (unit.1.x(), unit.1.y());
     if let Some(tile) = shore(t, unit, spatial, zones, by_id)? {
@@ -321,31 +331,25 @@ fn shore(
     t: &MeetingTarget,
     (id, at, stats): (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
-    zones: &mut crate::pathing::zones::Zones,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    zones: &mut Zones,
+    by_id: ObjectsRef<'_>,
 ) -> Result<Option<Tile>, GenieError> {
     let (ux, uy) = (at.x(), at.y());
-    let terrain = spatial
-        .terrain
-        .as_ref()
-        .ok_or(crate::pathing::zones::NO_TERRAIN)?;
+    let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
     let values = terrain
         .restriction(stats.restriction)
-        .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
+        .ok_or(UNKNOWN_RESTRICTION)?;
     let map = zones.of(spatial.map, &terrain.kinds, values)?;
     let own = map.zone(Tile::new(cvttss2si(ux), cvttss2si(uy)));
     let from = t.position.tile();
     for (tile, place) in LandingWalk::new(from, Tile::new(cvttss2si(ux), cvttss2si(uy))) {
         let (x, y) = (tile.x(), tile.y());
-        let terrain = spatial
-            .terrain
-            .as_ref()
-            .ok_or(crate::pathing::zones::NO_TERRAIN)?;
+        let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         if !terrain.beach(tile) {
             continue;
         }
         let zone = if x < 0 || y < 0 {
-            crate::pathing::zones::ZoneId::OFF_MAP
+            ZoneId::OFF_MAP
         } else {
             map.zone(Tile::new(x, y))
         };
@@ -387,10 +391,7 @@ impl Walls<'_> {
     /// # Errors
     ///
     /// [`walled_off`]'s.
-    pub fn walled_off(
-        &mut self,
-        by_id: crate::world::index::ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    pub fn walled_off(&mut self, by_id: ObjectsRef<'_>) -> Result<bool, GenieError> {
         walled_off(
             self.me,
             self.them,
@@ -413,7 +414,7 @@ pub(crate) fn enter_reach(
     (id, stats, moved_at): (ObjectId, &MoveStats, Position),
     (target, target_mover): (ObjectId, Option<&Mover>),
     range: Distance,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
     let me = spatial
         .get_known(id)?
@@ -447,10 +448,10 @@ pub(crate) fn enter_reach(
 pub(crate) fn enter_view(
     spatial: &mut Spatial,
     masters: &[Masters],
-    (unit, mover): (&crate::objects::unit::Unit, Option<&Mover>),
-    ((t, target_mover), tm, room): ((&crate::objects::unit::Unit, Option<&Mover>), &Master, bool),
+    (unit, mover): (&Unit, Option<&Mover>),
+    ((t, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
     range: Distance,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(EnterTarget, WalkStart), GenieError> {
     let building = tm.kind == BUILDING;
     let stats = mover.map(|m| m.stats).ok_or(NO_SPEED)?;
@@ -471,7 +472,7 @@ pub(crate) fn enter_view(
         })
     };
     let (me, them) = (placed(unit.id)?, placed(t.id)?);
-    let gap = crate::movement::footprint_gap(me.position, me.radius, them.position, them.radius);
+    let gap = footprint_gap(me.position, me.radius, them.position, them.radius);
     Ok((
         EnterTarget {
             state: t.life.state,
@@ -492,19 +493,19 @@ pub(crate) struct Meeting<'a> {
     /// The map, its places and its terrain.
     pub(crate) spatial: &'a mut Spatial,
     /// The zone maps the shore's test reads (built on first use).
-    pub(crate) zones: &'a mut crate::pathing::zones::Zones,
+    pub(crate) zones: &'a mut Zones,
     /// The target.
-    pub(crate) target: &'a crate::objects::unit::Unit,
+    pub(crate) target: &'a Unit,
     /// The target's action layer.
     pub(crate) target_actions: &'a Action,
     /// Why the load could not read the target whole, if it could not ([`crate::world::Unread`]).
-    pub(crate) target_unread: Option<&'a crate::world::Unread>,
+    pub(crate) target_unread: Option<&'a Unread>,
     /// The target's master.
     pub(crate) master: &'a Master,
     /// The target has room for the unit (slot 0x198).
     pub(crate) room: bool,
     /// The entering unit.
-    pub(crate) unit: &'a crate::objects::unit::Unit,
+    pub(crate) unit: &'a Unit,
     /// The entering unit's mover (its motion layer's), none for one that does not move.
     pub(crate) mover: Option<&'a Mover>,
     /// The target's mover, none for one that does not move.
@@ -518,10 +519,7 @@ impl Meeting<'_> {
     /// # Errors
     ///
     /// A unit without movement state ([`NO_SPEED`]), and what the meeting does not model.
-    pub(crate) fn point(
-        self,
-        by_id: crate::world::index::ObjectsRef<'_>,
-    ) -> Result<(Point, u8), GenieError> {
+    pub(crate) fn point(self, by_id: ObjectsRef<'_>) -> Result<(Point, u8), GenieError> {
         let at = self.target.position();
         if self.master.kind == BUILDING {
             return Ok((at.ground(), 0));
@@ -552,11 +550,11 @@ impl Meeting<'_> {
 /// from where it last moved to (`actions`, its action layer); one without movement state does
 /// not.
 pub(crate) fn ship_reaches(
-    (ship, actions, mover): (&crate::objects::unit::Unit, &Action, Option<&Mover>),
+    (ship, actions, mover): (&Unit, &Action, Option<&Mover>),
     world: &mut Spatial,
-    plan: &mut crate::movement::Planning<'_>,
+    plan: &mut Planning<'_>,
     to: Position,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
     let Some(m) = mover else {
         return Ok(false);

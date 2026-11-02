@@ -1,6 +1,9 @@
 //! An object's hit points ([`HitPoints`]), with the game's `f32` operations, and a master's whole
 //! hit points ([`MasterHitPoints`]).
 
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+
 /// Hit points as the game's `f32` holds them: an object's (`+0x40`), its powerup's room, what a
 /// heal, a gain or a loss moves, a building's loss while it is built. A master holds whole hit
 /// points ([`MasterHitPoints`], [`HitPoints::of_master`]). Each operator is the one `f32` operation
@@ -58,7 +61,7 @@ impl genie_diff::Diff for MasterHitPoints {
     }
 }
 
-impl std::ops::Add for HitPoints {
+impl Add for HitPoints {
     type Output = Self;
 
     /// The `f32` sum.
@@ -67,7 +70,7 @@ impl std::ops::Add for HitPoints {
     }
 }
 
-impl std::ops::Sub for HitPoints {
+impl Sub for HitPoints {
     type Output = Self;
 
     /// The `f32` difference.
@@ -76,21 +79,21 @@ impl std::ops::Sub for HitPoints {
     }
 }
 
-impl std::ops::AddAssign for HitPoints {
+impl AddAssign for HitPoints {
     /// The `f32` sum in place (a heal, a gain).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::SubAssign for HitPoints {
+impl SubAssign for HitPoints {
     /// The `f32` difference in place (a loss).
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }
 
-impl std::ops::Neg for HitPoints {
+impl Neg for HitPoints {
     type Output = Self;
 
     /// The points negated (their sign bit flipped).
@@ -99,7 +102,7 @@ impl std::ops::Neg for HitPoints {
     }
 }
 
-impl std::ops::Mul<f32> for HitPoints {
+impl Mul<f32> for HitPoints {
     type Output = Self;
 
     /// The points scaled by `f` (one `f32` product, the points first).
@@ -108,14 +111,14 @@ impl std::ops::Mul<f32> for HitPoints {
     }
 }
 
-impl std::ops::MulAssign<f32> for HitPoints {
+impl MulAssign<f32> for HitPoints {
     /// The points scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
     }
 }
 
-impl std::ops::Mul<HitPoints> for f32 {
+impl Mul<HitPoints> for f32 {
     type Output = HitPoints;
 
     /// The points scaled by `self` (one `f32` product, the factor first).
@@ -124,7 +127,7 @@ impl std::ops::Mul<HitPoints> for f32 {
     }
 }
 
-impl std::ops::Div<f32> for HitPoints {
+impl Div<f32> for HitPoints {
     type Output = Self;
 
     /// The points divided by `f` (one `f32` quotient).
@@ -133,7 +136,7 @@ impl std::ops::Div<f32> for HitPoints {
     }
 }
 
-impl std::ops::Div for HitPoints {
+impl Div for HitPoints {
     type Output = f32;
 
     /// The ratio of two amounts of points (one `f32` quotient: a share of the most).
@@ -142,8 +145,8 @@ impl std::ops::Div for HitPoints {
     }
 }
 
-impl std::fmt::Display for HitPoints {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for HitPoints {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

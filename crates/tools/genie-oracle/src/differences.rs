@@ -8,6 +8,8 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
 use genie_core::world::parts::ObjectView;
 use genie_diff::Scope;
+use std::collections::HashMap;
+use std::fmt::{Display, Error, Formatter};
 
 /// One field of one object where the slice and the game's save differ
 /// ([`object_field_differences`]); its text is [`object_differences`]' line.
@@ -30,8 +32,8 @@ pub const ONLY_IN_THE_GAME: &str = "only in the game";
 /// [`Difference::field`] of an object the slice holds and the game's save does not.
 pub const ONLY_IN_THE_SLICE: &str = "only in the slice";
 
-impl std::fmt::Display for Difference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Difference {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self.field.as_str() {
             ONLY_IN_THE_GAME => write!(f, "{}: {} ({})", self.id, self.field, self.game),
             ONLY_IN_THE_SLICE => write!(f, "{}: {} ({})", self.id, self.field, self.slice),
@@ -81,7 +83,7 @@ pub fn object_field_differences_in<'a>(
     let game: Vec<ObjectView<'a>> = game.into_iter().map(Into::into).collect();
     let mut out = Vec::new();
     // the first slice object of each id, as a search from the front finds it
-    let mut by_id = std::collections::HashMap::with_capacity(slice.len());
+    let mut by_id = HashMap::with_capacity(slice.len());
     for s in &slice {
         let _ = by_id.entry(s.unit.id).or_insert(s);
     }

@@ -1,5 +1,8 @@
 //! What a player's queries make of another player's objects as one type, and the tables by it.
 
+use crate::players::ByPlayer;
+use std::ops::{Index, IndexMut};
+
 /// What a player's queries make of another player's objects (`player+0x278`, the save's
 /// `unit_diplomacy`, which `FUN_141676b80` writes from the relation): Gaia's, its own, an
 /// ally's, a neutral's or an enemy's. The visible-units query (`GetVisibleUnits`,
@@ -57,7 +60,7 @@ impl UnitRelation {
 
 /// What a player's queries make of each player's objects (`unit_diplomacy[i]`, `player+0x278`),
 /// by the other player: none for a saved value past the five relations.
-pub type UnitRelations = crate::players::ByPlayer<Option<UnitRelation>>;
+pub type UnitRelations = ByPlayer<Option<UnitRelation>>;
 
 /// A test's row of saved relations (`unit_diplomacy`): each value as [`UnitRelation::of_field`]
 /// reads it.
@@ -94,7 +97,7 @@ impl<T> ByRelation<T> {
     }
 }
 
-impl<T> std::ops::Index<UnitRelation> for ByRelation<T> {
+impl<T> Index<UnitRelation> for ByRelation<T> {
     type Output = T;
 
     fn index(&self, relation: UnitRelation) -> &T {
@@ -102,7 +105,7 @@ impl<T> std::ops::Index<UnitRelation> for ByRelation<T> {
     }
 }
 
-impl<T> std::ops::IndexMut<UnitRelation> for ByRelation<T> {
+impl<T> IndexMut<UnitRelation> for ByRelation<T> {
     fn index_mut(&mut self, relation: UnitRelation) -> &mut T {
         &mut self.0[relation.index()]
     }

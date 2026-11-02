@@ -12,17 +12,21 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
+use crate::math::rng::Stream;
 use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::WaypointIndex;
 use crate::movement::{Planning, footprint_gap};
 use crate::objects::ObjectKey;
 use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
+use std::mem::take;
 
 /// The walk of the walked level (`LAB_14104b6b4`): see [`path_step`]. A group on its waypoint
 /// counts it reached ([`crate::movement::LevelFlags::AT_WAYPOINT`]); else the step along the ground
@@ -90,7 +94,7 @@ fn way_blocked(
     spatial: &mut Spatial,
     at: BVector,
     next: BVector,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<Option<Pass>, GenieError> {
     let ignore: Vec<RecordId> = match lead.group.as_ref() {
         Some(g) if !g.differentiator_units.is_empty() => g.differentiator_units.clone(),
@@ -128,7 +132,7 @@ fn weigh_hits(
     motion: &Motion,
     spatial: &Spatial,
     hits: &[RecordId],
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(bool, u32), GenieError> {
     let level = motion.paths.checked(0)?;
     let top_ignore = motion
@@ -198,10 +202,7 @@ fn walk_ends(
                 && NEAR < level.range.get()
                 && let Some(top) = top
             {
-                let end = point(
-                    top,
-                    crate::movement::WaypointIndex::last_of(top.points.len()),
-                );
+                let end = point(top, WaypointIndex::last_of(top.points.len()));
                 let d = fmath::sub(at, end);
                 let gap = fmath::sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
                 if gap - level.range.get() < EPSILON {
@@ -310,25 +311,20 @@ impl World {
                 .collect(),
         };
         let g = self.groups.held_mut(group)?;
-        let mut motion = std::mem::take(&mut g.motion);
+        let mut motion = take(&mut g.motion);
         let result = {
             let mut plan = Planning {
                 pathing: &mut self.pathing,
                 now: self.world_time,
                 player_type: lead.player_type,
-                object: self.streams.get(crate::math::rng::Stream::Object),
+                object: self.streams.get(Stream::Object),
                 groups: &self.groups,
             };
             let mut world = StepWorld {
                 spatial: &mut self.spatial,
                 plan: &mut plan,
                 dt: self.dt_seconds,
-                by_id: crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
+                by_id: ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
             };
             path_step(&mut motion, &view, &lead, &mut world, budget)
         };

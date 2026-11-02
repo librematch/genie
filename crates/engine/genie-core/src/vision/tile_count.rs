@@ -1,5 +1,7 @@
 //! A count of tiles a player explored ([`TileCount`]).
 
+use std::ops::AddAssign;
+
 /// A count of tiles a player explored: the visible map's `numberTilesExploredValue` (`+0x28`)
 /// and what one exploration adds to it ([`crate::vision::visibility::Visibility::explore`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,7 +26,7 @@ impl TileCount {
     }
 }
 
-impl std::ops::AddAssign for TileCount {
+impl AddAssign for TileCount {
     /// The game's integer add.
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;

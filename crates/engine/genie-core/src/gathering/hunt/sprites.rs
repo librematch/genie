@@ -2,8 +2,10 @@
 //! what a unit carries.
 
 use crate::gathering::hunt::HuntTask;
+use crate::objects::Graphics;
 use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::Task;
 use crate::objects::sprite::Graphic;
 use crate::players::attribute::{self, AttributeId};
 
@@ -14,7 +16,7 @@ pub(crate) fn stand_sprite(
     task: &HuntTask,
     standing: Option<SpriteId>,
     held: Held,
-    graphics: &crate::objects::Graphics,
+    graphics: &Graphics,
 ) -> Option<Graphic> {
     let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     let carrying = task.sprites.carrying;
@@ -70,7 +72,7 @@ pub struct HuntSprites {
 impl HuntTask {
     /// The hunt's view of master task `t`.
     #[must_use]
-    pub const fn of(t: &crate::objects::masters::Task) -> Self {
+    pub const fn of(t: &Task) -> Self {
         Self {
             id: t.id,
             range: t.work_range,

@@ -2,6 +2,7 @@ use crate::map_and_sight::{resource_differences, visibility_differences};
 use crate::test_ids::object_id;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
+use genie_core::map::Point;
 use genie_core::vision::TileCount;
 use genie_core::vision::VisionBits;
 use genie_core::vision::visibility::{Visibility, VisibleMap, VisibleResource, VisibleResources};
@@ -18,7 +19,7 @@ fn sight() -> Visibility {
             id: object_id(7),
             distance: Distance::ZERO,
             zone: 0,
-            at: genie_core::map::Point::new(1.5, 2.5),
+            at: Point::new(1.5, 2.5),
         }]],
     };
     let mut sight = Visibility::default();
@@ -79,7 +80,7 @@ fn player_without_map_or_lists_says_so() {
 fn the_resource_lists_differ_by_count_capacity_record_or_length() {
     let mut slice = sight();
     slice.resources[1].capacities = vec![8];
-    slice.resources[1].lists[0][0].at = genie_core::map::Point::new(1.75, 2.5);
+    slice.resources[1].lists[0][0].at = Point::new(1.75, 2.5);
     let lines = resource_differences(&slice, &sight(), 1);
     assert_eq!(
         lines[0],
@@ -115,11 +116,17 @@ mod spatial {
     use genie_core::map::Tile;
     use genie_core::map::spatial::Spatial;
     use genie_core::objects::masters::class;
+    use genie_core::objects::masters::ids::VILLAGER_MALE;
+    use genie_core::objects::masters::master_type::{BUILDING, COMBAT};
+    use genie_core::objects::masters::{ObstructionClass, ObstructionType};
+    use genie_core::ownership::CaptureKind;
     use genie_core::players::PlayerId;
+    use genie_core::players::{ByPlayer, UnitRelation};
+    use genie_save::generated::world::Master;
     use genie_save::generated::world::{Object, RgeMapRow, RgeTile};
 
     /// A master of id `id`, its radius `radius` and an obstruction of kind `kind`.
-    fn master(id: i16, radius: Radii, kind: u8) -> genie_save::generated::world::Master {
+    fn master(id: i16, radius: Radii, kind: u8) -> Master {
         let mut m = combat_master(id);
         let s = master_static_mut(&mut m);
         (s.radius_x, s.radius_y, s.radius_z) = (radius.x(), radius.y(), radius.z());
@@ -193,42 +200,26 @@ mod spatial {
         let unit = out.get(object_id(10)).unwrap();
         assert_eq!(
             (unit.player, unit.master, unit.class),
-            (
-                PlayerId::new(1),
-                genie_core::objects::masters::ids::VILLAGER_MALE,
-                class::CLASS_6
-            )
+            (PlayerId::new(1), VILLAGER_MALE, class::CLASS_6)
         );
         assert!(unit.tall);
         let obstruction = unit.obstruction.unwrap();
         assert_eq!(
             (obstruction.kind, obstruction.class),
-            (
-                genie_core::objects::masters::ObstructionType::TYPE_2,
-                genie_core::objects::masters::ObstructionClass::BUILDING
-            )
+            (ObstructionType::TYPE_2, ObstructionClass::BUILDING)
         );
         assert_eq!(out.tile_list(Tile::new(1, 1)), [object_id(10)]);
         let seer = out.sight.as_ref().unwrap().seer(object_id(10)).unwrap();
         assert_eq!(
             (seer.kind, seer.capture, seer.umv),
-            (
-                genie_core::objects::masters::master_type::COMBAT,
-                genie_core::ownership::CaptureKind::of_data(5),
-                0
-            )
+            (COMBAT, CaptureKind::of_data(5), 0)
         );
         assert!(seer.explored && seer.building.is_none());
         assert_eq!(
             out.unit_diplomacy
                 .get(PlayerId::new(1))
-                .map(genie_core::players::ByPlayer::values),
-            Some(
-                &[
-                    Some(genie_core::players::UnitRelation::GAIA),
-                    Some(genie_core::players::UnitRelation::OWN)
-                ][..]
-            )
+                .map(ByPlayer::values),
+            Some(&[Some(UnitRelation::GAIA), Some(UnitRelation::OWN)][..])
         );
     }
 
@@ -239,10 +230,7 @@ mod spatial {
         let out = placed();
         let sight = out.sight.as_ref().unwrap();
         let standing = sight.seer(object_id(11)).unwrap();
-        assert_eq!(
-            standing.kind,
-            genie_core::objects::masters::master_type::BUILDING
-        );
+        assert_eq!(standing.kind, BUILDING);
         assert!(standing.explored);
         assert!(standing.building.is_some_and(|b| b.built && !b.started));
         assert!(out.get(object_id(11)).unwrap().obstruction.is_some());

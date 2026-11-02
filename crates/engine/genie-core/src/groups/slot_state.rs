@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::groups::motion::Passing;
+use std::fmt::{Display, Error, Formatter};
 
 /// A formation slot's state (`mState`, `+0x2c`), which a member's steer to its slot
 /// (`FUN_141025fb0`) sets and switches on. The values without a state have no case.
@@ -58,8 +59,8 @@ impl SlotState {
     }
 }
 
-impl std::fmt::Display for SlotState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for SlotState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

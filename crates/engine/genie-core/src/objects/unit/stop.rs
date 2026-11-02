@@ -3,15 +3,21 @@
 
 use crate::GenieError;
 use crate::math::rng::{Stream, Well512};
+use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
+use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::orders::Work;
 use crate::unit_ai::{AiCommand, Effect};
 use crate::world::Unread;
+use crate::world::lets::torn_down;
 use crate::world::step::Step;
 
 impl Unit {
@@ -20,7 +26,7 @@ impl Unit {
     /// [`crate::objects::sprite::new_sprite`]) where the slice holds its sprite.
     pub(crate) fn stop_action(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
@@ -34,14 +40,11 @@ impl Unit {
             ),
             (&mut releases, &mut leaves),
             by,
-            crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
             &c.w.graphics,
             sprite,
         )?;
-        crate::world::lets::torn_down(c, self, (leaves, releases))
+        torn_down(c, self, (leaves, releases))
     }
 
     /// [`Unit::stop_action`] on the parts of the world it changes: the targets its actions let
@@ -50,15 +53,11 @@ impl Unit {
     /// motion layers, `unread` why the load could not read it whole ([`Unread`]).
     pub(crate) fn stop_with(
         &mut self,
-        (actions, unread, mut motion): (
-            &mut crate::objects::layers::Action,
-            Option<&Unread>,
-            MotionMut<'_>,
-        ),
+        (actions, unread, mut motion): (&mut Action, Option<&Unread>, MotionMut<'_>),
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
-        masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: &crate::objects::Graphics,
+        masters: OwnerMasters<'_>,
+        graphics: &Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
         self.tear_down_actions(
@@ -80,7 +79,7 @@ impl Unit {
     /// [`Unread`]).
     pub(crate) fn tear_down_actions(
         &self,
-        (actions, unread): (&mut crate::objects::layers::Action, Option<&Unread>),
+        (actions, unread): (&mut Action, Option<&Unread>),
         motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
@@ -103,8 +102,8 @@ impl Unit {
     pub(crate) fn show_standing(
         &mut self,
         mut motion: MotionMut<'_>,
-        masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: &crate::objects::Graphics,
+        masters: OwnerMasters<'_>,
+        graphics: &Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
         let standing = self
@@ -119,12 +118,7 @@ impl Unit {
             let standing = standing.ok_or(GenieError::unsupported(
                 "a stopped unit without its standing sprite",
             ))?;
-            crate::objects::sprite::new_sprite(
-                &mut self.sprite,
-                motion.move_stats_mut(),
-                standing,
-                sprite,
-            );
+            new_sprite(&mut self.sprite, motion.move_stats_mut(), standing, sprite);
         }
         Ok(())
     }
@@ -144,7 +138,7 @@ impl Unit {
     /// The unit's stop that the motion step does not model, and the list's deletion's.
     pub(crate) fn clear_own_actions(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
@@ -167,7 +161,7 @@ impl Unit {
     /// The deletion's, and what it lets go.
     pub(crate) fn delete_own_head(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
@@ -189,7 +183,7 @@ impl Unit {
     /// [`World::order_on_target`]: crate::world::World::order_on_target
     pub(crate) fn run_effect(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         e: Effect,
         class: Option<ClassId>,
         c: &mut Step<'_>,
@@ -237,7 +231,7 @@ impl Unit {
     /// The command's and the lend's.
     fn ai_command(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         command: AiCommand,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
@@ -252,7 +246,7 @@ impl Unit {
                 w.gather_command(p, i, target)
             }),
             AiCommand::WorkOn { target, point } => {
-                let work = crate::orders::Work {
+                let work = Work {
                     target: Some(target),
                     point,
                     carry_test: true,

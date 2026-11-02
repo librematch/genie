@@ -10,16 +10,23 @@
 
 use crate::GenieError;
 use crate::construction::MainBuildingId;
+use crate::objects::layers::{Building, Combat};
 use crate::objects::lines::UnitLines;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::release::{Releaser, released, released_fields};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::objects::{ObjectState, WorkerCount};
 use crate::orders::object_gone;
 use crate::players::PlayerId;
 use crate::players::tracker::Tracker;
+use crate::players::{NO_RELATIONS, Relations};
 use crate::unit_ai::Notify;
+use crate::unit_ai::UnitAi;
+use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::others::{Others, OthersRef};
+use crate::world::parts::{PartTable, repairers_in};
 use crate::world::step::Step;
 use crate::world::{Player, World};
 
@@ -30,17 +37,17 @@ use crate::world::{Player, World};
 /// with the unit's state, when its side's call returns: [`crate::objects::unit::Unit::with_side`]).
 pub(crate) struct Lets<'l> {
     pub(crate) player: PlayerId,
-    pub(crate) relations: &'l crate::players::Relations,
-    pub(crate) masters: crate::objects::masters::MasterTables<'l>,
+    pub(crate) relations: &'l Relations,
+    pub(crate) masters: MasterTables<'l>,
     /// The units' AIs ([`crate::world::parts::Parts::unit_ai`]).
-    pub(crate) ais: &'l mut crate::world::parts::PartTable<crate::unit_ai::UnitAi>,
+    pub(crate) ais: &'l mut PartTable<UnitAi>,
     /// The buildings' layers ([`crate::world::parts::Parts::building`]).
-    pub(crate) buildings: &'l mut crate::world::parts::PartTable<crate::objects::layers::Building>,
+    pub(crate) buildings: &'l mut PartTable<Building>,
     /// The combat layers ([`crate::world::parts::Parts::combat`]).
-    pub(crate) combats: &'l mut crate::world::parts::PartTable<crate::objects::layers::Combat>,
+    pub(crate) combats: &'l mut PartTable<Combat>,
     pub(crate) lines: &'l UnitLines,
     pub(crate) tracker: &'l mut Tracker,
-    pub(crate) own_notifies: &'l mut Vec<(Notify, crate::objects::ObjectState)>,
+    pub(crate) own_notifies: &'l mut Vec<(Notify, ObjectState)>,
 }
 
 /// A counted builder leaves the building `site` (`+0x9e8` one less): its construction's
@@ -50,11 +57,11 @@ pub(crate) struct Lets<'l> {
 ///
 /// None (an unreachable error where a table lost the part it took).
 fn leave_site(
-    buildings: &mut crate::world::parts::PartTable<crate::objects::layers::Building>,
-    combats: &mut crate::world::parts::PartTable<crate::objects::layers::Combat>,
+    buildings: &mut PartTable<Building>,
+    combats: &mut PartTable<Combat>,
     site: ObjectId,
 ) -> Result<(), GenieError> {
-    let n = crate::world::parts::repairers_in(buildings, combats, site)?;
+    let n = repairers_in(buildings, combats, site)?;
     *n = n.left();
     Ok(())
 }
@@ -79,7 +86,7 @@ impl World {
     pub(crate) fn with_lets_for<R>(
         &mut self,
         player: PlayerId,
-        own_notifies: &mut Vec<(Notify, crate::objects::ObjectState)>,
+        own_notifies: &mut Vec<(Notify, ObjectState)>,
         f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
     ) -> Result<R, GenieError> {
         let no_player = || {
@@ -107,10 +114,7 @@ impl World {
         let mut lets = Lets {
             player,
             relations,
-            masters: crate::objects::masters::MasterTables::new(
-                &self.masters,
-                &self.parts.own_master,
-            ),
+            masters: MasterTables::new(&self.masters, &self.parts.own_master),
             ais: &mut self.parts.unit_ai,
             buildings: &mut self.parts.building,
             combats: &mut self.parts.combat,
@@ -251,7 +255,7 @@ impl Lets<'_> {
         };
         if sleeps {
             let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-            if u.workers < crate::objects::WorkerCount::MOST {
+            if u.workers < WorkerCount::MOST {
                 u.workers = u.workers.plus(1);
             }
             let _ = others.wake(id, self.tracker, (self.masters.players, self.lines));
@@ -272,10 +276,7 @@ impl Lets<'_> {
         by: Releaser,
     ) -> Result<(), GenieError> {
         let listed = if u.lists_taker(u.master(self.masters, p)?, allied) {
-            Some(
-                self.buildings
-                    .get_or_insert_with(u.id, || crate::objects::layers::Building::NONE)?,
-            )
+            Some(self.buildings.get_or_insert_with(u.id, || Building::NONE)?)
         } else {
             None
         };
@@ -312,7 +313,7 @@ impl Lets<'_> {
             // a sleeping object (static: only those sleep) counts a worker less
             // (FUN_141197d00); asleep already (`+0x641`), it is not flagged again
             let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-            if crate::objects::WorkerCount::ZERO < u.workers {
+            if WorkerCount::ZERO < u.workers {
                 u.workers = u.workers.plus(-1);
             }
             return Ok(());
@@ -410,8 +411,8 @@ impl Lets<'_> {
             self.relations
         } else {
             let other = view.players().player(from);
-            other.map_or(&crate::players::NO_RELATIONS, |p| &p.relations)
+            other.map_or(&NO_RELATIONS, |p| &p.relations)
         };
-        crate::unit_ai::task_finder::allied(relations, from, to, true)
+        task_finder_allied(relations, from, to, true)
     }
 }

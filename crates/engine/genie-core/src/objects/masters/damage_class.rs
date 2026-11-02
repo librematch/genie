@@ -1,6 +1,8 @@
 //! An armor or attack entry's class as one type, and the entry: the `.dat`'s armor and attack
 //! classes.
 
+use crate::objects::masters::DamageAmount;
+
 /// An armor or attack class (the `.dat`'s `class` of an armor or attack entry; an attribute
 /// effect's amount's high byte): a hit's weapon of a class meets the victim's armor of the same
 /// class. The simulation's tests name melee (4), pierce (3) and the classes the garrison's
@@ -44,7 +46,7 @@ pub struct ClassAmount {
     /// The class.
     pub class: DamageClass,
     /// The amount.
-    pub amount: crate::objects::masters::DamageAmount,
+    pub amount: DamageAmount,
 }
 
 impl ClassAmount {
@@ -53,7 +55,7 @@ impl ClassAmount {
     pub const fn new(class: i16, amount: i16) -> Self {
         Self {
             class: DamageClass(class),
-            amount: crate::objects::masters::DamageAmount::new(amount),
+            amount: DamageAmount::new(amount),
         }
     }
 }

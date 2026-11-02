@@ -25,13 +25,22 @@ use std::collections::BTreeMap;
 
 use crate::GenieError;
 use crate::construction::build::{ClearLook, clearing_objects, footprint_clearing};
+use crate::construction::build::{Cleared, ClearingSite};
+use crate::map::Snow;
+use crate::map::spatial::Obstruction;
 use crate::map::spatial::Placed;
+use crate::map::terrain::Foundation;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
+use crate::math::image::unit_ai::RADIUS_SCALE as UNIT_AI_RADIUS_SCALE;
 use crate::objects::lifecycle::death_parts::clear_look_of;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::{Master, player_master};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Notify;
+use crate::unit_ai::NotifyKind;
 use crate::vision::visibility::{BuildingSight, Seer, capture_kind};
 use crate::world::World;
+use crate::world::index::{ObjectsRef, Place};
 
 impl World {
     /// `FUN_14123bb20`'s sending off (with `DAT_1439e60e2` 1) of the units on `foundation`'s
@@ -50,7 +59,7 @@ impl World {
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
         /// The notify's radii are hundredths (`DAT_14330ebcc`).
-        const RADIUS_SCALE: f32 = crate::math::image::unit_ai::RADIUS_SCALE;
+        const RADIUS_SCALE: f32 = UNIT_AI_RADIUS_SCALE;
         let (site_owner, site) = self.object(foundation).ok_or(GenieError::unsupported(
             "a footprint's foundation the slice does not hold",
         ))?;
@@ -99,16 +108,13 @@ impl World {
                 continue;
             }
             let state = u.life.state;
-            let Some(crate::world::index::Place::Live(q, i)) = self.place(id) else {
+            let Some(Place::Live(q, i)) = self.place(id) else {
                 return Err(GenieError::unsupported(
                     "a sleeping unit sent off a footprint",
                 ));
             };
             if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, i)?.id) {
-                ai.post(
-                    Notify::own(id, crate::unit_ai::NotifyKind::SENT_OFF, p),
-                    state,
-                )?;
+                ai.post(Notify::own(id, NotifyKind::SENT_OFF, p), state)?;
             }
         }
         if !together.is_empty() {
@@ -131,12 +137,7 @@ impl World {
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let site_at = self
             .spatial
             .get(foundation)
@@ -169,7 +170,7 @@ impl World {
         let listed: Vec<Option<ObjectId>> = units.iter().map(|&id| Some(id)).collect();
         let loose = self.loose_units(&listed)?;
         for id in loose {
-            let Some(crate::world::index::Place::Live(q, i)) = self.place(id) else {
+            let Some(Place::Live(q, i)) = self.place(id) else {
                 continue;
             };
             let z = self.players.live(q, i)?.position().z();
@@ -179,7 +180,7 @@ impl World {
             self.move_point_order(q, i, Position::new(x, y, z))?;
         }
         for &id in units {
-            let Some(crate::world::index::Place::Live(q, i)) = self.place(id) else {
+            let Some(Place::Live(q, i)) = self.place(id) else {
                 continue;
             };
             let unit = self.players.live_mut(q, i)?;
@@ -188,7 +189,7 @@ impl World {
                 && ai.current_action != Some(ActionKind::MoveAside)
             {
                 ai.post(
-                    Notify::own(id, crate::unit_ai::NotifyKind::SENT_OFF_GROUP, [0, 0, 0]),
+                    Notify::own(id, NotifyKind::SENT_OFF_GROUP, [0, 0, 0]),
                     state,
                 )?;
             }
@@ -218,11 +219,11 @@ impl World {
         if m.build_time <= WholeSeconds::ZERO {
             return Ok(());
         }
-        let f = crate::map::terrain::Foundation {
+        let f = Foundation {
             position,
             clearance: m.clearance,
             terrain: laid,
-            snow: crate::map::Snow::None,
+            snow: Snow::None,
             master,
             class: m.class,
             terrain_bonus: m.terrain_bonus,
@@ -256,7 +257,7 @@ impl World {
         let Some(m) = player_master(&self.masters, player, master) else {
             return Ok(());
         };
-        let site = crate::construction::build::ClearingSite {
+        let site = ClearingSite {
             player,
             master,
             class: m.class,
@@ -285,9 +286,7 @@ impl World {
                 .spatial
                 .get(cl.id)
                 .is_some_and(|o| o.obstruction.is_some());
-            if !look.roo_called
-                && (crate::math::fmath::below_or_unordered(0.0, look.height.get()) || recorded)
-            {
+            if !look.roo_called && (below_or_unordered(0.0, look.height.get()) || recorded) {
                 self.pathing.removed(cl.id);
                 self.spatial.drop_record(cl.id);
                 self.pathing.tiles_changed(self.spatial.take_changes());
@@ -307,7 +306,7 @@ impl World {
         Ok(Some(clear_look_of(
             u,
             self.parts.building_of(id),
-            crate::objects::masters::OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
+            OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
         )?))
     }
 
@@ -320,11 +319,7 @@ impl World {
     /// # Errors
     ///
     /// An object the slice does not hold, and what the deletes do not model.
-    pub(crate) fn clear_object(
-        &mut self,
-        cl: crate::construction::build::Cleared,
-        roo_done: bool,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn clear_object(&mut self, cl: Cleared, roo_done: bool) -> Result<(), GenieError> {
         let (owner, _) = self.object(cl.id).ok_or(GenieError::unsupported(
             "a footprint clearing of an object the slice does not hold",
         ))?;
@@ -353,7 +348,7 @@ impl World {
         position: Position,
         desolid: bool,
     ) -> Result<(), GenieError> {
-        let record = crate::map::spatial::Obstruction {
+        let record = Obstruction {
             kind: made.obstruction_type,
             class: made.obstruction_class,
         };
@@ -369,7 +364,7 @@ impl World {
             moves: false,
             unknown: None,
             obstruction: (!desolid
-                && !crate::math::fmath::at_most_or_unordered(made.height.get(), 0.0)
+                && !at_most_or_unordered(made.height.get(), 0.0)
                 && record.recorded())
             .then_some(record),
         };

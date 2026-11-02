@@ -11,6 +11,7 @@ use crate::gathering::gather::{
     STOP_CENTRE, STOP_DRAWS, STOP_FARMS, Walks,
 };
 use crate::gathering::hunt::HuntTask;
+use crate::gathering::{GatherTargetId, both_food};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -20,10 +21,13 @@ use crate::movement::Mover;
 use crate::movement::move_to::{TargetMoved, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::WorkRate;
+use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::WorkValue;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::ActiveSprite;
+use crate::objects::sprite::Graphic;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -86,11 +90,7 @@ impl StopRate {
     /// The time per stop (`+0x70`): the capacity times the productivity over the work a second,
     /// shared out over the stops.
     #[must_use]
-    pub fn time_per_stop(
-        self,
-        work_value: crate::objects::masters::WorkValue,
-        stops: FarmStops,
-    ) -> Seconds {
+    pub fn time_per_stop(self, work_value: WorkValue, stops: FarmStops) -> Seconds {
         Seconds::new(
             ((self.capacity.get() * self.productivity.get()) / (self.work_rate * work_value).get())
                 / stops.as_f32(),
@@ -182,7 +182,7 @@ impl GatherAction {
                 (FarmStops::ONE, Seconds::ZERO)
             };
         Ok(Self {
-            target: Some(crate::gathering::GatherTargetId::new(target.id)),
+            target: Some(GatherTargetId::new(target.id)),
             carry_to: None,
             state: GatherState::New,
             point: target.position,
@@ -227,7 +227,7 @@ impl GatherAction {
             walks,
         } = start;
         let kind = self.task.resource;
-        let both_food = crate::gathering::both_food(kind, held.kind);
+        let both_food = both_food(kind, held.kind);
         let drops = player_type.is_computer() && held.amount == Amount::ZERO;
         if (!carry_rule && !drops) || held.kind == kind || both_food {
             if held.kind != kind && both_food {
@@ -246,9 +246,7 @@ impl GatherAction {
         // a farm another farmer works (`+0x644` above 1 with this one, which the constructor
         // took): set_state(11) to its point, then the farm goes (slot 0x68 with none; the caller
         // lets it go)
-        if self.target_class == Some(class::FARM)
-            && crate::objects::WorkerCount::ONE < target.workers.plus(1)
-        {
+        if self.target_class == Some(class::FARM) && WorkerCount::ONE < target.workers.plus(1) {
             let radius = if STOP_FARMS.contains(&target.master) {
                 0.0
             } else {
@@ -302,7 +300,7 @@ impl GatherAction {
         } = retarget;
         let held = walks.held.amount;
         self.worked = false;
-        if self.target.map(crate::gathering::GatherTargetId::id) == Some(target.id) {
+        if self.target.map(GatherTargetId::id) == Some(target.id) {
             match self.state {
                 GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
                     return Ok(true);
@@ -324,7 +322,7 @@ impl GatherAction {
             return Ok(true);
         }
         // slot 0x68 takes the target: its workers count it once it is new
-        let taken = crate::gathering::GatherTargetId::new(target.id);
+        let taken = GatherTargetId::new(target.id);
         let workers = target.workers.plus(i32::from(Some(taken) != self.target));
         self.target = Some(taken);
         self.point = target.position;
@@ -340,7 +338,7 @@ impl GatherAction {
                 self.farm = target.position.ground();
             }
         }
-        if target.class == class::FARM && crate::objects::WorkerCount::ONE < workers {
+        if target.class == class::FARM && WorkerCount::ONE < workers {
             let radius = if STOP_FARMS.contains(&target.master) {
                 0.0
             } else {
@@ -522,7 +520,7 @@ impl GatherAction {
     pub(crate) fn halt(
         &mut self,
         mover: Option<&mut Mover>,
-        stand: Option<crate::objects::sprite::Graphic>,
+        stand: Option<Graphic>,
         sprite: &mut Option<ActiveSprite>,
         rng: &mut Well512,
     ) -> Result<[Option<ObjectId>; 2], GenieError> {

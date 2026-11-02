@@ -2,21 +2,25 @@
 
 use crate::GenieError;
 use crate::combat::attack::gaps;
+use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
+use crate::movement::move_to::{MoveToAction, point_sprite};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::Master;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
+use crate::objects::sprite::Graphic;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -26,6 +30,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
+use crate::unit_ai::{AiMove, Issuer, Notify, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
@@ -37,7 +42,7 @@ pub(super) enum PastureAfter {
     Ends,
     /// The unit tends this pasture, or none (`FUN_141189ca0` with −1: it leaves the one it
     /// tends).
-    Tends(Option<crate::gathering::PastureId>),
+    Tends(Option<PastureId>),
 }
 
 impl World {
@@ -112,12 +117,12 @@ impl World {
                 return Ok(());
             };
             let (target_type, target_owner) = target.map_or((None, None), |(m, o)| {
-                (Some(crate::unit_ai::OrderTargetType::of_master(m)), Some(o))
+                (Some(OrderTargetType::of_master(m)), Some(o))
             });
-            let queued = crate::unit_ai::QueuedOrder {
-                issuer: Some(crate::unit_ai::Issuer::Player(issuer)),
+            let queued = QueuedOrder {
+                issuer: Some(Issuer::Player(issuer)),
                 order: OrderKind::Move,
-                priority: crate::unit_ai::OrderPriority::COMMAND,
+                priority: OrderPriority::COMMAND,
                 target: if target.is_some() { order.target } else { None },
                 target_owner,
                 point: point2.with_height(0.0),
@@ -207,7 +212,7 @@ impl World {
             self.clear_actions(player, idx)?;
             let sprite = self.point_move_sprite(player, idx)?;
             let unit = self.players.live_mut(player, idx)?;
-            let move_to = crate::movement::move_to::MoveToAction::to_point(
+            let move_to = MoveToAction::to_point(
                 point,
                 Distance::ZERO,
                 sprite,
@@ -216,10 +221,7 @@ impl World {
             if move_to.shows_standing() {
                 unit.shows_standing_sprite(
                     self.parts.motion.layer_mut(unit.id),
-                    crate::objects::masters::OwnerMasters::new(
-                        &self.parts.own_master,
-                        self.masters.of(player),
-                    ),
+                    OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
                     &self.graphics,
                     self.streams.get(Stream::Sprite),
                 )?;
@@ -241,12 +243,11 @@ impl World {
         &self,
         player: PlayerId,
         idx: ListIndex,
-    ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
+    ) -> Result<Option<Graphic>, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let look = self.parts.combat_of(unit.id).abilities.look.as_ref();
-        Ok(crate::movement::move_to::point_sprite(master, look, false)
-            .and_then(|id| self.graphics.get(id).copied()))
+        Ok(point_sprite(master, look, false).and_then(|id| self.graphics.get(id).copied()))
     }
 
     /// The unit's slot 0x340 from its unit AI's move off a footprint (slot 0x148,
@@ -256,7 +257,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        m: crate::unit_ai::AiMove,
+        m: AiMove,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
         let class = unit.master(self.master_tables(), player)?.class;
@@ -270,10 +271,7 @@ impl World {
             (class, player),
             (&mut releases, &mut builder_leaves, by),
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &self.parts.own_master,
-                    self.masters.of(player),
-                ),
+                OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
                 (
                     &self.graphics,
                     self.parts.combat.of(id).abilities.look.as_ref(),
@@ -451,7 +449,7 @@ impl World {
         if !pasture {
             return Ok(PastureAfter::Tends(None));
         }
-        let on = crate::gathering::PastureId::new(on);
+        let on = PastureId::new(on);
         let room = Attributes::get(self.players.player(player)?, PASTURE_WORKERS)?;
         let workers = self.livestock_workers(on).as_f32();
         // COMISS room with the workers, JBE: a NaN is full
@@ -476,7 +474,7 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            let search = crate::unit_ai::Notify::own(
+            let search = Notify::own(
                 id,
                 NotifyKind::REQUIRES_SEARCH,
                 [ActionKind::Hunt.value(), i32::from(class::FARM.get()), -1],

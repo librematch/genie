@@ -1,5 +1,6 @@
 use crate::task_finder::{FinderObject, FinderWorld, finder_objects};
 use crate::test_ids::object_id;
+use genie_core::gathering::gather::GATHER;
 use genie_core::map::Position;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
@@ -29,7 +30,7 @@ fn object(annex_of: Option<ObjectId>) -> FinderObject {
         attackable: true,
         pasture: None,
         annex_of,
-        top_action: Some(genie_core::gathering::gather::GATHER),
+        top_action: Some(GATHER),
         position: Position::new(1.0, 2.0, 0.0),
     }
 }
@@ -93,10 +94,7 @@ fn an_annex_stands_for_its_main_building() {
         (target.player, target.state, target.hp),
         (PlayerId::new(1), ObjectState::Alive, HitPoints::new(25.0))
     );
-    assert_eq!(
-        (target.pasture, target.top_action),
-        (None, Some(genie_core::gathering::gather::GATHER))
-    );
+    assert_eq!((target.pasture, target.top_action), (None, Some(GATHER)));
     assert!(w.target(object_id(99)).is_none());
     let mut lost = world(0);
     lost.masters.truncate(1);

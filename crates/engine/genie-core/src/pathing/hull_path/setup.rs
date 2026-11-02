@@ -10,11 +10,13 @@ use crate::players::PlayerId;
 use std::collections::BTreeSet;
 
 use crate::GenieError;
+use crate::map::TerrainMask;
 use crate::map::spatial::{RecordId, Spatial, tile_record_id};
 use crate::math::conversions::cvttss2si;
 use crate::pathing::hull_path::{
     ClosedLists, HALF, HullPather, KeptHulls, Nodes, ONE, PATHS, Point, Waypoints,
 };
+use crate::world::index::ObjectsRef;
 
 /// A quick path without the map's terrain.
 pub(crate) const NO_TERRAIN: GenieError =
@@ -31,10 +33,10 @@ pub(crate) const NO_RESTRICTION: GenieError =
 ///
 /// Where the pather meets what the slice does not model, or an object the world does not place.
 pub fn quick_reach(
-    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+    (world, by_id): (&mut Spatial, ObjectsRef<'_>),
     me: ObjectId,
     target: Option<ObjectId>,
-    mask: crate::map::TerrainMask,
+    mask: TerrainMask,
     radius: Distance,
     range: Distance,
 ) -> Result<bool, GenieError> {
@@ -68,11 +70,11 @@ pub fn quick_reach(
 ///
 /// Where the pather meets what the slice does not model.
 pub fn quick_reach_from(
-    (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+    (world, by_id): (&mut Spatial, ObjectsRef<'_>),
     me: ObjectId,
     from: Point,
     target: Option<ObjectId>,
-    mask: crate::map::TerrainMask,
+    mask: TerrainMask,
     radius: Distance,
     range: Distance,
 ) -> Result<Option<Distance>, GenieError> {
@@ -106,10 +108,10 @@ impl<'w> HullPather<'w> {
     /// across searches holds the same state.
     #[must_use]
     pub fn new(
-        (world, by_id): (&'w mut Spatial, crate::world::index::ObjectsRef<'w>),
+        (world, by_id): (&'w mut Spatial, ObjectsRef<'w>),
         unit: ObjectId,
         target: Option<ObjectId>,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         radius: Distance,
     ) -> Self {
         let player = world.get(unit).map(|p| p.player);
@@ -127,9 +129,9 @@ impl<'w> HullPather<'w> {
     /// ([`HullPather::new`]).
     #[must_use]
     pub fn for_list(
-        (world, by_id): (&'w mut Spatial, crate::world::index::ObjectsRef<'w>),
+        (world, by_id): (&'w mut Spatial, ObjectsRef<'w>),
         ids: &[ObjectId],
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         radius: Distance,
         player: Option<PlayerId>,
     ) -> Self {

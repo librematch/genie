@@ -3,12 +3,18 @@
 
 use crate::GenieError;
 use crate::groups::MoveReason;
+use crate::groups::UnitGroups;
+use crate::math::fmath::sqrt;
 use crate::math::rng::Stream;
+use crate::movement::PathAsk;
 use crate::movement::Speed;
+use crate::movement::move_to::MoveStep;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::layers::Action;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::sprite::standing;
@@ -20,6 +26,8 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::SPEED_EPSILON;
+use crate::world::Unread;
+use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -34,7 +42,7 @@ impl Unit {
     /// not model.
     pub(crate) fn motion_step(
         &mut self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
@@ -52,10 +60,7 @@ impl Unit {
             Some(_) => self.group_speed(
                 (actions, c.w.parts.unread.get(self.id)),
                 &c.w.groups,
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 c.w.parts.unit_ai.get(self.id),
             )?,
             None => None,
@@ -80,7 +85,7 @@ impl Unit {
             // RGE_Moving_Object::update: a unit that moves animates at its speed (+0x7b8)
             if let Some(v) = mover.velocity.as_ref() {
                 let [x, y, z] = v.velocity.get();
-                let speed = crate::math::fmath::sqrt(x * x + y * y + z * z);
+                let speed = sqrt(x * x + y * y + z * z);
                 if SPEED_EPSILON < speed {
                     c.w.parts.set_anim_speed(self.id, Speed::new(speed));
                 }
@@ -104,12 +109,9 @@ impl Unit {
     /// [`UnitGroup::slot_in_place`]: crate::groups::UnitGroup::slot_in_place
     pub(crate) fn group_speed(
         &self,
-        (actions, unread): (
-            &crate::objects::layers::Action,
-            Option<&crate::world::Unread>,
-        ),
-        groups: &crate::groups::UnitGroups,
-        masters: crate::objects::masters::OwnerMasters<'_>,
+        (actions, unread): (&Action, Option<&Unread>),
+        groups: &UnitGroups,
+        masters: OwnerMasters<'_>,
         ai: Option<&UnitAi>,
     ) -> Result<Option<GroupSpeed>, GenieError> {
         let Some(g) = self.group.id.and_then(|id| groups.get(id)) else {
@@ -136,7 +138,7 @@ impl Unit {
     /// whose deletion lets the target go and stops the unit).
     pub(crate) fn move_to_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -161,7 +163,7 @@ impl Unit {
     /// waits, with its unit AI's stance (aggressive without one).
     fn own_move_give_up(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let villager = self.master(c.w.master_tables(), c.player)?.class == class::VILLAGER;
@@ -176,10 +178,7 @@ impl Unit {
             villager && !c.w.players.player(c.player)?.kind.is_computer(),
             stance,
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             ),
@@ -194,7 +193,7 @@ impl Unit {
     /// [`MoveToAction::check_held`]: crate::movement::move_to::MoveToAction::check_held
     fn own_move_held(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<Option<UpdateCode>, GenieError> {
         let Some(move_to) = actions.list.move_to_mut() else {
@@ -207,7 +206,7 @@ impl Unit {
         let releases = code.is_some() && move_to.voice.is_loud();
         if releases && let Some(target) = target {
             let by = self.releaser(c)?;
-            crate::world::lets::release(c, self, target, by)?;
+            release(c, self, target, by)?;
         }
         Ok(code)
     }
@@ -216,10 +215,10 @@ impl Unit {
     /// its point (the goal, or the target's place); none without a `MoveTo`.
     fn own_move_step(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
-    ) -> Result<crate::movement::move_to::MoveStep, GenieError> {
+    ) -> Result<MoveStep, GenieError> {
         Ok(match actions.list.move_to_mut() {
             Some(move_to) => {
                 // its state 3 reads the unit's AI for the path it asks (0x140aa2a70), with its
@@ -234,7 +233,7 @@ impl Unit {
                         self.place.position().ground(),
                         p,
                     ),
-                    _ => crate::movement::PathAsk::default(),
+                    _ => PathAsk::default(),
                 };
                 // its set_state 1 and 13 show slot 0x798's sprite; slot 0x68 takes the master's
                 // standing sprite for a null one
@@ -258,7 +257,7 @@ impl Unit {
                 };
                 move_to.update(walk, ask, shows)?
             }
-            None => crate::movement::move_to::MoveStep::default(),
+            None => MoveStep::default(),
         })
     }
 
@@ -281,7 +280,7 @@ impl Unit {
     /// The unit's Explore in its update ([`crate::movement::explore::ExploreAction::update`]): nothing without one.
     pub(crate) fn explore_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<(), GenieError> {
@@ -298,7 +297,7 @@ impl Unit {
     /// A bird's Fly in its update ([`crate::movement::fly::Fly::update`]): nothing without one.
     pub(crate) fn fly_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<(), GenieError> {

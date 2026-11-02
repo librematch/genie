@@ -4,21 +4,24 @@ use genie_core::map::Distance;
 use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::map::WholeDistance;
+use genie_core::movement::explore::InfluenceMap;
+use genie_core::players::ai_module::AiModule;
 use genie_core::players::history::HistoryEntry;
 use genie_core::players::history::HistoryUpdates;
 use genie_core::players::history::Population;
 use genie_core::players::history::Share;
 use genie_core::players::history::Tally;
 use genie_core::players::history::TimeSlice;
+use genie_core::players::history::{Event, EventKind, History};
+use genie_core::world::AiSettings;
 use genie_core::world::WorldTime;
 use genie_core::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
+use genie_save::generated::world::{History as WorldHistory, TribeMainDecisionAi, WorldPlayerBase};
 
 /// A player's AI settings as saved (`WorldPlayerBase::save`, `FUN_14166b820`), which GAME's
 /// sub-command 0xb sets.
-pub(super) const fn ai_settings(
-    b: &genie_save::generated::world::WorldPlayerBase,
-) -> genie_core::world::AiSettings {
-    genie_core::world::AiSettings {
+pub(super) const fn ai_settings(b: &WorldPlayerBase) -> AiSettings {
+    AiSettings {
         easiest_reaction_percentage: Percent::new(b.easiest_reaction_percentage),
         easier_reaction_percentage: Percent::new(b.easier_reaction_percentage),
         task_ungrouped_soldiers: b.task_ungrouped_soldiers,
@@ -42,8 +45,8 @@ pub(super) const fn ai_settings(
 /// events in the list's order (the load links each after the last), and the running totals'
 /// low 16 bits into the zeroed ints.
 #[must_use]
-pub fn history(h: &genie_save::generated::world::History) -> genie_core::players::history::History {
-    genie_core::players::history::History {
+pub fn history(h: &WorldHistory) -> History {
+    History {
         entries: h
             .history
             .iter()
@@ -56,8 +59,8 @@ pub fn history(h: &genie_save::generated::world::History) -> genie_core::players
         events: h
             .events
             .iter()
-            .map(|e| genie_core::players::history::Event {
-                kind: genie_core::players::history::EventKind::from(e.temp_event),
+            .map(|e| Event {
+                kind: EventKind::from(e.temp_event),
                 time_slice: TimeSlice::of_data(e.temp_time_slice),
                 world_time: WorldTime::from_millis(e.temp_world_time),
                 data1: e.temp_data1,
@@ -106,9 +109,7 @@ pub fn history(h: &genie_save::generated::world::History) -> genie_core::players
 /// A player's AI module as saved: the parts the simulation reads
 /// ([`genie_core::players::ai_module`]). The explorer and its search points are not saved; the
 /// load makes them none and empty.
-pub fn ai_module(
-    m: &genie_save::generated::world::TribeMainDecisionAi,
-) -> genie_core::players::ai_module::AiModule {
+pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
     use genie_core::players::ai_module::{AiModule, InfoModule, TacticalModule};
     let info = &m.tribe_information_ai_module;
     let grid = &info.tribe_information_ai_module;
@@ -124,7 +125,7 @@ pub fn ai_module(
     AiModule {
         info: InfoModule {
             size: GridSize::new(info.map_width, info.map_height),
-            path_map: genie_core::movement::explore::InfluenceMap {
+            path_map: InfluenceMap {
                 size: GridSize::new(grid.xsize_value, grid.ysize_value),
                 origin: Tile::new(grid.xreference_point_value, grid.yreference_point_value),
                 limit: grid.unchangeable_limit_value,

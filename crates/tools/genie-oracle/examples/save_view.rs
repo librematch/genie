@@ -9,15 +9,19 @@
 //! - `tiles SAVE X0 X1 Y0 Y1`: tile heights in a window, in both axis orders
 
 use genie_oracle::views;
+use std::env::args;
+use std::error::Error;
+use std::fs::read;
+use std::num::ParseIntError;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = std::env::args().collect();
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = args().collect();
     let usage = "usage: save_view objects|movement|unit-ais|tiles SAVE ARGS…";
     let [_, view, save, rest @ ..] = &args[..] else {
         return Err(usage.into());
     };
-    let data = std::fs::read(save)?;
-    let numbers = |from: usize| -> Result<Vec<i32>, std::num::ParseIntError> {
+    let data = read(save)?;
+    let numbers = |from: usize| -> Result<Vec<i32>, ParseIntError> {
         rest[from..].iter().map(|a| a.parse()).collect()
     };
     let text = match (view.as_str(), rest) {

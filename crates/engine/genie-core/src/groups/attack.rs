@@ -4,6 +4,8 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::combat::damage::charge_works;
+use crate::construction::MainBuildingId;
 use crate::groups::FormationCategory;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
@@ -16,9 +18,11 @@ use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::math::fmath;
 use crate::math::fmath::{BVector, below_or_unordered};
+use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
@@ -190,7 +194,7 @@ impl World {
             .building_of(unit.id)
             .annex_of
             .filter(|_| building)
-            .map_or(target, crate::construction::MainBuildingId::id))
+            .map_or(target, MainBuildingId::id))
     }
 
     /// Slot 0x520 (`FUN_14106d530`) of object `id`: where it last moved to ([`moved_place`]).
@@ -268,7 +272,7 @@ impl World {
             .ok_or_else(|| member_gone(target))?;
         let target_master = self.master(t.player(), t.master_id())?;
         let master = u.master(self.master_tables(), p)?;
-        let gap = crate::movement::footprint_gap_squared(
+        let gap = footprint_gap_squared(
             u.position(),
             master.radius,
             t.position(),
@@ -433,19 +437,14 @@ impl World {
     pub(super) fn charge_hits(
         &self,
         u: &Unit,
-        master: &crate::objects::masters::Master,
+        master: &Master,
         target: &WorldObject<'_>,
     ) -> Result<bool, GenieError> {
         if !master.charge_type.ranged() {
             return Ok(false);
         }
         let tm = self.master(target.player(), target.master_id())?;
-        let works = crate::combat::damage::charge_works(
-            master.charge_target,
-            master.charge_type,
-            tm.class,
-            tm.kind,
-        );
+        let works = charge_works(master.charge_target, master.charge_type, tm.class, tm.kind);
         Ok(works && Charge::new(1.0) <= self.parts.combat_of(u.id).charge)
     }
 }
@@ -458,6 +457,6 @@ fn take_into(list: &mut Vec<ObjectId>, ids: &[ObjectId], limit: usize) {
 
 /// Slot 0x520 (`FUN_14106d530`): the place the unit with its `mover` last moved to as the
 /// game holds it (x, height, y); an object that does not move holds its own.
-pub(crate) fn moved_place(u: &Unit, mover: Option<&crate::movement::Mover>) -> BVector {
+pub(crate) fn moved_place(u: &Unit, mover: Option<&Mover>) -> BVector {
     mover.map_or_else(|| u.position(), |m| m.moved_at).vector()
 }

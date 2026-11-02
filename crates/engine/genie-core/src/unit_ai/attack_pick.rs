@@ -1,14 +1,22 @@
 //! Which object a unit may attack: the attack search, its picks and each type's rules.
 
 use crate::GenieError;
+use crate::combat::Firepower;
+use crate::combat::attack::ATTACK;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::maxss;
+use crate::math::image::unit_ai::{
+    ARMED_FIREPOWER as UNIT_AI_ARMED_FIREPOWER, DEFEND_GROWTH as UNIT_AI_DEFEND_GROWTH,
+    STANCE_RANGE_GROWTH as UNIT_AI_STANCE_RANGE_GROWTH,
+};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
@@ -17,6 +25,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::action_type::{COMBAT as ACTION_TYPE_COMBAT, PACK, UNPACK};
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
@@ -30,6 +39,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::best_target::Ask;
 use crate::unit_ai::{
     ARTIFACT_AI, BOAR_AI, BUILDING_AI, CIVILIAN, FISHING_AI, OrderRecord, SIEGE_AI, SIEGE_TOWER_AI,
     TRADE_AI, TRANSPORT_AI, civilian_may_attack, defend_patrol_range, lion_may_attack,
@@ -89,8 +99,8 @@ impl AttackAsk {
 
     /// The full arguments ([`crate::unit_ai::best_target::Ask`]).
     #[must_use]
-    pub fn ask(&self) -> crate::unit_ai::best_target::Ask {
-        crate::unit_ai::best_target::Ask {
+    pub fn ask(&self) -> Ask {
+        Ask {
             distance: self.distance,
             idle: self.idle,
             paths: u8::from(self.paths),
@@ -128,7 +138,7 @@ pub enum Pick {
         /// The master (−1 any).
         master: Option<MasterId>,
         /// The workers cap (−1 none).
-        workers: crate::objects::WorkerCount,
+        workers: WorkerCount,
         /// The relation passed over (argument 9; −1 none).
         spared: Option<QueryRelation>,
         /// Argument 8: only objects the unit reaches count (slot 0x3d0); every caller but the
@@ -204,7 +214,7 @@ pub struct Attacker {
     /// The game mode is a scenario's.
     pub scenario: bool,
     /// Its firepower (`+0xa00`): the units inside a building add theirs.
-    pub firepower: crate::combat::Firepower,
+    pub firepower: Firepower,
     /// Its `+0x924` (`FUN_14107cc90`): a Gaia siege unit attacks only with 0.
     pub capture: CaptureKind,
 }
@@ -303,10 +313,7 @@ pub(super) const TOWER_SPARED: [MasterId; 2] = [MasterId::named(50), MasterId::n
 /// priest's (`FUN_140c19020`: its conversion test, slot 0x1b8) is not modelled here.
 pub fn can_attack(me: &Attacker, seeker: &Seeker, t: &Target) -> Result<bool, GenieError> {
     match me.ai_type {
-        UnitAiType::HUNTED => Ok(matches!(
-            me.top_action,
-            Some(crate::combat::attack::ATTACK | crate::objects::masters::action_type::COMBAT)
-        )),
+        UnitAiType::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ACTION_TYPE_COMBAT))),
         UnitAiType::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class)),
         BOAR_AI
         | UnitAiType::RANGED_6
@@ -400,8 +407,7 @@ pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
 
 /// An attacker without a missile is armed with a firepower above this (`FUN_14120ea30`,
 /// `DAT_14330eb8c`).
-pub(super) const ARMED_FIREPOWER: crate::combat::Firepower =
-    crate::combat::Firepower::new(crate::math::image::unit_ai::ARMED_FIREPOWER);
+pub(super) const ARMED_FIREPOWER: Firepower = Firepower::new(UNIT_AI_ARMED_FIREPOWER);
 /// A soldier never attacks with this master (raw `0x6258`).
 pub(super) const SOLDIER_NEVER: MasterId = MasterId::named(444);
 /// The master and class whose packed state (top action 124 or 125) attacks nothing (raw
@@ -410,15 +416,14 @@ pub(super) const PACKED_MASTER: MasterId = MasterId::named(109);
 pub(super) const PACKED_CLASS: ClassId = class::CLASS_54;
 /// The soldier's range against a target grows by this for its stance checks
 /// (`DAT_142e7f384`).
-pub(super) const STANCE_RANGE_GROWTH: Distance =
-    Distance::new(crate::math::image::unit_ai::STANCE_RANGE_GROWTH);
+pub(super) const STANCE_RANGE_GROWTH: Distance = Distance::new(UNIT_AI_STANCE_RANGE_GROWTH);
 /// And the defend stance's by this more (`DAT_14330ebb8`).
-pub(super) const DEFEND_GROWTH: f32 = crate::math::image::unit_ai::DEFEND_GROWTH;
+pub(super) const DEFEND_GROWTH: f32 = UNIT_AI_DEFEND_GROWTH;
 
 /// The squared gap between a point and an object's footprint (`FUN_140a847c0`: per axis the
 /// distance less the radius, `MAXSS 0` of it, so a gap that is not a number stays one).
 pub(super) fn point_gap_squared(point: Point, at: Position, radius: Footprint) -> DistanceSquared {
-    let gap = |d: f32, r: f32| crate::math::fmath::maxss(0.0, d.abs() - r);
+    let gap = |d: f32, r: f32| maxss(0.0, d.abs() - r);
     let x = gap(point.x() - at.x(), radius.x());
     let y = gap(point.y() - at.y(), radius.y());
     DistanceSquared::new(y * y + x * x)
@@ -501,13 +506,7 @@ pub(super) fn never_attacks(me: &Attacker) -> bool {
         return true;
     }
     (me.class == Some(PACKED_CLASS) || me.master == PACKED_MASTER)
-        && matches!(
-            me.top_action,
-            Some(
-                crate::objects::masters::action_type::PACK
-                    | crate::objects::masters::action_type::UNPACK
-            )
-        )
+        && matches!(me.top_action, Some(PACK | UNPACK))
 }
 
 /// [`soldier_can_attack`]'s stance: in `StandGround` (stance 2) only within its range against

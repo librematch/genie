@@ -9,6 +9,9 @@ use genie_rec::de::Op;
 use crate::fixtures::{combat_object, gaia, header, human, recording};
 use crate::survey::{field_key, header_survey};
 use crate::{Error, ONLY_IN_THE_GAME, object_field_differences_in};
+use genie_core::combat::AttackCount;
+use genie_core::objects::layers::Combat;
+use genie_core::world::parts::ObjectParts;
 
 fn every(n: usize) -> NonZeroUsize {
     NonZeroUsize::new(n).unwrap()
@@ -83,9 +86,9 @@ fn the_scope_widens_the_compared_fields() {
             idle_variant,
             ..Unit::default()
         },
-        parts: genie_core::world::parts::ObjectParts {
-            combat: genie_core::objects::layers::Combat {
-                attack_count: genie_core::combat::AttackCount::of_data(attack_count),
+        parts: ObjectParts {
+            combat: Combat {
+                attack_count: AttackCount::of_data(attack_count),
                 ..Default::default()
             },
             ..Default::default()

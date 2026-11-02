@@ -12,7 +12,13 @@ use crate::groups::TransformType;
 use crate::groups::UnitType;
 use crate::groups::{Formation, FormationLine, Slot, UnitGroup};
 use crate::map::Distance;
+use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{self, BVector};
+use crate::math::image::group::{
+    BOX_HALF as GROUP_BOX_HALF, BOX_SIDE_SHARE as GROUP_BOX_SIDE_SHARE,
+    BOX_SIDES as GROUP_BOX_SIDES, EPSILON, HORDE_REACH as GROUP_HORDE_REACH, SPACING_FACTOR,
+    USER_DEFINED_BACK as GROUP_USER_DEFINED_BACK,
+};
 use crate::objects::ObjectId;
 use crate::world::World;
 use crate::world::WorldTime;
@@ -20,21 +26,21 @@ use crate::world::slots::CheckedIndex;
 
 /// A horde's and a user defined formation's slots lie at most this far from the group's place
 /// (`DAT_14330ebb8`).
-const HORDE_REACH: f32 = crate::math::image::group::HORDE_REACH;
+const HORDE_REACH: f32 = GROUP_HORDE_REACH;
 /// A user defined formation's slots move back by the farthest one ahead plus this
 /// (`DAT_142e7f384`).
-const USER_DEFINED_BACK: f32 = crate::math::image::group::USER_DEFINED_BACK;
+const USER_DEFINED_BACK: f32 = GROUP_USER_DEFINED_BACK;
 /// Half: a phalanx's even line's step, a box's first side and its middles (`DAT_142e7f384`, and
 /// the phalanx's `DAT_142e8c150` as a divisor).
-const BOX_HALF: f32 = crate::math::image::group::BOX_HALF;
+const BOX_HALF: f32 = GROUP_BOX_HALF;
 /// A phalanx's even line moves back by its step over this (`DAT_142e8c150`).
-const TWO: f32 = crate::math::image::group::SPACING_FACTOR;
+const TWO: f32 = SPACING_FACTOR;
 /// A box's perimeter is its side times this (`DAT_142eb0f48`).
-const BOX_SIDES: f32 = crate::math::image::group::BOX_SIDES;
+const BOX_SIDES: f32 = GROUP_BOX_SIDES;
 /// A box too small for its units grows to this share of their length (`DAT_142eb880c`).
-const BOX_SIDE_SHARE: f32 = crate::math::image::group::BOX_SIDE_SHARE;
+const BOX_SIDE_SHARE: f32 = GROUP_BOX_SIDE_SHARE;
 /// Two slots whose offsets on x differ by less than this share a box's line (`DAT_142eb0c60`).
-const LINE_EPSILON: f32 = crate::math::image::group::EPSILON;
+const LINE_EPSILON: f32 = EPSILON;
 /// The places of the box's positions buffer (`DAT_143f15f00`, `FUN_14102ab30`'s `0x3c`).
 pub const BOX_POSITIONS: usize = 60;
 
@@ -540,7 +546,7 @@ pub(crate) fn box_slots(
     formation.kind = FormationKind::BOX;
     formation.transform_type = TransformType::TURNED;
     // CVTTSS2SI at 0x141012147 (a NaN or out of range width is i32::MIN)
-    let width = crate::math::conversions::cvttss2si(max_x - min_x);
+    let width = cvttss2si(max_x - min_x);
     formation.maximum_width = width;
     formation.maximum_depth = width;
     create_lines(formation)?;
@@ -643,6 +649,8 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::groups::formation::tests::slot_world;
     use crate::groups::{Member, UnitTypeStatistic};
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
@@ -835,7 +843,7 @@ mod tests {
     /// Group 1 of `slot_world`'s units 10, 11 (category 1) and 12 (category 3) at (5.5, 5.5),
     /// (6.5, 5.5) and (5.5, 6.5), their statistics, the group at (6, 6), spacing 1.
     fn three_at_six() -> World {
-        let mut t = crate::groups::formation::tests::slot_world(
+        let mut t = slot_world(
             &[(10, 4, 5.5, 5.5), (11, 4, 6.5, 5.5), (12, 6, 5.5, 6.5)],
             &[],
         );

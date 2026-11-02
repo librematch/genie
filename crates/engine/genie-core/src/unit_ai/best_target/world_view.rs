@@ -2,9 +2,11 @@
 //! world ([`Battlefield`]).
 
 use crate::map::Distance;
+use crate::math::image::best_target::ORDER_WINDOW as BEST_TARGET_ORDER_WINDOW;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -12,11 +14,14 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::best_target::Candidate;
+use crate::unit_ai::best_target::OrderWeight;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
+use crate::unit_ai::{ActionKind, OrderKind};
 use crate::world::WorldTime;
+use crate::world::{Percent, TargetingMode};
 
 /// The order history's window (`DAT_142efe420`, 60000 ms as a float).
-pub(super) const ORDER_WINDOW: f32 = crate::math::image::best_target::ORDER_WINDOW;
+pub(super) const ORDER_WINDOW: f32 = BEST_TARGET_ORDER_WINDOW;
 
 /// What `bestUnitToAttack` reads of the unit whose AI searches, and of that AI.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -28,9 +33,9 @@ pub struct Searcher {
     /// The AI's target's class (`+0x4c`) and its last target's (`+0x70`).
     pub target_classes: [Option<ClassId>; 2],
     /// The AI's order (`+0x3c`) and action (`+0x44`).
-    pub order: Option<crate::unit_ai::OrderKind>,
+    pub order: Option<OrderKind>,
     /// The AI's action (`+0x44`).
-    pub action: Option<crate::unit_ai::ActionKind>,
+    pub action: Option<ActionKind>,
     /// The unit's master's id, class and type (`+0x5d7`, `+0x98f`, the master's `+0x8`).
     pub master: MasterId,
     /// Its master's class.
@@ -38,7 +43,7 @@ pub struct Searcher {
     /// Its master's type (`'F'`, 70: the combat type).
     pub kind: MasterKind,
     /// Its master's `attack_priority` (`+0x92c`, `FUN_141202220`).
-    pub attack_priority: crate::objects::masters::AttackPriority,
+    pub attack_priority: AttackPriority,
     /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
     pub player_type: PlayerType,
     /// Its owner may attack walls (`player+0x611`, the AI's slot 0x18's player).
@@ -58,11 +63,11 @@ pub struct Searcher {
     /// The game mode is a scenario's (`FUN_141302540`).
     pub scenario: bool,
     /// Its owner's targeting mode and factor (`player+0x614`, `+0x618`).
-    pub targeting: (crate::world::TargetingMode, crate::world::Percent),
+    pub targeting: (TargetingMode, Percent),
     /// The order history's weights ([`order_weights`]).
     ///
     /// [`order_weights`]: crate::unit_ai::best_target::statistics::order_weights
-    pub weights: ByCategory<crate::unit_ai::best_target::OrderWeight>,
+    pub weights: ByCategory<OrderWeight>,
     /// The AI's retarget entries' targets (`+0x1e0`).
     pub retries: Vec<ObjectId>,
     /// The world's time (`FUN_1415300d0`).

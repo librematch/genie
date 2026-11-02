@@ -4,7 +4,9 @@
 use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
+use crate::groups::common_group;
 use crate::objects::ObjectId;
+use crate::orders::Split;
 use crate::orders::{LISTED, set_differentiator_groups};
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
@@ -53,9 +55,7 @@ impl World {
             if group_units.is_empty() {
                 continue;
             }
-            let common = crate::groups::common_group(group_units, |id| {
-                self.object(id).map(|(_, u)| u.group)
-            });
+            let common = common_group(group_units, |id| self.object(id).map(|(_, u)| u.group));
             let id = if let Some(common) = common {
                 match self.groups.get(common) {
                     None => continue,
@@ -99,7 +99,7 @@ impl World {
     /// What the joins, the stop and the statistics do not model.
     fn form_group(
         &mut self,
-        split: &crate::orders::Split,
+        split: &Split,
         units: &[ObjectId],
         number: usize,
     ) -> Result<GroupId, GenieError> {

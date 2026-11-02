@@ -17,9 +17,18 @@ use crate::objects::masters::master_type::ACTION;
 use crate::pathing::tile_path::Found;
 
 use crate::map::spatial::Spatial;
+use crate::math::image::turn::{
+    DROP_NO_POINT, DROP_REACH as TURN_DROP_REACH, FISHING_REACH as TURN_FISHING_REACH,
+    NO_DROP_DISTANCE as TURN_NO_DROP_DISTANCE, SHORT_DROP_REACH as TURN_SHORT_DROP_REACH,
+};
 use crate::movement::{Me, Mover, Planning, footprint_gap_squared};
+use crate::objects::layers::Action;
 use crate::objects::masters::Master;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::unit::Unit;
+use crate::pathing::zones::ZoneMap;
+use crate::world::Unread;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 
 /// The unit a drop-site search goes from ([`drop_site_search`]).
@@ -27,14 +36,14 @@ pub(crate) struct Seeker<'a, 'b> {
     /// The unit.
     pub(crate) unit: &'a Unit,
     /// Its action layer, whose top action's target the search reads (slot 0x190).
-    pub(crate) actions: &'a crate::objects::layers::Action,
+    pub(crate) actions: &'a Action,
     /// Why the load could not read it whole, if it could not ([`crate::world::Unread`]).
-    pub(crate) unread: Option<&'a crate::world::Unread>,
+    pub(crate) unread: Option<&'a Unread>,
     pub(crate) me: Me,
     pub(crate) mover: &'a Mover,
     pub(crate) plan: &'a mut Planning<'b>,
     pub(crate) spatial: &'a mut Spatial,
-    pub(crate) zones: &'a crate::pathing::zones::ZoneMap,
+    pub(crate) zones: &'a ZoneMap,
     /// Its master's class.
     pub(crate) class: ClassId,
     /// The nearest is by path (`FUN_1411671e0`'s argument 9: a human player's); else by the
@@ -44,7 +53,7 @@ pub(crate) struct Seeker<'a, 'b> {
 
 /// The point of a search from no point (`DAT_14330ec20`): at or below it on either axis the
 /// search has no zone and goes by distance; at it on both axes the first drop site wins.
-pub(crate) const NO_POINT: f32 = crate::math::image::turn::DROP_NO_POINT;
+pub(crate) const NO_POINT: f32 = DROP_NO_POINT;
 
 impl Seeker<'_, '_> {
     /// A fishing ship ([`class::FISHING_SHIP`]) seeks in every zone and counts a drop site its path
@@ -71,7 +80,7 @@ impl Seeker<'_, '_> {
         by_path: bool,
         squared: f32,
         last: &mut f32,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<f32>, GenieError> {
         let radii = Distance::new(self.mover.stats.radius.x() + master.radius.x());
         let to = o.position().ground();
@@ -133,8 +142,7 @@ impl Seeker<'_, '_> {
 }
 /// The squared footprint gap within which a fishing ship counts a drop site its path does not
 /// reach (`DAT_14330ebcc`).
-pub(crate) const FISHING_REACH: DistanceSquared =
-    DistanceSquared::new(crate::math::image::turn::FISHING_REACH);
+pub(crate) const FISHING_REACH: DistanceSquared = DistanceSquared::new(TURN_FISHING_REACH);
 
 /// Whether the planner's result `found` lets a drop site count in [`drop_site_search`]: a path
 /// to it or into its range (below 2), or for a fishing ship seeking by path one the planner
@@ -168,12 +176,12 @@ pub(crate) fn counted(
 /// of equals wins.
 pub(crate) fn drop_site_search<'u>(
     units: impl IntoIterator<Item = &'u Unit>,
-    masters: crate::objects::masters::OwnerMasters<'_>,
+    masters: OwnerMasters<'_>,
     sites: &[MasterId],
     at: Position,
     mut seeker: Option<Seeker<'_, '_>>,
     (outside, at_work): (bool, Option<ActionType>),
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<Option<DropSiteId>, GenieError> {
     let (mut x, mut y) = (at.x(), at.y());
     let pointless = x <= NO_POINT || y <= NO_POINT;
@@ -205,7 +213,7 @@ pub(crate) fn drop_site_search<'u>(
             ACTION <= master.kind
                 && by_id
                     .actions(o.id)
-                    .and_then(crate::objects::layers::Action::top_action_kind)
+                    .and_then(Action::top_action_kind)
                     .is_some_and(|k| {
                         // The action types the Gather's drop-site searches pass over (`FUN_1411671e0`'s
                         // argument 8 `0x7d`, which takes `0x7c` with it).
@@ -243,11 +251,11 @@ pub(crate) fn drop_site_search<'u>(
 
 /// A drop site within this path length is measured by the short path too (`FUN_1411671e0`,
 /// `DAT_142eb0f4c`).
-pub(crate) const SHORT_DROP_REACH: f32 = crate::math::image::turn::SHORT_DROP_REACH;
+pub(crate) const SHORT_DROP_REACH: f32 = TURN_SHORT_DROP_REACH;
 /// The range the short path measures a drop site within (`DAT_142eb5690`).
-pub(crate) const DROP_REACH: f32 = crate::math::image::turn::DROP_REACH;
+pub(crate) const DROP_REACH: f32 = TURN_DROP_REACH;
 /// The distance a drop-site search starts from (`DAT_14330ebf4`, the largest float).
-pub(crate) const NO_DROP_DISTANCE: f32 = crate::math::image::turn::NO_DROP_DISTANCE;
+pub(crate) const NO_DROP_DISTANCE: f32 = TURN_NO_DROP_DISTANCE;
 
 /// `FUN_1411671e0` with a point and no unit: of the player's live objects (`others`, in list
 /// order) of a master in `sites` and in state 2, the one nearest `at` (its centre's squared
@@ -276,19 +284,31 @@ pub(crate) fn nearest_drop_site(
 mod tests {
     use super::*;
     use crate::construction::build::BuildTask;
+    #[cfg(test)]
+    use crate::construction::build::tests::started;
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
+    #[cfg(test)]
+    use crate::groups::UnitGroups;
     use crate::map::Footprint;
     use crate::map::Restriction;
     use crate::map::spatial::Placed;
+    #[cfg(test)]
+    use crate::map::{GridSize, TerrainId};
     use crate::math::rng::Well512;
     use crate::objects::ActionState;
     use crate::objects::WorkRate;
     use crate::objects::actions::ActionList;
+    #[cfg(test)]
+    use crate::objects::layers::Static;
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::Master;
     use crate::objects::masters::Masters;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskId;
+    #[cfg(test)]
+    use crate::objects::masters::WorkValue;
     use crate::objects::masters::ids;
     use crate::objects::masters::master_type;
     use crate::pathing::Pathing;
@@ -298,6 +318,8 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::parts::{Object, no_own_masters};
 
     /// The town centre (master 109) and the mill (master 68), the villager's drop sites.
     const SITES: [MasterId; 2] = [MasterId::named(109), MasterId::named(68)];
@@ -305,7 +327,7 @@ mod tests {
     fn object(id: i32, master_id: MasterId, at: Point) -> Unit {
         Unit {
             id: object_id(id),
-            place: crate::objects::layers::Static::at(at.with_height(0.0)),
+            place: Static::at(at.with_height(0.0)),
             life: Lifecycle {
                 state: ObjectState::Alive,
                 master_id,
@@ -339,20 +361,20 @@ mod tests {
     }
 
     /// The villager 10 at (20, 20), building the object `target` when there is one.
-    fn villager(target: Option<i32>) -> crate::world::parts::Object {
+    fn villager(target: Option<i32>) -> Object {
         let task = BuildTask {
             range: Distance::new(0.1),
-            work_value: crate::objects::masters::WorkValue::new(1.0),
+            work_value: WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,
         };
-        crate::world::parts::Object::with_actions(
+        Object::with_actions(
             object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0)),
-            crate::objects::layers::Action {
+            Action {
                 list: ActionList::default().with_build(target.map(|t| {
-                    crate::construction::build::tests::started(
+                    started(
                         object_id(t),
                         Position::new(20.0, 17.0, 0.0),
                         Distance::ZERO,
@@ -392,23 +414,23 @@ mod tests {
     /// on an open map without planners: by path, no object gets a length.
     fn search(
         units: &[Unit],
-        seeker: &crate::world::parts::Object,
+        seeker: &Object,
         class: ClassId,
         at: Position,
         spatial: &Spatial,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let (unit, actions) = (&seeker.unit, &seeker.parts.actions);
-        let mover = crate::gathering::hunt::tests::walker();
+        let mover = walker();
         // the search writes the obstruction manager's scratch: it runs on the fixture's copy
         let mut spatial = spatial.clone();
         let zones = ZoneMap::new(
-            crate::map::GridSize::new(40, 40),
-            &[crate::map::TerrainId::named(0); 1600],
+            GridSize::new(40, 40),
+            &[TerrainId::named(0); 1600],
             &Restriction::new(vec![1.0]),
         );
         let mut pathing = Pathing::default();
         let mut object = Well512::default();
-        let groups = crate::groups::UnitGroups::default();
+        let groups = UnitGroups::default();
         let mut plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
@@ -435,15 +457,12 @@ mod tests {
         };
         drop_site_search(
             units,
-            crate::objects::masters::OwnerMasters::new(
-                crate::world::parts::no_own_masters(),
-                Some(&masters()),
-            ),
+            OwnerMasters::new(no_own_masters(), Some(&masters())),
             &SITES,
             at,
             Some(seeker),
             (false, None),
-            crate::world::index::ObjectsRef::empty(),
+            ObjectsRef::empty(),
         )
     }
 
@@ -507,9 +526,7 @@ mod tests {
             Ok(None)
         );
         let mut unmodelled = villager(None);
-        unmodelled.parts.unread = Some(crate::world::Unread::new(GenieError::unsupported(
-            "an action",
-        )));
+        unmodelled.parts.unread = Some(Unread::new(GenieError::unsupported("an action")));
         assert!(search(&sites(), &unmodelled, class::VILLAGER, at, &near_tc).is_err());
     }
 

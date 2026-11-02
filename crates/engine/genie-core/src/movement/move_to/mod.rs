@@ -33,6 +33,8 @@ mod list;
 mod move_wait_state;
 mod sub_action;
 
+use crate::combat::abilities::Look;
+use crate::math::image::move_to::{OFF_HIGH as MOVE_TO_OFF_HIGH, OFF_LOW as MOVE_TO_OFF_LOW};
 pub(crate) use crate::movement::move_to::action::TARGET_LACKING;
 pub use crate::movement::move_to::action::{
     MoveDefaults, MoveStep, MoveToAction, Shows, ai_sprite, holds_object, object_range,
@@ -43,6 +45,9 @@ pub use crate::movement::move_to::list::ListUpdate;
 pub(crate) use crate::movement::move_to::list::update_sub_actions;
 pub use crate::movement::move_to::move_wait_state::MoveWaitState;
 pub use crate::movement::move_to::sub_action::{GiveUp, NO_TARGET_GAP};
+use crate::objects::Graphics;
+use crate::objects::masters::Master;
+use crate::world::WALKER_UNMOVING;
 
 /// The `MoveTo` action's type, which word 9 adds when it is a unit's top action.
 pub const MOVE_TO: ActionType = ActionType::named(1);
@@ -295,7 +300,7 @@ pub fn ask_walk(
     };
     let now = walk.plan.as_ref().map_or(WorldTime::ZERO, |p| p.now);
     let here = walk.position();
-    let mover = walk.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
+    let mover = walk.mover_mut().ok_or(WALKER_UNMOVING)?;
     let ground = mover.stats.radius.ground();
     let squared = if target.is_none() {
         let gap = footprint_gap(here, ground, point, radius);
@@ -324,7 +329,7 @@ const SPRITE_LACKING: GenieError =
 ///
 /// A sprite the table lacks.
 pub fn graphic_of(
-    graphics: &crate::objects::Graphics,
+    graphics: &Graphics,
     id: Option<SpriteId>,
 ) -> Result<Option<Graphic>, GenieError> {
     id.map(|id| {
@@ -343,18 +348,14 @@ pub struct SpriteReads<'a> {
     /// The constructors' defaults ([`MoveDefaults::of`]).
     pub defaults: MoveDefaults,
     /// The sprites' table.
-    pub graphics: &'a crate::objects::Graphics,
+    pub graphics: &'a Graphics,
 }
 
 impl<'a> SpriteReads<'a> {
     /// The defaults of a unit of `master` with the terrain look `look` ([`MoveDefaults::of`]),
     /// and the sprites' table.
     #[must_use]
-    pub fn of(
-        master: &crate::objects::masters::Master,
-        look: Option<&crate::combat::abilities::Look>,
-        graphics: &'a crate::objects::Graphics,
-    ) -> Self {
+    pub fn of(master: &Master, look: Option<&Look>, graphics: &'a Graphics) -> Self {
         Self {
             defaults: MoveDefaults::of(master, look),
             graphics,
@@ -389,7 +390,7 @@ pub struct Sprites<'a> {
     /// The Sprite stream.
     pub rng: &'a mut Well512,
     /// The sprites' table.
-    pub graphics: &'a crate::objects::Graphics,
+    pub graphics: &'a Graphics,
 }
 
 impl Sprites<'_> {
@@ -449,7 +450,7 @@ pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
     } = walk;
     let mover = motion
         .and_then(layers::Motion::mover_mut)
-        .ok_or(crate::world::WALKER_UNMOVING)?;
+        .ok_or(WALKER_UNMOVING)?;
     if mover.paths.is_empty() {
         return Err(GenieError::unsupported("the path request (FUN_14114e410)"));
     }
@@ -464,8 +465,8 @@ pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
 
 /// A target leaves the `MoveTo`'s point when it is more than this off it on either axis
 /// (`DAT_142eb6e58`, `DAT_142e7f384`).
-const OFF_LOW: f32 = crate::math::image::move_to::OFF_LOW;
-const OFF_HIGH: f32 = crate::math::image::move_to::OFF_HIGH;
+const OFF_LOW: f32 = MOVE_TO_OFF_LOW;
+const OFF_HIGH: f32 = MOVE_TO_OFF_HIGH;
 
 /// What [`target_moved`] found.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -530,7 +531,7 @@ pub fn target_left(
     if mode == TargetMoved::AsksAgain {
         return Ok(Follow::Again);
     }
-    let mover = walk.mover().ok_or(crate::world::WALKER_UNMOVING)?;
+    let mover = walk.mover().ok_or(WALKER_UNMOVING)?;
     if mover.walks_to_path_end()? {
         let me = walk.position();
         let (a, b) = (me.ground(), at.ground());
@@ -558,6 +559,8 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::math::Angle;
     use crate::movement::Speed;
+    #[cfg(test)]
+    use crate::movement::tests::{WalkRig, builder_9177, tiled_world};
     use crate::objects::ActionState;
     use crate::objects::ObjectState;
     use crate::objects::UpdateCode;
@@ -568,6 +571,8 @@ mod tests {
     use crate::players::PlayerId;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::unit_ai::{ActionKind, Inbox, NotifyKind, UnitAi};
 
     /// A `MoveTo` sub-action ([`MoveToAction::sub_update`]) on house 10028 within 0.1 (the
     /// walker 0.8 off it) with [`WalkRig`]'s walker: a start asks for its path (a `MoveTo` that
@@ -598,7 +603,7 @@ mod tests {
         };
         let mut ai = None;
         let mut update = |m: &mut MoveToAction| {
-            let mut inbox = crate::unit_ai::Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
+            let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
             // the house 10028 stands (state 2)
             m.sub_update(
                 &mut rig.walk(4),
@@ -729,8 +734,8 @@ mod tests {
                 on_target_moved: mode,
                 ..MoveToAction::sub_in(MoveTo::Moving)
             };
-            let mut ai = Some(crate::unit_ai::UnitAi::default());
-            let mut inbox = crate::unit_ai::Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
+            let mut ai = Some(UnitAi::default());
+            let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
             let code = m.sub_update(
                 &mut rig.walk(4),
                 PathAsk::default(),
@@ -739,7 +744,7 @@ mod tests {
                 None,
                 &mut inbox,
             );
-            let posted: Vec<crate::unit_ai::NotifyKind> =
+            let posted: Vec<NotifyKind> =
                 ai.map_or(vec![], |ai| ai.notifies.iter().map(|n| n.kind).collect());
             (
                 code,
@@ -773,7 +778,7 @@ mod tests {
             (
                 Ok(UpdateCode::UNDER_WAY),
                 MoveTo::Start,
-                vec![crate::unit_ai::NotifyKind::TARGET_MOVED],
+                vec![NotifyKind::TARGET_MOVED],
                 true,
                 off
             )
@@ -794,13 +799,13 @@ mod tests {
                 ..MoveToAction::sub_in(MoveTo::Moving)
             };
             // a moving unit's AI: an invalidation of its move joins its queue
-            let mut ai = Some(crate::unit_ai::UnitAi {
-                current_action: Some(crate::unit_ai::ActionKind::Move),
-                ..crate::unit_ai::UnitAi::default()
+            let mut ai = Some(UnitAi {
+                current_action: Some(ActionKind::Move),
+                ..UnitAi::default()
             });
-            let mut inbox = crate::unit_ai::Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
+            let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
             let code = m.check_held(state, &mut inbox).unwrap();
-            let posted: Vec<(crate::unit_ai::NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
+            let posted: Vec<(NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
                 ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
             });
             (code, ObjectId::field(m.target), posted)
@@ -818,22 +823,19 @@ mod tests {
             checked(Voice::Quiet, 10028, Some(ObjectState::Removed)),
             (Some(UpdateCode::CODE_5), -1, vec![])
         );
-        let invalidated = (
-            crate::unit_ai::NotifyKind::ACTION_INVALIDATED,
-            [0x262, -1, 0],
-        );
+        let invalidated = (NotifyKind::ACTION_INVALIDATED, [0x262, -1, 0]);
         assert_eq!(
             checked(Voice::Loud, 10028, Some(ObjectState::Removed)),
             (Some(UpdateCode::CODE_4), -1, vec![invalidated])
         );
         // through the sub-action's update, before its state's case
-        let mut rig = crate::movement::tests::WalkRig::on_the_path();
+        let mut rig = WalkRig::on_the_path();
         let mut m = MoveToAction {
             target: Some(object_id(10028)),
             ..MoveToAction::sub_in(MoveTo::Moving)
         };
         let mut ai = None;
-        let mut inbox = crate::unit_ai::Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
+        let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
         let ask = PathAsk::default();
         let code = m.sub_update(
             &mut rig.walk(4),
@@ -867,17 +869,17 @@ mod tests {
     /// move action value (0x262) and 0, 0, unless the `MoveTo` is quiet; the codes stay 1 and 3.
     #[test]
     fn not_quiet_move_to_posts_its_end_and_quiet_one_does_not() {
-        let mut rig = crate::movement::tests::WalkRig::on_the_path();
+        let mut rig = WalkRig::on_the_path();
         let mut update = |voice: Voice, state: MoveTo| {
             let mut m = MoveToAction {
                 voice,
                 ..MoveToAction::sub_in(state)
             };
-            let mut ai = Some(crate::unit_ai::UnitAi {
-                current_action: Some(crate::unit_ai::ActionKind::Move),
-                ..crate::unit_ai::UnitAi::default()
+            let mut ai = Some(UnitAi {
+                current_action: Some(ActionKind::Move),
+                ..UnitAi::default()
             });
-            let mut inbox = crate::unit_ai::Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
+            let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
             let code = m
                 .sub_update(
                     &mut rig.walk(4),
@@ -888,7 +890,7 @@ mod tests {
                     &mut inbox,
                 )
                 .unwrap();
-            let posted: Vec<(crate::unit_ai::NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
+            let posted: Vec<(NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
                 ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
             });
             (code, posted)
@@ -905,14 +907,14 @@ mod tests {
             update(Voice::Loud, MoveTo::Arrived),
             (
                 UpdateCode::DONE,
-                vec![(crate::unit_ai::NotifyKind::ACTION_COMPLETED, [0x262, 0, 0])]
+                vec![(NotifyKind::ACTION_COMPLETED, [0x262, 0, 0])]
             )
         );
         assert_eq!(
             update(Voice::Loud, MoveTo::Failed),
             (
                 UpdateCode::FAILED,
-                vec![(crate::unit_ai::NotifyKind::ACTION_FAILED, [0x262, 0, 0])]
+                vec![(NotifyKind::ACTION_FAILED, [0x262, 0, 0])]
             )
         );
     }
@@ -1006,8 +1008,8 @@ mod tests {
             walled[y * 120 + 29] = 1;
         }
         let moved = |classes: &[u8], point: Position, target, mode| {
-            let mut world = crate::movement::tests::tiled_world(classes.to_vec());
-            let mover = crate::movement::tests::builder_9177();
+            let mut world = tiled_world(classes.to_vec());
+            let mover = builder_9177();
             let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
             let mut motion = layers::Motion::Moving(mover);
             let mut walk = Walk {

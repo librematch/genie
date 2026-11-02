@@ -33,6 +33,7 @@ use crate::players::PlayerSet;
 use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use std::collections::HashMap;
 
 /// The ghosts' master in every player's list (`player+0x28`'s entry 243, "DOPL").
 pub const GHOST_MASTER: MasterId = MasterId::named(243);
@@ -272,8 +273,7 @@ impl World {
     pub fn build_watched(&mut self) -> Result<(), GenieError> {
         // each id's object as [`World::object`] finds it (the first player in order, its live list
         // before its sleeping list), looked up once: the loop changes only the watched lists
-        let mut first: std::collections::HashMap<ObjectId, (PlayerId, bool, ListIndex)> =
-            std::collections::HashMap::new();
+        let mut first: HashMap<ObjectId, (PlayerId, bool, ListIndex)> = HashMap::new();
         for (q, player) in PlayerId::each(self.players.len()).zip(&self.players) {
             for (sleeping, list) in [(false, &player.objects), (true, &player.sleeping)] {
                 for (k, u) in list.indexed() {
@@ -674,11 +674,21 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::construction::BuilderCount;
     use crate::construction::MainBuildingId;
+    #[cfg(test)]
+    use crate::construction::build::Construction;
     use crate::map::Distance;
     use crate::map::GridSize;
+    #[cfg(test)]
+    use crate::map::Snow;
     use crate::map::TileOffset;
+    #[cfg(test)]
+    use crate::map::spatial::Obstruction;
     use crate::objects::MasterHitPoints;
+    #[cfg(test)]
+    use crate::objects::layers::Static;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::ids;
@@ -687,9 +697,19 @@ mod tests {
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
     use crate::ownership::CaptureKind;
+    #[cfg(test)]
+    use crate::players::{ByPlayer, PlayerType};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::vision::own_masks;
+    #[cfg(test)]
+    use crate::vision::registry::{Entry, Registry};
+    #[cfg(test)]
+    use crate::vision::visibility::Extent;
     use crate::vision::visibility::{Seer, Visibility};
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
@@ -733,7 +753,7 @@ mod tests {
     fn object(id: i32, master: MasterId, state: ObjectState, position: Position) -> Unit {
         let mut u = Unit {
             id: object_id(id),
-            place: crate::objects::layers::Static::at(position),
+            place: Static::at(position),
             ..Unit::default()
         };
         u.life.master_id = master;
@@ -747,7 +767,7 @@ mod tests {
         let players = (0..3).map(|_| Player::default()).collect();
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             players,
@@ -845,7 +865,7 @@ mod tests {
         // FUN_14118e990: player 1 explored and sees the mine's tile, player 2 explored it only;
         // Gaia gets none; the bit of a fourth player ends the walk
         let mut t = world(true);
-        t.players[2].kind = crate::players::PlayerType::COMPUTER;
+        t.players[2].kind = PlayerType::COMPUTER;
         set_tile(&mut t, 1, 2, 0x0000_000f_0000_0002);
         t.recycling.ghosts = vec![object_id(-3)];
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
@@ -1142,13 +1162,13 @@ mod tests {
             t.reindex();
             t.masters.push(masters(true));
         }
-        let own = |p| crate::vision::own_masks(p, false);
+        let own = |p| own_masks(p, false);
         let with = |p, bits: u64| {
             let mut masks = own(p);
             masks.visible |= VisionBits::from_bits_retain(bits);
             masks
         };
-        t.spatial.vision = crate::players::ByPlayer::new(vec![
+        t.spatial.vision = ByPlayer::new(vec![
             own(PlayerId::new(0)),
             own(PlayerId::new(1)),
             with(PlayerId::new(2), (1 << 3) | (1 << 4)),
@@ -1180,17 +1200,17 @@ mod tests {
     fn building_ghost_seen_on_its_footprint_alone_is_marked_seen() {
         let mut t = world(true);
         let sight = t.spatial.sight.as_mut().unwrap();
-        sight.extents = vec![crate::vision::visibility::Extent {
+        sight.extents = vec![Extent {
             guid: 1,
             offsets: vec![TileOffset::new(0, 0), TileOffset::new(1, 0)],
             capacity: 2,
         }];
-        let mut registry = crate::vision::registry::Registry::default();
+        let mut registry = Registry::default();
         let _ = registry.entries.insert(
             object_id(9),
-            crate::vision::registry::Entry {
+            Entry {
                 mask: VisionBits::from_bits_retain(1 << 1),
-                ..crate::vision::registry::Entry::default()
+                ..Entry::default()
             },
         );
         sight.registry = Some(registry);
@@ -1236,7 +1256,7 @@ mod tests {
         );
         // a computer viewer gets its ghost, then its AI's notify is not modelled
         let mut t = world(true);
-        t.players[2].kind = crate::players::PlayerType::COMPUTER;
+        t.players[2].kind = PlayerType::COMPUTER;
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0005);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
@@ -1340,20 +1360,19 @@ mod tests {
         }
         let foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
         let _ = t.push_asleep(PlayerId::new(1), foundation).unwrap();
-        t.parts.building_mut(object_id(14)).unwrap().construction =
-            Some(crate::construction::build::Construction {
-                progress: Seconds::ZERO,
-                desolid: true,
-                builders: crate::construction::BuilderCount::NONE,
-                hit_points: MasterHitPoints::of_data(0),
-                build_time: WholeSeconds::ZERO,
-                record: crate::map::spatial::Obstruction {
-                    kind: ObstructionType::TYPE_2,
-                    class: ObstructionClass::UNIT,
-                },
-                snow: crate::map::Snow::None,
-                sprite_override: false,
-            });
+        t.parts.building_mut(object_id(14)).unwrap().construction = Some(Construction {
+            progress: Seconds::ZERO,
+            desolid: true,
+            builders: BuilderCount::NONE,
+            hit_points: MasterHitPoints::of_data(0),
+            build_time: WholeSeconds::ZERO,
+            record: Obstruction {
+                kind: ObstructionType::TYPE_2,
+                class: ObstructionClass::UNIT,
+            },
+            snow: Snow::None,
+            sprite_override: false,
+        });
         t.build_watched().unwrap();
         let ids = |t: &World, p: usize| {
             t.players[p]

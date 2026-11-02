@@ -10,14 +10,22 @@ use crate::{
     tile_lists_from_dump, visibility_differences, watch_at_load,
 };
 use genie_core::commands::Command;
+use genie_core::groups::UnitGroups;
 use genie_core::map::Distance;
+use genie_core::map::Position;
+use genie_core::map::spatial::Spatial;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::action_type;
 use genie_core::players::Amount;
+use genie_core::players::PlayerId;
+use genie_core::technology::TechState;
+use genie_core::unit_ai::{Hunted, UnitAiType};
+use genie_core::world::GameState;
 use genie_core::world::Tick;
 use genie_core::world::{Player, World};
 use genie_rec::de;
 use genie_save::Header;
+use std::collections::BTreeMap;
 
 /// Every player's objects and sight after a run against the game's save `after`; with `tick`,
 /// only the freezes of that update count, else all. A frozen object's differences are left out.
@@ -126,12 +134,7 @@ fn stops(player: &Player, id: u32, tick: Option<u32>, report: &mut TickReport) -
 
 /// A player's resources against the game's (one difference), then each other attribute the
 /// slice holds that differs (reported apart).
-fn stock_differences(
-    player: &Player,
-    game: &genie_core::world::GameState,
-    p: usize,
-    report: &mut TickReport,
-) {
+fn stock_differences(player: &Player, game: &GameState, p: usize, report: &mut TickReport) {
     let id = p as u32;
     let resources = player.resources().map(Amount::get);
     if let Some(r) = game.resources.get(p)
@@ -156,11 +159,7 @@ fn stock_differences(
 
 /// A player's pending debit and technology states against the game's: per technology its state,
 /// researches queued and done, work done and building.
-pub(super) fn tech_differences(
-    player: &Player,
-    game: &genie_core::world::GameState,
-    p: usize,
-) -> Vec<String> {
+pub(super) fn tech_differences(player: &Player, game: &GameState, p: usize) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(d) = game
         .pending_debit
@@ -176,7 +175,7 @@ pub(super) fn tech_differences(
     let Some(theirs) = game.techs.get(p) else {
         return out;
     };
-    let key = |t: &genie_core::technology::TechState| {
+    let key = |t: &TechState| {
         (
             t.state,
             t.pending,
@@ -220,10 +219,7 @@ pub fn run_from_save(
 /// # Errors
 ///
 /// When the save does not parse or its groups do not import.
-pub fn saved_groups(
-    save: &[u8],
-    globals: Option<&str>,
-) -> Result<genie_core::groups::UnitGroups, Error> {
+pub fn saved_groups(save: &[u8], globals: Option<&str>) -> Result<UnitGroups, Error> {
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
     let mut g = groups::unit_groups(&header.world.base_world).map_err(Error::Unmodelled)?;
@@ -341,7 +337,7 @@ pub(super) fn primed(turns: &mut World, all: &[Frame<'_>], updates: usize) -> De
         if turns.last_commanded.len() <= p {
             turns.last_commanded.resize(p + 1, Vec::new());
         }
-        let most = genie_core::players::PlayerId::try_from(p).map_or(0, |q| turns.most_units(q));
+        let most = PlayerId::try_from(p).map_or(0, |q| turns.most_units(q));
         turns.last_commanded[p] = units[..units.len().min(most)].to_vec();
     }
     decoder
@@ -364,7 +360,7 @@ pub(super) fn frame_commands(turns: &mut World, decoder: &mut Decoder, frame: Op
 /// start (`start`, the recording's header save, whose load made the AI), the leash its master's
 /// last task of action type 6's work range (the unit's `+0xb74`, `FUN_141206d50`).
 pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
-    let places: std::collections::BTreeMap<i32, genie_core::map::Position> = start
+    let places: BTreeMap<i32, Position> = start
         .players()
         .iter()
         .flat_map(|p| {
@@ -374,7 +370,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
         })
         .filter_map(|o| {
             o.static_part()
-                .map(|s| (s.id, genie_core::map::Position::new(s.tx, s.ty, s.tz)))
+                .map(|s| (s.id, Position::new(s.tx, s.ty, s.tz)))
         })
         .collect();
     for (p, player) in turns.players.iter().enumerate() {
@@ -384,7 +380,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
                 .parts
                 .unit_ai
                 .get_mut(unit.id)
-                .filter(|ai| ai.ai_type == genie_core::unit_ai::UnitAiType::HUNTED)
+                .filter(|ai| ai.ai_type == UnitAiType::HUNTED)
             else {
                 continue;
             };
@@ -400,21 +396,18 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
                         .find(|t| t.action_type == action_type::HUNT_RANGE)
                 })
                 .map_or(Distance::ZERO, |t| t.work_range);
-            ai.hunted = Some(genie_core::unit_ai::Hunted { origin, leash });
+            ai.hunted = Some(Hunted { origin, leash });
         }
     }
 }
 
 /// The world's objects as movement sees them, from a save ([`spatial`]), on a map without terrain.
-pub fn spatial_from_save(save: &[u8]) -> Result<genie_core::map::spatial::Spatial, Error> {
+pub fn spatial_from_save(save: &[u8]) -> Result<Spatial, Error> {
     spatial_with_tiles(save, &TerrainTable::default())
 }
 
 /// The world's objects as movement sees them, from a save, with each tile's terrain class.
-pub fn spatial_with_tiles(
-    save: &[u8],
-    terrain: &TerrainTable,
-) -> Result<genie_core::map::spatial::Spatial, Error> {
+pub fn spatial_with_tiles(save: &[u8], terrain: &TerrainTable) -> Result<Spatial, Error> {
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
     spatial(&header, terrain).map_err(Error::Unmodelled)

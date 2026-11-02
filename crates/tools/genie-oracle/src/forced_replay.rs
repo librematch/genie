@@ -9,19 +9,30 @@ use crate::{
     turns_from_save,
 };
 use genie_core::GenieError;
+use genie_core::groups::GroupId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::objects::ObjectId;
+use genie_core::pathing::ShortFound;
+use genie_core::pathing::hull_path::HullPather;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::game_status::GameStatus;
+use genie_core::vision::ghost::Ghost;
 use genie_core::world::FrameSeed;
+use genie_core::world::GameState;
 use genie_core::world::PlayState;
 use genie_core::world::World;
+use genie_core::world::index::ObjectsRef;
 use genie_save::Header;
+use std::collections::BTreeMap;
+use std::mem::take as mem_take;
+use std::slice::from_ref;
+use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
+use std::time::{Duration, Instant};
 
 /// The old short pather's result and path for one call ([`old_pather_paths`]).
-pub type PatherAnswer = (genie_core::pathing::ShortFound, Vec<Point>);
+pub type PatherAnswer = (ShortFound, Vec<Point>);
 
 /// One call of the old short pather ([`old_pather_paths`]): the unit, its place then, the target
 /// and the range.
@@ -87,15 +98,10 @@ pub fn old_pather_paths(
             )));
             continue;
         };
-        let mut pather = genie_core::pathing::hull_path::HullPather::new(
+        let mut pather = HullPather::new(
             (
                 &mut turns.spatial,
-                genie_core::world::index::ObjectsRef::new(
-                    &turns.players,
-                    &turns.index,
-                    &turns.masters,
-                    &turns.parts,
-                ),
+                ObjectsRef::new(&turns.players, &turns.index, &turns.masters, &turns.parts),
             ),
             id,
             Some(target),
@@ -240,7 +246,7 @@ pub fn forced_run(
                 let Some(frame) = all.get(updates + k) else {
                     break;
                 };
-                let clock = std::time::Instant::now();
+                let clock = Instant::now();
                 let taken = ahead.take(k);
                 ask(k + window);
                 let Some(after) = taken else {
@@ -248,10 +254,10 @@ pub fn forced_run(
                 };
                 let after = after?;
                 times.parse += clock.elapsed();
-                let clock = std::time::Instant::now();
-                run(&mut turns, &mut decoder, std::slice::from_ref(frame));
+                let clock = Instant::now();
+                run(&mut turns, &mut decoder, from_ref(frame));
                 times.run += clock.elapsed();
-                let clock = std::time::Instant::now();
+                let clock = Instant::now();
                 let mut report = TickReport {
                     start: start + k,
                     ticks: 1,
@@ -331,7 +337,7 @@ pub fn forced_run(
                     ));
                 }
                 times.compare += clock.elapsed();
-                let clock = std::time::Instant::now();
+                let clock = Instant::now();
                 let SavedStep {
                     objects,
                     mut seen,
@@ -362,10 +368,7 @@ pub fn forced_run(
                     .iter()
                     .any(|(_, d)| d.starts_with("player "))
                 {
-                    game.sight = Some((
-                        std::mem::take(&mut seen.maps),
-                        std::mem::take(&mut seen.unified),
-                    ));
+                    game.sight = Some((mem_take(&mut seen.maps), mem_take(&mut seen.unified)));
                 }
                 for (p, id, why) in turns.force(&game) {
                     report.unsupported.push((p.index() as u32, id, tick, why));
@@ -386,11 +389,8 @@ pub fn forced_run(
 
 /// Each player's ghosts against the game's (`game`), in the list's order, by what the save holds
 /// of them: one difference per player whose list differs.
-pub(super) fn ghost_differences(
-    turns: &World,
-    game: &[Vec<genie_core::vision::ghost::Ghost>],
-) -> Vec<(u32, String)> {
-    let key = |g: &genie_core::vision::ghost::Ghost| {
+pub(super) fn ghost_differences(turns: &World, game: &[Vec<Ghost>]) -> Vec<(u32, String)> {
+    let key = |g: &Ghost| {
         // the report's line in the game's terms: the ids as the save holds them
         (
             g.id.get(),
@@ -428,7 +428,7 @@ pub(super) fn ghost_differences(
 /// game's groups first, and the comparison then holds the globals too.
 pub(super) fn owned_group_differences(
     turns: &World,
-    game: &mut genie_core::world::GameState,
+    game: &mut GameState,
     globals: Option<&str>,
 ) -> Vec<(u32, String)> {
     if let (Some(text), Some(g)) = (globals, game.groups.as_mut()) {
@@ -445,16 +445,12 @@ pub(super) fn owned_group_differences(
 
 /// The player a group difference (`group ID: …`) goes with: the group's owner in the game or the
 /// slice, Gaia for the world's list and counter.
-pub(super) fn group_owner(
-    turns: &World,
-    game: &genie_core::world::GameState,
-    difference: &str,
-) -> u32 {
+pub(super) fn group_owner(turns: &World, game: &GameState, difference: &str) -> u32 {
     let id = difference
         .strip_prefix("group ")
         .and_then(|d| d.split(':').next())
         .and_then(|d| d.parse::<i32>().ok())
-        .and_then(genie_core::groups::GroupId::of_field);
+        .and_then(GroupId::of_field);
     let owner = id.and_then(|id| {
         game.groups
             .as_ref()
@@ -470,24 +466,22 @@ pub(super) fn group_owner(
 /// The game's saves parsed ahead of a forced run ([`forced_run`]): the pool's tasks put them by
 /// index, the run takes them in order.
 pub(super) struct Ahead<T> {
-    pub(super) parsed: std::sync::Mutex<std::collections::BTreeMap<usize, T>>,
-    pub(super) ready: std::sync::Condvar,
+    pub(super) parsed: Mutex<BTreeMap<usize, T>>,
+    pub(super) ready: Condvar,
 }
 
 impl<T> Ahead<T> {
     pub(super) const fn new() -> Self {
         Self {
-            parsed: std::sync::Mutex::new(std::collections::BTreeMap::new()),
-            ready: std::sync::Condvar::new(),
+            parsed: Mutex::new(BTreeMap::new()),
+            ready: Condvar::new(),
         }
     }
 
     /// The parsed ones. A lock a panic poisoned still holds the parses that were put: the map is
     /// only ever inserted into and taken from.
-    fn locked(&self) -> std::sync::MutexGuard<'_, std::collections::BTreeMap<usize, T>> {
-        self.parsed
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn locked(&self) -> MutexGuard<'_, BTreeMap<usize, T>> {
+        self.parsed.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// A task's parse of index `k`.
@@ -506,7 +500,7 @@ impl<T> Ahead<T> {
             parsed = self
                 .ready
                 .wait(parsed)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                .unwrap_or_else(PoisonError::into_inner);
         }
     }
 }
@@ -517,22 +511,22 @@ impl<T> Ahead<T> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Times {
     /// Waiting for the parsed saves.
-    pub parse: std::time::Duration,
+    pub parse: Duration,
     /// The slice's updates.
-    pub run: std::time::Duration,
+    pub run: Duration,
     /// The comparisons with the game's saves and dumps.
-    pub compare: std::time::Duration,
+    pub compare: Duration,
     /// The forcing.
-    pub force: std::time::Duration,
+    pub force: Duration,
 }
 
 /// The game's state in a save as the slice's units ([`genie_core::world::GameState`]).
 pub(super) fn game_state(
     header: &Header,
     masters: Option<&MasterTable>,
-) -> Result<genie_core::world::GameState, GenieError> {
+) -> Result<GameState, GenieError> {
     let world = &header.world.base_world;
-    let mut game = genie_core::world::GameState {
+    let mut game = GameState {
         frame_seed: FrameSeed::of_data(world.current_frame_random_seed),
         next_reusable_id: ObjectId::try_from(world.next_reusable_object_id)?,
         game_state: PlayState::of_data(u32::from(world.temp_game_state)),

@@ -6,24 +6,32 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::map::WholeDistance;
 use crate::map::spatial::{
     AttackField, CLOSEST_RANGE, ClosestChecks, FarmLook, Filter, LIVESTOCK_CLASS, PASTURE_CLASS,
     PASTURES, Placed, QUERY_HITS, Reach, RecordId, SEARCH_REUSE_SQUARED, Spatial, TRAPPERS,
     players_seen, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
+use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::players::PlayerId;
+use crate::players::UnitRelations;
 use crate::players::{ByRelation, QueryRelation, UnitRelation};
+use crate::unit_ai::best_target::{Choice, best_unit_to_attack as best_target_best_unit_to_attack};
+use crate::unit_ai::{AttackAsk, AttackPicker, Memory};
 use crate::unit_ai::{Found, Pick, Search};
 use crate::vision::SightTiles;
 use crate::vision::registry::Record;
 use crate::vision::registry::VisibleQuery;
 use crate::vision::visibility::Seer;
+use crate::world::index::ObjectsRef;
+use std::fmt::{Debug, Error, Formatter};
 
 impl Spatial {
     /// `FormationTransform`'s line query (`FUN_141051900` with flags 0x40, any player, the
@@ -49,7 +57,7 @@ impl Spatial {
         to: Point,
         grow: Distance,
         ignore: &[RecordId],
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::new(
             if to.x() <= from.x() { to.x() } else { from.x() },
@@ -206,7 +214,7 @@ impl Spatial {
         &self,
         player: PlayerId,
         players: usize,
-    ) -> Result<crate::players::UnitRelations, GenieError> {
+    ) -> Result<UnitRelations, GenieError> {
         let kinds = self
             .unit_diplomacy
             .get(player)
@@ -289,7 +297,7 @@ impl Spatial {
         (me, player): (ObjectId, PlayerId),
         search: &Search<'_>,
         fresh: bool,
-        attack: &mut dyn crate::unit_ai::AttackPicker,
+        attack: &mut dyn AttackPicker,
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<Found, GenieError> {
@@ -320,9 +328,7 @@ impl Spatial {
                     position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
                     fresh,
                     players: players_seen(found),
-                    distance: crate::map::WholeDistance::of_data(
-                        crate::math::conversions::cvttss2si(distance),
-                    ),
+                    distance: WholeDistance::of_data(cvttss2si(distance)),
                     retries: [None; 3],
                 })
             }
@@ -334,7 +340,7 @@ impl Spatial {
                     position: None,
                     fresh,
                     players: 0,
-                    distance: crate::map::WholeDistance::NONE,
+                    distance: WholeDistance::NONE,
                     retries: [None; 3],
                 })
             }
@@ -351,7 +357,7 @@ impl Spatial {
                     position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
                     fresh,
                     players: 0,
-                    distance: crate::map::WholeDistance::NONE,
+                    distance: WholeDistance::NONE,
                     retries,
                 })
             }
@@ -430,11 +436,11 @@ impl Spatial {
     /// What the reads and tests do not model.
     pub(super) fn best_unit_to_attack(
         &mut self,
-        ask: &crate::unit_ai::AttackAsk,
-        memory: crate::unit_ai::Memory<'_>,
-        attack: &mut dyn crate::unit_ai::AttackPicker,
+        ask: &AttackAsk,
+        memory: Memory<'_>,
+        attack: &mut dyn AttackPicker,
         reach: &mut Reach<'_>,
-    ) -> Result<crate::unit_ai::best_target::Choice, GenieError> {
+    ) -> Result<Choice, GenieError> {
         let me = attack.searcher(memory)?;
         let found = self.last_found()?;
         let lists: ByRelation<Vec<ObjectId>> = found.map(|v| v.iter().map(|r| r.id).collect());
@@ -443,7 +449,7 @@ impl Spatial {
             reach,
             world: self,
         };
-        crate::unit_ai::best_target::best_unit_to_attack(&me, &ask.ask(), &lists, &mut field)
+        best_target_best_unit_to_attack(&me, &ask.ask(), &lists, &mut field)
     }
 }
 
@@ -457,7 +463,7 @@ pub struct SearchQuery<'a> {
     /// What it searches for.
     pub search: &'a Search<'a>,
     /// An attack pick's reads of the unit and the objects.
-    pub attack: &'a mut dyn crate::unit_ai::AttackPicker,
+    pub attack: &'a mut dyn AttackPicker,
     /// The reachability of a found object (slot 0x3d0).
     pub reach: &'a mut Reach<'a>,
     /// Whether livestock is moving (slot 0x288 not −1 and slot 0x530 107).
@@ -468,8 +474,8 @@ pub struct SearchQuery<'a> {
     pub farm: &'a FarmLook<'a>,
 }
 
-impl std::fmt::Debug for SearchQuery<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for SearchQuery<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("SearchQuery")
             .field("searcher", &self.searcher)
             .field("player", &self.player)
@@ -508,7 +514,7 @@ pub(super) fn closest_kept(
     if filter.state.is_some_and(|state| seer.state != state) {
         return Ok(false);
     }
-    if filter.workers != crate::objects::WorkerCount::NO_CAP {
+    if filter.workers != WorkerCount::NO_CAP {
         return Err(GenieError::unsupported(
             "ClosestObject's workers cap (+0x644)",
         ));
@@ -552,7 +558,7 @@ pub(super) fn farm_kept(
         ));
     }
     if filter.master.is_none() {
-        if crate::objects::WorkerCount::ONE <= workers {
+        if WorkerCount::ONE <= workers {
             return Ok(false);
         }
         // The fish trap (raw `0x6163`), which only the fishing ships gather from (`FUN_1411945a0`).

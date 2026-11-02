@@ -11,12 +11,17 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
+use crate::math::image::registry::{
+    MARGIN as REGISTRY_MARGIN, MOST_RADIUS as REGISTRY_MOST_RADIUS,
+};
+use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
 #[cfg(test)]
 use crate::players::UnitRelation;
+use crate::players::UnitRelations;
 use crate::vision::VisionBits;
 use crate::world::slots::CheckedIndex;
 
@@ -25,10 +30,10 @@ use crate::world::slots::CheckedIndex;
 pub const SLOTS: usize = 9;
 
 /// The query's cap on the radius (`DAT_142f64e88`).
-const MOST_RADIUS: f32 = crate::math::image::registry::MOST_RADIUS;
+const MOST_RADIUS: f32 = REGISTRY_MOST_RADIUS;
 
 /// The query box's margin (`DAT_142ec9eb8`).
-const MARGIN: f32 = crate::math::image::registry::MARGIN;
+const MARGIN: f32 = REGISTRY_MARGIN;
 
 /// The records a query keeps per relation (`0x1c00` bytes per output list).
 pub const MOST_FOUND: usize = 256;
@@ -98,7 +103,7 @@ pub struct VisibleQuery<'a> {
     /// The classes it reads.
     pub classes: &'a [ClassId],
     /// What the owners are to the player (none for a saved value past the relations).
-    pub relations: &'a crate::players::UnitRelations,
+    pub relations: &'a UnitRelations,
     /// The searcher's radii (x, y).
     pub size: Footprint,
     /// The relations kept, one bit each.
@@ -115,7 +120,7 @@ pub struct Registry {
     /// `lists[player][class]`: the records.
     pub lists: Vec<Vec<Vec<Record>>>,
     /// Each object's entry.
-    pub entries: crate::objects::IdTable<Entry>,
+    pub entries: IdTable<Entry>,
 }
 
 impl Registry {
@@ -126,7 +131,7 @@ impl Registry {
             players,
             classes,
             lists: vec![vec![Vec::new(); classes]; players],
-            entries: crate::objects::IdTable::new(),
+            entries: IdTable::new(),
         }
     }
 
@@ -341,6 +346,8 @@ impl Registry {
 mod tests {
     use super::*;
     use crate::objects::masters::class;
+    #[cfg(test)]
+    use crate::players::{ByPlayer, relations};
     use crate::test_ids::{class_id, object_id};
 
     fn registry() -> Registry {
@@ -436,7 +443,7 @@ mod tests {
             new: VisionBits::from_bits_retain(1),
         })
         .unwrap();
-        let relations = crate::players::relations([1, 4, 4]);
+        let relations = relations([1, 4, 4]);
         let found = r
             .visible_units(VisibleQuery {
                 player: PlayerId::new(0),
@@ -519,7 +526,7 @@ mod tests {
                 radius: Distance::new(100.0),
                 mode: 1,
                 classes: &[class_id(4)],
-                relations: &crate::players::ByPlayer::new(vec![
+                relations: &ByPlayer::new(vec![
                     Some(UnitRelation::OWN),
                     Some(UnitRelation::ENEMY),
                     Some(UnitRelation::ENEMY),
@@ -559,7 +566,7 @@ mod tests {
                 radius: Distance::new(3.0),
                 mode: 0,
                 classes: &[class_id(4)],
-                relations: &crate::players::ByPlayer::new(vec![
+                relations: &ByPlayer::new(vec![
                     Some(UnitRelation::OWN),
                     Some(UnitRelation::ENEMY),
                     Some(UnitRelation::ENEMY),

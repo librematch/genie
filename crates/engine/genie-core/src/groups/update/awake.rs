@@ -8,12 +8,15 @@ use crate::groups::GroupId;
 use crate::groups::MotionFlags;
 use crate::groups::SlotState;
 use crate::groups::UnitGroup;
+use crate::groups::formation::top_path;
 use crate::groups::group_list::{NO_FORMATION, member_gone};
+use crate::groups::stats::weapon_range;
 use crate::groups::update::{
     ATTACK, DIFFERENTIATORS, FRONT_AHEAD, NO_COMMAND, OTHER_COMMANDS, RELAYOUT_SPACING, TURN_LIMIT,
 };
 use crate::map::Distance;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{angle_between, at_most_or_unordered, scale};
 use crate::movement::PathFlags;
 use crate::objects::ObjectId;
 use crate::world::Millis;
@@ -111,8 +114,8 @@ impl World {
     /// What the target's test and the leaving do not model.
     pub(super) fn kept_apart_leave(&mut self, group: GroupId) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
-        let patrol = crate::groups::formation::top_path(&g.motion.paths)
-            .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol =
+            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
         // the dword compare at 0x14103dd78: the list's size (64 bits) against the count
         if g.objects.len() as u32 == g.members.len() as u32
             && !self.target_pending(group)?
@@ -313,7 +316,7 @@ impl World {
         forward: BVector,
     ) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
-        let turn = crate::math::fmath::angle_between(g.motion.position[1], forward).abs();
+        let turn = angle_between(g.motion.position[1], forward).abs();
         Ok(TURN_LIMIT < turn
             || g.motion.flags.contains(MotionFlags::NEW)
             || g.flags.contains(GroupFlags::RELAYOUT_AT_TURN))
@@ -339,7 +342,7 @@ impl World {
             sum = BVector::new(sum.x() + v.x(), sum.height() + v.height(), sum.y() + v.y());
         }
         let n = g.members.len() as i32 as f32;
-        let ahead = crate::math::fmath::scale(0.0, g.motion.position[1]);
+        let ahead = scale(0.0, g.motion.position[1]);
         let point = BVector::new(
             sum.x() / n + ahead.x(),
             sum.height() / n + ahead.height(),
@@ -386,7 +389,7 @@ impl World {
                     continue;
                 };
                 let master = self.master(object.player(), object.master_id())?;
-                let reach = crate::groups::stats::weapon_range(master);
+                let reach = weapon_range(master);
                 if range > reach.get() {
                     range = reach.get();
                 }
@@ -426,10 +429,7 @@ impl World {
                     .is_some_and(|f| f.kind == FormationKind::TYPE_6)
             {
                 refill = true;
-            } else if crate::math::fmath::at_most_or_unordered(
-                g.total_spacing.get(),
-                RELAYOUT_SPACING.get(),
-            ) {
+            } else if at_most_or_unordered(g.total_spacing.get(), RELAYOUT_SPACING.get()) {
                 g.flags |= GroupFlags::RELAYOUT_SPREAD;
             } else {
                 relayout = true;

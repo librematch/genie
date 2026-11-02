@@ -3,21 +3,28 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::{CommandMoveTo, common_group};
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::BVector;
+use crate::math::fmath::sub;
 use crate::math::rng::Stream;
+use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
+use crate::objects::masters::Master;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::RGE_COMBAT;
+use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::orders::{
     ATTACK_MOVE_QUEUED, LISTED, Place, Split, Sweep, ignore_unit, patrol_timeout,
     set_differentiator_groups, waypoints_from,
 };
+use crate::pathing::tile_path::{Found, Path, Request};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiMove;
 use crate::unit_ai::OrderKind;
 use crate::world::Millis;
 use crate::world::World;
@@ -162,8 +169,7 @@ impl World {
         let mut split = self.split(ids, &|_| true, false)?;
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
-            let common =
-                crate::groups::common_group(&units, |id| self.object(id).map(|(_, u)| u.group));
+            let common = common_group(&units, |id| self.object(id).map(|(_, u)| u.group));
             let kept = match common {
                 None => None,
                 Some(id) => match self.groups.get(id) {
@@ -197,7 +203,7 @@ impl World {
             for w in before {
                 g.add_waypoint(*w, true);
             }
-            let leg = crate::groups::CommandMoveTo {
+            let leg = CommandMoveTo {
                 range: Distance::ZERO,
                 leg: patrol,
                 forget_target: true,
@@ -225,20 +231,15 @@ impl World {
     /// a NaN is not), so the target is out of its sight.
     fn out_of_sight(
         &self,
-        unit: &crate::objects::unit::Unit,
-        master: &crate::objects::masters::Master,
+        unit: &Unit,
+        master: &Master,
         target: ObjectId,
     ) -> Result<bool, GenieError> {
         let Some(t) = self.world_object(target) else {
             return Ok(true);
         };
         let tm = self.master(t.player(), t.master_id())?;
-        let gap = crate::movement::footprint_gap_squared(
-            unit.position(),
-            master.radius,
-            t.position(),
-            tm.radius,
-        );
+        let gap = footprint_gap_squared(unit.position(), master.radius, t.position(), tm.radius);
         Ok(master.line_of_sight.squared() < gap)
     }
 
@@ -288,7 +289,7 @@ impl World {
             let restriction = self.parts.mover_of(u.id).map(|m| m.stats.restriction);
             let tiles = self.spatial.tiles();
             if let Some(planner) = restriction.and_then(|r| self.pathing.planner(r, tiles)) {
-                let req = crate::pathing::tile_path::Request {
+                let req = Request {
                     from,
                     to: at.ground(),
                     radii: Distance::ZERO,
@@ -296,16 +297,14 @@ impl World {
                     closed: Vec::new(),
                     full: false,
                 };
-                let mut path = crate::pathing::tile_path::Path::default();
-                if planner.plan::<GenieError>(&req, false, &mut path, None)?
-                    != crate::pathing::tile_path::Found::Goal
-                {
+                let mut path = Path::default();
+                if planner.plan::<GenieError>(&req, false, &mut path, None)? != Found::Goal {
                     i += 1;
                     continue;
                 }
             }
             // slot 0x520: +0x824 as the game holds it (x, height, y)
-            let d = crate::math::fmath::sub(BVector::new(moved.x(), moved.z(), moved.y()), at);
+            let d = sub(BVector::new(moved.x(), moved.z(), moved.y()), at);
             let influence = self.players.player(p)?.formations.influence.get();
             if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() <= influence * influence {
                 let _ = split.loose.remove(i);
@@ -388,7 +387,7 @@ impl World {
         if RGE_COMBAT <= kind
             && let Some(Place::Live(p, idx)) = self.place(id)
         {
-            let walk = crate::unit_ai::AiMove {
+            let walk = AiMove {
                 point: Position::new(lx, ly, z),
                 range: Distance::ZERO,
                 force: sweep.patrol,

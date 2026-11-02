@@ -17,6 +17,7 @@ use crate::world::WorldTime;
 
 use crate::objects::ObjectId;
 use crate::objects::masters::class;
+use crate::players::ai_module::InfoModule;
 use crate::players::ai_module::search::RING_SLACK;
 use crate::players::ai_module::{AiModule, SearchUnit};
 use crate::unit_ai::world_view::{UnitView, owner_view, town_centre_unit};
@@ -122,7 +123,7 @@ impl UnitView<'_, '_> {
         let mut unsynced = self.c.w.streams.get(Stream::Unsynced).clone();
         let (mut area, map, _) = self.scout_area()?;
         let info = &mut module.info;
-        let mut search = |info: &mut crate::players::ai_module::InfoModule, from: Point| {
+        let mut search = |info: &mut InfoModule, from: Point| {
             info.closest_unexplored_tile(&unit, from, &mut area, (map, &mut unsynced))
         };
         let waited = WorldTime::from_millis(slot.wrapping_mul(1000) as u32);

@@ -7,8 +7,15 @@
 //! `probe`).
 
 use flate2::read::DeflateDecoder;
+use genie_dat::de::DatFile;
+use serde::de::DeserializeOwned;
+use std::env::args;
+use std::fmt::Display;
 use std::fmt::Write as _;
+use std::fs::read;
 use std::io::{Cursor, Read};
+use std::panic::catch_unwind;
+use std::str::from_utf8;
 
 /// What the probe found for one file.
 struct Outcome {
@@ -17,7 +24,7 @@ struct Outcome {
     error: Option<String>,
 }
 
-fn failed(e: impl std::fmt::Display) -> Outcome {
+fn failed(e: impl Display) -> Outcome {
     Outcome {
         read: false,
         roundtrip: None,
@@ -30,7 +37,7 @@ fn dat_de(bytes: &[u8]) -> Outcome {
     if let Err(e) = DeflateDecoder::new(bytes).read_to_end(&mut data) {
         return failed(e);
     }
-    match genie_dat::de::DatFile::from_inflated(&data) {
+    match DatFile::from_inflated(&data) {
         Ok(dat) => Outcome {
             read: true,
             roundtrip: Some(dat.to_bytes().is_ok_and(|b| b == data)),
@@ -109,9 +116,9 @@ fn strings_keyvalue(bytes: &[u8]) -> Outcome {
 /// (the installed files differ in indentation, so bytes are not compared).
 fn json_table<T>(bytes: &[u8]) -> Outcome
 where
-    T: serde::de::DeserializeOwned + serde::Serialize,
+    T: DeserializeOwned + serde::Serialize,
 {
-    let text = match std::str::from_utf8(bytes) {
+    let text = match from_utf8(bytes) {
         Ok(t) => t,
         Err(e) => return failed(e),
     };
@@ -164,7 +171,7 @@ fn quote(s: &str) -> String {
 }
 
 fn main() {
-    let mut args = std::env::args().skip(1);
+    let mut args = args().skip(1);
     let kind = args.next().expect("a probe kind");
     let probe: fn(&str, &[u8]) -> Outcome = match kind.as_str() {
         "json-table" => json,
@@ -176,9 +183,9 @@ fn main() {
         other => panic!("unknown probe kind {other}"),
     };
     for file in args {
-        let outcome = match std::fs::read(&file) {
+        let outcome = match read(&file) {
             // an old reader may panic on a version it does not know; that is a failed read
-            Ok(bytes) => std::panic::catch_unwind(|| probe(&file, &bytes)).unwrap_or_else(|p| {
+            Ok(bytes) => catch_unwind(|| probe(&file, &bytes)).unwrap_or_else(|p| {
                 failed(format!(
                     "panic: {}",
                     p.downcast_ref::<String>()

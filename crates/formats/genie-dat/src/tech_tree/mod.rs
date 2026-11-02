@@ -12,6 +12,7 @@ use std::io::{Read, Result, Write};
 mod nodes;
 
 pub use self::nodes::{TechTreeAge, TechTreeBuilding, TechTreeTech, TechTreeUnit};
+use std::result::Result as StdResult;
 
 /// The status of a tech tree node for a player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -43,7 +44,7 @@ pub struct ParseTechTreeStatusError(u8);
 impl TryFrom<u8> for TechTreeStatus {
     type Error = ParseTechTreeStatusError;
 
-    fn try_from(n: u8) -> std::result::Result<Self, Self::Error> {
+    fn try_from(n: u8) -> StdResult<Self, Self::Error> {
         match n {
             1 => Ok(Self::None),
             2 => Ok(Self::AvailablePlayer),
@@ -101,7 +102,7 @@ pub struct ParseTechTreeTypeError(i32);
 impl TryFrom<i32> for TechTreeType {
     type Error = ParseTechTreeTypeError;
 
-    fn try_from(n: i32) -> std::result::Result<Self, Self::Error> {
+    fn try_from(n: i32) -> StdResult<Self, Self::Error> {
         match n {
             0 => Ok(Self::None),
             1 => Ok(Self::Age),
@@ -197,7 +198,7 @@ pub struct ParseTechTreeDependencyTypeError(i32);
 impl TryFrom<i32> for TechTreeDependencyType {
     type Error = ParseTechTreeDependencyTypeError;
 
-    fn try_from(n: i32) -> std::result::Result<Self, Self::Error> {
+    fn try_from(n: i32) -> StdResult<Self, Self::Error> {
         match n {
             0 => Ok(Self::Age),
             1 => Ok(Self::Building),
@@ -413,6 +414,8 @@ impl From<ParseTechTreeDependencyTypeError> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -426,7 +429,7 @@ mod genie_error_tests {
                 "a tech tree node status this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = ParseTechTreeTypeError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
@@ -435,7 +438,7 @@ mod genie_error_tests {
                 "a tech tree node type this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = ParseTechTreeDependencyTypeError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
@@ -444,6 +447,6 @@ mod genie_error_tests {
                 "a tech tree dependency type this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 }

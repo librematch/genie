@@ -9,6 +9,7 @@ use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, SpriteReads, Target
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::{Me, Mover};
 use crate::objects::ActionState;
+use crate::objects::Graphics;
 use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
 use crate::world::step::Step;
@@ -23,7 +24,7 @@ impl HuntReads {
     /// table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
-        graphics: &'g crate::objects::Graphics,
+        graphics: &'g Graphics,
         unit: (&Unit, Option<&Mover>),
     ) -> Walks<'g> {
         let sprites = SpriteReads {

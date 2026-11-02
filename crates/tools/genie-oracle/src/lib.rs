@@ -148,6 +148,8 @@ use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
+use std::error::Error as StdError;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// Why a recording could not be compared.
 #[derive(Debug)]
@@ -182,8 +184,8 @@ impl From<de::Error> for Error {
     }
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         match self {
             Self::Rec(e) => write!(f, "{e}"),
             Self::NoCheckpoint => write!(f, "the recording has no checkpoint"),
@@ -200,7 +202,7 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl StdError for Error {}
 
 /// The ids of a saved list of objects, which names no none (−1).
 ///

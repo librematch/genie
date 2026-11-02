@@ -43,6 +43,9 @@ pub use self::tech_id::TechId;
 pub use self::tech_mode::TechMode;
 pub use self::tech_type::TechType;
 pub use self::upgrade_mode::UpgradeMode;
+use crate::players::CivId;
+use crate::production::LocationButton;
+use crate::world::WholeSeconds;
 
 /// The age technologies (`FUN_1413cc3c0`: 101 to 103), whose costs the research cost modifier
 /// leaves alone.
@@ -113,11 +116,11 @@ pub struct TechDef {
     pub required_count: i16,
     /// `+0x26`: the civ it belongs to (below 1 every civ's); `+0x28`: the game modes it is for
     /// (0 every one, `FUN_1413cf2f0`).
-    pub civ: Option<crate::players::CivId>,
+    pub civ: Option<CivId>,
     /// `+0x28`: the game modes it is for (0 and 1 every one, `FUN_1413cf2f0`).
     pub mode: TechMode,
     /// `+0x70`: where it is researched, the building's master and the seconds it takes.
-    pub locations: Vec<(Option<MasterId>, crate::world::WholeSeconds)>,
+    pub locations: Vec<(Option<MasterId>, WholeSeconds)>,
 }
 
 impl TechDef {
@@ -154,9 +157,9 @@ pub struct Location {
     /// The building's master, none for an entry the data leaves open (−1).
     pub building: Option<MasterId>,
     /// The seconds it takes there (the save's `u16`, its bits kept).
-    pub time: crate::world::WholeSeconds,
+    pub time: WholeSeconds,
     /// Its button.
-    pub button: crate::production::LocationButton,
+    pub button: LocationButton,
     /// The seconds added (`+0xc`, `FUN_1413cec90`).
     pub adjustment: Seconds,
 }
@@ -512,6 +515,8 @@ mod tests {
     use crate::objects::masters::ids;
     use crate::players::attribute;
     use crate::production::LocationButton;
+    #[cfg(test)]
+    use crate::test_ids::amounts;
     use crate::test_ids::master_id;
     use crate::world::WholeSeconds;
 
@@ -581,10 +586,7 @@ mod tests {
             s.pay(&d, (0.0, 1), false, ids::TOWN_CENTRE, &mut held),
             Ok(true)
         );
-        assert_eq!(
-            held.0,
-            crate::test_ids::amounts([79.956_116, 157.05705, 200.0, 50.0])
-        );
+        assert_eq!(held.0, amounts([79.956_116, 157.05705, 200.0, 50.0]));
         assert_eq!(
             (s.state, s.building_master),
             (ResearchState::Queued, Some(master_id(109)))
@@ -634,7 +636,7 @@ mod tests {
             s.pay(&d, (0.5, 1), false, ids::TOWN_CENTRE, &mut held),
             Ok(true)
         );
-        assert_eq!(held.0, crate::test_ids::amounts([0.0, 5.0, 0.0, 100.0]));
+        assert_eq!(held.0, amounts([0.0, 5.0, 0.0, 100.0]));
         assert_eq!(
             s.listed_costs(&d, (0.5, 1))
                 .unwrap()

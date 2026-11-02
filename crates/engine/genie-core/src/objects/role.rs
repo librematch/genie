@@ -8,6 +8,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
+use crate::math::msvc::IntKey;
 use crate::objects::{ObjectId, ObjectKey};
 
 /// A part an object plays for another ([`RoleId`]): the role's name, which `Debug` prints.
@@ -109,7 +110,7 @@ impl<R: Role> ObjectKey for RoleId<R> {
 
 /// A map of a role's objects by id hashes the id's value, as one of any objects
 /// ([`crate::math::msvc::IntKey`]).
-impl<R: Role> crate::math::msvc::IntKey for RoleId<R> {
+impl<R: Role> IntKey for RoleId<R> {
     fn int(self) -> i32 {
         self.0.get()
     }

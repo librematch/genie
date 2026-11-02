@@ -15,10 +15,14 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 
+use crate::construction::MainBuildingId;
+use crate::groups::UnitGroups;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::{Placed, RecordId, Spatial};
+use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
+use crate::movement::WaypointIndex;
 use crate::movement::{
     Avoided, EPSILON, LONG_PATH_MOVER, LongWalker, Me, Mover, PUSHED, PathAsk, PathData, Planning,
     REACH_NEAR, REACH_SHORT, ShortAsk, USER_WAYPOINT_MIDDLE, WIDE_CLASS, WIDE_RANGE, footprint_gap,
@@ -28,8 +32,11 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::ID_45;
+use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches};
 use crate::pathing::tile_path::{Path, Request};
 use crate::players::PlayerId;
+use crate::players::PlayerSet;
+use crate::world::index::ObjectsRef;
 use crate::{GenieError, math::fmath};
 
 /// The classes whose hits a group member on an own move of reason 0 still keeps in
@@ -72,7 +79,7 @@ impl Mover {
         world: &mut Spatial,
         plan: &mut Planning<'_>,
         ask: ReachAsk,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let ReachAsk {
             goal: to,
@@ -144,9 +151,7 @@ impl Mover {
                 return Ok(false);
             }
             let gap = footprint_gap(at, ground, t.position, t.radius);
-            Some(crate::pathing::long_path::LongTarget::new(
-                t.position, t.radius, gap, gap2,
-            ))
+            Some(LongTarget::new(t.position, t.radius, gap, gap2))
         } else {
             let gap = |d: f32, r: f32| {
                 let g = d.abs() - r;
@@ -177,15 +182,9 @@ impl Mover {
             .filter(|p| p.tall)
             .map(|p| Tile::new(p.position.x() as i32, p.position.y() as i32))
             .collect();
-        let req = crate::pathing::long_path::LongRequest {
-            from: Tile::new(
-                crate::math::conversions::cvttss2si(x),
-                crate::math::conversions::cvttss2si(y),
-            ),
-            to: Tile::new(
-                crate::math::conversions::cvttss2si(to.x()),
-                crate::math::conversions::cvttss2si(to.y()),
-            ),
+        let req = LongRequest {
+            from: Tile::new(cvttss2si(x), cvttss2si(y)),
+            to: Tile::new(cvttss2si(to.x()), cvttss2si(to.y())),
             range,
             target: long_target,
             moves: self.stats.speed != Speed::ZERO || master == LONG_PATH_MOVER,
@@ -196,17 +195,11 @@ impl Mover {
             near_player: false,
             allies: world
                 .get(me.id)
-                .map_or(crate::players::PlayerSet::NONE, |p| {
-                    world.allies_of(p.player)
-                }),
+                .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
         };
         let player = world.get(me.id).map(|p| p.player);
-        let gates = |t| {
-            player.map_or(Ok(false), |p| {
-                crate::pathing::long_path::gate_lets_pass(world, by_id, p, t)
-            })
-        };
-        crate::pathing::long_path::reaches(world.tiles(), world.map, &req, &gates)
+        let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
+        reaches(world.tiles(), world.map, &req, &gates)
     }
 
     /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in
@@ -297,7 +290,7 @@ impl Mover {
             path_flags: PathFlags::BACK_AND_FORTH | PathFlags::FORWARD,
             length,
             created: now,
-            waypoint: crate::movement::WaypointIndex::SECOND,
+            waypoint: WaypointIndex::SECOND,
             state: if planned {
                 PathState::WantsPath
             } else {
@@ -331,19 +324,16 @@ impl Mover {
     ) {
         let start = from.vector();
         let mut path = Path::default();
-        if ask.resume == crate::movement::WaypointIndex::NONE {
+        if ask.resume == WaypointIndex::NONE {
             let _ = path.insert(0, start);
         }
         for &w in &self.user_waypoints {
             let _ = path.push(w);
         }
         self.clear_user_waypoints();
-        if ask.resume == crate::movement::WaypointIndex::NONE {
+        if ask.resume == WaypointIndex::NONE {
             let end = goal.vector();
-            let last = point_or_zero(
-                &path,
-                crate::movement::WaypointIndex::last_of(path.points.len()),
-            );
+            let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
             let mut d = fmath::sub(end, last);
             d = d.with_height(0.0);
             if EPSILON < fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()) {
@@ -380,8 +370,8 @@ impl Mover {
             level: WaypointLevel::TOP,
             points: path.points,
             path_flags,
-            waypoint: if ask.resume == crate::movement::WaypointIndex::NONE {
-                crate::movement::WaypointIndex::SECOND
+            waypoint: if ask.resume == WaypointIndex::NONE {
+                WaypointIndex::SECOND
             } else {
                 ask.resume
             },
@@ -458,7 +448,7 @@ impl Mover {
         (id, other): (ObjectId, &Placed),
         projected: BVector,
         now: WorldTime,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let level = self.paths.walked()?;
         let top = self.paths.last().filter(|l| !l.points.is_empty());
@@ -509,11 +499,7 @@ impl Mover {
     pub(super) fn avoid(
         &self,
         (at, me): (Position, &Me),
-        (world, groups, by_id): (
-            &Spatial,
-            Option<&crate::groups::UnitGroups>,
-            crate::world::index::ObjectsRef<'_>,
-        ),
+        (world, groups, by_id): (&Spatial, Option<&UnitGroups>, ObjectsRef<'_>),
         hits: &[RecordId],
         projected: BVector,
         dt: Seconds,
@@ -528,7 +514,7 @@ impl Mover {
         let met = |hit: RecordId| -> Result<Option<(ObjectId, &Placed)>, GenieError> {
             let Some(id) = by_id
                 .annex_of(hit)
-                .map(crate::construction::MainBuildingId::id)
+                .map(MainBuildingId::id)
                 .or_else(|| hit.key())
             else {
                 return Ok(None);
@@ -574,8 +560,8 @@ impl Mover {
             });
         }
         let mut pauses = Vec::new();
-        if level.waypoint < crate::movement::WaypointIndex::of_data(2)
-            || (level.waypoint < crate::movement::WaypointIndex::of_data(3)
+        if level.waypoint < WaypointIndex::of_data(2)
+            || (level.waypoint < WaypointIndex::of_data(3)
                 && level.created.after(Millis::new(500)) < now)
         {
             for &hit in hits {
@@ -607,11 +593,7 @@ impl Mover {
     /// The pause of unit `id`'s walked level as slot 0x5f0 leaves it: the last this walk gave it
     /// (the game's call writes it at once, a later pass of the same step reads it), else the
     /// unit's own (`by_id`, [`crate::map::spatial::Gait::pause`]).
-    pub(super) fn pause_of(
-        &self,
-        id: ObjectId,
-        by_id: crate::world::index::ObjectsRef<'_>,
-    ) -> Option<Seconds> {
+    pub(super) fn pause_of(&self, id: ObjectId, by_id: ObjectsRef<'_>) -> Option<Seconds> {
         self.pauses
             .iter()
             .rev()

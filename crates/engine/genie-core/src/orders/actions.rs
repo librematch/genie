@@ -2,11 +2,18 @@
 //! and master switches.
 
 use crate::GenieError;
+use crate::construction::gates::gate_units;
+use crate::map::Distance;
+use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
+use crate::math::rng::Well512;
+use crate::movement::Mover;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Combat;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
@@ -15,17 +22,22 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::objects::release::Releaser;
+use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::orders::{TROPHIES, TROPHY, clear_powerups, damage_share};
+use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderRecord;
+use crate::unit_ai::best_target::category;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
@@ -105,13 +117,13 @@ impl World {
             return Ok(());
         };
         let class = t.master(self.master_tables(), q)?.class;
-        let record = crate::unit_ai::OrderRecord {
+        let record = OrderRecord {
             order,
             action,
             time: self.world_time,
             position,
             target: Some(target),
-            category: crate::unit_ai::best_target::category(t.life.master_id, class),
+            category: category(t.life.master_id, class),
             target_position: t.moved_vector(self.parts.mover_of(t.id)),
         };
         if let Some(ai) = self
@@ -230,19 +242,14 @@ impl World {
         self.transform_building(player, idx, new)?;
         let height = self.master(player, new)?.height;
         let now = self.world_time;
-        if crate::map::Distance::ZERO < height {
+        if Distance::ZERO < height {
             let id = self.players.live(player, idx)?.id;
             let annexes: Vec<ObjectId> = self.objects().annexes(id).ids().collect();
-            let (units, _) = crate::construction::gates::gate_units(
+            let (units, _) = gate_units(
                 &mut self.spatial,
                 id,
                 &annexes,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
+                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
             )?;
             for u in units {
                 self.shut_in_gate(u)?;
@@ -347,10 +354,10 @@ impl World {
 /// What a master change ([`switch_master`]) changes of the world besides its unit: the place and
 /// its records, the pathing, and the sprites with the Sprite stream.
 pub(crate) struct SwitchWorld<'a> {
-    pub(crate) spatial: &'a mut crate::map::spatial::Spatial,
-    pub(crate) pathing: &'a mut crate::pathing::Pathing,
-    pub(crate) graphics: &'a crate::objects::Graphics,
-    pub(crate) sprite: &'a mut crate::math::rng::Well512,
+    pub(crate) spatial: &'a mut Spatial,
+    pub(crate) pathing: &'a mut Pathing,
+    pub(crate) graphics: &'a Graphics,
+    pub(crate) sprite: &'a mut Well512,
 }
 
 /// What [`switch_master`] leaves to its owner, in the game's order: the old master's storage
@@ -379,11 +386,7 @@ pub(crate) struct Switched {
 /// A change of its damage sprites, a moving unit's new master that does not move and a standing
 /// sprite the data file lacks.
 pub(crate) fn switch_master(
-    (unit, combat, mut motion): (
-        &mut Unit,
-        &mut crate::objects::layers::Combat,
-        MotionMut<'_>,
-    ),
+    (unit, combat, mut motion): (&mut Unit, &mut Combat, MotionMut<'_>),
     old: &Master,
     next: &Master,
     world: SwitchWorld<'_>,
@@ -420,9 +423,7 @@ pub(crate) fn switch_master(
             ));
         }
         unit.life.master_id = new;
-        let moving = motion
-            .mover()
-            .is_some_and(crate::movement::Mover::is_moving);
+        let moving = motion.mover().is_some_and(Mover::is_moving);
         if let Some(m) = motion.mover_mut() {
             m.stats = next.moving.ok_or(GenieError::unsupported(
                 "a moving unit's new master does not move",
@@ -474,14 +475,9 @@ pub(crate) fn switch_master(
                     "a new master's standing sprite the data file does not have",
                 ))?;
             if unit.sprite.is_some() {
-                crate::objects::sprite::new_sprite(
-                    &mut unit.sprite,
-                    motion.move_stats_mut(),
-                    g,
-                    world.sprite,
-                );
+                new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, world.sprite);
             } else {
-                let _ = crate::objects::sprite::ActiveSprite::start(g, world.sprite);
+                let _ = ActiveSprite::start(g, world.sprite);
             }
         }
         switched.promoted = true;

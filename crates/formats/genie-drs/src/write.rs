@@ -1,5 +1,6 @@
 use crate::{DrsHeader, DrsResource, DrsTable, IntoResourceType, ResourceType};
 use byteorder::{LE, WriteBytesExt};
+use std::fmt::{Debug, Error, Formatter};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
 /// The error of a count or a size the format cannot hold.
@@ -290,11 +291,11 @@ where
     strategy: Box<dyn Strategy<W>>,
 }
 
-impl<W> std::fmt::Debug for DrsWriter<W>
+impl<W> Debug for DrsWriter<W>
 where
-    W: Write + Seek + std::fmt::Debug,
+    W: Write + Seek + Debug,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         // The strategy is a trait object without `Debug`.
         f.debug_struct("DRSWriter")
             .field("inner", &self.inner)

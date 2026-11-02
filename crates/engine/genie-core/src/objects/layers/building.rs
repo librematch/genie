@@ -4,6 +4,8 @@
 //! [`Building::NONE`], the game's defaults below type 80.
 
 use crate::construction::build::Construction;
+use crate::construction::{Annexes, MainBuildingId};
+use crate::objects::Frame;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
 use crate::players::Amount;
@@ -24,9 +26,9 @@ pub struct Building {
     /// A building's `relic_count` and `specific_relic_count` (`+0xc20`, `+0xc24`).
     pub relics: Relics,
     /// An annex's main building (`+0xbb8`, the save's linked owner).
-    pub annex_of: Option<crate::construction::MainBuildingId>,
+    pub annex_of: Option<MainBuildingId>,
     /// A main building's annexes (`+0xbc0`..`+0xbd8`, the save's linked objects).
-    pub annexes: crate::construction::Annexes,
+    pub annexes: Annexes,
     /// A building's gate lock ([`Gate`]).
     pub gate: Option<Gate>,
     /// A building's `mLivestockSummation` (`+0xc28`, saved): the livestock inside it (their
@@ -53,7 +55,7 @@ pub struct Building {
     /// A building's `+0xc54`: the frame its BUILD command chose (`FUN_140e7a400`, the packet's
     /// `+0x1c`), which its standing sprite takes once built; 0 from its constructor and the load.
     #[diff(unsaved)]
-    pub build_frame: crate::objects::Frame,
+    pub build_frame: Frame,
 }
 
 impl Building {
@@ -64,7 +66,7 @@ impl Building {
         garrison_time: WorldTime::ZERO,
         relics: Relics::NONE,
         annex_of: None,
-        annexes: crate::construction::Annexes::NONE,
+        annexes: Annexes::NONE,
         gate: None,
         livestock_summation: Amount::ZERO,
         livestock: Vec::new(),
@@ -72,6 +74,6 @@ impl Building {
         attacking_units: Vec::new(),
         rice: false,
         stack_made: None,
-        build_frame: crate::objects::Frame::ZERO,
+        build_frame: Frame::ZERO,
     };
 }

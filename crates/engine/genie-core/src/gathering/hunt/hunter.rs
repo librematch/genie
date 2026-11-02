@@ -8,10 +8,13 @@ use crate::combat::victims::readable;
 use crate::gathering::DropSiteId;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
+use crate::gathering::hunt::{DropOff, Dropped, PointWalk, PointWalker};
 use crate::movement::move_to::MoveTo;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
+use crate::objects::layers::Action;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
@@ -19,10 +22,14 @@ use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, second_target_checked};
 use crate::players::Amount;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
+use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -34,7 +41,7 @@ impl Unit {
     /// `+0x60` being 0) and dropped; then the second target ([`second_target_checked`]).
     pub(crate) fn hunt_targets(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         if let Some(target) = actions
@@ -56,7 +63,7 @@ impl Unit {
             if gone {
                 if state.is_some() {
                     let by = self.releaser(c)?;
-                    crate::world::lets::release(c, self, target, by)?;
+                    release(c, self, target, by)?;
                 }
                 if let Some(h) = actions.list.hunt_mut() {
                     h.set_target(None);
@@ -87,7 +94,7 @@ impl Unit {
     /// finds the target it holds past state 6, code 5), or whose `MoveTo` failed (code 3), and
     /// whose class is a tree's: it searches for the next tree (`FUN_140ac4670` with 8 and -1
     /// both times).
-    pub(crate) fn tree_lost(&self, actions: &crate::objects::layers::Action, c: &Step<'_>) -> bool {
+    pub(crate) fn tree_lost(&self, actions: &Action, c: &Step<'_>) -> bool {
         actions.list.hunt().is_some_and(|h| {
             matches!(h.state, HuntState::Walk { .. })
                 && Seconds::ZERO <= h.timer
@@ -114,7 +121,7 @@ impl Unit {
     /// Nothing without a hunt. Its code: the failure's 3, the end after a drop-off's 1.
     pub(crate) fn hunt_part(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         own: &mut Option<Victim>,
@@ -162,7 +169,7 @@ impl Unit {
     /// again ([`Unit::hunt_drop_off`]).
     pub(crate) fn hunt_drop_wait(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
@@ -183,7 +190,7 @@ impl Unit {
     /// (`set_state` 2) is not modelled.
     pub(crate) fn hunt_drop_walk(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
@@ -215,8 +222,8 @@ impl Unit {
                         .unwrap_or(Amount::ZERO),
                     civ: c.w.players.player(c.player)?.civ,
                 };
-                Some(crate::gathering::hunt::DropOff {
-                    takes: crate::unit_ai::task_finder::drops_at(&c.w.drop_sites, s.master, &actor),
+                Some(DropOff {
+                    takes: drops_at(&c.w.drop_sites, s.master, &actor),
                     gap_squared: footprint_gap_squared(
                         me_position,
                         me_radius,
@@ -227,7 +234,7 @@ impl Unit {
             }
             None => None,
         };
-        let who = crate::gathering::hunt::PointWalker {
+        let who = PointWalker {
             player_type: c.w.players.player(c.player)?.kind,
             villager: master.class == class::VILLAGER,
             stance: c
@@ -243,8 +250,8 @@ impl Unit {
         }
         let dropped = dropped?;
         match dropped {
-            crate::gathering::hunt::Dropped::Going => {}
-            crate::gathering::hunt::Dropped::Load(kind, amount) => {
+            Dropped::Going => {}
+            Dropped::Load(kind, amount) => {
                 // the player's slot 0xf8 (FUN_141616820) with 1 and 1: the resource, and its
                 // gathered total (166 to 168; gold's 49 and 169); the statistics (slot 0xb8) and
                 // the local player's tracker (FUN_14097daf0) are not held; a sharing player's
@@ -252,14 +259,14 @@ impl Unit {
                 c.give_load(kind, amount)?;
                 return self.hunt_after_drop(actions, c);
             }
-            crate::gathering::hunt::Dropped::Again => {
+            Dropped::Again => {
                 // the drop site goes (FUN_140a7a190 with none), then set_state(8)
                 let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
                 let site = hunt.carry_to.take();
                 self.hunt_release(c, [site.map(DropSiteId::id)])?;
                 self.hunt_drop_off(actions, c)?;
             }
-            crate::gathering::hunt::Dropped::Idle => {
+            Dropped::Idle => {
                 return Err(GenieError::unsupported(
                     "a hunt's drop-off idling (set_state 2)",
                 ));
@@ -274,7 +281,7 @@ impl Unit {
     pub(crate) fn hunt_failed(&self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
         self.post_own(
             &mut c.w.parts.unit_ai,
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
+            NotifyKind::ACTION_FAILED,
             [ActionKind::Hunt.value(), 0, 0],
         )?;
         Ok(HeadCode::of(UpdateCode::FAILED))
@@ -287,7 +294,7 @@ impl Unit {
     /// search ([`Unit::hunt_search_state`]).
     pub(crate) fn hunt_point_walk(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<(), GenieError> {
@@ -297,7 +304,7 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
-        let who = crate::gathering::hunt::PointWalker {
+        let who = PointWalker {
             player_type: c.w.players.player(c.player)?.kind,
             villager: master.class == class::VILLAGER,
             stance: c
@@ -313,9 +320,9 @@ impl Unit {
         }
         let walked = walked?;
         match walked {
-            crate::gathering::hunt::PointWalk::Walking => {}
-            crate::gathering::hunt::PointWalk::Search => self.hunt_search_state(actions, c)?,
-            crate::gathering::hunt::PointWalk::Done { target, second } => {
+            PointWalk::Walking => {}
+            PointWalk::Search => self.hunt_search_state(actions, c)?,
+            PointWalk::Done { target, second } => {
                 let task = hunt.task;
                 self.hunt_stand(c, &task)?;
                 self.hunt_release(c, [target, second])?;
@@ -328,7 +335,7 @@ impl Unit {
     /// AI is told again (notify 0x202, [`Unit::hunt_search_notify`]).
     pub(crate) fn hunt_search_wait(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
@@ -346,12 +353,12 @@ impl Unit {
     /// walk to the point (`set_state` 11, [`crate::gathering::hunt::HuntAction::wait_then_walk`]).
     pub(crate) fn hunt_wait_walk(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
@@ -359,15 +366,12 @@ impl Unit {
             ),
         )?;
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
-        let mover =
-            c.w.parts
-                .mover_mut(self.id)
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         hunt.wait_then_walk(c.dt.seconds(), mover, &walks)
     }
 }
 
-impl crate::objects::layers::Action {
+impl Action {
     /// State 2 (case 1): a done hunt waits; one of a tree's target class would search again
     /// (`set_state` 3), which is not modelled.
     pub(crate) fn hunt_idle(&self) -> Result<(), GenieError> {

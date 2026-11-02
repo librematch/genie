@@ -4,6 +4,9 @@
 //! (`aoe2de-exe-re/load_oracle/playback.py --trace`); a row holds the state after its tick.
 
 use flate2::read::ZlibDecoder;
+use std::error::Error;
+use std::fmt::{Display, Error as FmtError, Formatter};
+use std::io::Error as IoError;
 use std::io::Read;
 
 const MAGIC: &[u8; 8] = b"GRTICK1\0";
@@ -14,13 +17,13 @@ pub enum TraceError {
     /// The bytes are not a trace (no magic).
     NotTrace,
     /// The rows would not inflate.
-    Inflate(std::io::Error),
+    Inflate(IoError),
     /// The rows hold fewer bytes than the header announces.
     Truncated,
 }
 
-impl std::fmt::Display for TraceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TraceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         match self {
             Self::NotTrace => write!(f, "not a GRTICK1 trace"),
             Self::Inflate(e) => write!(f, "the rows do not inflate: {e}"),
@@ -29,7 +32,7 @@ impl std::fmt::Display for TraceError {
     }
 }
 
-impl std::error::Error for TraceError {}
+impl Error for TraceError {}
 
 /// Every tick's world time and checkpoint lanes.
 #[derive(Clone, Debug, PartialEq, Eq)]

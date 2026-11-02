@@ -183,19 +183,19 @@ impl Notify {
 }
 
 /// The damage case's unit too slow to run away (`DAT_142eb0c60`, [`UnitAi::damaged`]).
-const STILL: f32 = crate::math::image::unit_ai::STILL;
+const STILL: f32 = UNIT_AI_STILL;
 /// The damage case's kill time of an object the unit cannot harm (`DAT_142efe41c`, 25000).
-const NEVER_KILLED: f32 = crate::math::image::unit_ai::NEVER_KILLED;
+const NEVER_KILLED: f32 = UNIT_AI_NEVER_KILLED;
 /// [`NotifyKind::SENT_OFF`]'s radii are hundredths (`DAT_14330ebcc`).
-const RADIUS_SCALE: f32 = crate::math::image::unit_ai::RADIUS_SCALE;
+const RADIUS_SCALE: f32 = UNIT_AI_RADIUS_SCALE;
 
 /// What a notify handler (unit-AI slot 0x238) returns: go on with the next notify.
 const GO_ON: u32 = 2;
 /// The defend stance's leash, squared (`DAT_142ed6f20`).
-const DEFEND_LEASH: f32 = crate::math::image::unit_ai::DEFEND_LEASH;
+const DEFEND_LEASH: f32 = UNIT_AI_DEFEND_LEASH;
 /// What the stand ground stance's leash adds to the unit's range (`DAT_142eb880c`, 0.25, read by
 /// `ADDSS` at `0x140c57c6a`).
-const STAND_GROUND_SLACK: Distance = Distance::new(crate::math::image::unit_ai::STAND_GROUND_SLACK);
+const STAND_GROUND_SLACK: Distance = Distance::new(UNIT_AI_STAND_GROUND_SLACK);
 /// "Notify processing returned stop or new action, breaking."
 const BREAK: u32 = 3;
 /// "I'm dead, purging notifyQueue and returning FALSE."
@@ -230,16 +230,16 @@ const TRADE_AI: UnitAiType = UnitAiType::TRADE;
 const FISHING_AI: UnitAiType = UnitAiType::FISHING;
 /// A computer player's ship evades the object its idle check found by its speed times this
 /// (`FUN_140c21930`, `FUN_140c1eab0`: `DAT_142ec9eb8`).
-const SHIP_EVADE_REACH: f32 = crate::math::image::unit_ai::SHIP_EVADE_REACH;
+const SHIP_EVADE_REACH: f32 = UNIT_AI_SHIP_EVADE_REACH;
 /// The classes of the foundations a fishing ship's builder looks for (`FUN_140c25ca0`, in its
 /// order): buildings, walls, gates, towers and farms.
-const FISHING_BUILDS: [ClassId; 5] = crate::objects::masters::class::classes([3, 27, 39, 52, 49]);
+const FISHING_BUILDS: [ClassId; 5] = classes([3, 27, 39, 52, 49]);
 /// The fishing ship's builder takes the nearest foundation nearer than this (`FUN_140c25ca0`'s
 /// 9999).
-const FISHING_BUILD_FAR: crate::map::WholeDistance = crate::map::WholeDistance::of_data(9999);
+const FISHING_BUILD_FAR: WholeDistance = WholeDistance::of_data(9999);
 /// The seconds without a sighting after which enemies found are the owner's news
 /// (`DAT_142eb0f4c`).
-const ENEMY_SIGHTING_GAP: Seconds = Seconds::new(crate::math::image::unit_ai::ENEMY_SIGHTING_GAP);
+const ENEMY_SIGHTING_GAP: Seconds = Seconds::new(UNIT_AI_ENEMY_SIGHTING_GAP);
 
 /// The notify queue's capacity of a unit AI of `ai_type` holding `count` notifies: the
 /// factory's (`FUN_141215560`: 5 for the artifact's and the livestock's, types 14 and 19; 10
@@ -352,7 +352,7 @@ pub enum Effect {
         target: ObjectId,
         /// The target's state as the AI saw it, which decides whether the `MoveTo` holds it
         /// ([`crate::movement::move_to::holds_object`]).
-        state: crate::objects::ObjectState,
+        state: ObjectState,
         /// The range within which the `MoveTo` arrives.
         range: Distance,
     },
@@ -387,7 +387,7 @@ pub enum AiCommand {
     /// `BuildObject`'s unit part (the AI's slot 0xf0, `FUN_140c47d80`): the unit's build command
     /// (slot 0x380) on the foundation ([`crate::world::World::build_command`]); the AI's part,
     /// the build action and the foundation as its target, is its own ([`UnitAi::build_object`]).
-    BuildObject(crate::construction::FoundationId),
+    BuildObject(FoundationId),
     /// The unit's slot 0x7e8 (`FUN_141227190`) on object `target` at `point`, with the
     /// carried-resource test, any task and `+0xa14` 0 ([`crate::world::World::order_work`]).
     WorkOn {
@@ -402,7 +402,7 @@ pub enum AiCommand {
     /// ([`crate::world::World::drop_elsewhere`]).
     DropElsewhere {
         /// The drop site.
-        site: crate::gathering::DropSiteId,
+        site: DropSiteId,
         /// The top action's target before the work.
         back: Option<ObjectId>,
     },
@@ -426,9 +426,9 @@ pub struct AfterOrder {
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct PatrolPath {
     /// The points (x, height, y) and the length.
-    pub path: crate::pathing::tile_path::Path,
+    pub path: Path,
     /// The path's flags.
-    pub flags: crate::movement::PathFlags,
+    pub flags: PathFlags,
 }
 
 /// The unit-AI fields the idle update reads and writes, with their offsets in 158041.
@@ -498,7 +498,7 @@ pub struct UnitAi {
     /// off it, which `restorePatrolInformation` (`FUN_140c5e5b0`) walks on.
     pub patrol_path: Option<PatrolPath>,
     /// `+0x1c8`, `mPatrolCurrentWaypoint`: the saved patrol's waypoint the unit walked to.
-    pub patrol_waypoint: crate::movement::WaypointIndex,
+    pub patrol_waypoint: WaypointIndex,
     /// `+0x1a8`, `stop_after_target_killed_value`: a move does not let the current action take its
     /// point (`FUN_140c41c10`).
     pub stop_after_kill: bool,
@@ -561,13 +561,13 @@ pub struct OrderRecord {
     /// The world time it was given (`mTime`).
     pub time: WorldTime,
     /// The unit's slot 0x520 then (`mPosition`: where it last moved to).
-    pub position: crate::math::fmath::BVector,
+    pub position: BVector,
     /// The target (`mTargetID`).
     pub target: Option<ObjectId>,
     /// The target's attack category ([`crate::unit_ai::best_target::category`], `mTargetAttackCategory`).
     pub category: Option<best_target::AttackCategory>,
     /// The target's slot 0x520 then (`mTargetPosition`).
-    pub target_position: crate::math::fmath::BVector,
+    pub target_position: BVector,
 }
 
 /// The order history's length (`FUN_140c42080`: a ninth order recycles the oldest).
@@ -587,6 +587,20 @@ pub struct Hunted {
 
 /// The engine's error ([`genie_error::GenieError`]), here for the modules' imports.
 use crate::GenieError;
+use crate::construction::FoundationId;
+use crate::gathering::DropSiteId;
+use crate::map::WholeDistance;
+use crate::math::fmath::BVector;
+use crate::math::image::unit_ai::{
+    DEFEND_LEASH as UNIT_AI_DEFEND_LEASH, ENEMY_SIGHTING_GAP as UNIT_AI_ENEMY_SIGHTING_GAP,
+    NEVER_KILLED as UNIT_AI_NEVER_KILLED, RADIUS_SCALE as UNIT_AI_RADIUS_SCALE,
+    SHIP_EVADE_REACH as UNIT_AI_SHIP_EVADE_REACH, STAND_GROUND_SLACK as UNIT_AI_STAND_GROUND_SLACK,
+    STILL as UNIT_AI_STILL,
+};
+use crate::movement::{PathFlags, WaypointIndex};
+use crate::objects::ObjectState;
+use crate::objects::masters::class::classes;
+use crate::pathing::tile_path::Path;
 
 #[cfg(test)]
 mod test_sides;

@@ -1,6 +1,8 @@
 //! A volley's size: the firepower (missiles a volley), the missiles counted and the swings that
 //! fired.
 
+use std::ops::{Add, AddAssign, MulAssign, Sub, SubAssign};
+
 /// A firepower: the missiles a volley fires (a float: a master's `volley_fire_amount`, `+0x8c0`,
 /// which the effects set, add to and scale; an object's `+0xa00`, its master's plus the shares
 /// of the units inside it). Each operator is the one `f32` operation the game does; every value
@@ -25,7 +27,7 @@ impl Firepower {
     }
 }
 
-impl std::ops::Add for Firepower {
+impl Add for Firepower {
     type Output = Self;
 
     /// The `f32` sum.
@@ -34,7 +36,7 @@ impl std::ops::Add for Firepower {
     }
 }
 
-impl std::ops::Sub for Firepower {
+impl Sub for Firepower {
     type Output = Self;
 
     /// The `f32` difference.
@@ -43,21 +45,21 @@ impl std::ops::Sub for Firepower {
     }
 }
 
-impl std::ops::AddAssign for Firepower {
+impl AddAssign for Firepower {
     /// A share's or an effect's add (`f32`).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::SubAssign for Firepower {
+impl SubAssign for Firepower {
     /// A share's removal (`f32`).
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for Firepower {
+impl MulAssign<f32> for Firepower {
     /// An effect's multiply (`f32`).
     fn mul_assign(&mut self, factor: f32) {
         self.0 *= factor;

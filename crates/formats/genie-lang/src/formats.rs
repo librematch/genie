@@ -7,6 +7,7 @@ use encoding_rs::{UTF_16LE, WINDOWS_1252};
 use encoding_rs_io::DecodeReaderBytesBuilder;
 use genie_support::StringKey;
 use pelite::pe32::{Pe, PeFile};
+use pelite::resources::Directory;
 use pelite::resources::Name;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -37,10 +38,7 @@ impl LangFile {
     }
 
     /// TODO specify
-    pub(super) fn load_pe_directory(
-        &mut self,
-        directory: pelite::resources::Directory<'_>,
-    ) -> Result<(), LoadError> {
+    pub(super) fn load_pe_directory(&mut self, directory: Directory<'_>) -> Result<(), LoadError> {
         for entry in directory.entries() {
             let base_index = if let Name::Id(n) = entry.name()? {
                 (n - 1) * 16

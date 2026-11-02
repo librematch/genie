@@ -21,15 +21,23 @@ use crate::orders::object_gone;
 use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
+use crate::garrison::transport::Around;
+use crate::math::image::garrison::{
+    NO_POINT as GARRISON_NO_POINT, UNLOAD_RANGE as GARRISON_UNLOAD_RANGE,
+};
+use crate::objects::unit::Unit;
+use crate::orders::set_stance;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::{Issuer, NotifyKind, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
+use crate::world::index::Place;
 
 /// UNLOAD's point without one (`DAT_14330ec20`).
-pub(super) const NO_POINT: f32 = crate::math::image::garrison::NO_POINT;
+pub(super) const NO_POINT: f32 = GARRISON_NO_POINT;
 /// UNLOAD's order range (`DAT_14330eb8c`).
-pub(super) const UNLOAD_RANGE: Distance = Distance::new(crate::math::image::garrison::UNLOAD_RANGE);
+pub(super) const UNLOAD_RANGE: Distance = Distance::new(GARRISON_UNLOAD_RANGE);
 
 impl World {
     /// UNLOAD (`FUN_14161f410`) by player `player` of the objects `ids` its check keeps
@@ -70,8 +78,7 @@ impl World {
         let mut last = None;
         for (&id, place) in checked.iter().zip(self.lookup(&checked)) {
             // any player's object the check kept; a sleeping one (below type 30) is not held
-            let (Some(id), Some(crate::world::index::Place::Live(player, idx))) = (id, place)
-            else {
+            let (Some(id), Some(Place::Live(player, idx))) = (id, place) else {
                 continue;
             };
             let unit = self.players.live(player, idx)?;
@@ -130,7 +137,7 @@ impl World {
         id: ObjectId,
         point: Point,
     ) -> Result<(), GenieError> {
-        let Some(crate::world::index::Place::Live(cp, ci)) = self.place(c) else {
+        let Some(Place::Live(cp, ci)) = self.place(c) else {
             return Err(GenieError::unreachable(
                 "a building that holds units outside the live lists",
             ));
@@ -244,7 +251,7 @@ impl World {
             return Ok(());
         }
         let made = unit.master(self.master_tables(), ip)?.clone();
-        let Some(crate::world::index::Place::Live(hp, hi)) = self.place(holder) else {
+        let Some(Place::Live(hp, hi)) = self.place(holder) else {
             return Err(GenieError::unreachable(
                 "a transport that holds units outside the live lists",
             ));
@@ -252,7 +259,7 @@ impl World {
         let h = self.players.live(hp, hi)?;
         let at = h.position();
         let r = h.master(self.master_tables(), hp)?.radius;
-        let around = crate::garrison::transport::Around {
+        let around = Around {
             center: at.ground(),
             radius: Footprint::new(r.x() + r.x(), r.y() + r.y()),
         };
@@ -269,7 +276,7 @@ impl World {
         if self.parts.unit_ai.contains(unit.id) {
             self.run_ai_calls((up, ui), |ai, side, rng| {
                 let stance = ai.stance;
-                crate::orders::set_stance(ai, stance, place, side, rng)
+                set_stance(ai, stance, place, side, rng)
             })?;
         }
         if COMBAT <= made.kind {
@@ -309,17 +316,17 @@ impl World {
         } else {
             point
         };
-        let order = crate::unit_ai::QueuedOrder {
-            issuer: Some(crate::unit_ai::Issuer::Player(player)),
+        let order = QueuedOrder {
+            issuer: Some(Issuer::Player(player)),
             order: OrderKind::Unload,
-            priority: crate::unit_ai::OrderPriority::COMMAND,
+            priority: OrderPriority::COMMAND,
             target: Some(id),
             target_owner: Some(player),
             point: to.with_height(0.0),
             range: UNLOAD_RANGE,
             shown: to,
             ready: true,
-            target_type: Some(crate::unit_ai::OrderTargetType::of_master(master.id)),
+            target_type: Some(OrderTargetType::of_master(master.id)),
         };
         if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
@@ -393,7 +400,7 @@ impl World {
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
             None => match self.place(id) {
-                Some(crate::world::index::Place::Live(p, i)) => (p, i),
+                Some(Place::Live(p, i)) => (p, i),
                 // the callers pass an object of type 70 or more the world holds, which never
                 // sleeps
                 _ => return Ok(false),
@@ -425,7 +432,7 @@ impl World {
             }
             unit.post_own(
                 &mut self.parts.unit_ai,
-                crate::unit_ai::NotifyKind::REQUIRES_SEARCH,
+                NotifyKind::REQUIRES_SEARCH,
                 [
                     ActionKind::field(record.action),
                     i32::from(ClassId::field(record.target_class)),
@@ -451,7 +458,7 @@ impl World {
     pub(super) fn unload_picks(
         &self,
         player: PlayerId,
-        unit: &crate::objects::unit::Unit,
+        unit: &Unit,
         pick: UnloadPick,
     ) -> Result<bool, GenieError> {
         let id = unit.id;

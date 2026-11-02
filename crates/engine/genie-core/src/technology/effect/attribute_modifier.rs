@@ -2,6 +2,12 @@
 //! masters' change and what their objects and an Attack follow of it.
 
 use crate::GenieError;
+use crate::combat::attack::Arms;
+use crate::garrison::{attack_rate, share};
+use crate::map::Distance;
+use crate::map::spatial::Obstruction;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::at_most_or_unordered;
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -13,9 +19,11 @@ use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{AttributeWorld, Master, master_type, player_master};
+use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::players::PlayerId;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 impl World {
@@ -105,11 +113,7 @@ impl World {
         if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
             return Ok(());
         }
-        let rate = crate::garrison::attack_rate(
-            master,
-            masters,
-            self.parts.combat_of(u.id).reload_powerup,
-        );
+        let rate = attack_rate(master, masters, self.parts.combat_of(u.id).reload_powerup);
         if at_most_or_unordered(rate.get(), 0.0) {
             return Ok(());
         }
@@ -120,7 +124,7 @@ impl World {
             };
             let m = unit.master(self.master_tables(), q)?;
             if m.kind == master_type::COMBAT {
-                shares.push(crate::garrison::share(
+                shares.push(share(
                     m,
                     self.masters.checked(q.index())?,
                     self.parts.combat_of(unit.id).reload_powerup,
@@ -182,19 +186,14 @@ impl World {
             let place = self.place(id).ok_or(OBJECT_GONE)?;
             let rng = self.streams.get(Stream::Sprite);
             let u = match place {
-                crate::world::index::Place::Live(q, i) => self.players.live_mut(q, i)?,
-                crate::world::index::Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
+                Place::Live(q, i) => self.players.live_mut(q, i)?,
+                Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
             };
             if u.sprite.is_some() {
-                crate::objects::sprite::new_sprite(
-                    &mut u.sprite,
-                    self.parts.move_stats_mut(u.id),
-                    graphic,
-                    rng,
-                );
+                new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), graphic, rng);
             } else {
                 // a sprite the slice does not hold is taken to be another one
-                let _ = crate::objects::sprite::ActiveSprite::start(graphic, rng);
+                let _ = ActiveSprite::start(graphic, rng);
             }
             return Ok(());
         }
@@ -334,8 +333,7 @@ impl World {
             let unrecorded = match attribute {
                 // a char compare of the new type with the object's master's
                 a::OBSTRUCTION_TYPE => {
-                    ObstructionType::from(crate::math::conversions::cvttss2si(v) as u8)
-                        != master.obstruction_type
+                    ObstructionType::from(cvttss2si(v) as u8) != master.obstruction_type
                 }
                 a::SIZE_Z => true,
                 _ => false,
@@ -366,7 +364,7 @@ impl World {
                         .is_some_and(|c| c.desolid);
                     if master.kind == master_type::BUILDING
                         && !desolid
-                        && crate::map::Distance::ZERO < master.height
+                        && Distance::ZERO < master.height
                     {
                         self.give_record(id, &master);
                     }
@@ -396,7 +394,7 @@ impl World {
             .spatial
             .get(id)
             .is_some_and(|o| o.obstruction.is_some());
-        if crate::map::Distance::ZERO < master.height || recorded {
+        if Distance::ZERO < master.height || recorded {
             self.spatial.drop_record(id);
             self.pathing.removed(id);
         }
@@ -411,11 +409,11 @@ impl World {
         };
         if ObjectState::Removed <= u.life.state
             || u.life.inside.is_some()
-            || crate::math::fmath::at_most_or_unordered(master.height.get(), 0.0)
+            || at_most_or_unordered(master.height.get(), 0.0)
         {
             return;
         }
-        let record = crate::map::spatial::Obstruction {
+        let record = Obstruction {
             kind: master.obstruction_type,
             class: master.obstruction_class,
         };
@@ -505,7 +503,7 @@ impl World {
                     | a::TRAIN_LOCATIONS_ENTRY_MOD
                     | a::TRAIN_LOCATIONS_TOTAL_NUM => c.build_time = master.build_time,
                     a::OBSTRUCTION_TYPE | a::BLOCKAGE_CLASS => {
-                        c.record = crate::map::spatial::Obstruction {
+                        c.record = Obstruction {
                             kind: master.obstruction_type,
                             class: master.obstruction_class,
                         };
@@ -534,11 +532,11 @@ impl World {
 /// the master is of a combat type (70 and up).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct MasterSprites {
-    pub(crate) moving: Option<crate::objects::sprite::Graphic>,
-    pub(crate) attack: Option<crate::objects::sprite::Graphic>,
-    pub(crate) standing: Option<crate::objects::sprite::Graphic>,
-    pub(crate) idle_attack: Option<crate::objects::sprite::Graphic>,
-    pub(crate) second: Option<crate::objects::sprite::Graphic>,
+    pub(crate) moving: Option<Graphic>,
+    pub(crate) attack: Option<Graphic>,
+    pub(crate) standing: Option<Graphic>,
+    pub(crate) idle_attack: Option<Graphic>,
+    pub(crate) second: Option<Graphic>,
     pub(crate) combat: bool,
 }
 
@@ -546,13 +544,8 @@ pub(crate) struct MasterSprites {
 /// master's (`sprites`) unless they are its task's (`task`, the moving, proceeding, working and
 /// carrying sprites; none for a unit's own Attack), and from type 70 on its idle attack and
 /// second attack sprites.
-pub(crate) fn follow_master(
-    arms: &mut crate::combat::attack::Arms,
-    task: Option<TaskSprites>,
-    sprites: &MasterSprites,
-) {
-    let of_task = |s: Option<crate::objects::sprite::Graphic>,
-                   pick: fn(TaskSprites) -> Option<SpriteId>| {
+pub(crate) fn follow_master(arms: &mut Arms, task: Option<TaskSprites>, sprites: &MasterSprites) {
+    let of_task = |s: Option<Graphic>, pick: fn(TaskSprites) -> Option<SpriteId>| {
         task.zip(s).is_some_and(|(t, s)| pick(t) == Some(s.id))
     };
     let proceeding = |t: TaskSprites| t.proceeding;

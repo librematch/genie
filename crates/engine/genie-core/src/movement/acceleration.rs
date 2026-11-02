@@ -2,6 +2,7 @@
 
 use crate::movement::Speed;
 use crate::world::Seconds;
+use std::ops::Mul;
 
 /// An acceleration in tiles per second squared: a missile's arc's vertical one (`+0x78`), which
 /// the launch sets and each step's dt turns into vertical speed.
@@ -25,7 +26,7 @@ impl Acceleration {
     }
 }
 
-impl std::ops::Mul<Acceleration> for Seconds {
+impl Mul<Acceleration> for Seconds {
     type Output = Speed;
 
     /// The speed `self` of the acceleration gains (one `f32` product, the time first).

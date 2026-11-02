@@ -2,6 +2,7 @@
 
 use crate::objects::masters::MasterField;
 use genie_diff::Diff;
+use std::ops::{AddAssign, MulAssign};
 
 /// A moving master's trail (`obj_trail_id`, `obj_trail_options`, `obj_trail_spacing`; the
 /// `.dat`'s tracking unit, its mode and density).
@@ -57,14 +58,14 @@ impl TrailDensity {
     }
 }
 
-impl std::ops::AddAssign for TrailDensity {
+impl AddAssign for TrailDensity {
     /// An add effect's sum (one `f32` add).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::MulAssign<f32> for TrailDensity {
+impl MulAssign<f32> for TrailDensity {
     /// A multiply effect's product (one `f32` product).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;

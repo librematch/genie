@@ -2,7 +2,11 @@
 
 use crate::GenieError;
 use crate::combat::attack::{Arms, Engagement};
+use crate::combat::attack::{arms as attack_arms, engagement as attack_engagement};
 use crate::construction::MainBuildingId;
+use crate::gathering::gather::{
+    GatherAction, GatherState, MoveTarget, Resource, StopRate, productivity_of,
+};
 use crate::gathering::gather::{GatherRetarget, GatherStart};
 use crate::gathering::hunt::{HuntAction, HuntMove, HuntStart, HuntTask, Quarry};
 use crate::map::Position;
@@ -19,7 +23,10 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::{ClassId, Master, MasterTables, Task};
 use crate::objects::release::Releaser;
+use crate::objects::sprite::new_sprite;
+use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
@@ -28,6 +35,7 @@ use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use crate::world::{ATTACKER_UNPLACED, HUNTER_UNMOVING, NO_STANDING_SPRITE, TARGET_UNPLACED};
 
 /// The Hunt a work command starts ([`World::start_hunt`]'s arguments).
 #[derive(Clone, Copy, Debug)]
@@ -71,7 +79,7 @@ impl World {
         let owner = self.players.player(player)?;
         let unit = owner.live(idx)?;
         let me = unit.master(self.master_tables(), player)?;
-        let resource = crate::gathering::gather::Resource {
+        let resource = Resource {
             id: target,
             position: t.position(),
             class: tm.class,
@@ -94,18 +102,15 @@ impl World {
             .list
             .gather()
             .and_then(|g| g.task.productivity);
-        let rate = crate::gathering::gather::StopRate {
+        let rate = StopRate {
             work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
-            productivity: crate::gathering::gather::productivity_of(
-                productivity,
-                &owner.attributes,
-            ),
+            productivity: productivity_of(productivity, &owner.attributes),
         };
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
@@ -137,10 +142,7 @@ impl World {
         )?;
         let new = gather.targets();
         // a farm another farmer works: taken (slot 0x68) and let go again (set_state 11)
-        let waits = matches!(
-            gather.state,
-            crate::gathering::gather::GatherState::WalkBack { .. }
-        ) && new[0].is_none();
+        let waits = matches!(gather.state, GatherState::WalkBack { .. }) && new[0].is_none();
         self.exchange_gather_targets(old, new, by)?;
         if waits && old[0] != Some(target) {
             self.take(target, by)?;
@@ -187,7 +189,7 @@ impl World {
         let (at, radius) = (o.position(), tm.radius);
         let unit = &self.players.live(player, idx)?;
         let me = unit.master(self.master_tables(), player)?;
-        let moved_to = Some(crate::gathering::gather::MoveTarget {
+        let moved_to = Some(MoveTarget {
             id: target,
             player: tp,
             drop_site: self.drops_at_main(player, idx, target)?,
@@ -197,7 +199,7 @@ impl World {
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
@@ -272,7 +274,7 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
@@ -356,7 +358,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        task: &crate::objects::masters::Task,
+        task: &Task,
         notify: Option<(Position, bool)>,
     ) -> Result<(), GenieError> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
@@ -365,7 +367,7 @@ impl World {
         let tm = t.master(self.master_tables(), tp)?;
         let unit = &self.players.live(player, idx)?;
         let me = unit.master(self.master_tables(), player)?;
-        let resource = crate::gathering::gather::Resource {
+        let resource = Resource {
             id: target,
             position: t.position(),
             class: tm.class,
@@ -388,20 +390,15 @@ impl World {
         };
         // the constructor's time per stop: the gatherer's work rate (its master's plus its
         // powerup, slot 0x6e8), capacity and productivity attribute (none: 1.0)
-        let rate = crate::gathering::gather::StopRate {
+        let rate = StopRate {
             work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
-            productivity: crate::gathering::gather::productivity_of(
+            productivity: productivity_of(
                 task.productivity,
                 &self.players.player(player)?.attributes,
             ),
         };
-        let mut gather = crate::gathering::gather::GatherAction::new(
-            task,
-            &resource,
-            self.settings.walkable_farms,
-            rate,
-        )?;
+        let mut gather = GatherAction::new(task, &resource, self.settings.walkable_farms, rate)?;
         self.take(target, self.releaser(player, idx)?)?;
         if let Some(notify) = notify {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
@@ -412,7 +409,7 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
@@ -465,7 +462,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        target: (ObjectId, crate::objects::masters::ClassId),
+        target: (ObjectId, ClassId),
         (point, clears): (Position, bool),
     ) -> Result<(), GenieError> {
         let id = self.players.live(player, idx)?.id;
@@ -498,12 +495,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let moving = task.walk_sprite_id(unit.life.held());
-        Ok(crate::combat::attack::arms(
-            master,
-            &self.graphics,
-            task.sprites,
-            moving,
-        ))
+        Ok(attack_arms(master, &self.graphics, task.sprites, moving))
     }
 
     /// [`crate::combat::attack::engagement`] of the unit at `idx` with `target`.
@@ -515,19 +507,13 @@ impl World {
     ) -> Result<Engagement, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        let me = self
-            .spatial
-            .get(unit.id)
-            .ok_or(crate::world::ATTACKER_UNPLACED)?;
-        let them = self
-            .spatial
-            .get_known(target)?
-            .ok_or(crate::world::TARGET_UNPLACED)?;
+        let me = self.spatial.get(unit.id).ok_or(ATTACKER_UNPLACED)?;
+        let them = self.spatial.get_known(target)?.ok_or(TARGET_UNPLACED)?;
         let speed = self
             .parts
             .mover_of(unit.id)
             .map_or(Speed::ZERO, |m| m.stats.speed);
-        crate::combat::attack::engagement(
+        attack_engagement(
             self.parts.unit_ai.get(unit.id),
             speed,
             master,
@@ -547,8 +533,8 @@ impl World {
     fn gatherable_building(
         &self,
         player: PlayerId,
-        (tp, t): (PlayerId, &crate::objects::unit::Unit),
-        tm: &crate::objects::masters::Master,
+        (tp, t): (PlayerId, &Unit),
+        tm: &Master,
     ) -> Result<bool, GenieError> {
         if tm.kind == BUILDING {
             // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
@@ -637,17 +623,14 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let mover = self
-            .parts
-            .mover_mut(unit.id)
-            .ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = self.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         let mut held = unit.life.held();
         let (hunt, arrived) = HuntAction::start(
             HuntStart {
@@ -670,8 +653,8 @@ impl World {
         // an Attack whose MoveTo started arrived: the unit shows the idle sprite (slot 0x68) and
         // its `+0x7b8` clears (`Attack::arrived_sprite`)
         if arrived {
-            let g = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
-            crate::objects::sprite::new_sprite(
+            let g = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
+            new_sprite(
                 &mut unit.sprite,
                 self.parts.move_stats_mut(unit.id),
                 g,

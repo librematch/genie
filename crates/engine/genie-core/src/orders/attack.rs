@@ -21,9 +21,17 @@ use crate::players::PlayerId;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
 
+use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
+use crate::combat::victims::victim_of;
+use crate::combat::{AttackCount, AttackTargetId};
+use crate::gathering::HuntTargetId;
+use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
+use crate::objects::sprite::new_sprite;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::Notify;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::{ATTACKER_UNPLACED, NO_STANDING_SPRITE, TARGET_UNPLACED};
 
 /// Where an attack task's target aims ([`World::attack_aim`]).
 pub(super) struct Aim {
@@ -47,24 +55,21 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        (master, world_time): (&crate::objects::masters::Master, WorldTime),
-    ) -> Result<Option<crate::combat::attack::ReadyReads>, GenieError> {
+        (master, world_time): (&Master, WorldTime),
+    ) -> Result<Option<ReadyReads>, GenieError> {
         let u = self.players.live(player, idx)?;
         let held = self.players.player(player)?;
         let reads = AttackReads::of(
             self.parts.combat_of(u.id),
             master,
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &self.parts.own_master,
-                    self.masters.of(player),
-                ),
+                OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
                 &self.graphics,
             ),
             self.parts.unit_ai.get(u.id),
             (held.kind, world_time),
         );
-        let own = crate::combat::victims::victim_of(
+        let own = victim_of(
             (
                 u,
                 self.parts.unit_ai.contains(u.id),
@@ -79,12 +84,10 @@ impl World {
             self.spatial.terrain.as_ref(),
             self.mode_680,
         );
-        Ok(self
-            .victim(target, player)?
-            .map(|victim| crate::combat::attack::ReadyReads {
-                reads,
-                fight: Fight { victim, own },
-            }))
+        Ok(self.victim(target, player)?.map(|victim| ReadyReads {
+            reads,
+            fight: Fight { victim, own },
+        }))
     }
 
     /// The work command's Attack (its task of action type 7, the factory `FUN_140a97e00` case 7):
@@ -105,7 +108,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        task: &crate::objects::masters::Task,
+        task: &Task,
         point: Position,
         clears: bool,
     ) -> Result<(), GenieError> {
@@ -123,17 +126,13 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?;
         // the task factory (`FUN_140a97e00` case 7) gives the Attack the task's moving sprite
-        let arms =
-            crate::combat::attack::arms(master, &self.graphics, task.sprites, task.sprites.moving);
-        let standing = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
+        let arms = arms(master, &self.graphics, task.sprites, task.sprites.moving);
+        let standing = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         let me_at = *self
             .spatial
             .get(self.players.live(player, idx)?.id)
-            .ok_or(crate::world::ATTACKER_UNPLACED)?;
-        let target_at = *self
-            .spatial
-            .get_known(target)?
-            .ok_or(crate::world::TARGET_UNPLACED)?;
+            .ok_or(ATTACKER_UNPLACED)?;
+        let target_at = *self.spatial.get_known(target)?.ok_or(TARGET_UNPLACED)?;
         let (tx, ty) = (target_at.position.x() as i32, target_at.position.y() as i32);
         let visible = self.spatial.sees_tile(player, Tile::new(tx, ty))
             || (aim.fog_visibility != FogVisibility::INVISIBLE
@@ -143,7 +142,7 @@ impl World {
             .parts
             .mover_of(self.players.live(player, idx)?.id)
             .map_or(Speed::ZERO, |m| m.stats.speed);
-        let e = crate::combat::attack::engagement(
+        let e = engagement(
             self.parts.unit_ai.get(self.players.live(player, idx)?.id),
             speed,
             master,
@@ -159,14 +158,14 @@ impl World {
             .with("object", unit.id)
             .with("master", unit.life.master_id));
         }
-        self.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
-        crate::objects::sprite::new_sprite(
+        self.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
+        new_sprite(
             &mut unit.sprite,
             self.parts.move_stats_mut(unit.id),
             standing,
             self.streams.get(Stream::Sprite),
         );
-        let cmd = crate::combat::attack::AttackCommand {
+        let cmd = AttackCommand {
             target,
             engagement: &e,
             arms,
@@ -185,7 +184,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        cmd: &crate::combat::attack::AttackCommand<'_>,
+        cmd: &AttackCommand<'_>,
     ) -> Result<(), GenieError> {
         let (mut attack, posted) =
             self.run_on_step(player, idx, |unit, _, c| Attack::command(c, unit, cmd))?;
@@ -194,11 +193,11 @@ impl World {
         let (id, state) = (unit.id, unit.life.state);
         for (kind, p) in posted {
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                ai.post(crate::unit_ai::Notify::own(id, kind, p), state)?;
+                ai.post(Notify::own(id, kind, p), state)?;
             }
         }
         // the attack command gives the Attack its second target
-        attack.target2 = Some(crate::combat::AttackTargetId::new(target));
+        attack.target2 = Some(AttackTargetId::new(target));
         self.parts
             .actions
             .of_mut(unit.id)?
@@ -318,7 +317,7 @@ impl World {
             .filter(|&t| t.is_some());
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
                 &self.graphics,
@@ -346,7 +345,7 @@ impl World {
             mover,
         )? {
             if arrived {
-                crate::combat::attack::show_arrived(
+                show_arrived(
                     &arms,
                     &mut unit.sprite,
                     self.parts.motion.layer_mut(unit.id),
@@ -355,7 +354,7 @@ impl World {
             }
             // the hunt's slot 0x68 (FUN_140ac7980): FUN_140a7a230 on the new target, which the
             // work command's task finder took below state 3
-            let old = old.flatten().map(crate::gathering::HuntTargetId::id);
+            let old = old.flatten().map(HuntTargetId::id);
             let _ = self.retarget_action(player, idx, old, target, Voice::Loud)?;
         }
         Ok(())

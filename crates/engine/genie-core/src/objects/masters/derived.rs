@@ -1,24 +1,25 @@
 //! The values the slice derives from a master after a change ([`Master::follow`]): the
 //! sprites' speed and facets, a moving unit's values.
 
+use crate::map::Distance;
+use crate::map::terrain::Terrain;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::Graphics;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::facing::SpriteFacets;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{Master, master_type};
+use crate::objects::sprite::top_speed;
 use crate::world::WholeSeconds;
 
 /// A sprite's speed factor (the `.dat` graphic's `speed_multiplier`): the master's speed times
 /// it when above 0, else the master's speed (as the masters' loader derives
 /// [`MoveStats`]' speeds).
-pub(super) fn sprite_speed(
-    base: Speed,
-    sprite: Option<SpriteId>,
-    graphics: &crate::objects::Graphics,
-) -> Speed {
-    crate::objects::sprite::top_speed(base, sprite.and_then(|s| graphics.get(s)))
+pub(super) fn sprite_speed(base: Speed, sprite: Option<SpriteId>, graphics: &Graphics) -> Speed {
+    top_speed(base, sprite.and_then(|s| graphics.get(s)))
 }
 
 impl Master {
@@ -34,10 +35,7 @@ impl Master {
     /// and up) and its tasks' sprites, when every one the graphics hold has the same count and
     /// bit 1 (as the masters' loader derives them).
     #[must_use]
-    pub fn sprite_facets(
-        &self,
-        graphics: &crate::objects::Graphics,
-    ) -> Option<crate::objects::facing::SpriteFacets> {
+    pub fn sprite_facets(&self, graphics: &Graphics) -> Option<SpriteFacets> {
         let mut sprites = vec![self.standing_sprite, self.standing_sprite_2];
         if master_type::MOVING <= self.kind {
             sprites.extend([self.move_sprite, self.run_sprite]);
@@ -52,7 +50,7 @@ impl Master {
             .into_iter()
             .flatten()
             .filter_map(|id| graphics.get(id))
-            .map(|g| crate::objects::facing::SpriteFacets {
+            .map(|g| SpriteFacets {
                 count: g.facets,
                 turns: g.flags.contains(SpriteFlags::TURNS),
             });
@@ -68,8 +66,8 @@ impl Master {
         &self,
         stats: &mut MoveStats,
         attribute: MasterAttribute,
-        graphics: &crate::objects::Graphics,
-        terrain: Option<&crate::map::terrain::Terrain>,
+        graphics: &Graphics,
+        terrain: Option<&Terrain>,
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
@@ -116,13 +114,13 @@ impl Master {
     pub fn follow(
         &mut self,
         attribute: MasterAttribute,
-        graphics: &crate::objects::Graphics,
-        terrain: Option<&crate::map::terrain::Terrain>,
+        graphics: &Graphics,
+        terrain: Option<&Terrain>,
     ) {
         use crate::objects::masters::attribute as a;
         match attribute {
             a::SIZE_X | a::SIZE_Y | a::SIZE_Z => {
-                self.tall = crate::map::Distance::ZERO < self.height;
+                self.tall = Distance::ZERO < self.height;
                 if let Some(m) = self.missile_stats.as_mut() {
                     m.radius = self.radius.with_height(self.height.get());
                 }

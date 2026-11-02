@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::Fight;
+use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::update::write_target_back;
@@ -12,9 +13,11 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
 use crate::movement::footprint_gap_squared;
+use crate::objects::layers::Action;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::AmountRate;
+use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::step::Step;
@@ -62,8 +65,8 @@ impl HuntAction {
         to: Position,
         now: WorldTime,
     ) -> Result<(), GenieError> {
-        let mover = mover.ok_or(crate::world::HUNTER_UNMOVING)?;
-        if !crate::combat::attack::face_target(mover, at, to, now)? {
+        let mover = mover.ok_or(HUNTER_UNMOVING)?;
+        if !face_target(mover, at, to, now)? {
             return Err(GenieError::unsupported(
                 "a hunter that turns over time to face its target",
             ));
@@ -108,7 +111,7 @@ impl HuntAction {
             c.w.parts
                 .mover_of(unit.id)
                 .map(|m| m.stats.radius.ground())
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+                .ok_or(HUNTER_UNMOVING)?;
         if footprint_gap_squared(unit.place.position(), ground, v, f.victim.radius) <= LEAD_REACH {
             self.lead.start = v.ground();
             self.face_animal(
@@ -140,7 +143,7 @@ impl HuntAction {
         &self,
         c: &mut Step<'_>,
         hunter: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         stops_decay: bool,
         f: &mut Fight,
     ) -> Result<(), GenieError> {

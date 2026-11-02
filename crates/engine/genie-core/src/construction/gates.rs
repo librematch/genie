@@ -3,15 +3,21 @@
 
 use crate::GenieError;
 use crate::map::Rect;
+use crate::map::spatial::Obstruction;
 use crate::map::spatial::{RecordId, Spatial, WalkQuery};
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
+use crate::objects::layers::Building;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
+use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::player_master;
+use crate::objects::masters::{Master, OwnerMasters};
+use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::{GATE_COUNT_CAP, GATE_GROW, GATE_QUERY_RECORDS, World};
 
@@ -23,11 +29,7 @@ use crate::world::{GATE_COUNT_CAP, GATE_GROW, GATE_QUERY_RECORDS, World};
 /// (`FUN_141663d90`), each with the ally flag.
 #[must_use]
 pub fn lets_pass(
-    (gate, layer, master): (
-        &crate::objects::unit::Unit,
-        &crate::objects::layers::Building,
-        &crate::objects::masters::Master,
-    ),
+    (gate, layer, master): (&Unit, &Building, &Master),
     owner: PlayerId,
     player: PlayerId,
     spatial: &Spatial,
@@ -36,7 +38,7 @@ pub fn lets_pass(
         .building
         .as_ref()
         .is_some_and(|b| b.transform_unit.is_some());
-    master.kind == crate::objects::masters::master_type::BUILDING
+    master.kind == BUILDING
         && gate.life.state < ObjectState::Dying
         && master.class == class::GATE
         && transforms
@@ -58,7 +60,7 @@ pub(crate) fn gate_units(
     spatial: &mut Spatial,
     gate: ObjectId,
     annexes: &[ObjectId],
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(Vec<ObjectId>, usize), GenieError> {
     let [a, b] = annexes[..] else {
         return Err(GenieError::unsupported("a gate without its two annexes"));
@@ -121,14 +123,10 @@ impl World {
         let owner = self.players.player(q)?;
         let mut gates = Vec::new();
         for i in owner.objects.places().rev() {
-            let m =
-                owner
-                    .objects
-                    .checked(i)?
-                    .master_in(crate::objects::masters::OwnerMasters::new(
-                        &self.parts.own_master,
-                        masters,
-                    ))?;
+            let m = owner
+                .objects
+                .checked(i)?
+                .master_in(OwnerMasters::new(&self.parts.own_master, masters))?;
             if m.class == class::GATE
                 && m.building
                     .as_ref()
@@ -222,7 +220,7 @@ impl World {
                 let Some(m) = player_master(&self.masters, q, master) else {
                     continue;
                 };
-                let record = crate::map::spatial::Obstruction {
+                let record = Obstruction {
                     kind: m.obstruction_type,
                     class: m.obstruction_class,
                 };

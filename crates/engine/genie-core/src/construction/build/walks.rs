@@ -2,11 +2,13 @@
 //! its foundation, and the sub-action list's update.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::construction::build::{BuildAction, BuildReads, BuildTask, SITE_GONE};
 use crate::movement::Me;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, MoveToReads, TargetMoved, WalkTo};
 use crate::objects::UpdateCode;
+use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::world::step::Step;
 
@@ -46,7 +48,7 @@ impl BuildAction {
     ) -> Result<(Option<WalkTo>, Option<MoveToAction>), GenieError> {
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
@@ -58,7 +60,7 @@ impl BuildAction {
         } else {
             Some(
                 move_reads
-                    .walk_to(c.w, self.target.map(crate::construction::FoundationId::id))?
+                    .walk_to(c.w, self.target.map(FoundationId::id))?
                     .ok_or(SITE_GONE)?,
             )
         };

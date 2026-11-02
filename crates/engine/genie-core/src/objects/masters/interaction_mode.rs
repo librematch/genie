@@ -1,5 +1,7 @@
 //! A master's interaction mode (`+0x62d`): how a player may select and order its objects.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's interaction mode (`select_level`, `+0x62d`; the `.dat`'s `interaction_mode`,
 /// openage's names): whether a player may select its objects and give them orders. The simulation
 /// only keeps it; every byte is kept.
@@ -39,8 +41,8 @@ impl InteractionMode {
     }
 }
 
-impl std::fmt::Display for InteractionMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for InteractionMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

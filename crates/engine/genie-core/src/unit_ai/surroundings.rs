@@ -2,17 +2,25 @@
 //! and what it has seen.
 
 use crate::GenieError;
+use crate::combat::Firepower;
+use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::map::WholeDistance;
+use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
+use crate::math::image::unit_ai::{
+    PATROL_TURN_REACH as UNIT_AI_PATROL_TURN_REACH, SINGLE_VOLLEY as UNIT_AI_SINGLE_VOLLEY,
+};
 use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
+use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
@@ -20,11 +28,13 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::ownership::CaptureKind;
+use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::unit_ai::Search;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
+use std::collections::HashSet;
 
 /// What a [`Search`] answers: the object picked, if any, and whether the lists it read hold
 /// enemies (the fifth relation list), which sets the alert mode when its query ran (`fresh`; a
@@ -45,7 +55,7 @@ pub struct Found {
     pub players: u32,
     /// What `ClosestObject` writes to its seventh argument: the object's search distance,
     /// truncated (`CVTTSS2SI`); −1 (`DAT_14330ec20`) without one and from the other picks.
-    pub distance: crate::map::WholeDistance,
+    pub distance: WholeDistance,
     /// The retarget entries `bestUnitToAttack`'s failed paths add (`FUN_140c42320`: a target and
     /// the world time until which it is ignored; at most three), the unit AI's.
     pub retries: [Option<(ObjectId, WorldTime)>; 3],
@@ -59,7 +69,7 @@ impl Found {
         position: None,
         fresh: true,
         players: 0,
-        distance: crate::map::WholeDistance::NONE,
+        distance: WholeDistance::NONE,
         retries: [None; 3],
     };
 }
@@ -79,7 +89,7 @@ pub fn flood_search(
     mut test: impl FnMut(Tile) -> Result<Option<ObjectId>, GenieError>,
 ) -> Result<Option<ObjectId>, GenieError> {
     let (ux, uy) = (at.x(), at.y());
-    let mut reached = std::collections::HashSet::from([at]);
+    let mut reached = HashSet::from([at]);
     if let Some(id) = test(at)? {
         return Ok(Some(id));
     }
@@ -151,7 +161,7 @@ pub struct Surroundings {
     /// The master's `combat_level` (`+0x62c`).
     pub combat_level: CombatLevel,
     /// The master's `attack_priority` (`+0x92c`, `FUN_141202220`).
-    pub attack_priority: crate::objects::masters::AttackPriority,
+    pub attack_priority: AttackPriority,
     /// The master's radii (`+0x5d8`, `+0x5dc`), line of sight (`+0x5d0`) and search radius
     /// (`+0x794`, the unit's slot 0x2c8).
     pub size: Footprint,
@@ -176,7 +186,7 @@ pub struct Surroundings {
     /// Its master has a missile (`+0x83c` 0 or more, `FUN_1410bfca0`).
     pub ranged: bool,
     /// Its missiles per volley (`+0xa00`, `FUN_1412136d0`), 0 for a unit without volleys.
-    pub firepower: crate::combat::Firepower,
+    pub firepower: Firepower,
     /// The unit's `+0x924`.
     pub capture: CaptureKind,
     /// The unit's master.
@@ -225,10 +235,10 @@ pub struct Surroundings {
     pub moved_at: BVector,
     /// Its owner's `chance_to_dodge_missiles` (`player+0xe10`, saved): a ship's handler takes a
     /// missile's warning (`0x20f`) as damage unless a draw below it dodges.
-    pub dodge_chance: crate::players::Chance,
+    pub dodge_chance: Chance,
     /// Its owner's `chance_for_archers_to_maintain_distance` (`player+0xe11`, saved): a computer
     /// player's siege unit backs up after a shot on a draw at least this.
-    pub keep_distance_chance: crate::players::Chance,
+    pub keep_distance_chance: Chance,
     /// Its owner's `disableTowerPriority` (`player+0x620`, GAME 0xb's setting 0xe): a computer
     /// player's unit but a siege weapon, unpacked trebuchet or warship ignores a tower's damage
     /// ([`UnitAi::damaged`]).
@@ -326,7 +336,7 @@ pub struct UnitSeen {
     /// Its type (`+0xf`).
     pub kind: MasterKind,
     /// An annex's main building (`+0xbb8`).
-    pub main: Option<crate::construction::MainBuildingId>,
+    pub main: Option<MainBuildingId>,
     /// The unit's owner counts its owner as its own or an ally (`FUN_141663d90` with the ally
     /// flag, [`crate::unit_ai::task_finder::allied`]).
     pub allied: bool,
@@ -377,17 +387,16 @@ pub struct Seen {
     pub flags: ObjectFlags,
     /// The viewer's test of its tile (`FUN_1416635e0`, [`crate::map::spatial::Spatial::tile_sight`]):
     /// 0xf seen, 0x80 explored, else 0.
-    pub sight: crate::map::spatial::TileSight,
+    pub sight: TileSight,
 }
 
 /// A patrol's path goes back and forth when its point is at least this far from the unit
 /// (`0x140aa2a70`, `DAT_142eb1c98`).
-pub(super) const PATROL_TURN_REACH: f32 = crate::math::image::unit_ai::PATROL_TURN_REACH;
+pub(super) const PATROL_TURN_REACH: f32 = UNIT_AI_PATROL_TURN_REACH;
 
 /// A building on its make action without a missile and with at most this firepower forgets its
 /// target (`DAT_14330eb8c`).
-pub(super) const SINGLE_VOLLEY: crate::combat::Firepower =
-    crate::combat::Firepower::new(crate::math::image::unit_ai::SINGLE_VOLLEY);
+pub(super) const SINGLE_VOLLEY: Firepower = Firepower::new(UNIT_AI_SINGLE_VOLLEY);
 
 /// A move the unit AI gives its unit (unit-AI slot 0x130, `FUN_140c55620`, to the unit's slot
 /// 0x340): a `MoveTo` to `point` within `range`.

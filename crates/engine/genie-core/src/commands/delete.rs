@@ -8,16 +8,21 @@
 
 use crate::GenieError;
 use crate::construction::build::held;
+use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
 use crate::map::Tile;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::lifecycle::death_parts::{
+    built_death, combat_dies, forget_resource, refund_of,
+};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
+use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::masters::master_type::BUILDING;
@@ -231,7 +236,7 @@ impl World {
         let site = self.parts.building_of(unit.id).construction;
         let desolid = site.is_some_and(|c| c.desolid);
         let share = if state < ObjectState::Alive && HitPoints::new(1.0) <= hp {
-            let c = site.ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+            let c = site.ok_or(NO_CONSTRUCTION)?;
             let build_time = Seconds::of_master(c.build_time).get();
             (build_time - c.progress.get()) / build_time
         } else {
@@ -243,7 +248,7 @@ impl World {
             share = 1.0;
         }
         if 0.0 < share {
-            for (resource, amount, paid) in crate::objects::masters::cost_entries(&cost) {
+            for (resource, amount, paid) in cost_entries(&cost) {
                 if paid {
                     self.players
                         .player_mut(owner)?
@@ -279,9 +284,7 @@ impl World {
     ///
     /// An object the slice does not hold, and what the parts do not model.
     pub(crate) fn destroy(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
-        let (_, u) = self
-            .object(id)
-            .ok_or(crate::construction::build::NOT_HELD)?;
+        let (_, u) = self.object(id).ok_or(NOT_HELD)?;
         let state = u.life.state;
         let master = u.master(self.master_tables(), owner)?.clone();
         if master.kind == BUILDING {
@@ -334,9 +337,7 @@ impl World {
     /// modelled. Not held: the special-object list (`+0x30c` bit 0, `FUN_141677380`) and the log
     /// line.
     pub(crate) fn base_destroy(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
-        let (_, u) = self
-            .object(id)
-            .ok_or(crate::construction::build::NOT_HELD)?;
+        let (_, u) = self.object(id).ok_or(NOT_HELD)?;
         if ObjectState::Removed <= u.life.state {
             return Ok(());
         }
@@ -439,7 +440,7 @@ impl World {
         let u = held(&mut self.players, place)?;
         let (state, main) = (u.life.state, self.parts.building_of(u.id).annex_of);
         if ObjectState::Dying <= new && state < ObjectState::Dying {
-            crate::objects::lifecycle::death_parts::combat_dies(
+            combat_dies(
                 u,
                 self.parts.building_of(id),
                 master,
@@ -449,7 +450,7 @@ impl World {
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
         if new == ObjectState::Dying && state == ObjectState::Alive {
-            for (kind, amount) in crate::objects::lifecycle::death_parts::refund_of(master, main) {
+            for (kind, amount) in refund_of(master, main) {
                 let player = self.players.player_mut(owner)?;
                 player.take_at_least_zero(kind, amount)?;
             }
@@ -487,12 +488,7 @@ impl World {
             }
         }
         if old < ObjectState::DyingSprite && ObjectState::Undead < new {
-            crate::objects::lifecycle::death_parts::forget_resource(
-                &mut self.spatial,
-                Some(master),
-                id,
-                position,
-            )?;
+            forget_resource(&mut self.spatial, Some(master), id, position)?;
         }
         self.spatial.sight_state(id, new)?;
         if old < ObjectState::Removed && new == ObjectState::Removed {
@@ -540,15 +536,8 @@ impl World {
     ) -> Result<(), GenieError> {
         let player_type = self.players.player(owner)?.kind;
         let annex_of = self.parts.building_of(id).annex_of;
-        let held = self
-            .object_and_combat_mut(id)?
-            .ok_or(crate::construction::build::NOT_HELD)?;
-        let death = crate::objects::lifecycle::death_parts::built_death(
-            held,
-            annex_of,
-            master,
-            player_type,
-        )?;
+        let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
+        let death = built_death(held, annex_of, master, player_type)?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?
@@ -598,9 +587,15 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::construction::BuilderCount;
     use crate::construction::build::Construction;
+    #[cfg(test)]
+    use crate::map::Snow;
     use crate::map::spatial::Obstruction;
     use crate::objects::MasterHitPoints;
+    #[cfg(test)]
+    use crate::objects::layers::Building;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::ids;
@@ -616,6 +611,8 @@ mod tests {
     use crate::world::Seconds;
     use crate::world::WholeSeconds;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::{FrameSeed, TreatyLength};
 
     /// Gaia and two players: player 1's villager 10, house foundation 11 (build time 25, cost 25
     /// wood paid) and sheep 12, and player 2's villager 20.
@@ -624,25 +621,25 @@ mod tests {
             id: object_id(11),
             ..Unit::default()
         };
-        let layer = crate::objects::layers::Building {
+        let layer = Building {
             construction: Some(Construction {
                 progress: Seconds::new(progress),
                 desolid,
-                builders: crate::construction::BuilderCount::of_data(0),
+                builders: BuilderCount::of_data(0),
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::NONE,
                 },
-                snow: crate::map::Snow::None,
+                snow: Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             vec![
@@ -789,7 +786,7 @@ mod tests {
         );
         let mut t = game(0.0, true);
         town_centre(&mut t);
-        t.settings.treaty_length = crate::world::TreatyLength::of_minutes(10);
+        t.settings.treaty_length = TreatyLength::of_minutes(10);
         assert_eq!(
             t.delete(player_id(1), object_id(11)),
             Err(GenieError::unsupported(
@@ -809,9 +806,15 @@ mod clearing_tests {
     use crate::map::Point;
     use crate::map::Position;
     use crate::map::Tile;
+    #[cfg(test)]
+    use crate::map::spatial::Obstruction;
     use crate::map::spatial::{Placed, Spatial, Tiles};
+    #[cfg(test)]
+    use crate::objects::layers::Static;
     use crate::objects::lifecycle::{Class, Lifecycle};
     use crate::objects::masters::BuildableOn;
+    #[cfg(test)]
+    use crate::objects::masters::BuildingMaster;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::master_type;
@@ -822,6 +825,10 @@ mod clearing_tests {
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::test_ids::{adds, amounts};
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -830,7 +837,7 @@ mod clearing_tests {
     fn object(id: i32, master: MasterId, x: f32, y: f32) -> Unit {
         Unit {
             id: object_id(id),
-            place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+            place: Static::at(Position::new(x, y, 0.0)),
             life: Lifecycle {
                 master_id: master,
                 ..Lifecycle::default()
@@ -907,14 +914,14 @@ mod clearing_tests {
                 class: class::CLASS_11,
                 radius: Footprint::new(1.5, 1.5),
                 buildable_on: BuildableOn::YES,
-                building: Some(crate::objects::masters::BuildingMaster {
+                building: Some(BuildingMaster {
                     stack_unit: None,
                     foundation_terrain: None,
                     tech: None,
                     annexes: [None; 4],
                     head_unit: None,
                     transform_unit: None,
-                    ..crate::objects::masters::BuildingMaster::default()
+                    ..BuildingMaster::default()
                 }),
                 ..Master::default()
             },
@@ -926,7 +933,7 @@ mod clearing_tests {
         let ms = masters();
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![
@@ -958,7 +965,7 @@ mod clearing_tests {
                 let m = ms.get(u.life.master_id).expect("a test master");
                 let mut at = placed(&u, m, p);
                 if m.obstruction_type == ObstructionType::TYPE_2 {
-                    at.obstruction = Some(crate::map::spatial::Obstruction {
+                    at.obstruction = Some(Obstruction {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::NONE,
                     });
@@ -1101,15 +1108,15 @@ mod clearing_tests {
             t.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Dead
         );
-        assert_eq!(at(&t), crate::test_ids::amounts([10.0; 3]));
+        assert_eq!(at(&t), amounts([10.0; 3]));
         // from 2 to 5: flags 2 and 16 leave, flag 32 stays; then to 7, flag 32 leaves
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
         t.set_state(PlayerId::new(0), object_id(1), ObjectState::Dead)
             .unwrap();
-        assert_eq!(at(&t), crate::test_ids::amounts([8.0, 7.0, 10.0]));
+        assert_eq!(at(&t), amounts([8.0, 7.0, 10.0]));
         t.set_state(PlayerId::new(0), object_id(1), ObjectState::Removed)
             .unwrap();
-        assert_eq!(at(&t), crate::test_ids::amounts([8.0, 7.0, 9.0]));
+        assert_eq!(at(&t), amounts([8.0, 7.0, 9.0]));
         assert_eq!(
             t.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Removed
@@ -1146,8 +1153,8 @@ mod clearing_tests {
             ..Master::default()
         };
         assert_eq!(
-            crate::objects::lifecycle::death_parts::refund_of(&unit, None),
-            crate::test_ids::adds([
+            refund_of(&unit, None),
+            adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::UNITS_VALUE, 70.0)
             ])
@@ -1158,17 +1165,14 @@ mod clearing_tests {
             ..unit
         };
         assert_eq!(
-            crate::objects::lifecycle::death_parts::refund_of(&house, None),
-            crate::test_ids::adds([
+            refund_of(&house, None),
+            adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::BUILDINGS_VALUE, 70.0)
             ])
         );
         assert_eq!(
-            crate::objects::lifecycle::death_parts::refund_of(
-                &house,
-                Some(MainBuildingId::new(object_id(9)))
-            ),
+            refund_of(&house, Some(MainBuildingId::new(object_id(9)))),
             []
         );
         let castle = Master {
@@ -1176,8 +1180,8 @@ mod clearing_tests {
             ..house
         };
         assert_eq!(
-            crate::objects::lifecycle::death_parts::refund_of(&castle, None),
-            crate::test_ids::adds([(attribute::TOTAL_VALUE, 70.0)])
+            refund_of(&castle, None),
+            adds([(attribute::TOTAL_VALUE, 70.0)])
         );
     }
 }

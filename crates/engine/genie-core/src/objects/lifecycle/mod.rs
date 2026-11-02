@@ -22,6 +22,9 @@ pub(crate) mod death_parts;
 mod object_state;
 
 pub use self::object_state::ObjectState;
+use crate::garrison::ContainerId;
+use crate::objects::FacetCount;
+use crate::world::player::Player;
 
 /// What the dead-object steps read from an object's master that the header save does not hold;
 /// they come from the `.dat`.
@@ -63,7 +66,7 @@ pub struct Held {
 ///
 /// An attribute the owner does not have.
 pub(crate) fn static_storage(
-    owner: &mut crate::world::player::Player,
+    owner: &mut Player,
     storage: &[(Option<AttributeId>, Amount, u8)],
 ) -> Result<Held, GenieError> {
     let mut held = Held::default();
@@ -106,9 +109,9 @@ pub struct Lifecycle {
     /// A static object's sprite after its death (the master's dying sprite, else its current
     /// one) starts on a random facet (sequence flag 4) of this many (more than one): its death
     /// draws the facet from the Object stream.
-    pub death_facets: Option<crate::objects::FacetCount>,
+    pub death_facets: Option<FacetCount>,
     /// `+0x2f0`: the object it is inside (its `inside_obj`), whose update decides for it.
-    pub inside: Option<crate::garrison::ContainerId>,
+    pub inside: Option<ContainerId>,
     /// `+0x643`: the next update moves the object to the sleeping list.
     pub goto_sleep: bool,
     /// The master's id.
@@ -268,6 +271,8 @@ mod tests {
     use crate::garrison::ContainerId;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
+    #[cfg(test)]
+    use crate::test_ids::amounts;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::world::Millis;
@@ -475,7 +480,7 @@ mod tests {
             attribute_type: Some(attribute::WOOD),
             amount: Amount::new(100.0),
             death_spawn: true,
-            death_facets: Some(crate::objects::FacetCount::of_data(8)),
+            death_facets: Some(FacetCount::of_data(8)),
             ..dead(Class::Static)
         };
         let mut object = Well512::default();
@@ -505,9 +510,9 @@ mod tests {
     /// not; the last of flag 0 is what the object holds.
     #[test]
     fn new_object_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {
-        let mut owner = crate::world::player::Player {
+        let mut owner = Player {
             attributes: vec![Amount::ZERO; 20],
-            ..crate::world::player::Player::default()
+            ..Player::default()
         };
         let storage = [
             (Some(attribute::WOOD), 2.0, 1),
@@ -526,10 +531,7 @@ mod tests {
                 amount: Amount::new(1.5)
             })
         );
-        assert_eq!(
-            owner.resources(),
-            crate::test_ids::amounts([0.0, 2.0, 0.0, 0.0])
-        );
+        assert_eq!(owner.resources(), amounts([0.0, 2.0, 0.0, 0.0]));
         let gained: Vec<(usize, f32)> = owner
             .attributes
             .iter()

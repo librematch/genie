@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's id: the `.dat`'s unit id, the place of the master in a player's masters
 /// ([`crate::objects::masters::Master::id`]), so 0 or more. A field that holds −1 for none
@@ -58,8 +59,8 @@ impl MasterId {
     }
 }
 
-impl std::fmt::Display for MasterId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MasterId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

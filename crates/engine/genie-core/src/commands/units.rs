@@ -95,13 +95,21 @@ impl World {
 mod tests {
     use crate::ErrorKind;
     use crate::commands::{BuildCommand, Command, StopCommand, UnitList};
+    #[cfg(test)]
+    use crate::commands::{QueueId, SpriteOverride};
     use crate::map::Point;
+    #[cfg(test)]
+    use crate::objects::Frame;
     use crate::objects::ObjectId;
     use crate::players::PlayerId;
+    #[cfg(test)]
+    use crate::players::PlayerType;
     use crate::test_ids::master_id;
     use crate::test_ids::object_ids;
     use crate::test_ids::player_id;
     use crate::test_ids::unit_list;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::WorldTime;
     use crate::world::{Player, World};
@@ -114,13 +122,13 @@ mod tests {
         };
         World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(1),
             vec![Millis::ZERO; 3],
             vec![
-                player(crate::players::PlayerType::default()),
-                player(crate::players::PlayerType::HUMAN),
-                player(crate::players::PlayerType::COMPUTER),
+                player(PlayerType::default()),
+                player(PlayerType::HUMAN),
+                player(PlayerType::COMPUTER),
             ],
         )
     }
@@ -172,12 +180,12 @@ mod tests {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(1.0, 1.0),
-            queue_id: crate::commands::QueueId::NONE,
-            sprite_override: crate::commands::SpriteOverride::NONE,
+            queue_id: QueueId::NONE,
+            sprite_override: SpriteOverride::NONE,
             builders: UnitList::last_commanded(),
             queued: false,
             commits: true,
-            frame: crate::objects::Frame::of_data(0),
+            frame: Frame::of_data(0),
         }));
         w.run(&Command::Stop(StopCommand {
             player: player_id(1),

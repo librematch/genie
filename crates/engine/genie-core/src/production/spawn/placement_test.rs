@@ -11,6 +11,7 @@ use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
+use crate::math::image::spawn::BUILD_SCAN as SPAWN_BUILD_SCAN;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -31,6 +32,7 @@ use crate::production::spawn::PlacementCode;
 use crate::production::spawn::{
     BuildSite, INSIDE, PASSABLE, REACH, Tested, hill_fails, placement_terrains,
 };
+use crate::vision::{VisionBits, VisionMasks};
 
 /// An object near a candidate, as the placement test and the blocker test read it.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -68,7 +70,7 @@ pub struct Near {
     pub fog_visibility: FogVisibility,
     /// A building's visibility mask (`+0x8f8`, the registry's) when its footprint has a UMV entry
     /// (`+0x904` not 0); None otherwise.
-    pub fog_mask: Option<crate::vision::VisionBits>,
+    pub fog_mask: Option<VisionBits>,
     /// It holds an amount (`+0x310` above 0) of food, wood, stone or gold (its attribute,
     /// `+0x308`, through `FUN_140fdd470` below 4: 0 to 3 and the meats 15 to 17).
     pub holds: bool,
@@ -167,7 +169,7 @@ pub trait PlaceMap {
     /// The player sees the tile now (its mask `+0x2a8` meets the tile's visible bits).
     fn visible(&self, player: PlayerId, tile: Tile) -> bool;
     /// The player's masks: what it sees (`+0x2a8`) and what it explored (`+0x2a0`).
-    fn vision(&self, player: PlayerId) -> crate::vision::VisionMasks;
+    fn vision(&self, player: PlayerId) -> VisionMasks;
     /// A tile's elevation (`+0x14`), when the map holds it.
     fn elevation(&self, tile: Tile) -> Option<u8>;
     /// A tile's shape (`+0x8`, [`crate::map::terrain::Terrain::set_elevations`]), when the map holds
@@ -495,7 +497,7 @@ pub(super) fn build_passes(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -
 }
 
 /// How far BUILD's placement scan looks around the point (`FUN_14123aee0`, `DAT_142eb9430`).
-pub(super) const BUILD_SCAN: f32 = crate::math::image::spawn::BUILD_SCAN;
+pub(super) const BUILD_SCAN: f32 = SPAWN_BUILD_SCAN;
 
 /// The first object of a scan, which the game reports as the blocker: the tiles row by row, each
 /// tile's objects in its list's order ([`crate::map::spatial::Spatial::objects_on`], the game's: the

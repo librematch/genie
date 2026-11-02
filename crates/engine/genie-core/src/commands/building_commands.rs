@@ -19,9 +19,14 @@ use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
+use crate::technology::{Attributes, TechState, TechType, factors};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::world::GameMode;
+use crate::world::index::Place;
 use crate::world::parts::Part;
+use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{BLOCKS_RESEARCH, World};
@@ -174,42 +179,38 @@ impl World {
         point: Point,
     ) -> Result<(), GenieError> {
         let [x, y] = point.get();
-        let step = |turns: &Self,
-                    t: Option<ObjectId>,
-                    at: Point|
-         -> Result<crate::unit_ai::QueuedOrder, GenieError> {
-            // the target's class, which the order on a gone target reads as a master of the
-            // owner (the game's)
-            let (target, owner, class) = match turns.object(t) {
-                Some((tp, u)) => (
-                    t,
-                    Some(tp),
-                    crate::unit_ai::OrderTargetType::of_class(
-                        u.master(turns.master_tables(), tp)?.class,
+        let step =
+            |turns: &Self, t: Option<ObjectId>, at: Point| -> Result<QueuedOrder, GenieError> {
+                // the target's class, which the order on a gone target reads as a master of the
+                // owner (the game's)
+                let (target, owner, class) = match turns.object(t) {
+                    Some((tp, u)) => (
+                        t,
+                        Some(tp),
+                        OrderTargetType::of_class(u.master(turns.master_tables(), tp)?.class),
                     ),
-                ),
-                None => (None, None, None),
+                    None => (None, None, None),
+                };
+                Ok(QueuedOrder {
+                    issuer: Some(Issuer::Player(player)),
+                    // the game tests the id's sign: a recyclable object's is no target
+                    order: if target.is_none_or(ObjectId::is_recyclable) {
+                        OrderKind::Move
+                    } else {
+                        OrderKind::OnTarget
+                    },
+                    priority: OrderPriority::NONE,
+                    target,
+                    target_owner: owner,
+                    point: at.with_height(-1.0),
+                    range: Distance::ZERO,
+                    shown: Point::new(-1.0, -1.0),
+                    ready: false,
+                    target_type: class,
+                })
             };
-            Ok(crate::unit_ai::QueuedOrder {
-                issuer: Some(crate::unit_ai::Issuer::Player(player)),
-                // the game tests the id's sign: a recyclable object's is no target
-                order: if target.is_none_or(ObjectId::is_recyclable) {
-                    OrderKind::Move
-                } else {
-                    OrderKind::OnTarget
-                },
-                priority: crate::unit_ai::OrderPriority::NONE,
-                target,
-                target_owner: owner,
-                point: at.with_height(-1.0),
-                range: Distance::ZERO,
-                shown: Point::new(-1.0, -1.0),
-                ready: false,
-                target_type: class,
-            })
-        };
         for &id in ids {
-            let Some(crate::world::index::Place::Live(p, i)) = self.place(id) else {
+            let Some(Place::Live(p, i)) = self.place(id) else {
                 if self.place(id).is_some() {
                     return Err(GenieError::unsupported(
                         "a command queue on a sleeping object",
@@ -319,14 +320,14 @@ impl World {
         let def = self.techs.get(tech).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
         ))?;
-        let get = |i: AttributeId| crate::technology::Attributes::get(owner, i);
-        let factors = crate::technology::factors(tech_id, &get)?;
+        let get = |i: AttributeId| Attributes::get(owner, i);
+        let factors = factors(tech_id, &get)?;
         let listed = owner.techs.checked(tech)?.listed_costs(def, factors)?;
         debit_listed(self.players.player_mut(player)?, listed);
         let owner = self.players.player(player)?;
         let state = owner.techs.checked(tech)?;
         let repeatable = state.repeatable(def, false);
-        if def.kind == crate::technology::TechType::SHARED {
+        if def.kind == TechType::SHARED {
             return Err(GenieError::unsupported(
                 "RESEARCH of the shared kind (FUN_1411c3fd0 over the packet's buildings)",
             ));
@@ -348,9 +349,7 @@ impl World {
         if self.queue_research(player, i, tech_id, r.shift)? {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
-            if tech_id == TechId::CASTLE_AGE
-                && self.settings.game_mode == crate::world::GameMode::ONE_UNIT
-            {
+            if tech_id == TechId::CASTLE_AGE && self.settings.game_mode == GameMode::ONE_UNIT {
                 return Err(GenieError::unsupported(
                     "RESEARCH of Castle Age in game mode 16 (the treaty monitor's +0x17)",
                 ));
@@ -376,7 +375,7 @@ impl World {
         &self,
         player: PlayerId,
         building_id: Option<ObjectId>,
-        state: &crate::technology::TechState,
+        state: &TechState,
     ) -> Result<Option<ListIndex>, GenieError> {
         let owner = self.players.player(player)?;
         let Some(i) = self.live_index(player, building_id) else {
@@ -437,10 +436,7 @@ impl World {
 
 /// A research's listed costs go to the pending debit: each attribute 0 to 3 sums its amounts (in
 /// 16 bits) and the player's debit of it falls by the sum.
-fn debit_listed(
-    owner: &mut crate::world::player::Player,
-    listed: [(Option<AttributeId>, CostAmount); 3],
-) {
+fn debit_listed(owner: &mut Player, listed: [(Option<AttributeId>, CostAmount); 3]) {
     let mut sums = [0i16; 4];
     for (attribute, amount) in listed {
         if let Some(sum) = attribute.and_then(|k| sums.get_mut(k.index())) {

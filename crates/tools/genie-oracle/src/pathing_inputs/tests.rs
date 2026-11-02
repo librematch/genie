@@ -65,6 +65,7 @@ mod unit_terrain {
         recording,
     };
     use crate::pathing_inputs::unit_terrain;
+    use genie_core::map::RestrictionId;
 
     /// A save of a player with unit 7 (master 83, x radius 0.4, terrain restriction 7), unit 8
     /// of a master the save does not hold and unit 9 of a master without a restriction.
@@ -92,7 +93,7 @@ mod unit_terrain {
         let (radius, restriction) = unit_terrain(&save, 7).unwrap().unwrap();
         assert_eq!(
             (radius.to_bits(), restriction),
-            (0.4_f32.to_bits(), genie_core::map::RestrictionId::named(7))
+            (0.4_f32.to_bits(), RestrictionId::named(7))
         );
     }
 

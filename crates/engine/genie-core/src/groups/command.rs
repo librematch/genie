@@ -11,14 +11,21 @@ use crate::groups::MotionFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::attack::AttackOrder;
+use crate::groups::formation::top_path;
 use crate::groups::group_list::member_gone;
 use crate::groups::{GroupCommand, GroupTarget, SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::map::Point;
+use crate::map::WholeDistance;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
+use crate::math::image::group::{
+    EPSILON as GROUP_EPSILON, PATROL_LEG_REACH as GROUP_PATROL_LEG_REACH,
+};
 use crate::movement::PathData;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::PlanTries;
 use crate::movement::Speed;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
@@ -34,12 +41,12 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// A group whose top speed is below this does not move (`commandMoveTo`, `DAT_142eb0c60`); nor is
 /// a path shorter than it one.
-const EPSILON: f32 = crate::math::image::group::EPSILON;
+const EPSILON: f32 = GROUP_EPSILON;
 /// The group's command while it moves (`mCurrentCommand` 1).
 pub const MOVE_COMMAND: GroupCommandKind = GroupCommandKind::MOVE;
 /// A patrol's leg goes back and forth when its point is at least this far from the group on
 /// the ground (`commandMoveTo` at 0x141010ddb, `DAT_14330ebb8`).
-const PATROL_LEG_REACH: f32 = crate::math::image::group::PATROL_LEG_REACH;
+const PATROL_LEG_REACH: f32 = GROUP_PATROL_LEG_REACH;
 
 /// The queued commands on a target `checkQueuedOrders` hands to `FUN_14100fc50` when the world
 /// holds the target (its switch's cases 3 and `0x2713`).
@@ -291,9 +298,7 @@ impl World {
         let min_column = self
             .players
             .get(owner.index())
-            .map_or(crate::map::WholeDistance::ZERO, |p| {
-                p.formations.min_column_distance
-            });
+            .map_or(WholeDistance::ZERO, |p| p.formations.min_column_distance);
         let g = self.groups.held_mut(group)?;
         g.current_target.original_position = g
             .current_target
@@ -302,9 +307,8 @@ impl World {
             .with_y(point.y());
         g.current_command = MOVE_COMMAND;
         if !g.motion.flags.contains(MotionFlags::NEW) && !patrol {
-            let column = length.is_none_or(|l| {
-                crate::math::fmath::below_or_unordered(min_column.distance().get(), l.get())
-            });
+            let column =
+                length.is_none_or(|l| below_or_unordered(min_column.distance().get(), l.get()));
             self.update_desired_positions(
                 group,
                 Some(if column {
@@ -332,7 +336,7 @@ impl World {
         let world_time = self.world_time;
         let g = self.groups.held_mut(group)?;
         // FUN_141046500: the top ancestor's path, else the walked level's
-        let patrol = crate::groups::formation::top_path(&g.motion.paths)
+        let patrol = top_path(&g.motion.paths)
             .is_some_and(|l| l.path_flags.contains(PathFlags::LOOPS))
             || g.flags.contains(GroupFlags::PATROL);
         if (!how.hold && !how.leg && patrol) || changed {
@@ -360,9 +364,8 @@ impl World {
             g.flags &= !GroupFlags::PATROL;
         }
         path.measure();
-        let path = (2 <= path.points.len()
-            && crate::math::fmath::below_or_unordered(EPSILON, path.length.get()))
-        .then_some(path);
+        let path = (2 <= path.points.len() && below_or_unordered(EPSILON, path.length.get()))
+            .then_some(path);
         if path.is_none() {
             g.flags &= !GroupFlags::PATROL;
         }
@@ -610,10 +613,10 @@ impl World {
 /// [`PathFlags::BACK_AND_FORTH`].
 fn move_path_flags(from: BVector, to: BVector, leg: bool) -> PathFlags {
     if leg {
-        let mut d = crate::math::fmath::sub(from, to);
+        let mut d = sub(from, to);
         d = d.with_height(0.0);
-        let length = crate::math::fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
-        if crate::math::fmath::at_most_or_unordered(PATROL_LEG_REACH, length) {
+        let length = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
+        if at_most_or_unordered(PATROL_LEG_REACH, length) {
             // A new path's flags (`FUN_14152eea0`'s construction).
             // The plans a path level may still try (`FUN_140f9b800`, `FUN_140f98e80`).
             PathFlags::NEW | PathFlags::LOOPS | PathFlags::BACK_AND_FORTH
@@ -651,7 +654,7 @@ fn move_level(
         level.target = target;
         level.waypoint = WaypointIndex::SECOND;
         level.state = PathState::WantsPath;
-        level.continue_counter = crate::movement::PlanTries::FULL;
+        level.continue_counter = PlanTries::FULL;
     }
     level.level = WaypointLevel::TOP;
     level
@@ -676,6 +679,10 @@ mod tests {
     use crate::test_ids::group_id;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::unit_ai::UnitAi;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
 
@@ -697,7 +704,7 @@ mod tests {
         ];
         let mut t = World::new(
             WorldTime::from_millis(50),
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             players,
@@ -885,7 +892,7 @@ mod tests {
         top.path_flags = PathFlags::LOOPS;
         t.groups.get_mut(group_id(1)).unwrap().motion.paths = vec![walked, top];
         let mut asleep = t.remove_live(PlayerId::new(1), ListIndex::new(0)).unwrap();
-        asleep.parts.unit_ai = Some(crate::unit_ai::UnitAi::default());
+        asleep.parts.unit_ai = Some(UnitAi::default());
         let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
         assert!(
             t.command_move_to(group_id(1), None, Point::new(2.0, 3.0), MoveTo::default())

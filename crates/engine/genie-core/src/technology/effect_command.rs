@@ -11,6 +11,7 @@ use crate::players::attribute::AttributeId;
 use crate::technology::UpgradeMode;
 use crate::technology::effect::Change;
 use crate::technology::{ChangeMode, DisabledTech, ModifyLocation, ModifyMode, TechId};
+use std::ops::{Range, RangeInclusive};
 
 /// The `TRIBE_Effects` command kinds that change technologies (`'e'`, `'f'`, `'g'`): a cost, the
 /// disabling and a research time.
@@ -40,11 +41,11 @@ mod kind {
 
 /// The cost attributes a multiply by a negative amount turns into a cost entry's removal or
 /// addition (`FUN_1415c1f70`): 103 to 106.
-const COST_ATTRIBUTES: std::ops::RangeInclusive<i16> = 103..=106;
+const COST_ATTRIBUTES: RangeInclusive<i16> = 103..=106;
 
 /// A cost command's master argument from which it names a class (`FUN_1415c1f70`: 900 to 999,
 /// the class + 900).
-const CLASS_UNITS: std::ops::Range<i16> = 900..1000;
+const CLASS_UNITS: Range<i16> = 900..1000;
 
 /// Which players a block of the base's kinds reaches.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

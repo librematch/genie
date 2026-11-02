@@ -4,6 +4,8 @@ use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{ReadStringsExt, write_opt_i32_str};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
+use std::result::Result as StdResult;
+use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
 /// The data set and the DLC packages a scenario needs (HD Edition and later).
 #[derive(Debug, Clone)]
@@ -226,9 +228,9 @@ impl ScxHeader {
     /// Returns an error if the system clock is before the Unix epoch.
     // The format stores a 32-bit Unix timestamp.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn touch(&mut self) -> std::result::Result<(), std::time::SystemTimeError> {
-        let system_time = std::time::SystemTime::now();
-        let duration = system_time.duration_since(std::time::UNIX_EPOCH)?;
+    pub fn touch(&mut self) -> StdResult<(), SystemTimeError> {
+        let system_time = SystemTime::now();
+        let duration = system_time.duration_since(UNIX_EPOCH)?;
         self.timestamp = duration.as_secs() as u32;
         Ok(())
     }

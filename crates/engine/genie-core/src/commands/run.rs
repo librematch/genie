@@ -6,6 +6,7 @@ use crate::commands::Command;
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -51,13 +52,12 @@ impl World {
                 continue;
             };
             let (p, i) = match place {
-                crate::world::index::Place::Live(p, i)
-                | crate::world::index::Place::Sleeping(p, i) => (p, i),
+                Place::Live(p, i) | Place::Sleeping(p, i) => (p, i),
             };
             let player = self.players.player_mut(p)?;
             let unit = match place {
-                crate::world::index::Place::Live(..) => player.objects.checked_mut(i)?,
-                crate::world::index::Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
+                Place::Live(..) => player.objects.checked_mut(i)?,
+                Place::Sleeping(..) => player.sleeping.checked_mut(i)?,
             };
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.reset_for_order(self.streams.get(Stream::Ai));

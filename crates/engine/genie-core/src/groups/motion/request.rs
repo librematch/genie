@@ -15,6 +15,7 @@ use crate::math::fmath::BVector;
 use crate::movement::LinkedPathType;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
+use crate::movement::PlanTries;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
@@ -25,6 +26,7 @@ use crate::pathing::DelayCount;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Path;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 
 /// What the request plans toward: the walked level's number, range and target, its waypoint,
@@ -177,7 +179,7 @@ fn tile_plan(
     leg: &Leg,
     target: Option<&Placed>,
     plan: &mut PathSoFar,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(), GenieError> {
     let spatial = &mut *world.spatial;
     let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
@@ -349,7 +351,7 @@ fn long_plan(
     leg: &Leg,
     target: Option<&Placed>,
     plan: &mut PathSoFar,
-    by_id: crate::world::index::ObjectsRef<'_>,
+    by_id: ObjectsRef<'_>,
 ) -> Result<(), GenieError> {
     let walker = LongWalker {
         id: lead.walker.id,
@@ -439,7 +441,7 @@ pub(super) fn link(
     level.state = PathState::Idle;
     // A level's plans (`FUN_140f8f670`, `FUN_140f9b800`).
     // A new path's flags (`FUN_14152eea0`).
-    level.continue_counter = crate::movement::PlanTries::FULL;
+    level.continue_counter = PlanTries::FULL;
     let (range, target, top) = (level.range, level.target, level.level == WaypointLevel::TOP);
     let new = PathData {
         points: path.points,

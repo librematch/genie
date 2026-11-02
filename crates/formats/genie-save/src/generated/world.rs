@@ -8,6 +8,7 @@
     missing_docs,
     missing_copy_implementations,
     trivial_numeric_casts,
+    clippy::absolute_paths,
     clippy::cast_sign_loss,
     clippy::default_trait_access,
     clippy::derive_partial_eq_without_eq,

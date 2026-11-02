@@ -1,5 +1,7 @@
 //! How a technology's cost entry is paid (its paid flag).
 
+use std::fmt::{Display, Error, Formatter};
+
 /// How a technology's cost entry is paid (the `.dat`'s paid flag): 0 not at all, 1 from the
 /// player's attribute, 2 from the building (`FUN_141204310`). Every byte is kept; any but 0 is
 /// paid.
@@ -33,8 +35,8 @@ impl CostPaid {
     }
 }
 
-impl std::fmt::Display for CostPaid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for CostPaid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

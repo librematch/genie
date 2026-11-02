@@ -3,17 +3,28 @@
 
 use crate::GenieError;
 use crate::combat::damage::Victim;
+use crate::combat::damage::blast;
+use crate::combat::victims::file_kill;
 use crate::combat::victims::{victim_of, write_back};
+use crate::construction::Annexes;
 use crate::construction::gates::gate_units;
+use crate::map::Snow;
 use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
+use crate::map::terrain::Foundation;
+use crate::math::image::turn::{
+    DEATH_BLAST_FACTOR as TURN_DEATH_BLAST_FACTOR, DEATH_BLAST_HP as TURN_DEATH_BLAST_HP,
+    FARM_STAGES,
+};
 use crate::math::rng::Well512;
 use crate::movement::MoveAlgorithm;
+use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::SpriteId;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
@@ -26,18 +37,22 @@ use crate::objects::masters::ids::HOUSE;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
+use crate::unit_ai::HUMAN_ORDER_CAP;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 use crate::world::{
     BUILDING_TERRAIN, EJECT_SHARE, GATE_CLOSE_DELAY, GATE_EPSILON, GATE_SHUT_HEIGHT,
 };
+use std::mem::take;
 
 /// `TRIBE_Building_Object::update`'s walls' branch (`0x1411c9000`): a master of class 27 (a
 /// wall) or the house runs only its damage frames by its hit points and its combat update; no
@@ -94,7 +109,7 @@ impl Unit {
     /// of at most 0).
     pub(crate) fn gate_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -119,12 +134,7 @@ impl Unit {
         }
         let locked = gate.locked;
         let annexes = c.w.parts.building_of(self.id).annexes;
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
         let (total, allied) = self.gate_count(annexes, &mut c.w.spatial, by_id)?;
         let gate =
             c.w.parts
@@ -160,7 +170,7 @@ impl Unit {
     /// The toggle's, or the gate gone from its owner's live list.
     fn toggle_own_gate(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         toggles: bool,
     ) -> Result<(), GenieError> {
@@ -180,9 +190,9 @@ impl Unit {
     /// it and how many of them are of an ally.
     pub(crate) fn gate_count(
         &self,
-        annexes: crate::construction::Annexes,
+        annexes: Annexes,
         spatial: &mut Spatial,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(usize, usize), GenieError> {
         let annexes: Vec<ObjectId> = annexes.ids().collect();
         let (units, allied) = gate_units(spatial, self.id, &annexes, by_id)?;
@@ -219,11 +229,11 @@ impl Unit {
                 "a farm's stage terrain the local player's view maps (8, 27, 64)",
             ));
         }
-        let f = crate::map::terrain::Foundation {
+        let f = Foundation {
             position: self.position(),
             clearance: m.clearance,
             terrain,
-            snow: crate::map::Snow::None,
+            snow: Snow::None,
             master: m.id,
             class: m.class,
             terrain_bonus: m.terrain_bonus,
@@ -252,7 +262,7 @@ impl Unit {
     /// What the completion does not model.
     pub(crate) fn complete_on_update(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         self.farm_stage(c)?;
@@ -405,7 +415,7 @@ impl Unit {
         mut motion: MotionMut<'_>,
         standing: Option<SpriteId>,
         second: Option<SpriteId>,
-        graphics: &crate::objects::Graphics,
+        graphics: &Graphics,
         sprite_rng: &mut Well512,
     ) {
         let Some(second) = second else {
@@ -435,12 +445,7 @@ impl Unit {
             Some(second)
         };
         if let Some(&g) = next.and_then(|next| graphics.get(next)) {
-            crate::objects::sprite::new_sprite(
-                &mut self.sprite,
-                motion.move_stats_mut(),
-                g,
-                sprite_rng,
-            );
+            new_sprite(&mut self.sprite, motion.move_stats_mut(), g, sprite_rng);
         }
         if let Some(s) = self.sprite.as_mut() {
             s.reset_frame();
@@ -460,7 +465,7 @@ impl Unit {
     /// What the blast does not model.
     pub(crate) fn death_blast(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -484,7 +489,7 @@ impl Unit {
             c.w.mode_680,
         );
         let mut targets: Vec<&mut Victim> = c.blasted.iter_mut().collect();
-        let _ = crate::combat::damage::blast(
+        let _ = blast(
             &mut own,
             self.position(),
             Some(self.id),
@@ -492,10 +497,10 @@ impl Unit {
             &mut targets,
             DEATH_BLAST_FACTOR,
         )?;
-        let mut blasted = std::mem::take(&mut c.blasted);
+        let mut blasted = take(&mut c.blasted);
         for v in &mut blasted {
             if let Some(k) = write_back(c, v)? {
-                crate::combat::victims::file_kill(c, (self, actions), k)?;
+                file_kill(c, (self, actions), k)?;
             }
         }
         c.blasted = blasted;
@@ -508,7 +513,7 @@ impl Unit {
     /// live, so the world's view follows at once: the unit's own walk later in this update ranks
     /// the units it meets by the counted-down time.
     pub(crate) fn count_down_human_order(&mut self, dt: Millis) {
-        if self.last_human_order <= crate::unit_ai::HUMAN_ORDER_CAP {
+        if self.last_human_order <= HUMAN_ORDER_CAP {
             self.last_human_order = self.last_human_order.saturating_before(dt);
         }
     }
@@ -526,7 +531,7 @@ pub(crate) fn farm_stage_terrain(
     build_time: WholeSeconds,
 ) -> Option<TerrainId> {
     /// The stages over the build time (`DAT_142eb1c98`).
-    const STAGES: f32 = crate::math::image::turn::FARM_STAGES;
+    const STAGES: f32 = FARM_STAGES;
     /// A farm's first stage terrain (`0x1d`).
     const FIRST_STAGE: u8 = 29;
     /// A rice farm's first stage terrain on mangrove or rice (`0x41`).
@@ -560,9 +565,9 @@ pub(crate) const DEATH_BLAST_MASTERS: [MasterId; 6] = [
 /// The classes whose units blast so: 35 (petards) and 64.
 pub(crate) const DEATH_BLAST_CLASSES: [ClassId; 2] = [class::CLASS_35, class::CLASS_64];
 /// The hit points below which they blast (`DAT_14330eb8c`; `COMISS`, a NaN does not).
-pub(crate) const DEATH_BLAST_HP: f32 = crate::math::image::turn::DEATH_BLAST_HP;
+pub(crate) const DEATH_BLAST_HP: f32 = TURN_DEATH_BLAST_HP;
 /// The blast's damage factor (`XMM11`, the same constant).
-pub(crate) const DEATH_BLAST_FACTOR: f32 = crate::math::image::turn::DEATH_BLAST_FACTOR;
+pub(crate) const DEATH_BLAST_FACTOR: f32 = TURN_DEATH_BLAST_FACTOR;
 
 /// `TRIBE_Combat_Object::update`'s test for the blast at death: a unit of one of
 /// [`DEATH_BLAST_MASTERS`] or [`DEATH_BLAST_CLASSES`] below [`DEATH_BLAST_HP`] hit points in state

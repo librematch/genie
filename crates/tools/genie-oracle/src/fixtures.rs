@@ -1,13 +1,21 @@
 //! Save parts for the tests, built from the generated layouts' defaults: genie holds no game
 //! saves (FD-044), so a test builds the few fields its routine reads and leaves the rest zero.
 
+use flate2::write::DeflateEncoder;
 use genie_core::objects::masters::ActionType;
+use genie_rec::de::Op;
 use genie_save::Header;
 use genie_save::Positioned;
+use genie_save::generated::world::{
+    Action, ActionList, ActionListEntry1, HumanOrCoopPlayer, Master, PlayerMaster, PlayerObjects,
+    RgeMasterMovingObject, RgeMasterStaticObject, TribeBuildingObject,
+};
 use genie_save::generated::world::{
     GaiaPlayer, Object, ObjectListEntry1, Player, RgeMovingObject, RgeStaticObject,
     RgeVictoryConditions, TribeCombatObject, WorldPlayer,
 };
+use std::io::Cursor;
+use std::iter::once;
 
 /// A combat object (type 70), its id `id` and master `master`; its town bell holds no
 /// back-to-work action (−1, as the game's saves do).
@@ -64,7 +72,7 @@ pub(crate) fn gaia(objects: Vec<Object>) -> Player {
 
 /// A human player (type 1), its live objects `objects`.
 pub(crate) fn human(objects: Vec<Object>) -> Player {
-    let mut human = genie_save::generated::world::HumanOrCoopPlayer::default();
+    let mut human = HumanOrCoopPlayer::default();
     human.player_objects.objects.object_type_list = object_list(objects);
     Player {
         type_: 1,
@@ -98,7 +106,7 @@ pub(crate) fn object_list(objects: Vec<Object>) -> Vec<ObjectListEntry1> {
             },
             object: Some(Box::new(object)),
         })
-        .chain(std::iter::once(ObjectListEntry1::default()))
+        .chain(once(ObjectListEntry1::default()))
         .collect()
 }
 
@@ -151,7 +159,7 @@ fn world_player_mut(player: &mut Player) -> Option<&mut WorldPlayer> {
 /// # Panics
 ///
 /// For a player without a type's class.
-pub(crate) fn objects_mut(player: &mut Player) -> &mut genie_save::generated::world::PlayerObjects {
+pub(crate) fn objects_mut(player: &mut Player) -> &mut PlayerObjects {
     if let Some(g) = player.gaia_player.as_deref_mut() {
         return &mut g.player_objects;
     }
@@ -169,10 +177,7 @@ pub(crate) fn objects_mut(player: &mut Player) -> &mut genie_save::generated::wo
 }
 
 /// `player` holding the masters `masters` ([`with_masters`]).
-pub(crate) fn holding_masters(
-    mut player: Player,
-    masters: Vec<genie_save::generated::world::Master>,
-) -> Player {
+pub(crate) fn holding_masters(mut player: Player, masters: Vec<Master>) -> Player {
     let given = with_masters(masters);
     let objects = objects_mut(&mut player);
     objects.master_object_num = given.master_object_num;
@@ -184,15 +189,15 @@ pub(crate) fn holding_masters(
 
 /// A save's bytes, as genie-save writes them.
 pub(crate) fn save_bytes(header: &Header) -> Vec<u8> {
-    let mut out = std::io::Cursor::new(Vec::new());
+    let mut out = Cursor::new(Vec::new());
     genie_save::write(header, &mut out).expect("a test's save writes");
     out.into_inner()
 }
 
 /// A recording of one chapter: the save `header` (deflated), then the ops `ops`.
-pub(crate) fn recording(header: &Header, ops: &[genie_rec::de::Op<'_>]) -> Vec<u8> {
+pub(crate) fn recording(header: &Header, ops: &[Op<'_>]) -> Vec<u8> {
     use std::io::Write;
-    let mut deflate = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::fast());
+    let mut deflate = DeflateEncoder::new(Vec::new(), flate2::Compression::fast());
     deflate
         .write_all(&save_bytes(header))
         .expect("a test's save deflates");
@@ -209,10 +214,10 @@ pub(crate) fn recording(header: &Header, ops: &[genie_rec::de::Op<'_>]) -> Vec<u
 }
 
 /// A combat master (type 70) of id `id`.
-pub(crate) fn combat_master(id: i16) -> genie_save::generated::world::Master {
-    let mut master = genie_save::generated::world::Master {
+pub(crate) fn combat_master(id: i16) -> Master {
+    let mut master = Master {
         tribe_master_combat_object: Some(Box::default()),
-        ..genie_save::generated::world::Master::default()
+        ..Master::default()
     };
     // the master's id and its copy's, as the save writes them first
     let s = master_static_mut(&mut master);
@@ -226,9 +231,7 @@ pub(crate) fn combat_master(id: i16) -> genie_save::generated::world::Master {
 /// # Panics
 ///
 /// For a master without a combat part.
-pub(crate) fn master_moving_mut(
-    master: &mut genie_save::generated::world::Master,
-) -> &mut genie_save::generated::world::RgeMasterMovingObject {
+pub(crate) fn master_moving_mut(master: &mut Master) -> &mut RgeMasterMovingObject {
     &mut master
         .tribe_master_combat_object
         .as_deref_mut()
@@ -239,9 +242,7 @@ pub(crate) fn master_moving_mut(
 }
 
 /// The static part of a master of [`combat_master`].
-pub(crate) fn master_static_mut(
-    master: &mut genie_save::generated::world::Master,
-) -> &mut genie_save::generated::world::RgeMasterStaticObject {
+pub(crate) fn master_static_mut(master: &mut Master) -> &mut RgeMasterStaticObject {
     &mut master_moving_mut(master)
         .rge_master_animated_object
         .rge_master_static_object
@@ -270,9 +271,7 @@ pub(crate) fn building_object(id: i32, master: i16) -> Object {
 /// # Panics
 ///
 /// For an object without one.
-pub(crate) fn building_mut(
-    object: &mut Object,
-) -> &mut genie_save::generated::world::TribeBuildingObject {
+pub(crate) fn building_mut(object: &mut Object) -> &mut TribeBuildingObject {
     object
         .tribe_building_object
         .as_deref_mut()
@@ -280,31 +279,23 @@ pub(crate) fn building_mut(
 }
 
 /// An action list of `actions` (type, action), its end after them.
-pub(crate) fn action_list(
-    actions: Vec<(ActionType, genie_save::generated::world::Action)>,
-) -> genie_save::generated::world::ActionList {
-    genie_save::generated::world::ActionList {
+pub(crate) fn action_list(actions: Vec<(ActionType, Action)>) -> ActionList {
+    ActionList {
         action_type_list: actions
             .into_iter()
-            .map(
-                |(action_type, action)| genie_save::generated::world::ActionListEntry1 {
-                    action_type: action_type.get(),
-                    action: Some(Box::new(action)),
-                },
-            )
-            .chain(std::iter::once(
-                genie_save::generated::world::ActionListEntry1::default(),
-            ))
+            .map(|(action_type, action)| ActionListEntry1 {
+                action_type: action_type.get(),
+                action: Some(Box::new(action)),
+            })
+            .chain(once(ActionListEntry1::default()))
             .collect(),
     }
 }
 
 /// A player's saved objects with the masters `masters` (each of type 70).
-pub(crate) fn with_masters(
-    masters: Vec<genie_save::generated::world::Master>,
-) -> genie_save::generated::world::PlayerObjects {
+pub(crate) fn with_masters(masters: Vec<Master>) -> PlayerObjects {
     let n = masters.len();
-    genie_save::generated::world::PlayerObjects {
+    PlayerObjects {
         // each master enabled, so the save's list holds them all
         master_object_num: i32::try_from(n).expect("a test's few masters"),
         enabled: vec![1; n],
@@ -312,13 +303,13 @@ pub(crate) fn with_masters(
         masters: (n > 0).then(|| {
             masters
                 .into_iter()
-                .map(|master| genie_save::generated::world::PlayerMaster {
+                .map(|master| PlayerMaster {
                     master_type: 70,
                     master,
                     end_marker: (),
                 })
                 .collect()
         }),
-        ..genie_save::generated::world::PlayerObjects::default()
+        ..PlayerObjects::default()
     }
 }

@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// A Repair's state (`+0x18`, set by `set_state`, `0x140ad9c60`) with the data only that state
 /// holds (FD-045-D62): every `set_state` drops the sub-actions first, and the two walks make
@@ -119,8 +120,8 @@ impl RepairState {
     }
 }
 
-impl std::fmt::Display for RepairState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for RepairState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }
@@ -128,6 +129,8 @@ impl std::fmt::Display for RepairState {
 #[cfg(test)]
 mod tests {
     use crate::construction::repair::RepairState;
+    #[cfg(test)]
+    use crate::movement::move_to::{MoveTo, MoveToAction};
 
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
     /// `MoveTo` of a state that does not walk; the walks give theirs.
@@ -140,9 +143,7 @@ mod tests {
             }
         }
         assert_eq!(RepairState::Wait.to_string(), "10");
-        let walk = crate::movement::move_to::MoveToAction::sub_in(
-            crate::movement::move_to::MoveTo::Moving,
-        );
+        let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 11] {
             let mut s = RepairState::of_byte(b, Some(walk)).unwrap();
             assert_eq!((s.get(), s.move_to()), (b, Some(&walk)));

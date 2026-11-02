@@ -1,5 +1,7 @@
 //! A sprite's frame and its animation state.
 
+use std::ops::{Add, Neg, Rem, Sub};
+
 /// A frame of a sprite (a short): the frame a sprite shows (`+0x24`) and showed before
 /// (`+0x30`), a graphic's frame count (`frame_count`, `+0x8`, one past its last frame), a
 /// master's fire and interrupt frames and the frame a BUILD command chose. Each operator is the
@@ -64,7 +66,7 @@ impl Frame {
     }
 }
 
-impl std::ops::Add for Frame {
+impl Add for Frame {
     type Output = Self;
 
     /// The 16-bit sum.
@@ -73,7 +75,7 @@ impl std::ops::Add for Frame {
     }
 }
 
-impl std::ops::Sub for Frame {
+impl Sub for Frame {
     type Output = Self;
 
     /// The 16-bit difference.
@@ -82,7 +84,7 @@ impl std::ops::Sub for Frame {
     }
 }
 
-impl std::ops::Neg for Frame {
+impl Neg for Frame {
     type Output = Self;
 
     /// The negated frames: a backwards step.
@@ -91,7 +93,7 @@ impl std::ops::Neg for Frame {
     }
 }
 
-impl std::ops::Rem for Frame {
+impl Rem for Frame {
     type Output = Self;
 
     /// The 16-bit remainder (`IDIV`'s, its sign the frame's).

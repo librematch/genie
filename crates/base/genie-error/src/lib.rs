@@ -12,7 +12,10 @@
 //!
 //! The crate depends on no other crate of the workspace: every one may depend on it.
 
+use std::error::Error;
 use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::io::Error as IoError;
 use std::panic::Location;
 use std::sync::Arc;
 
@@ -61,7 +64,7 @@ pub struct GenieError {
 #[derive(Clone, Debug, Default)]
 struct Extra {
     context: Vec<(&'static str, String)>,
-    source: Option<Arc<dyn std::error::Error + Send + Sync>>,
+    source: Option<Arc<dyn Error + Send + Sync>>,
 }
 
 impl GenieError {
@@ -124,7 +127,7 @@ impl GenieError {
 
     /// The error caused by `source`.
     #[must_use]
-    pub fn with_source(mut self, source: impl std::error::Error + Send + Sync + 'static) -> Self {
+    pub fn with_source(mut self, source: impl Error + Send + Sync + 'static) -> Self {
         self.extra.get_or_insert_with(Box::default).source = Some(Arc::new(source));
         self
     }
@@ -191,10 +194,10 @@ pub const fn invalid_input(reason: &'static str) -> GenieError {
     GenieError::new(ErrorKind::InvalidInput, reason)
 }
 
-impl From<std::io::Error> for GenieError {
+impl From<IoError> for GenieError {
     /// A failed read or write ([`ErrorKind::Io`]) caused by `e`, raised where `?` converts it.
     #[track_caller]
-    fn from(e: std::io::Error) -> Self {
+    fn from(e: IoError) -> Self {
         Self::io("a read or write that failed").with_source(e)
     }
 }
@@ -208,8 +211,8 @@ impl PartialEq for GenieError {
 
 impl Eq for GenieError {}
 
-impl std::hash::Hash for GenieError {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl Hash for GenieError {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
         self.reason.hash(state);
     }
@@ -257,10 +260,10 @@ impl fmt::Display for GenieError {
     }
 }
 
-impl std::error::Error for GenieError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl Error for GenieError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         let source = self.extra.as_ref()?.source.as_deref()?;
-        let source: &(dyn std::error::Error + 'static) = source;
+        let source: &(dyn Error + 'static) = source;
         Some(source)
     }
 }
@@ -339,10 +342,10 @@ mod tests {
 
     #[test]
     fn source_is_the_cause() {
-        let io = std::io::Error::other("short read");
+        let io = IoError::other("short read");
         let e = invalid_input("a header too short").with_source(io);
         assert_eq!(
-            std::error::Error::source(&e).map(ToString::to_string),
+            Error::source(&e).map(ToString::to_string),
             Some("short read".to_owned())
         );
         assert!(e.to_string().ends_with(": short read"));
@@ -351,7 +354,7 @@ mod tests {
     #[test]
     fn an_io_error_converts_where_question_mark_meets_it() {
         fn open() -> GenieResult<()> {
-            Err(std::io::Error::other("no such file"))?;
+            Err(IoError::other("no such file"))?;
             Ok(())
         }
         let line = line!() - 3;

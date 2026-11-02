@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::players::PlayerId;
+use crate::players::tribute::Gift;
 use crate::world::World;
 
 /// GIVE ATTRIBUTES (0xc4, `FUN_140e7d040`): the player's tribute to player `to`
@@ -13,7 +14,7 @@ pub struct TributeCommand {
     /// The player who receives (`+0x2c`).
     pub to: PlayerId,
     /// The four entries.
-    pub gifts: [crate::players::tribute::Gift; 4],
+    pub gifts: [Gift; 4],
 }
 
 impl TributeCommand {

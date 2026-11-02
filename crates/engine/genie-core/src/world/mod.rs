@@ -86,6 +86,26 @@ pub use self::options::{
 pub use self::play_state::PlayState;
 pub use self::tick::Tick;
 pub use self::unread::Unread;
+use crate::combat::Firepower;
+use crate::groups::UnitGroups;
+use crate::math::image::hunt::TREE_NEAR as HUNT_TREE_NEAR;
+use crate::math::image::turn::{
+    ARMED_FIREPOWER as TURN_ARMED_FIREPOWER, EJECT_SHARE as TURN_EJECT_SHARE,
+    GATE_EPSILON as TURN_GATE_EPSILON, GATE_GROW as TURN_GATE_GROW,
+    GATE_SHUT_HEIGHT as TURN_GATE_SHUT_HEIGHT, SPEED_EPSILON as TURN_SPEED_EPSILON,
+    TREE_SEARCH_WITHIN as TURN_TREE_SEARCH_WITHIN,
+};
+use crate::objects::lines::UnitLines;
+use crate::objects::masters::action_type::{ACTION_123, PACK, UNPACK};
+use crate::objects::{Graphics, RelicCount};
+use crate::pathing::zones::Zones;
+use crate::players::Team;
+use crate::players::ai_module::AiModules;
+use crate::players::history::HistoryUpdates;
+use crate::players::market::Market;
+use crate::players::world_player::TechTree;
+use crate::technology::{EffectCommand, Linked, TechDef};
+use std::collections::BTreeMap;
 
 /// What every building holds of a gate: `mGateLocked` (`+0xc7c`; a lock also sets the
 /// building's last move time, [`Mover::last_move`], slot 0x670, `FUN_1411dba30`), `mFirstUpdate`
@@ -147,12 +167,12 @@ pub(crate) const ATTACKER_MASTER: GenieError =
 
 /// A gate's height (its master's `radius_z`) above this shuts it (`DAT_142eb0c60`); a unit
 /// slower than it counts in a gate only when it is a player's.
-pub(crate) const GATE_EPSILON: f32 = crate::math::image::turn::GATE_EPSILON;
+pub(crate) const GATE_EPSILON: f32 = TURN_GATE_EPSILON;
 /// A gate's query grows its records and its own box by this (`FUN_1410562d0` with
 /// `DAT_142eb3630`).
-pub(crate) const GATE_GROW: Distance = Distance::new(crate::math::image::turn::GATE_GROW);
+pub(crate) const GATE_GROW: Distance = Distance::new(TURN_GATE_GROW);
 /// The least height of a shut gate its player opens (`FUN_14162f7e0`, `DAT_14330eb8c`).
-pub(crate) const GATE_SHUT_HEIGHT: f32 = crate::math::image::turn::GATE_SHUT_HEIGHT;
+pub(crate) const GATE_SHUT_HEIGHT: f32 = TURN_GATE_SHUT_HEIGHT;
 /// The seconds an open gate with nothing in it waits before it shuts (`FUN_1411e7730`'s
 /// immediate `0x3f000000`).
 pub(crate) const GATE_CLOSE_DELAY: Seconds = Seconds::new(0.5);
@@ -162,15 +182,10 @@ pub(crate) const GATE_QUERY_RECORDS: usize = 10;
 pub(crate) const GATE_COUNT_CAP: usize = 25;
 /// The world constructor's history period (`FUN_141599e50`'s immediate 0x19 at `world+0x8b8`),
 /// until the `.dat`'s `time_slice` replaces it.
-pub const HISTORY_PERIOD: crate::players::history::HistoryUpdates =
-    crate::players::history::HistoryUpdates::of_data(25);
+pub const HISTORY_PERIOD: HistoryUpdates = HistoryUpdates::of_data(25);
 
 /// The building top actions that keep RESEARCH from a building (`FUN_141227a00`: 0x7b to 0x7d).
-pub(crate) const BLOCKS_RESEARCH: [ActionType; 3] = [
-    crate::objects::masters::action_type::ACTION_123,
-    crate::objects::masters::action_type::PACK,
-    crate::objects::masters::action_type::UNPACK,
-];
+pub(crate) const BLOCKS_RESEARCH: [ActionType; 3] = [ACTION_123, PACK, UNPACK];
 /// The first master type whose slot 0x128 (a work at an object) does something: the action
 /// objects' (`FUN_14106c590`) and up; below it `FUN_141071bd0` returns at once.
 pub(crate) const STATIC_TYPES_END: MasterKind = master_type::ACTION;
@@ -198,7 +213,7 @@ pub(crate) const VILLAGER_ANY: MasterId = MasterId::named(0x712);
 /// (`FUN_1411c39b0`, the player's attribute 255).
 pub(crate) const BUILDING_TERRAIN: usize = 255;
 /// A building at most this share of its hit points lets its garrison out (`DAT_142eae8d0`).
-pub(crate) const EJECT_SHARE: f32 = crate::math::image::turn::EJECT_SHARE;
+pub(crate) const EJECT_SHARE: f32 = TURN_EJECT_SHARE;
 /// The petard (master 440, `0x6254` raw), which a class-10 searcher passes (`FUN_140c488b0`).
 pub(crate) const PETARD: MasterId = MasterId::named(440);
 /// The building masters `FUN_140fde180` counts as drop sites besides the drop-site table's:
@@ -222,16 +237,14 @@ pub(crate) const COMPUTER_QUEUE_LIMIT: usize = 2;
 pub(crate) const SEARCH_AGAIN: Seconds = Seconds::new(-10.0);
 /// `FUN_140ac4670`'s first argument when a hunt's target went on the walk to it, or its `MoveTo`
 /// failed (`DAT_142eb9430`): the hunt searches within this of its point.
-pub(crate) const TREE_SEARCH_WITHIN: Distance =
-    Distance::new(crate::math::image::turn::TREE_SEARCH_WITHIN);
+pub(crate) const TREE_SEARCH_WITHIN: Distance = Distance::new(TURN_TREE_SEARCH_WITHIN);
 /// `FUN_140ac4670`'s second argument when a hunt's Attack failed (`DAT_14330ebb8`): the tree
 /// found counts within this of the unit.
-pub(crate) const TREE_NEAR: Distance = Distance::new(crate::math::image::hunt::TREE_NEAR);
+pub(crate) const TREE_NEAR: Distance = Distance::new(HUNT_TREE_NEAR);
 /// A velocity longer than this sets the animation speed (`DAT_142eb0c60`).
-pub(crate) const SPEED_EPSILON: f32 = crate::math::image::turn::SPEED_EPSILON;
+pub(crate) const SPEED_EPSILON: f32 = TURN_SPEED_EPSILON;
 /// A building attacks with a firepower above this (`FUN_14120ea30`).
-pub(crate) const ARMED_FIREPOWER: crate::combat::Firepower =
-    crate::combat::Firepower::new(crate::math::image::turn::ARMED_FIREPOWER);
+pub(crate) const ARMED_FIREPOWER: Firepower = Firepower::new(TURN_ARMED_FIREPOWER);
 
 /// A queued villager's master: male when the 64-bit Action draw times 100 (wrapping) is below 50
 /// modulo 100.
@@ -277,14 +290,14 @@ pub struct World {
     /// The planners and the mesh.
     pub pathing: Pathing,
     /// What the sprite clock reads of each graphic (the `.dat`'s).
-    pub graphics: crate::objects::Graphics,
+    pub graphics: Graphics,
     /// The game's drop-site table (`dropsites.json`).
     pub drop_sites: Vec<DropSite>,
     /// The game's unit lines (`unitlines.json`, [`crate::objects::lines`]); empty when not loaded.
-    pub lines: crate::objects::lines::UnitLines,
+    pub lines: UnitLines,
     /// The game's linked technologies (`linkedTechs.json`, the table at the game settings'
     /// `+0x18` that `FUN_140f39f40` looks up), by technology; empty when not loaded.
-    pub linked_techs: std::collections::BTreeMap<TechId, crate::technology::Linked>,
+    pub linked_techs: BTreeMap<TechId, Linked>,
     /// The game options the simulation reads ([`crate::world::settings::Settings`]), from the header.
     pub settings: settings::Settings,
     /// The game object's tagged value at `+0x680` (`DAT_143f07a58`, read through
@@ -300,28 +313,28 @@ pub struct World {
     /// The world's `+0x844`: the relics (master 0x11d) an effect's spawn made (`FUN_1416136f0`),
     /// which the relic victory's countdown reads (not modelled, [`crate::players::game_status`]); not
     /// saved here, 0 at a load.
-    pub spawned_relics: crate::objects::RelicCount,
+    pub spawned_relics: RelicCount,
     /// The world's game state (`+0x88`, the save's `tempGameState`): 1 once the game is over.
     pub game_state: PlayState,
     /// The scenario's `victory_conquest` (`world+0x7e0`'s `+0x2c0`, `FUN_140ca4d20`): the game
     /// ends when one side is left.
     pub victory_conquest: bool,
     /// The map's zone maps (`map+0x5e28`), made when first asked for.
-    pub zones: crate::pathing::zones::Zones,
+    pub zones: Zones,
     /// The world's ids and pools for the objects of recyclable masters ([`Recycling`]).
     pub recycling: Recycling,
     /// The computer players' AI modules (`player+0x7a8`), by player.
-    pub ai: crate::players::ai_module::AiModules,
+    pub ai: AiModules,
     pub(crate) streams: Streams,
     /// The `.dat`'s technologies, by id.
-    pub techs: Vec<crate::technology::TechDef>,
+    pub techs: Vec<TechDef>,
     /// The world's effect table (`+0x128`, `TRIBE_Effects`): every effect's commands by id, the
     /// `.dat`'s.
-    pub effects: Vec<Vec<crate::technology::EffectCommand>>,
+    pub effects: Vec<Vec<EffectCommand>>,
     /// The market's prices (`+0x868`.., saved).
-    pub market: crate::players::market::Market,
+    pub market: Market,
     /// The world's unit groups ([`crate::groups`]).
-    pub groups: crate::groups::UnitGroups,
+    pub groups: UnitGroups,
     /// Each comm player's last commanded units (the command processor's list at
     /// `+(0xd + n) * 0x18`, not saved): the own list of an INTERACT, WORK, MOVE or RETREAT
     /// whose check let it run, which a count of `0xffff` names
@@ -333,7 +346,7 @@ pub struct World {
     pub dt: Millis,
     /// The history period (`world+0x8b8`, `time_slice`): the `.dat`'s, which the world reads
     /// after its constructor's [`HISTORY_PERIOD`] ([`crate::players::history::History::update`]).
-    pub history_period: crate::players::history::HistoryUpdates,
+    pub history_period: HistoryUpdates,
     /// Each player's `mAllowCapturingGaiaUnits` (`player+0x670`, saved; false for a player it
     /// lacks): a computer player takes Gaia's objects over by seeing them in the game modes
     /// outside the standard ones ([`crate::vision::visibility::sight_taker`]).
@@ -344,13 +357,13 @@ pub struct World {
     pub local_player: PlayerId,
     /// The game's tech tree table and its civilisations' unique units, which the defeat check's
     /// count of the units a building will train reads ([`crate::players::world_player::TechTree`]).
-    pub tech_tree: crate::players::world_player::TechTree,
+    pub tech_tree: TechTree,
     /// `allianceLocked` (`world+0xc`, saved): GAME's diplomacy and allied victory change nothing
     /// while it is not 0.
     pub alliance_locked: i32,
     /// The world's teams (`+0x984`..`+0x9a0`, `playerTeams[i]`, saved as bytes): player i's
     /// team at i − 1, 1 alone ([`World::resolve_teams`]).
-    pub teams: [crate::players::Team; 8],
+    pub teams: [Team; 8],
     /// The game's `+0xc14` (`FUN_140c884c0`, saved as a byte): the player of the quick-build
     /// cheat (GAME 4), 0 without; while it is not 0 every work is done at once, which the work
     /// actions do not model (they take it as 0).

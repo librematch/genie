@@ -2,6 +2,10 @@
 //! ([`Millis`]). The game keeps both as `u32` and its arithmetic on them wraps. The update's
 //! span in seconds and the timers that count it down are `f32` ([`Seconds`]).
 
+use crate::math::image::facing::MS_PER_SECOND;
+use std::fmt::{Display, Error, Formatter};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+
 /// A moment of the world's clock in milliseconds since the game's start (`world_time`): the
 /// clock itself and the moments the objects keep (a unit AI's last retarget, a reload's end,
 /// a building's last garrison count).
@@ -55,12 +59,12 @@ impl WorldTime {
     /// the facing's clock, `FUN_141162db0`).
     #[must_use]
     pub fn seconds(self) -> Seconds {
-        Seconds(self.0 as f32 / crate::math::image::facing::MS_PER_SECOND)
+        Seconds(self.0 as f32 / MS_PER_SECOND)
     }
 }
 
-impl std::fmt::Display for WorldTime {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for WorldTime {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
@@ -111,8 +115,8 @@ impl Millis {
     }
 }
 
-impl std::fmt::Display for Millis {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Millis {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
@@ -190,7 +194,7 @@ impl Seconds {
     }
 }
 
-impl std::ops::Add for Seconds {
+impl Add for Seconds {
     type Output = Self;
 
     /// The `f32` sum.
@@ -199,7 +203,7 @@ impl std::ops::Add for Seconds {
     }
 }
 
-impl std::ops::Sub for Seconds {
+impl Sub for Seconds {
     type Output = Self;
 
     /// The `f32` difference.
@@ -208,21 +212,21 @@ impl std::ops::Sub for Seconds {
     }
 }
 
-impl std::ops::AddAssign for Seconds {
+impl AddAssign for Seconds {
     /// The `f32` sum in place (a timer that counts up).
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
-impl std::ops::SubAssign for Seconds {
+impl SubAssign for Seconds {
     /// The `f32` difference in place (a timer that counts down).
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }
 
-impl std::ops::Neg for Seconds {
+impl Neg for Seconds {
     type Output = Self;
 
     /// The span negated (its sign bit flipped).
@@ -231,7 +235,7 @@ impl std::ops::Neg for Seconds {
     }
 }
 
-impl std::ops::Mul<f32> for Seconds {
+impl Mul<f32> for Seconds {
     type Output = Self;
 
     /// The span scaled by `f` (one `f32` product).
@@ -240,14 +244,14 @@ impl std::ops::Mul<f32> for Seconds {
     }
 }
 
-impl std::ops::MulAssign<f32> for Seconds {
+impl MulAssign<f32> for Seconds {
     /// The span scaled by `f` in place (an effect's multiplier).
     fn mul_assign(&mut self, f: f32) {
         self.0 *= f;
     }
 }
 
-impl std::ops::Div<f32> for Seconds {
+impl Div<f32> for Seconds {
     type Output = Self;
 
     /// The span divided by `f` (one `f32` quotient).
@@ -256,7 +260,7 @@ impl std::ops::Div<f32> for Seconds {
     }
 }
 
-impl std::ops::Div for Seconds {
+impl Div for Seconds {
     type Output = f32;
 
     /// The ratio of two spans (one `f32` quotient).
@@ -265,7 +269,7 @@ impl std::ops::Div for Seconds {
     }
 }
 
-impl std::ops::Mul<Seconds> for f32 {
+impl Mul<Seconds> for f32 {
     type Output = Self;
 
     /// A rate per second over the span: what it adds up to (one `f32` product).
@@ -274,8 +278,8 @@ impl std::ops::Mul<Seconds> for f32 {
     }
 }
 
-impl std::fmt::Display for Seconds {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Seconds {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

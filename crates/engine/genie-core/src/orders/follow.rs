@@ -1,23 +1,42 @@
 //! FOLLOW and GUARD, a move to an object and the head action's move.
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
+use crate::combat::missile::MISSILE;
+use crate::construction::repair::REPAIR;
+use crate::construction::wait_solidify::WAIT_SOLIDIFY;
+use crate::garrison::ENTER;
+use crate::garrison::transport::TRANSPORT;
+use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
+use crate::gathering::make::MAKE;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
+use crate::movement::ai_moves::PointMove;
+use crate::movement::explore::EXPLORE;
+use crate::movement::fly::FLY;
+use crate::movement::move_to::{
+    MOVE_TO, MoveToAction, TARGET_LACKING, holds_object, object_range, object_sprite,
+};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::MOVING;
 use crate::orders::{Followed, GUARD_RANGE, follow_axis, follow_spread, ignore_unit};
+use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::{OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::CheckedIndex;
@@ -107,17 +126,17 @@ impl World {
         };
         let tm = t.master(self.master_tables(), tp)?;
         let (x, y, z) = (t.position().x(), t.position().y(), t.position().z());
-        let order = crate::unit_ai::QueuedOrder {
+        let order = QueuedOrder {
             issuer: None,
             order: OrderKind::Defend,
-            priority: crate::unit_ai::OrderPriority::COMMAND,
+            priority: OrderPriority::COMMAND,
             target: Some(target),
             target_owner: Some(tp),
             point: Position::new(x, y, z),
             range: Distance::new(GUARD_RANGE),
             shown: Point::new(x, y),
             ready: true,
-            target_type: Some(crate::unit_ai::OrderTargetType::of_master(tm.id)),
+            target_type: Some(OrderTargetType::of_master(tm.id)),
         };
         let cap = if self.players.player(player)?.kind.is_computer() {
             500
@@ -147,7 +166,7 @@ impl World {
             if !self.parts.unit_ai.contains(self.players.live(p, idx)?.id) {
                 continue;
             }
-            let order = crate::unit_ai::QueuedOrder {
+            let order = QueuedOrder {
                 issuer: Some(Issuer::Player(p)),
                 ..order
             };
@@ -180,8 +199,7 @@ impl World {
         };
         let master = u.master(self.master_tables(), p)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
-        let moves =
-            MOVING <= master.kind && crate::math::fmath::below_or_unordered(0.0, speed.get());
+        let moves = MOVING <= master.kind && below_or_unordered(0.0, speed.get());
         Ok(moves.then_some(u.position().ground()))
     }
 
@@ -374,12 +392,10 @@ impl World {
         // FUN_140aa0df0 makes the MoveTo first, which takes its target (slot 0x178, quiet 0);
         // slot 0x808 then clears the list (the old actions' teardowns) and starts it
         let livestock = unit.master(self.master_tables(), player)?.class == class::LIVESTOCK;
-        let (tp, t) = self
-            .object(target)
-            .ok_or(crate::movement::move_to::TARGET_LACKING)?;
+        let (tp, t) = self.object(target).ok_or(TARGET_LACKING)?;
         let target_state = t.life.state;
         let target_master = t.master(self.master_tables(), tp)?.id;
-        if crate::movement::move_to::holds_object(livestock, target_master, target_state) {
+        if holds_object(livestock, target_master, target_state) {
             self.take(target, self.releaser(player, idx)?)?;
         }
         self.clear_actions(player, idx)?;
@@ -397,16 +413,15 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (target, target_state): (ObjectId, crate::objects::ObjectState),
+        (target, target_state): (ObjectId, ObjectState),
         livestock: bool,
     ) -> Result<bool, GenieError> {
         let master = self
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let range = crate::movement::move_to::object_range(Distance::ZERO, Some(master));
-        let sprite = crate::movement::move_to::object_sprite(master)
-            .and_then(|id| self.graphics.get(id).copied());
+        let range = object_range(Distance::ZERO, Some(master));
+        let sprite = object_sprite(master).and_then(|id| self.graphics.get(id).copied());
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
         let mover = self
@@ -415,7 +430,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a moved unit without movement state",
             ))?;
-        let move_to = crate::movement::move_to::MoveToAction::to_object(
+        let move_to = MoveToAction::to_object(
             &self.spatial,
             here,
             mover,
@@ -426,10 +441,7 @@ impl World {
         if move_to.shows_standing() {
             unit.shows_standing_sprite(
                 self.parts.motion.layer_mut(unit.id),
-                crate::objects::masters::OwnerMasters::new(
-                    &self.parts.own_master,
-                    self.masters.of(player),
-                ),
+                OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
                 &self.graphics,
                 self.streams.get(Stream::Sprite),
             )?;
@@ -469,29 +481,25 @@ impl World {
         match self.parts.actions_of(unit.id).top_action_kind() {
             None
             | Some(
-                crate::movement::move_to::MOVE_TO
-                | crate::movement::explore::EXPLORE
+                MOVE_TO
+                | EXPLORE
                 | action_type::BUILD
-                | crate::combat::attack::ATTACK
-                | crate::garrison::ENTER
-                | crate::movement::fly::FLY
-                | crate::combat::missile::MISSILE
-                | crate::gathering::make::MAKE
-                | crate::construction::wait_solidify::WAIT_SOLIDIFY,
+                | ATTACK
+                | ENTER
+                | FLY
+                | MISSILE
+                | MAKE
+                | WAIT_SOLIDIFY,
             ) => Ok(false),
-            Some(crate::ownership::artifact::ARTIFACT_TYPE) => {
+            Some(ARTIFACT_TYPE) => {
                 self.artifact_take_object(player, idx, target)?;
                 Ok(true)
             }
             Some(HUNT) => self.hunt_take_move(player, idx, target, point),
-            Some(crate::gathering::gather::GATHER) => {
-                self.gather_take_move(player, idx, target, point)
-            }
+            Some(GATHER) => self.gather_take_move(player, idx, target, point),
             // the Repair's slot 0x40 (FUN_140ad9700) walks to the point whatever the target, and
             // the Transport's (0x140aa3e40) sails there
-            Some(crate::construction::repair::REPAIR | crate::garrison::transport::TRANSPORT) => {
-                self.point_taken(player, idx, point)
-            }
+            Some(REPAIR | TRANSPORT) => self.point_taken(player, idx, point),
             Some(other) => Err(GenieError::unreachable(
                 "a top action of a type that top_action never holds",
             )
@@ -514,19 +522,16 @@ impl World {
             self.parts.motion.layer_mut(id),
             point,
             player,
-            crate::objects::masters::OwnerMasters::new(
-                &self.parts.own_master,
-                self.masters.of(player),
-            ),
+            OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
             (
                 &self.graphics,
                 self.parts.combat.of(id).abilities.look.as_ref(),
             ),
         )? {
-            crate::movement::ai_moves::PointMove::Declined => return Ok(false),
-            crate::movement::ai_moves::PointMove::Taken(released) => (released, None),
-            crate::movement::ai_moves::PointMove::Repairs(released, left) => (released, left),
-            crate::movement::ai_moves::PointMove::Sails => {
+            PointMove::Declined => return Ok(false),
+            PointMove::Taken(released) => (released, None),
+            PointMove::Repairs(released, left) => (released, left),
+            PointMove::Sails => {
                 self.transport_move(player, idx, point)?;
                 return Ok(true);
             }

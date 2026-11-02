@@ -42,8 +42,16 @@ pub(crate) use self::shore::MapShore;
 pub(crate) use self::shore::{DropDraws, in_zone, retry_point};
 pub use self::transport_mode::TransportMode;
 pub use self::transport_state::TransportState;
+use crate::map::RestrictionId;
+use crate::math::image::transport::{
+    DRAW_SCALE as TRANSPORT_DRAW_SCALE, DROP_GAP as TRANSPORT_DROP_GAP,
+    MOVE_RANGE as TRANSPORT_MOVE_RANGE, NEAR as TRANSPORT_NEAR, NONE as TRANSPORT_NONE,
+    RETRY_SPREAD as TRANSPORT_RETRY_SPREAD, SHORE_MARGIN as TRANSPORT_SHORE_MARGIN,
+    UNLOAD_REACH_SQUARED as TRANSPORT_UNLOAD_REACH_SQUARED,
+};
 #[cfg(test)]
 use crate::math::rng::Well512;
+use crate::objects::masters::TaskId;
 
 /// The Transport action's type, which word 9 adds.
 pub const TRANSPORT: ActionType = ActionType::named(12);
@@ -52,19 +60,19 @@ pub(crate) const NO_TRANSPORT: GenieError =
     GenieError::unreachable("a Transport's update without its action");
 
 /// The action's point while it has none (`DAT_14330ec20`).
-pub const NONE: f32 = crate::math::image::transport::NONE;
+pub const NONE: f32 = TRANSPORT_NONE;
 /// The reach within which a tile of the point's zone lets the unit unload (`DAT_142e8c150`).
-const NEAR: f32 = crate::math::image::transport::NEAR;
+const NEAR: f32 = TRANSPORT_NEAR;
 /// The shore search's margin about the unit's footprint (`DAT_142e8c150`).
-const SHORE_MARGIN: f32 = crate::math::image::transport::SHORE_MARGIN;
+const SHORE_MARGIN: f32 = TRANSPORT_SHORE_MARGIN;
 /// The squared gap from the unit's footprint within which the work unloads at once
 /// (`DAT_142eb0f48`).
-const UNLOAD_REACH_SQUARED: f32 = crate::math::image::transport::UNLOAD_REACH_SQUARED;
+const UNLOAD_REACH_SQUARED: f32 = TRANSPORT_UNLOAD_REACH_SQUARED;
 /// The `MoveTo`'s range to the point (`DAT_142e8c148`).
-const MOVE_RANGE: f32 = crate::math::image::transport::MOVE_RANGE;
+const MOVE_RANGE: f32 = TRANSPORT_MOVE_RANGE;
 /// The new point's spread about the old one (`DAT_14330ebb8`): a draw over [`RETRY_STEP`] less
 /// this.
-const RETRY_SPREAD: f32 = crate::math::image::transport::RETRY_SPREAD;
+const RETRY_SPREAD: f32 = TRANSPORT_RETRY_SPREAD;
 /// The divisor that cuts a 15-bit draw to 0..10 tiles (`FUN_140aa3ba0`'s `0xccc`).
 const RETRY_STEP: u32 = 0xccc;
 /// The new point's draws (`FUN_140aa3ba0`).
@@ -74,8 +82,8 @@ const DEEP_WATER: TerrainId = TerrainId::named(0x16);
 const WATER: TerrainId = TerrainId::named(1);
 /// A drop location's draw scale (`DAT_142eb69cc`) and the gap past the footprints
 /// (`DAT_142eb99cc`).
-const DRAW_SCALE: f32 = crate::math::image::transport::DRAW_SCALE;
-const DROP_GAP: f32 = crate::math::image::transport::DROP_GAP;
+const DRAW_SCALE: f32 = TRANSPORT_DRAW_SCALE;
+const DROP_GAP: f32 = TRANSPORT_DROP_GAP;
 /// The draws `find_drop_location` makes (`FUN_141192d10`: 50).
 const DROP_TRIES: u16 = 50;
 
@@ -99,7 +107,7 @@ pub struct TransportAction {
     pub retarget: bool,
     /// `+0x48`: the task it works on, none from the unload command (the work command's
     /// `LAB_1410706a8` retakes only a Transport on the task it finds).
-    pub task: Option<crate::objects::masters::TaskId>,
+    pub task: Option<TaskId>,
 }
 
 /// What the Transport reads of its unit.
@@ -165,7 +173,7 @@ pub(crate) struct TransportReads {
     /// The master's radii (x, y).
     pub(crate) radius: Footprint,
     /// The master's terrain restriction (`+0x606`).
-    pub(crate) restriction: Option<crate::map::RestrictionId>,
+    pub(crate) restriction: Option<RestrictionId>,
     /// The sprites a `MoveTo` the update's `set_state` makes takes when its maker gives none.
     pub(crate) defaults: MoveDefaults,
     /// The sprite its maker gives it ([`Ship::given`]).

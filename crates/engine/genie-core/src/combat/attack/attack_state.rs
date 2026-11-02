@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::movement::move_to::MoveToAction;
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// An Attack's state (`+0x18`, set by `set_state`, slot 16 `0x140a820c0`) with the data only
 /// that state holds (FD-045-D62): every `set_state` drops the sub-actions first
@@ -144,8 +145,8 @@ impl AttackState {
     }
 }
 
-impl std::fmt::Display for AttackState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for AttackState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

@@ -5,6 +5,7 @@ use encoding_rs::Encoding;
 use genie_scx::{self as scx, DlcPackage, Scenario};
 use std::convert::TryFrom;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
+use std::result::Result as StdResult;
 
 /// Type for errrors that could occur while reading/parsing a campaign file.
 #[derive(Debug, thiserror::Error)]
@@ -26,7 +27,7 @@ pub enum ReadCampaignError {
     ParseScxError(#[from] scx::Error),
 }
 
-type Result<T> = std::result::Result<T, ReadCampaignError>;
+type Result<T> = StdResult<T, ReadCampaignError>;
 
 /// Decode a string with unknown encoding.
 fn decode_str(bytes: &[u8]) -> Result<String> {
@@ -485,6 +486,8 @@ mod tests {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -498,12 +501,12 @@ mod genie_error_tests {
                 "a scenario the campaign does not hold"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(Error::source(&e).is_some());
         let e: genie_error::GenieError = ReadCampaignError::IoError(io::Error::other("x")).into();
         assert_eq!(
             (e.kind(), e.reason()),
             (genie_error::ErrorKind::Io, "a read or write that failed")
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(Error::source(&e).is_some());
     }
 }

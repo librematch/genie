@@ -13,19 +13,28 @@ use crate::garrison::{
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::rng::Stream;
+use crate::movement::Planning;
 use crate::movement::move_to::MoveToReads;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
 use crate::objects::masters::master_type::BUILDING;
+use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
 use crate::orders::object_gone;
+use crate::ownership::artifact::{ARTIFACT_TYPE, ArtifactSub};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::world_view::EnterOrder;
+use crate::unit_ai::{AiMove, Notify, NotifyKind};
+use crate::world::Player;
 use crate::world::World;
+use crate::world::index::{ObjectsRef, Place};
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -53,7 +62,7 @@ impl World {
                 Some((target.id(), class)),
                 point,
                 clears,
-                self.streams.get(crate::math::rng::Stream::Ai),
+                self.streams.get(Stream::Ai),
             )?;
             self.remember_order(
                 player,
@@ -96,7 +105,7 @@ impl World {
         let Some(task) = self.find_work_task(player, idx, target, Some(GARRISON), true)? else {
             return Ok(false);
         };
-        let under_artifact = top == Some(crate::ownership::artifact::ARTIFACT_TYPE);
+        let under_artifact = top == Some(ARTIFACT_TYPE);
         let failed = self.enter_with(player, idx, target, &task, under_artifact)?;
         self.post_own_failure(player, idx, failed)?;
         Ok(true)
@@ -108,7 +117,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        failed: Option<crate::unit_ai::Notify>,
+        failed: Option<Notify>,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(player, idx)?;
         let state = unit.life.state;
@@ -130,8 +139,8 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        order: crate::unit_ai::world_view::EnterOrder,
-    ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
+        order: EnterOrder,
+    ) -> Result<Option<Notify>, GenieError> {
         if let Some(master) = order.switch {
             self.change_master(player, idx, master)?;
         }
@@ -154,7 +163,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         under_artifact: bool,
-    ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
+    ) -> Result<Option<Notify>, GenieError> {
         let (action, target, _) = self.new_enter(player, idx, target, task)?;
         self.install_enter_as(player, idx, target, action, task, under_artifact)
     }
@@ -205,7 +214,7 @@ impl World {
         target: ContainerId,
         action: EnterAction,
         task: &Task,
-    ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
+    ) -> Result<Option<Notify>, GenieError> {
         self.install_enter_as(player, idx, target, action, task, false)
     }
 
@@ -225,7 +234,7 @@ impl World {
         mut action: EnterAction,
         task: &Task,
         sub: bool,
-    ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
+    ) -> Result<Option<Notify>, GenieError> {
         let id = self.players.live(player, idx)?.id;
         if sub {
             self.enter_under_artifact(player, idx, id, action)?;
@@ -256,7 +265,7 @@ impl World {
                     let actions = self.parts.actions.of_mut(id)?;
                     let e = actions.list.take_enter();
                     if let (Some(e), Some(art)) = (e, actions.list.artifact_mut()) {
-                        art.sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter: e });
+                        art.sub = Some(ArtifactSub::Enter { enter: e });
                     }
                 }
                 entered.map(|()| None)
@@ -314,23 +323,20 @@ impl World {
         idx: ListIndex,
         mut action: EnterAction,
         sub: bool,
-    ) -> Result<crate::unit_ai::Notify, GenieError> {
+    ) -> Result<Notify, GenieError> {
         action.state = EnterState::Failed;
-        let masters = crate::objects::masters::OwnerMasters::new(
-            &self.parts.own_master,
-            self.masters.of(player),
-        );
+        let masters = OwnerMasters::new(&self.parts.own_master, self.masters.of(player));
         let unit = self.players.live_mut(player, idx)?;
         self.parts.actions.of_mut(unit.id)?.place_enter(action, sub);
         unit.shows_standing_sprite(
             self.parts.motion.layer_mut(unit.id),
             masters,
             &self.graphics,
-            self.streams.get(crate::math::rng::Stream::Sprite),
+            self.streams.get(Stream::Sprite),
         )?;
-        Ok(crate::unit_ai::Notify::own(
+        Ok(Notify::own(
             unit.id,
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
+            NotifyKind::ACTION_FAILED,
             [ActionKind::Enter.value(), 0, 0],
         ))
     }
@@ -348,12 +354,7 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let tm = t.master(self.master_tables(), tp)?.clone();
@@ -386,12 +387,7 @@ impl World {
         t: &EnterTarget,
         start: WalkStart,
     ) -> Result<Walking, GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(self.master_tables(), tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
@@ -433,12 +429,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let master = t.master(self.master_tables(), tp)?.clone();
@@ -470,21 +461,16 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
-        let Some(crate::world::index::Place::Live(tp, ti)) = self.place(transport) else {
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let Some(Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };
         let ship = self.players.live(tp, ti)?;
-        let mut plan = crate::movement::Planning {
+        let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
             player_type: self.players.player(tp)?.kind,
-            object: self.streams.get(crate::math::rng::Stream::Object),
+            object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };
         if !ship_reaches(
@@ -510,10 +496,10 @@ impl World {
         ship: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let Some(crate::world::index::Place::Live(p, i)) = self.place(ship) else {
+        let Some(Place::Live(p, i)) = self.place(ship) else {
             return Err(UNREACHED);
         };
-        let walk = crate::unit_ai::AiMove {
+        let walk = AiMove {
             point: to,
             range: Distance::ZERO,
             force: true,
@@ -537,7 +523,7 @@ impl World {
             .flat_map(|p| p.objects.iter().chain(&p.sleeping))
             .filter(|u| u.life.inside == Some(target))
             .count();
-        let Some(crate::world::index::Place::Live(..)) = self.place(target) else {
+        let Some(Place::Live(..)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
         self.run_on_step(player, idx, |unit, actions, c| {
@@ -560,7 +546,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(), GenieError> {
-        let Some(crate::world::index::Place::Live(tp, ti)) = self.place(target) else {
+        let Some(Place::Live(tp, ti)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
         let me = self
@@ -584,13 +570,10 @@ impl World {
 /// # Errors
 ///
 /// [`UNPLACED`] for an object the world does not place.
-fn placed_object(
-    players: &[crate::world::Player],
-    place: Option<crate::world::index::Place>,
-) -> Result<&crate::objects::unit::Unit, GenieError> {
+fn placed_object(players: &[Player], place: Option<Place>) -> Result<&Unit, GenieError> {
     match place {
-        Some(crate::world::index::Place::Live(p, i)) => players.live(p, i),
-        Some(crate::world::index::Place::Sleeping(p, i)) => players.asleep(p, i),
+        Some(Place::Live(p, i)) => players.live(p, i),
+        Some(Place::Sleeping(p, i)) => players.asleep(p, i),
         None => Err(UNPLACED),
     }
 }

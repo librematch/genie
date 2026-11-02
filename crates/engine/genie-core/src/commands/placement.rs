@@ -6,15 +6,19 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Restriction;
 use crate::map::Tile;
+use crate::map::spatial::Placed;
+use crate::map::terrain::is_rice_terrain;
 use crate::objects::ObjectId;
 use crate::objects::masters::HillMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
+use crate::production::spawn::{BuildSite, WorldMap, build_placement};
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{RICE_FARM, World};
@@ -29,7 +33,7 @@ impl World {
         }
         let tile = Tile::new(position.x() as i32, position.y() as i32);
         let terrain = self.spatial.terrain.as_ref().and_then(|t| t.kind(tile));
-        if terrain.is_some_and(crate::map::terrain::is_rice_terrain) {
+        if terrain.is_some_and(is_rice_terrain) {
             RICE_FARM
         } else {
             master
@@ -47,7 +51,7 @@ impl World {
             "BUILD of a master the player does not have",
         ))?;
         let mut listed = [0i16; 4];
-        for (resource, amount, _) in crate::objects::masters::cost_entries(&site.cost) {
+        for (resource, amount, _) in cost_entries(&site.cost) {
             if let Some(r) = resource.is_resource().then(|| resource.index()) {
                 let entry = listed.checked_mut(r)?;
                 *entry = entry.wrapping_add(amount.get());
@@ -128,7 +132,7 @@ impl World {
         own: &[ObjectId],
     ) -> Result<PlacementCode, GenieError> {
         let site = self.master(player, master)?;
-        let build = crate::production::spawn::BuildSite {
+        let build = BuildSite {
             player,
             human,
             radius: site.clearance,
@@ -142,8 +146,8 @@ impl World {
             zones: false,
             own,
         };
-        let map = crate::production::spawn::WorldMap { turns: self };
-        crate::production::spawn::build_placement(&build, &map, at)
+        let map = WorldMap { turns: self };
+        build_placement(&build, &map, at)
     }
 
     /// The Build's placement test of the building `placed` (`0x140aae200` case 7: its master's
@@ -160,13 +164,13 @@ impl World {
     /// A master the player lacks, and what the test does not model.
     pub(crate) fn foundation_code(
         &self,
-        placed: &crate::map::spatial::Placed,
+        placed: &Placed,
         desolid: bool,
         own: &[ObjectId],
     ) -> Result<PlacementCode, GenieError> {
         let player = placed.player;
         let site = self.master(player, placed.master)?;
-        let test = crate::production::spawn::BuildSite {
+        let test = BuildSite {
             player,
             human: false,
             radius: site.radius,
@@ -180,9 +184,9 @@ impl World {
             zones: false,
             own,
         };
-        let map = crate::production::spawn::WorldMap { turns: self };
+        let map = WorldMap { turns: self };
         let at = placed.position.ground();
-        crate::production::spawn::build_placement(&test, &map, at)
+        build_placement(&test, &map, at)
     }
 
     /// The terrain restriction a placement test of `site` reads (`+0x606`), from the data file.
@@ -211,7 +215,7 @@ impl World {
     pub(crate) fn affords(&self, player: PlayerId, master: MasterId) -> Result<bool, GenieError> {
         let site = self.master(player, master)?;
         let owner = self.players.player(player)?;
-        for (resource, amount, _) in crate::objects::masters::cost_entries(&site.cost) {
+        for (resource, amount, _) in cost_entries(&site.cost) {
             let r = resource.index();
             if r == 4 {
                 return Err(GenieError::unsupported(

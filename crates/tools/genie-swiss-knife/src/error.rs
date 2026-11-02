@@ -1,6 +1,7 @@
 //! Error types
 
 use abscissa_core::error::{BoxError, Context};
+use std::error::Error as StdError;
 use std::{
     fmt::{self, Display},
     io,
@@ -45,8 +46,8 @@ impl Display for Error {
     }
 }
 
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         self.0.source()
     }
 }

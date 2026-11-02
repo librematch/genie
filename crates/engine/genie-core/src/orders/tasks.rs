@@ -2,13 +2,20 @@
 
 use crate::GenieError;
 use crate::construction::MainBuildingId;
+use crate::construction::build::{BuildAction, BuildTask};
 use crate::construction::repair::RepairState;
+use crate::construction::repair::{RepairAction, RepairTask, SHIP_REPAIR, SHIPS};
+use crate::construction::{FoundationId, RepairTargetId};
+use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HuntTask;
 use crate::map::Position;
 use crate::math::rng::Stream;
+use crate::movement::footprint_gap;
+use crate::movement::move_to::{MoveToReads, WalkTo};
 use crate::objects::ListIndex;
 use crate::objects::Voice;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Task;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::orders::gather::HuntOrder;
@@ -16,6 +23,7 @@ use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::world_view::RepairOrder;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
@@ -94,8 +102,7 @@ impl World {
             .find_work_task(player, idx, target, None, true)?
             .ok_or(GenieError::unsupported("a gather command without a task"))?;
         let unit = &self.players.live(player, idx)?;
-        if self.parts.actions_of(unit.id).top_action_kind()
-            == Some(crate::gathering::gather::GATHER)
+        if self.parts.actions_of(unit.id).top_action_kind() == Some(GATHER)
             && self
                 .parts
                 .actions_of(unit.id)
@@ -122,7 +129,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        task: &crate::objects::masters::Task,
+        task: &Task,
         point: Position,
         clears: bool,
     ) -> Result<(), GenieError> {
@@ -134,23 +141,18 @@ impl World {
         let target_state = Some(t.life.state);
         let unit = &self.players.live(player, idx)?;
         let builder = unit.master(self.master_tables(), player)?;
-        let to = crate::movement::move_to::WalkTo {
+        let to = WalkTo {
             id: Some(target),
             at: target_at,
-            gap: crate::movement::footprint_gap(
-                unit.position(),
-                builder.radius,
-                target_at,
-                target_radius,
-            ),
+            gap: footprint_gap(unit.position(), builder.radius, target_at, target_radius),
             state: target_state,
         };
-        let build_task = crate::construction::build::BuildTask::of(
+        let build_task = BuildTask::of(
             task,
             builder.work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
-        let move_reads = crate::movement::move_to::MoveToReads::of(
+        let move_reads = MoveToReads::of(
             (unit, self.parts.mover_of(unit.id)),
             builder,
             (
@@ -158,7 +160,7 @@ impl World {
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );
-        let build = crate::construction::build::BuildAction::start(to, build_task, &move_reads)?;
+        let build = BuildAction::start(to, build_task, &move_reads)?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -195,17 +197,17 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        task: &crate::objects::masters::Task,
-    ) -> Result<(crate::construction::repair::RepairAction, ClassId), GenieError> {
+        task: &Task,
+    ) -> Result<(RepairAction, ClassId), GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = t.master(self.master_tables(), tp)?;
-        if crate::construction::repair::SHIPS.contains(&tm.class) {
-            return Err(crate::construction::repair::SHIP_REPAIR);
+        if SHIPS.contains(&tm.class) {
+            return Err(SHIP_REPAIR);
         }
         let class = tm.class;
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        let move_reads = crate::movement::move_to::MoveToReads::of(
+        let move_reads = MoveToReads::of(
             (unit, self.parts.mover_of(unit.id)),
             master,
             (
@@ -216,13 +218,8 @@ impl World {
         let to = move_reads
             .walk_to(self, Some(target))?
             .ok_or(REPAIR_TARGET_GONE)?;
-        let repair_task = crate::construction::repair::RepairTask::of(task);
-        let repair = crate::construction::repair::RepairAction::start(
-            to,
-            repair_task,
-            master.weapon_range,
-            &move_reads,
-        )?;
+        let repair_task = RepairTask::of(task);
+        let repair = RepairAction::start(to, repair_task, master.weapon_range, &move_reads)?;
         self.take(target, self.releaser(player, idx)?)?;
         Ok((repair, class))
     }
@@ -236,7 +233,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        task: &crate::objects::masters::Task,
+        task: &Task,
         point: Position,
         clears: bool,
     ) -> Result<(), GenieError> {
@@ -278,13 +275,13 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        order: crate::unit_ai::world_view::RepairOrder,
+        order: RepairOrder,
     ) -> Result<(), GenieError> {
         match order {
-            crate::unit_ai::world_view::RepairOrder::Retake(target) => {
+            RepairOrder::Retake(target) => {
                 self.repair_retarget(player, idx, target).map(|_class| ())?;
             }
-            crate::unit_ai::world_view::RepairOrder::Start {
+            RepairOrder::Start {
                 target,
                 switches,
                 task,
@@ -352,10 +349,7 @@ impl World {
     ) -> Result<ClassId, GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = t.master(self.master_tables(), tp)?;
-        let (class, ship) = (
-            tm.class,
-            crate::construction::repair::SHIPS.contains(&tm.class),
-        );
+        let (class, ship) = (tm.class, SHIPS.contains(&tm.class));
         let player_type = self.players.player(player)?.kind;
         let repair = self
             .parts
@@ -365,7 +359,7 @@ impl World {
             .copied()
             .ok_or(NO_REPAIR)?;
         // the work command gives the Repair its target
-        let same = repair.target == Some(crate::construction::RepairTargetId::new(target));
+        let same = repair.target == Some(RepairTargetId::new(target));
         let stays = same
             && (repair.state == RepairState::Face
                 || (matches!(repair.state, RepairState::Move { .. }) && player_type.is_computer()));
@@ -377,16 +371,16 @@ impl World {
                 .retarget_action(
                     player,
                     idx,
-                    repair.target.map(crate::construction::RepairTargetId::id),
+                    repair.target.map(RepairTargetId::id),
                     target,
                     repair.voice,
                 )?
-                .map(crate::construction::RepairTargetId::new);
+                .map(RepairTargetId::new);
             if ship {
-                return Err(crate::construction::repair::SHIP_REPAIR);
+                return Err(SHIP_REPAIR);
             }
             let unit = &self.players.live(player, idx)?;
-            let move_reads = crate::movement::move_to::MoveToReads::of(
+            let move_reads = MoveToReads::of(
                 (unit, self.parts.mover_of(unit.id)),
                 unit.master(self.master_tables(), player)?,
                 (
@@ -485,19 +479,14 @@ impl World {
                     "a Build's retarget without its Build",
                 ))?;
         let builder = unit.master(self.master_tables(), player)?;
-        let to = crate::movement::move_to::WalkTo {
+        let to = WalkTo {
             id: Some(target),
             at: target_at,
-            gap: crate::movement::footprint_gap(
-                unit.position(),
-                builder.radius,
-                target_at,
-                target_radius,
-            ),
+            gap: footprint_gap(unit.position(), builder.radius, target_at, target_radius),
             state: target_state,
         };
         // set_state(4)'s MoveTo to the foundation (FUN_140aa0df0), made before the borrows below
-        let move_reads = crate::movement::move_to::MoveToReads::of(
+        let move_reads = MoveToReads::of(
             (unit, self.parts.mover_of(unit.id)),
             builder,
             (
@@ -507,7 +496,7 @@ impl World {
         );
         let walk = old.task.walk(&move_reads, Some(to))?;
         // the work command gives the Build its new foundation
-        let foundation = crate::construction::FoundationId::new(target);
+        let foundation = FoundationId::new(target);
         if old.target != Some(foundation) {
             // the task finder took the new target below state 3, which slot 0x68 keeps
             let _ = self.build_set_target(player, idx, (old.target, old.added), foundation)?;
@@ -566,9 +555,9 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (old, added): (Option<crate::construction::FoundationId>, bool),
-        new: crate::construction::FoundationId,
-    ) -> Result<Option<crate::construction::FoundationId>, GenieError> {
+        (old, added): (Option<FoundationId>, bool),
+        new: FoundationId,
+    ) -> Result<Option<FoundationId>, GenieError> {
         let leaves = old != Some(new) && added;
         if leaves {
             self.leave_builders(old)?;
@@ -577,11 +566,11 @@ impl World {
             .retarget_action(
                 player,
                 idx,
-                old.map(crate::construction::FoundationId::id),
+                old.map(FoundationId::id),
                 new.id(),
                 Voice::Loud,
             )?
-            .map(crate::construction::FoundationId::new);
+            .map(FoundationId::new);
         if let Some(build) = self
             .parts
             .actions_mut(self.players.live(player, idx)?.id)?

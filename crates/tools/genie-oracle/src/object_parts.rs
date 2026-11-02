@@ -5,6 +5,7 @@ use crate::masters::dat_id;
 use crate::vec3;
 use genie_core::GenieError;
 use genie_core::garrison::ContainerId;
+use genie_core::groups::FormationKind;
 use genie_core::map::Distance;
 use genie_core::map::Point;
 use genie_core::map::Position;
@@ -12,11 +13,13 @@ use genie_core::movement::PathFlags;
 use genie_core::movement::WaypointIndex;
 use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
+use genie_core::objects::ObjectState;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::lifecycle::{Class, Lifecycle, MasterData};
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::MasterId;
+use genie_core::pathing::tile_path::Path;
 use genie_core::players::Amount;
 use genie_core::players::AmountRate;
 use genie_core::players::CivId;
@@ -24,6 +27,10 @@ use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::OrderPriority;
 use genie_core::unit_ai::best_target::AttackCategory;
 use genie_core::unit_ai::{ActionKind, OrderKind};
+use genie_core::unit_ai::{
+    Attackers, Home, Notify, OrderRecord, PatrolPath, QueuedOrder, UnitAi, UnitAiType, UnitStance,
+    notify_capacity,
+};
 use genie_core::world::Millis;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
@@ -93,7 +100,7 @@ pub(super) fn lifecycle(
         } else {
             Class::Animated
         },
-        state: genie_core::objects::ObjectState::of_byte(s.object_state)?,
+        state: ObjectState::of_byte(s.object_state)?,
         hp: HitPoints::new(s.hp),
         attribute_type: AttributeId::of_data(s.attribute_type_held),
         amount: Amount::new(s.attribute_amount_held),
@@ -117,12 +124,12 @@ pub(super) fn unit_ai(
     object: &genie_save::Object,
     own: ObjectId,
     players: usize,
-) -> Result<Option<genie_core::unit_ai::UnitAi>, GenieError> {
+) -> Result<Option<UnitAi>, GenieError> {
     let Some((combat, ai)) = object.combat().and_then(|c| Some((c, c.unit_ai()?))) else {
         return Ok(None);
     };
-    Ok(Some(genie_core::unit_ai::UnitAi {
-        ai_type: genie_core::unit_ai::UnitAiType::of_value(combat.need_unit_ai as u32),
+    Ok(Some(UnitAi {
+        ai_type: UnitAiType::of_value(combat.need_unit_ai as u32),
         current_order: OrderKind::of_field(ai.current_order_value)?,
         order_priority: OrderPriority::of_data(ai.current_order_priority_value),
         current_action: ActionKind::of_field(ai.current_action_value)?,
@@ -147,8 +154,8 @@ pub(super) fn unit_ai(
         look_around_timeout: Millis::new(ai.look_around_timeout_value),
         last_retarget_time: WorldTime::from_millis(ai.last_retarget_time),
         retarget_timer: Millis::new(ai.randomized_retarget_timer),
-        stance: genie_core::unit_ai::UnitStance::of_byte(ai.state_value),
-        formation_type: genie_core::groups::FormationKind::of_byte(ai.formation_type),
+        stance: UnitStance::of_byte(ai.state_value),
+        formation_type: FormationKind::of_byte(ai.formation_type),
         state_position: Point::new(ai.state_position_xvalue, ai.state_position_yvalue),
         retarget_disabled: ai.disable_retargeting,
         alert_mode: ai.alert_mode_value != 0,
@@ -159,7 +166,7 @@ pub(super) fn unit_ai(
         home: home(combat),
         hunted: None,
         last_update_time: Millis::new(ai.last_update_time_value),
-        attackers: genie_core::unit_ai::Attackers::of_saved(&ai.temp_int),
+        attackers: Attackers::of_saved(&ai.temp_int),
         order_history: order_history(ai)?,
         retries: ai
             .retarget_entries
@@ -177,11 +184,11 @@ pub(super) fn unit_ai(
         notifies: ai
             .temp_notify
             .iter()
-            .map(genie_core::unit_ai::Notify::from_bytes)
+            .map(Notify::from_bytes)
             .collect::<Result<_, _>>()?,
         // the load's factory capacity, doubled for what it reads
-        notify_capacity: genie_core::unit_ai::notify_capacity(
-            genie_core::unit_ai::UnitAiType::of_value(combat.need_unit_ai as u32),
+        notify_capacity: notify_capacity(
+            UnitAiType::of_value(combat.need_unit_ai as u32),
             ai.temp_notify.len(),
         ),
         processing: false,
@@ -191,24 +198,22 @@ pub(super) fn unit_ai(
 }
 
 /// The saved patrol: its path's points in the game's layout, its length and flags.
-fn patrol_path(ai: &UnitAiModule) -> Option<genie_core::unit_ai::PatrolPath> {
-    ai.patrol_path
-        .as_deref()
-        .map(|p| genie_core::unit_ai::PatrolPath {
-            path: genie_core::pathing::tile_path::Path {
-                points: p.waypoints.iter().map(vec3).collect(),
-                length: Distance::new(p.path_length_value),
-            },
-            flags: PathFlags::from_bits_retain(p.flags_bits),
-        })
+fn patrol_path(ai: &UnitAiModule) -> Option<PatrolPath> {
+    ai.patrol_path.as_deref().map(|p| PatrolPath {
+        path: Path {
+            points: p.waypoints.iter().map(vec3).collect(),
+            length: Distance::new(p.path_length_value),
+        },
+        flags: PathFlags::from_bits_retain(p.flags_bits),
+    })
 }
 
 /// An animal's home: its origin and fury (the elephant unit AI's).
-fn home(combat: &TribeCombatObject) -> Option<genie_core::unit_ai::Home> {
+fn home(combat: &TribeCombatObject) -> Option<Home> {
     combat
         .tribe_elephant_unit_ai_module
         .as_deref()
-        .map(|e| genie_core::unit_ai::Home {
+        .map(|e| Home {
             origin: Position::new(e.origin_x, e.origin_y, e.origin_z),
             furious: e.furious != 0,
             go_home: false,
@@ -221,11 +226,11 @@ fn home(combat: &TribeCombatObject) -> Option<genie_core::unit_ai::Home> {
 /// # Errors
 ///
 /// A record's order or action value no order or action holds, or a category past 0 to 11.
-fn order_history(ai: &UnitAiModule) -> Result<Vec<genie_core::unit_ai::OrderRecord>, GenieError> {
+fn order_history(ai: &UnitAiModule) -> Result<Vec<OrderRecord>, GenieError> {
     ai.oh
         .iter()
         .map(|e| {
-            Ok(genie_core::unit_ai::OrderRecord {
+            Ok(OrderRecord {
                 order: OrderKind::of_field(e.new_oh_order)?,
                 action: ActionKind::of_field(e.new_oh_action)?,
                 time: WorldTime::from_millis(e.new_oh_time),
@@ -263,10 +268,10 @@ fn queue(
     records: &[[u8; 52]],
     own: ObjectId,
     players: usize,
-) -> Result<Vec<genie_core::unit_ai::QueuedOrder>, GenieError> {
+) -> Result<Vec<QueuedOrder>, GenieError> {
     records
         .iter()
-        .map(|r| genie_core::unit_ai::QueuedOrder::from_bytes(r, own, players))
+        .map(|r| QueuedOrder::from_bytes(r, own, players))
         .collect()
 }
 

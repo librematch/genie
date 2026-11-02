@@ -1,8 +1,12 @@
 use super::*;
+use crate::combat::damage::Victim;
+use crate::gathering::hunt::tests::walker;
 use crate::map::GridSize;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
+use crate::map::terrain::{Terrain, TerrainKind};
+use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads};
 use crate::objects::ActionState;
@@ -11,14 +15,21 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
+use crate::objects::layers::{Motion, MotionMut, Static};
 use crate::objects::masters::TaskSprites;
+use crate::objects::sprite::ActiveSprite;
+use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
 use crate::pathing::zones::ZoneId;
 use crate::players::PlayerType;
 use crate::test_ids::object_id;
+use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
+use crate::world::WorldTime;
 use crate::world::parts::PartTable;
+use std::iter::once;
 
 /// A map of zones by column (the tile's x over 10) and terrain flags by a closure; the shore
 /// point the planner gives, recorded.
@@ -70,8 +81,8 @@ fn coast(near: bool) -> Coast {
 /// The sprite a hull shows first, and its master's standing sprite.
 const SHOWN: Graphic = Graphic {
     id: SpriteId::named(1),
-    frames: crate::objects::Frame::of_data(10),
-    facets: crate::objects::FacetCount::of_data(16),
+    frames: Frame::of_data(10),
+    facets: FacetCount::of_data(16),
     speed_multiplier: SpeedMultiplier::ONE,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
@@ -85,25 +96,18 @@ const STANDING: Graphic = Graphic {
 /// The transport's unit as the update's effects read it: a mover in motion (its animation at
 /// speed 1), a sprite ([`SHOWN`]); and the table of its unit AI, which takes its notifies (state
 /// 2).
-fn hull() -> (
-    crate::objects::unit::Unit,
-    crate::objects::layers::Motion,
-    PartTable<UnitAi>,
-) {
-    let mut mover = crate::gathering::hunt::tests::walker();
+fn hull() -> (Unit, Motion, PartTable<UnitAi>) {
+    let mut mover = walker();
     mover.animated.speed = Speed::new(1.0);
-    let mut unit = crate::objects::unit::Unit {
+    let mut unit = Unit {
         id: object_id(9),
-        place: crate::objects::layers::Static::at(Position::new(12.5, 8.5, 0.0)),
-        sprite: Some(crate::objects::sprite::ActiveSprite::start(
-            SHOWN,
-            &mut Well512::default(),
-        )),
-        ..crate::objects::unit::Unit::default()
+        place: Static::at(Position::new(12.5, 8.5, 0.0)),
+        sprite: Some(ActiveSprite::start(SHOWN, &mut Well512::default())),
+        ..Unit::default()
     };
     unit.life.state = ObjectState::Alive;
-    let ais = std::iter::once((unit.id, UnitAi::default())).collect();
-    (unit, crate::objects::layers::Motion::Moving(mover), ais)
+    let ais = once((unit.id, UnitAi::default())).collect();
+    (unit, Motion::Moving(mover), ais)
 }
 
 /// What a state change left the hull ([`left`]).
@@ -118,13 +122,7 @@ struct Left {
 }
 
 /// What a state change left `unit` with its `motion` and its unit AI among `ais`.
-fn left(
-    (unit, motion, ais): (
-        &crate::objects::unit::Unit,
-        &crate::objects::layers::Motion,
-        &PartTable<UnitAi>,
-    ),
-) -> Left {
+fn left((unit, motion, ais): (&Unit, &Motion, &PartTable<UnitAi>)) -> Left {
     Left {
         stopped: motion.animated().speed == Speed::new(0.0),
         stands: unit.sprite.map(|s| s.graphic.id) == Some(STANDING.id),
@@ -141,11 +139,7 @@ fn run_on(
     t: &mut TransportAction,
     s: &Ship<'_>,
     c: &mut Coast,
-    hull: (
-        &mut crate::objects::unit::Unit,
-        crate::objects::layers::MotionMut<'_>,
-        &mut PartTable<UnitAi>,
-    ),
+    hull: (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
     player_type: PlayerType,
 ) -> Result<Updated, GenieError> {
     let walked = match t.state.move_to().copied().map(|m| m.state) {
@@ -550,7 +544,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let (r, Left { stands, posted, .. }) = run(&mut t, &s, &mut c);
     let failed = (
         NotifyKind::ACTION_FAILED,
-        [crate::unit_ai::ActionKind::Transport.value(), 0, 0],
+        [ActionKind::Transport.value(), 0, 0],
     );
     assert_eq!(
         (r, stands, posted),
@@ -619,14 +613,14 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         point: Position::new(35.5, 88.5, 0.0),
         ..TransportAction::new(Position::new(28.0, 89.0, 0.0))
     };
-    let me = crate::movement::Me {
-        human_order: crate::world::WorldTime::ZERO,
+    let me = Me {
+        human_order: WorldTime::ZERO,
         id: object_id(9177),
         group: None,
         action_state: ActionState::new(TransportState::Sail { move_to: None }.get()),
     };
     let rig = || {
-        let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
+        let mut rig = Rig::on_the_path(Victim::default());
         assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic), None);
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig
@@ -726,17 +720,17 @@ fn rng() -> Well512 {
 
 /// A `size` by `size` map of terrain `fill` but for `tiles` (x, y and their terrain), every
 /// terrain up to 23 shown.
-fn terrain(size: i32, fill: u8, tiles: &[([i16; 2], u8)]) -> crate::map::terrain::Terrain {
+fn terrain(size: i32, fill: u8, tiles: &[([i16; 2], u8)]) -> Terrain {
     let mut kinds = vec![(fill, 255, -1); (size * size) as usize];
     for &([x, y], t) in tiles {
         kinds[(i32::from(y) * size + i32::from(x)) as usize] = (t, 255, -1);
     }
-    let shown = crate::map::terrain::TerrainKind {
+    let shown = TerrainKind {
         shown: true,
-        ..crate::map::terrain::TerrainKind::default()
+        ..TerrainKind::default()
     };
-    crate::map::terrain::Terrain::new(
-        crate::map::GridSize::new(size, size),
+    Terrain::new(
+        GridSize::new(size, size),
         kinds
             .into_iter()
             .map(|(k, r, l)| TileTerrain::of_save(k, r, l))

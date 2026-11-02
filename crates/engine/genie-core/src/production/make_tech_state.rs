@@ -1,6 +1,7 @@
 //! A research's state: researching a technology at its building.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A research's state (`+0x18`, its `set_state` `FUN_140ad29a0` only stores it): its update
 /// (`FUN_140ad2a20`) is done in 1 and works in 6, and its destructor (`FUN_140ad0be0`) tells 1 from
@@ -42,8 +43,8 @@ impl MakeTechState {
     }
 }
 
-impl std::fmt::Display for MakeTechState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for MakeTechState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

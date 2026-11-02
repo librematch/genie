@@ -62,6 +62,7 @@ use genie_support::{fallible_try_from, fallible_try_into, infallible_try_into};
 pub use header::Header;
 use std::fmt::Debug;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
+use std::result::Result as StdResult;
 pub use version::*;
 
 /// ID identifying a player (0-8).
@@ -212,7 +213,7 @@ impl From<genie_support::ReadStringError> for Error {
 }
 
 /// Result type alias with `genie_rec::Error` as the error type.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 /// Iterator over body actions.
 #[derive(Debug)]
@@ -645,6 +646,8 @@ mod tests {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -658,12 +661,12 @@ mod genie_error_tests {
                 "a time message where a sync was due"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = Error::IoError(io::Error::other("x")).into();
         assert_eq!(
             (e.kind(), e.reason()),
             (genie_error::ErrorKind::Io, "a read or write that failed")
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 }

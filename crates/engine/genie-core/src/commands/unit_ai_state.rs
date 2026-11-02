@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::commands::UnitList;
 use crate::players::PlayerId;
+use crate::unit_ai::UnitStance;
 use crate::world::World;
 
 /// `UNIT_AI_STATE` (0x12, `FUN_140e6a7c0`): the unit AIs of the units the packet lists (the
@@ -14,7 +15,7 @@ pub struct UnitAiStateCommand {
     /// The units.
     pub units: UnitList,
     /// The stance.
-    pub state: crate::unit_ai::UnitStance,
+    pub state: UnitStance,
 }
 
 impl UnitAiStateCommand {

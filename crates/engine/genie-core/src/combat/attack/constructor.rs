@@ -2,7 +2,10 @@
 //! and what it reads of its unit and its target.
 
 use crate::GenieError;
+use crate::combat::AttackTargetId;
+use crate::combat::abilities::Look;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::TARGET_GONE;
 use crate::combat::attack::{
     Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, LEASH_SLACK,
     MASTER_1704, MASTER_1706, NONE, Posted, Posts, face_target,
@@ -12,10 +15,14 @@ use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
+use crate::map::spatial::{Placed, Spatial};
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
+use crate::movement::gate_gap;
 use crate::movement::move_to::{MoveToReads, TargetMoved};
 use crate::movement::{Mover, footprint_gap, footprint_gap_squared};
+use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
@@ -23,13 +30,18 @@ use crate::objects::layers::MotionMut;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
+use crate::objects::masters::{Master, MasterTables, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
+use crate::objects::sprite::{running, walking};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::{NotifyKind, UnitAi};
+use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectsRef;
 use crate::world::step::Step;
 
 impl Attack {
@@ -40,7 +52,7 @@ impl Attack {
     /// (slot 0x7d0's sprite).
     pub(crate) fn own(target: ObjectId, e: &Engagement, arms: Arms) -> Self {
         Self {
-            target: Some(crate::combat::AttackTargetId::new(target)),
+            target: Some(AttackTargetId::new(target)),
             target2: None,
             state: AttackState::New,
             timer: Seconds::ZERO,
@@ -130,19 +142,14 @@ impl Attack {
     /// What the start does not model, and a target the world does not hold.
     pub(super) fn own_start(
         cmd: &AttackCommand<'_>,
-        (world, by_id): (
-            &crate::map::spatial::Spatial,
-            crate::world::index::ObjectsRef<'_>,
-        ),
+        (world, by_id): (&Spatial, ObjectsRef<'_>),
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
     ) -> Result<(Self, Begun, Vec<Posted>), GenieError> {
         let e = cmd.engagement;
-        let t = *world
-            .get_known(cmd.target)?
-            .ok_or(crate::combat::attack::TARGET_GONE)?;
+        let t = *world.get_known(cmd.target)?.ok_or(TARGET_GONE)?;
         let ground = mover.stats.radius.ground();
-        let reach_gap = crate::movement::gate_gap(
+        let reach_gap = gate_gap(
             world,
             (e.position, ground),
             (cmd.target, &t),
@@ -184,7 +191,7 @@ impl Attack {
     ) -> Result<(Self, Vec<Posted>), GenieError> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
@@ -194,7 +201,7 @@ impl Attack {
         let (mover, by_id) =
             c.w.parts
                 .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.masters));
-        let mover = mover.ok_or(crate::world::ATTACKER_UNMOVING)?;
+        let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
             Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
         if begun.failed_first {
@@ -228,10 +235,7 @@ impl Attack {
         if begun.arrived {
             unit.shows_standing_sprite(
                 c.w.parts.motion.layer_mut(unit.id),
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -270,7 +274,7 @@ impl Attack {
         (e, reach_gap): (&Engagement, Distance),
         (visible, target_owner): (bool, PlayerId),
         mover: &mut Mover,
-        posted: &mut Vec<(crate::unit_ai::NotifyKind, [i32; 3])>,
+        posted: &mut Vec<(NotifyKind, [i32; 3])>,
         reads: &MoveToReads<'_>,
     ) -> Result<Begun, GenieError> {
         let movable = e.speed != Speed::ZERO && e.can_move;
@@ -286,12 +290,12 @@ impl Attack {
             }
         } else if self.min_range > e.gap {
             if self.voice.is_loud() {
-                posted.push((crate::unit_ai::NotifyKind::TOO_CLOSE, [-1; 3]));
+                posted.push((NotifyKind::TOO_CLOSE, [-1; 3]));
             }
             failed_first = !movable;
-        } else if !crate::math::fmath::at_most_or_unordered(reach_gap.get(), self.reach().get()) {
+        } else if !at_most_or_unordered(reach_gap.get(), self.reach().get()) {
             if self.voice.is_loud() {
-                posted.push((crate::unit_ai::NotifyKind::OUT_OF_REACH, [0; 3]));
+                posted.push((NotifyKind::OUT_OF_REACH, [0; 3]));
             }
             if (e.stance == UnitStance::DEFENSIVE
                 && self.off_leash(e.target_position, e.state_position))
@@ -330,7 +334,7 @@ impl Attack {
     /// least the range plus [`LEASH_SLACK`] (`COMISS`/`JNC`: a NaN distance is within).
     pub(super) fn off_leash(&self, at: Position, centre: Point) -> bool {
         let (dx, dy) = (at.x() - centre.x(), at.y() - centre.y());
-        crate::math::fmath::sqrt(dy * dy + dx * dx) >= (self.range + LEASH_SLACK).get()
+        sqrt(dy * dy + dx * dx) >= (self.range + LEASH_SLACK).get()
     }
 
     /// The start's `set_state(13)` for a unit that cannot move out of reach of its target
@@ -378,8 +382,8 @@ impl Attack {
 /// master's sprites ([`arms_looking`] without a terrain look).
 #[must_use]
 pub fn arms(
-    master: &crate::objects::masters::Master,
-    graphics: &crate::objects::Graphics,
+    master: &Master,
+    graphics: &Graphics,
     sprites: TaskSprites,
     moving: Option<SpriteId>,
 ) -> Arms {
@@ -395,17 +399,17 @@ pub fn arms(
 /// interrupting frames.
 #[must_use]
 pub fn arms_looking(
-    master: &crate::objects::masters::Master,
-    look: Option<&crate::combat::abilities::Look>,
-    graphics: &crate::objects::Graphics,
+    master: &Master,
+    look: Option<&Look>,
+    graphics: &Graphics,
     sprites: TaskSprites,
     moving: Option<SpriteId>,
 ) -> Arms {
     let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     Arms {
         move_sprite: g(moving)
-            .or_else(|| g(crate::objects::sprite::running(master, look)))
-            .or_else(|| g(crate::objects::sprite::walking(master, look, false))),
+            .or_else(|| g(running(master, look)))
+            .or_else(|| g(walking(master, look, false))),
         sprite: g(sprites.proceeding).or_else(|| g(master.attack_sprite)),
         second_sprite: g(master.attack_sprite2),
         idle_sprite: g(master.standing_sprite),
@@ -419,11 +423,11 @@ pub fn arms_looking(
 /// What an Attack of a unit (its unit AI, top speed and master, placed at `me`) reads of it and
 /// its target (placed at `them`).
 pub fn engagement(
-    ai: Option<&crate::unit_ai::UnitAi>,
+    ai: Option<&UnitAi>,
     speed: Speed,
-    master: &crate::objects::masters::Master,
-    me: &crate::map::spatial::Placed,
-    them: &crate::map::spatial::Placed,
+    master: &Master,
+    me: &Placed,
+    them: &Placed,
     world_time: WorldTime,
 ) -> Result<Engagement, GenieError> {
     if master.charge_type.ranged() {

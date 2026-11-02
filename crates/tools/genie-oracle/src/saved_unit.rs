@@ -12,16 +12,22 @@ use genie_core::combat::AttackPowerup;
 use genie_core::combat::Charge;
 use genie_core::combat::Firepower;
 use genie_core::combat::MissileCount;
+use genie_core::combat::abilities::Abilities;
 use genie_core::combat::damage::ArmorPair;
 use genie_core::combat::missile::ShooterId;
+use genie_core::combat::missile::{LANDING, MISSILE, Missile};
 use genie_core::construction::Annexes;
 use genie_core::construction::BuilderCount;
 use genie_core::construction::MainBuildingId;
+use genie_core::construction::build::Construction;
 use genie_core::garrison::RaiderCountdown;
 use genie_core::gathering::PastureId;
 use genie_core::map::Distance;
 use genie_core::map::Point;
+use genie_core::map::Snow;
+use genie_core::map::spatial::Obstruction;
 use genie_core::map::{Offset, Position};
+use genie_core::movement::Speed;
 use genie_core::objects::DamagedTimer;
 use genie_core::objects::HitPoints;
 use genie_core::objects::HpPowerup;
@@ -33,6 +39,9 @@ use genie_core::objects::Relics;
 use genie_core::objects::WorkRate;
 use genie_core::objects::WorkerCount;
 use genie_core::objects::layers::Building;
+use genie_core::objects::layers::{
+    Action, Animated, Combat, DefaultTask, Motion, Static, Unstartable,
+};
 use genie_core::objects::lifecycle::Lifecycle;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::ClassId;
@@ -41,6 +50,7 @@ use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionType;
 use genie_core::objects::unit::Unit;
 use genie_core::orders::town_bell::TownBell;
+use genie_core::ownership::CaptureKind;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
@@ -49,6 +59,8 @@ use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
 use genie_core::world::parts::{Object, ObjectParts};
+use genie_core::world::{Gate, Unread};
+use genie_save::generated::world::TribeCombatObject;
 use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
@@ -81,9 +93,7 @@ pub(super) fn object(
 /// [`genie_core::combat::missile::LANDING`]; a missile without its action (one that met its
 /// target, dying) takes the 1 the load's constructor sets. None for an object that is no
 /// missile.
-pub(super) fn saved_missile(
-    object: &genie_save::Object,
-) -> Option<genie_core::combat::missile::Missile> {
+pub(super) fn saved_missile(object: &genie_save::Object) -> Option<Missile> {
     let mo = object
         .rge_object
         .as_deref()
@@ -94,17 +104,15 @@ pub(super) fn saved_missile(
     let distance = object
         .actions()
         .and_then(|a| a.entries().next())
-        .filter(|&(kind, _)| {
-            ActionType::try_from(kind).ok() == Some(genie_core::combat::missile::MISSILE)
-        })
+        .filter(|&(kind, _)| ActionType::try_from(kind).ok() == Some(MISSILE))
         .and_then(|(_, action)| action.rge_action_by_type.as_deref())
         .and_then(|t| t.rge_action_missile.as_deref())
         .map(|ma| ma.distance);
-    Some(genie_core::combat::missile::Missile {
+    Some(Missile {
         max_range: Distance::new(mo.max_range),
         fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
         charge: mo.is_charge_projectile != 0,
-        flying: distance.is_none_or(|d| genie_core::combat::missile::LANDING < d),
+        flying: distance.is_none_or(|d| LANDING < d),
         step,
     })
 }
@@ -113,7 +121,7 @@ pub(super) fn saved_missile(
 /// entry ([`genie_core::world::Unread`]).
 fn unmodelled(why: GenieError) -> ObjectParts {
     ObjectParts {
-        unread: Some(genie_core::world::Unread::new(why)),
+        unread: Some(Unread::new(why)),
         ..ObjectParts::default()
     }
 }
@@ -221,15 +229,13 @@ fn row(
             .is_some_and(|v| v != 0),
         ..Default::default()
     };
-    let combat = genie_core::objects::layers::Combat {
+    let combat = Combat {
         work_rate_powerup: object
             .combat()
             .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
-        capture_flag: object
-            .combat()
-            .map_or(genie_core::ownership::CaptureKind::NONE, |c| {
-                genie_core::ownership::CaptureKind::of_data(c.rge_combat_object.capture_flag)
-            }),
+        capture_flag: object.combat().map_or(CaptureKind::NONE, |c| {
+            CaptureKind::of_data(c.rge_combat_object.capture_flag)
+        }),
         hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {
             taken: HitPoints::new(c.hitpoints_powerup),
             max: HitPoints::new(c.hitpoints_max_powerup),
@@ -275,11 +281,11 @@ fn row(
         }),
         // the movement damage timer (+0x9a4) is saved; the attack timer's rate and the terrain
         // look are not (the constructor's 1 and none, until the first update's abilities)
-        abilities: genie_core::combat::abilities::Abilities {
+        abilities: Abilities {
             movement_damage_timer: object
                 .combat()
                 .map_or(Seconds::ZERO, |c| Seconds::new(c.movement_damage_timer)),
-            ..genie_core::combat::abilities::Abilities::default()
+            ..Abilities::default()
         },
         reload_stinger: object
             .combat()
@@ -331,11 +337,9 @@ fn row(
             .unwrap_or_default(),
     };
     // the animated layer (types 20 and up); a moving object's mover takes it below
-    let animated = object.animated_part().map(|a| {
-        genie_core::objects::layers::Animated::new(genie_core::movement::Speed::new(
-            a.current_speed,
-        ))
-    });
+    let animated = object
+        .animated_part()
+        .map(|a| Animated::new(Speed::new(a.current_speed)));
     let unit = Unit {
         id,
         life,
@@ -349,13 +353,13 @@ fn row(
         workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
         damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
-        place: genie_core::objects::layers::Static::at(Position::new(s.tx, s.ty, s.tz)),
+        place: Static::at(Position::new(s.tx, s.ty, s.tz)),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
         sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
         roo_called: s.roo_already_called != 0,
         ..Unit::default()
     };
-    let mut actions = genie_core::objects::layers::Action::default();
+    let mut actions = Action::default();
     let default = default_task(object, s, objects, civ, masters);
     let imported = if saved {
         saved_actions(
@@ -401,7 +405,7 @@ fn row(
         .and(production)
         .and(moving)
         .err()
-        .map(genie_core::world::Unread::new);
+        .map(Unread::new);
     (
         unit,
         ObjectParts {
@@ -409,7 +413,7 @@ fn row(
             town_bell,
             building,
             combat,
-            motion: genie_core::objects::layers::Motion::of(animated, mover),
+            motion: Motion::of(animated, mover),
             actions,
             unread,
             ..ObjectParts::default()
@@ -421,10 +425,7 @@ fn row(
 /// once its action list empties: nothing, a Fly or a Make before its first update, the Artifact
 /// again, or a start the slice cannot make. A saved object's Fly is its saved action's: none
 /// starts again (it never ends); a saved Make started.
-fn default_start(
-    default: Result<Option<DefaultStart>, genie_core::objects::layers::Unstartable>,
-    saved: bool,
-) -> genie_core::objects::layers::DefaultTask {
+fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool) -> DefaultTask {
     use genie_core::objects::layers::DefaultTask;
     match default {
         Ok(None) => DefaultTask::Nothing,
@@ -494,9 +495,7 @@ fn ai_parts(
 /// # Errors
 ///
 /// A record's action value no action holds ([`ActionKind::try_from`]).
-pub(super) fn town_bell(
-    c: &genie_save::generated::world::TribeCombatObject,
-) -> Result<TownBell, GenieError> {
+pub(super) fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
     use genie_core::orders::town_bell::BackToWork;
     Ok(TownBell {
         flag: c.town_bell_flag != 0,
@@ -526,9 +525,9 @@ pub(super) fn town_bell(
 /// A saved building's gate state ([`genie_core::world::Gate`]): its lock, first update and close
 /// timer, and whether a saved open or shut master or its original owner's would take part in a
 /// toggle.
-pub(super) fn saved_gate(object: &genie_save::Object) -> Option<genie_core::world::Gate> {
+pub(super) fn saved_gate(object: &genie_save::Object) -> Option<Gate> {
     let b = object.tribe_building_object.as_deref()?;
-    Some(genie_core::world::Gate {
+    Some(Gate {
         locked: b.gate_locked != 0,
         first_update: b.first_update != 0,
         close_timer: Seconds::new(b.close_timer),
@@ -551,7 +550,7 @@ pub(super) fn construction(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
-) -> Result<Option<genie_core::construction::build::Construction>, GenieError> {
+) -> Result<Option<Construction>, GenieError> {
     let Some(b) = object.tribe_building_object.as_deref() else {
         return Ok(None);
     };
@@ -568,17 +567,17 @@ pub(super) fn construction(
         .or(m.tribe_master_combat_object.as_deref())
         .and_then(|c| c.train_location.first())
         .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-    Ok(Some(genie_core::construction::build::Construction {
+    Ok(Some(Construction {
         progress: Seconds::new(b.build_pts),
         desolid: b.desolid_flag != 0,
         builders: BuilderCount::of_data(b.tribe_combat_object.num_builders),
         hit_points: MasterHitPoints::of_data(ms.read_temp_6),
         build_time,
-        record: genie_core::map::spatial::Obstruction {
+        record: Obstruction {
             kind: ObstructionType::from(ms.obstruction_type),
             class: ObstructionClass::from(ms.obstruction_class),
         },
-        snow: genie_core::map::Snow::of_byte(b.snow_flag)?,
+        snow: Snow::of_byte(b.snow_flag)?,
         sprite_override: s.sprite_override_id != -1,
     }))
 }

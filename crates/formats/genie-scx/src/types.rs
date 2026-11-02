@@ -546,6 +546,8 @@ impl From<ParseStartingAgeError> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error as StdError;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -559,7 +561,7 @@ mod genie_error_tests {
                 "a diplomatic stance id this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = ParseDataSetError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
@@ -568,7 +570,7 @@ mod genie_error_tests {
                 "a data set id this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
         let e: genie_error::GenieError = ParseDlcPackageError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
@@ -577,7 +579,7 @@ mod genie_error_tests {
                 "a DLC package id this reader does not know"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(StdError::source(&e).is_some());
     }
 
     /// The victory conditions' ids 0 to 11 and any other kept as it is, both ways.

@@ -354,6 +354,8 @@ impl From<WriteCampaignError> for genie_error::GenieError {
 #[cfg(test)]
 mod genie_error_tests {
     use super::*;
+    #[cfg(test)]
+    use std::error::Error;
 
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
@@ -367,7 +369,7 @@ mod genie_error_tests {
                 "a campaign scenario without its data"
             )
         );
-        assert!(std::error::Error::source(&e).is_some());
+        assert!(Error::source(&e).is_some());
     }
 }
 

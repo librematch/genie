@@ -8,8 +8,11 @@ use crate::map::Tile;
 use crate::movement::Speed;
 use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::players::Amount;
+use crate::players::NO_RELATIONS;
 use crate::players::PlayerId;
 use crate::production::spawn::{Near, PlaceMap};
+use crate::unit_ai::task_finder::allied as task_finder_allied;
+use crate::vision::{VisionBits, VisionMasks};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -64,7 +67,7 @@ impl PlaceMap for WorldMap<'_> {
         self.turns.spatial.visible(player, tile)
     }
 
-    fn vision(&self, player: PlayerId) -> crate::vision::VisionMasks {
+    fn vision(&self, player: PlayerId) -> VisionMasks {
         self.turns.spatial.vision(player)
     }
 
@@ -85,8 +88,8 @@ impl PlaceMap for WorldMap<'_> {
             .turns
             .players
             .player(a)
-            .map_or(&crate::players::NO_RELATIONS, |p| &p.relations);
-        crate::unit_ai::task_finder::allied(relations, a, b, with_4)
+            .map_or(&NO_RELATIONS, |p| &p.relations);
+        task_finder_allied(relations, a, b, with_4)
     }
 
     fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
@@ -127,7 +130,7 @@ impl PlaceMap for WorldMap<'_> {
                             v.registry
                                 .as_ref()
                                 .and_then(|r| r.entry(id))
-                                .map_or(crate::vision::VisionBits::NONE, |e| e.mask)
+                                .map_or(VisionBits::NONE, |e| e.mask)
                         })
                     }),
                     holds: Amount::ZERO < unit.life.amount

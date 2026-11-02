@@ -13,13 +13,20 @@
 //! its id + 0x609c), the port compares the decoded values and names the encoded ones.
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
+use crate::construction::repair::REPAIR;
+use crate::garrison::{ENTER, garrison_type_takes, is_garrison_task};
+use crate::gathering::PastureId;
+use crate::gathering::hunt::HUNT;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::TargetOwner;
@@ -33,6 +40,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::players::{CivId, Relations};
 use crate::unit_ai::task_finder::target_steps::on_target;
 
 mod target_steps;
@@ -58,7 +66,7 @@ pub struct Actor<'a> {
     /// The owner's attribute 95 (`+0x2f8`), which some monk tasks read.
     pub attribute_95: Amount,
     /// The owner's civ (`FUN_140e879e0` of `player+0x738`), which drop sites read.
-    pub civ: crate::players::CivId,
+    pub civ: CivId,
 }
 
 /// What the finder reads of a target object.
@@ -81,7 +89,7 @@ pub struct TaskTarget<'a> {
     /// `+0x68a`, `unit_attackable_flag` (`FUN_141188b10`).
     pub attackable: bool,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in, if any.
-    pub pasture: Option<crate::gathering::PastureId>,
+    pub pasture: Option<PastureId>,
     /// The type of the first action in its action list (`+0x880`), if any.
     pub top_action: Option<ActionType>,
 }
@@ -105,12 +113,7 @@ pub struct TaskOn<'t, 'a> {
 /// counts; Gaia never does; else relation 0 does, and 4 with the ally flag; relation 1 counts only
 /// under allied victory (`FUN_1415e8e10`), which the slice does not model.
 #[must_use]
-pub fn allied(
-    relations: &crate::players::Relations,
-    from: PlayerId,
-    to: PlayerId,
-    with_ally: bool,
-) -> bool {
+pub fn allied(relations: &Relations, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
     if from == to {
         return true;
     }
@@ -140,7 +143,7 @@ pub struct DropSite {
     /// The unit masters that drop there (empty: all).
     pub workers: Vec<MasterId>,
     /// The civs it is for (empty: all).
-    pub civs: Vec<crate::players::CivId>,
+    pub civs: Vec<CivId>,
     /// `+8`, `auto_work` (1 when the key is missing): a builder whose building completes looks
     /// for more work around it (`FUN_1415cc4e0`).
     pub auto_work: bool,
@@ -160,7 +163,7 @@ pub struct DropTarget {
     /// `object_group`: the class of the objects.
     pub class: ClassId,
     /// `worker_num`: the most workers such an object may have.
-    pub workers: crate::objects::WorkerCount,
+    pub workers: WorkerCount,
     /// `object_state`: the state such an object must be in (none for −1, any).
     pub state: Option<ObjectState>,
     /// `attribute_type`: the resource it gives, none for −1.
@@ -176,7 +179,7 @@ impl DropSite {
         &self,
         class: ClassId,
         state: ObjectState,
-        workers: crate::objects::WorkerCount,
+        workers: WorkerCount,
     ) -> Option<AttributeId> {
         let t = self.targets.iter().find(|t| t.class == class)?;
         if t.workers.caps(workers) || t.state.is_some_and(|wanted| wanted != state) {
@@ -193,7 +196,7 @@ pub fn drop_site(
     table: &[DropSite],
     building: MasterId,
     class: ClassId,
-    civ: crate::players::CivId,
+    civ: CivId,
 ) -> Option<&DropSite> {
     table.iter().find(|e| {
         (e.civs.is_empty() || e.civs.contains(&civ))
@@ -232,7 +235,7 @@ pub fn table_drop_buildings(
     table: &[DropSite],
     kind: Option<AttributeId>,
     class: Option<ClassId>,
-    civ: crate::players::CivId,
+    civ: CivId,
 ) -> Vec<MasterId> {
     table
         .iter()
@@ -284,8 +287,8 @@ fn applies(task: &Task, actor: &Actor<'_>, target: &TaskTarget<'_>, dip: &impl D
         }
     }
     match task.action_type {
-        crate::garrison::ENTER | crate::construction::repair::REPAIR => return false,
-        action_type::COMBAT | crate::combat::attack::ATTACK if !target.attackable => return false,
+        ENTER | REPAIR => return false,
+        action_type::COMBAT | ATTACK if !target.attackable => return false,
         _ => {}
     }
     let (me, them) = (actor.player, target.player);
@@ -384,11 +387,9 @@ fn garrison_task<'m>(
         let garrison_type = t
             .master
             .building
-            .map_or(crate::objects::masters::GarrisonKinds::NONE, |b| {
-                b.garrison_type
-            });
-        let takes = crate::garrison::garrison_type_takes(garrison_type, list.class, list.id, false);
-        if let Some(task) = first(list, crate::garrison::is_garrison_task).filter(|_| takes) {
+            .map_or(GarrisonKinds::NONE, |b| b.garrison_type);
+        let takes = garrison_type_takes(garrison_type, list.class, list.id, false);
+        if let Some(task) = first(list, is_garrison_task).filter(|_| takes) {
             if matches!(t.top_action, Some(action_type::PACK | action_type::UNPACK)) {
                 return Err(GenieError::unsupported(
                     "a garrison task on a building at work 0x7c or 0x7d (FUN_1411e8630)",
@@ -450,7 +451,7 @@ fn finder_head<'m>(
     // the garrison filter (3): a building's garrison task; with none, a target whose master has
     // object flag 0 (a transport) goes on through the finder to its garrison into the target
     // (`LAB_1412796b4`), any other has no task
-    if filter == Some(crate::garrison::ENTER) {
+    if filter == Some(ENTER) {
         if let Some(task) = garrison_task(list, actor, target, dip)? {
             return Ok(Finding::Answer(Some(task)));
         }
@@ -575,7 +576,7 @@ fn finder_tail<'m>(
         && own.class == class::VILLAGER
     {
         return Ok(first(list, |task| {
-            task.action_type == crate::gathering::hunt::HUNT
+            task.action_type == HUNT
                 && (task.for_class(class::LIVESTOCK) || inside)
                 && wanted(filter, task)
         }));
@@ -586,16 +587,26 @@ fn finder_tail<'m>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::garrison::transport::TRANSPORT;
+    #[cfg(test)]
+    use crate::gathering::gather::GATHER;
     use crate::objects::masters::CombatLevel;
     use crate::objects::masters::GarrisonCapacity;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::TaskTerrain;
+    #[cfg(test)]
+    use crate::objects::masters::WorkValue;
+    #[cfg(test)]
+    use crate::orders::GARRISON;
     use crate::players::CivId;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::test_ids::carrying;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::test_ids::{class_of, opt_master};
     use crate::unit_ai::task_finder::target_steps::{
         drop_off_finding, garrison_into, repair_finding,
     };
@@ -616,9 +627,9 @@ mod tests {
     fn task(action_type: ActionType, object_group: i16, object_id: i16, work_val1: f32) -> Task {
         Task {
             action_type,
-            object_group: crate::test_ids::class_of(object_group),
-            object_id: crate::test_ids::opt_master(object_id),
-            work_val1: crate::objects::masters::WorkValue::new(work_val1),
+            object_group: class_of(object_group),
+            object_id: opt_master(object_id),
+            work_val1: WorkValue::new(work_val1),
             ..Task::default()
         }
     }
@@ -726,11 +737,11 @@ mod tests {
         }
         // the types that never apply, and the attacks on what cannot be attacked
         for (action_type, attackable, takes) in [
-            (crate::garrison::ENTER, true, false),
-            (crate::construction::repair::REPAIR, true, false),
+            (ENTER, true, false),
+            (REPAIR, true, false),
             (action_type::COMBAT, false, false),
-            (crate::combat::attack::ATTACK, false, false),
-            (crate::combat::attack::ATTACK, true, true),
+            (ATTACK, false, false),
+            (ATTACK, true, true),
         ] {
             let task = Task {
                 action_type,
@@ -805,7 +816,7 @@ mod tests {
             resource_types: types,
             targets: vec![DropTarget {
                 class: class::TREE,
-                workers: crate::objects::WorkerCount::NO_CAP,
+                workers: WorkerCount::NO_CAP,
                 state: None,
                 attribute,
             }],
@@ -892,7 +903,7 @@ mod tests {
     /// stores something (`+0x610` above 0); prey without storage takes its task as any target.
     #[test]
     fn flag_0x10_master_has_no_task_on_prey_that_stores_food() {
-        let hunt = task(crate::gathering::hunt::HUNT, class::PREY.get(), -1, 1.0);
+        let hunt = task(HUNT, class::PREY.get(), -1, 1.0);
         let hunter = Master {
             object_flags: ObjectFlags::SCOUT,
             ..master(master_id(122), COMBAT, class::VILLAGER, vec![hunt])
@@ -956,7 +967,7 @@ mod tests {
         let camp = master(master_id(562), BUILDING, class::BUILDING, vec![]);
         let chop = Task {
             attribute_type: Some(attribute::FOOD),
-            ..task(crate::gathering::gather::GATHER, 15, -1, 0.6)
+            ..task(GATHER, 15, -1, 0.6)
         };
         let lumberjack = master(
             master_id(123),
@@ -1007,24 +1018,15 @@ mod tests {
             let builder = master(ids::BUILDER, COMBAT, class::VILLAGER, tasks);
             find_with(&builder, t, filter).map(Option::<&Task>::copied)
         };
-        let any = task(crate::construction::repair::REPAIR, -1, -1, 0.0);
-        let class3 = task(crate::construction::repair::REPAIR, 3, -1, 2.0);
-        let own = task(
-            crate::construction::repair::REPAIR,
-            -1,
-            ids::HOUSE.get(),
-            0.0,
-        );
+        let any = task(REPAIR, -1, -1, 0.0);
+        let class3 = task(REPAIR, 3, -1, 2.0);
+        let own = task(REPAIR, -1, ids::HOUSE.get(), 0.0);
         assert_eq!(by(vec![any], &damaged, None), Ok(Some(any)));
         assert_eq!(by(vec![class3, any], &damaged, None), Ok(Some(class3)));
         assert_eq!(by(vec![class3, any, own], &damaged, None), Ok(Some(own)));
         // a class task without a work value leaves no task, not the any one
         assert_eq!(
-            by(
-                vec![task(crate::construction::repair::REPAIR, 3, -1, 0.0), any],
-                &damaged,
-                Some(crate::construction::repair::REPAIR)
-            ),
+            by(vec![task(REPAIR, 3, -1, 0.0), any], &damaged, Some(REPAIR)),
             Ok(None)
         );
         // Gaia's damaged building too; whole or another player's, none
@@ -1032,15 +1034,12 @@ mod tests {
             player: PlayerId::new(0),
             ..damaged
         };
-        assert_eq!(
-            by(vec![any], &gaia, Some(crate::construction::repair::REPAIR)),
-            Ok(Some(any))
-        );
+        assert_eq!(by(vec![any], &gaia, Some(REPAIR)), Ok(Some(any)));
         assert_eq!(
             by(
                 vec![any],
                 &building(&house, PlayerId::new(2), ObjectState::Alive),
-                Some(crate::construction::repair::REPAIR)
+                Some(REPAIR)
             ),
             Ok(None)
         );
@@ -1048,14 +1047,7 @@ mod tests {
             player: PlayerId::new(3),
             ..damaged
         };
-        assert_eq!(
-            by(
-                vec![any],
-                &foreign,
-                Some(crate::construction::repair::REPAIR)
-            ),
-            Ok(None)
-        );
+        assert_eq!(by(vec![any], &foreign, Some(REPAIR)), Ok(None));
     }
 
     /// A transport of player `player` (object flag 0) in state 2 of class `class`.
@@ -1093,19 +1085,15 @@ mod tests {
             garrison: GarrisonCapacity::of_data(5),
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
-        let enter = task(crate::garrison::ENTER, class::TRANSPORT.get(), -1, 0.0);
+        let enter = task(ENTER, class::TRANSPORT.get(), -1, 0.0);
         let villager = master(
             ids::VILLAGER_FEMALE,
             COMBAT,
             class::VILLAGER,
-            vec![task(crate::garrison::ENTER, 3, -1, 0.0), enter],
+            vec![task(ENTER, 3, -1, 0.0), enter],
         );
         assert_eq!(
-            find_with(
-                &villager,
-                &transport(&ship, PlayerId::new(2)),
-                Some(crate::garrison::ENTER)
-            ),
+            find_with(&villager, &transport(&ship, PlayerId::new(2)), Some(ENTER)),
             Ok(Some(&enter))
         );
         // any filter takes it too, another not
@@ -1121,11 +1109,7 @@ mod tests {
         };
         let militia = master(master_id(74), COMBAT, class::CLASS_6, vec![attack]);
         assert_eq!(
-            find_with(
-                &militia,
-                &transport(&ship, PlayerId::new(2)),
-                Some(crate::garrison::ENTER)
-            ),
+            find_with(&militia, &transport(&ship, PlayerId::new(2)), Some(ENTER)),
             Ok(None)
         );
         assert_eq!(
@@ -1146,7 +1130,7 @@ mod tests {
             find_with(
                 &villager,
                 &transport(&galley, PlayerId::new(2)),
-                Some(crate::garrison::ENTER)
+                Some(ENTER)
             ),
             Ok(None)
         );
@@ -1161,14 +1145,10 @@ mod tests {
             garrison: GarrisonCapacity::of_data(4),
             ..master(ids::ID_35, COMBAT, class::SIEGE, vec![])
         };
-        let enter = task(crate::garrison::ENTER, class::SIEGE.get(), -1, 0.0);
+        let enter = task(ENTER, class::SIEGE.get(), -1, 0.0);
         let villager = master(ids::VILLAGER_FEMALE, COMBAT, class::VILLAGER, vec![enter]);
         assert_eq!(
-            find_with(
-                &villager,
-                &transport(&ram, PlayerId::new(2)),
-                Some(crate::garrison::ENTER)
-            ),
+            find_with(&villager, &transport(&ram, PlayerId::new(2)), Some(ENTER)),
             Ok(Some(&enter))
         );
         assert_eq!(
@@ -1185,10 +1165,7 @@ mod tests {
             state: ObjectState::Dying,
             ..transport(&ram, PlayerId::new(2))
         };
-        assert_eq!(
-            find_with(&infantry, &dead, Some(crate::garrison::ENTER)),
-            Ok(None)
-        );
+        assert_eq!(find_with(&infantry, &dead, Some(ENTER)), Ok(None));
     }
 
     #[test]
@@ -1241,13 +1218,7 @@ mod tests {
             Ok(Finding::Next)
         );
         assert_eq!(
-            finder_head(
-                &villager,
-                &a,
-                Some(&t),
-                Some(crate::garrison::ENTER),
-                &Alone
-            ),
+            finder_head(&villager, &a, Some(&t), Some(ENTER), &Alone),
             Ok(Finding::Answer(None))
         );
         let ship = Master {
@@ -1259,7 +1230,7 @@ mod tests {
                 &villager,
                 &a,
                 Some(&transport(&ship, PlayerId::new(2))),
-                Some(crate::garrison::ENTER),
+                Some(ENTER),
                 &Alone
             ),
             Ok(Finding::Next)
@@ -1312,7 +1283,7 @@ mod tests {
     fn point_on_terrain_takes_the_task_for_that_terrain() {
         let beach = Task {
             terrain: TaskTerrain::of_data(2),
-            ..task(crate::garrison::transport::TRANSPORT, -1, -1, 0.0)
+            ..task(TRANSPORT, -1, -1, 0.0)
         };
         let ship = master(
             master_id(545),
@@ -1326,15 +1297,11 @@ mod tests {
         };
         assert_eq!(
             found(None, Some(TerrainId::named(2)), None),
-            Ok(Some(crate::garrison::transport::TRANSPORT))
+            Ok(Some(TRANSPORT))
         );
         assert_eq!(
-            found(
-                None,
-                Some(TerrainId::named(2)),
-                Some(crate::garrison::transport::TRANSPORT)
-            ),
-            Ok(Some(crate::garrison::transport::TRANSPORT))
+            found(None, Some(TerrainId::named(2)), Some(TRANSPORT)),
+            Ok(Some(TRANSPORT))
         );
         assert_eq!(found(None, Some(TerrainId::named(1)), None), Ok(None));
         assert_eq!(found(None, None, None), Ok(None));
@@ -1342,7 +1309,7 @@ mod tests {
         let peasant = building(&villager, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
             found(Some(&peasant), Some(TerrainId::named(2)), None),
-            Ok(Some(crate::garrison::transport::TRANSPORT))
+            Ok(Some(TRANSPORT))
         );
     }
 
@@ -1423,13 +1390,7 @@ mod tests {
             Ok(Finding::Answer(Some(&trader.tasks[2])))
         );
         assert_eq!(
-            on_target(
-                &trader,
-                &cart,
-                &dock,
-                Some(crate::gathering::gather::GATHER),
-                &Alone
-            ),
+            on_target(&trader, &cart, &dock, Some(GATHER), &Alone),
             Ok(Finding::Next)
         );
         let market = master(ids::MARKET, BUILDING, class::CLASS_7, vec![]);
@@ -1483,7 +1444,7 @@ mod tests {
         let camp = master(master_id(562), BUILDING, class::BUILDING, vec![]);
         let chop = Task {
             attribute_type: Some(attribute::FOOD),
-            ..task(crate::gathering::gather::GATHER, 15, -1, 0.6)
+            ..task(GATHER, 15, -1, 0.6)
         };
         let lumberjack = master(master_id(123), COMBAT, class::VILLAGER, vec![chop]);
         let site = building(&camp, PlayerId::new(2), ObjectState::Alive);
@@ -1523,7 +1484,7 @@ mod tests {
             object_flags: ObjectFlags::GARRISON,
             ..master(master_id(545), COMBAT, class::TRANSPORT, vec![])
         };
-        let boarding = task(crate::orders::GARRISON, class::TRANSPORT.get(), -1, 0.0);
+        let boarding = task(GARRISON, class::TRANSPORT.get(), -1, 0.0);
         let soldier = master(master_id(4), COMBAT, class::CLASS_6, vec![boarding]);
         let bare = master(master_id(4), COMBAT, class::CLASS_6, vec![]);
         let t = transport(&ship, PlayerId::new(2));
@@ -1531,10 +1492,7 @@ mod tests {
             into(&soldier, &t, None),
             (Finding::Answer(Some(&soldier.tasks[0])), false)
         );
-        assert_eq!(
-            into(&bare, &t, Some(crate::garrison::ENTER)),
-            (Finding::Answer(None), false)
-        );
+        assert_eq!(into(&bare, &t, Some(ENTER)), (Finding::Answer(None), false));
         assert_eq!(into(&bare, &t, None), (Finding::Next, true));
         let barge = Master {
             object_flags: ObjectFlags::GARRISON,
@@ -1567,7 +1525,7 @@ mod tests {
             ids::BUILDER,
             COMBAT,
             class::VILLAGER,
-            vec![task(crate::construction::repair::REPAIR, -1, -1, 0.0)],
+            vec![task(REPAIR, -1, -1, 0.0)],
         );
         assert_eq!(
             repair(&any, &damaged, None),
@@ -1585,17 +1543,9 @@ mod tests {
             ids::BUILDER,
             COMBAT,
             class::VILLAGER,
-            vec![task(
-                crate::construction::repair::REPAIR,
-                class::BUILDING.get(),
-                -1,
-                0.0,
-            )],
+            vec![task(REPAIR, class::BUILDING.get(), -1, 0.0)],
         );
-        assert_eq!(
-            repair(&weak, &damaged, Some(crate::construction::repair::REPAIR)),
-            Finding::Answer(None)
-        );
+        assert_eq!(repair(&weak, &damaged, Some(REPAIR)), Finding::Answer(None));
         assert_eq!(repair(&weak, &damaged, None), Finding::Next);
     }
 
@@ -1636,12 +1586,7 @@ mod tests {
             ids::VILLAGER_MALE,
             COMBAT,
             class::VILLAGER,
-            vec![task(
-                crate::gathering::hunt::HUNT,
-                class::LIVESTOCK.get(),
-                -1,
-                0.0,
-            )],
+            vec![task(HUNT, class::LIVESTOCK.get(), -1, 0.0)],
         );
         assert_eq!(
             tail(

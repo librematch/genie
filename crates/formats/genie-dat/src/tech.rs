@@ -320,6 +320,8 @@ fn dll_id_u16(key: Option<&StringKey>) -> Result<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use std::io::ErrorKind;
 
     /// A language string's id fits the format's u16, none is 0xFFFF.
     #[test]
@@ -332,7 +334,7 @@ mod tests {
     #[test]
     fn named_string_key_cannot_be_written() {
         let e = dll_id_u16(Some(&StringKey::from("NAME"))).unwrap_err();
-        assert_eq!(e.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(e.kind(), ErrorKind::InvalidData);
     }
 
     /// The requirements: six tech slots (-1 for none), three effect slots (type 0xFFFF for

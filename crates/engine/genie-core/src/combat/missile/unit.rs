@@ -25,7 +25,16 @@ use crate::objects::unit::{Unit, missed_passes};
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 
+use crate::combat::attack::{Hit, strike};
+use crate::combat::missile::{
+    HitMode, Missile, MissileAction, MissileStats, MissileTargetId, QUERY_EDGE, grounded,
+    meets_height, on_target,
+};
+use crate::objects::layers::Action;
+use crate::objects::masters::MasterTables;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
+use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
@@ -43,11 +52,7 @@ impl Unit {
     /// ([`Unit::missile_lands`]). A dead shooter's weapons going to the missile
     /// (`FUN_14113e170`), the sprite's pitch facet and the projectile types 1 and 2 are not
     /// modelled.
-    pub(crate) fn fly(
-        &mut self,
-        actions: &mut crate::objects::layers::Action,
-        c: &mut Step<'_>,
-    ) -> Result<(), GenieError> {
+    pub(crate) fn fly(&mut self, actions: &mut Action, c: &mut Step<'_>) -> Result<(), GenieError> {
         let Some(mut missile) = c.w.parts.missile.get(self.id).copied() else {
             return Ok(());
         };
@@ -69,7 +74,7 @@ impl Unit {
     /// weapons going to the missile, `FUN_14113e170`).
     pub(crate) fn missile_ends(
         &mut self,
-        action: &mut crate::combat::missile::MissileAction,
+        action: &mut MissileAction,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let dead = |state: ObjectState| ObjectState::Alive < state && state != ObjectState::Undead;
@@ -97,7 +102,7 @@ impl Unit {
             && target_state.is_some_and(dead)
         {
             let by = self.releaser(c)?;
-            crate::world::lets::release(c, self, target, by)?;
+            release(c, self, target, by)?;
             action.target = None;
         }
         if action.fired_from.is_some() && shooter_state.is_some_and(dead) {
@@ -110,9 +115,9 @@ impl Unit {
 
     pub(crate) fn fly_missile(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        missile: &mut crate::combat::missile::Missile,
-        slot: &mut Option<crate::combat::missile::MissileAction>,
+        actions: &mut Action,
+        missile: &mut Missile,
+        slot: &mut Option<MissileAction>,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -158,12 +163,7 @@ impl Unit {
                     "a missile without the map's terrain",
                 ))?
                 .ground(at.ground())?;
-        at = at.with_z(crate::combat::missile::grounded(
-            at.z(),
-            ground,
-            flying,
-            stats.fly_mode,
-        ));
+        at = at.with_z(grounded(at.z(), ground, flying, stats.fly_mode));
         mover.mark_move(at, c.w.world_time);
         mover.new_position(
             &mut self.place,
@@ -199,9 +199,9 @@ impl Unit {
     /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled.
     pub(crate) fn missile_hits(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        action: &mut crate::combat::missile::MissileAction,
-        stats: &crate::combat::missile::MissileStats,
+        actions: &mut Action,
+        action: &mut MissileAction,
+        stats: &MissileStats,
         fired: Fired,
         old: Position,
         c: &mut Step<'_>,
@@ -219,12 +219,8 @@ impl Unit {
                 continue;
             }
             match action.hit_mode {
-                crate::combat::missile::HitMode::TARGET_ALONE => {
-                    if Some(id)
-                        != action
-                            .target
-                            .map(crate::combat::missile::MissileTargetId::id)
-                    {
+                HitMode::TARGET_ALONE => {
+                    if Some(id) != action.target.map(MissileTargetId::id) {
                         continue;
                     }
                     let result = self.missile_strike(actions, action, fired, c)?;
@@ -235,18 +231,12 @@ impl Unit {
                         self.end_missile(action);
                     }
                 }
-                crate::combat::missile::HitMode::MISSED => {
-                    let target = action
-                        .target
-                        .map(crate::combat::missile::MissileTargetId::id);
+                HitMode::MISSED => {
+                    let target = action.target.map(MissileTargetId::id);
                     if missed_passes(c, (id, player, kind, level), target, blast_level) {
                         continue;
                     }
-                    if Some(id)
-                        != action
-                            .target
-                            .map(crate::combat::missile::MissileTargetId::id)
-                    {
+                    if Some(id) != action.target.map(MissileTargetId::id) {
                         return Err(GenieError::unsupported(
                             "a missed missile meeting another object than its target",
                         ));
@@ -282,7 +272,7 @@ impl Unit {
     /// A frozen object the sweep may cross, and an object of a master the slice does not have.
     pub(crate) fn missile_meets(
         &self,
-        stats: &crate::combat::missile::MissileStats,
+        stats: &MissileStats,
         old: Position,
         c: &mut Step<'_>,
     ) -> Result<Vec<(ObjectId, PlayerId, MasterKind, BlastDefense)>, GenieError> {
@@ -291,7 +281,7 @@ impl Unit {
             if v < 0.0 {
                 0.0
             } else if size as f32 <= v {
-                size as f32 - crate::combat::missile::QUERY_EDGE
+                size as f32 - QUERY_EDGE
             } else {
                 v
             }
@@ -311,12 +301,7 @@ impl Unit {
             ally_factor: 1.0,
             player: Some(c.player),
             ignore: &[RecordId::from(self.id)],
-            objects: crate::world::index::ObjectsRef::new(
-                &c.w.players,
-                &c.w.index,
-                &c.w.masters,
-                &c.w.parts,
-            ),
+            objects: ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts),
         })?;
         let mut met = Vec::new();
         for record in crossed {
@@ -331,12 +316,7 @@ impl Unit {
                 player_master(&c.w.masters, p.player, p.master).ok_or(GenieError::unsupported(
                     "an object a missile meets of a master the slice does not have",
                 ))?;
-            if crate::combat::missile::meets_height(
-                p.position.z(),
-                m.height.get(),
-                at.z(),
-                stats.radius.z(),
-            ) {
+            if meets_height(p.position.z(), m.height.get(), at.z(), stats.radius.z()) {
                 met.push((id, p.player, m.kind, m.blast_defense));
             }
         }
@@ -345,7 +325,7 @@ impl Unit {
 
     /// The missile action's `set_state(1)` (`FUN_140a9de70`): the missile's slot 0xd8
     /// (`FUN_14118f580`), its hit points to 0.
-    pub(crate) const fn end_missile(&mut self, action: &mut crate::combat::missile::MissileAction) {
+    pub(crate) const fn end_missile(&mut self, action: &mut MissileAction) {
         action.state = MissileState::Done;
         self.life.hp = HitPoints::ZERO;
     }
@@ -360,8 +340,8 @@ impl Unit {
     /// is its own (`FUN_1411cc890`, its relics: [`crate::combat::attack::strike`]).
     pub(crate) fn missile_strike(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        action: &crate::combat::missile::MissileAction,
+        actions: &mut Action,
+        action: &MissileAction,
         fired: Fired,
         c: &mut Step<'_>,
     ) -> Result<StrikeResult, GenieError> {
@@ -393,10 +373,7 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a missile's shooter outside its list",
                 ))?;
-        let master = shooter.master(
-            crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-            p,
-        )?;
+        let master = shooter.master(MasterTables::new(masters, &parts.own_master), p)?;
         if Distance::ZERO < master.area_effect {
             return Err(GenieError::unsupported(
                 "a missile of a shooter with an area effect",
@@ -421,14 +398,14 @@ impl Unit {
         let victim = victim.as_mut().ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
-        let hit = crate::combat::attack::Hit {
+        let hit = Hit {
             at: self.position(),
             from_z: Some(action.origin.position.z()),
             missile: true,
             chance: master.hit_chance,
         };
         let object = streams.get(Stream::Object);
-        let struck = crate::combat::attack::strike(&mut own, victim, &mut c.blasted, hit, object)?;
+        let struck = strike(&mut own, victim, &mut c.blasted, hit, object)?;
         if let Some(target) = struck.executed {
             shooter.post_own(
                 &mut parts.unit_ai,
@@ -458,8 +435,8 @@ impl Unit {
     /// names an owner is not modelled.
     pub(crate) fn own_strike(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        action: &crate::combat::missile::MissileAction,
+        actions: &mut Action,
+        action: &MissileAction,
         fired_from: Option<ShooterId>,
         c: &mut Step<'_>,
     ) -> Result<StrikeResult, GenieError> {
@@ -496,14 +473,14 @@ impl Unit {
             "a missile's target the slice does not hold live",
         ))?;
         let victim = &mut victim;
-        let hit = crate::combat::attack::Hit {
+        let hit = Hit {
             at: self.position(),
             from_z: None,
             missile: true,
             chance: master.hit_chance,
         };
         let object = c.w.streams.get(Stream::Object);
-        let struck = crate::combat::attack::strike(&mut own, victim, &mut c.blasted, hit, object)?;
+        let struck = strike(&mut own, victim, &mut c.blasted, hit, object)?;
         if self
             .hit_back(own, c.w.parts.ai_and_combat_mut(self.id)?)?
             .is_some()
@@ -526,10 +503,10 @@ impl Unit {
     /// shooter go; `FUN_14118f1e0`: its hit points 0 and state 7).
     pub(crate) fn missile_lands(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        missile: &crate::combat::missile::Missile,
-        slot: &mut Option<crate::combat::missile::MissileAction>,
-        stats: &crate::combat::missile::MissileStats,
+        actions: &mut Action,
+        missile: &Missile,
+        slot: &mut Option<MissileAction>,
+        stats: &MissileStats,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let fired = Fired {
@@ -574,10 +551,10 @@ impl Unit {
     /// the shooter's hit ([`Unit::missile_strike`]) ends it unless a shield blocked it.
     fn missile_lands_on_target(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        action: &mut crate::combat::missile::MissileAction,
+        actions: &mut Action,
+        action: &mut MissileAction,
         fired: Fired,
-        stats: &crate::combat::missile::MissileStats,
+        stats: &MissileStats,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let Some(target) = action.target else {
@@ -590,12 +567,7 @@ impl Unit {
             "a missile's target the slice does not hold live",
         ))?;
         if stats.hit_mode.strikes_on_landing(c.player != v.player)
-            && crate::combat::missile::on_target(
-                self.position(),
-                stats.radius,
-                v.position,
-                v.radius,
-            )
+            && on_target(self.position(), stats.radius, v.position, v.radius)
         {
             let result = self.missile_strike(actions, action, fired, c)?;
             action.result = result;
@@ -612,19 +584,19 @@ impl Unit {
     /// 4. One inside another is not modelled.
     fn missile_destroyed(
         &mut self,
-        slot: &mut Option<crate::combat::missile::MissileAction>,
+        slot: &mut Option<MissileAction>,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         if let Some(a) = slot.take() {
             let by = self.releaser(c)?;
             for t in [
-                a.target.map(crate::combat::missile::MissileTargetId::id),
+                a.target.map(MissileTargetId::id),
                 a.fired_from.map(ShooterId::id),
             ]
             .into_iter()
             .flatten()
             {
-                crate::world::lets::release(c, self, t, by)?;
+                release(c, self, t, by)?;
             }
         }
         if self.life.state < ObjectState::Removed {
@@ -640,7 +612,7 @@ impl Unit {
             c.w.spatial.sight_state(self.id, ObjectState::Removed)?;
             if before < ObjectState::DyingSprite {
                 let master = self.master(
-                    crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                    MasterTables::new(&c.w.masters, &c.w.parts.own_master),
                     c.player,
                 )?;
                 forget_resource(&mut c.w.spatial, Some(master), self.id, self.position())?;

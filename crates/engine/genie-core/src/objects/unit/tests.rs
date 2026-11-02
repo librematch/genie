@@ -1,11 +1,27 @@
 use crate::GenieError;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::tests::own_attack;
+use crate::construction::FoundationId;
+use crate::construction::build::tests::started;
+use crate::construction::build::{BuildState, BuildTask};
 use crate::construction::wait_solidify::WaitSolidifyState;
+use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::garrison::ContainerId;
+use crate::garrison::tests::enter_task;
+use crate::garrison::transport::{TransportAction, TransportState};
+use crate::garrison::{ENTER, EnterAction};
+use crate::gathering::GatherTargetId;
+use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::tests::{hunting, walker};
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::rng::Well512;
 use crate::movement::Speed;
+use crate::movement::explore::{ExploreAction, bare_walk};
+use crate::movement::fly::{Fly, FlyState};
+use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
+use crate::movement::{Me, PathData};
 use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
@@ -16,23 +32,34 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
+use crate::objects::facing::SpriteFacets;
+use crate::objects::layers::{Action, Action as LayersAction, DefaultTask};
 use crate::objects::layers::{Animated, Motion};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::TaskId;
+use crate::objects::masters::class::NO_CLASS;
+use crate::objects::masters::{Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame};
+use crate::ownership::artifact::{Artifact, ArtifactSub};
 use crate::players::PlayerId;
+use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::world::Seconds;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
+use crate::world::parts::Part;
 use crate::world::tests::{forage_world, in_update};
+use crate::world::{OBJECT_MASTER, Unread, WorldTime};
+use std::iter::once;
 
 /// A graphic of sixteen facets, its sequence flag bit 1 set (`turns`).
 const WALKING: Graphic = Graphic {
     id: SpriteId::named(300),
-    frames: crate::objects::Frame::of_data(10),
-    facets: crate::objects::FacetCount::of_data(16),
+    frames: Frame::of_data(10),
+    facets: FacetCount::of_data(16),
     speed_multiplier: SpeedMultiplier::ONE,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
@@ -61,7 +88,7 @@ fn static_object_flagged_to_sleep_ends_its_update() {
         "an object above the static type goes to sleep"
     );
     // a static object flagged with movement state or a unit AI is not modelled either
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     for (mover, ai) in [(Some(&walker), false), (None, true)] {
         assert!(flagged(Class::Static).go_to_sleep(mover, ai).is_err());
     }
@@ -72,18 +99,15 @@ fn static_object_flagged_to_sleep_ends_its_update() {
 #[test]
 fn the_movement_state_takes_the_sprite_facets() {
     let mut u = Unit::default();
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     u.take_sprite_facets(Some(&mut mover));
     assert_eq!(mover.sprite_facets, None);
-    u.sprite = Some(ActiveSprite::start(
-        WALKING,
-        &mut crate::math::rng::Well512::default(),
-    ));
+    u.sprite = Some(ActiveSprite::start(WALKING, &mut Well512::default()));
     u.take_sprite_facets(Some(&mut mover));
     assert_eq!(
         mover.sprite_facets,
-        Some(crate::objects::facing::SpriteFacets {
-            count: crate::objects::FacetCount::of_data(16),
+        Some(SpriteFacets {
+            count: FacetCount::of_data(16),
             turns: true,
         })
     );
@@ -96,16 +120,12 @@ fn an_animated_object_sprite_runs_by_the_update_dt() {
     let animated = |speed: Option<f32>| {
         let mut t = forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
-        u.sprite = Some(ActiveSprite::start(
-            WALKING,
-            &mut crate::math::rng::Well512::default(),
-        ));
+        u.sprite = Some(ActiveSprite::start(WALKING, &mut Well512::default()));
         // a static object has no animation speed, so no clock
         let (id, before) = (u.id, u.sprite);
         let motion =
             speed.map(|speed| Box::new(Motion::Animated(Animated::new(Speed::new(speed)))));
-        t.set_part(id, crate::world::parts::Part::Motion(motion))
-            .unwrap();
+        t.set_part(id, Part::Motion(motion)).unwrap();
         in_update(
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
@@ -143,7 +163,7 @@ fn an_object_past_state_2_loses_its_actions() {
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+            on_target_moved: TargetMoved::Follows,
             wait: MoveWait::default(),
         }));
     in_update(
@@ -182,8 +202,8 @@ fn an_object_past_state_2_loses_its_actions() {
 fn after_its_actions_the_units_walk_met_take_their_pauses() {
     let mut t = forage_world();
     let at = t.players[1].objects[ListIndex::new(0)].position();
-    let mut met = crate::gathering::hunt::tests::walker();
-    met.paths = vec![crate::movement::PathData::without_path()];
+    let mut met = walker();
+    met.paths = vec![PathData::without_path()];
     t.parts
         .put_mover(t.players[0].objects[ListIndex::new(0)].id, Some(met));
     let mover = t
@@ -208,14 +228,9 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
             let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
             Ok((
                 level,
-                crate::world::index::ObjectsRef::new(
-                    &c.w.players,
-                    &c.w.index,
-                    &c.w.masters,
-                    &c.w.parts,
-                )
-                .gait(object_id(600))
-                .and_then(|g| g.pause),
+                ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts)
+                    .gait(object_id(600))
+                    .and_then(|g| g.pause),
             ))
         },
     )
@@ -326,17 +341,17 @@ fn the_actions_update_runs_the_action_held() {
         .copied();
     assert_eq!(
         after.map(|g| g.target),
-        Some(Some(crate::gathering::GatherTargetId::new(object_id(600))))
+        Some(Some(GatherTargetId::new(object_id(600))))
     );
     assert_ne!(before, after);
 }
 
 /// A wait for a foundation (state 0) on one the world does not hold.
-fn gone_foundation() -> crate::construction::wait_solidify::WaitSolidify {
-    crate::construction::wait_solidify::WaitSolidify {
+fn gone_foundation() -> WaitSolidify {
+    WaitSolidify {
         state: WaitSolidifyState::Waiting,
-        task: crate::objects::masters::Task::default(),
-        target: crate::construction::FoundationId::new(object_id(99_999)),
+        task: Task::default(),
+        target: FoundationId::new(object_id(99_999)),
     }
 }
 
@@ -357,7 +372,7 @@ fn the_list_update_stops_at_an_action_below_its_head() {
         .set_wait_solidify(Some(gone_foundation()));
     assert_eq!(
         t.parts.actions_of(unit.id).top_action_kind(),
-        Some(crate::construction::wait_solidify::WAIT_SOLIDIFY)
+        Some(WAIT_SOLIDIFY)
     );
     let err = in_update(
         &mut t,
@@ -404,8 +419,7 @@ fn an_object_inside_another_runs_its_inside_update() {
     assert_eq!(unit.position(), at);
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     unit.life.inside = None;
-    t.parts.actions.of_mut(unit.id).unwrap().default_task =
-        crate::objects::layers::DefaultTask::Artifact;
+    t.parts.actions.of_mut(unit.id).unwrap().default_task = DefaultTask::Artifact;
     assert_eq!(
         in_update(
             &mut t,
@@ -420,7 +434,7 @@ fn an_object_inside_another_runs_its_inside_update() {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .artifact(),
-        Some(&crate::ownership::artifact::Artifact::new(false, None)),
+        Some(&Artifact::new(false, None)),
         "the Artifact the default task made has not run yet"
     );
 }
@@ -432,14 +446,14 @@ fn the_top_action_object_is_its_target_unless_it_has_none() {
     use crate::construction::build::BuildTask;
     let task = BuildTask {
         range: Distance::new(0.1),
-        work_value: crate::objects::masters::WorkValue::new(1.0),
+        work_value: WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
         moving: None,
     };
-    let building = crate::objects::layers::Action {
-        list: ActionList::default().with_build(Some(crate::construction::build::tests::started(
+    let building = Action {
+        list: ActionList::default().with_build(Some(started(
             object_id(800),
             Position::new(1.0, 2.0, 0.0),
             Distance::ZERO,
@@ -449,22 +463,17 @@ fn the_top_action_object_is_its_target_unless_it_has_none() {
     };
     assert_eq!(building.top_action_object(None), Ok(Some(object_id(800))));
     // a wait for a foundation keeps it at +0x68, its +0x30 is −1
-    let waiting = crate::objects::layers::Action {
-        list: ActionList::default().with_wait_solidify(Some(
-            crate::construction::wait_solidify::WaitSolidify::new(
-                crate::objects::masters::Task::default(),
-                crate::construction::FoundationId::new(object_id(900)),
-            ),
-        )),
+    let waiting = Action {
+        list: ActionList::default().with_wait_solidify(Some(WaitSolidify::new(
+            Task::default(),
+            FoundationId::new(object_id(900)),
+        ))),
         ..Default::default()
     };
     assert_eq!(waiting.top_action_object(None), Ok(None));
-    assert_eq!(
-        crate::objects::layers::Action::default().top_action_object(None),
-        Ok(None)
-    );
+    assert_eq!(Action::default().top_action_object(None), Ok(None));
     // an object the load could not read whole: its top action is unknown
-    let unread = crate::world::Unread::new(GenieError::unsupported("an action"));
+    let unread = Unread::new(GenieError::unsupported("an action"));
     assert!(building.top_action_object(Some(&unread)).is_err());
 }
 
@@ -478,47 +487,44 @@ fn the_top_action_sub_action_is_its_move_to_or_its_attack() {
         kind: MOVE_TO,
         state,
     };
-    let mut hunt = crate::gathering::hunt::tests::hunting(7);
-    hunt.state = crate::gathering::hunt::HuntState::Walk {
+    let mut hunt = hunting(7);
+    hunt.state = HuntState::Walk {
         move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
     };
-    let hunter = crate::objects::layers::Action {
+    let hunter = Action {
         list: ActionList::default().with_hunt(Some(hunt)),
         ..Default::default()
     };
     assert_eq!(hunter.top_sub_action(), Some(walking(ActionState::new(1))));
     let mut idle = hunt;
     idle.state = idle.state.bare();
-    let resting = crate::objects::layers::Action {
+    let resting = Action {
         list: ActionList::default().with_hunt(Some(idle)),
         ..Default::default()
     };
     assert_eq!(resting.top_sub_action(), None);
-    let mut build = crate::construction::build::tests::started(
+    let mut build = started(
         object_id(800),
         Position::new(1.0, 2.0, 0.0),
         Distance::ZERO,
-        crate::construction::build::BuildTask {
+        BuildTask {
             range: Distance::new(0.1),
-            work_value: crate::objects::masters::WorkValue::new(1.0),
+            work_value: WorkValue::new(1.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
             id: TaskId::of_task(-1),
             moving: None,
         },
     );
-    build.state = crate::construction::build::BuildState::Move {
+    build.state = BuildState::Move {
         move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
     };
-    let builder = crate::objects::layers::Action {
+    let builder = Action {
         list: ActionList::default().with_build(Some(build)),
         ..Default::default()
     };
     assert_eq!(builder.top_sub_action(), Some(walking(ActionState::new(4))));
-    assert_eq!(
-        crate::objects::layers::Action::default().top_sub_action(),
-        None
-    );
+    assert_eq!(Action::default().top_sub_action(), None);
 }
 
 /// The sub-action of each kind of top action: the walk of an Artifact, a Fly, an Attack, an
@@ -534,69 +540,57 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         state: ActionState::new(MoveTo::Moving.number()),
     });
     let of = |action: Action| {
-        let mut layer = crate::objects::layers::Action::default();
+        let mut layer = LayersAction::default();
         layer.list.put(action);
         layer.top_sub_action()
     };
-    let mut artifact = crate::ownership::artifact::Artifact::new(false, None);
-    artifact.sub = Some(crate::ownership::artifact::ArtifactSub::Walk {
+    let mut artifact = Artifact::new(false, None);
+    artifact.sub = Some(ArtifactSub::Walk {
         move_to: MoveToAction::sub_in(MoveTo::Moving),
     });
     assert_eq!(of(Action::Artifact(artifact)), walking);
-    let mut enter = crate::garrison::EnterAction::new(
+    let mut enter = EnterAction::new(
         ContainerId::new(object_id(7)),
         Position::new(1.0, 2.0, 0.0),
-        &crate::garrison::tests::enter_task(
-            Distance::new(0.5),
-            crate::objects::masters::class::NO_CLASS,
-        ),
+        &enter_task(Distance::new(0.5), NO_CLASS),
     );
     artifact.sub = None;
-    artifact.sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter });
+    artifact.sub = Some(ArtifactSub::Enter { enter });
     assert_eq!(
         of(Action::Artifact(artifact)),
         Some(TopAction {
-            kind: crate::garrison::ENTER,
+            kind: ENTER,
             state: ActionState::new(enter.state.get()),
         })
     );
     enter = enter.walking(MoveTo::Moving);
     assert_eq!(of(Action::Enter(enter)), walking);
-    let mut fly = crate::movement::fly::Fly::start(
-        crate::objects::masters::Task::default(),
+    let mut fly = Fly::start(
+        Task::default(),
         Position::new(1.0, 2.0, 0.0),
-        &mut crate::math::rng::Well512::default(),
+        &mut Well512::default(),
     );
-    fly.state = crate::movement::fly::FlyState::Flying {
+    fly.state = FlyState::Flying {
         move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
     };
     assert_eq!(of(Action::Fly(fly)), walking);
-    let mut attack = crate::combat::attack::tests::own_attack(
-        7,
-        AttackState::Move { move_to: None },
-        Distance::new(0.5),
-    );
+    let mut attack = own_attack(7, AttackState::Move { move_to: None }, Distance::new(0.5));
     *attack.state.walk_mut().unwrap() = Some(MoveToAction::sub_in(MoveTo::Moving));
     assert_eq!(of(Action::Attack(attack)), walking);
-    let (mut explore, _) = crate::movement::explore::ExploreAction::new(
-        Position::new(1.0, 2.0, 0.0),
-        &crate::movement::explore::bare_walk(),
-    )
-    .unwrap();
+    let (mut explore, _) = ExploreAction::new(Position::new(1.0, 2.0, 0.0), &bare_walk()).unwrap();
     if let Some(m) = explore.state.move_to_mut() {
         m.state = MoveTo::Moving;
     }
     assert_eq!(of(Action::Explore(explore)), walking);
-    let mut transport =
-        crate::garrison::transport::TransportAction::new(Position::new(1.0, 2.0, 0.0));
-    transport.state = crate::garrison::transport::TransportState::Sail {
+    let mut transport = TransportAction::new(Position::new(1.0, 2.0, 0.0));
+    transport.state = TransportState::Sail {
         move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
     };
     assert_eq!(of(Action::Transport(transport)), walking);
-    let wait = crate::construction::wait_solidify::WaitSolidify {
+    let wait = WaitSolidify {
         state: WaitSolidifyState::Waiting,
-        task: crate::objects::masters::Task::default(),
-        target: crate::construction::FoundationId::new(object_id(7)),
+        task: Task::default(),
+        target: FoundationId::new(object_id(7)),
     };
     assert_eq!(of(Action::WaitSolidify(wait)), None);
 }
@@ -627,7 +621,7 @@ fn unit_reads_its_own_master_before_its_player_s() {
         u.master(tables, PlayerId::new(1)).map(|m| m.hit_points),
         Ok(MasterHitPoints::of_data(25))
     );
-    let own: PartTable<Master> = std::iter::once((
+    let own: PartTable<Master> = once((
         object_id(7),
         Master {
             id: master_id(4),
@@ -648,7 +642,7 @@ fn unit_reads_its_own_master_before_its_player_s() {
     let missing = u
         .master(tables, PlayerId::new(0))
         .expect_err("player 0 has no master 4");
-    assert_eq!(missing, crate::world::OBJECT_MASTER);
+    assert_eq!(missing, OBJECT_MASTER);
     assert!(
         u.master(tables, PlayerId::new(2)).is_err(),
         "no table for player 2"
@@ -661,17 +655,17 @@ fn unit_reads_its_own_master_before_its_player_s() {
 fn unit_own_view_for_its_walk() {
     let mut u = Unit {
         id: object_id(5),
-        last_human_order: crate::world::WorldTime::from_millis(2001),
+        last_human_order: WorldTime::from_millis(2001),
         ..Unit::default()
     };
-    u.group.id = Some(crate::test_ids::group_id(4));
+    u.group.id = Some(group_id(4));
     assert_eq!(
-        u.me(&crate::objects::layers::Action::default()),
-        crate::movement::Me {
+        u.me(&Action::default()),
+        Me {
             id: object_id(5),
             action_state: ActionState::NO_ACTION,
-            group: Some(crate::test_ids::group_id(4)),
-            human_order: crate::world::WorldTime::from_millis(2001),
+            group: Some(group_id(4)),
+            human_order: WorldTime::from_millis(2001),
         }
     );
 }

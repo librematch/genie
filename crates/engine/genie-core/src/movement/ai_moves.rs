@@ -24,8 +24,30 @@ use crate::objects::masters::class;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 
+use crate::combat::abilities::Look;
+use crate::combat::attack::ATTACK;
+use crate::combat::missile::MISSILE;
+use crate::construction::repair::REPAIR;
+use crate::construction::wait_solidify::WAIT_SOLIDIFY;
+use crate::garrison::ENTER;
+use crate::garrison::transport::TRANSPORT;
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::HUNT;
+use crate::gathering::make::MAKE;
+use crate::gathering::{GatherTargetId, HuntTargetId};
+use crate::movement::explore::EXPLORE;
+use crate::movement::fly::FLY;
+use crate::movement::move_to::{MOVE_TO, TARGET_LACKING, holds_object, object_range};
+use crate::objects::layers::Action;
+use crate::objects::masters::OwnerMasters;
+use crate::objects::sprite::new_sprite;
+use crate::objects::{Graphics, ObjectState};
+use crate::ownership::artifact::{ARTIFACT_TYPE, SubActionsGone};
 use crate::unit_ai::AiMove;
+use crate::unit_ai::UnitStance;
+use crate::world::lets::{take, torn_down};
 use crate::world::step::Step;
+use crate::world::{Unread, WALKER_UNMOVING};
 
 /// An unpacked trebuchet's class (`-0xe76` raw), whose slot 0x340 packs instead of moving.
 const UNPACKED_TREBUCHET: ClassId = class::CLASS_54;
@@ -35,7 +57,7 @@ impl Unit {
     /// the standing sprite of a `MoveTo` that fails at its start into the context `c`.
     pub(crate) fn ai_move(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         m: AiMove,
         class: ClassId,
         c: &mut Step<'_>,
@@ -50,10 +72,7 @@ impl Unit {
             (class, c.player),
             (&mut releases, &mut leaves, by),
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 (
                     &c.w.graphics,
                     c.w.parts.combat.of(self.id).abilities.look.as_ref(),
@@ -61,7 +80,7 @@ impl Unit {
                 sprite_rng,
             ),
         )?;
-        crate::world::lets::torn_down(c, self, (leaves, releases))?;
+        torn_down(c, self, (leaves, releases))?;
         if sails {
             let sprite_rng = c.w.streams.get(Stream::Sprite);
             self.transport_sail(
@@ -70,10 +89,7 @@ impl Unit {
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
                 (
-                    crate::objects::masters::OwnerMasters::new(
-                        &c.w.parts.own_master,
-                        c.w.masters.of(c.player),
-                    ),
+                    OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                     (
                         &c.w.graphics,
                         c.w.parts.combat.of(self.id).abilities.look.as_ref(),
@@ -107,10 +123,7 @@ impl Unit {
     /// read it whole ([`crate::world::Unread`]).
     pub(crate) fn ai_move_with(
         &mut self,
-        (actions, unread): (
-            &mut crate::objects::layers::Action,
-            Option<&crate::world::Unread>,
-        ),
+        (actions, unread): (&mut Action, Option<&Unread>),
         mut motion: MotionMut<'_>,
         m: AiMove,
         (class, player): (ClassId, PlayerId),
@@ -120,11 +133,8 @@ impl Unit {
             Releaser,
         ),
         (masters, (graphics, look), sprite_rng): (
-            crate::objects::masters::OwnerMasters<'_>,
-            (
-                &crate::objects::Graphics,
-                Option<&crate::combat::abilities::Look>,
-            ),
+            OwnerMasters<'_>,
+            (&Graphics, Option<&Look>),
             &mut Well512,
         ),
     ) -> Result<bool, GenieError> {
@@ -134,7 +144,7 @@ impl Unit {
             ));
         }
         if !m.force
-            && actions.top_action_kind() == Some(crate::movement::move_to::MOVE_TO)
+            && actions.top_action_kind() == Some(MOVE_TO)
             && actions.list.move_to().is_some_and(|mt| mt.point == m.point)
         {
             return Ok(false);
@@ -196,18 +206,12 @@ impl Unit {
     /// [`HuntAction::take_move`]: crate::gathering::hunt::HuntAction::take_move
     pub(crate) fn head_takes_point(
         &self,
-        (actions, unread): (
-            &mut crate::objects::layers::Action,
-            Option<&crate::world::Unread>,
-        ),
+        (actions, unread): (&mut Action, Option<&Unread>),
         mut motion: MotionMut<'_>,
         point: Position,
         player: PlayerId,
-        masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: (
-            &crate::objects::Graphics,
-            Option<&crate::combat::abilities::Look>,
-        ),
+        masters: OwnerMasters<'_>,
+        graphics: (&Graphics, Option<&Look>),
     ) -> Result<PointMove, GenieError> {
         if unread.is_some() {
             return Err(GenieError::unsupported(
@@ -217,31 +221,31 @@ impl Unit {
         match actions.top_action_kind() {
             None
             | Some(
-                crate::movement::move_to::MOVE_TO
-                | crate::movement::explore::EXPLORE
+                MOVE_TO
+                | EXPLORE
                 | action_type::BUILD
-                | crate::combat::attack::ATTACK
-                | crate::garrison::ENTER
-                | crate::movement::fly::FLY
-                | crate::combat::missile::MISSILE
-                | crate::gathering::make::MAKE
-                | crate::construction::wait_solidify::WAIT_SOLIDIFY,
+                | ATTACK
+                | ENTER
+                | FLY
+                | MISSILE
+                | MAKE
+                | WAIT_SOLIDIFY,
             ) => Ok(PointMove::Declined),
-            Some(crate::ownership::artifact::ARTIFACT_TYPE) => {
+            Some(ARTIFACT_TYPE) => {
                 let sprites = self.point_sprites(masters, graphics)?;
                 self.artifact_takes_point(actions, motion.mover_mut(), point, &sprites)
             }
-            Some(crate::gathering::hunt::HUNT) => {
+            Some(HUNT) => {
                 let sprites = self.point_sprites(masters, graphics)?;
                 self.hunt_takes_point(actions, motion.mover_mut(), point, player, sprites)
             }
-            Some(crate::gathering::gather::GATHER) => {
+            Some(GATHER) => {
                 let sprites = self.point_sprites(masters, graphics)?;
                 self.gather_takes_point(actions, motion.mover_mut(), point, player, sprites)
             }
             // the Transport's (0x140aa3e40): the caller sails it there
-            Some(crate::garrison::transport::TRANSPORT) => Ok(PointMove::Sails),
-            Some(crate::construction::repair::REPAIR) => {
+            Some(TRANSPORT) => Ok(PointMove::Sails),
+            Some(REPAIR) => {
                 let move_reads =
                     MoveToReads::of((self, motion.mover()), self.master_in(masters)?, graphics);
                 actions.repair_takes_point(motion.mover_mut(), point, &move_reads)
@@ -257,11 +261,8 @@ impl Unit {
     /// (`FUN_140aa0d30`'s default from the unit's master and terrain look).
     fn point_sprites<'g>(
         &self,
-        masters: crate::objects::masters::OwnerMasters<'_>,
-        (graphics, look): (
-            &'g crate::objects::Graphics,
-            Option<&crate::combat::abilities::Look>,
-        ),
+        masters: OwnerMasters<'_>,
+        (graphics, look): (&'g Graphics, Option<&Look>),
     ) -> Result<SpriteReads<'g>, GenieError> {
         Ok(SpriteReads::of(self.master_in(masters)?, look, graphics))
     }
@@ -273,7 +274,7 @@ impl Unit {
     /// [`Artifact::take_point`]: crate::ownership::artifact::Artifact::take_point
     fn artifact_takes_point(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         mover: Option<&mut Mover>,
         point: Position,
         sprites: &SpriteReads<'_>,
@@ -281,10 +282,10 @@ impl Unit {
         let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref()));
         let gone = match actions.list.artifact_mut() {
             Some(a) => a.take_point(point, &reads)?,
-            None => crate::ownership::artifact::SubActionsGone::default(),
+            None => SubActionsGone::default(),
         };
         if gone.stops {
-            mover.ok_or(crate::world::WALKER_UNMOVING)?.stop()?;
+            mover.ok_or(WALKER_UNMOVING)?.stop()?;
         }
         Ok(PointMove::Taken(gone.released))
     }
@@ -295,7 +296,7 @@ impl Unit {
     /// [`HuntAction::take_move`]: crate::gathering::hunt::HuntAction::take_move
     fn hunt_takes_point(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
@@ -308,7 +309,7 @@ impl Unit {
                 "a hunter without its hunt or movement state",
             ));
         };
-        let old = hunt.target.map(crate::gathering::HuntTargetId::id);
+        let old = hunt.target.map(HuntTargetId::id);
         if !hunt.take_move(
             HuntMove {
                 target: None,
@@ -330,7 +331,7 @@ impl Unit {
     /// `MoveTo` it makes takes `sprites`' default for a sprite the task lacks.
     fn gather_takes_point(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
@@ -342,7 +343,7 @@ impl Unit {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = gather.target.map(crate::gathering::GatherTargetId::id);
+        let old = gather.target.map(GatherTargetId::id);
         gather.take_move(None, point, player, mover, &walks)?;
         Ok(PointMove::Taken(old))
     }
@@ -356,8 +357,8 @@ impl Unit {
     /// ([`MoveToAction::to_object`]).
     pub(crate) fn move_to_object(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
-        (target, state): (ObjectId, crate::objects::ObjectState),
+        actions: &mut Action,
+        (target, state): (ObjectId, ObjectState),
         range: Distance,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
@@ -372,14 +373,10 @@ impl Unit {
             ));
         }
         let livestock = self.master(c.w.master_tables(), c.player)?.class == class::LIVESTOCK;
-        let master =
-            c.w.spatial
-                .get_known(target)?
-                .ok_or(crate::movement::move_to::TARGET_LACKING)?
-                .master;
+        let master = c.w.spatial.get_known(target)?.ok_or(TARGET_LACKING)?.master;
         let by = self.releaser(c)?;
-        if crate::movement::move_to::holds_object(livestock, master, state) {
-            crate::world::lets::take(c, self, target, by)?;
+        if holds_object(livestock, master, state) {
+            take(c, self, target, by)?;
         }
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.clear_own_actions(
@@ -389,9 +386,9 @@ impl Unit {
             &mut leaves,
             by,
         )?;
-        crate::world::lets::torn_down(c, self, (leaves, releases))?;
+        torn_down(c, self, (leaves, releases))?;
         let own = self.master(c.w.master_tables(), c.player)?;
-        let range = crate::movement::move_to::object_range(range, Some(own));
+        let range = object_range(range, Some(own));
         let sprite = ai_sprite(own, false)
             .or_else(|| object_sprite(own))
             .and_then(|id| c.w.graphics.get(id).copied());
@@ -410,10 +407,7 @@ impl Unit {
         if move_to.shows_standing() {
             self.shows_standing_sprite(
                 c.w.parts.motion.layer_mut(self.id),
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                 &c.w.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
@@ -434,15 +428,11 @@ impl Unit {
     /// A unit with a sprite whose master's standing sprite the slice does not hold.
     pub(crate) fn own_move_gave_up(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         motion: MotionMut<'_>,
         waits: bool,
-        stance: crate::unit_ai::UnitStance,
-        (masters, graphics, sprite_rng): (
-            crate::objects::masters::OwnerMasters<'_>,
-            &crate::objects::Graphics,
-            &mut Well512,
-        ),
+        stance: UnitStance,
+        (masters, graphics, sprite_rng): (OwnerMasters<'_>, &Graphics, &mut Well512),
     ) -> Result<(), GenieError> {
         let Some(m) = actions.list.move_to_mut() else {
             return Ok(());
@@ -460,8 +450,8 @@ impl Unit {
     pub(crate) fn shows_standing_sprite(
         &mut self,
         mut motion: MotionMut<'_>,
-        masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: &crate::objects::Graphics,
+        masters: OwnerMasters<'_>,
+        graphics: &Graphics,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let standing = self
@@ -476,7 +466,7 @@ impl Unit {
             let standing = standing.ok_or(GenieError::unsupported(
                 "an arrived walker without its standing sprite",
             ))?;
-            crate::objects::sprite::new_sprite(
+            new_sprite(
                 &mut self.sprite,
                 motion.move_stats_mut(),
                 standing,
@@ -505,7 +495,7 @@ pub(crate) enum PointMove {
     Sails,
 }
 
-impl crate::objects::layers::Action {
+impl Action {
     /// The Repair's slot 0x40 (`FUN_140ad9700`, [`RepairAction::take_point`]): its point, slot
     /// 0x68 with none, `set_state(11)`, whose `MoveTo` reads `move_reads`. Returns
     /// the target let go and the one whose repairers it leaves.

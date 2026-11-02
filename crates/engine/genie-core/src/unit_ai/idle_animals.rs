@@ -5,8 +5,10 @@ use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::sqrt;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::class;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
@@ -17,6 +19,7 @@ use crate::unit_ai::{
     Memory, Pick, Search, Surroundings, UnitAi, UnitSide, point_gap_squared,
 };
 use crate::world::Seconds;
+use std::cmp::Ordering;
 
 impl UnitAi {
     /// The boar's idle check (slot 72, `FUN_140c1e630`): `FUN_140c41e50` first
@@ -71,7 +74,7 @@ impl UnitAi {
             return (true, m);
         }
         // comiss; jbe: unordered counts as inside
-        if d2.partial_cmp(&leash) != Some(std::cmp::Ordering::Greater) {
+        if d2.partial_cmp(&leash) != Some(Ordering::Greater) {
             if !ai.rand15().is_multiple_of(BOAR_WANDER) {
                 return (false, None);
             }
@@ -135,7 +138,7 @@ impl UnitAi {
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let reach = (at.speed * EVADE_REACH).get();
         let (dx, dy) = (other.x() - x, other.y() - y);
-        let d = crate::math::fmath::sqrt(dy * dy + dx * dx);
+        let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
         let _ = self.evasive_move(point, (true, false), at, ai, side)?;
         Ok(true)
@@ -212,7 +215,7 @@ impl UnitAi {
                 relation: None,
                 state: None,
                 master: None,
-                workers: crate::objects::WorkerCount::NO_CAP,
+                workers: WorkerCount::NO_CAP,
                 spared: None,
                 reach: true,
             },
@@ -291,7 +294,7 @@ impl UnitAi {
                 relation: Some(QueryRelation::Enemies),
                 state: Some(ObjectState::Alive),
                 master: None,
-                workers: crate::objects::WorkerCount::NO_CAP,
+                workers: WorkerCount::NO_CAP,
                 spared: None,
                 reach: true,
             },

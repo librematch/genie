@@ -8,10 +8,15 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
+use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
+use crate::orders::Work;
+use crate::pathing::tile_path::GridLevel;
 use crate::players::PlayerId;
+use crate::unit_ai::task_finder::drop_site;
 use crate::world::others::OthersRef;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
@@ -30,11 +35,11 @@ impl Unit {
     /// no carried-resource test, `+0xa14` as it stands outside slot 0x128: 1; the caller's).
     pub(crate) fn more_work(
         &self,
-        actions: &crate::objects::layers::Action,
+        actions: &Action,
         c: &mut Step<'_>,
         building: ObjectId,
         built: MasterId,
-    ) -> Result<Option<crate::orders::Work>, GenieError> {
+    ) -> Result<Option<Work>, GenieError> {
         use crate::gathering::gather_search::{self, Candidate};
         use crate::math::image::gather_search::{REACH_CAP, REACH_FLOOR};
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
@@ -46,17 +51,14 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a builder without its player's masters",
                 ))?;
-        let master = self.master_in(crate::objects::masters::OwnerMasters::new(
-            &c.w.parts.own_master,
-            Some(masters),
-        ))?;
+        let master = self.master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?;
         let site = masters.get(built).ok_or(GenieError::unsupported(
             "a building of a master the slice does not have",
         ))?;
         let at = *c.w.spatial.get(building).ok_or(GenieError::unsupported(
             "a builder's building without a place",
         ))?;
-        let entry = crate::unit_ai::task_finder::drop_site(
+        let entry = drop_site(
             &c.w.drop_sites,
             built,
             master.class,
@@ -79,7 +81,7 @@ impl Unit {
         let (player, me_id, every) = (
             c.player,
             self.id,
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
         );
         let candidate = |id: ObjectId, owner: PlayerId, u: &Self, position: Position| {
             let m = u.master(every, owner)?;
@@ -119,7 +121,7 @@ impl Unit {
             let planner = c.w.pathing.planner(restriction, spatial.tiles()).ok_or(
                 GenieError::unsupported("a builder's restriction without a planner"),
             )?;
-            let tiles = crate::pathing::tile_path::GridLevel::TILES;
+            let tiles = GridLevel::TILES;
             let width = i64::from(planner.level_size(tiles).width());
             let cells = planner.level(tiles);
             let blocked = move |t: Tile| -> Result<bool, GenieError> {
@@ -148,7 +150,7 @@ impl Unit {
                 "a builder's new work without a place",
             ))?
             .position;
-        Ok(Some(crate::orders::Work {
+        Ok(Some(Work {
             target: Some(target),
             point,
             carry_test: false,

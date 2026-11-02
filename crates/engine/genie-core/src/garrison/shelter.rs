@@ -11,6 +11,9 @@ use crate::garrison::{
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
+use crate::math::image::garrison::LEAST_HP_SHARE as GARRISON_LEAST_HP_SHARE;
+use crate::math::msvc::{sort, unordered_map_order};
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -22,12 +25,15 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::orders::{GARRISON, Work};
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
@@ -57,7 +63,7 @@ pub(crate) struct Shelters {
 }
 /// A building takes units in only above this share of its master's hit points (`FUN_14120eb10`,
 /// in doubles).
-pub(super) const LEAST_HP_SHARE: f64 = crate::math::image::garrison::LEAST_HP_SHARE;
+pub(super) const LEAST_HP_SHARE: f64 = GARRISON_LEAST_HP_SHARE;
 
 impl World {
     /// `UNIT_ORDER`'s garrison (action 5) on `target`, which the world holds (`FUN_140e7f200`; the
@@ -214,7 +220,7 @@ impl World {
             let (other_at, other_radius) = self.ground(id)?;
             // COMISS NEARBY, gap; JC: a gap above it, or a NaN, is out
             let gap = footprint_gap_squared(other_at, other_radius, at, radius);
-            if crate::math::fmath::below_or_unordered(NEARBY, gap.get()) {
+            if below_or_unordered(NEARBY, gap.get()) {
                 continue;
             }
             let om = o.master(self.master_tables(), op)?;
@@ -316,13 +322,13 @@ impl World {
                 }
             }
         }
-        crate::math::msvc::sort(
+        sort(
             &mut pairs,
             &|a: (usize, usize, f32), b: (usize, usize, f32)| a.2 < b.2,
         )?;
         let (going, first_taken) =
             assign_shelters(&pairs, units, (&all, &capacities), shelters.counts.clone())?;
-        for building in crate::math::msvc::unordered_map_order(first_taken) {
+        for building in unordered_map_order(first_taken) {
             let j = all
                 .iter()
                 .position(|&b| b == building)
@@ -338,7 +344,7 @@ impl World {
     pub(super) fn ai_takes(
         &self,
         bp: PlayerId,
-        b: &crate::objects::unit::Unit,
+        b: &Unit,
         player: PlayerId,
         master: MasterId,
     ) -> Result<bool, GenieError> {
@@ -383,7 +389,7 @@ impl World {
         let going: Vec<Option<ObjectId>> = going.iter().copied().map(Some).collect();
         let loose = self.loose_units_kept(&going, &|id| kept.contains(&id))?;
         for id in loose {
-            let Some(crate::world::index::Place::Live(p, idx)) = self.place(id) else {
+            let Some(Place::Live(p, idx)) = self.place(id) else {
                 return Err(GenieError::unsupported(
                     "a garrison of a unit the slice does not hold live",
                 ));
@@ -397,17 +403,17 @@ impl World {
             }
             if through_ai && self.parts.unit_ai.contains(unit.id) {
                 let state = unit.life.state;
-                let order = crate::unit_ai::QueuedOrder {
-                    issuer: Some(crate::unit_ai::Issuer::Object(id)),
+                let order = QueuedOrder {
+                    issuer: Some(Issuer::Object(id)),
                     order: OrderKind::Enter,
-                    priority: crate::unit_ai::OrderPriority::COMMAND,
+                    priority: OrderPriority::COMMAND,
                     target: Some(building.id()),
                     target_owner: Some(owner),
                     point,
                     range: Distance::ZERO,
                     shown: point.ground(),
                     ready: true,
-                    target_type: Some(crate::unit_ai::OrderTargetType::of_master(master)),
+                    target_type: Some(OrderTargetType::of_master(master)),
                 };
                 let ai = self
                     .parts

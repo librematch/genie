@@ -44,6 +44,7 @@ use crate::terrain::{Terrain, TerrainBorder, TerrainId, TerrainRestriction, Tile
 use genie_support::TechId;
 use std::cmp::{Ordering, PartialOrd};
 use std::fmt;
+use std::str::from_utf8;
 
 /// A game version targeted by a data file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,7 +95,7 @@ impl From<&str> for FileVersion {
 
 impl fmt::Display for FileVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match std::str::from_utf8(&self.0[0..7]) {
+        match from_utf8(&self.0[0..7]) {
             Ok(s) => write!(f, "{s}"),
             Err(_) => write!(f, "{:?}", self.0),
         }
@@ -215,6 +216,8 @@ impl DatFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use std::fs::read;
     use std::{
         collections::hash_map::DefaultHasher,
         fs::File,
@@ -256,7 +259,7 @@ mod tests {
 
     #[test]
     fn reserialize() -> anyhow::Result<()> {
-        let original = std::fs::read("fixtures/aoc1.0c.dat")?;
+        let original = read("fixtures/aoc1.0c.dat")?;
         let mut cursor = Cursor::new(&original);
         let dat = DatFile::read_from(&mut cursor)?;
         let mut serialized = vec![];

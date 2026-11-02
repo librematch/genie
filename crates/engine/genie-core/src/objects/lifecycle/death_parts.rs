@@ -2,6 +2,9 @@
 //! and refund, a built building's death and storage, and the military and civilian counts.
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
+use crate::construction::build::ClearLook;
+use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
@@ -18,6 +21,7 @@ use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::{OwnerMasters, cost_entries};
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -115,7 +119,7 @@ pub(crate) fn combat_dies(
         return Ok(());
     }
     let desolid = layer.construction.is_some_and(|c| c.desolid);
-    if master.kind < BUILDING || (!desolid && crate::map::Distance::ZERO < master.height) {
+    if master.kind < BUILDING || (!desolid && Distance::ZERO < master.height) {
         pathing.removed(u.id);
         spatial.drop_record(u.id);
     }
@@ -141,10 +145,10 @@ pub(crate) fn combat_dies(
 #[must_use]
 pub(crate) fn refund_of(
     master: &Master,
-    main: Option<crate::construction::MainBuildingId>,
+    main: Option<MainBuildingId>,
 ) -> Vec<(AttributeId, Amount)> {
     let mut cost = 0.0f32;
-    for (_, amount, paid) in crate::objects::masters::cost_entries(&master.cost) {
+    for (_, amount, paid) in cost_entries(&master.cost) {
         if paid {
             cost += amount.as_f32();
         }
@@ -198,7 +202,7 @@ pub(crate) struct BuiltDeath {
 /// [`World::withdraw_tech`]: crate::world::World::withdraw_tech
 pub(crate) fn built_death(
     (u, combat): (&mut Unit, &mut Combat),
-    annex_of: Option<crate::construction::MainBuildingId>,
+    annex_of: Option<MainBuildingId>,
     master: &Master,
     player_type: PlayerType,
 ) -> Result<BuiltDeath, GenieError> {
@@ -281,10 +285,10 @@ pub(crate) fn storage_leaves(
 pub(crate) fn clear_look_of(
     u: &Unit,
     layer: &Building,
-    masters: crate::objects::masters::OwnerMasters<'_>,
-) -> Result<crate::construction::build::ClearLook, GenieError> {
+    masters: OwnerMasters<'_>,
+) -> Result<ClearLook, GenieError> {
     let m = u.master_in(masters)?;
-    Ok(crate::construction::build::ClearLook {
+    Ok(ClearLook {
         hp: u.life.hp,
         height: m.height,
         roo_called: u.roo_called,

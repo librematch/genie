@@ -11,10 +11,14 @@ use crate::world::slots::CheckedIndex;
 
 /// One kill or razing, as the counts add it to an attribute.
 const ONE_COUNT: Amount = Amount::new(ONE);
+use crate::construction::MainBuildingId;
+use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
 use crate::map::Position;
+use crate::objects::DamagedTimer;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
@@ -28,6 +32,8 @@ use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
+use crate::players::history::EventKind;
+use std::mem::replace;
 
 /// The target's slot 0xe8 with the source's `weapons` at `factor`, less the damage a blast has
 /// already done to it (`blast_taken`, a building's `+0xb90`): a static, animated, doppelganger,
@@ -45,7 +51,7 @@ pub fn take(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    weapons: &[crate::objects::masters::ClassAmount],
+    weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
 ) -> Result<(), GenieError> {
@@ -132,7 +138,7 @@ pub(super) fn take_building(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    weapons: &[crate::objects::masters::ClassAmount],
+    weapons: &[ClassAmount],
     factor: f32,
     forward: bool,
     blast_taken: HitPoints,
@@ -163,8 +169,8 @@ pub(super) fn take_building(
     if t.player != PlayerId::GAIA && ONE > t.hp.get() {
         let (ap, q) = (src.player, t.player);
         let event = match t.master_id {
-            CASTLE => Some(crate::players::history::EventKind::CASTLE_DESTROYED),
-            WONDER => Some(crate::players::history::EventKind::WONDER_DESTROYED),
+            CASTLE => Some(EventKind::CASTLE_DESTROYED),
+            WONDER => Some(EventKind::WONDER_DESTROYED),
             _ => None,
         };
         let mut adds = Vec::new();
@@ -188,7 +194,7 @@ pub(super) fn take_building(
             adds,
         });
     }
-    b.damaged_lately = crate::objects::DamagedTimer::HIT;
+    b.damaged_lately = DamagedTimer::HIT;
     b.struck = true;
     let annexes = b.annexes.clone();
     for a in others.iter_mut().filter(|a| annexes.contains(&a.id)) {
@@ -208,15 +214,15 @@ fn forward_to_main(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    (weapons, factor): (&[crate::objects::masters::ClassAmount], f32),
+    (weapons, factor): (&[ClassAmount], f32),
     blast_taken: HitPoints,
-    main: crate::construction::MainBuildingId,
+    main: MainBuildingId,
 ) -> Result<bool, GenieError> {
     let k = others
         .iter()
         .position(|v| v.id == main.id())
-        .ok_or(crate::construction::build::NOT_HELD)?;
-    let mut m = std::mem::replace(&mut **others.checked_mut(k)?, Victim::placeholder());
+        .ok_or(NOT_HELD)?;
+    let mut m = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
     let struck = take_building(&mut m, src, others, weapons, factor, false, blast_taken);
     let annexed = m
         .building
@@ -275,12 +281,7 @@ impl Victim {
 /// slot 0x2f0 before it. Its last call (slot 0x4c0, `FUN_141196a00` or `FUN_141158bb0`) plays
 /// the master's damage sound (`+0x700`), whose draws are the Unsynced stream's: no simulation
 /// state.
-pub(super) fn take_static(
-    t: &mut Victim,
-    src: &Attacker,
-    weapons: &[crate::objects::masters::ClassAmount],
-    factor: f32,
-) {
+pub(super) fn take_static(t: &mut Victim, src: &Attacker, weapons: &[ClassAmount], factor: f32) {
     // slot 0x2f0 of a TRIBE attacker (types 70, 80; [`charge_hit`]) starts the sum at its raw
     // charge (slot 0x310, `+0x9e0`) plus 0
     let mut damage = if COMBAT <= src.kind && charge_hit(src, t) {
@@ -317,7 +318,7 @@ pub(super) fn take_unit(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    weapons: &[crate::objects::masters::ClassAmount],
+    weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
 ) -> Result<(), GenieError> {

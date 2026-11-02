@@ -2,22 +2,31 @@
 //! tail) and its unit AI's own search (slot 0x1e8), then the work command toward the one it found.
 
 use crate::GenieError;
+use crate::construction::build::CART_TASK;
+use crate::gathering::DropSiteId;
 use crate::gathering::closest_resource::{ResourceWorld, closest_resource_of};
 use crate::map::DistanceSquared;
 use crate::map::Position;
+use crate::math::image::turn::CART_REACH as TURN_CART_REACH;
 use crate::math::rng::Stream;
 use crate::movement::{Planning, footprint_gap_squared};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
+use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::orders::Work;
 use crate::players::PlayerId;
+use crate::unit_ai::NO_POINT;
 use crate::unit_ai::world_view::Foreign;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
+use std::mem::replace;
 
 impl World {
     /// A mule cart's completion (`FUN_1411c6bd0`'s tail, a building whose master has a task of
@@ -50,7 +59,7 @@ impl World {
             None
         };
         // all of it runs inside the completion's set_state(2), before the cart is in state 2
-        let built = std::mem::replace(&mut self.players.live_mut(p, idx)?.life.state, state);
+        let built = replace(&mut self.players.live_mut(p, idx)?.life.state, state);
         let result = (|| {
             if let Some(found) = found {
                 self.cart_work(p, idx, found)?;
@@ -97,8 +106,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<(Option<ObjectId>, Position), GenieError> {
-        const CART_REACH: DistanceSquared =
-            DistanceSquared::new(crate::math::image::turn::CART_REACH);
+        const CART_REACH: DistanceSquared = DistanceSquared::new(TURN_CART_REACH);
         let id = self.players.live(p, idx)?.id;
         let current = self
             .parts
@@ -114,7 +122,7 @@ impl World {
         let mut kinds = Vec::new();
         let mut cart_class = None;
         for t in &master.tasks {
-            if t.action_type == crate::construction::build::CART_TASK {
+            if t.action_type == CART_TASK {
                 cart_class = t.object_group;
             }
             let kind = match cart_class {
@@ -141,14 +149,8 @@ impl World {
                     after,
                     left: None,
                 },
-                every: crate::objects::masters::MasterTables::new(
-                    &self.masters,
-                    &self.parts.own_master,
-                ),
-                masters: crate::objects::masters::OwnerMasters::new(
-                    &self.parts.own_master,
-                    self.masters.of(p),
-                ),
+                every: MasterTables::new(&self.masters, &self.parts.own_master),
+                masters: OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
                 plan: Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,
@@ -168,18 +170,9 @@ impl World {
                     ),
                     &mut w,
                     others,
-                    (
-                        kind,
-                        crate::objects::WorkerCount::NO_CAP,
-                        Some(crate::gathering::DropSiteId::new(id)),
-                    ),
-                    (current, ObjectState::Foundation, crate::unit_ai::NO_POINT),
-                    crate::world::index::ObjectsRef::new(
-                        &self.players,
-                        &self.index,
-                        &self.masters,
-                        &self.parts,
-                    ),
+                    (kind, WorkerCount::NO_CAP, Some(DropSiteId::new(id))),
+                    (current, ObjectState::Foundation, NO_POINT),
+                    ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
                 )?;
                 if let Some(f) = f {
                     found.push(f);
@@ -215,7 +208,7 @@ impl World {
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
     ) -> Result<(), GenieError> {
-        let work = crate::orders::Work {
+        let work = Work {
             target,
             point,
             carry_test: false,

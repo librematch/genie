@@ -2,23 +2,31 @@
 //! a target's state and the search of slot 0x820.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::map::TerrainId;
 use crate::map::terrain::Terrain;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
+use crate::objects::ObjectState;
 use crate::objects::layers::Building;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters};
+use crate::objects::masters::{MasterTables, Task};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
+use crate::players::{NO_RELATIONS, Relations};
 use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskTarget};
+use crate::unit_ai::task_finder::{
+    allied as task_finder_allied, drops_at as task_finder_drops_at, find_task,
+};
 use crate::unit_ai::world_view::Foreign;
 use crate::world::Seconds;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
+use crate::world::parts::Parts;
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
 
@@ -40,12 +48,12 @@ impl Diplomacy for TaskWorld<'_> {
         let relations = self
             .players
             .player(from)
-            .map_or(&crate::players::NO_RELATIONS, |p| &p.relations);
-        crate::unit_ai::task_finder::allied(relations, from, to, with_ally)
+            .map_or(&NO_RELATIONS, |p| &p.relations);
+        task_finder_allied(relations, from, to, with_ally)
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
-        crate::unit_ai::task_finder::drops_at(self.drop_sites, building, actor)
+        task_finder_drops_at(self.drop_sites, building, actor)
     }
 }
 
@@ -53,7 +61,7 @@ impl Diplomacy for TaskWorld<'_> {
 /// owner's list is out for its update ([`UnitView`]): the owner's relations, the others'.
 pub(crate) struct SideWorld<'a> {
     pub(crate) player: PlayerId,
-    pub(crate) relations: &'a crate::players::Relations,
+    pub(crate) relations: &'a Relations,
     pub(crate) foreign: Foreign<'a>,
     pub(crate) drop_sites: &'a [DropSite],
 }
@@ -66,13 +74,13 @@ impl Diplomacy for SideWorld<'_> {
         } else {
             self.foreign
                 .player(from)
-                .map_or(&crate::players::NO_RELATIONS, |p| &p.relations)
+                .map_or(&NO_RELATIONS, |p| &p.relations)
         };
-        crate::unit_ai::task_finder::allied(relations, from, to, with_ally)
+        task_finder_allied(relations, from, to, with_ally)
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
-        crate::unit_ai::task_finder::drops_at(self.drop_sites, building, actor)
+        task_finder_drops_at(self.drop_sites, building, actor)
     }
 }
 
@@ -83,7 +91,7 @@ impl Diplomacy for SideWorld<'_> {
 /// the world never gives its id to another object, so an object without a construction is not
 /// met. `buildings` holds the objects' building layers.
 pub(crate) fn wait_progress(
-    foundation: crate::construction::FoundationId,
+    foundation: FoundationId,
     others: OthersRef<'_>,
     buildings: &PartTable<Building>,
 ) -> Option<Seconds> {
@@ -95,10 +103,7 @@ pub(crate) fn wait_progress(
 /// The state (`+0x640`) of object `id` among its owner's other objects and the other players'
 /// lists: None when they do not hold it (the unit itself, or one of its owner's sleeping objects:
 /// static objects only, never a drop site, which the callers ask for).
-pub(crate) fn state_of(
-    id: Option<ObjectId>,
-    others: OthersRef<'_>,
-) -> Option<crate::objects::ObjectState> {
+pub(crate) fn state_of(id: Option<ObjectId>, others: OthersRef<'_>) -> Option<ObjectState> {
     others.get(id).map(|u| u.life.state)
 }
 
@@ -110,8 +115,8 @@ pub(crate) fn task_target_with<'a>(
     id: ObjectId,
     steps: usize,
     find: &impl Fn(ObjectId) -> Option<(PlayerId, &'a Unit)>,
-    parts: &crate::world::parts::Parts,
-    every: crate::objects::masters::MasterTables<'a>,
+    parts: &Parts,
+    every: MasterTables<'a>,
 ) -> Result<Option<TaskTarget<'a>>, GenieError> {
     let mut id = id;
     for _ in 0..steps {
@@ -157,19 +162,11 @@ pub(crate) fn task_search<'m>(
     terrain: Option<TerrainId>,
     filter: Option<ActionType>,
     dip: &impl Diplomacy,
-) -> Result<Option<(crate::objects::masters::Task, Option<&'m Master>)>, GenieError> {
+) -> Result<Option<(Task, Option<&'m Master>)>, GenieError> {
     let own = actor.master;
     let find = |list: &Master, filter: Option<ActionType>| {
-        crate::unit_ai::task_finder::find_task(
-            list,
-            actor,
-            Some(t),
-            Some(general),
-            terrain,
-            filter,
-            dip,
-        )
-        .map(Option::<&crate::objects::masters::Task>::copied)
+        find_task(list, actor, Some(t), Some(general), terrain, filter, dip)
+            .map(Option::<&Task>::copied)
     };
     if let Some(task) = find(own, filter)? {
         return Ok(Some((task, None)));

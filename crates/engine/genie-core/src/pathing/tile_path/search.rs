@@ -9,6 +9,8 @@ use crate::pathing::tile_path::{
     SHORTCUT_COST,
 };
 use crate::{math::fmath, math::msvc};
+use std::ops::{Index, IndexMut};
+use std::slice::Iter;
 
 /// The searches' four steps from a node, in their order: the edge, the step and the neighbour's
 /// edge back.
@@ -36,7 +38,7 @@ impl Nodes {
     }
 
     /// Every node, in the order made.
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, Node> {
+    pub(super) fn iter(&self) -> Iter<'_, Node> {
         self.0.iter()
     }
 
@@ -46,7 +48,7 @@ impl Nodes {
     }
 }
 
-impl std::ops::Index<NodeIndex> for Nodes {
+impl Index<NodeIndex> for Nodes {
     type Output = Node;
 
     fn index(&self, n: NodeIndex) -> &Node {
@@ -54,7 +56,7 @@ impl std::ops::Index<NodeIndex> for Nodes {
     }
 }
 
-impl std::ops::IndexMut<NodeIndex> for Nodes {
+impl IndexMut<NodeIndex> for Nodes {
     fn index_mut(&mut self, n: NodeIndex) -> &mut Node {
         &mut self.0[n.0]
     }

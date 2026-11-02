@@ -8,36 +8,44 @@ use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::MotionFlags;
+use crate::groups::WorldObject;
 use crate::groups::formation::on_map;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
+use crate::map::TerrainMask;
 use crate::map::spatial::RecordId;
 use crate::map::{GroundOffset, Point};
 use crate::math::fmath::BVector;
 use crate::math::fmath::{self, cross, normalize};
+use crate::math::image::group::{
+    DEFAULT_FORWARD as GROUP_DEFAULT_FORWARD, FARTHEST as GROUP_FARTHEST,
+    FRONT_SHARE as GROUP_FRONT_SHARE, SPIRAL_FIRST, SPIRAL_LAST, SQUARE_MAX as GROUP_SQUARE_MAX,
+    SQUARE_MIN as GROUP_SQUARE_MIN,
+};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 
 /// The spiral's steps (`FUN_141007630`'s table from `DAT_142f49460` and `DAT_142f49480`), x and y:
 /// up y, up x, down y, down x.
 const SPIRAL: [GroundOffset; 4] = GroundOffset::table([
-    crate::math::image::group::SPIRAL_FIRST[0],
-    crate::math::image::group::SPIRAL_FIRST[1],
-    crate::math::image::group::SPIRAL_LAST[0],
-    crate::math::image::group::SPIRAL_LAST[1],
+    SPIRAL_FIRST[0],
+    SPIRAL_FIRST[1],
+    SPIRAL_LAST[0],
+    SPIRAL_LAST[1],
 ]);
 /// The points the spiral tries (`FUN_141007630`'s count from 1 below `0x191`).
 const SPIRAL_POINTS: i32 = 400;
 /// `FUN_141049e10` refuses a forward whose dot product with the up is below this
 /// (`DAT_142f4c1a0`) ...
-const SQUARE_MIN: f32 = crate::math::image::group::SQUARE_MIN;
+const SQUARE_MIN: f32 = GROUP_SQUARE_MIN;
 /// ... or above this (`DAT_14330eb78`).
-const SQUARE_MAX: f32 = crate::math::image::group::SQUARE_MAX;
+const SQUARE_MAX: f32 = GROUP_SQUARE_MAX;
 /// A group whose members' forwards cancel out and that holds none faces x (`DAT_14330eb8c`).
-const DEFAULT_FORWARD: f32 = crate::math::image::group::DEFAULT_FORWARD;
+const DEFAULT_FORWARD: f32 = GROUP_DEFAULT_FORWARD;
 
 /// `FUN_141007630`'s spiral: where it is (x, y), its direction in [`SPIRAL`], its leg's length
 /// and its count of steps (from 1).
@@ -176,12 +184,7 @@ impl World {
                 grow,
                 &members,
                 true,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
+                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
             )? {
                 return Ok(at);
             }
@@ -261,12 +264,7 @@ impl World {
         group: GroupId,
         ahead: Distance,
     ) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &self.players,
-            &self.index,
-            &self.masters,
-            &self.parts,
-        );
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
@@ -294,9 +292,7 @@ impl World {
         // the lead's slot 0x270: an object that does not move (a ghost found by the lead -1)
         // stands nowhere (`FUN_141071e30`)
         if g.formation_locked_type == Some(FormationKind::FLANKED)
-            && let Some(lead) = self
-                .lead_object(m)
-                .filter(crate::groups::WorldObject::moves)
+            && let Some(lead) = self.lead_object(m).filter(WorldObject::moves)
         {
             let master = self.master(lead.player(), lead.master_id())?;
             let mask = self.master_mask(lead.player(), lead.master_id())?;
@@ -388,7 +384,7 @@ impl World {
         &self,
         p: PlayerId,
         master: MasterId,
-    ) -> Result<crate::map::TerrainMask, GenieError> {
+    ) -> Result<TerrainMask, GenieError> {
         let restriction =
             self.master(p, master)?
                 .terrain_restriction
@@ -408,10 +404,10 @@ impl World {
 
 /// `movePositionToFront`'s share of the spacing (`DAT_142e7f384`; the whole spacing for a
 /// staggered lock) and of the lead's radius.
-const FRONT_SHARE: f32 = crate::math::image::group::FRONT_SHARE;
+const FRONT_SHARE: f32 = GROUP_FRONT_SHARE;
 
 /// The first best distance of `movePositionToFront`'s searches (`DAT_14330ebf4`).
-const FARTHEST: f32 = crate::math::image::group::FARTHEST;
+const FARTHEST: f32 = GROUP_FARTHEST;
 
 /// `p − q` squared on the ground, the height difference zeroed (`FUN_14087e560`, then
 /// `x² + 0 + y²`).
@@ -423,7 +419,13 @@ fn ground_squared(p: BVector, q: BVector) -> DistanceSquared {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
     use crate::groups::MotionFlags;
+    #[cfg(test)]
+    use crate::groups::formation::tests::ghost_at;
+    #[cfg(test)]
+    use crate::groups::{LinePoint, Member, UnitGroup, UnitGroups};
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
@@ -431,15 +433,25 @@ mod tests {
     use crate::map::RestrictionId;
     use crate::map::TerrainFlags;
     use crate::map::terrain::TileTerrain;
+    #[cfg(test)]
+    use crate::objects::layers::Static;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
+    #[cfg(test)]
+    use crate::objects::masters::{Master, Masters};
+    #[cfg(test)]
+    use crate::objects::unit::Unit;
     use crate::test_ids::group_id;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::world::Millis;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::parts::Object;
+    #[cfg(test)]
+    use crate::world::{FrameSeed, Player};
 
     /// `FUN_141049e10` facing x with up y: right is `y × x`, (0, 0, -1), the constructor's.
     #[test]
@@ -464,11 +476,11 @@ mod tests {
     }
 
     /// A unit at `[x, y]` (the unit's order: x, y, height) of master 4.
-    fn unit(id: i32, x: f32, y: f32) -> crate::objects::unit::Unit {
-        let mut u = crate::objects::unit::Unit {
+    fn unit(id: i32, x: f32, y: f32) -> Unit {
+        let mut u = Unit {
             id: object_id(id),
-            place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
-            ..crate::objects::unit::Unit::default()
+            place: Static::at(Position::new(x, y, 0.0)),
+            ..Unit::default()
         };
         u.life.master_id = master_id(4);
         u
@@ -476,29 +488,27 @@ mod tests {
 
     /// A 20 by 20 map of terrain class 1, its objects on the obstruction manager, and group 1 of
     /// them at (10, 10) facing x, spacing 2, two stored points.
-    fn front_world(objects: Vec<impl Into<crate::world::parts::Object>>) -> World {
+    fn front_world(objects: Vec<impl Into<Object>>) -> World {
         use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
         use crate::map::terrain::{Terrain, TerrainKind};
         let (units, parts) = World::split_layers(objects.into_iter().map(Into::into));
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
-            vec![crate::world::Player {
+            vec![Player {
                 objects: units.clone().into(),
-                ..crate::world::Player::default()
+                ..Player::default()
             }],
         )
         .with_parts(parts);
-        t.masters = vec![crate::objects::masters::Masters::new([
-            crate::objects::masters::Master {
-                id: master_id(4),
-                radius: Footprint::new(0.4, 0.4),
-                terrain_restriction: Some(RestrictionId::named(0)),
-                ..crate::objects::masters::Master::default()
-            },
-        ])];
+        t.masters = vec![Masters::new([Master {
+            id: master_id(4),
+            radius: Footprint::new(0.4, 0.4),
+            terrain_restriction: Some(RestrictionId::named(0)),
+            ..Master::default()
+        }])];
         t.spatial = Spatial::with_tiles(
             GridSize::new(20, 20),
             Tiles::new(GridSize::new(20, 20), vec![1; 400]),
@@ -535,23 +545,23 @@ mod tests {
                 },
             );
         }
-        let mut g = crate::groups::UnitGroup::new(group_id(1));
+        let mut g = UnitGroup::new(group_id(1));
         g.members = units
             .iter()
-            .map(|u| crate::groups::Member {
+            .map(|u| Member {
                 id: u.id,
-                ..crate::groups::Member::default()
+                ..Member::default()
             })
             .collect();
         g.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
         g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
         g.motion.flags = MotionFlags::NONE;
         g.desired_spacing = Distance::new(2.0);
-        g.stored_positions.points = vec![crate::groups::LinePoint::default(); 2];
+        g.stored_positions.points = vec![LinePoint::default(); 2];
         g.stored_positions.length = Distance::new(3.0);
-        t.groups = crate::groups::UnitGroups {
+        t.groups = UnitGroups {
             groups: vec![g],
-            ..crate::groups::UnitGroups::default()
+            ..UnitGroups::default()
         };
         t
     }
@@ -607,10 +617,10 @@ mod tests {
                 0
             )
         );
-        let mut t = front_world(Vec::<crate::world::parts::Object>::new());
-        t.groups.groups[0].members = vec![crate::groups::Member {
+        let mut t = front_world(Vec::<Object>::new());
+        t.groups.groups[0].members = vec![Member {
             id: object_id(99),
-            ..crate::groups::Member::default()
+            ..Member::default()
         }];
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
@@ -667,12 +677,9 @@ mod tests {
     fn flanked_group_stays_where_its_lead_could_stand() {
         // the lead moves (slot 0x270 is `FUN_141158940`), where it last moved to its place
         let lead = unit(10, 15.0, 10.5);
-        let mut mover = crate::gathering::hunt::tests::walker();
+        let mut mover = walker();
         mover.moved_at = lead.position();
-        let units = vec![
-            crate::world::parts::Object::moving(lead, mover),
-            unit(11, 10.2, 10.1).into(),
-        ];
+        let units = vec![Object::moving(lead, mover), unit(11, 10.2, 10.1).into()];
         let flanked = |t: &mut World| {
             t.groups.groups[0].formation_locked_type = Some(FormationKind::FLANKED);
             t.groups.groups[0].motion.lead = Some(object_id(10));
@@ -717,10 +724,7 @@ mod tests {
             t.groups.groups[0].members.truncate(2);
             t.groups.groups[0].motion.lead = Some(object_id(-2));
         };
-        let missile = crate::world::parts::Object::moving(
-            unit(-2, 3.0, 3.0),
-            crate::gathering::hunt::tests::walker(),
-        );
+        let missile = Object::moving(unit(-2, 3.0, 3.0), walker());
         let mut t = front_world(vec![
             units[0].clone().into(),
             units[1].clone().into(),
@@ -739,7 +743,7 @@ mod tests {
         );
         let mut t = front_world(units);
         flanked(&mut t);
-        t.players[0].ghosts = vec![crate::groups::formation::tests::ghost_at(-2, 3.0, 3.0)];
+        t.players[0].ghosts = vec![ghost_at(-2, 3.0, 3.0)];
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(
@@ -758,16 +762,16 @@ mod tests {
     #[test]
     fn the_initial_orientation_averages_the_members_forwards() {
         let facing = |forwards: &[Option<BVector>]| {
-            let units: Vec<crate::world::parts::Object> = forwards
+            let units: Vec<Object> = forwards
                 .iter()
                 .enumerate()
                 .map(|(i, f)| {
                     let u = unit(10 + i as i32, 5.0, 5.0);
                     match f {
                         Some(f) => {
-                            let mut mover = crate::gathering::hunt::tests::walker();
+                            let mut mover = walker();
                             mover.forward = *f;
-                            crate::world::parts::Object::moving(u, mover)
+                            Object::moving(u, mover)
                         }
                         None => u.into(),
                     }
@@ -788,10 +792,10 @@ mod tests {
             ]),
             BVector::new(0.0, 0.0, 1.0)
         );
-        let mut t = front_world(Vec::<crate::world::parts::Object>::new());
-        t.groups.groups[0].members = vec![crate::groups::Member {
+        let mut t = front_world(Vec::<Object>::new());
+        t.groups.groups[0].members = vec![Member {
             id: object_id(99),
-            ..crate::groups::Member::default()
+            ..Member::default()
         }];
         t.groups.groups[0].motion.position[1] = BVector::new(0.0, 0.0, 1.0);
         t.set_initial_orientation(group_id(1)).unwrap();

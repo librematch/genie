@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
+use crate::movement::footprint_gap_squared;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -16,6 +17,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::best_target::category;
 use crate::unit_ai::{
     AiMove, AttackAsk, DEFEND_LEASH, DEFEND_PATROL_LEASH, DEFEND_SLACK, Effect, FOLLOW_SLACK_HIGH,
     FOLLOW_SLACK_LOW, INVALID_POINT, Pick, RETARGET_RANGE, RETARGET_REACH, RetargetSearch,
@@ -233,8 +235,7 @@ impl UnitAi {
             && self.current_order == Some(OrderKind::Attack)
             && let (Some(n), Some(c)) = (new, current)
             && c.state == ObjectState::Alive
-            && crate::unit_ai::best_target::category(n.master, n.class)
-                != crate::unit_ai::best_target::category(c.master, c.class)
+            && category(n.master, n.class) != category(c.master, c.class)
         {
             return Ok(9);
         }
@@ -480,12 +481,7 @@ impl UnitAi {
             return Ok(false);
         }
         self.target_point = target.position;
-        let gap = crate::movement::footprint_gap_squared(
-            at.position,
-            at.size,
-            target.position,
-            target.radius,
-        );
+        let gap = footprint_gap_squared(at.position, at.size, target.position, target.radius);
         let range = self.desired_distance;
         if range.squared() < gap {
             let held = (target.state, target.class, target.position);

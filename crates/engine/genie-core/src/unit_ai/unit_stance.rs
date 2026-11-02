@@ -1,5 +1,7 @@
 //! A unit's stance: how far it goes after what it sees.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A unit's stance (the unit AI's `+0x1a9`, the save's `state_value`): aggressive (0), defensive
 /// (1), stand ground (2) or no attack (3). A new soldier may take its owner's posture's low byte,
 /// so the byte keeps any value; the game's tests name only these four.
@@ -52,8 +54,8 @@ impl UnitStance {
     }
 }
 
-impl std::fmt::Display for UnitStance {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UnitStance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.0)
     }
 }

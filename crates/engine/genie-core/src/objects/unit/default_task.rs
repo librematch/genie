@@ -2,7 +2,9 @@
 //! Make or the Artifact of livestock.
 
 use crate::GenieError;
+use crate::gathering::make::MakeAction;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::layers::DefaultTask;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
@@ -17,7 +19,7 @@ impl Unit {
     /// the next update (true). A default task that the slice does not hold is an error.
     pub(crate) fn start_default_task(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<bool, GenieError> {
         if self.life.state != ObjectState::Alive
@@ -43,13 +45,11 @@ impl Unit {
                 let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
                     .copied()
                     .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
-                actions
-                    .list
-                    .set_make(Some(crate::gathering::make::MakeAction::start(
-                        task,
-                        &c.w.players.player(c.player)?.attributes,
-                        &mut self.life,
-                    )));
+                actions.list.set_make(Some(MakeAction::start(
+                    task,
+                    &c.w.players.player(c.player)?.attributes,
+                    &mut self.life,
+                )));
                 Ok(true)
             }
             DefaultTask::Artifact => {

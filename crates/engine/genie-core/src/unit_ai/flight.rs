@@ -5,6 +5,7 @@ use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
@@ -122,20 +123,20 @@ impl UnitAi {
             ));
         }
         let reach = (at.speed * RUN_REACH).get();
-        let mut d = crate::math::fmath::sqrt(vy * vy + vx * vx);
+        let mut d = sqrt(vy * vy + vx * vx);
         if d < RUN_EPSILON {
             let r = ai.rand15() as i32 as f32;
             vx = (r + r) / RUN_DRAW_SCALE - RUN_ONE;
             let r = ai.rand15() as i32 as f32;
             vy = (r + r) / RUN_DRAW_SCALE - RUN_ONE;
-            d = crate::math::fmath::sqrt(vy * vy + vx * vx);
+            d = sqrt(vy * vy + vx * vx);
         }
         let mut ex = x - (vx / d) * reach;
         let mut ey = y - (vy / d) * reach;
         if at.player != PlayerId::GAIA && self.stance == UnitStance::DEFENSIVE {
             let gx = self.state_position.x() - ex;
             let gy = self.state_position.y() - ey;
-            if RUN_LEASH < crate::math::fmath::sqrt(gy * gy + gx * gx) {
+            if RUN_LEASH < sqrt(gy * gy + gx * gx) {
                 ex = self.state_position.x() - (vx / d) * RUN_LEASH;
                 ey = self.state_position.y() - (vy / d) * RUN_LEASH;
             }
@@ -165,7 +166,7 @@ impl UnitAi {
         let near = |p: f32, own: f32| {
             if !p.is_nan() {
                 p
-            } else if crate::math::fmath::at_most_or_unordered(own, EVASIVE_NEAR) {
+            } else if at_most_or_unordered(own, EVASIVE_NEAR) {
                 // COMISS own, 5.0; JBE
                 own + RUN_ONE
             } else {

@@ -31,6 +31,9 @@ use crate::objects::unit::Unit;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 
+use crate::combat::AttackTargetId;
+use crate::objects::layers::Action;
+use crate::world::ATTACKER_UNMOVING;
 use crate::world::step::Step;
 use crate::{GenieError, combat::damage};
 
@@ -90,7 +93,7 @@ impl Attack {
             c.w.parts
                 .mover_of(unit.id)
                 .map(|m| m.stats.radius.ground())
-                .ok_or(crate::world::ATTACKER_UNMOVING)?;
+                .ok_or(ATTACKER_UNMOVING)?;
         let at = unit.place.position();
         let reach = squared_reach(self.range);
         if reach.get().abs() <= EPSILON || reach < footprint_gap_squared(at, ground, target, radius)
@@ -137,7 +140,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         f: &mut Fight,
         r: &AttackReads,
     ) -> Result<UpdateCode, GenieError> {
@@ -160,7 +163,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         f: &mut Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
@@ -203,7 +206,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         f: &mut Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
@@ -222,13 +225,7 @@ impl Attack {
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
         if ranged || r.volleys {
-            unit.volley(
-                c,
-                Aimed::at(
-                    self.target.map(crate::combat::AttackTargetId::id),
-                    &f.victim,
-                ),
-            )?;
+            unit.volley(c, Aimed::at(self.target.map(AttackTargetId::id), &f.victim))?;
         } else {
             if matches!(
                 f.own.master_id,

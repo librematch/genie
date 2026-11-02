@@ -2,6 +2,8 @@
 //! action's state; the AI's build orders whose foundation is gone.
 
 use crate::GenieError;
+use crate::combat::attack::face_target;
+use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{BUILDER_UNMOVING, BuildAction, BuildReads, BuildTask};
 use crate::map::Position;
@@ -9,6 +11,7 @@ use crate::movement::Me;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
@@ -19,7 +22,9 @@ use crate::players::attribute;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::{ActionKind, NotifyKind};
 use crate::world::Seconds;
+use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -37,7 +42,7 @@ impl BuildAction {
         move_reads: &MoveToReads<'_>,
     ) -> Result<Self, GenieError> {
         Ok(Self {
-            target: to.id.map(crate::construction::FoundationId::new),
+            target: to.id.map(FoundationId::new),
             state: BuildState::Move {
                 move_to: task.walk(move_reads, Some(to))?,
             },
@@ -54,7 +59,7 @@ impl BuildAction {
     #[must_use]
     pub(super) const fn restarted(
         &self,
-        target: Option<crate::construction::FoundationId>,
+        target: Option<FoundationId>,
         at: Position,
         move_to: Option<MoveToAction>,
     ) -> Self {
@@ -86,7 +91,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
@@ -160,9 +165,9 @@ impl BuildAction {
         ai.end_order_and_action()?;
         builder.post_own(
             &mut c.w.parts.unit_ai,
-            crate::unit_ai::NotifyKind::PASTURE_BUILT,
+            NotifyKind::PASTURE_BUILT,
             [
-                crate::unit_ai::ActionKind::Build.value(),
+                ActionKind::Build.value(),
                 // the notify's record holds the stack unit's id, 0 for none
                 reads.stack_made.map_or(0, ObjectId::get),
                 0,
@@ -171,7 +176,7 @@ impl BuildAction {
         self.uncount(c)?;
         if self.target.is_some() {
             let target = self.target.take();
-            crate::world::lets::release(c, builder, target, reads.by)?;
+            release(c, builder, target, reads.by)?;
         }
         let Held { kind, amount } = builder.life.held();
         let attributes = c.w.players.player(c.player)?.attributes.len();
@@ -224,7 +229,7 @@ impl BuildAction {
         }
         self.restart(c, builder)?;
         let target = self.target.take();
-        crate::world::lets::release(c, builder, target, reads.by)?;
+        release(c, builder, target, reads.by)?;
         Ok(())
     }
 
@@ -233,7 +238,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
@@ -322,8 +327,8 @@ impl BuildAction {
     ) -> Result<HeadCode, GenieError> {
         builder.post_own(
             &mut c.w.parts.unit_ai,
-            crate::unit_ai::NotifyKind::ACTION_FAILED,
-            [crate::unit_ai::ActionKind::Build.value(), 0, 0],
+            NotifyKind::ACTION_FAILED,
+            [ActionKind::Build.value(), 0, 0],
         )?;
         self.halt_in(c, builder, reads)?;
         Ok(HeadCode::Deletes)
@@ -339,7 +344,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         self.timer -= c.dt.seconds();
@@ -375,7 +380,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         let at = builder.position();
@@ -388,7 +393,7 @@ impl BuildAction {
                 .position;
         let now = c.w.world_time;
         let mover = c.w.parts.mover_mut(builder.id).ok_or(BUILDER_UNMOVING)?;
-        if !crate::combat::attack::face_target(mover, at, to, now)? {
+        if !face_target(mover, at, to, now)? {
             return Err(GenieError::unsupported(
                 "a builder that turns over time to face its foundation",
             ));

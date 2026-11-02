@@ -179,10 +179,10 @@ impl Master {
     /// the slice cannot make of another type the factory makes; nothing for a type the factory
     /// makes no action of.
     #[must_use]
-    pub fn default_start(&self) -> crate::objects::layers::DefaultTask {
+    pub fn default_start(&self) -> DefaultTask {
         use crate::objects::layers::{DefaultTask, Unstartable};
         match self.default_task() {
-            Some(t) if t.action_type == crate::gathering::make::MAKE => DefaultTask::Make,
+            Some(t) if t.action_type == MAKE => DefaultTask::Make,
             Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_type) => {
                 DefaultTask::Fails(Unstartable::Unported(t.action_type))
             }
@@ -194,7 +194,7 @@ impl Master {
     /// the master's id `id` ([`crate::unit_ai::factory_type`]).
     #[must_use]
     pub const fn unit_ai_type(&self, id: MasterId) -> Option<UnitAiType> {
-        crate::unit_ai::factory_type(self.class, id, self.volley_missile, self.combat_level)
+        factory_type(self.class, id, self.volley_missile, self.combat_level)
     }
 }
 
@@ -267,7 +267,7 @@ pub struct Master {
     pub line_of_sight: Distance,
     /// `+0x606`, its terrain restriction (the save's `terrain_restriction_mask_id`; −1 for none),
     /// which a placement test reads.
-    pub terrain_restriction: Option<crate::map::RestrictionId>,
+    pub terrain_restriction: Option<RestrictionId>,
     /// `obstruction_type` (`+0x651`) and `can_be_built_on` (`+0x5e9`).
     pub obstruction_type: ObstructionType,
     /// `can_be_built_on` (`+0x5e9`): a new building deletes an object of it off its footprint.
@@ -421,7 +421,7 @@ pub struct Master {
     /// The death spawns (`+0x5e4`, `+0x5e6`, −1 for none).
     pub death_spawns: [Option<MasterId>; 2],
     /// What a dead object's steps read of the master.
-    pub life: Option<crate::objects::lifecycle::MasterData>,
+    pub life: Option<MasterData>,
     /// What a combat master's attack reads: its standing sprite (`+0x470`), its attack sprite
     /// (`+0x7f8`, `fight_sprite_id`), a second attack sprite
     /// (`+0x878`, the `.dat`'s `attack_graphic2`), `missile_id`, `fire_missile_at_frame`,
@@ -446,9 +446,9 @@ pub struct Master {
     /// `missile_id`, −1 for none: every short the effects leave in it is kept.
     pub missile: MasterField,
     /// `fire_missile_at_frame`.
-    pub fire_frame: crate::objects::Frame,
+    pub fire_frame: Frame,
     /// `interrupt_frame`.
-    pub interrupt_frame: crate::objects::Frame,
+    pub interrupt_frame: Frame,
     /// `base_hit_chance`.
     pub hit_chance: HitChance,
     /// `speed_of_attack`: the reload time.
@@ -460,15 +460,15 @@ pub struct Master {
     /// (`missed_missile_spread`, `+0x860`).
     pub weapon_offset: Offset,
     /// How far a missed missile strays per tile of the way (`missed_missile_spread`, `+0x860`).
-    pub missed_spread: crate::combat::missile::MissSpread,
+    pub missed_spread: MissSpread,
     /// `garrison_firepower` (`+0x870`): what a unit adds to the volleys of a building it is
     /// inside; one at most 0 adds its magnitude.
-    pub garrison_firepower: crate::combat::Firepower,
+    pub garrison_firepower: Firepower,
     /// `volley_fire_amount` (`+0x8c0`, the `.dat`'s total projectiles): a new object's missiles
     /// per volley (`+0xa00`).
-    pub volley_fire: crate::combat::Firepower,
+    pub volley_fire: Firepower,
     /// `max_attacks_in_volley` (`+0x8c4`, the `.dat`'s max total projectiles).
-    pub max_volley: crate::combat::MissileCount,
+    pub max_volley: MissileCount,
     /// `volley_x_spread`, `volley_y_spread` and `volley_start_spread_adjustment` (`+0x8c8`..
     /// `+0x8d0`, the `.dat`'s projectile spawning area): how far a volley's missiles scatter.
     pub volley_spread: VolleySpread,
@@ -477,7 +477,7 @@ pub struct Master {
     /// `mChargeProjectileUnit` (`+0x928`), None for −1.
     pub charge_projectile: Option<MasterId>,
     /// A missile master's flight (type 60, [`crate::combat::missile::MissileStats`]).
-    pub missile_stats: Option<crate::combat::missile::MissileStats>,
+    pub missile_stats: Option<MissileStats>,
     /// What a unit of this master moves with, its speed with the master's walking sprite (the
     /// run sprite `+0x750` if it has one, else the move sprite `+0x748`); None for a master that
     /// does not move.
@@ -520,7 +520,7 @@ pub struct Master {
     /// change.
     pub train_location_entry: TrainLocationEntry,
     /// `+0x8b4`, `regeneration_rate`.
-    pub regeneration: crate::objects::Regeneration,
+    pub regeneration: Regeneration,
     /// `+0x91c`, `mRechargeRate`.
     pub recharge_rate: ChargeRate,
     /// `+0x920`, `mChargeEvent`.
@@ -546,9 +546,9 @@ pub struct TrainLocation {
     /// `+0x2`, `trainTime`.
     pub time: WholeSeconds,
     /// `+0x4`, `buttonLocationID`.
-    pub button: crate::production::LocationButton,
+    pub button: LocationButton,
     /// `+0x8`, `hotkeyID`.
-    pub hotkey: crate::production::HotkeyId,
+    pub hotkey: HotkeyId,
 }
 
 /// What a combat master shows of its values (`+0x856`, `+0x858`, `+0x854`, `+0x8b0`).
@@ -673,6 +673,15 @@ pub use self::task_group::TaskGroup;
 pub use self::task_sprites::TaskSprites;
 pub use self::volley_spread::VolleySpread;
 pub use self::work_value::WorkValue;
+use crate::combat::missile::{MissSpread, MissileStats};
+use crate::combat::{Firepower, MissileCount};
+use crate::gathering::make::MAKE;
+use crate::map::RestrictionId;
+use crate::objects::layers::DefaultTask;
+use crate::objects::lifecycle::MasterData;
+use crate::objects::{Frame, Regeneration};
+use crate::production::{HotkeyId, LocationButton};
+use crate::unit_ai::factory_type;
 
 #[cfg(test)]
 mod tests;

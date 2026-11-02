@@ -54,6 +54,16 @@ use crate::GenieError;
 use crate::combat::damage::Victim;
 #[cfg(test)]
 use crate::gathering::hunt::Dropped;
+use crate::gathering::{DropSiteId, GatherTargetId};
+use crate::math::image::gather::{
+    DEFAULT_PRODUCTIVITY as GATHER_DEFAULT_PRODUCTIVITY, DROP_REACH as GATHER_DROP_REACH,
+    LAST_BIT as GATHER_LAST_BIT, NO_GATHER_POINT as GATHER_NO_GATHER_POINT,
+    REMAINDER as GATHER_REMAINDER, STOP_CENTRE as GATHER_STOP_CENTRE, WAIT_GAP as GATHER_WAIT_GAP,
+    WAIT_SHIFT as GATHER_WAIT_SHIFT, WAIT_WORKERS as GATHER_WAIT_WORKERS,
+};
+use crate::movement::move_to::WalkTo;
+use crate::objects::WorkerCount;
+use crate::unit_ai::UnitStance;
 
 /// The Gather action's type, which word 9 adds.
 pub const GATHER: ActionType = ActionType::named(5);
@@ -64,7 +74,7 @@ const SEARCH_WAIT: Seconds = Seconds::new(-10.0);
 /// `set_state(0xf3)`'s timer: a second (`0xbf800000`, an immediate in `0x140a8cd40`).
 const FARM_WAIT_TIME: Seconds = Seconds::new(-1.0);
 /// `mGatherX` of none (`DAT_14330ec20`, −1.0, read at `0x140a8d1c6`).
-const NO_GATHER_POINT: f32 = crate::math::image::gather::NO_GATHER_POINT;
+const NO_GATHER_POINT: f32 = GATHER_NO_GATHER_POINT;
 /// The gatherers whose gather without a target waits for another farm (`set_state(0xf3)`,
 /// `0x140a8e1d0`'s cases 3, 5 and 6: masters 259, 214, 1891 and 1892).
 const FARM_WAITERS: [MasterId; 4] = [
@@ -82,18 +92,18 @@ const TRAP_WAITERS: [MasterId; 3] = [
 ];
 
 /// Below this a target's or a load's remainder counts as nothing (`DAT_142eb5690`).
-const REMAINDER: Amount = Amount::new(crate::math::image::gather::REMAINDER);
+const REMAINDER: Amount = Amount::new(GATHER_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).
-const LAST_BIT: f32 = crate::math::image::gather::LAST_BIT;
+const LAST_BIT: f32 = GATHER_LAST_BIT;
 /// A drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
-const DROP_REACH: f32 = crate::math::image::gather::DROP_REACH;
+const DROP_REACH: f32 = GATHER_DROP_REACH;
 /// A random wait's shift (`DAT_142e7f384`).
-const WAIT_SHIFT: f32 = crate::math::image::gather::WAIT_SHIFT;
+const WAIT_SHIFT: f32 = GATHER_WAIT_SHIFT;
 /// A failed walk to a target with at most this many workers waits (`0x140a8e1d0` case 3,
 /// `DAT_142eb1c98`), as one to a target at least `WAIT_GAP` away (the squared footprint gap,
 /// `DAT_142ec9ec0`); else the gatherer searches.
-const WAIT_WORKERS: f32 = crate::math::image::gather::WAIT_WORKERS;
-const WAIT_GAP: f32 = crate::math::image::gather::WAIT_GAP;
+const WAIT_WORKERS: f32 = GATHER_WAIT_WORKERS;
+const WAIT_GAP: f32 = GATHER_WAIT_GAP;
 /// The masters a gatherer may gather from while they hold nothing (the combat object's slot
 /// 0x2b8, `FUN_141216390`: the farm, the rice farm and master 45).
 const REGATHERED: [MasterId; 3] = [
@@ -109,9 +119,9 @@ const STOP_FARMS: [MasterId; 2] = [MasterId::named(50), MasterId::named(1187)];
 /// A farm's stops under the game's farm setting (the constructor's `mNumberStops`).
 const FARM_STOPS: FarmStops = FarmStops::of_data(4);
 /// A stop's point lies this far into its tile (`DAT_142e7f384`).
-const STOP_CENTRE: f32 = crate::math::image::gather::STOP_CENTRE;
+const STOP_CENTRE: f32 = GATHER_STOP_CENTRE;
 /// The productivity of a task without a productivity attribute (`DAT_14330eb8c`).
-const DEFAULT_PRODUCTIVITY: Amount = Amount::new(crate::math::image::gather::DEFAULT_PRODUCTIVITY);
+const DEFAULT_PRODUCTIVITY: Amount = Amount::new(GATHER_DEFAULT_PRODUCTIVITY);
 /// The draws a stop's point takes at most (`set_state(4)`'s loop).
 const STOP_DRAWS: u32 = 10;
 /// The player's attribute that sells a farm's food at once (`player+0x100` at `+0x300`).
@@ -121,10 +131,10 @@ pub(crate) const FARM_FOOD_SOLD: usize = 96;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct GatherAction {
     /// The target object (`+0x20`, its id at `+0x30`), −1 for none.
-    pub target: Option<crate::gathering::GatherTargetId>,
+    pub target: Option<GatherTargetId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
-    pub carry_to: Option<crate::gathering::DropSiteId>,
+    pub carry_to: Option<DropSiteId>,
     /// The action state (`+0x18`), which word 9 adds.
     pub state: GatherState,
     /// `+0x38`..`+0x40`: where the target stood.
@@ -187,7 +197,7 @@ pub struct Resource {
     /// Its owner.
     pub player: PlayerId,
     /// How many actions work on it (`+0x644`).
-    pub workers: crate::objects::WorkerCount,
+    pub workers: WorkerCount,
     /// The gatherer's master has its master (a building annex's main building's, `+0xbb8`) among
     /// its drop sites (`FUN_14109d4f0`).
     pub drop_site: bool,
@@ -203,8 +213,8 @@ pub struct Resource {
 impl Resource {
     /// The object a `MoveTo` of the gatherer walks to: its place, the footprint gap and its state.
     #[must_use]
-    pub const fn walk_to(&self) -> crate::movement::move_to::WalkTo {
-        crate::movement::move_to::WalkTo {
+    pub const fn walk_to(&self) -> WalkTo {
+        WalkTo {
             id: Some(self.id),
             at: self.position,
             gap: self.gap,
@@ -233,7 +243,7 @@ pub(crate) struct GatherReads {
     /// (`set_state(0xf3)`, [`FARM_WAITERS`]).
     pub(crate) master: MasterId,
     /// The unit AI's stance (`+0x1a9`), 0 without a unit AI.
-    pub(crate) stance: crate::unit_ai::UnitStance,
+    pub(crate) stance: UnitStance,
     /// The game's setting at `FUN_140c87b90()`'s `+0x69` (farmers walk their farm's stops); with
     /// it `set_state(7)` leaves `mGatherX`, `mGatherY` as they are.
     pub(crate) farm_stops: bool,

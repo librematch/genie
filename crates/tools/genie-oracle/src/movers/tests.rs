@@ -4,13 +4,17 @@ use crate::fixtures::{
 };
 use crate::masters::{MasterTable, Turning};
 use crate::movers::mover;
+use genie_core::map::{RestrictionId, TerrainMask};
 use genie_core::movement::MoveAlgorithm;
+use genie_core::movement::Mover;
 use genie_core::objects::FacetCount;
+use genie_core::objects::SpeedMultiplier;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::CivId;
+use genie_save::generated::world::RgeObject;
 use genie_save::generated::world::{Master, PathData, PlayerObjects};
 
 /// Master 83: restriction 1, top speed 1, turning 0.5, walking as sprite 11 and running as 12.
@@ -41,19 +45,19 @@ fn table() -> MasterTable {
     )
     .with_sprite(
         SpriteId::named(10),
-        genie_core::objects::SpeedMultiplier::ZERO,
+        SpeedMultiplier::ZERO,
         FacetCount::of_data(8),
         SpriteFlags::NONE,
     )
     .with_sprite(
         SpriteId::named(11),
-        genie_core::objects::SpeedMultiplier::of_data(2.0),
+        SpeedMultiplier::of_data(2.0),
         FacetCount::of_data(8),
         SpriteFlags::NONE,
     )
     .with_sprite(
         SpriteId::named(12),
-        genie_core::objects::SpeedMultiplier::of_data(3.0),
+        SpeedMultiplier::of_data(3.0),
         FacetCount::of_data(8),
         SpriteFlags::NONE,
     )
@@ -72,7 +76,7 @@ fn run(
     object: &genie_save::Object,
     objects: &PlayerObjects,
     table: Option<&MasterTable>,
-) -> Result<Option<genie_core::movement::Mover>, genie_core::GenieError> {
+) -> Result<Option<Mover>, genie_core::GenieError> {
     let s = object.static_part().unwrap().clone();
     mover(object, &s, objects, &[], CivId::GAIA, table)
 }
@@ -86,10 +90,7 @@ fn walker_moves_by_its_master_and_sprites() {
     assert_eq!(m.stats.speed.get().to_bits(), 2.0_f32.to_bits());
     assert_eq!(
         (m.stats.restriction, m.stats.restriction_mask),
-        (
-            genie_core::map::RestrictionId::named(1),
-            genie_core::map::TerrainMask::of_bits(0b11)
-        )
+        (RestrictionId::named(1), TerrainMask::of_bits(0b11))
     );
     assert_eq!(m.angle.get().to_bits(), 0.25_f32.to_bits());
     assert!(m.velocity.is_none() && m.paths.is_empty());
@@ -106,7 +107,7 @@ fn walker_moves_by_its_master_and_sprites() {
 #[test]
 fn static_object_has_no_mover() {
     let tree = genie_save::Object {
-        rge_object: Some(Box::new(genie_save::generated::world::RgeObject {
+        rge_object: Some(Box::new(RgeObject {
             rge_static_object: Some(Box::default()),
             ..Default::default()
         })),
@@ -133,7 +134,7 @@ fn what_the_mover_cannot_read_is_unsupported() {
     assert!(run(&walker(99), &objects, Some(&table())).is_err());
     let unturned = MasterTable::default().with_sprite(
         SpriteId::named(11),
-        genie_core::objects::SpeedMultiplier::ONE,
+        SpeedMultiplier::ONE,
         FacetCount::of_data(8),
         SpriteFlags::NONE,
     );

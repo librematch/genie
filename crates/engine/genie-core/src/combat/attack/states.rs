@@ -23,8 +23,10 @@ use crate::players::PlayerId;
 use crate::unit_ai::BOAR_AI;
 use crate::unit_ai::LION_AI;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::step::Step;
+use crate::world::{ATTACKER_UNMOVING, NO_STANDING_SPRITE};
 
 impl Attack {
     /// A `MoveTo` of the attack that starts arrived (its `set_state` 1, not quiet): the unit shows
@@ -35,10 +37,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        let g = self
-            .arms
-            .idle_sprite
-            .ok_or(crate::world::NO_STANDING_SPRITE)?;
+        let g = self.arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, sprite_rng);
         set_walker_anim(motion, Speed::new(0.0));
         Ok(())
@@ -106,10 +105,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
     ) -> Result<(), GenieError> {
         if self.state.take_move_to().is_some() {
-            motion
-                .mover_mut()
-                .ok_or(crate::world::ATTACKER_UNMOVING)?
-                .stop()?;
+            motion.mover_mut().ok_or(ATTACKER_UNMOVING)?.stop()?;
         }
         self.state = state;
         Ok(())
@@ -272,10 +268,7 @@ impl Attack {
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.state.take_move_to().is_some() {
-            motion
-                .mover_mut()
-                .ok_or(crate::world::ATTACKER_UNMOVING)?
-                .stop()?;
+            motion.mover_mut().ok_or(ATTACKER_UNMOVING)?.stop()?;
         }
         self.state = AttackState::Done;
         motion.set_anim_speed(Speed::new(1.0));
@@ -305,7 +298,7 @@ impl Attack {
 }
 
 /// `FUN_140c5e1e0` at once: the unit AI forgets its target ([`crate::unit_ai::UnitAi::remove_target`]).
-fn forget_target(ai: Option<&mut crate::unit_ai::UnitAi>) {
+fn forget_target(ai: Option<&mut UnitAi>) {
     if let Some(ai) = ai {
         ai.remove_target();
     }

@@ -7,19 +7,26 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
+use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::{
     Grid, Obstruction, Placed, RecordCells, RecordId, SearchCache, Spatial, Tiles, WalkTest,
     tile_record_id,
 };
 use crate::movement::Speed;
+use crate::objects::IdTable;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::pathing::tile_path::PlanRect;
+use crate::players::ByPlayer;
 use crate::players::PlayerId;
+use crate::vision::VisionBits;
 use crate::world::Seconds;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::mem::take;
 
 impl Spatial {
     /// A map without terrain: every tile's class is 0.
@@ -35,22 +42,22 @@ impl Spatial {
         Self {
             map,
             manager_ignore: Vec::new(),
-            tile_records: std::collections::BTreeSet::new(),
+            tile_records: BTreeSet::new(),
             manager_buffer: None,
-            objects: crate::objects::IdTable::new(),
+            objects: IdTable::new(),
             records: RecordCells::default(),
-            inside: crate::objects::IdTable::new(),
+            inside: IdTable::new(),
             tiles,
             changed: Vec::new(),
-            frozen_for: crate::objects::IdTable::new(),
+            frozen_for: IdTable::new(),
             fastest: 0.0,
             reach: Distance::ZERO,
             scout_maps: BTreeMap::new(),
-            relations: crate::players::ByPlayer::default(),
-            unit_diplomacy: crate::players::ByPlayer::default(),
+            relations: ByPlayer::default(),
+            unit_diplomacy: ByPlayer::default(),
             task_0x99: Vec::new(),
             sight: None,
-            vision: crate::players::ByPlayer::default(),
+            vision: ByPlayer::default(),
             terrain: None,
             search_cache: SearchCache::default(),
             grid: Grid::new(map),
@@ -188,7 +195,7 @@ impl Spatial {
 
     /// The tile rectangles whose static marks changed since the last call.
     pub fn take_changes(&mut self) -> Vec<PlanRect> {
-        std::mem::take(&mut self.changed)
+        take(&mut self.changed)
     }
 
     /// Player `player`'s masks both meet the unified map's bits of `tile`: what it sees
@@ -202,7 +209,7 @@ impl Spatial {
         let Some(&unified) = v.size.index(tile).and_then(|i| v.unified.get(i)) else {
             return false;
         };
-        let word = unified & crate::vision::VisionBits::OBJECT_MASK;
+        let word = unified & VisionBits::OBJECT_MASK;
         let masks = self.vision(player);
         word.intersects(masks.visible) && word.intersects(masks.explored)
     }
@@ -248,11 +255,7 @@ impl Spatial {
 
     /// A tick of `dt` seconds passed: every frozen object that moves may have moved its master's
     /// speed (`speed` of its player and master) times dt.
-    pub fn grow_unknown(
-        &mut self,
-        dt: Seconds,
-        speed: impl Fn(PlayerId, crate::objects::masters::MasterId) -> Speed,
-    ) {
+    pub fn grow_unknown(&mut self, dt: Seconds, speed: impl Fn(PlayerId, MasterId) -> Speed) {
         for p in self.objects.values_mut() {
             if let Some(u) = p.unknown.as_mut()
                 && p.moves
@@ -377,7 +380,7 @@ impl Spatial {
     /// Whether listed object `id` counts as tall (its master's height radius above 0, which
     /// `FUN_140f5f0a0` and `FUN_140f5f560` read): a ghost, whose master the slice does not hold,
     /// counts as not tall.
-    pub(super) fn is_tall(objects: &crate::objects::IdTable<Placed>, id: ObjectId) -> bool {
+    pub(super) fn is_tall(objects: &IdTable<Placed>, id: ObjectId) -> bool {
         objects.get(id).is_some_and(|p| p.tall)
     }
 
@@ -472,7 +475,7 @@ impl Spatial {
         a: Point,
         b: Point,
         grow: Distance,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         ignore: &[RecordId],
     ) -> bool {
         self.put_tile_records(a, b, grow, mask);
@@ -533,13 +536,7 @@ impl Spatial {
     /// its query, then `FUN_1410561f0`): its temporary tile records
     /// ([`Spatial::put_tile_records`]) tested as [`Spatial::segment_meets`] tests them, and
     /// removed again. A walk whose grown box leaves the map counts as blocked.
-    pub fn tiles_block(
-        &mut self,
-        a: Point,
-        b: Point,
-        grow: Distance,
-        mask: crate::map::TerrainMask,
-    ) -> bool {
+    pub fn tiles_block(&mut self, a: Point, b: Point, grow: Distance, mask: TerrainMask) -> bool {
         self.put_tile_records(a, b, grow, mask);
         let blocked =
             WalkTest::new(a, b, grow, self.map).is_none_or(|t| self.tile_records_meet(&t, &[]));
@@ -551,13 +548,7 @@ impl Spatial {
     /// `a` and `b` (x, y), grown by `grow` (the manager's buffer) and held on the map, whose word
     /// holds neither a terrain class of `mask` nor a temporary record (`mask & 0x7f | 0x80`), row
     /// by row. The records stay until [`Spatial::clear_tile_records`].
-    pub fn put_tile_records(
-        &mut self,
-        a: Point,
-        b: Point,
-        grow: Distance,
-        mask: crate::map::TerrainMask,
-    ) {
+    pub fn put_tile_records(&mut self, a: Point, b: Point, grow: Distance, mask: TerrainMask) {
         use crate::math::conversions::cvttss2si;
         let (lo_x, hi_x) = (
             if b.x() <= a.x() { b.x() } else { a.x() },

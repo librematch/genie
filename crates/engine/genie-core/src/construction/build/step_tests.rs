@@ -32,13 +32,17 @@ use crate::world::WorldTime;
 
 use super::tests::{MOVING_TASK, TASK, started};
 use super::*;
+use crate::construction::FootprintWaits;
+use crate::gathering::hunt::tests::walker;
 use crate::map::Footprint;
 use crate::map::spatial::{Placed, Tiles};
 use crate::math::rng::Well512;
 use crate::movement::Me;
+use crate::movement::move_to::MOVE_TO;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
 use crate::objects::ObjectId;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::{Action, Building, Motion, Static};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
@@ -48,13 +52,20 @@ use crate::objects::masters::master_type;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, WorkerCount};
 use crate::players::PlayerId;
+use crate::players::tracker::key;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::unit_ai::CIVILIAN;
+use crate::unit_ai::task_finder::{DropSite, DropTarget};
 use crate::unit_ai::{ActionKind, OrderKind, QueuedOrder, UnitAi};
+use crate::vision::visibility::Visibility;
+use crate::world::FrameSeed;
 use crate::world::parts::Object;
 use crate::world::step::Step;
 use crate::world::tests::in_update;
+use crate::world::tests::{builder_masters, placeable_on};
 use crate::world::{Player, World};
 
 /// The builder of [`site_world`].
@@ -62,7 +73,7 @@ const BUILDER: ObjectId = object_id(5);
 /// Its foundation, a house.
 const HOUSE: ObjectId = object_id(10028);
 /// The house as the Build's foundation.
-const HOUSE_SITE: crate::construction::FoundationId = crate::construction::FoundationId::new(HOUSE);
+const HOUSE_SITE: FoundationId = FoundationId::new(HOUSE);
 /// The house's place.
 const AT_HOUSE: Position = Position::new(10.5, 10.5, 0.0);
 /// The builder's walking sprite, which its `MoveTo`s show by default, and its standing sprite,
@@ -76,8 +87,8 @@ const TASK_SPRITE: SpriteId = SpriteId::named(3);
 const fn graphic(id: SpriteId) -> Graphic {
     Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(16),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -116,14 +127,14 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
     Construction {
         progress: Seconds::new(progress),
         desolid,
-        builders: crate::construction::BuilderCount::of_data(builders),
+        builders: BuilderCount::of_data(builders),
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: crate::map::Snow::None,
+        snow: Snow::None,
         sprite_override: false,
     }
 }
@@ -136,7 +147,7 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
 /// masters hold the house as 562 (a lumber camp, a drop site), 1889 (a pasture), 1584 (a gate,
 /// class 39), 68 (a mill) and 50 (a farm, class 49).
 fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
-    let mut masters = crate::world::tests::builder_masters();
+    let mut masters = builder_masters();
     let others = [
         house_as(&masters, master_id(562), class::BUILDING),
         house_as(&masters, PASTURE_1889, class::BUILDING),
@@ -147,12 +158,12 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     masters = Masters::new(masters.iter().cloned().chain(others));
     let v = masters.get_mut(ids::VILLAGER_MALE).unwrap();
     (v.class, v.move_sprite, v.standing_sprite) = (class, Some(WALKING), Some(STANDING));
-    let mut mover = crate::gathering::hunt::tests::walker();
+    let mut mover = walker();
     mover.moved_at = at;
     let builder = Object::with_actions(
         Unit {
             id: BUILDER,
-            place: crate::objects::layers::Static::at(at),
+            place: Static::at(at),
             life: Lifecycle {
                 class: Class::Animated,
                 state: ObjectState::Alive,
@@ -169,14 +180,14 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             my_pasture: None,
             ..Unit::default()
         },
-        crate::objects::layers::Action {
+        Action {
             list: ActionList::default().with_build(Some(build)),
             ..Default::default()
         },
     );
     let house = Unit {
         id: HOUSE,
-        place: crate::objects::layers::Static::at(AT_HOUSE),
+        place: Static::at(AT_HOUSE),
         life: Lifecycle {
             class: Class::Animated,
             state: ObjectState::Foundation,
@@ -184,14 +195,14 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             master_id: ids::HOUSE,
             ..Lifecycle::default()
         },
-        workers: crate::objects::WorkerCount::of_data(1),
+        workers: WorkerCount::of_data(1),
         pasture: None,
         my_pasture: None,
         ..Unit::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
@@ -206,17 +217,17 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     )
     .with_buildings([(
         HOUSE,
-        crate::objects::layers::Building {
+        Building {
             construction: Some(construction(0.0, 0, true)),
             ..Default::default()
         },
     )])
-    .with_motions([(BUILDER, crate::objects::layers::Motion::Moving(mover))])
+    .with_motions([(BUILDER, Motion::Moving(mover))])
     .with_actions([(BUILDER, builder.parts.actions)])
     .with_ais([(
         BUILDER,
         UnitAi {
-            ai_type: crate::unit_ai::CIVILIAN,
+            ai_type: CIVILIAN,
             current_target: None,
             last_target: None,
             ..UnitAi::default()
@@ -827,7 +838,7 @@ fn builder_whose_move_to_failed_waits_or_halts_on_marks() {
         t.spatial
             .tiles_mut_for_test()
             .mark_for_test(Tile::new(10, 10), 0x80_0000 << 3);
-        t.spatial.sight = Some(crate::vision::visibility::Visibility::new(
+        t.spatial.sight = Some(Visibility::new(
             GridSize::new(20, 20),
             Vec::new(),
             vec![VisionBits::from_bits_retain(1 << 1); 400],
@@ -956,7 +967,7 @@ fn stump(t: &mut World) {
             PlayerId::new(0),
             Unit {
                 id: object_id(77),
-                place: crate::objects::layers::Static::at(Position::new(10.2, 10.2, 0.0)),
+                place: Static::at(Position::new(10.2, 10.2, 0.0)),
                 life: Lifecycle {
                     state: ObjectState::Alive,
                     hp: HitPoints::new(0.5),
@@ -992,7 +1003,7 @@ fn stump(t: &mut World) {
 /// ([`crate::world::tests::placeable_on`]) over the world's map.
 fn sighted(t: &mut World) {
     let map = t.spatial.map;
-    crate::world::tests::placeable_on(t, map);
+    placeable_on(t, map);
 }
 
 /// A Build waiting for the house's footprint (state 222), its wait run out in this update.
@@ -1068,17 +1079,13 @@ fn another_player_marks_on_the_footprint_halt_the_build() {
 #[test]
 fn builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
     for (waits, state, after) in [
-        (
-            crate::construction::FootprintWaits::MOST.get(),
-            BuildState::Halted,
-            0,
-        ),
+        (FootprintWaits::MOST.get(), BuildState::Halted, 0),
         (3, BuildState::Wait, 4),
     ] {
         let mut t = site_world(class::VILLAGER, Position::new(12.5, 10.5, 0.0), placing());
         stump(&mut t);
         sighted(&mut t);
-        own(&mut t, BUILDER).footprint_waits = crate::construction::FootprintWaits::of_data(waits);
+        own(&mut t, BUILDER).footprint_waits = FootprintWaits::of_data(waits);
         let mut other = copy_of(&t, BUILDER);
         other.unit.id = object_id(6);
         other.parts.actions.list = ActionList::default();
@@ -1283,7 +1290,7 @@ fn villager_works_the_farm_it_built() {
     // the work command within the update: [`site_world`]'s villager has no farm task, so it
     // walks to the farm, and the move (slot 0x138, `+0xa14` 1) empties the queue the Build
     // left its Hunt order in
-    let walks = Some(crate::movement::move_to::MOVE_TO);
+    let walks = Some(MOVE_TO);
     assert_eq!(worked, (HeadCode::Keeps, (walks, Some(HOUSE))));
     assert_eq!(t.parts.unit_ai.get(builder(&t).id).unwrap().orders, vec![]);
 }
@@ -1326,7 +1333,7 @@ fn with_mill(t: &mut World) {
     mill.unit.id = object_id(300);
     mill.unit.life.master_id = master_id(68);
     mill.unit.life.state = ObjectState::Alive;
-    mill.unit.workers = crate::objects::WorkerCount::of_data(0);
+    mill.unit.workers = WorkerCount::of_data(0);
     mill.parts.building.construction = Some(construction(25.0, 0, false));
     mill.unit.place_for_test(Position::new(15.5, 10.5, 0.0));
     let _ = t.push_live(PlayerId::new(1), mill).unwrap();
@@ -1340,20 +1347,20 @@ fn with_mill(t: &mut World) {
         ),
     );
     // a done building of its owner's tracker, which the table's search reads
-    let k = crate::players::tracker::key(t.masters.get(1), &t.lines, master_id(68));
+    let k = key(t.masters.get(1), &t.lines, master_id(68));
     t.players[1].tracker.add(object_id(300), k);
     t.players[1].tracker.complete(object_id(300), k);
-    t.drop_sites = vec![crate::unit_ai::task_finder::DropSite {
+    t.drop_sites = vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
-        targets: vec![crate::unit_ai::task_finder::DropTarget {
+        targets: vec![DropTarget {
             class: class::TREE,
-            workers: crate::objects::WorkerCount::of_data(-1),
+            workers: WorkerCount::of_data(-1),
             state: None,
             attribute: Some(attribute::WOOD),
         }],
         resource_types: vec![attribute::WOOD],
-        ..crate::unit_ai::task_finder::DropSite::default()
+        ..DropSite::default()
     }];
 }
 
@@ -1526,7 +1533,7 @@ fn wood(t: &World) -> (f32, f32, i32) {
 #[test]
 fn builder_at_its_drop_site_gives_its_load_and_walks_back() {
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(MoveTo::Arrived));
-    own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
+    own(&mut t, object_id(300)).workers = WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
     let b = build(&t);
     assert_eq!(wood(&t), (0.0, 10.0, 0));
@@ -1571,7 +1578,7 @@ fn builder_at_its_drop_site_gives_its_load_and_walks_back() {
         )
     );
     let mut refused = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(MoveTo::Arrived));
-    own(&mut refused, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
+    own(&mut refused, object_id(300)).workers = WorkerCount::of_data(1);
     refused.drop_sites[0].targets[0].attribute = Some(attribute::STONE);
     let _ = code(&mut refused, 250);
     let b = build(&refused);
@@ -1666,7 +1673,7 @@ fn builder_without_foundation_after_its_drop_off() {
         lone(Position::new(-1.0, -1.0, -1.0)),
     );
     t.parts.set_unit_ai(BUILDER, None);
-    own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
+    own(&mut t, object_id(300)).workers = WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
     assert_eq!(
         (build(&t).state.bare(), wood(&t).2),
@@ -1818,10 +1825,7 @@ fn an_annex_test_sends_its_units_off_or_halts_the_build() {
                 (b.state, b.target, sent_off(&t)),
                 (BuildState::Wait, Some(HOUSE_SITE), 1)
             );
-            assert_eq!(
-                builder(&t).footprint_waits,
-                crate::construction::FootprintWaits::of_data(1)
-            );
+            assert_eq!(builder(&t).footprint_waits, FootprintWaits::of_data(1));
         }
     }
 }

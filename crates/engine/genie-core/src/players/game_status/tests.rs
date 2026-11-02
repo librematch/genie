@@ -1,14 +1,23 @@
 use super::*;
+use crate::combat::attack::ATTACK;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::tests::own_attack;
 use crate::construction::build::BuildState;
+use crate::construction::build::BuildTask;
+use crate::construction::build::tests::started_on;
 use crate::construction::repair::RepairState;
+use crate::construction::repair::{REPAIR, RepairAction, RepairTask};
 use crate::gathering::gather::GatherState;
+use crate::gathering::gather::{GATHER, GatherAction, Resource, StopRate};
 use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::HuntTask;
+use crate::gathering::hunt::tests::walker;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::movement::Speed;
+use crate::movement::move_to::{MoveDefaults, MoveToReads, NO_TARGET_GAP, SpriteReads, WalkTo};
 use crate::objects::Graphics;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -18,20 +27,26 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::{Action, Motion};
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
+use crate::objects::masters::WorkValue;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters};
+use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, Frame, WorkerCount};
+use crate::ownership::artifact::{ARTIFACT_TYPE, Artifact, ArtifactState};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
+use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::relation_row;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
@@ -40,14 +55,17 @@ use crate::production::UnitIndex;
 use crate::production::{
     Entry, MakeObj, MakeObjState, MakeTech, MakeTechState, Making, Production, Queue,
 };
+use crate::production::{EntrySerial, QueueChanges, QueueLength};
 use crate::technology::CostPaid;
 use crate::technology::ResearchState;
+use crate::technology::{CostOverride, ResearchCap, ResearchCount};
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::tech_id;
+use crate::test_ids::{adds, amounts};
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
@@ -57,6 +75,7 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
+use crate::world::{FrameSeed, GameMode, PlayState};
 
 /// An entry of `count` villagers of master `master` that paid `food` each.
 fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
@@ -69,7 +88,7 @@ fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
             (None, Amount::new(0.0)),
             (Some(attribute::HEADROOM), Amount::new(1.0)),
         ],
-        serial: crate::production::EntrySerial::new(0),
+        serial: EntrySerial::new(0),
         button: QueueButton::NONE,
         train_time: WholeSeconds::of_data(25),
     }
@@ -81,9 +100,9 @@ fn queue(entries: &[Entry]) -> Queue {
     slots[..entries.len()].copy_from_slice(entries);
     Queue {
         slots,
-        count: crate::production::QueueLength::of_data(entries.len() as i16),
+        count: QueueLength::of_data(entries.len() as i16),
         total: entries.iter().map(|e| e.count).sum(),
-        next_serial: crate::production::EntrySerial::new(10),
+        next_serial: EntrySerial::new(10),
         ..Queue::default()
     }
 }
@@ -114,7 +133,7 @@ fn game() -> World {
     };
     let mut t = World::new(
         WorldTime::from_millis(61_000),
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO; 3],
         vec![
@@ -180,9 +199,9 @@ fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
     t.players[3].attributes[303] = Amount::new(7.9);
     t.players[1].attributes[301] = Amount::new(50.0);
     t.players[1].history.entries = vec![
-        crate::players::history::HistoryEntry {
-            civilian: crate::players::history::Population::of_data(1),
-            military: crate::players::history::Population::ZERO,
+        HistoryEntry {
+            civilian: Population::of_data(1),
+            military: Population::ZERO,
         };
         4
     ];
@@ -190,9 +209,9 @@ fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
     t.defeat_event(PlayerId::new(1)).unwrap();
     assert_eq!(
         t.players[1].history.events,
-        [crate::players::history::Event {
-            kind: crate::players::history::EventKind::DEFEAT,
-            time_slice: crate::players::history::TimeSlice::of_data(4),
+        [Event {
+            kind: EventKind::DEFEAT,
+            time_slice: TimeSlice::of_data(4),
             world_time: WorldTime::from_millis(5_000),
             data1: 3.0,
             data2: 7.0,
@@ -200,9 +219,9 @@ fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
         }]
     );
     t.players[2].resigned = true;
-    t.players[2].history.entries = vec![crate::players::history::HistoryEntry {
-        civilian: crate::players::history::Population::of_data(1),
-        military: crate::players::history::Population::ZERO,
+    t.players[2].history.entries = vec![HistoryEntry {
+        civilian: Population::of_data(1),
+        military: Population::ZERO,
     }];
     t.defeat_event(PlayerId::new(2)).unwrap();
     assert_eq!(t.players[2].history.events, []);
@@ -221,28 +240,28 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         let _ = t.push_live(PlayerId::new(1), object).unwrap();
         t.players[1].objects.last_place().unwrap()
     };
-    let task = crate::gathering::hunt::HuntTask {
+    let task = HuntTask {
         id: TaskId::test(0),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,
-        work_value: crate::objects::masters::WorkValue::new(1.0),
+        work_value: WorkValue::new(1.0),
         productivity: None,
         kind4: None,
     };
-    let bush = crate::gathering::gather::Resource {
+    let bush = Resource {
         id: ObjectId::NOBODY,
         position: Position::new(3.5, 3.5, 0.0),
         class: class::CLASS_7,
         master: master_id(59),
         player: PlayerId::new(0),
-        workers: crate::objects::WorkerCount::of_data(0),
+        workers: WorkerCount::of_data(0),
         drop_site: false,
         gap: Distance::new(1.2),
         state: ObjectState::Alive,
         radius: Footprint::new(0.5, 0.5),
     };
-    let rate = crate::gathering::gather::StopRate {
+    let rate = StopRate {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
@@ -252,16 +271,15 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             id: object_id(30),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
-            list: ActionList::default().with_gather(Some(
-                crate::gathering::gather::GatherAction::new(task, &bush, false, rate).unwrap(),
-            )),
+        Action {
+            list: ActionList::default()
+                .with_gather(Some(GatherAction::new(task, &bush, false, rate).unwrap())),
             ..Default::default()
         },
     ));
-    let build_task = crate::construction::build::BuildTask {
+    let build_task = BuildTask {
         range: Distance::ZERO,
-        work_value: crate::objects::masters::WorkValue::new(1.0),
+        work_value: WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::of_task(-1),
@@ -272,21 +290,19 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             id: object_id(31),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
-            list: ActionList::default().with_build(Some(
-                crate::construction::build::tests::started_on(
-                    None,
-                    Position::new(3.5, 3.5, 0.0),
-                    Distance::new(1.0),
-                    build_task,
-                ),
-            )),
+        Action {
+            list: ActionList::default().with_build(Some(started_on(
+                None,
+                Position::new(3.5, 3.5, 0.0),
+                Distance::new(1.0),
+                build_task,
+            ))),
             ..Default::default()
         },
     ));
-    let repair_task = crate::construction::repair::RepairTask {
+    let repair_task = RepairTask {
         id: TaskId::test(0),
-        work_value: crate::objects::masters::WorkValue::new(1.0),
+        work_value: WorkValue::new(1.0),
         moving: None,
         proceeding: None,
     };
@@ -295,20 +311,20 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             id: object_id(32),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
+        Action {
             list: ActionList::default().with_repair(Some(
-                crate::construction::repair::RepairAction::start(
-                    crate::movement::move_to::WalkTo {
+                RepairAction::start(
+                    WalkTo {
                         id: None,
                         at: Position::new(3.5, 3.5, 0.0),
-                        gap: Distance::new(crate::movement::move_to::NO_TARGET_GAP),
+                        gap: Distance::new(NO_TARGET_GAP),
                         state: None,
                     },
                     repair_task,
                     Distance::ZERO,
-                    &crate::movement::move_to::MoveToReads {
-                        sprites: crate::movement::move_to::SpriteReads {
-                            defaults: crate::movement::move_to::MoveDefaults::default(),
+                    &MoveToReads {
+                        sprites: SpriteReads {
+                            defaults: MoveDefaults::default(),
                             graphics: &Graphics::new(),
                         },
                         state: ObjectState::Alive,
@@ -322,12 +338,11 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             ..Default::default()
         },
     ));
-    let mut attack =
-        crate::combat::attack::tests::own_attack(-1, AttackState::Done, Distance::new(1.0));
-    attack.arms.idle_sprite = Some(crate::objects::sprite::Graphic {
+    let mut attack = own_attack(-1, AttackState::Done, Distance::new(1.0));
+    attack.arms.idle_sprite = Some(Graphic {
         id: SpriteId::named(1),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -338,7 +353,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             id: object_id(33),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
+        Action {
             list: ActionList::default().with_attack(Some(attack)),
             ..Default::default()
         },
@@ -348,39 +363,20 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             id: object_id(34),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
-            list: ActionList::default()
-                .with_artifact(Some(crate::ownership::artifact::Artifact::new(false, None))),
+        Action {
+            list: ActionList::default().with_artifact(Some(Artifact::new(false, None))),
             ..Default::default()
         },
     ));
-    t.set_motion(
-        object_id(33),
-        Some(crate::objects::layers::Motion::Moving(
-            crate::gathering::hunt::tests::walker(),
-        )),
-    );
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), gather, crate::gathering::gather::GATHER),
-        Ok(true)
-    );
+    t.set_motion(object_id(33), Some(Motion::Moving(walker())));
+    assert_eq!(t.halt_other(PlayerId::new(1), gather, GATHER), Ok(true));
     assert_eq!(
         t.halt_other(PlayerId::new(1), build, action_type::BUILD),
         Ok(true)
     );
-    assert_eq!(
-        t.halt_other(
-            PlayerId::new(1),
-            repair,
-            crate::construction::repair::REPAIR
-        ),
-        Ok(true)
-    );
-    assert_eq!(
-        t.halt_other(PlayerId::new(1), attack, crate::combat::attack::ATTACK),
-        Ok(true)
-    );
-    let kind = crate::ownership::artifact::ARTIFACT_TYPE;
+    assert_eq!(t.halt_other(PlayerId::new(1), repair, REPAIR), Ok(true));
+    assert_eq!(t.halt_other(PlayerId::new(1), attack, ATTACK), Ok(true));
+    let kind = ARTIFACT_TYPE;
     assert_eq!(t.halt_other(PlayerId::new(1), artifact, kind), Ok(true));
     let objects = &t.players[1].objects;
     assert_eq!(
@@ -420,7 +416,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             .list
             .artifact()
             .map(|a| a.state),
-        Some(crate::ownership::artifact::ArtifactState::Check)
+        Some(ArtifactState::Check)
     );
     assert!(
         t.halt_other(PlayerId::new(1), gather, ActionType::named(99))
@@ -436,7 +432,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
             id: object_id(20),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
+        Action {
             list: ActionList::default().with_hunt(Some(HuntAction {
                 target: None,
                 state: HuntState::Walk { move_to: None },
@@ -447,7 +443,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
                     range: Distance::ZERO,
                     resource: None,
                     sprites: TaskSprites::NONE,
-                    work_value: crate::objects::masters::WorkValue::new(0.0),
+                    work_value: WorkValue::new(0.0),
                     productivity: None,
                     kind4: None,
                 },
@@ -631,7 +627,7 @@ fn dying_building_cancels_its_queue_in_its_update() {
             .unwrap()
             .queue
             .count,
-        crate::production::QueueLength::of_data(1)
+        QueueLength::of_data(1)
     );
     assert_eq!(p.attributes[0], Amount::ZERO);
 }
@@ -729,7 +725,7 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
         ),
         (1, 2, Some(master_id(293)), 2)
     );
-    assert_eq!(q.changes, crate::production::QueueChanges::of_data(2));
+    assert_eq!(q.changes, QueueChanges::of_data(2));
     assert!(production.action.is_none());
     assert_eq!(p.tracker.queued, -10);
     // from the second unit the make action goes on for the other sex
@@ -803,10 +799,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
     )
     .unwrap();
     let p = &t.players[1];
-    assert_eq!(
-        p.resources(),
-        crate::test_ids::amounts([92.0, 50.0, 0.0, 90.0])
-    );
+    assert_eq!(p.resources(), amounts([92.0, 50.0, 0.0, 90.0]));
     assert_eq!(p.attributes[80], Amount::ZERO);
     assert_eq!(
         t.parts
@@ -815,7 +808,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
             .unwrap()
             .queue
             .count,
-        crate::production::QueueLength::of_data(0)
+        QueueLength::of_data(0)
     );
     // [2 villagers, a research]: the research moved into the slot ends it
     let mut t = game();
@@ -889,10 +882,10 @@ fn researching(progress: f32) -> World {
     techs[22] = TechState {
         state: ResearchState::Researching,
         allow_multiple: true,
-        pending: crate::technology::ResearchCount::of_data(3),
+        pending: ResearchCount::of_data(3),
         research_done: Seconds::new(progress),
-        research_cap: crate::technology::ResearchCap::of_data(-1),
-        overrides: [crate::technology::CostOverride::UNSET; 3],
+        research_cap: ResearchCap::of_data(-1),
+        overrides: [CostOverride::UNSET; 3],
         locations: vec![Location {
             building: Some(ids::TOWN_CENTRE),
             time: WholeSeconds::of_data(25),
@@ -950,7 +943,7 @@ fn cancel_of_all_researches_gives_back_the_entry_three() {
     let tc = &p.objects[ListIndex::new(0)];
     assert_eq!(
         t.parts.combat_of(tc.id).store,
-        crate::test_ids::adds([(attribute::WOOD, 20.0)])
+        adds([(attribute::WOOD, 20.0)])
     );
     let production = t.parts.production.get(tc.id).unwrap();
     assert_eq!(production.disabled_techs, [tech_id(5)]);
@@ -990,7 +983,7 @@ fn cancel_of_all_researches_gives_back_the_entry_three() {
 fn queue_cancel_gives_back_its_researches_and_the_destructor_counts_done_one() {
     let mut t = researching(30.0);
     let s = &mut t.players[1].techs[22];
-    (s.stack, s.research_cap) = (true, crate::technology::ResearchCap::of_data(5));
+    (s.stack, s.research_cap) = (true, ResearchCap::of_data(5));
     t.cancel_queue(PlayerId::new(1), ListIndex::new(0)).unwrap();
     let p = &t.players[1];
     assert_eq!(p.attributes[3], Amount::new(150.0));
@@ -1016,7 +1009,7 @@ fn queue_cancel_gives_back_its_researches_and_the_destructor_counts_done_one() {
     // not done: state 1, nothing counted
     let mut t = researching(10.0);
     let s = &mut t.players[1].techs[22];
-    (s.stack, s.research_cap) = (true, crate::technology::ResearchCap::of_data(5));
+    (s.stack, s.research_cap) = (true, ResearchCap::of_data(5));
     t.cancel_queue(PlayerId::new(1), ListIndex::new(0)).unwrap();
     let s = &t.players[1].techs[22];
     assert_eq!(
@@ -1057,7 +1050,7 @@ fn research_gives_the_effect_attribute_269_names() {
 fn cancel_in_game_mode_16_clears_the_military_flag() {
     let run = |age: f32| {
         let mut t = game();
-        t.settings.game_mode = crate::world::GameMode::of_data(16);
+        t.settings.game_mode = GameMode::of_data(16);
         t.players[1].attributes[6] = Amount::new(age);
         t.players[1].one_military_queued = true;
         let ms = &mut t.masters[1];
@@ -1117,9 +1110,9 @@ fn resignation_cancels_the_queues_and_the_last_side_wins() {
         (None, Some(ActionKind::Make))
     );
     assert_eq!(ai.notifies.len(), 1);
-    assert_eq!(t.game_state, crate::world::PlayState::of_data(0));
+    assert_eq!(t.game_state, PlayState::of_data(0));
     t.victory_check().unwrap();
-    assert_eq!(t.game_state, crate::world::PlayState::of_data(1));
+    assert_eq!(t.game_state, PlayState::of_data(1));
     assert_eq!(
         (t.players[1].game_status, t.players[2].game_status),
         (GameStatus::LOST, GameStatus::WON)

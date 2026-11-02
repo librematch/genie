@@ -3,9 +3,14 @@
 //! target as a hit reads it, the start's readiness, the target's sight and a villager's swap.
 
 use crate::GenieError;
+use crate::combat::attack::unit::NO_ATTACK;
+use crate::combat::attack::{
+    Attack, AttackCommand, Mark, ReadyReads, Wielder, arms_looking, engagement, speed_of,
+};
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
 use crate::combat::victims::{victim_in, victim_of};
+use crate::combat::{AttackCount, AttackTargetId};
 use crate::map::Tile;
 use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
@@ -20,13 +25,17 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::player_master;
+use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::release::Releaser;
+use crate::objects::sprite::new_sprite;
+use crate::unit_ai::Attacked;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::world::SideWorld;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{NOT_HELD, UnitView};
 use crate::world::slots::PlayerSlots;
+use crate::world::{ATTACKER_UNPLACED, NO_STANDING_SPRITE};
 
 impl UnitView<'_, '_> {
     /// The attack command (slot 0x338, `FUN_14120cea0`; classes 51 and 54 are not modelled) ->
@@ -50,7 +59,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         force: bool,
         ai: &UnitAi,
-    ) -> Result<crate::unit_ai::Attacked, GenieError> {
+    ) -> Result<Attacked, GenieError> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
         let own = self
             .unit
@@ -62,7 +71,7 @@ impl UnitView<'_, '_> {
                 "the attack command of a unit of class 51 or 54",
             ));
         }
-        let no = crate::unit_ai::Attacked::default;
+        let no = Attacked::default;
         let Some(t) = self.c.w.spatial.get_known(target)?.copied() else {
             return Ok(no());
         };
@@ -70,12 +79,12 @@ impl UnitView<'_, '_> {
             .actions
             .list
             .attack()
-            .is_some_and(|a| a.target.map(crate::combat::AttackTargetId::id) == Some(target))
+            .is_some_and(|a| a.target.map(AttackTargetId::id) == Some(target))
         {
             if force {
                 self.attack_again(target, &t, master, ai)?;
             }
-            return Ok(crate::unit_ai::Attacked {
+            return Ok(Attacked {
                 attacks: true,
                 posted: Vec::new(),
             });
@@ -86,7 +95,7 @@ impl UnitView<'_, '_> {
             .w
             .spatial
             .get(self.unit.id)
-            .ok_or(crate::world::ATTACKER_UNPLACED)?;
+            .ok_or(ATTACKER_UNPLACED)?;
         let target_master = player_master(&self.c.w.masters, t.player, t.master).ok_or(
             GenieError::unsupported("an attack's target of a master the slice does not have"),
         )?;
@@ -94,14 +103,8 @@ impl UnitView<'_, '_> {
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
         let look = self.c.w.parts.combat_of(unit.id).abilities.look.as_ref();
-        let arms = crate::combat::attack::arms_looking(
-            master,
-            look,
-            &self.c.w.graphics,
-            TaskSprites::NONE,
-            None,
-        );
-        let standing = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
+        let arms = arms_looking(master, look, &self.c.w.graphics, TaskSprites::NONE, None);
+        let standing = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         if unit.sprite.is_none() {
             return Err(GenieError::unsupported(
                 "an attack command of a unit whose sprite the slice does not hold",
@@ -109,28 +112,20 @@ impl UnitView<'_, '_> {
         }
         let by = self.attack_clears_actions(master.class)?;
         let unit = &mut *self.unit;
-        let speed = crate::combat::attack::speed_of(self.c.w.parts.mover_of(unit.id))?;
-        let e = crate::combat::attack::engagement(
-            Some(ai),
-            speed,
-            master,
-            &me_at,
-            &t,
-            self.c.w.world_time,
-        )?;
+        let speed = speed_of(self.c.w.parts.mover_of(unit.id))?;
+        let e = engagement(Some(ai), speed, master, &me_at, &t, self.c.w.world_time)?;
         // the constructor clears +0x900 for a target other than its own (none yet)
-        self.c.w.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
+        self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         if unit.life.inside.is_some() {
-            return self
-                .attack_from_inside(crate::combat::attack::Attack::own(target, &e, arms), by);
+            return self.attack_from_inside(Attack::own(target, &e, arms), by);
         }
-        crate::objects::sprite::new_sprite(
+        new_sprite(
             &mut unit.sprite,
             self.c.w.parts.move_stats_mut(unit.id),
             standing,
             self.c.w.streams.get(Stream::Sprite),
         );
-        let cmd = crate::combat::attack::AttackCommand {
+        let cmd = AttackCommand {
             target,
             engagement: &e,
             arms,
@@ -139,10 +134,10 @@ impl UnitView<'_, '_> {
             ready: self.ready_reads(target, master, ai)?,
         };
         let unit = &mut *self.unit;
-        let (attack, posted) = crate::combat::attack::Attack::command(self.c, unit, &cmd)?;
+        let (attack, posted) = Attack::command(self.c, unit, &cmd)?;
         self.actions.list.set_attack(Some(attack));
         self.take(target, by)?;
-        Ok(crate::unit_ai::Attacked {
+        Ok(Attacked {
             attacks: true,
             posted,
         })
@@ -151,10 +146,7 @@ impl UnitView<'_, '_> {
     /// The attack command's master: a villager switches to its player's villager of its task
     /// swap group first ([`UnitView::villager_swap`]; slot 0x90 with 0: the action list clears,
     /// then the master change at once, [`UnitView::switch_unit_master`]), else it keeps `own`.
-    fn swapped_master(
-        &mut self,
-        own: crate::objects::masters::Master,
-    ) -> Result<crate::objects::masters::Master, GenieError> {
+    fn swapped_master(&mut self, own: Master) -> Result<Master, GenieError> {
         let Some(next) = self.villager_swap(&own).cloned() else {
             return Ok(own);
         };
@@ -167,9 +159,9 @@ impl UnitView<'_, '_> {
     /// target, which it takes (slot 0x178, as `by`).
     fn attack_from_inside(
         &mut self,
-        mut attack: crate::combat::attack::Attack,
+        mut attack: Attack,
         by: Releaser,
-    ) -> Result<crate::unit_ai::Attacked, GenieError> {
+    ) -> Result<Attacked, GenieError> {
         let unit = &mut *self.unit;
         attack.fail_at_start(
             &mut unit.sprite,
@@ -181,7 +173,7 @@ impl UnitView<'_, '_> {
         if let Some(target) = target {
             self.take(target.id(), by)?;
         }
-        Ok(crate::unit_ai::Attacked {
+        Ok(Attacked {
             attacks: true,
             posted: Vec::new(),
         })
@@ -219,10 +211,10 @@ impl UnitView<'_, '_> {
         &mut self,
         target: ObjectId,
         t: &Placed,
-        master: &crate::objects::masters::Master,
+        master: &Master,
         ai: &UnitAi,
     ) -> Result<(), GenieError> {
-        let mark = |id: ObjectId, p: &Placed| -> Result<crate::combat::attack::Mark, GenieError> {
+        let mark = |id: ObjectId, p: &Placed| -> Result<Mark, GenieError> {
             let u = owner_view(
                 &self.c.w.players,
                 &self.c.w.index,
@@ -232,7 +224,7 @@ impl UnitView<'_, '_> {
             .get(id)
             .ok_or(NOT_HELD)?;
             let m = player_master(&self.c.w.masters, p.player, p.master).ok_or(NOT_HELD)?;
-            Ok(crate::combat::attack::Mark {
+            Ok(Mark {
                 id,
                 kind: m.kind,
                 class: m.class,
@@ -258,7 +250,7 @@ impl UnitView<'_, '_> {
             None => None,
         };
         let unit = &mut *self.unit;
-        let wielder = crate::combat::attack::Wielder {
+        let wielder = Wielder {
             area_effect: master.area_effect,
             speed: self
                 .c
@@ -270,11 +262,7 @@ impl UnitView<'_, '_> {
             radius: master.radius,
         };
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE;
-        let attack = self
-            .actions
-            .list
-            .attack_mut()
-            .ok_or(crate::combat::attack::unit::NO_ATTACK)?;
+        let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let w = attack.work(Some(target_mark), main, &wielder, |_| can_move);
         let by = Releaser {
             id: unit.id,
@@ -282,7 +270,7 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         if w.clears_count {
-            self.c.w.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
+            self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         }
         if let Some(old) = w.lets_go {
             self.release(old, by)?;
@@ -346,9 +334,9 @@ impl UnitView<'_, '_> {
     fn ready_reads(
         &self,
         target: ObjectId,
-        master: &crate::objects::masters::Master,
+        master: &Master,
         ai: &UnitAi,
-    ) -> Result<Option<crate::combat::attack::ReadyReads>, GenieError> {
+    ) -> Result<Option<ReadyReads>, GenieError> {
         let Some(victim) = self.victim_of_target(target)? else {
             return Ok(None);
         };
@@ -372,16 +360,13 @@ impl UnitView<'_, '_> {
             self.c.w.parts.combat_of(unit.id),
             master,
             (
-                crate::objects::masters::OwnerMasters::new(
-                    &self.c.w.parts.own_master,
-                    self.c.w.masters.of(self.player),
-                ),
+                OwnerMasters::new(&self.c.w.parts.own_master, self.c.w.masters.of(self.player)),
                 &self.c.w.graphics,
             ),
             Some(ai),
             (self.player_type, self.c.w.world_time),
         );
-        Ok(Some(crate::combat::attack::ReadyReads {
+        Ok(Some(ReadyReads {
             reads,
             fight: Fight { victim, own },
         }))
@@ -393,11 +378,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// A tile the map's sight does not hold.
-    fn target_visible(
-        &self,
-        t: &Placed,
-        target_master: &crate::objects::masters::Master,
-    ) -> Result<bool, GenieError> {
+    fn target_visible(&self, t: &Placed, target_master: &Master) -> Result<bool, GenieError> {
         let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
         Ok(self.c.w.spatial.sees_tile(self.player, Tile::new(tx, ty))
             || (target_master.fog_visibility != FogVisibility::INVISIBLE
@@ -407,10 +388,7 @@ impl UnitView<'_, '_> {
     /// The attack command's villager swap: a villager (class 4) switches to its player's villager
     /// of its task swap group (`+0x7b8` 1: the master table's `+0x298`, 83; else `+0x928`, 293)
     /// when the player has it.
-    fn villager_swap(
-        &self,
-        master: &crate::objects::masters::Master,
-    ) -> Option<&crate::objects::masters::Master> {
+    fn villager_swap(&self, master: &Master) -> Option<&Master> {
         if master.class != class::VILLAGER {
             return None;
         }

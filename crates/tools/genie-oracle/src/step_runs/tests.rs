@@ -5,18 +5,20 @@ use genie_core::world::schedule::{
 };
 
 use crate::Dumps;
+use crate::fixtures::recording;
 use crate::fixtures::{gaia, header, human};
 use crate::step_runs::steps_from_save;
+use genie_rec::de::Op;
 
 /// Gaia and a player without objects, as a save file (one chapter, no ops).
 fn quiet() -> Vec<u8> {
-    crate::fixtures::recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[])
+    recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[])
 }
 
 /// A recording of the same save and `n` syncs of 50 ms.
 fn syncs(n: usize) -> Vec<u8> {
-    let ops: Vec<_> = (0..n).map(|_| genie_rec::de::Op::Sync { dt: 50 }).collect();
-    crate::fixtures::recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &ops)
+    let ops: Vec<_> = (0..n).map(|_| Op::Sync { dt: 50 }).collect();
+    recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &ops)
 }
 
 /// Every step of the update is reported in the schedule's order, and a quiet world against the

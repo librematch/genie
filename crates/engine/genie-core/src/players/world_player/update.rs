@@ -7,10 +7,12 @@ use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::WONDER;
+use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute;
+use crate::players::game_status::GameStatus;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{
     ALIVE_STORE_MODE, PERCENT, POPULATION_STORAGE, SECOND, UNKEPT_HIGH, UNKEPT_LOW, get, set,
@@ -91,7 +93,7 @@ impl World {
             return Ok(());
         }
         self.defeat_check(p)?;
-        if self.players.player(p)?.game_status == crate::players::game_status::GameStatus::PLAYING {
+        if self.players.player(p)?.game_status == GameStatus::PLAYING {
             self.trickles(p)?;
             self.mill_food(p, time)?;
         }
@@ -144,7 +146,7 @@ impl World {
                 player.sudden_death_eliminable = true;
             }
         }
-        if self.players.player(p)?.game_status == crate::players::game_status::GameStatus::LOST {
+        if self.players.player(p)?.game_status == GameStatus::LOST {
             return Ok(());
         }
         let kingless = self.settings.regicide()
@@ -155,7 +157,7 @@ impl World {
                 .list(ListKey::master(ids::KING))
                 .is_empty();
         if !stays || kingless {
-            self.set_status(p, crate::players::game_status::GameStatus::LOST)?;
+            self.set_status(p, GameStatus::LOST)?;
             set(
                 &mut self.players.player_mut(p)?.attributes,
                 attribute::SURVIVAL,
@@ -183,11 +185,7 @@ impl World {
     /// # Errors
     ///
     /// An object of a master the slice does not have.
-    pub fn keeps_alive(
-        &self,
-        p: PlayerId,
-        unit: &crate::objects::unit::Unit,
-    ) -> Result<bool, GenieError> {
+    pub fn keeps_alive(&self, p: PlayerId, unit: &Unit) -> Result<bool, GenieError> {
         let master = unit.master(self.master_tables(), p)?;
         let state = unit.life.state;
         if (ObjectState::Unfinished..=ObjectState::DyingSprite).contains(&state)

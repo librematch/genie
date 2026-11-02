@@ -4,10 +4,12 @@
 
 use genie_rec::de::{self, Op, command::Command};
 use std::collections::BTreeMap;
+use std::env::var;
+use std::fs::{read, read_dir};
 use std::path::{Path, PathBuf};
 
 fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).unwrap().map(Result::unwrap) {
+    for entry in read_dir(dir).unwrap().map(Result::unwrap) {
         let path = entry.path();
         if path.is_dir() {
             recordings(&path, out);
@@ -53,7 +55,7 @@ fn packet_that_fits_no_layout_stays_raw() {
 
 #[test]
 fn every_tier_1_command_decodes_and_writes_back() {
-    let Ok(dir) = std::env::var("GENIE_REC_CORPUS") else {
+    let Ok(dir) = var("GENIE_REC_CORPUS") else {
         eprintln!("GENIE_REC_CORPUS is not set; skipping");
         return;
     };
@@ -62,7 +64,7 @@ fn every_tier_1_command_decodes_and_writes_back() {
     paths.sort();
     let (mut packets, mut unknown) = (0usize, BTreeMap::<u8, usize>::new());
     for path in &paths {
-        let data = std::fs::read(path).unwrap();
+        let data = read(path).unwrap();
         let Ok(chapters) = de::chapters(&data) else {
             continue;
         };

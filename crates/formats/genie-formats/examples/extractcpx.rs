@@ -1,6 +1,8 @@
 //! Lists or extracts the scenario files in a campaign file.
 
 use genie_formats::Campaign;
+use std::env::current_dir;
+use std::fs::write;
 use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 
@@ -54,7 +56,7 @@ fn list(args: List) {
 fn extract(args: Extract) {
     let dir = args
         .output
-        .unwrap_or_else(|| std::env::current_dir().expect("invalid cwd"));
+        .unwrap_or_else(|| current_dir().expect("invalid cwd"));
 
     let f = File::open(args.input).expect("could not open file");
     let mut campaign = Campaign::from(f).expect("not a campaign file");
@@ -67,7 +69,7 @@ fn extract(args: Extract) {
     (0..campaign.len()).for_each(|i| {
         let bytes = campaign.by_index_raw(i).expect("missing scenario data");
         println!("{}", names[i]);
-        std::fs::write(dir.join(&names[i]), bytes).expect("failed to write");
+        write(dir.join(&names[i]), bytes).expect("failed to write");
     });
 }
 

@@ -17,12 +17,18 @@ use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::{RestrictionId, Snow};
+use crate::math::conversions::cvttss2si;
+use crate::math::image::terrain::{INSIDE as TERRAIN_INSIDE, TILE as TERRAIN_TILE};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::TOWN_CENTRE;
+use crate::world::Mode680;
 use crate::world::slots::CheckedIndex;
+use std::mem::swap;
 
 /// A foundation's tile off the map after the clamp to it.
 const TILE_OFF_MAP: GenieError =
@@ -130,7 +136,7 @@ pub struct Terrain {
 }
 
 /// A tile's side (`DAT_14330eb8c`), which the slope shares measure against.
-const TILE: f32 = crate::math::image::terrain::TILE;
+const TILE: f32 = TERRAIN_TILE;
 
 /// `FUN_140f69470` (HD's `RGE_Map::get_tile_type`): the shape of the tile of elevation `e` from
 /// its neighbours' (`n`orth is `y − 1`, `e`ast `x + 1`; a neighbour off the map counts as the
@@ -211,16 +217,16 @@ pub struct Foundation {
     /// The foundation terrain, the master's `+0x988` byte.
     pub terrain: TerrainId,
     /// The building's `snow_flag` (`+0xc61`).
-    pub snow: crate::map::Snow,
+    pub snow: Snow,
     /// The master's id and class, its `defense_terrain_bonus` (`+0x820`).
     pub master: MasterId,
     /// The master's class.
     pub class: ClassId,
     /// The master's `defense_terrain_bonus` (`+0x820`).
-    pub terrain_bonus: crate::objects::masters::RestrictionField,
+    pub terrain_bonus: RestrictionField,
     /// The game's setting `FUN_140ec0cd0` reads at `+0x680` ([`crate::world::World::mode_680`]):
     /// at 1 a foundation without a snow layer goes into the layer, not the terrain.
-    pub mode_680: crate::world::Mode680,
+    pub mode_680: Mode680,
 }
 
 /// The class bit of a terrain's flags (the `.dat`'s `is_water` byte) in the terrain
@@ -243,7 +249,7 @@ pub const fn terrain_class(flags: TerrainFlags) -> TerrainMask {
 impl Terrain {
     /// Restriction `restriction`'s values, one a terrain; none for a restriction the table lacks.
     #[must_use]
-    pub fn restriction(&self, restriction: crate::map::RestrictionId) -> Option<&Restriction> {
+    pub fn restriction(&self, restriction: RestrictionId) -> Option<&Restriction> {
         self.restrictions.get(restriction.index())
     }
 
@@ -251,7 +257,7 @@ impl Terrain {
     /// (`FUN_141054630`'s table): the class bits ([`terrain_class`]) of the terrains whose value
     /// in it is above 0; none for a restriction the table lacks.
     #[must_use]
-    pub fn restriction_mask(&self, restriction: crate::map::RestrictionId) -> TerrainMask {
+    pub fn restriction_mask(&self, restriction: RestrictionId) -> TerrainMask {
         self.restrictions
             .get(restriction.index())
             .map_or(TerrainMask::NONE, |values| {
@@ -379,11 +385,7 @@ impl Terrain {
     /// to restore, else its terrain (the tile's `+0xa`, else `+0x9`); 0 counts as 1, and an
     /// object off the tiles has 1. None for a restriction or terrain the data has not got.
     #[must_use]
-    pub fn defense(
-        &self,
-        bonus: crate::objects::masters::RestrictionField,
-        tile: Tile,
-    ) -> Option<f32> {
+    pub fn defense(&self, bonus: RestrictionField, tile: Tile) -> Option<f32> {
         let Some(i) = self.size.index(tile) else {
             return Some(1.0);
         };
@@ -450,7 +452,7 @@ impl Terrain {
         if x == -1.0 || y == -1.0 {
             return None;
         }
-        let short = |v: f32| i32::from(crate::math::conversions::cvttss2si(v) as i16);
+        let short = |v: f32| i32::from(cvttss2si(v) as i16);
         let tile = Tile::new(short(x), short(y));
         self.size.holds(tile).then(|| self.read(tile))
     }
@@ -510,16 +512,16 @@ impl Terrain {
     /// Never: the tiles it covers are held on the map.
     pub fn cover(&mut self, f: &Foundation) -> Result<(), GenieError> {
         /// `DAT_142eb1e9c`.
-        const INSIDE: f32 = crate::math::image::terrain::INSIDE;
+        const INSIDE: f32 = TERRAIN_INSIDE;
         let (x, y) = (f.position.x(), f.position.y());
         let (cx, cy) = (f.clearance.x(), f.clearance.y());
         let (mut x0, mut y0) = ((x - cx) as i32, (y - cy) as i32);
         let (mut x1, mut y1) = (((x + cx) - INSIDE) as i32, ((y + cy) - INSIDE) as i32);
         if x1 < x0 {
-            std::mem::swap(&mut x0, &mut x1);
+            swap(&mut x0, &mut x1);
         }
         if y1 < y0 {
-            std::mem::swap(&mut y0, &mut y1);
+            swap(&mut y0, &mut y1);
         }
         let (w, h) = (self.size.width() - 1, self.size.height() - 1);
         if x0 > w || y0 > h || x1 < 0 || y1 < 0 {
@@ -810,11 +812,11 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: FOUNDATION,
-            snow: crate::map::Snow::Completed,
+            snow: Snow::Completed,
             master: ids::HOUSE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::of_data(4),
-            mode_680: crate::world::Mode680::ZERO,
+            mode_680: Mode680::ZERO,
         })
         .unwrap();
         assert_eq!(t.kinds, ids(&[6, 6, 6, 6]));
@@ -840,11 +842,11 @@ mod tests {
             position: Position::new(2.0, 2.0, 0.0),
             clearance: Footprint::new(2.0, 2.0),
             terrain: FOUNDATION,
-            snow: crate::map::Snow::None,
+            snow: Snow::None,
             master: TOWN_CENTRE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::of_data(4),
-            mode_680: crate::world::Mode680::ZERO,
+            mode_680: Mode680::ZERO,
         })
         .unwrap();
         #[rustfmt::skip]
@@ -866,11 +868,11 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: FOUNDATION,
-            snow: crate::map::Snow::None,
+            snow: Snow::None,
             master: ids::HOUSE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::NONE,
-            mode_680: crate::world::Mode680::ZERO,
+            mode_680: Mode680::ZERO,
         })
         .unwrap();
         assert_eq!(t.kinds, ids(&[27, 2, 27, 47]));
@@ -886,11 +888,11 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: TerrainId::named(29),
-            snow: crate::map::Snow::None,
+            snow: Snow::None,
             master: ids::FARM,
             class: class::FARM,
             terrain_bonus: RestrictionField::NONE,
-            mode_680: crate::world::Mode680::ONE,
+            mode_680: Mode680::ONE,
         };
         t.cover(&farm).unwrap();
         assert_eq!(
@@ -914,11 +916,11 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: TerrainId::named(14),
-            snow: crate::map::Snow::None,
+            snow: Snow::None,
             master,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::NONE,
-            mode_680: crate::world::Mode680::ONE,
+            mode_680: Mode680::ONE,
         };
         for master in [master_id(357), master_id(1188)] {
             let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);

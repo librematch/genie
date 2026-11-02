@@ -24,6 +24,7 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::{Found, Path};
+use crate::world::index::ObjectsRef;
 
 /// The new level and its path, and what the request's planners found: a path (`local_19d0`),
 /// one partway (`bVar35`), one the tile pathfinder planned (`bVar6`), a failed short path
@@ -83,7 +84,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
         // FUN_141158210 is 1 only on an `E` tile in game type 12
         if plan.pathing.game_type == 12 {
@@ -121,7 +122,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         if self.planner_exists(world, plan) {
             if !self.near_target_path(me, world, plan, w, np, by_id)? {
@@ -148,7 +149,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         if w.goal.target.is_none()
             || TARGET_SHORT_REACH < w.distance.get()
@@ -179,7 +180,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         let target_moves = w.goal.target.is_some_and(|(_, t)| t.moves);
         let target_radius = w
@@ -227,7 +228,7 @@ impl Mover {
     fn short_path_to(
         &self,
         me: &Me,
-        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         near: bool,
@@ -262,7 +263,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<ControlFlow<AfterRequest, bool>, GenieError> {
         let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
         if np.found && 3 <= np.path.points.len() {
@@ -298,7 +299,7 @@ impl Mover {
     fn short_try(
         &mut self,
         me: &Me,
-        (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
+        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         near: bool,
@@ -367,7 +368,7 @@ impl Mover {
         plan: &Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
         if !(LONG_PATHER && (w.trade_cart || SHORT_REACH < w.distance.get())) {
             return Ok(None);
@@ -415,7 +416,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         w: &Way<'_>,
         np: &mut NewPath,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
         let target_radius = w
             .goal

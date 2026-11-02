@@ -6,6 +6,10 @@ use crate::combat::Firepower;
 use crate::garrison::DamageRate;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, maxss};
+use crate::math::image::garrison::{
+    EPSILON as GARRISON_EPSILON, ONE_MISSILE as GARRISON_ONE_MISSILE,
+    RATE_RANGE as GARRISON_RATE_RANGE,
+};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
@@ -16,11 +20,11 @@ use crate::objects::masters::{Master, Masters};
 use crate::world::Seconds;
 
 /// A combat master's attack rate needs a weapon range above this (`FUN_14120dc10`).
-pub(super) const RATE_RANGE: f32 = crate::math::image::garrison::RATE_RANGE;
+pub(super) const RATE_RANGE: f32 = GARRISON_RATE_RANGE;
 /// A unit's firepower counts its volley missiles beyond this many (`FUN_14120e1a0`).
-pub(super) const ONE_MISSILE: f32 = crate::math::image::garrison::ONE_MISSILE;
+pub(super) const ONE_MISSILE: f32 = GARRISON_ONE_MISSILE;
 /// A reload at most this long gives no firepower (`FUN_14120e1a0`).
-pub(super) const EPSILON: f32 = crate::math::image::garrison::EPSILON;
+pub(super) const EPSILON: f32 = GARRISON_EPSILON;
 /// The class whose garrison share is 1 whatever its firepower (`FUN_141213520`, `-0xe82` raw);
 /// UNLOAD's flag 0 leaves it inside (`FUN_14118a610`).
 pub(super) const WHOLE_SHARE_CLASS: ClassId = class::RELIC;

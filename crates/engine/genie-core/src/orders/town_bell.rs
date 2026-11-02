@@ -5,11 +5,14 @@
 
 use crate::GenieError;
 use crate::garrison::ContainerId;
+use crate::garrison::{Shelters, TOWN_BELL_REACH};
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::fmath::below_or_unordered;
+use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -22,13 +25,16 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiMove;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
 
@@ -195,9 +201,9 @@ impl TownBell {
 }
 
 /// The town bell's reach ([`crate::garrison::TOWN_BELL_REACH`]).
-const REACH: f32 = crate::garrison::TOWN_BELL_REACH;
+const REACH: f32 = TOWN_BELL_REACH;
 /// A record's point on neither axis (`DAT_14330ec20`).
-const NO_POINT: f32 = crate::math::image::garrison::NO_POINT;
+const NO_POINT: f32 = GARRISON_NO_POINT;
 
 impl World {
     /// `TOWN_BELL` (0x7f, `do_command`): the object `id` (none for −1, `FUN_140e6bad0`) of the
@@ -251,7 +257,7 @@ impl World {
         }
         let (at, radius) = self.ground(tc)?;
         let mut units = Vec::new();
-        let mut shelters = crate::garrison::Shelters::default();
+        let mut shelters = Shelters::default();
         let mut k = ListIndex::FIRST;
         while self.players.player(owner)?.objects.holds(k) {
             let here = k;
@@ -270,7 +276,7 @@ impl World {
                 let (other_at, other_radius) = t.ground(id)?;
                 let gap = footprint_gap_squared(other_at, other_radius, at, radius);
                 // COMISS REACH, gap; JC: a gap above it, or a NaN, is out
-                Ok(!crate::math::fmath::below_or_unordered(REACH, gap.get()))
+                Ok(!below_or_unordered(REACH, gap.get()))
             };
             if (class == class::VILLAGER && kind == COMBAT && near(self)?)
                 || (master == MASTER_1808 && near(self)?)
@@ -327,7 +333,7 @@ impl World {
             let (building_at, building_radius) = self.ground(id)?;
             // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
             let gap = footprint_gap_squared(building_at, building_radius, at, radius);
-            if crate::math::fmath::below_or_unordered(REACH, gap.get()) {
+            if below_or_unordered(REACH, gap.get()) {
                 continue;
             }
             self.workers_out(owner, idx)?;
@@ -376,7 +382,7 @@ impl World {
             let (building_at, building_radius) = self.ground(b.id)?;
             // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
             let gap = footprint_gap_squared(building_at, building_radius, at, radius);
-            if crate::math::fmath::below_or_unordered(REACH, gap.get()) {
+            if below_or_unordered(REACH, gap.get()) {
                 continue;
             }
             self.workers_out(owner, idx)?;
@@ -440,7 +446,7 @@ impl World {
         work_on: Option<ObjectId>,
         point: Point,
     ) -> Result<bool, GenieError> {
-        let Some(crate::world::index::Place::Live(up, ui)) = self.place(id) else {
+        let Some(Place::Live(up, ui)) = self.place(id) else {
             return Ok(false);
         };
         if !self.parts.town_bell_of(id).flag {
@@ -454,7 +460,7 @@ impl World {
             None => self.move_aside(
                 up,
                 ui,
-                crate::unit_ai::AiMove {
+                AiMove {
                     point: Position::new(x, y, 0.0),
                     range: Distance::ZERO,
                     force: true,
@@ -464,7 +470,7 @@ impl World {
             Some(target) => self.order_work(
                 up,
                 ui,
-                &crate::orders::Work {
+                &Work {
                     target: Some(target),
                     point: Position::new(x, y, 0.0),
                     carry_test: true,
@@ -804,11 +810,15 @@ mod tests {
 
     mod rings {
         use super::{bell, set_bell};
+        #[cfg(test)]
+        use crate::garrison::ContainerId;
         use crate::garrison::tests::{
             ARCHER, VILLAGER, inside_tc, let_out_world, sized_world, tracked, walker,
         };
         use crate::map::{Point, Position};
         use crate::objects::ObjectId;
+        #[cfg(test)]
+        use crate::orders::town_bell::BackToWork as TownBellBackToWork;
         use crate::players::PlayerId;
         use crate::test_ids::object_id;
         use crate::test_ids::player_id;
@@ -820,7 +830,7 @@ mod tests {
                 .list
                 .enter()
                 .and_then(|e| e.target)
-                .map(crate::garrison::ContainerId::id)
+                .map(ContainerId::id)
         }
 
         #[test]
@@ -917,9 +927,9 @@ mod tests {
             ] {
                 set_bell(&mut t, id, |v| {
                     v.flag = id != 1002;
-                    v.work = crate::orders::town_bell::BackToWork {
+                    v.work = TownBellBackToWork {
                         point,
-                        ..crate::orders::town_bell::BackToWork::NONE
+                        ..TownBellBackToWork::NONE
                     };
                 });
             }
@@ -984,9 +994,9 @@ mod tests {
                 for (id, point) in [(1000, Point::new(4.5, 4.5)), (1001, Point::new(3.5, 3.5))] {
                     set_bell(&mut t, id, |v| {
                         v.flag = true;
-                        v.work = crate::orders::town_bell::BackToWork {
+                        v.work = TownBellBackToWork {
                             point,
-                            ..crate::orders::town_bell::BackToWork::NONE
+                            ..TownBellBackToWork::NONE
                         };
                     });
                 }
@@ -1019,7 +1029,7 @@ mod tests {
             t.all_back_to_work(player_id(2), object_id(100)).unwrap();
             assert_eq!(
                 t.object(object_id(1000)).unwrap().1.life.inside,
-                Some(crate::garrison::ContainerId::new(object_id(100)))
+                Some(ContainerId::new(object_id(100)))
             );
         }
     }

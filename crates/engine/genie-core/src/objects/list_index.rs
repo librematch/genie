@@ -1,5 +1,8 @@
 //! An object's place in its player's list ([`ListIndex`]) and a list's places ([`Places`]).
 
+use std::fmt::{Display, Error, Formatter};
+use std::ops::Range;
+
 /// An object's place in its player's live or sleeping list, counted from 0 (the object's
 /// `+0x668` follows it: `FUN_1411664a0` swap-removes, the last object taking the place).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -34,7 +37,7 @@ impl ListIndex {
 /// The places of a list of a length counted once, first to last ([`crate::objects::ObjectList::places`]):
 /// the game's loops over a list whose objects may change under them by a count taken at the start.
 #[derive(Clone, Debug)]
-pub struct Places(std::ops::Range<usize>);
+pub struct Places(Range<usize>);
 
 impl Places {
     /// The places of a list of `len` objects.
@@ -64,8 +67,8 @@ impl DoubleEndedIterator for Places {
 
 impl ExactSizeIterator for Places {}
 
-impl std::fmt::Display for ListIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ListIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

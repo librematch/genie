@@ -2,15 +2,18 @@
 //! spots.
 
 use crate::GenieError;
+use crate::construction::MainBuildingId;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
+use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::map::spatial::{BLOCKED, Spatial};
+use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
@@ -19,8 +22,12 @@ use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::game_status::GameStatus;
+use crate::vision::own_masks;
 use crate::vision::visibility::Visibility;
 use crate::vision::{VisionBits, VisionMasks};
+use crate::world::index::ObjectsRef;
+use crate::world::player::Player;
 impl Spatial {
     /// The Artifact action's owner search (`FUN_140aabc40`) for the animal `me`: the objects on
     /// the lists of the tiles within the animal's radius (whole) plus 3 tiles of its own tile
@@ -36,7 +43,7 @@ impl Spatial {
     pub fn artifact_owner(
         &self,
         me: ObjectId,
-        players: &[crate::world::player::Player],
+        players: &[Player],
     ) -> Result<Option<PlayerId>, GenieError> {
         const KEPT: [ClassId; 16] = [
             class::ARTIFACT,
@@ -85,7 +92,7 @@ impl Spatial {
         let out = |o: usize| {
             players
                 .get(o)
-                .is_some_and(|q| q.game_status != crate::players::game_status::GameStatus::PLAYING)
+                .is_some_and(|q| q.game_status != GameStatus::PLAYING)
         };
         // a frozen unit that could count (of the combat type and a class that counts) may have
         // moved onto the tiles
@@ -145,8 +152,7 @@ impl Spatial {
                     *count += 100;
                 }
             }
-            let gap =
-                crate::movement::footprint_gap_squared(q.position, q.radius, p.position, p.radius);
+            let gap = footprint_gap_squared(q.position, q.radius, p.position, p.radius);
             if gap < *near {
                 *near = gap;
             }
@@ -220,7 +226,7 @@ impl Spatial {
         self.vision
             .get(player)
             .copied()
-            .unwrap_or_else(|| crate::vision::own_masks(player, false))
+            .unwrap_or_else(|| own_masks(player, false))
     }
 
     /// The map revealed to player `player` (`FUN_141639860` -> `FUN_1412847b0` with
@@ -397,7 +403,7 @@ impl Spatial {
     pub fn combat_sight(
         &mut self,
         id: ObjectId,
-        annex_of: Option<crate::construction::MainBuildingId>,
+        annex_of: Option<MainBuildingId>,
     ) -> Result<Option<VisionBits>, GenieError> {
         let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) else {
             return Ok(None);
@@ -505,7 +511,7 @@ impl Spatial {
     /// `FUN_141185690`: tile (`x`, `y`) lies on the obstruction manager's map, its terrain class
     /// is in `mask` and no static record blocks it.
     #[must_use]
-    pub fn standable(&self, tile: Tile, mask: crate::map::TerrainMask) -> bool {
+    pub fn standable(&self, tile: Tile, mask: TerrainMask) -> bool {
         self.tiles
             .word(tile)
             .is_some_and(|w| w & (mask.blocked() | BLOCKED) == 0)
@@ -524,10 +530,10 @@ impl Spatial {
     pub fn passable(
         &mut self,
         tile: Tile,
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         me: ObjectId,
         radius_x: Distance,
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let (Some(word), Some(tall)) = (self.tiles.word(tile), self.tiles.tall(tile)) else {
             return Ok(false);
@@ -551,9 +557,9 @@ impl Spatial {
         &mut self,
         from: Position,
         me: (ObjectId, f32),
-        mask: crate::map::TerrainMask,
+        mask: TerrainMask,
         site: (Position, Footprint),
-        by_id: crate::world::index::ObjectsRef<'_>,
+        by_id: ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
         self.spot_off(from, me, mask, site, false, by_id)
     }

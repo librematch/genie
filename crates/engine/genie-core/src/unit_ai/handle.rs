@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::WorkerCount;
 use crate::objects::masters::master_type::MOVING;
 use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
@@ -131,7 +132,7 @@ impl UnitAi {
                 relation: None,
                 state: None,
                 master: None,
-                workers: crate::objects::WorkerCount::NO_CAP,
+                workers: WorkerCount::NO_CAP,
                 spared: None,
                 reach: Speed::ZERO < at.speed,
             },

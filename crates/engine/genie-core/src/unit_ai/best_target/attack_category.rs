@@ -1,6 +1,7 @@
 //! `bestUnitToAttack`'s attack categories and the tables it keeps by category.
 
 use crate::GenieError;
+use std::ops::{Index, IndexMut};
 
 /// An attack category (`FUN_140c4c8e0`, [`crate::unit_ai::best_target::category`]): the group of
 /// targets by which `bestUnitToAttack` weighs and narrows its choice, 0 to 11. A class the
@@ -82,7 +83,7 @@ impl<T> ByCategory<T> {
     }
 }
 
-impl<T> std::ops::Index<AttackCategory> for ByCategory<T> {
+impl<T> Index<AttackCategory> for ByCategory<T> {
     type Output = T;
 
     fn index(&self, category: AttackCategory) -> &T {
@@ -91,7 +92,7 @@ impl<T> std::ops::Index<AttackCategory> for ByCategory<T> {
     }
 }
 
-impl<T> std::ops::IndexMut<AttackCategory> for ByCategory<T> {
+impl<T> IndexMut<AttackCategory> for ByCategory<T> {
     fn index_mut(&mut self, category: AttackCategory) -> &mut T {
         &mut self.0[usize::from(category.0)]
     }

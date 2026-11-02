@@ -12,10 +12,12 @@
 
 use crate::GenieError;
 use crate::garrison::ContainerId;
+use crate::garrison::SIEGE_UNLOAD;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
+use crate::math::image::diplomacy::NO_POINT as DIPLOMACY_NO_POINT;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::class;
@@ -24,6 +26,7 @@ use crate::objects::masters::master_type;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::Stance;
+use crate::players::Team;
 use crate::players::UnitRelation;
 use crate::vision::VisionBits;
 use crate::world::World;
@@ -176,7 +179,7 @@ impl World {
                     .iter()
                     .any(|&g| self.object(g).is_some_and(|(gp, _)| gp == q))
             {
-                return Err(crate::garrison::SIEGE_UNLOAD);
+                return Err(SIEGE_UNLOAD);
             }
         }
         if kind != master_type::BUILDING {
@@ -218,7 +221,7 @@ impl World {
                 self.destroy(p, id)?;
             }
         } else if holder_master.class == class::SIEGE {
-            return Err(crate::garrison::SIEGE_UNLOAD);
+            return Err(SIEGE_UNLOAD);
         }
         Ok(())
     }
@@ -311,10 +314,10 @@ impl World {
             return;
         }
         let players = PlayerId::each(self.players.len()).skip(1);
-        self.teams = [crate::players::Team::ALONE; 8];
-        let mut team = crate::players::Team::FIRST;
+        self.teams = [Team::ALONE; 8];
+        let mut team = Team::FIRST;
         for i in players.clone() {
-            if crate::players::Team::FIRST <= self.team(i) || team == crate::players::Team::ALONE {
+            if Team::FIRST <= self.team(i) || team == Team::ALONE {
                 continue;
             }
             let mut joined = 0;
@@ -324,8 +327,7 @@ impl World {
                         pl.relations.get(b) == Some(&Relation::ALLY) && pl.allied_victory == 1
                     })
                 };
-                if j != i && self.team(j) < crate::players::Team::FIRST && both(i, j) && both(j, i)
-                {
+                if j != i && self.team(j) < Team::FIRST && both(i, j) && both(j, i) {
                     joined += 1;
                     self.set_team(j, team);
                 }
@@ -333,22 +335,22 @@ impl World {
             if 0 < joined {
                 self.set_team(i, team);
                 team = team.next();
-                if crate::players::Team::LAST < team {
-                    team = crate::players::Team::ALONE;
+                if Team::LAST < team {
+                    team = Team::ALONE;
                 }
             }
         }
     }
 
     /// Player `i`'s team (`+0x984` at `i − 1`), 1 for a player past the eight.
-    fn team(&self, i: PlayerId) -> crate::players::Team {
+    fn team(&self, i: PlayerId) -> Team {
         self.teams
             .get(i.index() - 1)
             .copied()
-            .unwrap_or(crate::players::Team::ALONE)
+            .unwrap_or(Team::ALONE)
     }
 
-    fn set_team(&mut self, i: PlayerId, team: crate::players::Team) {
+    fn set_team(&mut self, i: PlayerId, team: Team) {
         if let Some(t) = self.teams.get_mut(i.index() - 1) {
             *t = team;
         }
@@ -371,12 +373,16 @@ impl World {
 }
 
 /// The point of an unload toward none (`DAT_14330ec20`, the unload's own role).
-const NO_POINT: f32 = crate::math::image::diplomacy::NO_POINT;
+const NO_POINT: f32 = DIPLOMACY_NO_POINT;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::players::Amount;
+    #[cfg(test)]
+    use crate::players::{ByPlayer, relation_row};
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -385,13 +391,13 @@ mod tests {
     fn world() -> World {
         let player = |p: usize| Player {
             attributes: vec![Amount::ZERO; 300],
-            relations: crate::players::relation_row((0..4).map(|q| if q == p { 0 } else { 3 })),
-            diplomacy: crate::players::ByPlayer::new(vec![Stance::NONE; 9]),
+            relations: relation_row((0..4).map(|q| if q == p { 0 } else { 3 })),
+            diplomacy: ByPlayer::new(vec![Stance::NONE; 9]),
             ..Player::default()
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 4],
             (0..4).map(player).collect(),
@@ -526,11 +532,11 @@ mod tests {
             .unwrap();
         t.set_diplomacy(PlayerId::new(3), PlayerId::new(1), Stance::ALLY)
             .unwrap();
-        assert_eq!(t.teams.map(crate::players::Team::get), [1; 8]);
+        assert_eq!(t.teams.map(Team::get), [1; 8]);
         t.players[1].allied_victory = 1;
         t.players[3].allied_victory = 2;
         t.resolve_teams();
-        assert_eq!(t.teams.map(crate::players::Team::get), [1; 8]);
+        assert_eq!(t.teams.map(Team::get), [1; 8]);
         t.players[3].allied_victory = 1;
         t.resolve_teams();
         assert_eq!(
@@ -546,7 +552,7 @@ mod tests {
         );
         t.settings.teams_locked = false;
         t.resolve_teams();
-        assert_eq!(t.teams.map(crate::players::Team::get), [1; 8]);
+        assert_eq!(t.teams.map(Team::get), [1; 8]);
     }
 
     /// Teams run out past 5: the players after the fourth team stay alone.
@@ -558,7 +564,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO; 9],
             (0..9).map(|_| player()).collect(),
@@ -567,16 +573,13 @@ mod tests {
         for (a, b) in [(1, 2), (3, 4), (5, 6), (7, 8)] {
             for (x, y) in [(a, b), (b, a)] {
                 let row = &mut t.players[usize::from(x)].relations;
-                *row = crate::players::ByPlayer::new(vec![Relation::ENEMY; 9]);
+                *row = ByPlayer::new(vec![Relation::ENEMY; 9]);
                 row.set(PlayerId::new(x), Relation::ALLY);
                 row.set(PlayerId::new(y), Relation::ALLY);
             }
         }
         t.resolve_teams();
-        assert_eq!(
-            t.teams.map(crate::players::Team::get),
-            [2, 2, 3, 3, 4, 4, 5, 5]
-        );
+        assert_eq!(t.teams.map(Team::get), [2, 2, 3, 3, 4, 4, 5, 5]);
     }
 
     /// Attribute 204 truncated to 0 reveals nothing; 1 or more is not modelled.

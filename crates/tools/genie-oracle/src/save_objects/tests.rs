@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::save_objects::{ghost_pool_from_dump, recycle_pools_from_dump, registry_from_dump};
 use crate::test_ids::object_id;
+use genie_core::players::PlayerId;
 use genie_core::vision::VisionBits;
 use genie_core::vision::registry::SLOTS;
 
@@ -68,10 +69,7 @@ fn registry_dump_reads_its_lists_and_masks() {
     let registry = registry_from_dump(&text).unwrap();
     assert_eq!((registry.players, registry.classes), (2, 3));
     let record = registry.lists[1][2][0];
-    assert_eq!(
-        (record.id, record.owner),
-        (object_id(77), genie_core::players::PlayerId::new(1))
-    );
+    assert_eq!((record.id, record.owner), (object_id(77), PlayerId::new(1)));
     assert_eq!(record.distance.get().to_bits(), one);
     assert_eq!(record.at.y().to_bits(), 2.0_f32.to_bits());
     let entry = registry.entries.get(object_id(77)).unwrap();

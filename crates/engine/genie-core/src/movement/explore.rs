@@ -36,14 +36,29 @@ use genie_diff::Diff;
 /// The Explore action's type.
 pub const EXPLORE: ActionType = ActionType::named(4);
 
+use crate::combat::abilities::Look;
+#[cfg(test)]
+use crate::map::Footprint;
+use crate::math::image::explore::NO_POINT as EXPLORE_NO_POINT;
+use crate::math::rng::Well512;
+#[cfg(test)]
+use crate::movement::Speed;
 pub use crate::movement::explore_state::ExploreState;
+use crate::movement::stop_mover;
+use crate::objects::Graphics;
+#[cfg(test)]
+use crate::objects::ObjectState;
+use crate::objects::layers::Action;
+use crate::objects::sprite::new_sprite;
+use crate::pathing::zones::ZoneId;
+use crate::unit_ai::NotifyKind;
 
 /// State 11 made without what its `MoveTo` reads of the unit.
 const WALK_WITHOUT_READS: GenieError =
     GenieError::unreachable("an Explore's set_state(11) without the unit's reads");
 
 /// A point of −1 is no point (`DAT_14330ec20`).
-const NO_POINT: f32 = crate::math::image::explore::NO_POINT;
+const NO_POINT: f32 = EXPLORE_NO_POINT;
 
 /// What an Explore's `set_state` asks of its owner besides its own fields.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,10 +102,7 @@ impl<'a> ExploreMove<'a> {
     pub fn of(
         unit: (&Unit, Option<&Mover>),
         master: &Master,
-        graphics: (
-            &'a crate::objects::Graphics,
-            Option<&crate::combat::abilities::Look>,
-        ),
+        graphics: (&'a Graphics, Option<&Look>),
     ) -> Self {
         Self {
             reads: MoveToReads::of(unit, master, graphics),
@@ -255,7 +267,7 @@ impl ExploreAction {
         let walked = move_to.is_some();
         let owner = self.after_walk(code)?;
         if walked && self.state.move_to().is_none() {
-            crate::movement::stop_mover(c.w.parts.mover_mut(explorer.id))?;
+            stop_mover(c.w.parts.mover_mut(explorer.id))?;
         }
         explorer.explore_owner(owner, c)
     }
@@ -336,9 +348,9 @@ pub trait Area {
     fn explored(&self, tile: Tile) -> Result<bool, GenieError>;
     /// The tile's zone for the unit's restriction (`FUN_1411958c0`), and the unit's own
     /// (`FUN_14118eea0`).
-    fn zone(&mut self, tile: Tile) -> crate::pathing::zones::ZoneId;
+    fn zone(&mut self, tile: Tile) -> ZoneId;
     /// The unit's own zone (`FUN_14118eea0`).
-    fn own_zone(&mut self) -> crate::pathing::zones::ZoneId;
+    fn own_zone(&mut self) -> ZoneId;
     /// The unit could stand at the point (slot 0x278, [`crate::map::spatial::Spatial::point_clear`]).
     fn clear(&mut self, tile: Tile) -> Result<bool, GenieError>;
     /// The unit reaches the point within its line of sight less a tile (slot 0x3d8,
@@ -419,7 +431,7 @@ pub fn closest_undiscovered(
     area: &mut dyn Area,
     seeker: Seeker,
     map: GridSize,
-    ai: &mut crate::math::rng::Well512,
+    ai: &mut Well512,
 ) -> Result<Option<Tile>, GenieError> {
     if seeker.player_type.is_computer() {
         return Ok(None);
@@ -487,7 +499,7 @@ pub fn beyond_sight(
     at: Position,
     line_of_sight: Distance,
     map: GridSize,
-    ai: &mut crate::math::rng::Well512,
+    ai: &mut Well512,
 ) -> Result<Option<Tile>, GenieError> {
     let own = area.own_zone();
     let (w, h) = (map.width(), map.height());
@@ -550,7 +562,7 @@ impl Unit {
     /// replace are not modelled.
     pub(crate) fn explore_to(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         point: Point,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
@@ -560,7 +572,7 @@ impl Unit {
             let walked = e.state.move_to().is_some();
             let owner = e.take_point(at, &walk)?;
             if walked {
-                crate::movement::stop_mover(c.w.parts.mover_mut(self.id))?;
+                stop_mover(c.w.parts.mover_mut(self.id))?;
             }
             owner
         } else {
@@ -627,7 +639,7 @@ impl Unit {
             }
             Owner::WantsPoint => self.post_own(
                 &mut c.w.parts.unit_ai,
-                crate::unit_ai::NotifyKind::REQUIRES_SEARCH,
+                NotifyKind::REQUIRES_SEARCH,
                 [ActionKind::Explore.value(), 0, 0],
             )?,
             Owner::Standing => {}
@@ -644,7 +656,7 @@ impl Unit {
             let standing = standing.ok_or(GenieError::unsupported(
                 "an explorer without its standing sprite",
             ))?;
-            crate::objects::sprite::new_sprite(
+            new_sprite(
                 &mut self.sprite,
                 c.w.parts.move_stats_mut(self.id),
                 standing,
@@ -657,7 +669,7 @@ impl Unit {
 
 /// The sprites' table of a world without sprites.
 #[cfg(test)]
-static NO_GRAPHICS: crate::objects::Graphics = crate::objects::Graphics::new();
+static NO_GRAPHICS: Graphics = Graphics::new();
 
 /// What an Explore's `MoveTo` reads of a unit in state 2 with speed 1 in a world without sprites,
 /// for tests that make an Explore.
@@ -669,10 +681,10 @@ pub(crate) fn bare_walk() -> ExploreMove<'static> {
                 defaults: MoveDefaults::default(),
                 graphics: &NO_GRAPHICS,
             },
-            state: crate::objects::ObjectState::Alive,
-            speed: crate::movement::Speed::new(1.0),
+            state: ObjectState::Alive,
+            speed: Speed::new(1.0),
             at: Position::ORIGIN,
-            ground: crate::map::Footprint::ZERO,
+            ground: Footprint::ZERO,
         },
         given: None,
     }
@@ -682,19 +694,25 @@ pub(crate) fn bare_walk() -> ExploreMove<'static> {
 mod tests {
     use super::*;
     use crate::map::Footprint;
+    #[cfg(test)]
+    use crate::math::fmath::sqrt;
     use crate::movement::Speed;
+    #[cfg(test)]
+    use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
     use crate::objects::Graphics;
     use crate::objects::ObjectState;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::Voice;
     use crate::objects::sprite::Graphic;
+    #[cfg(test)]
+    use crate::objects::{FacetCount, Frame};
     use crate::world::Seconds;
 
     const WALKING: Graphic = Graphic {
         id: SpriteId::named(7),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(16),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(16),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -787,15 +805,15 @@ mod tests {
             a.take_point(Position::new(19.0, 84.0, 0.0), &walk),
             Ok(Owner::Nothing)
         );
-        let made = crate::movement::move_to::MoveToAction {
-            state: crate::movement::move_to::MoveTo::Start,
+        let made = MoveToAction {
+            state: MoveTo::Start,
             point: Position::new(19.0, 84.0, 0.0),
             target: None,
             range: Distance::ZERO,
             sprite: Some(walking),
             voice: Voice::Quiet,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-            wait: crate::movement::move_to::MoveWait::NEW,
+            on_target_moved: TargetMoved::Follows,
+            wait: MoveWait::NEW,
         };
         assert_eq!(
             a.state,
@@ -814,10 +832,7 @@ mod tests {
         let mut stuck = walk;
         stuck.reads.speed = Speed::ZERO;
         let (b, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck).unwrap();
-        assert_eq!(
-            b.state.move_to().map(|m| m.state),
-            Some(crate::movement::move_to::MoveTo::Failed)
-        );
+        assert_eq!(b.state.move_to().map(|m| m.state), Some(MoveTo::Failed));
         stuck.reads.state = ObjectState::Dying;
         let (b, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck).unwrap();
         assert_eq!(b.state, ExploreState::Walk { move_to: None });
@@ -833,11 +848,11 @@ mod tests {
         fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
             Ok(self.explored.contains(&tile.get()))
         }
-        fn zone(&mut self, _: Tile) -> crate::pathing::zones::ZoneId {
-            crate::pathing::zones::ZoneId::new(1)
+        fn zone(&mut self, _: Tile) -> ZoneId {
+            ZoneId::new(1)
         }
-        fn own_zone(&mut self) -> crate::pathing::zones::ZoneId {
-            crate::pathing::zones::ZoneId::new(1)
+        fn own_zone(&mut self) -> ZoneId {
+            ZoneId::new(1)
         }
         fn clear(&mut self, _: Tile) -> Result<bool, GenieError> {
             Ok(true)
@@ -847,12 +862,12 @@ mod tests {
         }
         fn distance(&self, tile: Tile) -> f32 {
             let (dx, dy) = ((tile.x() - 20) as f32, (tile.y() - 92) as f32);
-            crate::math::fmath::sqrt(dx * dx + dy * dy)
+            sqrt(dx * dx + dy * dy)
         }
     }
 
-    fn rng() -> crate::math::rng::Well512 {
-        let mut r = crate::math::rng::Well512::default();
+    fn rng() -> Well512 {
+        let mut r = Well512::default();
         r.set_seed(7);
         r
     }
@@ -930,11 +945,11 @@ mod tests {
         fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
             self.open.explored(tile)
         }
-        fn zone(&mut self, _: Tile) -> crate::pathing::zones::ZoneId {
-            crate::pathing::zones::ZoneId::new(self.zone)
+        fn zone(&mut self, _: Tile) -> ZoneId {
+            ZoneId::new(self.zone)
         }
-        fn own_zone(&mut self) -> crate::pathing::zones::ZoneId {
-            crate::pathing::zones::ZoneId::new(1)
+        fn own_zone(&mut self) -> ZoneId {
+            ZoneId::new(1)
         }
         fn clear(&mut self, tile: Tile) -> Result<bool, GenieError> {
             self.open.clear(tile)
@@ -982,11 +997,11 @@ mod tests {
         fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
             Ok(!self.unexplored.contains(&tile.get()))
         }
-        fn zone(&mut self, _: Tile) -> crate::pathing::zones::ZoneId {
-            crate::pathing::zones::ZoneId::new(1)
+        fn zone(&mut self, _: Tile) -> ZoneId {
+            ZoneId::new(1)
         }
-        fn own_zone(&mut self) -> crate::pathing::zones::ZoneId {
-            crate::pathing::zones::ZoneId::new(1)
+        fn own_zone(&mut self) -> ZoneId {
+            ZoneId::new(1)
         }
         fn clear(&mut self, _: Tile) -> Result<bool, GenieError> {
             Ok(true)
@@ -1009,7 +1024,7 @@ mod tests {
             player_type: PlayerType::HUMAN,
         };
         let seeded = || {
-            let mut r = crate::math::rng::Well512::default();
+            let mut r = Well512::default();
             r.set_seed(7);
             r
         };

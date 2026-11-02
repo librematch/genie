@@ -2,6 +2,7 @@
 //! the target was seen.
 
 use crate::GenieError;
+use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
@@ -12,16 +13,19 @@ use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::map::spatial::{Placed, Spatial};
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::{Me, footprint_gap};
+use crate::objects::Graphics;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
+use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
@@ -31,7 +35,9 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
+use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::lets::release;
 use crate::world::step::Step;
 
 impl Attack {
@@ -126,11 +132,7 @@ impl Attack {
         new_sprite(sprite, motion.move_stats_mut(), idle, rng);
         Ok(self.voice.is_loud().then_some((
             NotifyKind::ACTION_INVALIDATED,
-            [
-                600,
-                ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
-                0,
-            ],
+            [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
         )))
     }
 
@@ -146,7 +148,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         me: Me,
         f: &mut Fight,
         r: &AttackReads,
@@ -249,7 +251,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-        t: &crate::map::spatial::Placed,
+        t: &Placed,
     ) -> Result<Option<UpdateCode>, GenieError> {
         // the target moved: where it was seen follows (`+0xa4`..`+0xac`); one the unit's
         // player sees (the target's slot 0x1e0, `FUN_1416635e0` at its tile: 0xf), or only
@@ -271,7 +273,7 @@ impl Attack {
                 c.w.parts
                     .mover_of(unit.id)
                     .map(|m| m.stats.radius.ground())
-                    .ok_or(crate::world::ATTACKER_UNMOVING)?;
+                    .ok_or(ATTACKER_UNMOVING)?;
             let gap = footprint_gap(unit.place.position(), ground, t.position, t.radius);
             self.follow(unit, &mut c.w.attack_ground(unit.id), r, f, gap)?;
             return Ok(Some(UpdateCode::UNDER_WAY));
@@ -321,11 +323,7 @@ impl Attack {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
-                    [
-                        600,
-                        ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
-                        0,
-                    ],
+                    [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
             }
             return Ok(Some(UpdateCode::DONE));
@@ -339,11 +337,7 @@ impl Attack {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
-                    [
-                        600,
-                        ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
-                        0,
-                    ],
+                    [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
             }
             return Ok(Some(UpdateCode::CODE_4));
@@ -356,11 +350,7 @@ impl Attack {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
-                    [
-                        600,
-                        ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
-                        0,
-                    ],
+                    [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
             }
             return Ok(Some(UpdateCode::DONE));
@@ -452,7 +442,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         f: &Fight,
         r: &AttackReads,
-        graphics: &crate::objects::Graphics,
+        graphics: &Graphics,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::GotoSeen { move_to: None }, motion.reborrow())?;
         self.range = f.own.source.weapon_range;
@@ -477,7 +467,7 @@ impl Attack {
         walk: fn(Option<MoveToAction>) -> AttackState,
         unit: (&Unit, Option<&Mover>),
         r: &AttackReads,
-        graphics: &crate::objects::Graphics,
+        graphics: &Graphics,
     ) -> Result<(), GenieError> {
         self.walk_to_seen(walk, &move_reads(unit, r, graphics)?)
     }
@@ -546,11 +536,7 @@ impl Attack {
 /// # Errors
 ///
 /// A tile the map's sight does not hold.
-pub(super) fn sees(
-    map: &crate::map::spatial::Spatial,
-    f: &Fight,
-    at: Position,
-) -> Result<bool, GenieError> {
+pub(super) fn sees(map: &Spatial, f: &Fight, at: Position) -> Result<bool, GenieError> {
     let (tx, ty) = (at.x() as i32, at.y() as i32);
     Ok(map.sees_tile(f.own.player, Tile::new(tx, ty))
         || (f.victim.fog_visibility != FogVisibility::INVISIBLE
@@ -566,13 +552,13 @@ pub(super) fn sees(
 pub(super) fn let_go(
     c: &mut Step<'_>,
     unit: &mut Unit,
-    target: Option<crate::combat::AttackTargetId>,
+    target: Option<AttackTargetId>,
 ) -> Result<(), GenieError> {
     let Some(target) = target else {
         return Ok(());
     };
     let by = unit.releaser(c)?;
-    crate::world::lets::release(c, unit, target, by)
+    release(c, unit, target, by)
 }
 
 /// The squared reach of an attack of `range` (`FUN_140a82ae0` at `0x140a83950`): the range squared,

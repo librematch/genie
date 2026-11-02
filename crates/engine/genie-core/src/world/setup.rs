@@ -2,20 +2,35 @@
 //! planners and the shape mesh the game's load builds.
 
 use crate::GenieError;
+use crate::groups::UnitGroups;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
 use crate::movement::Mover;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::lines::UnitLines;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterTables;
 use crate::objects::masters::ObstructionClass;
+use crate::objects::{Graphics, RelicCount};
 use crate::pathing::Pathing;
+use crate::pathing::zones::Zones;
 use crate::players::PlayerId;
+use crate::players::Team;
+use crate::players::ai_module::AiModules;
+use crate::players::market::Market;
+use crate::players::world_player::TechTree;
+use crate::trace::new_object;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::index::ObjectIndex;
+use crate::world::parts::Parts;
 use crate::world::player::Player;
+use crate::world::settings::Settings;
+use crate::world::{FrameSeed, Mode680, PlayState, Tick};
 use crate::world::{HISTORY_PERIOD, PLANNED_MASTERS, Recycling, World};
+use std::collections::BTreeMap;
 
 impl World {
     /// The world's next object id (`FUN_14152fd70`) for a new object of `master` for `player`: it
@@ -24,7 +39,7 @@ impl World {
     pub(crate) fn take_object_id(&mut self, player: PlayerId, master: MasterId) -> ObjectId {
         let id = self.next_object_id;
         self.next_object_id = id.successor();
-        crate::trace::new_object(self.ticks, player, id, master);
+        new_object(self.ticks, player, id, master);
         id
     }
 
@@ -32,7 +47,7 @@ impl World {
     #[must_use]
     pub fn new(
         world_time: WorldTime,
-        frame_seed: crate::world::FrameSeed,
+        frame_seed: FrameSeed,
         player_turn: PlayerId,
         player_time: Vec<Millis>,
         players: Vec<Player>,
@@ -42,41 +57,41 @@ impl World {
             frame_seed,
             player_turn,
             player_time,
-            index: crate::world::index::ObjectIndex::of(&players),
-            parts: crate::world::parts::Parts::default(),
+            index: ObjectIndex::of(&players),
+            parts: Parts::default(),
             players,
-            ticks: crate::world::Tick::ZERO,
+            ticks: Tick::ZERO,
             next_object_id: ObjectId::default(),
             masters: Vec::new(),
             spatial: Spatial::default(),
             pathing: Pathing::default(),
-            graphics: crate::objects::Graphics::default(),
+            graphics: Graphics::default(),
             drop_sites: Vec::new(),
-            lines: crate::objects::lines::UnitLines::default(),
-            linked_techs: std::collections::BTreeMap::new(),
-            settings: crate::world::settings::Settings::default(),
+            lines: UnitLines::default(),
+            linked_techs: BTreeMap::new(),
+            settings: Settings::default(),
             start_work_due: false,
-            mode_680: crate::world::Mode680::ZERO,
-            spawned_relics: crate::objects::RelicCount::ZERO,
-            game_state: crate::world::PlayState::PLAYING,
+            mode_680: Mode680::ZERO,
+            spawned_relics: RelicCount::ZERO,
+            game_state: PlayState::PLAYING,
             victory_conquest: false,
-            zones: crate::pathing::zones::Zones::default(),
+            zones: Zones::default(),
             recycling: Recycling::default(),
             streams: Streams::default(),
             techs: Vec::new(),
             effects: Vec::new(),
-            market: crate::players::market::Market::default(),
-            ai: crate::players::ai_module::AiModules::default(),
-            groups: crate::groups::UnitGroups::default(),
+            market: Market::default(),
+            ai: AiModules::default(),
+            groups: UnitGroups::default(),
             last_commanded: Vec::new(),
             dt_seconds: Seconds::ZERO,
             dt: Millis::ZERO,
             history_period: HISTORY_PERIOD,
             allow_gaia_capture: Vec::new(),
             local_player: PlayerId::new(0),
-            tech_tree: crate::players::world_player::TechTree::default(),
+            tech_tree: TechTree::default(),
             alliance_locked: 0,
-            teams: [crate::players::Team::ALONE; 8],
+            teams: [Team::ALONE; 8],
             instant_work: 0,
         }
     }
@@ -121,13 +136,7 @@ impl World {
                 if u.life.inside.is_some() || ObjectState::Removed <= u.life.state {
                     continue;
                 }
-                let m = u.master(
-                    crate::objects::masters::MasterTables::new(
-                        &self.masters,
-                        &self.parts.own_master,
-                    ),
-                    q,
-                )?;
+                let m = u.master(MasterTables::new(&self.masters, &self.parts.own_master), q)?;
                 let Some(placed) = self.spatial.get(u.id) else {
                     continue;
                 };

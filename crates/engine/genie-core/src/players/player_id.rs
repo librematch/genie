@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A player's number: 0 for Gaia, then the players in their order. A command's byte 1 holds
 /// the player who sent it, a comm player the game looks up whatever its value
@@ -34,8 +35,8 @@ impl PlayerId {
     }
 }
 
-impl std::fmt::Display for PlayerId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for PlayerId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)
     }
 }

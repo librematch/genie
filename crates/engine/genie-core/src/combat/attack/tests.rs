@@ -1,11 +1,16 @@
 use super::*;
+use crate::combat::abilities::Look;
 use crate::combat::damage::Allied;
+use crate::combat::missile::StrikeResult;
 use crate::construction::MainBuildingId;
+use crate::construction::build::NOT_HELD;
+use crate::gathering::hunt::tests::walker;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
+use crate::map::spatial::Placed;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
@@ -16,6 +21,8 @@ use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{
     GiveUp, MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads,
 };
+use crate::movement::tests::path_world;
+use crate::movement::{SubstituteCount, WaitDelays};
 use crate::objects::ActionState;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
@@ -29,6 +36,8 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::Voice;
+use crate::objects::facing::SpriteFacets;
+use crate::objects::layers::Action;
 use crate::objects::layers::Animated;
 use crate::objects::layers::{Motion, MotionMut, Static};
 use crate::objects::masters::BlastDefense;
@@ -36,6 +45,7 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::DamageShare;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::Masters;
@@ -47,16 +57,24 @@ use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
+use crate::objects::{FacetCount, RelicCount, WorkerCount};
 use crate::players::PlayerId;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::BOAR_AI;
+use crate::unit_ai::Home;
 use crate::unit_ai::LION_AI;
 use crate::unit_ai::NotifyKind;
+use crate::vision::VisionBits;
+use crate::vision::visibility::Visibility;
+use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Player;
+use crate::world::index::TestObjects;
+use crate::world::parts::Object;
 use crate::world::step::Step;
+use crate::world::tests::{archer_world, in_update, missiles};
 
 /// `FUN_140a82ae0` case 6 after the hit: a ranged unit whose attack timer ran out is done
 /// without a target and ready again past its interrupt frame (its firing frame without one);
@@ -64,7 +82,7 @@ use crate::world::step::Step;
 #[test]
 fn swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
     use AfterHit::{Continue, Done, Ready};
-    let f = crate::objects::Frame::of_data;
+    let f = Frame::of_data;
     // ranged, timer run out (NaN counts too)
     assert_eq!(
         after_hit(true, Seconds::ZERO, false, f(5), f(3), f(9)),
@@ -137,7 +155,7 @@ fn walking(state: MoveTo) -> MoveToAction {
 /// A unit's own Attack on `target` in `state` with range `range`.
 pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> Attack {
     Attack {
-        target: crate::combat::AttackTargetId::of_field(target),
+        target: AttackTargetId::of_field(target),
         target2: None,
         state,
         timer: Seconds::ZERO,
@@ -155,8 +173,8 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
             idle_sprite: None,
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: crate::objects::Frame::of_data(0),
-            interrupt_frame: crate::objects::Frame::of_data(-1),
+            fire_frame: Frame::of_data(0),
+            interrupt_frame: Frame::of_data(-1),
         },
         voice: Voice::Loud,
         on_target_moved: TargetMoved::Follows,
@@ -170,8 +188,8 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
 fn stop_ends_the_attack_and_the_unit_stands() {
     let stand = Graphic {
         id: SpriteId::named(1),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -180,7 +198,7 @@ fn stop_ends_the_attack_and_the_unit_stands() {
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     *a.state.walk_mut().unwrap() = Some(walking(MoveTo::Moving));
     a.arms.idle_sprite = Some(stand);
-    let mut motion = Motion::Moving(crate::gathering::hunt::tests::walker());
+    let mut motion = Motion::Moving(walker());
     motion.lent().set_anim_speed(Speed::new(0.5));
     let (mut sprite, mut rng) = (None, Well512::default());
     a.halt(motion.lent(), &mut sprite, &mut rng).unwrap();
@@ -189,7 +207,7 @@ fn stop_ends_the_attack_and_the_unit_stands() {
         (
             a.state,
             a.state.move_to().copied(),
-            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id)),
+            ObjectId::field(a.target.map(AttackTargetId::id)),
             motion.animated().speed
         ),
         (AttackState::Done, None, 77, Speed::new(1.0))
@@ -265,10 +283,7 @@ fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
         );
         assert_eq!(
             (a.target, a.seen),
-            (
-                Some(crate::combat::AttackTargetId::new(object_id(7))),
-                deer.position
-            ),
+            (Some(AttackTargetId::new(object_id(7))), deer.position),
             "{state}"
         );
     }
@@ -395,10 +410,7 @@ fn an_area_effect_attack_takes_building_main_building() {
     );
     assert_eq!(
         (a.target, a.seen),
-        (
-            Some(crate::combat::AttackTargetId::new(object_id(31))),
-            main.position
-        )
+        (Some(AttackTargetId::new(object_id(31))), main.position)
     );
     // without an area effect the annex itself is the target, its own in state 6
     let mut a = own_attack(30, AttackState::Ready, Distance::ZERO);
@@ -418,7 +430,7 @@ fn an_area_effect_attack_takes_building_main_building() {
             w.lets_go,
             w.takes,
             w.clears_count,
-            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id))
+            ObjectId::field(a.target.map(AttackTargetId::id))
         ),
         (None, None, true, 31)
     );
@@ -433,7 +445,7 @@ fn an_area_effect_attack_takes_building_main_building() {
         (
             w.lets_go,
             w.takes,
-            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id))
+            ObjectId::field(a.target.map(AttackTargetId::id))
         ),
         (Some(object_id(30)), None, -1)
     );
@@ -451,7 +463,7 @@ fn an_area_effect_attack_takes_building_main_building() {
                 kept: true,
                 ..Worked::default()
             },
-            Some(crate::combat::AttackTargetId::new(object_id(7))),
+            Some(AttackTargetId::new(object_id(7))),
             odd.position
         )
     );
@@ -474,8 +486,8 @@ fn an_area_effect_attack_takes_building_main_building() {
 fn sprite_resets_only_for_its_own_graphic() {
     let swing = Graphic {
         id: SpriteId::named(224),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -486,8 +498,8 @@ fn sprite_resets_only_for_its_own_graphic() {
         ..swing
     };
     let mut sprite = Some(ActiveSprite {
-        frame: crate::objects::Frame::of_data(6),
-        last_frame: crate::objects::Frame::of_data(5),
+        frame: Frame::of_data(6),
+        last_frame: Frame::of_data(5),
         looped: true,
         ..ActiveSprite::start(swing, &mut Well512::default())
     });
@@ -498,11 +510,7 @@ fn sprite_resets_only_for_its_own_graphic() {
     let s = sprite.unwrap();
     assert_eq!(
         (s.frame, s.last_frame, s.looped),
-        (
-            crate::objects::Frame::of_data(0),
-            crate::objects::Frame::of_data(0),
-            false
-        )
+        (Frame::of_data(0), Frame::of_data(0), false)
     );
     assert!(!reset_sprite(&mut None, swing));
 }
@@ -533,18 +541,18 @@ fn soldier_mover(speed: f32) -> Mover {
             move_algorithm: MoveAlgorithm::NONE,
             min_collision: 1.0,
             fast_turn: false,
-            facets: Some(crate::objects::facing::SpriteFacets {
-                count: crate::objects::FacetCount::of_data(8),
+            facets: Some(SpriteFacets {
+                count: FacetCount::of_data(8),
                 turns: true,
             }),
             weapon_range: Distance::ZERO,
         },
         waiting: 0,
-        wait_delays: crate::movement::WaitDelays::of_data(0),
+        wait_delays: WaitDelays::of_data(0),
         attack_moving: false,
         last_move: WorldTime::ZERO,
         moved_at: Position::ORIGIN,
-        substitute_count: crate::movement::SubstituteCount::of_data(0),
+        substitute_count: SubstituteCount::of_data(0),
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
         last_turn: Seconds::ZERO,
@@ -558,8 +566,8 @@ fn soldier_mover(speed: f32) -> Mover {
 
 const STANDING: Graphic = Graphic {
     id: SpriteId::named(300),
-    frames: crate::objects::Frame::of_data(10),
-    facets: crate::objects::FacetCount::of_data(8),
+    frames: Frame::of_data(10),
+    facets: FacetCount::of_data(8),
     speed_multiplier: SpeedMultiplier::ONE,
     frame_duration: Seconds::new(0.1),
     replay_delay: Seconds::ZERO,
@@ -618,7 +626,7 @@ impl Rig {
         let players = (0..3).map(|_| Player::default()).collect();
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 3],
             players,
@@ -627,7 +635,7 @@ impl Rig {
         let _ = t
             .push_live(
                 PlayerId::new(1),
-                crate::world::parts::Object::moving(
+                Object::moving(
                     Unit {
                         id: object_id(1),
                         place: Static::at(Position::new(10.0, 10.0, 0.0)),
@@ -643,7 +651,7 @@ impl Rig {
     /// The builder 9177 of [`crate::movement::tests::path_world`] on its path toward house
     /// 10028, attacking `victim` as [`soldier`] does.
     pub(crate) fn on_the_path(victim: Victim) -> Self {
-        let t = crate::movement::tests::path_world(Player::default());
+        let t = path_world(Player::default());
         let own = Victim {
             id: object_id(9177),
             ..soldier()
@@ -683,7 +691,7 @@ impl Rig {
     pub(crate) fn holding(mut self, id: i32, player: PlayerId) -> Self {
         let mut u = Unit {
             id: object_id(id),
-            workers: crate::objects::WorkerCount::of_data(1),
+            workers: WorkerCount::of_data(1),
             ..Unit::default()
         };
         u.life.state = ObjectState::Alive;
@@ -707,13 +715,13 @@ impl Rig {
         f: impl FnOnce(
             &mut Step<'_>,
             &mut Unit,
-            &mut crate::objects::layers::Action,
+            &mut Action,
             &mut Fight,
             &AttackReads,
         ) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let (fight, r) = (&mut self.f, &self.r);
-        crate::world::tests::in_update(
+        in_update(
             &mut self.t,
             (PlayerId::new(1), ListIndex::new(0)),
             dt,
@@ -744,10 +752,10 @@ impl Rig {
         let (object, sprite) = streams.object_and_sprite();
         let (motion, motions) = parts.motion.lend(unit.id);
         let mut g = Ground {
-            by_id: crate::world::index::ObjectsRef::of_tables(
+            by_id: ObjectsRef::of_tables(
                 players,
                 index,
-                crate::objects::masters::MasterTables::new(masters, &parts.own_master),
+                MasterTables::new(masters, &parts.own_master),
                 (
                     &parts.building,
                     &parts.combat,
@@ -779,13 +787,13 @@ impl Rig {
     }
 
     /// The attacker's action layer, to change.
-    pub(crate) fn actions_mut(&mut self) -> &mut crate::objects::layers::Action {
+    pub(crate) fn actions_mut(&mut self) -> &mut Action {
         let id = self.unit().id;
         self.t.parts.actions_mut(id).unwrap()
     }
 
     /// The attacker's combat layer, to change.
-    pub(crate) fn combat_mut(&mut self) -> &mut crate::objects::layers::Combat {
+    pub(crate) fn combat_mut(&mut self) -> &mut Combat {
         let id = self.unit().id;
         self.t.parts.combat_mut(id).unwrap()
     }
@@ -863,7 +871,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
         armored: Some(damage::Armored {
             armors: vec![ClassAmount::new(4, 0)],
             terrain_bonus: RestrictionField::NONE,
-            friendly_fire: crate::objects::masters::DamageShare::new(1.0),
+            friendly_fire: DamageShare::new(1.0),
             ..damage::Armored::default()
         }),
         building: Some(building),
@@ -922,10 +930,7 @@ fn strike_on_an_annex_hits_its_main_building() {
         &mut Well512::default(),
     )
     .unwrap();
-    assert_eq!(
-        struck.result,
-        crate::combat::missile::StrikeResult::of_data(1)
-    );
+    assert_eq!(struck.result, StrikeResult::of_data(1));
     assert_eq!(
         (blasted[0].hp, annex.hp),
         (HitPoints::new(96.0), HitPoints::new(96.0))
@@ -982,31 +987,16 @@ fn building_relic_raises_its_missile_hit() {
         target.hp
     };
     assert!(
-        hit_by(Relics::new(
-            crate::objects::RelicCount::of_data(0),
-            crate::objects::RelicCount::of_data(1)
-        )) < hit_by(Relics::new(
-            crate::objects::RelicCount::of_data(0),
-            crate::objects::RelicCount::of_data(0)
-        ))
+        hit_by(Relics::new(RelicCount::of_data(0), RelicCount::of_data(1)))
+            < hit_by(Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)))
     );
     assert!(
-        hit_by(Relics::new(
-            crate::objects::RelicCount::of_data(1),
-            crate::objects::RelicCount::of_data(0)
-        )) < hit_by(Relics::new(
-            crate::objects::RelicCount::of_data(0),
-            crate::objects::RelicCount::of_data(0)
-        ))
+        hit_by(Relics::new(RelicCount::of_data(1), RelicCount::of_data(0)))
+            < hit_by(Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)))
     );
     assert!(
-        hit_by(Relics::new(
-            crate::objects::RelicCount::of_data(0),
-            crate::objects::RelicCount::of_data(1)
-        )) < hit_by(Relics::new(
-            crate::objects::RelicCount::of_data(1),
-            crate::objects::RelicCount::of_data(0)
-        ))
+        hit_by(Relics::new(RelicCount::of_data(0), RelicCount::of_data(1)))
+            < hit_by(Relics::new(RelicCount::of_data(1), RelicCount::of_data(0)))
     );
 }
 
@@ -1043,7 +1033,7 @@ fn trample_hit_leaves_out_its_building_target_blast_so_far() {
                 player: PlayerId::new(1),
                 area_effect: Distance::new(1.0),
                 blast_level: BlastLevel::from_bits_retain(2),
-                area_damage: crate::objects::masters::DamageShare::new(0.5),
+                area_damage: DamageShare::new(0.5),
                 ..damage::Attacker::default()
             },
             ..soldier()
@@ -1109,7 +1099,7 @@ fn trample_reads_building_blast_so_far_or_its_main_building_s() {
             ),
             &[]
         ),
-        Err(crate::construction::build::NOT_HELD)
+        Err(NOT_HELD)
     );
     let unit = Victim {
         kind: master_type::COMBAT,
@@ -1123,7 +1113,7 @@ fn world_with(id: i32, player: PlayerId, class: ClassId, at: Position) -> Spatia
     let mut world = Spatial::default();
     world.insert(
         object_id(id),
-        crate::map::spatial::Placed {
+        Placed {
             position: at,
             radius: Footprint::new(0.2, 0.2),
             class,
@@ -1239,7 +1229,7 @@ fn an_attack_on_target_out_of_sight_fails() {
         (rig.f.own.class, rig.r.ai_type, rig.r.queue_empty) = (class, ai_type, queue_empty);
         let ai = rig.ai_mut().unwrap();
         ai.current_target = Some(object_id(77));
-        ai.home = Some(crate::unit_ai::Home::default());
+        ai.home = Some(Home::default());
         let code = rig.run(100, |c, u, _, f, r| a.out_of_sight(c, u, f, r));
         let ai = rig.ai().unwrap();
         let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().go_home);
@@ -1322,13 +1312,13 @@ fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
 }
 
 /// The players' sight over a 16×16 map: every tile revealed and explored (seen), or none.
-fn sight(seen: bool) -> crate::vision::visibility::Visibility {
+fn sight(seen: bool) -> Visibility {
     let word = if seen {
-        crate::vision::VisionBits::NO_TILE | crate::vision::VisionBits::NO_TILE_EXPLORED
+        VisionBits::NO_TILE | VisionBits::NO_TILE_EXPLORED
     } else {
-        crate::vision::VisionBits::NONE
+        VisionBits::NONE
     };
-    crate::vision::visibility::Visibility::new(
+    Visibility::new(
         GridSize::new(16, 16),
         Vec::new(),
         vec![word; 256],
@@ -1819,12 +1809,11 @@ fn swing_that_fails_its_interrupt_check_stays_failed() {
     };
     rig.unit_mut().sprite = Some(ActiveSprite {
         looped: true,
-        frame: crate::objects::Frame::of_data(9),
+        frame: Frame::of_data(9),
         ..ActiveSprite::start(swing, &mut Well512::default())
     });
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
-    (a.state, a.seen, a.arms.interrupt_frame) =
-        (AttackState::Swing, at, crate::objects::Frame::of_data(5));
+    (a.state, a.seen, a.arms.interrupt_frame) = (AttackState::Swing, at, Frame::of_data(5));
     let code = rig.run(20, |c, u, actions, f, r| {
         a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
@@ -1853,8 +1842,8 @@ fn rangeless_attack_reaches_tenth_squared_in_f32() {
 fn disarmed_building_targetless_attack_ends_with_its_notify() {
     let standing = Graphic {
         id: SpriteId::named(418),
-        frames: crate::objects::Frame::of_data(1),
-        facets: crate::objects::FacetCount::of_data(1),
+        frames: Frame::of_data(1),
+        facets: FacetCount::of_data(1),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::ZERO,
         replay_delay: Seconds::ZERO,
@@ -1879,8 +1868,8 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
             idle_sprite: Some(standing),
             idle_attack_sprite: None,
             missile: None,
-            fire_frame: crate::objects::Frame::of_data(0),
-            interrupt_frame: crate::objects::Frame::of_data(-1),
+            fire_frame: Frame::of_data(0),
+            interrupt_frame: Frame::of_data(-1),
         },
         voice: Voice::Loud,
         on_target_moved: TargetMoved::Follows,
@@ -1921,8 +1910,8 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
 fn an_attack_walks_with_the_unit_running_or_walking_slot() {
     let g = |id| Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -1940,7 +1929,7 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
     };
     let a = arms(&master, &graphics, TaskSprites::NONE, None);
     assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(11)));
-    let look = crate::combat::abilities::Look {
+    let look = Look {
         standing: None,
         walking: Some(SpriteId::named(20)),
         attacking: Some(SpriteId::named(21)),
@@ -2011,13 +2000,13 @@ fn own_start(
     owner: PlayerId,
     mover: &mut Mover,
 ) -> Result<Started, GenieError> {
-    let none = crate::world::index::ObjectsRef::empty();
+    let none = ObjectsRef::empty();
     own_start_among((world, none), e, arms, visible, owner, mover)
 }
 
 /// [`own_start`] among the objects `by_id` (a gate's parts).
 fn own_start_among(
-    (world, by_id): (&Spatial, crate::world::index::ObjectsRef<'_>),
+    (world, by_id): (&Spatial, ObjectsRef<'_>),
     e: &Engagement,
     arms: Arms,
     visible: bool,
@@ -2254,7 +2243,7 @@ fn gate_reach_is_to_its_nearest_part() {
         for (id, x) in parts {
             world.insert(
                 object_id(id),
-                crate::map::spatial::Placed {
+                Placed {
                     position: Position::new(x, 10.0, 0.0),
                     ..*world.get(object_id(7)).unwrap()
                 },
@@ -2262,7 +2251,7 @@ fn gate_reach_is_to_its_nearest_part() {
         }
         world
     };
-    let mut objects = crate::world::index::TestObjects::default();
+    let mut objects = TestObjects::default();
     for (id, _) in parts {
         objects.link_annex(object_id(id), object_id(7));
     }
@@ -2495,8 +2484,8 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
     use crate::world::tests::{forage_world, in_update};
     let stand = Graphic {
         id: SpriteId::named(9),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(1),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(1),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -2581,8 +2570,8 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
 /// `last` to `frame`.
 fn at_frame(frame: i16, last: i16) -> ActiveSprite {
     ActiveSprite {
-        frame: crate::objects::Frame::of_data(frame),
-        last_frame: crate::objects::Frame::of_data(last),
+        frame: Frame::of_data(frame),
+        last_frame: Frame::of_data(last),
         changed: true,
         looped: false,
         ..ActiveSprite::start(STANDING, &mut Well512::default())
@@ -2596,7 +2585,7 @@ fn swinging_attack(state: AttackState, ranged: bool, fire: i16) -> Attack {
     a.pending = true;
     a.arms.idle_sprite = Some(STANDING);
     a.arms.missile = if ranged { Some(master_id(5)) } else { None };
-    a.arms.fire_frame = crate::objects::Frame::of_data(fire);
+    a.arms.fire_frame = Frame::of_data(fire);
     a
 }
 
@@ -2638,8 +2627,8 @@ fn ranged_swing_fires_at_its_firing_frame_and_melee_one_counts_down() {
     let r = reads();
     let mut swing_at = |t: &mut World, a: &mut Attack, frame: i16| {
         let sprite = ActiveSprite {
-            frame: crate::objects::Frame::of_data(frame),
-            last_frame: crate::objects::Frame::of_data(frame - 1),
+            frame: Frame::of_data(frame),
+            last_frame: Frame::of_data(frame - 1),
             changed: true,
             looped: false,
             ..ActiveSprite::start(
@@ -2647,7 +2636,7 @@ fn ranged_swing_fires_at_its_firing_frame_and_melee_one_counts_down() {
                 &mut Well512::default(),
             )
         };
-        crate::world::tests::in_update(
+        in_update(
             t,
             (PlayerId::new(1), ListIndex::new(0)),
             100,
@@ -2720,7 +2709,7 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
         reason(class::CLASS_6, ids::ID_527, false, 0),
         "a self-destructing attacker's hit (masters 527, 528, 1104, 2133..2135)"
     );
-    let mut t = crate::world::tests::archer_world(100, 0, 0.0);
+    let mut t = archer_world(100, 0, 0.0);
     let mut a = *t
         .parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -2740,15 +2729,15 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
     };
     let r = reads();
     let sprite = ActiveSprite {
-        frame: crate::objects::Frame::of_data(5),
-        last_frame: crate::objects::Frame::of_data(4),
+        frame: Frame::of_data(5),
+        last_frame: Frame::of_data(4),
         changed: true,
         ..ActiveSprite::start(
             *t.graphics.get(SpriteId::named(301)).unwrap(),
             &mut Well512::default(),
         )
     };
-    crate::world::tests::in_update(
+    in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         100,
@@ -2756,7 +2745,7 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
     )
     .unwrap();
     assert_eq!((a.pending, a.state), (false, AttackState::Killed));
-    assert_eq!(crate::world::tests::missiles(&t).len(), 1);
+    assert_eq!(missiles(&t).len(), 1);
 }
 
 /// The swing after its hit ([`Attack::swing_after_hit`]): a ranged swing whose timer ran out
@@ -2776,19 +2765,13 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         (a.state.bare(), rig.mover().animated.speed)
     };
     assert_eq!(
-        after(
-            None,
-            crate::objects::Frame::of_data(5),
-            at_frame(9, 8),
-            Seconds::ZERO
-        )
-        .0,
+        after(None, Frame::of_data(5), at_frame(9, 8), Seconds::ZERO).0,
         AttackState::Killed
     );
     assert_eq!(
         after(
-            Some(crate::combat::AttackTargetId::new(object_id(10028))),
-            crate::objects::Frame::of_data(5),
+            Some(AttackTargetId::new(object_id(10028))),
+            Frame::of_data(5),
             at_frame(6, 5),
             Seconds::ZERO
         )
@@ -2797,8 +2780,8 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
     );
     assert_eq!(
         after(
-            Some(crate::combat::AttackTargetId::new(object_id(10028))),
-            crate::objects::Frame::of_data(-1),
+            Some(AttackTargetId::new(object_id(10028))),
+            Frame::of_data(-1),
             at_frame(3, 2),
             Seconds::ZERO
         )
@@ -2811,8 +2794,8 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
     };
     assert_eq!(
         after(
-            Some(crate::combat::AttackTargetId::new(object_id(10028))),
-            crate::objects::Frame::of_data(-1),
+            Some(AttackTargetId::new(object_id(10028))),
+            Frame::of_data(-1),
             looped,
             Seconds::new(0.5)
         ),
@@ -3279,7 +3262,7 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
     assert_eq!(
         (
             code,
-            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id)),
+            ObjectId::field(a.target.map(AttackTargetId::id)),
             a.point,
             a.state
         ),
@@ -3506,7 +3489,7 @@ fn killing_attack_ends_once_its_swing_looped() {
             code,
             rig.workers(7, PlayerId::new(0)),
             rig.posted(),
-            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id)),
+            ObjectId::field(a.target.map(AttackTargetId::id)),
             a.state
         ),
         (
@@ -3524,7 +3507,7 @@ fn killing_attack_ends_once_its_swing_looped() {
         (
             code,
             a.state,
-            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id))
+            ObjectId::field(a.target.map(AttackTargetId::id))
         ),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Killed, 7)
     );

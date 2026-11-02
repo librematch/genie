@@ -16,11 +16,13 @@ use crate::movement::move_to::{MoveToAction, TargetMoved};
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
+use crate::objects::sprite::Graphic;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::PlayerType;
@@ -183,7 +185,7 @@ impl GatherAction {
         });
         if !self.worked {
             if self.target_class == Some(class::FARM)
-                && target.is_some_and(|t| crate::objects::WorkerCount::ONE < t.workers)
+                && target.is_some_and(|t| WorkerCount::ONE < t.workers)
             {
                 let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
@@ -244,7 +246,7 @@ impl GatherAction {
         arrived: bool,
         player_type: PlayerType,
         mover: Option<&mut Mover>,
-        stand: Option<crate::objects::sprite::Graphic>,
+        stand: Option<Graphic>,
         sprite: &mut Option<ActiveSprite>,
         rng: &mut Well512,
     ) -> Result<[Option<ObjectId>; 2], GenieError> {
@@ -292,11 +294,7 @@ impl GatherAction {
 
     /// The sprite the gatherer stands with (`FUN_140a8b6b0`): the task's carrying sprite while
     /// it carries at least 1 of the task's resource, else its master's standing sprite.
-    pub(super) fn stand_sprite(
-        &self,
-        unit: &Unit,
-        r: &GatherReads,
-    ) -> Option<crate::objects::sprite::Graphic> {
+    pub(super) fn stand_sprite(&self, unit: &Unit, r: &GatherReads) -> Option<Graphic> {
         let resource = self.task.resource;
         let Held { kind, amount } = unit.life.held();
         match r.sprites.carrying {

@@ -30,8 +30,13 @@ use crate::world::World;
 pub use crate::world::whole::{Object, ObjectParts, ObjectView};
 use std::borrow::Cow;
 
+use crate::construction::BuilderCount;
+use crate::objects::ObjectState;
+use crate::unit_ai::Inbox;
 #[cfg(test)]
 pub(crate) use crate::world::parts_fixtures::{no_own_masters, no_parts};
+use std::mem::replace;
+use std::sync::LazyLock;
 
 /// One part's table: the parts packed in a dense vector in the order they came, each id's slot
 /// in a table by id. A removal moves the last part into the gap.
@@ -95,7 +100,7 @@ impl<T> PartTable<T> {
     /// the part it held before, if any.
     pub(in crate::world) fn insert(&mut self, id: ObjectId, part: T) -> Option<T> {
         if let Some(held) = self.get_mut(id) {
-            return Some(std::mem::replace(held, part));
+            return Some(replace(held, part));
         }
         let _ = self.slots.insert(id, self.parts.len());
         self.parts.push(part);
@@ -169,12 +174,8 @@ impl PartTable<Combat> {
 impl PartTable<UnitAi> {
     /// The notifies object `id` in `state` posts to its own unit AI ([`crate::unit_ai::Inbox`]),
     /// none for an object without one.
-    pub(crate) fn inbox(
-        &mut self,
-        id: ObjectId,
-        state: crate::objects::ObjectState,
-    ) -> crate::unit_ai::Inbox<'_> {
-        crate::unit_ai::Inbox {
+    pub(crate) fn inbox(&mut self, id: ObjectId, state: ObjectState) -> Inbox<'_> {
+        Inbox {
             ai: self.get_mut(id),
             id,
             state,
@@ -267,7 +268,7 @@ pub(in crate::world) fn repairers_in<'a>(
     buildings: &'a mut PartTable<Building>,
     combats: &'a mut PartTable<Combat>,
     id: ObjectId,
-) -> Result<&'a mut crate::construction::BuilderCount, GenieError> {
+) -> Result<&'a mut BuilderCount, GenieError> {
     if buildings.get(id).is_some_and(|b| b.construction.is_some()) {
         return buildings
             .get_mut(id)
@@ -281,7 +282,7 @@ pub(in crate::world) fn repairers_in<'a>(
 }
 
 /// The combat layer of an object the table does not hold: a new object's.
-static NO_COMBAT: std::sync::LazyLock<Combat> = std::sync::LazyLock::new(Combat::default);
+static NO_COMBAT: LazyLock<Combat> = LazyLock::new(Combat::default);
 
 impl Parts {
     /// Object `id`'s parts filed in the tables (it enters the world).
@@ -413,7 +414,7 @@ impl Parts {
     /// Object `id`'s repairers or builders (`+0x9e8`, `num_builders`): a building's in its
     /// construction, any other's in its combat layer.
     #[must_use]
-    pub fn repairers_of(&self, id: ObjectId) -> crate::construction::BuilderCount {
+    pub fn repairers_of(&self, id: ObjectId) -> BuilderCount {
         self.building_of(id)
             .construction
             .map_or_else(|| self.combat_of(id).builders, |k| k.builders)
@@ -424,10 +425,7 @@ impl Parts {
     /// # Errors
     ///
     /// None (an unreachable error where a table lost the part it took).
-    pub(crate) fn repairers_mut(
-        &mut self,
-        id: ObjectId,
-    ) -> Result<&mut crate::construction::BuilderCount, GenieError> {
+    pub(crate) fn repairers_mut(&mut self, id: ObjectId) -> Result<&mut BuilderCount, GenieError> {
         repairers_in(&mut self.building, &mut self.combat, id)
     }
 
@@ -682,7 +680,27 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::combat::damage::ArmorPair;
+    #[cfg(test)]
+    use crate::commands::GatherPointState;
+    #[cfg(test)]
+    use crate::map::{Distance, Offset, Point, Position};
+    #[cfg(test)]
+    use crate::objects::HitPoints;
+    #[cfg(test)]
+    use crate::objects::lifecycle::Lifecycle;
+    #[cfg(test)]
+    use crate::orders::town_bell::BackToWork;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::test_ids::tech_id;
+    #[cfg(test)]
+    use crate::world::index::ObjectsRef;
+    #[cfg(test)]
+    use crate::world::player::Player;
+    #[cfg(test)]
+    use crate::world::{FrameSeed, Millis, WorldTime};
 
     /// The table finds each object's part by id; a removal moves the last part into the gap and
     /// its slot follows; a second insert replaces; two tables of the same parts in another
@@ -722,11 +740,11 @@ mod tests {
         use genie_diff::{Scope, differences};
         let id = object_id(5);
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player {
+            vec![Millis::ZERO],
+            vec![Player {
                 objects: vec![Unit {
                     id,
                     ..Unit::default()
@@ -775,11 +793,11 @@ mod tests {
         use crate::players::PlayerId;
         let id = object_id(5);
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player {
+            vec![Millis::ZERO],
+            vec![Player {
                 objects: vec![Unit {
                     id,
                     ..Unit::default()
@@ -790,11 +808,11 @@ mod tests {
         );
         let gather = gather_point(3.5);
         let missile = Missile {
-            max_range: crate::map::Distance::new(7.0),
+            max_range: Distance::new(7.0),
             fired_from: None,
             charge: true,
             flying: true,
-            step: crate::map::Offset::ZERO,
+            step: Offset::ZERO,
         };
         let parts = ObjectParts {
             gather_point: Some(gather),
@@ -833,11 +851,11 @@ mod tests {
         use crate::unit_ai::NotifyKind;
         let id = object_id(5);
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player::default()],
+            vec![Millis::ZERO],
+            vec![Player::default()],
         );
         let unit = Unit {
             id,
@@ -876,11 +894,11 @@ mod tests {
         use crate::players::PlayerId;
         let id = object_id(5);
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player {
+            vec![Millis::ZERO],
+            vec![Player {
                 objects: vec![Unit {
                     id,
                     ..Unit::default()
@@ -893,9 +911,9 @@ mod tests {
         assert!(t.parts.production.is_empty());
         let made = t.production_or_new(id).unwrap();
         assert_eq!(*made, Production::default());
-        made.disabled_techs.push(crate::test_ids::tech_id(3));
+        made.disabled_techs.push(tech_id(3));
         let again = t.production_or_new(id).unwrap();
-        assert_eq!(again.disabled_techs, [crate::test_ids::tech_id(3)]);
+        assert_eq!(again.disabled_techs, [tech_id(3)]);
         assert_eq!(t.parts.production.len(), 1);
         t.set_part(id, Part::Production(None)).unwrap();
         assert!(t.parts.production.is_empty());
@@ -911,11 +929,11 @@ mod tests {
         use crate::players::PlayerId;
         let id = object_id(5);
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player {
+            vec![Millis::ZERO],
+            vec![Player {
                 objects: vec![Unit {
                     id,
                     ..Unit::default()
@@ -931,9 +949,9 @@ mod tests {
         t.parts.set_town_bell_flag(id, false);
         assert!(t.parts.town_bell.is_empty());
         let mut bell = t.parts.town_bell_of(id);
-        bell.record(crate::orders::town_bell::BackToWork {
-            point: crate::map::Point::new(2.0, 3.0),
-            ..crate::orders::town_bell::BackToWork::NONE
+        bell.record(BackToWork {
+            point: Point::new(2.0, 3.0),
+            ..BackToWork::NONE
         });
         t.set_part(id, Part::TownBell(bell)).unwrap();
         assert_eq!(t.parts.town_bell_of(id), bell);
@@ -955,11 +973,11 @@ mod tests {
         let id = object_id(5);
         let why = Unread::new(GenieError::unsupported("a saved production list"));
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player {
+            vec![Millis::ZERO],
+            vec![Player {
                 objects: vec![Unit {
                     id,
                     ..Unit::default()
@@ -978,8 +996,7 @@ mod tests {
         .unwrap();
         assert_eq!(t.parts.unread.get(id), Some(&why));
         assert_eq!(t.parts.of(id).unread, Some(why.clone()));
-        let by_id =
-            crate::world::index::ObjectsRef::new(&t.players, &t.index, &t.masters, &t.parts);
+        let by_id = ObjectsRef::new(&t.players, &t.index, &t.masters, &t.parts);
         assert_eq!(by_id.unread(id), Some(&why));
         t.check_parts().unwrap();
         let gone = t
@@ -1006,18 +1023,18 @@ mod tests {
         let (id, other) = (object_id(5), object_id(6));
         let unit = |id| Unit {
             id,
-            life: crate::objects::lifecycle::Lifecycle {
+            life: Lifecycle {
                 master_id: master_id(4),
                 ..Default::default()
             },
             ..Unit::default()
         };
         let mut t = World::new(
-            crate::world::WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            WorldTime::ZERO,
+            FrameSeed::of_data(1),
             PlayerId::new(0),
-            vec![crate::world::Millis::ZERO],
-            vec![crate::world::player::Player {
+            vec![Millis::ZERO],
+            vec![Player {
                 objects: vec![unit(id), unit(other)].into(),
                 ..Default::default()
             }],
@@ -1048,8 +1065,8 @@ mod tests {
     /// A gather point at `x` on no target.
     fn gather_point(x: f32) -> GatherPoint {
         GatherPoint {
-            state: crate::commands::GatherPointState::POINT,
-            point: crate::map::Position::new(x, 1.0, 0.0),
+            state: GatherPointState::POINT,
+            point: Position::new(x, 1.0, 0.0),
             target: None,
             target_master: None,
         }
@@ -1069,21 +1086,21 @@ mod tests {
         });
         let mut b = a.clone();
         b.parts.dead_master = Some(Master::default());
-        b.unit.life.hp = crate::objects::HitPoints::new(7.0);
+        b.unit.life.hp = HitPoints::new(7.0);
         b.parts.gather_point = Some(gather_point(2.0));
         b.parts.production = Some(Production::default());
         b.parts.own_master = Some(Master::default());
         b.parts.town_bell.flag = true;
         b.parts.unit_ai = Some(UnitAi::default());
         b.parts.missile = Some(Missile {
-            max_range: crate::map::Distance::ZERO,
+            max_range: Distance::ZERO,
             fired_from: None,
             charge: false,
             flying: true,
-            step: crate::map::Offset::ZERO,
+            step: Offset::ZERO,
         });
-        b.parts.building.garrison_time = crate::world::WorldTime::from_millis(5);
-        b.parts.combat.armor_removed = crate::combat::damage::ArmorPair::new(1, 0);
+        b.parts.building.garrison_time = WorldTime::from_millis(5);
+        b.parts.combat.armor_removed = ArmorPair::new(1, 0);
         let paths = |scope| {
             differences(&a, &b, scope)
                 .into_iter()

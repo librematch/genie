@@ -1,6 +1,7 @@
 //! A sprite's id ([`SpriteId`]): the `.dat`'s graphic a master or a task shows.
 
 use genie_diff::Diff;
+use std::fmt::{Display, Error, Formatter};
 
 /// A sprite (a `.dat` graphic) by its id, 0 and up: what a master's and a task's sprite
 /// fields name and the world's sprite table holds ([`crate::world::World::graphics`]). The
@@ -29,8 +30,8 @@ impl SpriteId {
     }
 }
 
-impl std::fmt::Display for SpriteId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for SpriteId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

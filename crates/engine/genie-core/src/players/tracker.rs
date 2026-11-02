@@ -42,7 +42,10 @@ use crate::objects::masters::{ClassId, class};
 use crate::players::PlayerId;
 use crate::production::QueuedUnits;
 use crate::world::Seconds;
+use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use std::collections::BTreeMap;
+use std::mem::take;
 
 /// A pending key is its done key + this (a master's + 90000, a class's + 90900).
 const PENDING: i32 = 90_000;
@@ -218,7 +221,7 @@ pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId) -> Ke
 /// pending), each in the order its ids came in.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Tracker {
-    lists: std::collections::BTreeMap<ListKey, Vec<Option<ObjectId>>>,
+    lists: BTreeMap<ListKey, Vec<Option<ObjectId>>>,
     /// `+0x60` (`FUN_14104fb00`): what the production queues' writers count, units queued and
     /// spawned or cancelled (a cancel of several counts them twice, as the game does).
     pub queued: i32,
@@ -396,7 +399,7 @@ impl Tracker {
     }
 }
 
-impl crate::world::World {
+impl World {
     /// [`key`] of player `p`'s master `master`.
     #[must_use]
     pub fn tracker_key(&self, p: PlayerId, master: MasterId) -> Key {
@@ -525,7 +528,7 @@ impl crate::world::World {
         to: MasterId,
     ) -> Result<(), GenieError> {
         let old_class = self.tracker_key(p, from).class;
-        let mut tracker = std::mem::take(&mut self.players.player_mut(p)?.tracker);
+        let mut tracker = take(&mut self.players.player_mut(p)?.tracker);
         let class_of = |id: ObjectId| -> Result<Option<ClassId>, GenieError> {
             let Some((q, u)) = self.object(id) else {
                 return Ok(None);
@@ -546,7 +549,17 @@ impl crate::world::World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::construction::BuilderCount;
+    #[cfg(test)]
+    use crate::construction::build::Construction;
+    #[cfg(test)]
+    use crate::map::Snow;
+    #[cfg(test)]
+    use crate::map::spatial::Obstruction;
     use crate::objects::MasterHitPoints;
+    #[cfg(test)]
+    use crate::objects::layers::Building;
     use crate::objects::lines::LineId;
     use crate::objects::lines::UnitLine;
     use crate::objects::masters::ObstructionClass;
@@ -557,6 +570,8 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::WholeSeconds;
     use crate::world::WorldTime;
@@ -884,7 +899,7 @@ mod tests {
         assert_eq!(t.list(list_of(118)), [Some(object_id(1))]);
     }
 
-    fn world() -> crate::world::World {
+    fn world() -> World {
         use crate::objects::unit::Unit;
         use crate::world::{Player, World};
         let unit = |id: i32, master: MasterId| {
@@ -898,18 +913,18 @@ mod tests {
         let site = |id: i32, progress: f32| {
             (
                 object_id(id),
-                crate::objects::layers::Building {
-                    construction: Some(crate::construction::build::Construction {
+                Building {
+                    construction: Some(Construction {
                         progress: Seconds::new(progress),
                         desolid: false,
-                        builders: crate::construction::BuilderCount::of_data(0),
+                        builders: BuilderCount::of_data(0),
                         hit_points: MasterHitPoints::of_data(2400),
                         build_time: WholeSeconds::of_data(150),
-                        record: crate::map::spatial::Obstruction {
+                        record: Obstruction {
                             kind: ObstructionType::NONE,
                             class: ObstructionClass::NONE,
                         },
-                        snow: crate::map::Snow::None,
+                        snow: Snow::None,
                         sprite_override: false,
                     }),
                     ..Default::default()
@@ -930,7 +945,7 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(0),
+            FrameSeed::of_data(0),
             PlayerId::new(0),
             vec![Millis::ZERO; 2],
             vec![Player::default(), player],

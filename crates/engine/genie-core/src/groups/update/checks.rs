@@ -2,7 +2,9 @@
 //! still to act on, the relics, a member's idleness, the sprites shown and the lead.
 
 use crate::GenieError;
+use crate::combat::attack::ATTACK;
 use crate::groups::GroupId;
+use crate::groups::attack::moved_place;
 use crate::groups::group_list::member_gone;
 use crate::groups::update::{
     BUILD, DELIVER_RELIC, FARTHEST, NO_COMMAND, PICK_UP_RELIC, RELIC_DELIVERY_ACTION,
@@ -12,8 +14,17 @@ use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Tile;
+use crate::math::conversions::cvttss2si;
+use crate::math::fmath::{maxss, sub};
+use crate::math::rng::Stream;
+use crate::movement::{
+    Mover, footprint_gap as movement_footprint_gap,
+    footprint_gap_squared as movement_footprint_gap_squared,
+};
 use crate::objects::ActionState;
+use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::layers::Action;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::Master;
@@ -24,12 +35,15 @@ use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
+use crate::objects::sprite::{new_sprite, running, standing, walking};
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
+use crate::world::Unread;
 use crate::world::World;
+use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -84,7 +98,7 @@ impl World {
                 } else {
                     master.search_radius
                 };
-                let reach = crate::math::fmath::maxss(search.get(), master.line_of_sight.get());
+                let reach = maxss(search.get(), master.line_of_sight.get());
                 let reach = reach * reach;
                 let mut nearest = FARTHEST;
                 let mut found = false;
@@ -170,7 +184,7 @@ impl World {
         }
         !g.members.iter().any(|m| {
             matches!(self.world_object(m.id), Some(WorldObject::Unit(_, u, _))
-                if self.parts.mover_of(u.id).is_some_and(crate::movement::Mover::is_moving))
+                if self.parts.mover_of(u.id).is_some_and(Mover::is_moving))
         })
     }
 
@@ -192,7 +206,7 @@ impl World {
         if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok(None);
         }
-        if let Some(e) = self.parts.unread.get(u.id).map(crate::world::Unread::error) {
+        if let Some(e) = self.parts.unread.get(u.id).map(Unread::error) {
             return Err(e);
         }
         Ok(self
@@ -216,7 +230,7 @@ impl World {
     ) -> Result<DistanceSquared, GenieError> {
         let ra = self.master(a.player(), a.master_id())?.radius;
         let rb = self.master(b.player(), b.master_id())?.radius;
-        Ok(crate::movement::footprint_gap_squared(
+        Ok(movement_footprint_gap_squared(
             a.position(),
             ra,
             b.position(),
@@ -237,12 +251,7 @@ impl World {
     ) -> Result<Distance, GenieError> {
         let ra = self.master(a.player(), a.master_id())?.radius;
         let rb = self.master(b.player(), b.master_id())?.radius;
-        Ok(crate::movement::footprint_gap(
-            a.position(),
-            ra,
-            b.position(),
-            rb,
-        ))
+        Ok(movement_footprint_gap(a.position(), ra, b.position(), rb))
     }
 
     /// `FUN_1410176b0` of group `group`: whether its target is still to act on. None without
@@ -274,9 +283,9 @@ impl World {
         };
         let owner = g.owner_player()?;
         let most = if g.current_command == BUILD {
-            crate::objects::ObjectState::Foundation
+            ObjectState::Foundation
         } else {
-            crate::objects::ObjectState::Alive
+            ObjectState::Alive
         };
         if most < target.state() || target.inside() {
             return Ok(false);
@@ -384,10 +393,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         let master = self.master(object.player(), object.master_id())?;
         let (x, y) = (object.position().x(), object.position().y());
-        let (x, y) = (
-            crate::math::conversions::cvttss2si(x),
-            crate::math::conversions::cvttss2si(y),
-        );
+        let (x, y) = (cvttss2si(x), cvttss2si(y));
         if master.fog_visibility == FogVisibility::INVISIBLE {
             Ok(self.spatial.sees_tile(player, Tile::new(x, y)))
         } else {
@@ -492,7 +498,7 @@ impl World {
             return Err(TRADE_CART_SPRITES);
         }
         if ACTION <= master.kind
-            && let Some(e) = self.parts.unread.get(u.id).map(crate::world::Unread::error)
+            && let Some(e) = self.parts.unread.get(u.id).map(Unread::error)
         {
             return Err(e);
         }
@@ -500,9 +506,9 @@ impl World {
         // trade cart's goods are passed above
         let look = self.parts.combat_of(u.id).abilities.look.as_ref();
         let sprite = match shown {
-            Shown::Standing => crate::objects::sprite::standing(master, look, false),
-            Shown::Walking => crate::objects::sprite::walking(master, look, false),
-            Shown::Running => crate::objects::sprite::running(master, look),
+            Shown::Standing => standing(master, look, false),
+            Shown::Walking => walking(master, look, false),
+            Shown::Running => running(master, look),
         };
         Ok(sprite)
     }
@@ -515,8 +521,8 @@ impl World {
         let graphic = self.graphics.get(sprite).copied();
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
         let u = match place {
-            crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i).ok(),
-            crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i).ok(),
+            Place::Live(p, i) => self.players.live_mut(p, i).ok(),
+            Place::Sleeping(p, i) => self.players.asleep_mut(p, i).ok(),
         }
         .ok_or_else(|| member_gone(id))?;
         let mut motion = self.parts.motion.layer_mut(u.id);
@@ -529,8 +535,8 @@ impl World {
         let g = graphic.ok_or(GenieError::unsupported(
             "a unit without its sprite's graphic",
         ))?;
-        let rng = self.streams.get(crate::math::rng::Stream::Sprite);
-        crate::objects::sprite::new_sprite(&mut u.sprite, motion.move_stats_mut(), g, rng);
+        let rng = self.streams.get(Stream::Sprite);
+        new_sprite(&mut u.sprite, motion.move_stats_mut(), g, rng);
         Ok(true)
     }
 
@@ -548,10 +554,7 @@ impl World {
                 continue;
             };
             // slot 0x520: the game's vector of where it last moved to
-            let d = crate::math::fmath::sub(
-                crate::groups::attack::moved_place(u, self.parts.mover_of(u.id)),
-                to,
-            );
+            let d = sub(moved_place(u, self.parts.mover_of(u.id)), to);
             let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
             if squared < best {
                 lead = Some(m.id);
@@ -562,7 +565,7 @@ impl World {
     }
 }
 
-impl crate::objects::layers::Action {
+impl Action {
     /// [`World::member_idle`] of the unit itself (`FUN_141017f00`) by its action layer, of
     /// master `master` and unit AI `ai`, as its own update asks it (slot 0x5e0,
     /// [`crate::movement::GroupSpeed`]); `unread`: the load could not read it whole
@@ -573,7 +576,7 @@ impl crate::objects::layers::Action {
     /// A unit with an action the slice does not model.
     pub(crate) fn free_for_group(
         &self,
-        unread: Option<&crate::world::Unread>,
+        unread: Option<&Unread>,
         master: &Master,
         ai: Option<&UnitAi>,
     ) -> Result<bool, GenieError> {
@@ -594,7 +597,7 @@ impl crate::objects::layers::Action {
                 if master.class == class::TRADE_CART || master.class == class::TRADE_BOAT {
                     return Ok(true);
                 }
-                if actions.top_action_kind() == Some(crate::combat::attack::ATTACK) {
+                if actions.top_action_kind() == Some(ATTACK) {
                     return Ok(false);
                 }
             } else if !matches!(state, 3 | 13 | 14) {

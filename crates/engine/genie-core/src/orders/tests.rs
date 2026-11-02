@@ -1,26 +1,41 @@
 use super::*;
+use crate::combat::attack::{ATTACK, AttackState};
+use crate::combat::{AttackTargetId, Firepower};
 use crate::commands::UnitOrderAction;
 use crate::commands::UnloadPick;
 use crate::construction::MainBuildingId;
 use crate::construction::build::BuildState;
+use crate::construction::build::tests::started;
+use crate::construction::build::{BuildAction, BuildTask, Construction};
+use crate::construction::{BuilderCount, FoundationId};
 use crate::garrison::ContainerId;
+use crate::garrison::ENTER;
 use crate::gathering::DropSiteId;
+use crate::gathering::gather::GATHER;
 use crate::gathering::gather::GatherState;
 use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::tests::{hunting, walker};
+use crate::gathering::{GatherTargetId, HuntTargetId};
 use crate::groups::Differentiator;
 use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
+use crate::groups::{GroupLink, Member};
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Restriction;
 use crate::map::RestrictionId;
+use crate::map::Snow;
 use crate::map::TerrainFlags;
 use crate::map::Tile;
+use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
 use crate::map::terrain::TileTerrain;
+use crate::map::terrain::{Terrain, TerrainKind};
 use crate::math::fmath::BVector;
 use crate::movement::PathFlags;
+use crate::movement::WaypointIndex;
+use crate::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, MoveWait, TargetMoved};
 use crate::objects::Graphics;
 use crate::objects::HpPowerup;
 use crate::objects::ObjectId;
@@ -29,7 +44,9 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::{Action, Motion, MotionMut, Static};
 use crate::objects::lifecycle::Held;
+use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
@@ -46,12 +63,18 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::{Masters, Task, WorkValue};
+use crate::objects::sprite::{ActiveSprite, Graphic};
+use crate::objects::{FacetCount, Frame, WorkerCount};
+use crate::ownership::artifact::Artifact;
+use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::players::relations;
+use crate::test_ids::adds;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::group_id;
@@ -66,10 +89,16 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::{Effect, Notify, OrderPriority, PatrolPath};
 use crate::vision::VisionBits;
+use crate::vision::registry::Registry;
+use crate::vision::visibility::Visibility;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::parts::Object;
+use crate::world::parts::ObjectParts;
+use crate::world::tests::{forage_world, hunt_world};
+use crate::world::{FrameSeed, Gate, Player};
 
 /// The object's own update knows its slot: it is taken while it still holds the object, and
 /// the object is found by its id once the list moved or the slot is out of the lists; an
@@ -82,18 +111,18 @@ fn an_object_own_slot_is_taken_while_it_holds_the_object() {
     };
     let t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
-            crate::world::Player {
+            Player {
                 objects: vec![unit(object_id(1)), unit(object_id(2))].into(),
-                ..crate::world::Player::default()
+                ..Player::default()
             },
-            crate::world::Player {
+            Player {
                 objects: vec![unit(object_id(3))].into(),
                 sleeping: vec![unit(object_id(4))].into(),
-                ..crate::world::Player::default()
+                ..Player::default()
             },
         ],
     );
@@ -174,31 +203,31 @@ fn damage_share_is_the_whole_less_the_hit_points_share() {
 fn drop_off_order_leaves_livestock_without_drop_site_alone() {
     let goose = Unit {
         id: object_id(28766),
-        life: crate::objects::lifecycle::Lifecycle {
+        life: Lifecycle {
             master_id: master_id(1243),
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
-        vec![crate::world::Player {
+        vec![Player {
             objects: vec![goose].into(),
-            ..crate::world::Player::default()
+            ..Player::default()
         }],
     );
-    t.masters = vec![crate::objects::masters::Masters::new([Master {
+    t.masters = vec![Masters::new([Master {
         id: master_id(1243),
         class: class::LIVESTOCK,
         ..Master::default()
     }])];
-    let tc = crate::unit_ai::task_finder::DropSite {
+    let tc = DropSite {
         building: ids::TOWN_CENTRE,
         worker_class: Some(class::VILLAGER),
-        ..crate::unit_ai::task_finder::DropSite::default()
+        ..DropSite::default()
     };
     t.drop_sites = vec![tc.clone()];
     assert!(
@@ -207,24 +236,24 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
     );
     t.drop_sites = vec![
         tc,
-        crate::unit_ai::task_finder::DropSite {
+        DropSite {
             building: ids::PASTURE,
             worker_class: Some(class::LIVESTOCK),
             resource_types: vec![attribute::FOOD],
-            ..crate::unit_ai::task_finder::DropSite::default()
+            ..DropSite::default()
         },
     ];
     let pen = |id, x: f32, state| Unit {
         id,
-        place: crate::objects::layers::Static::at(Position::new(x, 10.0, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
+        place: Static::at(Position::new(x, 10.0, 0.0)),
+        life: Lifecycle {
             master_id: ids::PASTURE,
             state,
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
-    t.masters[0] = crate::objects::masters::Masters::new([
+    t.masters[0] = Masters::new([
         t.masters[0].get(master_id(1243)).unwrap().clone(),
         Master {
             id: ids::PASTURE,
@@ -304,27 +333,27 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     let villager = Object::with_actions(
         Unit {
             id: object_id(10),
-            life: crate::objects::lifecycle::Lifecycle {
+            life: Lifecycle {
                 master_id: ids::VILLAGER_MALE,
                 state: ObjectState::Alive,
                 attribute_type: Some(attribute::WOOD),
                 amount: Amount::new(5.0),
-                ..crate::objects::lifecycle::Lifecycle::default()
+                ..Lifecycle::default()
             },
-            place: crate::objects::layers::Static::at(Position::new(10.0, 10.0, 0.0)),
+            place: Static::at(Position::new(10.0, 10.0, 0.0)),
             ..Unit::default()
         },
-        crate::objects::layers::Action {
-            list: ActionList::default().with_build(Some(crate::construction::build::BuildAction {
+        Action {
+            list: ActionList::default().with_build(Some(BuildAction {
                 state: BuildState::Work,
                 added: true,
-                ..crate::construction::build::tests::started(
+                ..started(
                     object_id(600),
                     Position::new(5.0, 10.0, 0.0),
                     Distance::ZERO,
-                    crate::construction::build::BuildTask {
+                    BuildTask {
                         range: Distance::new(0.1),
-                        work_value: crate::objects::masters::WorkValue::new(1.0),
+                        work_value: WorkValue::new(1.0),
                         work_rate: WorkRate::new(1.0),
                         resource: None,
                         id: TaskId::of_task(-1),
@@ -338,25 +367,25 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     let foundation = Object::with_building(
         Unit {
             id: object_id(600),
-            place: crate::objects::layers::Static::at(Position::new(5.0, 10.0, 0.0)),
-            life: crate::objects::lifecycle::Lifecycle {
+            place: Static::at(Position::new(5.0, 10.0, 0.0)),
+            life: Lifecycle {
                 master_id: ids::HOUSE,
-                ..crate::objects::lifecycle::Lifecycle::default()
+                ..Lifecycle::default()
             },
             ..Unit::default()
         },
-        crate::objects::layers::Building {
-            construction: Some(crate::construction::build::Construction {
+        Building {
+            construction: Some(Construction {
                 progress: Seconds::new(1.0),
                 desolid: false,
-                builders: crate::construction::BuilderCount::of_data(1),
+                builders: BuilderCount::of_data(1),
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
-                record: crate::map::spatial::Obstruction {
+                record: Obstruction {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: crate::map::Snow::None,
+                snow: Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -364,32 +393,29 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     );
     let mill = Unit {
         id: object_id(503),
-        place: crate::objects::layers::Static::at(Position::new(15.0, 10.0, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
+        place: Static::at(Position::new(15.0, 10.0, 0.0)),
+        life: Lifecycle {
             master_id: master_id(68),
             state: ObjectState::Alive,
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
     let world = || {
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
-            vec![crate::world::Player {
+            vec![Player {
                 objects: vec![villager.unit.clone(), foundation.unit.clone(), mill.clone()].into(),
-                ..crate::world::Player::default()
+                ..Player::default()
             }],
         )
         .with_buildings([(foundation.unit.id, foundation.parts.building.clone())])
         .with_actions([(villager.unit.id, villager.parts.actions.clone())])
-        .with_motions([(
-            villager.unit.id,
-            crate::objects::layers::Motion::Moving(crate::gathering::hunt::tests::walker()),
-        )]);
-        t.masters = vec![crate::objects::masters::Masters::new([
+        .with_motions([(villager.unit.id, Motion::Moving(walker()))]);
+        t.masters = vec![Masters::new([
             Master {
                 id: ids::VILLAGER_MALE,
                 kind: master_type::COMBAT,
@@ -447,11 +473,11 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         t
     };
     let mut t = world();
-    t.drop_sites = vec![crate::unit_ai::task_finder::DropSite {
+    t.drop_sites = vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
         resource_types: vec![attribute::WOOD],
-        ..crate::unit_ai::task_finder::DropSite::default()
+        ..DropSite::default()
     }];
     t.unit_order(
         player_id(0),
@@ -483,11 +509,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     );
     assert_eq!(
         (walk.state, walk.on_target_moved, build.added),
-        (
-            crate::movement::move_to::MoveTo::Start,
-            crate::movement::move_to::TargetMoved::AsksAgain,
-            false
-        )
+        (MoveTo::Start, TargetMoved::AsksAgain, false)
     );
     assert_eq!(
         t.parts
@@ -498,7 +520,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     );
     assert_eq!(
         t.players[0].objects[ListIndex::new(2)].workers,
-        crate::objects::WorkerCount::of_data(1)
+        WorkerCount::of_data(1)
     );
     // no table entry for wood: back to the foundation
     let mut t = world();
@@ -547,11 +569,11 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     // 7 asks the Build as 8 does; 6 does not ask it: the search alone (no drop site in the
     // table here, nothing to work on)
     let mut t = world();
-    t.drop_sites = vec![crate::unit_ai::task_finder::DropSite {
+    t.drop_sites = vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
         resource_types: vec![attribute::WOOD],
-        ..crate::unit_ai::task_finder::DropSite::default()
+        ..DropSite::default()
     }];
     t.unit_order(player_id(0), &object_ids([10]), UnitOrderAction::DropOff)
         .unwrap();
@@ -618,9 +640,9 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
             attack.target2
         ),
         (
-            crate::combat::attack::AttackState::Move { move_to: None },
-            Some(crate::movement::move_to::MoveTo::Arrived),
-            Some(crate::combat::AttackTargetId::new(object_id(50)))
+            AttackState::Move { move_to: None },
+            Some(MoveTo::Arrived),
+            Some(AttackTargetId::new(object_id(50)))
         )
     );
     assert_eq!(
@@ -657,7 +679,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(50)),
-            Some(crate::garrison::ENTER),
+            Some(ENTER),
             at,
             true
         ),
@@ -686,7 +708,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(50)),
-            Some(crate::combat::attack::ATTACK),
+            Some(ATTACK),
             at,
             true
         ),
@@ -800,7 +822,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
     );
     assert_eq!(
         t.players[0].objects[ListIndex::new(2)].workers,
-        crate::objects::WorkerCount::of_data(1)
+        WorkerCount::of_data(1)
     );
     t.parts
         .set_unit_ai(t.players[1].objects[ListIndex::new(0)].id, None);
@@ -814,7 +836,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
     .unwrap();
     assert_eq!(
         t.players[0].objects[ListIndex::new(2)].workers,
-        crate::objects::WorkerCount::of_data(2)
+        WorkerCount::of_data(2)
     );
 }
 
@@ -853,11 +875,7 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
             .expect("the soldier's Attack");
         assert_eq!(
             (attack.state, attack.pending, attack.target2),
-            (
-                state,
-                pending,
-                Some(crate::combat::AttackTargetId::new(object_id(50)))
-            ),
+            (state, pending, Some(AttackTargetId::new(object_id(50)))),
             "reload timer {timer}"
         );
         assert_eq!(
@@ -874,7 +892,7 @@ fn annexed(t: &mut World) {
         .get(master_id(126))
         .cloned()
         .expect("the wolf's master");
-    t.masters[0] = crate::objects::masters::Masters::new([
+    t.masters[0] = Masters::new([
         wolf,
         Master {
             id: master_id(200),
@@ -895,15 +913,15 @@ fn annexed(t: &mut World) {
         Object::with_building(
             Unit {
                 id,
-                place: crate::objects::layers::Static::at(position),
-                life: crate::objects::lifecycle::Lifecycle {
+                place: Static::at(position),
+                life: Lifecycle {
                     master_id,
                     state: ObjectState::Alive,
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
-            crate::objects::layers::Building {
+            Building {
                 annex_of,
                 ..Default::default()
             },
@@ -936,14 +954,14 @@ fn annexed(t: &mut World) {
 /// [`soldiers`]' soldier 11 (master 4, melee, reload 2) at (10, 10) on its feet with a walker
 /// of speed 1.2 and a unit AI of `stance`, touching Gaia's wolf 50 (master 126, class 10, 25
 /// hit points) at (10.4, 10), and the attack task (action type 7, no sprites of its own).
-fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
+fn work_attack(stance: UnitStance) -> (World, Task) {
     use crate::map::spatial::Placed;
     use crate::math::rng::Well512;
     use crate::objects::sprite::Graphic;
     let standing = Graphic {
         id: SpriteId::named(300),
-        frames: crate::objects::Frame::of_data(10),
-        facets: crate::objects::FacetCount::of_data(8),
+        frames: Frame::of_data(10),
+        facets: FacetCount::of_data(8),
         speed_multiplier: SpeedMultiplier::ONE,
         frame_duration: Seconds::new(0.1),
         replay_delay: Seconds::ZERO,
@@ -968,7 +986,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
             },
         ),
     ]);
-    let mut walker = crate::gathering::hunt::tests::walker();
+    let mut walker = walker();
     // the soldier's speed 0.8: its standing sprite's factor 1, its walking one's 1.5
     walker.stats.speed = Speed::new(1.2);
     let soldier = t.masters[1].get_mut(master_id(4)).unwrap();
@@ -978,7 +996,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     soldier.weapon_range = Distance::ZERO;
     soldier.reload = Seconds::new(2.0);
     soldier.moving = Some(walker.stats);
-    t.masters[0] = crate::objects::masters::Masters::new([Master {
+    t.masters[0] = Masters::new([Master {
         id: master_id(126),
         kind: master_type::COMBAT,
         class: class::PREDATOR,
@@ -989,12 +1007,12 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
             PlayerId::new(0),
             Unit {
                 id: object_id(50),
-                place: crate::objects::layers::Static::at(Position::new(10.4, 10.0, 0.0)),
-                life: crate::objects::lifecycle::Lifecycle {
+                place: Static::at(Position::new(10.4, 10.0, 0.0)),
+                life: Lifecycle {
                     master_id: master_id(126),
                     state: ObjectState::Alive,
                     hp: HitPoints::new(25.0),
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
@@ -1013,7 +1031,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         unknown: None,
         obstruction: None,
     };
-    t.spatial = crate::map::spatial::Spatial::new(GridSize::new(120, 120));
+    t.spatial = Spatial::new(GridSize::new(120, 120));
     t.spatial.insert(
         object_id(11),
         placed(10.0, class::CLASS_0, PlayerId::new(1), master_id(4)),
@@ -1025,7 +1043,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     let mut rng = Well512::default();
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.put_mover(unit.id, Some(walker));
-    unit.sprite = Some(crate::objects::sprite::ActiveSprite::start(
+    unit.sprite = Some(ActiveSprite::start(
         Graphic {
             id: SpriteId::named(302),
             ..standing
@@ -1035,19 +1053,19 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     t.parts.set_anim_speed(unit.id, Speed::new(1.0));
     t.parts.set_unit_ai(
         unit.id,
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             ai_type: UnitAiType::RANGED_6,
             current_order: None,
             current_action: None,
             current_target: None,
             stance,
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
-    let task = crate::objects::masters::Task {
+    let task = Task {
         action_type: ATTACK_TASK,
         sprites: TaskSprites::NONE,
-        ..crate::objects::masters::Task::default()
+        ..Task::default()
     };
     (t, task)
 }
@@ -1060,8 +1078,8 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         .iter()
         .map(|&(id, master, at)| Unit {
             id: object_id(id),
-            place: crate::objects::layers::Static::at(at.with_height(0.0)),
-            group: crate::groups::GroupLink {
+            place: Static::at(at.with_height(0.0)),
+            group: GroupLink {
                 id: if members.contains(&id) {
                     Some(group_id(5))
                 } else {
@@ -1069,30 +1087,30 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
                 },
                 flag: -2,
             },
-            life: crate::objects::lifecycle::Lifecycle {
+            life: Lifecycle {
                 master_id: master_id(master),
                 state: ObjectState::Alive,
-                ..crate::objects::lifecycle::Lifecycle::default()
+                ..Lifecycle::default()
             },
             ..Unit::default()
         })
         .collect();
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![
-            crate::world::Player::default(),
-            crate::world::Player {
+            Player::default(),
+            Player {
                 objects,
-                formations: crate::world::Formations {
+                formations: Formations {
                     auto: true,
                     influence: Distance::new(3.0),
                     by_speed: false,
-                    ..crate::world::Formations::default()
+                    ..Formations::default()
                 },
-                ..crate::world::Player::default()
+                ..Player::default()
             },
         ],
     );
@@ -1107,23 +1125,23 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         ..Master::default()
     };
     t.masters = vec![
-        crate::objects::masters::Masters::new([]),
-        crate::objects::masters::Masters::new([
+        Masters::new([]),
+        Masters::new([
             master(master_id(4), FormationClass::of_data(3)),
             master(ids::VILLAGER_MALE, FormationClass::UNGROUPED),
         ]),
     ];
     if !members.is_empty() {
-        t.groups.groups.push(crate::groups::UnitGroup {
+        t.groups.groups.push(UnitGroup {
             id: group_id(5),
             members: members
                 .iter()
-                .map(|&id| crate::groups::Member {
+                .map(|&id| Member {
                     id: object_id(id),
-                    ..crate::groups::Member::default()
+                    ..Member::default()
                 })
                 .collect(),
-            ..crate::groups::UnitGroup::default()
+            ..UnitGroup::default()
         });
     }
     t
@@ -1252,13 +1270,13 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         (12, 4, Point::new(21.0, 20.0)),
     ];
     let mut t = soldiers(&units, &[]);
-    t.players.push(crate::world::Player {
+    t.players.push(Player {
         objects: vec![Unit {
             id: object_id(30),
             ..Unit::default()
         }]
         .into(),
-        ..crate::world::Player::default()
+        ..Player::default()
     });
     t.reindex();
     t.players[1].relations = relation_row([3, 0, 4]);
@@ -1356,10 +1374,10 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
         (12, 4, Point::new(21.0, 20.0)),
     ];
     let mut t = soldiers(&units, &[11, 12]);
-    let order = crate::unit_ai::QueuedOrder {
+    let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: crate::unit_ai::OrderPriority::of_data(100),
+        priority: OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(1.0, 1.0, 0.0),
@@ -1370,11 +1388,11 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
     };
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             orders: vec![order],
             idle_timer: Millis::new(5),
             adjusted_idle_timeout: Millis::new(300),
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
     let ai = t
@@ -1428,18 +1446,17 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
 fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     t.settings.cheats_enabled = true;
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.reindex();
     t.player_time.push(Millis::ZERO);
-    t.masters.push(crate::objects::masters::Masters::new([]));
-    let walker = crate::gathering::hunt::tests::walker();
+    t.masters.push(Masters::new([]));
+    let walker = walker();
     if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
         m.moving = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.put_mover(unit.id, Some(walker));
-    t.parts
-        .set_unit_ai(unit.id, Some(crate::unit_ai::UnitAi::default()));
+    t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
     assert_eq!(
         t.checked_units(PlayerId::new(2), &object_ids([11])),
         object_ids([11])
@@ -1504,13 +1521,13 @@ fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
     // two groups' members ordered alone: both loose
     let two = || {
         let mut t = soldiers(&units, &[11]);
-        t.groups.groups.push(crate::groups::UnitGroup {
+        t.groups.groups.push(UnitGroup {
             id: group_id(6),
-            members: vec![crate::groups::Member {
+            members: vec![Member {
                 id: object_id(12),
-                ..crate::groups::Member::default()
+                ..Member::default()
             }],
-            ..crate::groups::UnitGroup::default()
+            ..UnitGroup::default()
         });
         t.players[1].objects[ListIndex::new(1)].group.id = Some(group_id(6));
         t
@@ -1561,11 +1578,11 @@ fn queued_move_new_group_takes_its_first_unit_target() {
         (11, 4, Point::new(20.0, 20.0)),
         (13, 4, Point::new(21.0, 20.0)),
     ];
-    let ai = |target| crate::unit_ai::UnitAi {
+    let ai = |target| UnitAi {
         current_order: None,
         current_action: None,
         current_target: target,
-        ..crate::unit_ai::UnitAi::default()
+        ..UnitAi::default()
     };
     let mut t = soldiers(&units, &[]);
     t.parts.set_unit_ai(
@@ -1603,10 +1620,10 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.world_time = WorldTime::from_millis(400);
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.reindex();
-    t.masters.push(crate::objects::masters::Masters::new([]));
-    t.masters[1] = crate::objects::masters::Masters::new([
+    t.masters.push(Masters::new([]));
+    t.masters[1] = Masters::new([
         Master {
             id: master_id(4),
             kind: master_type::COMBAT,
@@ -1624,26 +1641,21 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
             Object::with_building(
                 Unit {
                     id: object_id(50),
-                    life: crate::objects::lifecycle::Lifecycle {
+                    life: Lifecycle {
                         master_id: master_id(79),
                         state: ObjectState::Alive,
-                        ..crate::objects::lifecycle::Lifecycle::default()
+                        ..Lifecycle::default()
                     },
                     ..Unit::default()
                 },
-                crate::objects::layers::Building {
-                    gate: Some(crate::world::Gate::default()),
+                Building {
+                    gate: Some(Gate::default()),
                     ..Default::default()
                 },
             ),
         )
         .unwrap();
-    t.set_motion(
-        object_id(50),
-        Some(crate::objects::layers::Motion::Moving(
-            crate::gathering::hunt::tests::walker(),
-        )),
-    );
+    t.set_motion(object_id(50), Some(Motion::Moving(walker())));
     let building = |t: &World| {
         let b = &t.players[1].objects[ListIndex::new(1)];
         (
@@ -1681,41 +1693,41 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         kind: BUILDING,
         hit_points: MasterHitPoints::of_data(100),
         build_time,
-        volley_fire: crate::combat::Firepower::new(f32::from(build_time.get() / 15)),
+        volley_fire: Firepower::new(f32::from(build_time.get() / 15)),
         ..Master::default()
     };
-    t.masters[1] = crate::objects::masters::Masters::new([
+    t.masters[1] = Masters::new([
         master(TROPHY, WholeSeconds::of_data(10)),
         master(master_id(1650), WholeSeconds::of_data(30)),
     ]);
     let trophy = |state| Object {
         unit: Unit {
             id: object_id(60),
-            life: crate::objects::lifecycle::Lifecycle {
+            life: Lifecycle {
                 master_id: TROPHY,
                 state,
                 hp: HitPoints::new(50.0),
-                ..crate::objects::lifecycle::Lifecycle::default()
+                ..Lifecycle::default()
             },
             ..Unit::default()
         },
-        parts: crate::world::parts::ObjectParts {
-            combat: crate::objects::layers::Combat {
-                firepower: crate::combat::Firepower::new(7.0),
+        parts: ObjectParts {
+            combat: Combat {
+                firepower: Firepower::new(7.0),
                 ..Default::default()
             },
-            building: crate::objects::layers::Building {
-                construction: Some(crate::construction::build::Construction {
+            building: Building {
+                construction: Some(Construction {
                     progress: Seconds::new(10.0),
                     desolid: false,
-                    builders: crate::construction::BuilderCount::of_data(0),
+                    builders: BuilderCount::of_data(0),
                     hit_points: MasterHitPoints::of_data(100),
                     build_time: WholeSeconds::of_data(10),
-                    record: crate::map::spatial::Obstruction {
+                    record: Obstruction {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: crate::map::Snow::None,
+                    snow: Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()
@@ -1734,10 +1746,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         Seconds::new(30.0)
     );
     // FUN_141225b70 in state 2: the volleys are the new master's volley fire
-    assert_eq!(
-        t.parts.combat_of(unit.id).firepower,
-        crate::combat::Firepower::new(2.0)
-    );
+    assert_eq!(t.parts.combat_of(unit.id).firepower, Firepower::new(2.0));
     t.set_live_for_test(player_id(1), [trophy(ObjectState::Unfinished)]);
     t.transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
@@ -1753,7 +1762,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         t.parts
             .combat_of(t.players[1].objects[ListIndex::new(0)].id)
             .firepower,
-        crate::combat::Firepower::new(7.0)
+        Firepower::new(7.0)
     );
 }
 
@@ -1778,8 +1787,7 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         (unit.pasture, unit.my_pasture) = (None, None);
-        t.parts
-            .set_unit_ai(unit.id, Some(crate::unit_ai::UnitAi::default()));
+        t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
         t.interact(PlayerId::new(1), &object_ids([11]), &interact(queued))
             .unwrap();
         let ai = t
@@ -1801,7 +1809,7 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
 #[test]
 fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
         m.moving = Some(walker.stats);
     }
@@ -1810,16 +1818,16 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     (unit.pasture, unit.my_pasture) = (None, None);
     t.parts.set_unit_ai(
         unit.id,
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             current_order: Some(OrderKind::Move),
             current_action: Some(ActionKind::Move),
             current_target: Some(object_id(99)),
-            orders: vec![crate::unit_ai::QueuedOrder {
+            orders: vec![QueuedOrder {
                 order: OrderKind::Move,
                 ready: false,
-                ..crate::unit_ai::QueuedOrder::default()
+                ..QueuedOrder::default()
             }],
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
     let interact = Interact {
@@ -1865,15 +1873,14 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     };
     let mover = || {
         let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
-        let walker = crate::gathering::hunt::tests::walker();
+        let walker = walker();
         if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
             m.moving = Some(walker.stats);
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         t.parts.put_mover(unit.id, Some(walker));
         (unit.pasture, unit.my_pasture) = (None, None);
-        t.parts
-            .set_unit_ai(unit.id, Some(crate::unit_ai::UnitAi::default()));
+        t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
         t.spatial.map = GridSize::new(100, 100);
         t
     };
@@ -1916,7 +1923,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
-    ai.orders.push(crate::unit_ai::QueuedOrder::default());
+    ai.orders.push(QueuedOrder::default());
     let itself = Interact {
         target: Some(object_id(11)),
         queued: false,
@@ -1952,10 +1959,10 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
 #[test]
 fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
     // each order told apart by its issuer
-    let order = |issuer, ready| crate::unit_ai::QueuedOrder {
+    let order = |issuer, ready| QueuedOrder {
         issuer,
         ready,
-        ..crate::unit_ai::QueuedOrder::default()
+        ..QueuedOrder::default()
     };
     let mut orders = vec![
         order(Some(Issuer::Player(player_id(1))), true),
@@ -1972,7 +1979,7 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
             order(Some(Issuer::Player(player_id(4))), true)
         ]
     );
-    let mut none: Vec<crate::unit_ai::QueuedOrder> = Vec::new();
+    let mut none: Vec<QueuedOrder> = Vec::new();
     readiness(&mut none, true);
     assert_eq!(none.len(), 0);
     // with 0 (BUILD's) the ready ones stay and every order is ready
@@ -1993,12 +2000,12 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
 /// are one); an attack task (7 or 9) turns a unit's retargeting off unless it is a villager.
 #[test]
 fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargeting() {
-    let task = |action_type, attribute_type| crate::objects::masters::Task {
+    let task = |action_type, attribute_type| Task {
         action_type,
         attribute_type,
-        ..crate::objects::masters::Task::default()
+        ..Task::default()
     };
-    let run = |master: MasterId, held: Held, task: crate::objects::masters::Task| {
+    let run = |master: MasterId, held: Held, task: Task| {
         let mut t = soldiers(&[(11, master.get(), Point::new(20.0, 20.0))], &[]);
         for (id, class) in [(83, class::VILLAGER), (4, class::CLASS_6)] {
             if let Some(m) = t.masters[1].get_mut(master_id(id)) {
@@ -2007,8 +2014,7 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         (unit.life.attribute_type, unit.life.amount) = (held.kind, held.amount);
-        t.parts
-            .set_unit_ai(unit.id, Some(crate::unit_ai::UnitAi::default()));
+        t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
         t.carried_resource_test(PlayerId::new(1), ListIndex::new(0), &task)
             .unwrap();
         let unit = &t.players[1].objects[ListIndex::new(0)];
@@ -2023,7 +2029,7 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
         run(
             ids::VILLAGER_MALE,
             carrying(Some(attribute::WOOD), 10.0),
-            task(crate::gathering::gather::GATHER, Some(attribute::GOLD))
+            task(GATHER, Some(attribute::GOLD))
         ),
         (Some(attribute::GOLD), Amount::ZERO, 0)
     );
@@ -2041,7 +2047,7 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
         run(
             ids::VILLAGER_MALE,
             carrying(Some(attribute::GOLD), 4.0),
-            task(crate::gathering::gather::GATHER, Some(attribute::GOLD))
+            task(GATHER, Some(attribute::GOLD))
         ),
         (Some(attribute::GOLD), Amount::new(4.0), 0)
     );
@@ -2067,10 +2073,10 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
 fn move_inside_work_command_with_0_keeps_the_order_queue() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    let order = crate::unit_ai::QueuedOrder {
+    let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: crate::unit_ai::OrderPriority::of_data(100),
+        priority: OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(1.0, 1.0, 0.0),
@@ -2081,9 +2087,9 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
     };
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
-        Some(crate::unit_ai::UnitAi {
+        Some(UnitAi {
             orders: vec![order],
-            ..crate::unit_ai::UnitAi::default()
+            ..UnitAi::default()
         }),
     );
     t.move_point_order_with(
@@ -2128,7 +2134,7 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
 fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.reindex();
     let scout = Master {
         id: ids::ID_448,
@@ -2140,9 +2146,8 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
         standing_sprite: None,
         ..Master::default()
     };
-    t.masters
-        .push(crate::objects::masters::Masters::new([scout.clone()]));
-    t.masters[1] = crate::objects::masters::Masters::new([
+    t.masters.push(Masters::new([scout.clone()]));
+    t.masters[1] = Masters::new([
         scout,
         Master {
             id: master_id(4),
@@ -2150,18 +2155,18 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
             ..Master::default()
         },
     ]);
-    let ai = crate::unit_ai::UnitAi {
+    let ai = UnitAi {
         current_order: None,
         current_action: None,
-        ..crate::unit_ai::UnitAi::default()
+        ..UnitAi::default()
     };
     let unit = |id| Unit {
         id,
-        place: crate::objects::layers::Static::at(Position::new(20.0, 20.0, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
+        place: Static::at(Position::new(20.0, 20.0, 0.0)),
+        life: Lifecycle {
             master_id: ids::ID_448,
             state: ObjectState::Alive,
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
@@ -2198,21 +2203,21 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
 /// forgets its target; any other stance leaves them.
 #[test]
 fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
-    let attacking = crate::unit_ai::UnitAi {
+    let attacking = UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(40)),
         target_class: class_of(6),
-        ..crate::unit_ai::UnitAi::default()
+        ..UnitAi::default()
     };
     let mut ai = attacking;
-    let mut fx: Vec<crate::unit_ai::Effect> = Vec::new();
+    let mut fx: Vec<Effect> = Vec::new();
     set_stance(
         &mut ai,
         UnitStance::DEFENSIVE,
         (Point::new(3.0, 4.0), Some(class::CLASS_6)),
         &mut fx,
-        &mut crate::math::rng::Well512::default(),
+        &mut Well512::default(),
     )
     .unwrap();
     assert_eq!(
@@ -2229,7 +2234,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         UnitStance::NO_ATTACK,
         (Point::new(3.0, 5.0), Some(class::CLASS_6)),
         &mut fx,
-        &mut crate::math::rng::Well512::default(),
+        &mut Well512::default(),
     )
     .unwrap();
     assert_eq!(ai.stance, UnitStance::NO_ATTACK);
@@ -2239,7 +2244,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         (ai.current_target, ai.last_target),
         (None, Some(object_id(40)))
     );
-    assert_eq!(fx, [crate::unit_ai::Effect::Stop]);
+    assert_eq!(fx, [Effect::Stop]);
 }
 
 /// `FUN_140e6a7c0` after `FUN_140e55d30`: another player's unit takes the stance only while
@@ -2248,18 +2253,17 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
 fn stance_reaches_another_player_unit_only_under_the_setting() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.reindex();
-    t.masters
-        .push(crate::objects::masters::Masters::new([Master {
-            id: master_id(4),
-            kind: master_type::COMBAT,
-            class: class::CLASS_54,
-            ..Master::default()
-        }]));
+    t.masters.push(Masters::new([Master {
+        id: master_id(4),
+        kind: master_type::COMBAT,
+        class: class::CLASS_54,
+        ..Master::default()
+    }]));
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
-        Some(crate::unit_ai::UnitAi::default()),
+        Some(UnitAi::default()),
     );
     let _ = t
         .push_live(
@@ -2267,14 +2271,14 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
             Object::with_ai(
                 Unit {
                     id: object_id(30),
-                    life: crate::objects::lifecycle::Lifecycle {
+                    life: Lifecycle {
                         master_id: master_id(4),
                         state: ObjectState::Alive,
-                        ..crate::objects::lifecycle::Lifecycle::default()
+                        ..Lifecycle::default()
                     },
                     ..Unit::default()
                 },
-                crate::unit_ai::UnitAi::default(),
+                UnitAi::default(),
             ),
         )
         .unwrap();
@@ -2327,10 +2331,10 @@ fn master_change_inside_building_keeps_to_its_record() {
         standing_sprite: None,
         ..Master::default()
     };
-    let mut spatial = crate::map::spatial::Spatial::new(GridSize::new(10, 10));
+    let mut spatial = Spatial::new(GridSize::new(10, 10));
     spatial.insert(
         object_id(7),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(3.5, 3.5, 0.0),
             radius: Footprint::new(0.2, 0.2),
             class: class::CLASS_6,
@@ -2347,31 +2351,27 @@ fn master_change_inside_building_keeps_to_its_record() {
     spatial.go_inside(object_id(7), Position::new(5.0, 5.0, 0.0));
     let mut unit = Unit {
         id: object_id(7),
-        place: crate::objects::layers::Static::at(Position::new(5.0, 5.0, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
+        place: Static::at(Position::new(5.0, 5.0, 0.0)),
+        life: Lifecycle {
             hp: HitPoints::new(20.0),
             master_id: master_id(4),
             inside: Some(ContainerId::new(object_id(100))),
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
-    let mut pathing = crate::pathing::Pathing::default();
+    let mut pathing = Pathing::default();
     let graphics = Graphics::new();
-    let mut rng = crate::math::rng::Well512::default();
+    let mut rng = Well512::default();
     let world = SwitchWorld {
         spatial: &mut spatial,
         pathing: &mut pathing,
         graphics: &graphics,
         sprite: &mut rng,
     };
-    let mut combat = crate::objects::layers::Combat::default();
+    let mut combat = Combat::default();
     let switched = switch_master(
-        (
-            &mut unit,
-            &mut combat,
-            crate::objects::layers::MotionMut::new(None),
-        ),
+        (&mut unit, &mut combat, MotionMut::new(None)),
         &old,
         &next,
         world,
@@ -2392,25 +2392,21 @@ fn master_change_inside_building_keeps_to_its_record() {
 
 /// What [`switched_in_the_open`] gives: what the switch leaves to the owner, the unit with its
 /// combat layer, and its record.
-type InTheOpen = (
-    actions::Switched,
-    (Unit, crate::objects::layers::Combat),
-    crate::map::spatial::Placed,
-);
+type InTheOpen = (actions::Switched, (Unit, Combat), Placed);
 
 /// Slot 0x90's unit part ([`switch_master`]) of `unit` (with the motion part `motion`), at
 /// (3.5, 3.5) in the open, from `old` to `next`, with the graphics `shown`: what it leaves to
 /// its owner, the unit after it with its combat layer and its record.
 fn switched_in_the_open(
-    (mut unit, mut motion): (Unit, Option<crate::objects::layers::Motion>),
+    (mut unit, mut motion): (Unit, Option<Motion>),
     old: &Master,
     next: &Master,
     shown: &[i16],
 ) -> Result<InTheOpen, GenieError> {
-    let mut spatial = crate::map::spatial::Spatial::new(GridSize::new(10, 10));
+    let mut spatial = Spatial::new(GridSize::new(10, 10));
     spatial.insert(
         unit.id,
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(3.5, 3.5, 0.0),
             radius: old.radius,
             class: old.class,
@@ -2421,20 +2417,20 @@ fn switched_in_the_open(
             tall: false,
             moves: false,
             unknown: None,
-            obstruction: Some(crate::map::spatial::Obstruction {
+            obstruction: Some(Obstruction {
                 kind: ObstructionType::CIRCLE,
                 class: ObstructionClass::UNIT,
             }),
         },
     );
-    let mut pathing = crate::pathing::Pathing::default();
+    let mut pathing = Pathing::default();
     let graphics = shown
         .iter()
         .map(|&id| {
-            let g = crate::objects::sprite::Graphic {
+            let g = Graphic {
                 id: SpriteId::named(id),
-                frames: crate::objects::Frame::of_data(10),
-                facets: crate::objects::FacetCount::of_data(8),
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(8),
                 speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -2443,20 +2439,16 @@ fn switched_in_the_open(
             (g.id, g)
         })
         .collect();
-    let mut rng = crate::math::rng::Well512::default();
+    let mut rng = Well512::default();
     let world = SwitchWorld {
         spatial: &mut spatial,
         pathing: &mut pathing,
         graphics: &graphics,
         sprite: &mut rng,
     };
-    let mut combat = crate::objects::layers::Combat::default();
+    let mut combat = Combat::default();
     let switched = switch_master(
-        (
-            &mut unit,
-            &mut combat,
-            crate::objects::layers::MotionMut::new(motion.as_mut()),
-        ),
+        (&mut unit, &mut combat, MotionMut::new(motion.as_mut())),
         old,
         next,
         world,
@@ -2495,7 +2487,7 @@ fn switch_masters() -> (Master, Master) {
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(AttributeId::numbered(14)), Amount::new(1.0), 16),
         ],
-        volley_fire: crate::combat::Firepower::new(3.0),
+        volley_fire: Firepower::new(3.0),
         obstruction_type: ObstructionType::TYPE_3,
         obstruction_class: ObstructionClass::RESOURCE,
         ..Master::default()
@@ -2513,22 +2505,22 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
     let (old, next) = switch_masters();
     let unit = |hp, state| Unit {
         id: object_id(7),
-        place: crate::objects::layers::Static::at(Position::new(3.5, 3.5, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
+        place: Static::at(Position::new(3.5, 3.5, 0.0)),
+        life: Lifecycle {
             hp,
             state,
             master_id: master_id(4),
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
-    let mut sprites = crate::math::rng::Well512::default();
+    let mut sprites = Well512::default();
     let showing = Unit {
-        sprite: Some(crate::objects::sprite::ActiveSprite::start(
-            crate::objects::sprite::Graphic {
+        sprite: Some(ActiveSprite::start(
+            Graphic {
                 id: SpriteId::named(10),
-                frames: crate::objects::Frame::of_data(10),
-                facets: crate::objects::FacetCount::of_data(8),
+                frames: Frame::of_data(10),
+                facets: FacetCount::of_data(8),
                 speed_multiplier: SpeedMultiplier::ONE,
                 frame_duration: Seconds::new(0.1),
                 replay_delay: Seconds::ZERO,
@@ -2542,24 +2534,17 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
         switched_in_the_open((showing, None), &old, &next, &[10, 11]).unwrap();
     assert_eq!(
         switched.leaving,
-        crate::test_ids::adds([
+        adds([
             (attribute::HEADROOM, -1.0),
             (attribute::POPULATION, -1.0),
             (AttributeId::numbered(12), -2.0)
         ])
     );
-    assert_eq!(
-        switched.coming,
-        crate::test_ids::adds([(attribute::HEADROOM, 1.0)])
-    );
+    assert_eq!(switched.coming, adds([(attribute::HEADROOM, 1.0)]));
     assert!(switched.promoted);
     assert_eq!(
         (u.life.master_id, u.life.hp, combat.firepower),
-        (
-            master_id(5),
-            HitPoints::new(30.0),
-            crate::combat::Firepower::new(3.0)
-        )
+        (master_id(5), HitPoints::new(30.0), Firepower::new(3.0))
     );
     assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(11)));
     assert_eq!(
@@ -2572,7 +2557,7 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
     );
     assert_eq!(
         record.obstruction,
-        Some(crate::map::spatial::Obstruction {
+        Some(Obstruction {
             kind: ObstructionType::TYPE_3,
             class: ObstructionClass::RESOURCE
         })
@@ -2589,11 +2574,11 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
     };
     assert_eq!(
         hp(HitPoints::new(50.0)),
-        (HitPoints::new(60.0), crate::combat::Firepower::new(0.0))
+        (HitPoints::new(60.0), Firepower::new(0.0))
     );
     assert_eq!(
         hp(HitPoints::new(0.5)),
-        (HitPoints::new(1.0), crate::combat::Firepower::new(0.0))
+        (HitPoints::new(1.0), Firepower::new(0.0))
     );
     let (switched, (u, _), record) = switched_in_the_open(
         (unit(HitPoints::new(20.0), ObjectState::Dying), None),
@@ -2616,10 +2601,10 @@ fn master_change_unmodelled_parts_fail() {
     let (old, next) = switch_masters();
     let unit = Unit {
         id: object_id(7),
-        life: crate::objects::lifecycle::Lifecycle {
+        life: Lifecycle {
             hp: HitPoints::new(0.1),
             master_id: master_id(4),
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
@@ -2637,7 +2622,7 @@ fn master_change_unmodelled_parts_fail() {
         )),
         "a master change that changes the damage sprites (FUN_1411859a0)"
     );
-    let walking = crate::objects::layers::Motion::Moving(crate::gathering::hunt::tests::walker());
+    let walking = Motion::Moving(walker());
     assert_eq!(
         reason(switched_in_the_open(
             (unit.clone(), Some(walking)),
@@ -2657,8 +2642,8 @@ fn master_change_unmodelled_parts_fail() {
 /// hit points powerup and the reload stinger stay.
 #[test]
 fn master_change_clears_the_powerups_but_the_hit_points_one() {
-    let mut combat = crate::objects::layers::Combat {
-        attack_powerup: crate::combat::AttackPowerup::new(2.0),
+    let mut combat = Combat {
+        attack_powerup: AttackPowerup::new(2.0),
         reload_powerup: Seconds::new(0.5),
         reload_stinger: Seconds::new(0.25),
         work_rate_powerup: WorkRate::new(0.15),
@@ -2676,11 +2661,7 @@ fn master_change_clears_the_powerups_but_the_hit_points_one() {
             combat.reload_powerup,
             combat.work_rate_powerup
         ),
-        (
-            crate::combat::AttackPowerup::ZERO,
-            Seconds::ZERO,
-            WorkRate::ZERO
-        )
+        (AttackPowerup::ZERO, Seconds::ZERO, WorkRate::ZERO)
     );
     assert_eq!(
         (combat.hp_powerup, combat.armor_powerups),
@@ -2711,15 +2692,15 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_move_to(Some(crate::movement::move_to::MoveToAction {
+        .set_move_to(Some(MoveToAction {
             sprite: None,
-            state: crate::movement::move_to::MoveTo::Start,
+            state: MoveTo::Start,
             point: Position::new(30.0, 30.0, 0.0),
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-            wait: crate::movement::move_to::MoveWait::default(),
+            on_target_moved: TargetMoved::Follows,
+            wait: MoveWait::default(),
         }));
     assert_eq!(
         t.head_takes_move(
@@ -2741,7 +2722,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_artifact(Some(crate::ownership::artifact::Artifact::new(false, None)));
+        .set_artifact(Some(Artifact::new(false, None)));
     assert_eq!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
         Ok(true)
@@ -2820,8 +2801,8 @@ fn followers() -> World {
     let mut t = soldiers(&units, &[]);
     t.players[1].formations.auto = false;
     t.spatial.map = GridSize::new(120, 120);
-    let walker = crate::gathering::hunt::tests::walker();
-    t.masters[1] = crate::objects::masters::Masters::new([Master {
+    let walker = walker();
+    t.masters[1] = Masters::new([Master {
         id: master_id(4),
         kind: master_type::COMBAT,
         moving: Some(walker.stats),
@@ -2831,34 +2812,33 @@ fn followers() -> World {
         t.parts.put_mover(u.id, Some(walker.clone()));
         t.parts.set_unit_ai(
             u.id,
-            Some(crate::unit_ai::UnitAi {
+            Some(UnitAi {
                 current_order: None,
                 current_action: None,
                 current_target: None,
-                ..crate::unit_ai::UnitAi::default()
+                ..UnitAi::default()
             }),
         );
     }
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.reindex();
-    t.masters
-        .push(crate::objects::masters::Masters::new([Master {
-            id: master_id(5),
-            kind: master_type::COMBAT,
-            class: class::CLASS_6,
-            radius: Footprint::new(0.5, 0.5),
-            ..Master::default()
-        }]));
+    t.masters.push(Masters::new([Master {
+        id: master_id(5),
+        kind: master_type::COMBAT,
+        class: class::CLASS_6,
+        radius: Footprint::new(0.5, 0.5),
+        ..Master::default()
+    }]));
     let _ = t
         .push_live(
             PlayerId::new(2),
             Unit {
                 id: object_id(30),
-                place: crate::objects::layers::Static::at(Position::new(40.0, 20.0, 0.0)),
-                life: crate::objects::lifecycle::Lifecycle {
+                place: Static::at(Position::new(40.0, 20.0, 0.0)),
+                life: Lifecycle {
                     master_id: master_id(5),
                     state: ObjectState::Alive,
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
@@ -2866,7 +2846,7 @@ fn followers() -> World {
         .unwrap();
     t.spatial.insert(
         object_id(30),
-        crate::map::spatial::Placed {
+        Placed {
             position: Position::new(40.0, 20.0, 0.0),
             radius: Footprint::new(0.5, 0.5),
             class: class::CLASS_6,
@@ -3020,35 +3000,35 @@ fn follow_of_another_player_unit_does_nothing() {
 fn builder_leaves_the_main_building_of_an_annex() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.masters[1] = crate::objects::masters::Masters::new([Master {
+    t.masters[1] = Masters::new([Master {
         id: master_id(79),
         kind: BUILDING,
         ..Master::default()
     }]);
-    let construction = crate::construction::build::Construction {
+    let construction = Construction {
         progress: Seconds::ZERO,
         desolid: true,
-        builders: crate::construction::BuilderCount::of_data(2),
+        builders: BuilderCount::of_data(2),
         hit_points: MasterHitPoints::of_data(100),
         build_time: WholeSeconds::of_data(10),
-        record: crate::map::spatial::Obstruction {
+        record: Obstruction {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: crate::map::Snow::None,
+        snow: Snow::None,
         sprite_override: false,
     };
     let building = |id, annex_of| {
         Object::with_building(
             Unit {
                 id,
-                life: crate::objects::lifecycle::Lifecycle {
+                life: Lifecycle {
                     master_id: master_id(79),
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
-            crate::objects::layers::Building {
+            Building {
                 annex_of,
                 construction: Some(construction),
                 ..Default::default()
@@ -3087,10 +3067,10 @@ fn builder_leaves_the_main_building_of_an_annex() {
 /// order of another issuer or without a target does not count.
 #[test]
 fn unit_own_queued_order_names_its_target() {
-    let order = |issuer, target| crate::unit_ai::QueuedOrder {
+    let order = |issuer, target| QueuedOrder {
         issuer,
         order: OrderKind::Move,
-        priority: crate::unit_ai::OrderPriority::of_data(100),
+        priority: OrderPriority::of_data(100),
         target,
         target_owner: None,
         point: Position::new(1.0, 1.0, 0.0),
@@ -3099,14 +3079,14 @@ fn unit_own_queued_order_names_its_target() {
         ready: true,
         target_type: None,
     };
-    let mut ai = crate::unit_ai::UnitAi {
+    let mut ai = UnitAi {
         orders: vec![
             order(Some(Issuer::Player(player_id(1))), Some(object_id(50))),
             order(Some(Issuer::Object(object_id(11))), None),
             order(Some(Issuer::Object(object_id(11))), Some(object_id(60))),
             order(Some(Issuer::Object(object_id(11))), Some(object_id(70))),
         ],
-        ..crate::unit_ai::UnitAi::default()
+        ..UnitAi::default()
     };
     assert_eq!(own_order_target(&ai, object_id(11)), Some(object_id(60)));
     ai.orders.truncate(2);
@@ -3120,7 +3100,7 @@ fn unit_own_queued_order_names_its_target() {
 fn an_action_new_target_is_taken_and_its_old_one_let_go() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.masters[0] = crate::objects::masters::Masters::new([Master {
+    t.masters[0] = Masters::new([Master {
         id: master_id(66),
         kind: master_type::COMBAT,
         ..Master::default()
@@ -3128,29 +3108,17 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
     let deer = |id, state, workers| Unit {
         id,
         workers,
-        life: crate::objects::lifecycle::Lifecycle {
+        life: Lifecycle {
             master_id: master_id(66),
             state,
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
     t.players[0].objects = vec![
-        deer(
-            object_id(40),
-            ObjectState::Alive,
-            crate::objects::WorkerCount::of_data(1),
-        ),
-        deer(
-            object_id(41),
-            ObjectState::Alive,
-            crate::objects::WorkerCount::of_data(0),
-        ),
-        deer(
-            object_id(42),
-            ObjectState::Removed,
-            crate::objects::WorkerCount::of_data(0),
-        ),
+        deer(object_id(40), ObjectState::Alive, WorkerCount::of_data(1)),
+        deer(object_id(41), ObjectState::Alive, WorkerCount::of_data(0)),
+        deer(object_id(42), ObjectState::Removed, WorkerCount::of_data(0)),
     ]
     .into();
     t.reindex();
@@ -3224,7 +3192,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
 fn build_new_target_leaves_the_old_foundation_builders() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.masters[1] = crate::objects::masters::Masters::new([
+    t.masters[1] = Masters::new([
         Master {
             id: master_id(4),
             kind: master_type::COMBAT,
@@ -3240,25 +3208,25 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         Object::with_building(
             Unit {
                 id,
-                workers: crate::objects::WorkerCount::of_data(1),
-                life: crate::objects::lifecycle::Lifecycle {
+                workers: WorkerCount::of_data(1),
+                life: Lifecycle {
                     master_id: master_id(79),
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
-            crate::objects::layers::Building {
-                construction: Some(crate::construction::build::Construction {
+            Building {
+                construction: Some(Construction {
                     progress: Seconds::ZERO,
                     desolid: true,
                     builders,
                     hit_points: MasterHitPoints::of_data(100),
                     build_time: WholeSeconds::of_data(10),
-                    record: crate::map::spatial::Obstruction {
+                    record: Obstruction {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: crate::map::Snow::None,
+                    snow: Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()
@@ -3268,13 +3236,13 @@ fn build_new_target_leaves_the_old_foundation_builders() {
     let _ = t
         .push_live(
             PlayerId::new(1),
-            foundation(object_id(60), crate::construction::BuilderCount::of_data(1)),
+            foundation(object_id(60), BuilderCount::of_data(1)),
         )
         .unwrap();
     let _ = t
         .push_live(
             PlayerId::new(1),
-            foundation(object_id(61), crate::construction::BuilderCount::of_data(0)),
+            foundation(object_id(61), BuilderCount::of_data(0)),
         )
         .unwrap();
     t.parts
@@ -3282,13 +3250,13 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_build(Some(crate::construction::build::BuildAction {
-            target: Some(crate::construction::FoundationId::new(object_id(60))),
+        .set_build(Some(BuildAction {
+            target: Some(FoundationId::new(object_id(60))),
             state: BuildState::Work,
             point: Position::new(-1.0, -1.0, -1.0),
-            task: crate::construction::build::BuildTask {
+            task: BuildTask {
                 range: Distance::new(0.1),
-                work_value: crate::objects::masters::WorkValue::new(1.0),
+                work_value: WorkValue::new(1.0),
                 work_rate: WorkRate::new(1.0),
                 resource: None,
                 id: TaskId::of_task(-1),
@@ -3302,13 +3270,10 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         t.build_set_target(
             PlayerId::new(1),
             ListIndex::new(0),
-            (
-                Some(crate::construction::FoundationId::new(object_id(60))),
-                true
-            ),
-            crate::construction::FoundationId::new(object_id(60))
+            (Some(FoundationId::new(object_id(60))), true),
+            FoundationId::new(object_id(60))
         ),
-        Ok(Some(crate::construction::FoundationId::new(object_id(60))))
+        Ok(Some(FoundationId::new(object_id(60))))
     );
     assert!(
         t.parts
@@ -3323,13 +3288,10 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         t.build_set_target(
             PlayerId::new(1),
             ListIndex::new(0),
-            (
-                Some(crate::construction::FoundationId::new(object_id(60))),
-                true
-            ),
-            crate::construction::FoundationId::new(object_id(61))
+            (Some(FoundationId::new(object_id(60))), true),
+            FoundationId::new(object_id(61))
         ),
-        Ok(Some(crate::construction::FoundationId::new(object_id(61))))
+        Ok(Some(FoundationId::new(object_id(61))))
     );
     let build = t
         .parts
@@ -3339,10 +3301,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         .copied()
         .unwrap();
     assert_eq!(
-        (
-            build.target.map(crate::construction::FoundationId::id),
-            build.added
-        ),
+        (build.target.map(FoundationId::id), build.added),
         (Some(object_id(61)), false)
     );
     let site = |t: &World, i: ListIndex| {
@@ -3376,7 +3335,7 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
         class,
         ..Master::default()
     };
-    t.masters[1] = crate::objects::masters::Masters::new([
+    t.masters[1] = Masters::new([
         master(master_id(4), master_type::COMBAT, class::CLASS_6),
         master(ids::ID_42, master_type::COMBAT, class::RELIC),
         master(master_id(58), master_type::COMBAT, class::LIVESTOCK),
@@ -3384,12 +3343,12 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
     ]);
     let unit = |id, master, amount| Unit {
         id,
-        life: crate::objects::lifecycle::Lifecycle {
+        life: Lifecycle {
             master_id: master,
             hp: HitPoints::new(10.0),
             amount,
             state: ObjectState::Alive,
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
@@ -3424,12 +3383,12 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
 fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     let units = [(11, 83, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    let task = |action_type, object_id| crate::objects::masters::Task {
+    let task = |action_type, object_id| Task {
         action_type,
         object_group: None,
         object_id,
-        work_val1: crate::objects::masters::WorkValue::new(1.0),
-        ..crate::objects::masters::Task::default()
+        work_val1: WorkValue::new(1.0),
+        ..Task::default()
     };
     let villager = |id, tasks| Master {
         id,
@@ -3440,11 +3399,8 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
         tasks,
         ..Master::default()
     };
-    t.masters[1] = crate::objects::masters::Masters::new([
-        villager(
-            ids::VILLAGER_MALE,
-            vec![task(crate::gathering::gather::GATHER, Some(master_id(53)))],
-        ),
+    t.masters[1] = Masters::new([
+        villager(ids::VILLAGER_MALE, vec![task(GATHER, Some(master_id(53)))]),
         villager(ids::BUILDER, vec![task(action_type::BUILD, None)]),
         Master {
             id: ids::HOUSE,
@@ -3460,11 +3416,11 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             PlayerId::new(1),
             Unit {
                 id: object_id(60),
-                life: crate::objects::lifecycle::Lifecycle {
+                life: Lifecycle {
                     master_id: ids::HOUSE,
                     state: ObjectState::Foundation,
                     hp: HitPoints::new(550.0),
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
@@ -3523,8 +3479,8 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
 fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     let units = [(11, 4, Point::new(30.0, 30.0))];
     let mut t = soldiers(&units, &[]);
-    t.spatial = crate::map::spatial::Spatial::new(GridSize::new(40, 40));
-    let sight = crate::vision::visibility::Visibility::new(
+    t.spatial = Spatial::new(GridSize::new(40, 40));
+    let sight = Visibility::new(
         GridSize::new(40, 40),
         vec![],
         vec![VisionBits::from_bits_retain(u64::MAX); 1600],
@@ -3533,7 +3489,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         vec![],
     );
     t.spatial.sight = Some(sight);
-    let walker = crate::gathering::hunt::tests::walker();
+    let walker = walker();
     let sheep_master = Master {
         id: master_id(594),
         kind: master_type::COMBAT,
@@ -3542,7 +3498,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         moving: Some(walker.stats),
         ..Master::default()
     };
-    t.masters[1] = crate::objects::masters::Masters::new([
+    t.masters[1] = Masters::new([
         sheep_master.clone(),
         Master {
             id: master_id(4),
@@ -3551,19 +3507,18 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
             ..Master::default()
         },
     ]);
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.reindex();
-    t.masters
-        .push(crate::objects::masters::Masters::new([sheep_master]));
+    t.masters.push(Masters::new([sheep_master]));
     let sheep = |id, x: f32, y: f32| {
         Object::moving(
             Unit {
                 id,
-                place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
-                life: crate::objects::lifecycle::Lifecycle {
+                place: Static::at(Position::new(x, y, 0.0)),
+                life: Lifecycle {
                     master_id: master_id(594),
                     state: ObjectState::Alive,
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 ..Unit::default()
             },
@@ -3582,7 +3537,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     let _ = t
         .push_live(PlayerId::new(2), sheep(object_id(23), 11.5, 10.5))
         .unwrap();
-    let placed = |player, master, at: Point, radius| crate::map::spatial::Placed {
+    let placed = |player, master, at: Point, radius| Placed {
         position: at.with_height(0.0),
         radius: Footprint::new(radius, radius),
         class: class::LIVESTOCK,
@@ -3633,9 +3588,9 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
 /// `FUN_1410395a0`: the old list goes, the new one is copied whole, an empty one too.
 #[test]
 fn group_differentiator_groups_are_the_list_given() {
-    let mut g = crate::groups::UnitGroup {
+    let mut g = UnitGroup {
         differentiator_groups: vec![group_id(1), group_id(2), group_id(3)],
-        ..crate::groups::UnitGroup::default()
+        ..UnitGroup::default()
     };
     set_differentiator_groups(&mut g, &[group_id(7), group_id(8)]);
     assert_eq!(g.differentiator_groups, [group_id(7), group_id(8)]);
@@ -3696,22 +3651,22 @@ fn target_is_in_reach_within_the_weapon_range_and_not_below_the_least() {
 fn soldier_and_enemy(x: f32, class: ClassId) -> World {
     let unit = |id, master, x: f32| Unit {
         id,
-        place: crate::objects::layers::Static::at(Position::new(x, 10.0, 0.0)),
-        life: crate::objects::lifecycle::Lifecycle {
+        place: Static::at(Position::new(x, 10.0, 0.0)),
+        life: Lifecycle {
             master_id: master,
             state: ObjectState::Alive,
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     };
-    let player = |objects, relations| crate::world::Player {
+    let player = |objects, relations| Player {
         objects,
         relations,
-        ..crate::world::Player::default()
+        ..Player::default()
     };
     let mut t = World::new(
         WorldTime::ZERO,
-        crate::world::FrameSeed::of_data(1),
+        FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
         vec![
@@ -3726,7 +3681,7 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
             ),
         ],
     )
-    .with_ais([10, 20].map(|id| (object_id(id), crate::unit_ai::UnitAi::default())));
+    .with_ais([10, 20].map(|id| (object_id(id), UnitAi::default())));
     let master = |id, class| Master {
         id,
         kind: master_type::COMBAT,
@@ -3737,14 +3692,14 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
         ..Master::default()
     };
     t.masters = vec![
-        crate::objects::masters::Masters::new([]),
-        crate::objects::masters::Masters::new([master(master_id(4), class)]),
-        crate::objects::masters::Masters::new([master(master_id(5), class::CLASS_6)]),
+        Masters::new([]),
+        Masters::new([master(master_id(4), class)]),
+        Masters::new([master(master_id(5), class::CLASS_6)]),
     ];
     for (id, player, x) in [(10, 1, 10.0), (20, 2, x)] {
         t.spatial.insert(
             object_id(id),
-            crate::map::spatial::Placed {
+            Placed {
                 position: Position::new(x, 10.0, 0.0),
                 radius: Footprint::new(0.2, 0.2),
                 class,
@@ -3780,7 +3735,7 @@ fn an_order_on_an_enemy_below_the_least_range_notifies_the_unit_ai() {
     let ai = t.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         ai.notifies,
-        [crate::unit_ai::Notify::own(
+        [Notify::own(
             object_id(10),
             NotifyKind::TOO_CLOSE,
             [20, -1, -1]
@@ -3895,11 +3850,11 @@ fn the_box_of_an_order_moves_only_its_least_value_for_lower_one() {
 /// 9529 (formation category 0) stay loose, the scout 9185 has none to join it.
 #[test]
 fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
-    let f = crate::world::Formations {
+    let f = Formations {
         auto: true,
         influence: Distance::new(3.0),
         by_speed: false,
-        ..crate::world::Formations::default()
+        ..Formations::default()
     };
     let unit = |id, grouped, position: Position| Splittable {
         id: object_id(id),
@@ -3916,7 +3871,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     };
     // no planner: the distance decides
     let mut none = |_: &Splittable, _: &Splittable| Ok(None);
-    let mut away = std::collections::BTreeSet::new();
+    let mut away = BTreeSet::new();
     let scout = unit(9185, true, Position::new(42.047_367, 94.338_486, 0.0));
     let sheep = unit(9529, false, Position::new(45.5, 93.5, 0.0));
     assert!(!splits_together(&scout, &sheep, f, false, &mut none, &mut away).unwrap());
@@ -3943,7 +3898,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     assert!(splits_together(&scout, &nowhere, f, false, &mut short, &mut away).unwrap());
     let far = unit(9187, true, Position::new(80.0, 94.0, 0.0));
     assert!(!splits_together(&scout, &far, f, false, &mut none, &mut away).unwrap());
-    let wide = crate::world::Formations {
+    let wide = Formations {
         influence: Distance::new(40.0),
         ..f
     };
@@ -4013,11 +3968,10 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
     let mut t = soldiers(units, members);
     t.dt = Millis::new(100);
     for u in &mut t.players[1].objects {
-        t.parts
-            .put_mover(u.id, Some(crate::gathering::hunt::tests::walker()));
+        t.parts.put_mover(u.id, Some(walker()));
         t.parts.set_unit_ai(
             u.id,
-            Some(crate::unit_ai::UnitAi {
+            Some(UnitAi {
                 ai_type: UnitAiType::SOLDIER,
                 current_order: None,
                 current_action: None,
@@ -4026,9 +3980,9 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
                 idle_timer: Millis::new(400),
                 adjusted_idle_timeout: Millis::new(2000),
                 secondary_timer: Millis::new(3000),
-                patrol_path: Some(crate::unit_ai::PatrolPath::default()),
-                patrol_waypoint: crate::movement::WaypointIndex::of_data(2),
-                ..crate::unit_ai::UnitAi::default()
+                patrol_path: Some(PatrolPath::default()),
+                patrol_waypoint: WaypointIndex::of_data(2),
+                ..UnitAi::default()
             }),
         );
     }
@@ -4226,7 +4180,7 @@ fn move_runs_the_stop_of_pending_completion_first() {
         .get_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     ai.current_action = Some(ActionKind::Move);
-    ai.notifies = vec![crate::unit_ai::Notify::own(
+    ai.notifies = vec![Notify::own(
         object_id(11),
         NotifyKind::ACTION_COMPLETED,
         [ActionKind::Move.value(), 0, 0],
@@ -4385,10 +4339,10 @@ fn an_attack_move_through_the_unit_ai_queue_is_not_modelled() {
         ),
         Err(ATTACK_MOVE_QUEUED)
     );
-    let unready = crate::unit_ai::QueuedOrder {
+    let unready = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
-        priority: crate::unit_ai::OrderPriority::of_data(100),
+        priority: OrderPriority::of_data(100),
         target: None,
         target_owner: None,
         point: Position::new(25.0, 20.0, 0.0),
@@ -4481,7 +4435,7 @@ fn kept_group_takes_the_loose_soldiers_about_it() {
     ];
     let mut t = soldiers(&units, &[11, 12]);
     for u in &mut t.players[1].objects {
-        let mut m = crate::gathering::hunt::tests::walker();
+        let mut m = walker();
         m.moved_at = u.position();
         t.parts.put_mover(u.id, Some(m));
     }
@@ -4522,7 +4476,7 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
     let world = |target_x: f32| {
         let mut t = soldiers(&units, &[11, 12]);
         t.masters[1].get_mut(master_id(4)).unwrap().line_of_sight = Distance::new(5.0);
-        t.masters[0] = crate::objects::masters::Masters::new([Master {
+        t.masters[0] = Masters::new([Master {
             id: ids::HOUSE,
             kind: BUILDING,
             class: class::BUILDING,
@@ -4533,11 +4487,11 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
                 PlayerId::new(0),
                 Unit {
                     id: object_id(60),
-                    place: crate::objects::layers::Static::at(Position::new(target_x, 20.0, 0.0)),
-                    life: crate::objects::lifecycle::Lifecycle {
+                    place: Static::at(Position::new(target_x, 20.0, 0.0)),
+                    life: Lifecycle {
                         master_id: ids::HOUSE,
                         state: ObjectState::Alive,
-                        ..crate::objects::lifecycle::Lifecycle::default()
+                        ..Lifecycle::default()
                     },
                     ..Unit::default()
                 },
@@ -4545,7 +4499,7 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
             .unwrap();
         t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
         for u in &mut t.players[1].objects {
-            let mut m = crate::gathering::hunt::tests::walker();
+            let mut m = walker();
             m.moved_at = u.position();
             t.parts.put_mover(u.id, Some(m));
         }
@@ -4580,16 +4534,16 @@ fn two_patrollers() -> World {
 /// `t` on a 60 by 60 map of open land, its sight's registry for the searches.
 fn searchable(mut t: World) -> World {
     // the group's statistics search the members' surroundings
-    let mut s = crate::map::spatial::Spatial::with_tiles(
+    let mut s = Spatial::with_tiles(
         GridSize::new(60, 60),
-        crate::map::spatial::Tiles::new(GridSize::new(60, 60), vec![1; 3600]),
+        Tiles::new(GridSize::new(60, 60), vec![1; 3600]),
     );
-    let kind = crate::map::terrain::TerrainKind {
+    let kind = TerrainKind {
         shown: true,
         flags: TerrainFlags::WATER,
         forest: false,
     };
-    s.terrain = Some(crate::map::terrain::Terrain::new(
+    s.terrain = Some(Terrain::new(
         GridSize::new(60, 60),
         vec![TileTerrain::of_save(0, 255, -1); 3600],
         vec![kind],
@@ -4597,15 +4551,8 @@ fn searchable(mut t: World) -> World {
     ));
     s.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([0, 0])]);
     s.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([0, 1])]);
-    let mut v = crate::vision::visibility::Visibility::new(
-        GridSize::new(60, 60),
-        vec![],
-        vec![],
-        vec![],
-        0,
-        vec![],
-    );
-    v.registry = Some(crate::vision::registry::Registry::new(2, 65));
+    let mut v = Visibility::new(GridSize::new(60, 60), vec![], vec![], vec![], 0, vec![]);
+    v.registry = Some(Registry::new(2, 65));
     s.sight = Some(v);
     t.spatial = s;
     t
@@ -4805,32 +4752,31 @@ fn move_of_whole_group_keeps_it() {
 /// a new action.
 #[test]
 fn gather_takes_farm_but_no_other_building() {
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    t.masters[1] =
-        crate::objects::masters::Masters::new(t.masters[1].iter().cloned().chain([Master {
-            id: ids::FARM,
-            kind: BUILDING,
-            class: class::FARM,
-            radius: Footprint::new(1.5, 1.5),
-            ..Master::default()
-        }]));
+    t.masters[1] = Masters::new(t.masters[1].iter().cloned().chain([Master {
+        id: ids::FARM,
+        kind: BUILDING,
+        class: class::FARM,
+        radius: Footprint::new(1.5, 1.5),
+        ..Master::default()
+    }]));
     let farm = |id, state, annex_of| {
         Object::with_building(
             Unit {
                 id,
-                place: crate::objects::layers::Static::at(Position::new(26.5, 89.5, 0.0)),
-                life: crate::objects::lifecycle::Lifecycle {
+                place: Static::at(Position::new(26.5, 89.5, 0.0)),
+                life: Lifecycle {
                     state,
                     master_id: ids::FARM,
-                    ..crate::objects::lifecycle::Lifecycle::default()
+                    ..Lifecycle::default()
                 },
                 pasture: None,
                 my_pasture: None,
                 ..Unit::default()
             },
-            crate::objects::layers::Building {
+            Building {
                 annex_of,
                 ..Default::default()
             },
@@ -4873,7 +4819,7 @@ fn gather_takes_farm_but_no_other_building() {
     assert_eq!(
         (g.target, g.state.bare(), g.point),
         (
-            Some(crate::gathering::GatherTargetId::new(object_id(800))),
+            Some(GatherTargetId::new(object_id(800))),
             GatherState::Walk { move_to: None },
             Position::new(26.5, 89.5, 0.0)
         )
@@ -4883,10 +4829,7 @@ fn gather_takes_farm_but_no_other_building() {
             t.players[0].objects[ListIndex::new(0)].workers,
             t.players[1].objects[ListIndex::new(3)].workers
         ),
-        (
-            crate::objects::WorkerCount::of_data(0),
-            crate::objects::WorkerCount::of_data(1)
-        )
+        (WorkerCount::of_data(0), WorkerCount::of_data(1))
     );
     let mut t = world.clone();
     assert!(
@@ -4919,7 +4862,7 @@ fn gather_takes_farm_but_no_other_building() {
 /// [`crate::world::tests::forage_world`]'s forager 9175 carrying 6 berries (kind 17), its
 /// Gather on bush 600 from a work command, its player holding 10 attributes.
 fn foraging() -> World {
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     let work = Work {
         target: Some(object_id(600)),
         point: Position::new(32.5, 89.5, 0.0),
@@ -4980,7 +4923,7 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
         ask(DropOffBy::Gather, false, false)
     );
     // a Hunt and a Build of a wood task, aimed
-    let mut hunt = crate::gathering::hunt::tests::hunting(600);
+    let mut hunt = hunting(600);
     hunt.task.resource = Some(attribute::WOOD);
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.actions.of_mut(v.id).unwrap().list.set_gather(None);
@@ -4995,23 +4938,26 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
             .unwrap(),
         ask(DropOffBy::Hunt, true, false)
     );
-    let task = crate::construction::build::BuildTask {
+    let task = BuildTask {
         range: Distance::new(0.1),
-        work_value: crate::objects::masters::WorkValue::new(1.0),
+        work_value: WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: Some(attribute::WOOD),
         id: TaskId::of_task(-1),
         moving: None,
     };
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.actions.of_mut(v.id).unwrap().list.set_build(Some(
-        crate::construction::build::tests::started(
+    t.parts
+        .actions
+        .of_mut(v.id)
+        .unwrap()
+        .list
+        .set_build(Some(started(
             object_id(10028),
             Position::new(10.5, 10.5, 0.0),
             Distance::new(5.0),
             task,
-        ),
-    ));
+        )));
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
@@ -5052,7 +4998,7 @@ fn drop_off_order_takes_gather_to_its_site_or_posts_the_other_load() {
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,
-        crate::objects::WorkerCount::of_data(1)
+        WorkerCount::of_data(1)
     );
     let mut t = foraging();
     t.players[1].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::WOOD);
@@ -5110,7 +5056,7 @@ fn drop_off_order_takes_hunt_to_its_site() {
     let mut t = foraging();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.actions.of_mut(v.id).unwrap().list.set_gather(None);
-    let mut hunt = crate::gathering::hunt::tests::hunting(600);
+    let mut hunt = hunting(600);
     hunt.task.resource = Some(AttributeId::numbered(17));
     // the sprites' table of the world holds none
     hunt.task.sprites = TaskSprites::NONE;
@@ -5138,7 +5084,7 @@ fn drop_off_order_takes_hunt_to_its_site() {
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,
-        crate::objects::WorkerCount::of_data(1)
+        WorkerCount::of_data(1)
     );
 }
 
@@ -5187,8 +5133,7 @@ fn an_attack_task_start_ends_where_the_start_does() {
         let mut wolf = *t.spatial.get(object_id(50)).unwrap();
         wolf.position = Position::new(at, 10.0, 0.0);
         t.spatial.insert(object_id(50), wolf);
-        t.players[0].objects[ListIndex::new(0)].place =
-            crate::objects::layers::Static::at(Position::new(at, 10.0, 0.0));
+        t.players[0].objects[ListIndex::new(0)].place = Static::at(Position::new(at, 10.0, 0.0));
         t.start_attack(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -5235,7 +5180,7 @@ fn an_attack_task_start_ends_where_the_start_does() {
 /// Gaia's bush (its master 120); none on its town centre, which no task of it names.
 #[test]
 fn work_command_finds_its_master_and_task_on_target() {
-    let t = crate::world::tests::forage_world();
+    let t = forage_world();
     assert_eq!(
         t.work_task(
             PlayerId::new(1),
@@ -5257,11 +5202,7 @@ fn work_command_finds_its_master_and_task_on_target() {
         .expect("the Gather task");
     assert_eq!(
         (with, task.id, task.action_type),
-        (
-            master_id(120),
-            TaskId::test(2),
-            crate::gathering::gather::GATHER
-        )
+        (master_id(120), TaskId::test(2), GATHER)
     );
     assert_eq!(
         t.work_task(
@@ -5279,7 +5220,7 @@ fn work_command_finds_its_master_and_task_on_target() {
 /// the other deer the hunter's Hunt: the unit AI hears the gather or hunt order on it.
 #[test]
 fn work_command_retargets_gather_or_hunt_on_its_task() {
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
     let took = t
@@ -5295,10 +5236,7 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
             took,
             t.parts.actions_of(v.id).list.gather().map(|g| g.target)
         ),
-        (
-            true,
-            Some(Some(crate::gathering::GatherTargetId::new(object_id(601))))
-        )
+        (true, Some(Some(GatherTargetId::new(object_id(601)))))
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
     assert_eq!(
@@ -5309,7 +5247,7 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
             Some(object_id(601))
         )
     );
-    let mut t = crate::world::tests::hunt_world();
+    let mut t = hunt_world();
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
     t.retarget_hunt_work(
@@ -5321,7 +5259,7 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
         t.parts.actions_of(v.id).list.hunt().map(|h| h.target),
-        Some(Some(crate::gathering::HuntTargetId::new(object_id(501))))
+        Some(Some(HuntTargetId::new(object_id(501))))
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
     assert_eq!(
@@ -5345,19 +5283,19 @@ fn work_command_retarget_to_its_player_master_84_fails() {
                 class: class::PREY,
                 ..Master::default()
             };
-            *masters = crate::objects::masters::Masters::new(masters.iter().cloned().chain([m84]));
+            *masters = Masters::new(masters.iter().cloned().chain([m84]));
         }
         let _ = t
             .push_live(
                 PlayerId::new(1),
                 Unit {
                     id: object_id(800),
-                    place: crate::objects::layers::Static::at(Position::new(33.5, 89.5, 0.0)),
-                    life: crate::objects::lifecycle::Lifecycle {
+                    place: Static::at(Position::new(33.5, 89.5, 0.0)),
+                    life: Lifecycle {
                         master_id: ids::MARKET,
                         state: ObjectState::Alive,
                         hp: HitPoints::new(5.0),
-                        ..crate::objects::lifecycle::Lifecycle::default()
+                        ..Lifecycle::default()
                     },
                     ..Unit::default()
                 },
@@ -5365,7 +5303,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
             .unwrap();
         t
     };
-    let mut t = with_84(crate::world::tests::forage_world());
+    let mut t = with_84(forage_world());
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
     let r = t.retarget_gather_work(
@@ -5377,7 +5315,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
         r.err().map(|e| e.reason()),
         Some("a gather sent to its player's master 84")
     );
-    let mut t = with_84(crate::world::tests::hunt_world());
+    let mut t = with_84(hunt_world());
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
     let r = t.retarget_hunt_work(
@@ -5398,7 +5336,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
 #[test]
 fn work_command_task_is_retaken_by_the_action_on_top() {
     use crate::objects::masters::Task;
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     let task = *t.masters[1]
         .get(master_id(120))
         .unwrap()
@@ -5426,34 +5364,34 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             .map(|e| e.reason()),
         Some("a work command on the unit's current task")
     );
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     t.parts
         .actions
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_move_to(Some(crate::movement::move_to::MoveToAction {
+        .set_move_to(Some(MoveToAction {
             sprite: None,
-            state: crate::movement::move_to::MoveTo::Moving,
+            state: MoveTo::Moving,
             point: Position::new(40.0, 89.5, 0.0),
             target: None,
             range: Distance::ZERO,
             voice: Voice::Loud,
-            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-            wait: crate::movement::move_to::MoveWait::default(),
+            on_target_moved: TargetMoved::Follows,
+            wait: MoveWait::default(),
         }));
     let moving = Task {
-        action_type: crate::movement::move_to::MOVE_TO,
+        action_type: MOVE_TO,
         ..task
     };
     assert_eq!(
         t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &moving, true),
         Ok(false)
     );
-    let mut t = crate::world::tests::forage_world();
-    let build = crate::construction::build::BuildTask {
+    let mut t = forage_world();
+    let build = BuildTask {
         range: Distance::new(0.1),
-        work_value: crate::objects::masters::WorkValue::new(1.0),
+        work_value: WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
         id: TaskId::test(3),
@@ -5464,7 +5402,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_build(Some(crate::construction::build::tests::started(
+        .set_build(Some(started(
             object_id(10028),
             Position::new(30.0, 88.0, 0.0),
             Distance::new(1.0),
@@ -5487,7 +5425,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
 #[test]
 fn work_command_factory_starts_the_task_action() {
     use crate::objects::masters::Task;
-    let mut t = crate::world::tests::forage_world();
+    let mut t = forage_world();
     let task = *t.masters[1]
         .get(master_id(120))
         .unwrap()
@@ -5509,7 +5447,7 @@ fn work_command_factory_starts_the_task_action() {
             .gather()
             .map(|g| (g.target, g.state.bare())),
         Some((
-            Some(crate::gathering::GatherTargetId::new(object_id(600))),
+            Some(GatherTargetId::new(object_id(600))),
             GatherState::Walk { move_to: None }
         ))
     );
@@ -5544,16 +5482,16 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         (13, 4, Point::new(22.0, 20.0)),
     ];
     let mut t = searchable(patrollers(&units, &[]));
-    t.players.push(crate::world::Player::default());
+    t.players.push(Player::default());
     t.players[2].objects = vec![Unit {
         id: object_id(60),
-        place: crate::objects::layers::Static::at(Position::new(40.0, 40.0, 0.0)),
+        place: Static::at(Position::new(40.0, 40.0, 0.0)),
         attackable: true,
-        life: crate::objects::lifecycle::Lifecycle {
+        life: Lifecycle {
             master_id: ids::HOUSE,
             state: ObjectState::Alive,
             hp: HitPoints::new(550.0),
-            ..crate::objects::lifecycle::Lifecycle::default()
+            ..Lifecycle::default()
         },
         ..Unit::default()
     }]
@@ -5568,17 +5506,16 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         ..Master::default()
     };
     let soldier = Master {
-        tasks: vec![crate::objects::masters::Task {
+        tasks: vec![Task {
             action_type: action_type::COMBAT,
             owner_type: TargetOwner::ENEMY,
             object_group: Some(class::BUILDING),
-            ..crate::objects::masters::Task::default()
+            ..Task::default()
         }],
         ..t.masters[1].get(master_id(4)).unwrap().clone()
     };
-    t.masters[1] = crate::objects::masters::Masters::new([soldier, building.clone()]);
-    t.masters
-        .push(crate::objects::masters::Masters::new([building]));
+    t.masters[1] = Masters::new([soldier, building.clone()]);
+    t.masters.push(Masters::new([building]));
     for u in &mut t.players[1].objects {
         u.life.hp = HitPoints::new(25.0);
     }

@@ -1,5 +1,7 @@
 //! A master's charge type (`+0x922`): what its charge does.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's charge type (`charge_type`, `+0x922`): what its charge (`+0x9e0`) does. Every short
 /// the data or an effect leaves is kept; the values the game tests are named.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -51,8 +53,8 @@ impl ChargeType {
     }
 }
 
-impl std::fmt::Display for ChargeType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ChargeType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }

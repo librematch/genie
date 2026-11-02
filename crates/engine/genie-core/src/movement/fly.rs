@@ -30,12 +30,15 @@ use genie_diff::Diff;
 /// The Fly action's type, which word 9 adds.
 pub const FLY: ActionType = ActionType::named(10);
 
+use crate::math::image::fly::{DEGREE as FLY_DEGREE, EPSILON as FLY_EPSILON, HEIGHT as FLY_HEIGHT};
 pub use crate::movement::fly_state::FlyState;
+use crate::objects::Graphics;
+use crate::objects::layers::Action;
 
 /// Below this (`DAT_142eb0c60`, 1e-7) a task value counts as none.
-const EPSILON: f32 = crate::math::image::fly::EPSILON;
+const EPSILON: f32 = FLY_EPSILON;
 /// Degrees to radians (`DAT_142eb568c`).
-const DEGREE: f32 = crate::math::image::fly::DEGREE;
+const DEGREE: f32 = FLY_DEGREE;
 /// The flight angle's step between tries, in degrees, and the tries (`FUN_140a84b40`, state 3).
 const ANGLE_STEP: i32 = 80;
 const TRIES: i32 = 12;
@@ -64,11 +67,11 @@ pub struct FlightSprites<'a> {
     /// The bird's master's walking sprite, None for none.
     pub walking: Option<SpriteId>,
     /// The sprites' table.
-    pub graphics: &'a crate::objects::Graphics,
+    pub graphics: &'a Graphics,
 }
 
 /// The height a bird of fly mode 1 flies at once its Fly starts (`FUN_140a84900`).
-pub const HEIGHT: f32 = crate::math::image::fly::HEIGHT;
+pub const HEIGHT: f32 = FLY_HEIGHT;
 
 impl Fly {
     /// The Fly a bird's default task starts (constructor `FUN_140a845c0`, then its first, slot
@@ -350,7 +353,7 @@ impl Unit {
     /// height (slot 0x58, the position setter: its tile stays, so do its counts).
     pub(crate) fn start_fly(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         task: Task,
     ) -> Result<(), GenieError> {
@@ -388,7 +391,11 @@ impl Unit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(test)]
+    use crate::gathering::hunt::tests::walker;
     use crate::map::Radii;
+    #[cfg(test)]
+    use crate::map::spatial::Spatial;
     use crate::movement::Speed;
     use crate::movement::move_to::MoveTo;
     use crate::objects::ActionState;
@@ -396,14 +403,26 @@ mod tests {
     use crate::objects::ObjectState;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    #[cfg(test)]
+    use crate::objects::layers::{DefaultTask, Motion, Static};
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::TaskTerrain;
+    #[cfg(test)]
+    use crate::objects::masters::{Master, Masters, TaskIndex, WorkValue};
     use crate::objects::sprite::Graphic;
+    #[cfg(test)]
+    use crate::objects::{FacetCount, Frame};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    #[cfg(test)]
+    use crate::unit_ai::NotifyKind;
     use crate::unit_ai::UnitAi;
+    #[cfg(test)]
+    use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::WorldTime;
+    #[cfg(test)]
+    use crate::world::tests::in_update;
     use crate::world::{Player, World};
 
     /// The hawk's place.
@@ -412,7 +431,7 @@ mod tests {
     /// The hawk's movement state: top speed `speed`, radii 0.2, waiting to move (a stop clears
     /// it).
     fn wings(speed: f32) -> Mover {
-        let mut m = crate::gathering::hunt::tests::walker();
+        let mut m = walker();
         m.stats.speed = Speed::new(speed);
         m.stats.radius = Radii::new(0.2, 0.2, 0.5);
         m
@@ -437,7 +456,7 @@ mod tests {
             task: Task {
                 action_type: FLY,
                 object_group: None,
-                work_val2: crate::objects::masters::WorkValue::new(0.0),
+                work_val2: WorkValue::new(0.0),
                 sprites: TaskSprites::of_data([846, 1595, 846, -1]),
                 ..Task::default()
             },
@@ -449,7 +468,7 @@ mod tests {
     fn sky_world(fly: Fly, speed: f32, seed: u32) -> World {
         let bird = Unit {
             id: object_id(9925),
-            place: crate::objects::layers::Static::at(AT),
+            place: Static::at(AT),
             life: Lifecycle {
                 state: ObjectState::Alive,
                 master_id: master_id(96),
@@ -457,7 +476,7 @@ mod tests {
             },
             ..Unit::default()
         };
-        let mut layer = crate::objects::layers::Action::default();
+        let mut layer = Action::default();
         layer.list.set_fly(Some(fly));
         let gaia = Player {
             objects: vec![bird].into(),
@@ -465,39 +484,34 @@ mod tests {
         };
         let mut t = World::new(
             WorldTime::ZERO,
-            crate::world::FrameSeed::of_data(1),
+            FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![gaia],
         )
         .with_ais([(object_id(9925), UnitAi::default())])
         .with_actions([(object_id(9925), layer)])
-        .with_motions([(
-            object_id(9925),
-            crate::objects::layers::Motion::Moving(wings(speed)),
-        )]);
-        t.spatial = crate::map::spatial::Spatial::new(GridSize::new(120, 120));
+        .with_motions([(object_id(9925), Motion::Moving(wings(speed)))]);
+        t.spatial = Spatial::new(GridSize::new(120, 120));
         t.streams.get(Stream::Action).set_seed(seed);
         t.graphics = hawk_graphics();
-        t.masters = vec![crate::objects::masters::Masters::new([
-            crate::objects::masters::Master {
-                id: master_id(96),
-                move_sprite: Some(SpriteId::named(846)),
-                ..crate::objects::masters::Master::default()
-            },
-        ])];
+        t.masters = vec![Masters::new([Master {
+            id: master_id(96),
+            move_sprite: Some(SpriteId::named(846)),
+            ..Master::default()
+        }])];
         t
     }
 
     /// The hawk's sprites: 846 (its task's moving and working one, its master's walking one)
     /// and 1595 (the task's proceeding one).
-    fn hawk_graphics() -> crate::objects::Graphics {
+    fn hawk_graphics() -> Graphics {
         [(846, 0.0625), (1595, 0.0625)]
             .map(|(id, frame_duration)| {
                 let g = Graphic {
                     id: SpriteId::named(id),
-                    frames: crate::objects::Frame::of_data(60),
-                    facets: crate::objects::FacetCount::of_data(16),
+                    frames: Frame::of_data(60),
+                    facets: FacetCount::of_data(16),
                     speed_multiplier: SpeedMultiplier::ONE,
                     frame_duration: Seconds::new(frame_duration),
                     replay_delay: Seconds::ZERO,
@@ -516,7 +530,7 @@ mod tests {
             group: None,
             action_state: ActionState::NO_ACTION,
         };
-        crate::world::tests::in_update(
+        in_update(
             t,
             (PlayerId::new(0), ListIndex::new(0)),
             21,
@@ -548,7 +562,7 @@ mod tests {
             .unwrap();
         let failed = ai.notifies.iter();
         failed
-            .filter(|n| n.kind == crate::unit_ai::NotifyKind::ACTION_FAILED)
+            .filter(|n| n.kind == NotifyKind::ACTION_FAILED)
             .count()
     }
 
@@ -621,12 +635,12 @@ mod tests {
                 ..unsprited
             },
             Task {
-                work_val2: crate::objects::masters::WorkValue::new(4.0),
+                work_val2: WorkValue::new(4.0),
                 work_range: Distance::new(3.0),
                 ..unsprited
             },
             Task {
-                work_val1: crate::objects::masters::WorkValue::new(2.0),
+                work_val1: WorkValue::new(2.0),
                 ..unsprited
             },
             Task {
@@ -782,7 +796,7 @@ mod tests {
     fn bird_without_movement_state_does_not_fly() {
         let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
         let bird = &mut t.players[0].objects[ListIndex::new(0)];
-        bird.place = crate::objects::layers::Static::at(AT);
+        bird.place = Static::at(AT);
         let id = bird.id;
         t.set_motion(id, None);
         assert_eq!(flown(&mut t), Err(NO_MOVER));
@@ -798,16 +812,15 @@ mod tests {
             wait_time: Seconds::new(3.0),
             ..Task::default()
         };
-        let start = |default: Option<crate::objects::masters::TaskIndex>| {
+        let start = |default: Option<TaskIndex>| {
             let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
             let bird = &mut t.players[0].objects[ListIndex::new(0)];
             t.parts.actions.of_mut(bird.id).unwrap().list.set_fly(None);
-            t.parts.actions.of_mut(bird.id).unwrap().default_task =
-                crate::objects::layers::DefaultTask::Fly;
+            t.parts.actions.of_mut(bird.id).unwrap().default_task = DefaultTask::Fly;
             let master = t.masters[0].get_mut(master_id(96)).unwrap();
             master.tasks = vec![task];
             master.default_task = default;
-            let r = crate::world::tests::in_update(
+            let r = in_update(
                 &mut t,
                 (PlayerId::new(0), ListIndex::new(0)),
                 21,
@@ -821,7 +834,7 @@ mod tests {
                 .copied();
             (r, fly)
         };
-        let (r, fly) = start(crate::objects::masters::TaskIndex::of_data(0));
+        let (r, fly) = start(TaskIndex::of_data(0));
         assert_eq!(r, Ok(true));
         assert_eq!(fly.map(|f| f.task), Some(task));
         let (r, fly) = start(None);

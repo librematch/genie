@@ -1,6 +1,7 @@
 //! A Wait Solidify's state: waiting for its foundation to turn solid.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A Wait Solidify's state (`+0x18`): the constructor's 10, changed only by its `set_state` (slot
 /// 0x80, `FUN_140ae8b60`), which sets the state its caller gives: 1 and 13 every action shares, 2 a
@@ -44,8 +45,8 @@ impl WaitSolidifyState {
     }
 }
 
-impl std::fmt::Display for WaitSolidifyState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for WaitSolidifyState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

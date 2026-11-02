@@ -2,10 +2,13 @@
 //! the herd it leads, the hunt's update and what follows.
 
 use crate::GenieError;
+use crate::combat::AttackTargetId;
 use crate::combat::attack::{AttackReads, Fight};
+use crate::combat::attack::{arms, engagement};
 use crate::combat::damage::Victim;
 use crate::combat::victims::{KillLeft, file_kill, victim};
 use crate::gathering::DropSiteId;
+use crate::gathering::HuntTargetId;
 use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
@@ -17,14 +20,17 @@ use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::layers::Action;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
+use crate::world::HUNTER_MASTER;
 use crate::world::TREE_NEAR;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -40,7 +46,7 @@ impl Unit {
     /// object, taken).
     pub(crate) fn hunt_strike(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
         own: &mut Option<Victim>,
@@ -53,7 +59,7 @@ impl Unit {
         )?;
         let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
         let victim = hunt_victim(c, &hunt)?;
-        let own = own.take().ok_or(crate::world::HUNTER_MASTER)?;
+        let own = own.take().ok_or(HUNTER_MASTER)?;
         let herd = self.herd_for(
             c,
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
@@ -111,10 +117,7 @@ impl Unit {
                 c.w.parts.combat_of(self.id),
                 master,
                 (
-                    crate::objects::masters::OwnerMasters::new(
-                        &c.w.parts.own_master,
-                        c.w.masters.of(c.player),
-                    ),
+                    OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
                     &c.w.graphics,
                 ),
                 c.w.parts.unit_ai.get(self.id),
@@ -150,7 +153,7 @@ impl Unit {
     /// [`Unit::hunt_search_state`]).
     pub(crate) fn hunt_attack_failed(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         let tree = c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
@@ -195,15 +198,12 @@ impl Unit {
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
-        let (me_at, them) = (
-            at(Some(self.id))?,
-            at(action.target.map(crate::gathering::HuntTargetId::id))?,
-        );
+        let (me_at, them) = (at(Some(self.id))?, at(action.target.map(HuntTargetId::id))?);
         let speed =
             c.w.parts
                 .mover_of(self.id)
                 .map_or(Speed::ZERO, |m| m.stats.speed);
-        let engagement = crate::combat::attack::engagement(
+        let engagement = engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
             master,
@@ -212,7 +212,7 @@ impl Unit {
             c.w.world_time,
         )?;
         let moving = action.task.walk_sprite_id(self.life.held());
-        let arms = crate::combat::attack::arms(master, &c.w.graphics, action.task.sprites, moving);
+        let arms = arms(master, &c.w.graphics, action.task.sprites, moving);
         let own = them.player == c.player;
         let drop_site = if !own {
             None
@@ -289,7 +289,7 @@ fn hunt_victim(c: &Step<'_>, action: &HuntAction) -> Result<Victim, GenieError> 
             action
                 .state
                 .attack()
-                .and_then(|a| a.target.map(crate::combat::AttackTargetId::id))
+                .and_then(|a| a.target.map(AttackTargetId::id))
         },
         |t| Some(t.id()),
     );

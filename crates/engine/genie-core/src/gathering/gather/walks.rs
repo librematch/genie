@@ -7,6 +7,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
 use crate::movement::move_to::{MoveToAction, MoveToReads, SpriteReads, TargetMoved, WalkTo};
+use crate::objects::Graphics;
 use crate::objects::lifecycle::Held;
 use crate::objects::unit::Unit;
 
@@ -45,14 +46,14 @@ impl GatherReads {
     /// table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
-        graphics: &'g crate::objects::Graphics,
+        graphics: &'g Graphics,
         unit: (&Unit, Option<&Mover>),
     ) -> Walks<'g> {
         Walks::of(self.sprites_of(graphics), unit)
     }
 
     /// The sprites a `MoveTo` takes when its maker gives none.
-    const fn sprites_of<'g>(&self, graphics: &'g crate::objects::Graphics) -> SpriteReads<'g> {
+    const fn sprites_of<'g>(&self, graphics: &'g Graphics) -> SpriteReads<'g> {
         SpriteReads {
             defaults: self.defaults,
             graphics,

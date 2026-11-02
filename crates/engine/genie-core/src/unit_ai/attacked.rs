@@ -2,6 +2,7 @@
 //! the explorers' search.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::math::rng::Well512;
@@ -18,6 +19,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderPriority;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, NEVER_KILLED, Named, Notify, OrderTargetType,
@@ -367,7 +369,7 @@ impl UnitAi {
     ) -> Result<u32, GenieError> {
         let radius = Footprint::new(n.p[0] as f32 / RADIUS_SCALE, n.p[1] as f32 / RADIUS_SCALE);
         // p3 the foundation: none (−1) has no footprint, so the unit has nowhere to go
-        let Some(site) = crate::construction::FoundationId::of_field(n.p[2]) else {
+        let Some(site) = FoundationId::of_field(n.p[2]) else {
             return Ok(GO_ON);
         };
         let off = side.off_footprint(site, radius)?;
@@ -393,7 +395,7 @@ impl UnitAi {
             let order = |o: &Named, order: OrderKind| QueuedOrder {
                 issuer: Some(Issuer::Player(off.player)),
                 order,
-                priority: crate::unit_ai::OrderPriority::COMMAND,
+                priority: OrderPriority::COMMAND,
                 target: Some(o.id),
                 target_owner: Some(o.owner),
                 point: o.vector.with_height(0.0),

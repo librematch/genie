@@ -26,23 +26,34 @@ pub(crate) use self::world_picker::NOT_HELD;
 #[cfg(test)]
 use self::world_picker::attacks;
 pub(crate) use self::world_picker::{WorldPicker, patrol_information};
+use crate::construction::FoundationId;
+use crate::groups::UnitGroups;
+use crate::objects::layers::Action;
+use crate::objects::masters::{OwnerMasters, Task};
+use crate::objects::object_list::ObjectList;
+use crate::pathing::zones::Zones;
+use crate::players::{CivId, Relations};
+use crate::unit_ai::Attacker;
 #[cfg(test)]
 use crate::unit_ai::UnitAi;
+use crate::world::index::ObjectIndex;
+use crate::world::player::AiSettings;
 use crate::world::step::Step;
+use std::cmp::Ordering;
 
 /// What a tick's update of one object needs from the world.
 /// What a hunt's drop-off ([`Unit::drop_off_in`]) reads besides its unit: the owner's masters,
 /// the world with its zone maps and planners, the world's time, the Object stream (the drop-site
 /// search's plans) and the owner's type.
 pub(crate) struct DropWorld<'a> {
-    pub masters: crate::objects::masters::OwnerMasters<'a>,
+    pub masters: OwnerMasters<'a>,
     pub spatial: &'a mut Spatial,
-    pub zones: &'a mut crate::pathing::zones::Zones,
+    pub zones: &'a mut Zones,
     pub pathing: &'a mut Pathing,
     pub object: &'a mut Well512,
     pub world_time: WorldTime,
     pub player_type: PlayerType,
-    pub groups: &'a crate::groups::UnitGroups,
+    pub groups: &'a UnitGroups,
 }
 
 /// What the unit's slot 0x388 (`FUN_141226fc0`) found while its unit AI ran
@@ -52,8 +63,8 @@ pub(crate) struct DropWorld<'a> {
 /// [`UnitView::lend`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Wait {
-    pub(crate) target: crate::construction::FoundationId,
-    pub(crate) task: crate::objects::masters::Task,
+    pub(crate) target: FoundationId,
+    pub(crate) task: Task,
     pub(crate) switch: Option<MasterId>,
 }
 
@@ -68,7 +79,7 @@ pub(crate) enum RepairOrder {
     Start {
         target: ObjectId,
         switches: [Option<MasterId>; 2],
-        task: Option<crate::objects::masters::Task>,
+        task: Option<Task>,
     },
 }
 
@@ -80,7 +91,7 @@ pub(crate) enum RepairOrder {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct EnterOrder {
     pub(crate) target: ObjectId,
-    pub(crate) task: crate::objects::masters::Task,
+    pub(crate) task: Task,
     pub(crate) switch: Option<MasterId>,
     pub(crate) under_artifact: bool,
 }
@@ -93,7 +104,7 @@ pub(crate) struct Foreign<'a> {
     pub(crate) after: &'a [Player],
     /// The live list of the player whose list is out, once its object changed hands: that
     /// object's AI part reads it as another player's ([`OthersRef::changed_hands`]).
-    pub(crate) left: Option<(PlayerId, &'a crate::objects::object_list::ObjectList)>,
+    pub(crate) left: Option<(PlayerId, &'a ObjectList)>,
 }
 
 impl<'a> Foreign<'a> {
@@ -102,9 +113,9 @@ impl<'a> Foreign<'a> {
         let q = q.index();
         let own = self.before.len();
         match q.cmp(&own) {
-            std::cmp::Ordering::Less => self.before.get(q),
-            std::cmp::Ordering::Equal => None,
-            std::cmp::Ordering::Greater => self.after.get(q - own - 1),
+            Ordering::Less => self.before.get(q),
+            Ordering::Equal => None,
+            Ordering::Greater => self.after.get(q - own - 1),
         }
     }
 }
@@ -118,8 +129,8 @@ impl<'a> Foreign<'a> {
 pub(crate) struct OwnerView {
     pub(crate) player: PlayerId,
     pub(crate) new_owner: Option<PlayerId>,
-    pub(crate) civ: crate::players::CivId,
-    pub(crate) ai_settings: crate::world::player::AiSettings,
+    pub(crate) civ: CivId,
+    pub(crate) ai_settings: AiSettings,
 }
 
 impl OwnerView {
@@ -153,7 +164,7 @@ impl OwnerView {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub(crate) fn relations(self, w: &World) -> Result<&crate::players::Relations, GenieError> {
+    pub(crate) fn relations(self, w: &World) -> Result<&Relations, GenieError> {
         Ok(&w.players.player(self.player)?.relations)
     }
 }
@@ -163,7 +174,7 @@ impl OwnerView {
 /// own and the old owner's among the others' ([`OthersRef::changed_hands`]).
 pub(crate) fn owner_view<'a>(
     players: &'a [Player],
-    index: &'a crate::world::index::ObjectIndex,
+    index: &'a ObjectIndex,
     p: PlayerId,
     new: Option<PlayerId>,
 ) -> Result<OthersRef<'a>, GenieError> {
@@ -188,9 +199,9 @@ pub(crate) struct UnitView<'u, 's> {
     /// The unit, without its unit AI.
     pub(crate) unit: &'u mut Unit,
     /// The unit's action layer, out of the table with it.
-    pub(crate) actions: &'u mut crate::objects::layers::Action,
+    pub(crate) actions: &'u mut Action,
     /// What the attack check of a search reads of the unit.
-    pub(crate) attacker: crate::unit_ai::Attacker,
+    pub(crate) attacker: Attacker,
     /// The owner, as the AI runs (a captured unit's new one): its diplomacy, attributes and
     /// civ are what the task search reads of it.
     pub(crate) player: PlayerId,
@@ -199,9 +210,9 @@ pub(crate) struct UnitView<'u, 's> {
     /// The player that took the unit over in its update ([`changed_view`]).
     pub(crate) new_owner: Option<PlayerId>,
     /// The owner's civ.
-    pub(crate) civ: crate::players::CivId,
+    pub(crate) civ: CivId,
     /// The owner's AI settings.
-    pub(crate) ai_settings: crate::world::player::AiSettings,
+    pub(crate) ai_settings: AiSettings,
 }
 
 #[cfg(test)]

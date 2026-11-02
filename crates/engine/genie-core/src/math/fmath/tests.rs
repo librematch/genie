@@ -1,4 +1,5 @@
 use super::*;
+use std::f32::consts::{FRAC_PI_2, LN_2, PI};
 
 /// `f` gives the game's bits on each `(input, output)` pair, a NaN's payload included. The
 /// outputs are build 158041's own routines, run on these inputs in unicorn.
@@ -52,7 +53,7 @@ fn the_double_logarithm_takes_each_branch() {
     // 2 · (1 + 2^-30): the short series with an exponent
     assert_eq!(
         log_f64(2.0 + f64::from_bits(0x3e20_0000_0000_0000)) as f32,
-        std::f32::consts::LN_2
+        LN_2
     );
     // 1.2 and 1.4 sit on either side of the i > 0 test
     assert_eq!(log_f64(1.2) as f32, 0.182_321_56);
@@ -983,15 +984,9 @@ fn the_angle_between_unit_vectors_follows_the_games_compares() {
     // FUN_14087e650: |d| below 1e-7 gives π/2, 1 and up 0, -1 and down π, else acosf; a NaN
     // dot falls through all three unordered compares (JBE, JC, JC) to acosf(NaN)
     let x = BVector::new(1.0, 0.0, 0.0);
-    assert_eq!(
-        angle_between(x, BVector::new(0.0, 0.0, 1.0)),
-        std::f32::consts::FRAC_PI_2
-    );
+    assert_eq!(angle_between(x, BVector::new(0.0, 0.0, 1.0)), FRAC_PI_2);
     assert_eq!(angle_between(x, x), 0.0);
-    assert_eq!(
-        angle_between(x, BVector::new(-1.0, 0.0, 0.0)),
-        std::f32::consts::PI
-    );
+    assert_eq!(angle_between(x, BVector::new(-1.0, 0.0, 0.0)), PI);
     assert_eq!(angle_between(x, BVector::new(0.5, 0.0, 0.0)), acos(0.5));
     assert!(angle_between(x, BVector::new(f32::NAN, 0.0, 0.0)).is_nan());
 }

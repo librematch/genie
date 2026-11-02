@@ -1,5 +1,7 @@
 //! A master's attack priority: which targets its unit AI's checks let it choose.
 
+use std::fmt::{Display, Error, Formatter};
+
 /// A master's attack priority (`+0x92c`, `FUN_141202220`; the `.dat`'s combat part): a number
 /// the unit AIs' attack checks read by value. Priority 3 limits most of them to the classes of
 /// `PRIORITY_3_CLASSES`; 1 and 2 let the lion and the predators choose anything; 0 holds the
@@ -42,8 +44,8 @@ impl AttackPriority {
     }
 }
 
-impl std::fmt::Display for AttackPriority {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for AttackPriority {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.0)
     }
 }

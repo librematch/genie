@@ -1,6 +1,7 @@
 //! A path level's state: whether it asks for a path, walks it or is done with it.
 
 use crate::GenieError;
+use std::fmt::{Display, Error, Formatter};
 
 /// A path level's state (`+0x28`, the save's `state`), which the motion step (`0x141150f00`)
 /// switches on: a level that wants a path asks for one, an arrived level and one without a plan
@@ -52,8 +53,8 @@ impl PathState {
     }
 }
 
-impl std::fmt::Display for PathState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for PathState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.get())
     }
 }

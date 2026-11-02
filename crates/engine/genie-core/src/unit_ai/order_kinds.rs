@@ -2,6 +2,7 @@
 //! seek and explore; an order on a target and one taken at once.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -9,6 +10,7 @@ use crate::map::Tile;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
@@ -83,7 +85,7 @@ impl UnitAi {
     /// model.
     pub(crate) fn build_object(
         &mut self,
-        target: crate::construction::FoundationId,
+        target: FoundationId,
         force: bool,
         at: &Surroundings,
         side: &mut dyn UnitSide,
@@ -388,9 +390,9 @@ impl UnitAi {
             let found = side.closest_resource(ResourceSearch {
                 kind,
                 cap: if kind == GatherGroup::WOOD {
-                    crate::objects::WorkerCount::of_data(2)
+                    WorkerCount::of_data(2)
                 } else {
-                    crate::objects::WorkerCount::NO_CAP
+                    WorkerCount::NO_CAP
                 },
                 site: None,
                 current: self.current_target,

@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, btree_map};
 
 use crate::GenieError;
 use crate::objects::ObjectId;
+use std::mem::take as mem_take;
 
 /// The most ids on either side of 0 a column holds; an id beyond (a stand-in such as
 /// [`ObjectId::UNSAVED`]) goes to the sorted rest.
@@ -416,14 +417,14 @@ impl<'a, T> Iterator for IterMut<'a, T> {
         }
         for i in self.behind.bits.by_ref() {
             // a held index lies below the values not passed yet, so the split finds it
-            let (head, tail) = std::mem::take(&mut self.behind.values).split_at_mut_checked(i)?;
+            let (head, tail) = mem_take(&mut self.behind.values).split_at_mut_checked(i)?;
             self.behind.values = head;
             if let (Some(id), Some(Some(v))) = (behind_id(i), tail.first_mut()) {
                 return Some((id, v));
             }
         }
         for i in self.ahead.bits.by_ref() {
-            let rest = std::mem::take(&mut self.ahead.values);
+            let rest = mem_take(&mut self.ahead.values);
             let (head, tail) = rest.split_at_mut_checked(i.checked_sub(self.ahead.at)? + 1)?;
             self.ahead.values = tail;
             self.ahead.at = i + 1;
@@ -468,6 +469,8 @@ mod tests {
 
     use crate::objects::ObjectId;
     use crate::objects::id_table::IdTable;
+    #[cfg(test)]
+    use std::iter::once;
 
     /// Object `value`, which the test knows is an id.
     fn id(value: i32) -> ObjectId {
@@ -560,7 +563,7 @@ mod tests {
             .collect();
         let _ = grown.remove(id(900));
         let _ = grown.remove(id(-900));
-        let small: IdTable<i32> = std::iter::once((id(4), 3)).collect();
+        let small: IdTable<i32> = once((id(4), 3)).collect();
         assert_eq!(grown, small);
         assert_ne!(grown, IdTable::new());
     }

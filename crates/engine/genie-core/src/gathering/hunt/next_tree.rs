@@ -2,17 +2,27 @@
 //! (trees): the closest tree from the hunt's drop site, which the hunt then takes.
 
 use crate::GenieError;
+use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntRetarget;
+use crate::gathering::hunt::{NO_HUNT, Quarry};
 use crate::map::Distance;
 use crate::map::Position;
+use crate::math::fmath::sqrt;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::WorkerCount;
+use crate::objects::layers::Action;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::{GatherGroup, MasterTables};
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
+use crate::unit_ai::task_finder::allied;
+use crate::world::HUNTER_UNMOVING;
+use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
+use std::cmp::Ordering;
 
 impl Unit {
     /// The hunt's search for another target (`FUN_140ac4670`) when the class its unit AI targets
@@ -27,7 +37,7 @@ impl Unit {
     /// found one.
     pub(crate) fn hunt_tree_search(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        actions: &mut Action,
         c: &mut Step<'_>,
         within: Option<Distance>,
         near: Option<Distance>,
@@ -35,10 +45,10 @@ impl Unit {
         // NaN compares false as the game's `comiss` does
         let beyond = |a: Position, b: Position, limit: Distance| {
             let (dx, dz, dy) = (a.x() - b.x(), a.z() - b.z(), a.y() - b.y());
-            let d = crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy);
-            d.partial_cmp(&limit.get()) != Some(std::cmp::Ordering::Less)
+            let d = sqrt(dx * dx + dz * dz + dy * dy);
+            d.partial_cmp(&limit.get()) != Some(Ordering::Less)
         };
-        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         if let Some(within) = within
             && beyond(hunt.point, self.position(), within)
         {
@@ -48,8 +58,8 @@ impl Unit {
         let Some(found) = self.resource_search_from(
             actions,
             c,
-            crate::objects::masters::GatherGroup::WOOD,
-            crate::objects::WorkerCount::of_data(2),
+            GatherGroup::WOOD,
+            WorkerCount::of_data(2),
             site,
         )?
         else {
@@ -66,7 +76,7 @@ impl Unit {
                 self.position().z() - t.position().z(),
                 self.position().y() - t.position().y(),
             );
-            if near.get() < crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy) {
+            if near.get() < sqrt(dx * dx + dz * dz + dy * dy) {
                 return Ok(false);
             }
         }
@@ -78,7 +88,7 @@ impl Unit {
                 .ok_or(GenieError::unsupported(
                     "a hunter's player without relations",
                 ))?;
-        let quarry = crate::gathering::hunt::Quarry {
+        let quarry = Quarry {
             id: found,
             position: t.position(),
             class: target_master.class,
@@ -86,7 +96,7 @@ impl Unit {
             state: t.life.state,
             player: tp,
             amount: t.life.amount,
-            allied: crate::unit_ai::task_finder::allied(own, c.player, tp, true),
+            allied: allied(own, c.player, tp, true),
             top_action: c.w.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         };
@@ -106,7 +116,7 @@ impl Unit {
             c.w.parts
                 .mover_of(self.id)
                 .map_or(Speed::ZERO, |m| m.stats.speed);
-        let engagement = crate::combat::attack::engagement(
+        let engagement = engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
             master,
@@ -116,24 +126,18 @@ impl Unit {
         )?;
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
                 &c.w.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let hunt = actions
-            .list
-            .hunt_mut()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let old = hunt.target;
         let moving = hunt.task.walk_sprite_id(self.life.held());
-        let arms = crate::combat::attack::arms(master, &c.w.graphics, hunt.task.sprites, moving);
-        let mover =
-            c.w.parts
-                .mover_mut(self.id)
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+        let arms = arms(master, &c.w.graphics, hunt.task.sprites, moving);
+        let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         if let Some(arrived) = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
@@ -146,7 +150,7 @@ impl Unit {
             mover,
         )? {
             if arrived {
-                crate::combat::attack::show_arrived(
+                show_arrived(
                     &arms,
                     &mut self.sprite,
                     c.w.parts.motion_mut(self.id),
@@ -156,7 +160,7 @@ impl Unit {
             // slot 0x68 (FUN_140a7a230): the old target goes, the new one is taken
             self.hunt_release(c, [old])?;
             let by = self.releaser(c)?;
-            crate::world::lets::take(c, self, found, by)?;
+            take(c, self, found, by)?;
         }
         Ok(true)
     }

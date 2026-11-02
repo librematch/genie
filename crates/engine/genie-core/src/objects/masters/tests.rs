@@ -1,20 +1,28 @@
 use super::*;
 use crate::combat::missile::ArcRatio;
 use crate::combat::missile::HitMode;
+use crate::combat::missile::ProjectileType;
 use crate::combat::missile::SmartMode;
 use crate::combat::missile::VanishMode;
+use crate::construction::repair::REPAIR;
+use crate::garrison::ENTER;
+use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::HUNT;
 use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::TerrainMask;
 use crate::movement::MoveAlgorithm;
 use crate::movement::TurnRate;
+use crate::objects::FacetCount;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Regeneration;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
+use crate::objects::facing::SpriteFacets;
 use crate::objects::masters::class;
+use crate::objects::sprite::Graphic;
 use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::attribute as player_attribute;
@@ -23,6 +31,8 @@ use crate::test_ids::carrying;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::test_ids::{class_of, opt_master};
+use crate::unit_ai::task_finder::TaskOn;
 
 /// A sprite field as the attribute tests read it: its id, −1 for none.
 fn sprite_value(s: Option<SpriteId>) -> f32 {
@@ -32,8 +42,8 @@ fn sprite_value(s: Option<SpriteId>) -> f32 {
 fn task(action_type: ActionType, object_group: i16, object_id: i16, work_val1: f32) -> Task {
     Task {
         action_type,
-        object_group: crate::test_ids::class_of(object_group),
-        object_id: crate::test_ids::opt_master(object_id),
+        object_group: class_of(object_group),
+        object_id: opt_master(object_id),
         work_val1: WorkValue::new(work_val1),
         ..Task::default()
     }
@@ -89,22 +99,18 @@ fn villagers() -> Masters {
     let base = || {
         vec![
             task(action_type::COMBAT, -1, -1, 0.0),
-            task(crate::garrison::ENTER, 3, -1, 0.0),
-            task(crate::gathering::hunt::HUNT, -1, 126, 0.0),
+            task(ENTER, 3, -1, 0.0),
+            task(HUNT, -1, 126, 0.0),
         ]
     };
     let builder = || {
         vec![
             task(action_type::BUILD, -1, -1, 1.0),
-            task(crate::garrison::ENTER, 3, -1, 0.0),
+            task(ENTER, 3, -1, 0.0),
         ]
     };
     Masters::new([
-        master(
-            master_id(56),
-            1,
-            vec![task(crate::gathering::gather::GATHER, -1, 53, 1.0)],
-        ),
+        master(master_id(56), 1, vec![task(GATHER, -1, 53, 1.0)]),
         master(ids::VILLAGER_MALE, 1, base()),
         master(ids::BUILDER, 1, builder()),
         master(master_id(212), 2, builder()),
@@ -814,12 +820,12 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
 fn some_combat_shorts_multiply_by_the_truncated_amount() {
     let mut m = of_type(master_type::RGE_COMBAT);
     m.base_armor = DamageAmount::new(3);
-    m.fire_frame = crate::objects::Frame::of_data(5);
+    m.fire_frame = Frame::of_data(5);
     m.shown.attack = DamageAmount::new(7);
     m.multiply_attribute(attribute::BASE_ARMOR, 1.5, &world(false));
     assert_eq!(m.base_armor, DamageAmount::new(5));
     m.multiply_attribute(attribute::FRAME_DELAY, 2.9, &world(false));
-    assert_eq!(m.fire_frame, crate::objects::Frame::of_data(10));
+    assert_eq!(m.fire_frame, Frame::of_data(10));
     m.multiply_attribute(attribute::SHOWN_ATTACK, 3.5, &world(false));
     assert_eq!(m.shown.attack, DamageAmount::new(21));
     m.add_attribute(attribute::ROTATION_SPEED, 0.25, &world(false));
@@ -833,8 +839,8 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
 #[test]
 fn missile_smart_mode_multiply_sets_it() {
     let mut m = of_type(master_type::MISSILE);
-    m.missile_stats = Some(crate::combat::missile::MissileStats {
-        projectile_type: crate::combat::missile::ProjectileType::STRAIGHT,
+    m.missile_stats = Some(MissileStats {
+        projectile_type: ProjectileType::STRAIGHT,
         smart_mode: SmartMode::LEADS_TARGET,
         hit_mode: HitMode::TARGET_ALONE,
         vanish_mode: VanishMode::NONE,
@@ -921,7 +927,7 @@ fn the_train_location_attributes_change_the_selected_entry() {
         location: Some(master_id(12)),
         time,
         button: LocationButton::of_data(1),
-        hotkey: crate::production::HotkeyId::of_data(16_000),
+        hotkey: HotkeyId::of_data(16_000),
     };
     let mut m = of_type(master_type::COMBAT);
     m.train_locations = vec![
@@ -1047,9 +1053,9 @@ fn foundation_terrain_add_counts_none_as_minus_one() {
 /// speed and its speeds by its sprites' factors, its turn time and its facets.
 #[test]
 fn moving_master_derived_values_follow_its_attributes() {
-    let graphic = |id, speed_multiplier, facets| crate::objects::sprite::Graphic {
+    let graphic = |id, speed_multiplier, facets| Graphic {
         id,
-        frames: crate::objects::Frame::of_data(10),
+        frames: Frame::of_data(10),
         facets,
         speed_multiplier,
         frame_duration: Seconds::new(0.1),
@@ -1062,7 +1068,7 @@ fn moving_master_derived_values_follow_its_attributes() {
             graphic(
                 SpriteId::named(1),
                 SpeedMultiplier::ZERO,
-                crate::objects::FacetCount::of_data(8),
+                FacetCount::of_data(8),
             ),
         ),
         (
@@ -1070,7 +1076,7 @@ fn moving_master_derived_values_follow_its_attributes() {
             graphic(
                 SpriteId::named(2),
                 SpeedMultiplier::of_data(1.5),
-                crate::objects::FacetCount::of_data(8),
+                FacetCount::of_data(8),
             ),
         ),
         (
@@ -1078,7 +1084,7 @@ fn moving_master_derived_values_follow_its_attributes() {
             graphic(
                 SpriteId::named(3),
                 SpeedMultiplier::of_data(0.5),
-                crate::objects::FacetCount::of_data(16),
+                FacetCount::of_data(16),
             ),
         ),
     ]
@@ -1125,8 +1131,8 @@ fn moving_master_derived_values_follow_its_attributes() {
     m.follow(attribute::RUNNING_GRAPHIC, &graphics, None);
     assert_eq!(
         m.moving.unwrap().facets,
-        Some(crate::objects::facing::SpriteFacets {
-            count: crate::objects::FacetCount::of_data(8),
+        Some(SpriteFacets {
+            count: FacetCount::of_data(8),
             turns: false
         })
     );
@@ -1254,8 +1260,8 @@ fn the_combat_master_own_values_change() {
     assert_eq!(
         (m.volley_fire, m.max_volley, m.attack_sprite2),
         (
-            crate::combat::Firepower::new(2.0),
-            crate::combat::MissileCount::of_data(0),
+            Firepower::new(2.0),
+            MissileCount::of_data(0),
             Some(SpriteId::named(12))
         )
     );
@@ -1279,8 +1285,8 @@ fn the_combat_master_own_values_change() {
 #[test]
 fn the_missile_building_and_animated_setters() {
     let mut m = of_type(master_type::MISSILE);
-    m.missile_stats = Some(crate::combat::missile::MissileStats {
-        projectile_type: crate::combat::missile::ProjectileType::STRAIGHT,
+    m.missile_stats = Some(MissileStats {
+        projectile_type: ProjectileType::STRAIGHT,
         smart_mode: SmartMode::NONE,
         hit_mode: HitMode::of_data(1),
         vanish_mode: VanishMode::NONE,
@@ -1333,7 +1339,7 @@ fn master_copy_keeps_its_id_class_and_flags() {
         2,
         vec![
             task(action_type::COMBAT, -1, -1, 0.0),
-            task(crate::garrison::ENTER, 3, -1, 0.0),
+            task(ENTER, 3, -1, 0.0),
         ],
     );
     man.class = class::CLASS_7;
@@ -1365,7 +1371,7 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
         class: class::FARM,
         ..Master::default()
     };
-    let gather = |group, id, work| task(crate::construction::repair::REPAIR, group, id, work);
+    let gather = |group, id, work| task(REPAIR, group, id, work);
     let with = |own: Vec<Task>, others: Vec<Master>| {
         let mut all = vec![master(ids::VILLAGER_MALE, 1, own), farm.clone()];
         all.extend(others);
@@ -1392,7 +1398,7 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
             attribute_95: Amount::ZERO,
             civ: CivId::new(1),
         };
-        let on = crate::unit_ai::task_finder::TaskOn {
+        let on = TaskOn {
             target: Some(&site),
             general: Some(&site),
             terrain: None,
@@ -1458,7 +1464,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             attribute_95: Amount::ZERO,
             civ: CivId::new(1),
         };
-        let on = crate::unit_ai::task_finder::TaskOn {
+        let on = TaskOn {
             target: Some(&site),
             general: Some(&site),
             terrain: None,
