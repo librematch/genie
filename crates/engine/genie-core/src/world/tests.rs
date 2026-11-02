@@ -166,6 +166,8 @@ use crate::unit_ai::task_finder::world::{
 use crate::unit_ai::task_finder::{Actor, Diplomacy};
 use crate::unit_ai::world_view::{DropWorld, Foreign, Wait, patrol_information};
 use crate::unit_ai::{Effect, Notify, UnitAi};
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
@@ -10650,7 +10652,13 @@ pub(crate) fn hands_world(
             kind: master_type::COMBAT,
         },
     );
-    let _ = v.sight_on(object_id(id), at, Footprint::new(0.2, 0.2), false, false);
+    let _ = v.sight_on(
+        object_id(id),
+        at,
+        Footprint::new(0.2, 0.2),
+        SightShape::Circle,
+        SightCentre::Tile,
+    );
     s.sight = Some(v);
     s.insert(
         object_id(id),

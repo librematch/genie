@@ -48,6 +48,8 @@ use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
@@ -850,7 +852,13 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
         v.add_seer(object_id(1), seer);
         let position = Position::new(10.5, 10.5, 0.0);
         let radius = Footprint::new(0.5, 0.5);
-        let _ = v.sight_on(object_id(1), position, radius, false, false);
+        let _ = v.sight_on(
+            object_id(1),
+            position,
+            radius,
+            SightShape::Circle,
+            SightCentre::Tile,
+        );
         t.spatial.sight = Some(v);
         t.spatial.insert(
             object_id(1),
@@ -878,17 +886,17 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             object_id(1),
             Position::new(10.5, 10.5, 0.0),
             Footprint::new(0.5, 0.5),
-            false,
-            false,
+            SightShape::Circle,
+            SightCentre::Tile,
         )
         .unwrap();
         let _ = v.sight_on_los(
             object_id(1),
             Position::new(10.5, 10.5, 0.0),
             Footprint::new(0.5, 0.5),
-            false,
+            SightShape::Circle,
             SightTiles::new(los),
-            false,
+            SightCentre::Tile,
         );
         sight(&t)
     };

@@ -11,6 +11,8 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Visibility;
@@ -221,14 +223,14 @@ impl Visibility {
             return Ok(());
         }
         if sees {
-            self.sight_off(id, position, radius, false, false)?;
+            self.sight_off(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
         }
         if let Some(s) = self.seers.get_mut(id) {
             s.player = new;
             s.los = Distance::new(los);
         }
         if sees {
-            let _ = self.sight_on(id, position, radius, false, false)?;
+            let _ = self.sight_on(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
         }
         Ok(())
     }
@@ -249,8 +251,14 @@ impl Visibility {
             return Ok(());
         }
         b.built = true;
-        self.sight_off(id, position, radius, true, false)?;
-        let _ = self.sight_on(id, position, radius, false, false)?;
+        self.sight_off(
+            id,
+            position,
+            radius,
+            SightShape::Footprint,
+            SightCentre::Tile,
+        )?;
+        let _ = self.sight_on(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
         Ok(())
     }
 
@@ -265,7 +273,13 @@ impl Visibility {
         if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) {
             b.started = true;
         }
-        let _ = self.sight_on(id, position, radius, true, false)?;
+        let _ = self.sight_on(
+            id,
+            position,
+            radius,
+            SightShape::Footprint,
+            SightCentre::Tile,
+        )?;
         let _ = self.link_building(position, radius)?;
         Ok(())
     }

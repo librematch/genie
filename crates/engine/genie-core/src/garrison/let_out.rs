@@ -21,6 +21,8 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::orders::Work;
 use crate::players::PlayerId;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -172,9 +174,9 @@ impl World {
                 bid,
                 building_at,
                 building_radius,
-                false,
+                SightShape::Circle,
                 INSIDE_SIGHT,
-                false,
+                SightCentre::Tile,
             )?;
         }
         // slot 0x58: on the map at the spot (new_position: its tile's list, its sight)
@@ -207,7 +209,7 @@ impl World {
         if let Some(v) = self.spatial.sight.as_mut()
             && state == ObjectState::Alive
         {
-            let _ = v.sight_on(id, at, made.radius, false, false)?;
+            let _ = v.sight_on(id, at, made.radius, SightShape::Circle, SightCentre::Tile)?;
         }
         if let Some(e) = self.take_sight_unsupported() {
             return Err(e);

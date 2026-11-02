@@ -6,6 +6,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::TileOffset;
 use crate::map::TileRect;
+use crate::vision::SightCentre;
 use crate::vision::visibility::{ANCHOR, EDGE, Extent, LINKED, STEP, Visibility};
 use crate::world::slots::CheckedIndex;
 
@@ -286,11 +287,11 @@ impl Visibility {
     /// A building's slots pick the table: one whose radii add up to an odd whole number centres
     /// on a tile (the caller's table), any other on a tile corner (`DAT_143f51790`, probed 0,
     /// would pick the centred one).
-    pub(super) fn building_offset(radius: Footprint, offset: bool) -> bool {
+    pub(super) fn building_centre(radius: Footprint, centre: SightCentre) -> SightCentre {
         if ((radius.x() + radius.y()) as i32) & 1 != 0 {
-            offset
+            centre
         } else {
-            true
+            SightCentre::Corner
         }
     }
 }

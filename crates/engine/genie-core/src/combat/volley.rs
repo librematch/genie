@@ -38,6 +38,8 @@ use crate::objects::unit::object_master;
 use crate::players::PlayerId;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::ARMED_FIREPOWER;
 use crate::world::Seconds;
@@ -510,7 +512,13 @@ impl Unit {
                     kind: made.kind,
                 },
             );
-            let _ = v.sight_on(id, position, made.radius, false, false)?;
+            let _ = v.sight_on(
+                id,
+                position,
+                made.radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+            )?;
         }
         let held = static_storage(c.w.players.player_mut(c.player)?, &made.storage)?;
         // its action: the target and the shooter taken (slot 0x178), then the start

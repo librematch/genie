@@ -12,6 +12,8 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::MARKET;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
@@ -30,30 +32,30 @@ pub(super) struct SightOn {
     pub(super) position: Position,
     /// Its master's radii (x, y).
     pub(super) radius: Footprint,
-    /// Whether it explores its footprint as a rectangle.
-    pub(super) square: bool,
+    /// What it explores: a circle of its line of sight or its footprint.
+    pub(super) shape: SightShape,
     /// Its line of sight.
     pub(super) line_of_sight: SightTiles,
-    /// The circle's offset.
-    pub(super) offset: bool,
+    /// Where the circle is centred.
+    pub(super) centre: SightCentre,
 }
 
 impl Visibility {
-    /// Slot 0x1d0: the object's sight comes, on its owner's map: a circle of its line of sight, or
-    /// its footprint when `square` (`FUN_141192560`; a building's `FUN_1411d0190`). Returns the
-    /// tiles explored.
+    /// Slot 0x1d0: the object's sight comes, on its owner's map, of `shape`: a circle of its line
+    /// of sight centred at `centre`, or its footprint (`FUN_141192560`; a building's
+    /// `FUN_1411d0190`). Returns the tiles explored.
     pub fn sight_on(
         &mut self,
         id: ObjectId,
         position: Position,
         radius: Footprint,
-        square: bool,
-        offset: bool,
+        shape: SightShape,
+        centre: SightCentre,
     ) -> Result<TileCount, GenieError> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
-        self.sight_on_los(id, position, radius, square, SightTiles::of(s.los), offset)
+        self.sight_on_los(id, position, radius, shape, SightTiles::of(s.los), centre)
     }
 
     /// Slot 0x1d0 with a line of sight of its own (its fourth argument not −1): a building takes
@@ -63,14 +65,14 @@ impl Visibility {
         id: ObjectId,
         position: Position,
         radius: Footprint,
-        square: bool,
+        shape: SightShape,
         los: SightTiles,
-        offset: bool,
+        centre: SightCentre,
     ) -> Result<TileCount, GenieError> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
-        let (square, offset) = match s.building {
+        let (shape, centre) = match s.building {
             Some(b) if !b.built => {
                 if !b.started {
                     if let Some(s) = self.seers.get_mut(id) {
@@ -78,7 +80,7 @@ impl Visibility {
                     }
                     return Ok(TileCount::ZERO);
                 }
-                (true, offset)
+                (SightShape::Footprint, centre)
             }
             Some(_) => {
                 // The master whose sight the AI players' market lists follow (`FUN_1411d0190`: id 84).
@@ -93,18 +95,18 @@ impl Visibility {
                         self.unsupported("a market's sight with computer players");
                     }
                 }
-                (square, Self::building_offset(radius, offset))
+                (shape, Self::building_centre(radius, centre))
             }
-            None => (square, offset),
+            None => (shape, centre),
         };
         self.base_sight_on(SightOn {
             id,
             seer: s,
             position,
             radius,
-            square,
+            shape,
             line_of_sight: los,
-            offset,
+            centre,
         })
     }
 
@@ -115,16 +117,20 @@ impl Visibility {
             seer: s,
             position,
             radius,
-            square,
+            shape,
             line_of_sight: los,
-            offset,
+            centre,
         } = on;
-        let square = square && s.master != CIRCLE_MASTER;
+        let shape = if s.master == CIRCLE_MASTER {
+            SightShape::Circle
+        } else {
+            shape
+        };
         if !los.sees() {
             return Ok(TileCount::ZERO);
         }
         let (x, y) = (position.x(), position.y());
-        let newly = if square {
+        let newly = if shape == SightShape::Footprint {
             let (rx, ry) = (radius.x(), radius.y());
             if rx <= 0.0 || ry <= 0.0 {
                 return Ok(TileCount::ZERO);
@@ -139,7 +145,7 @@ impl Visibility {
                 ),
             )?
         } else {
-            self.explore(s.player, Tile::new(x as i32, y as i32), los, offset)?
+            self.explore(s.player, Tile::new(x as i32, y as i32), los, centre)?
         };
         if let Some(s) = self.seers.get_mut(id) {
             s.explored = true;
@@ -154,13 +160,13 @@ impl Visibility {
         id: ObjectId,
         position: Position,
         radius: Footprint,
-        square: bool,
-        offset: bool,
+        shape: SightShape,
+        centre: SightCentre,
     ) -> Result<(), GenieError> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
-        self.sight_off_los(id, position, radius, square, SightTiles::of(s.los), offset)?;
+        self.sight_off_los(id, position, radius, shape, SightTiles::of(s.los), centre)?;
         Ok(())
     }
 
@@ -171,30 +177,34 @@ impl Visibility {
         id: ObjectId,
         position: Position,
         radius: Footprint,
-        square: bool,
+        shape: SightShape,
         los: SightTiles,
-        offset: bool,
+        centre: SightCentre,
     ) -> Result<(), GenieError> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
-        let offset = match s.building {
+        let centre = match s.building {
             Some(_) if !s.explored => return Ok(()),
             Some(b) if !b.built => {
                 if !b.started {
                     return Ok(());
                 }
-                offset
+                centre
             }
-            Some(_) => Self::building_offset(radius, offset),
-            None => offset,
+            Some(_) => Self::building_centre(radius, centre),
+            None => centre,
         };
-        let square = square && s.master != CIRCLE_MASTER;
+        let shape = if s.master == CIRCLE_MASTER {
+            SightShape::Circle
+        } else {
+            shape
+        };
         if !los.sees() {
             return Ok(());
         }
         let (x, y) = (position.x(), position.y());
-        if square {
+        if shape == SightShape::Footprint {
             let (rx, ry) = (radius.x(), radius.y());
             if rx <= 0.0 || ry <= 0.0 {
                 return Ok(());
@@ -209,7 +219,7 @@ impl Visibility {
                 ),
             )?;
         } else {
-            self.unexplore(s.player, Tile::new(x as i32, y as i32), los, offset)?;
+            self.unexplore(s.player, Tile::new(x as i32, y as i32), los, centre)?;
         }
         Ok(())
     }
@@ -232,13 +242,13 @@ impl Visibility {
         if tile(from) == tile(to) {
             return Ok(());
         }
-        self.sight_off(id, from, radius, false, false)?;
+        self.sight_off(id, from, radius, SightShape::Circle, SightCentre::Tile)?;
         if self
             .seers
             .get(id)
             .is_some_and(|s| s.state == ObjectState::Alive)
         {
-            let _ = self.sight_on(id, to, radius, false, false)?;
+            let _ = self.sight_on(id, to, radius, SightShape::Circle, SightCentre::Tile)?;
         }
         Ok(())
     }
@@ -261,13 +271,25 @@ impl Visibility {
         let master_sees = self.seers.get(id).is_some_and(|s| Distance::ZERO < s.los);
         if old == ObjectState::Alive && (ObjectState::Alive < new || new == ObjectState::Foundation)
         {
-            self.sight_off(id, position, radius, false, false)?;
+            self.sight_off(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
             if master_sees {
-                let _ = self.sight_on(id, position, radius, true, false)?;
+                let _ = self.sight_on(
+                    id,
+                    position,
+                    radius,
+                    SightShape::Footprint,
+                    SightCentre::Tile,
+                )?;
             }
         }
         if old < ObjectState::Removed && new == ObjectState::Removed && master_sees {
-            self.sight_off(id, position, radius, true, false)?;
+            self.sight_off(
+                id,
+                position,
+                radius,
+                SightShape::Footprint,
+                SightCentre::Tile,
+            )?;
         }
         if let Some(s) = self.seers.get_mut(id) {
             s.state = new;
@@ -286,12 +308,24 @@ impl Visibility {
         master: MasterId,
         los: Distance,
     ) -> Result<(), GenieError> {
-        self.sight_off(id, position, old_radius, false, false)?;
+        self.sight_off(
+            id,
+            position,
+            old_radius,
+            SightShape::Circle,
+            SightCentre::Tile,
+        )?;
         if let Some(s) = self.seers.get_mut(id) {
             s.master = master;
             s.los = los;
         }
-        let _ = self.sight_on(id, position, new_radius, false, false)?;
+        let _ = self.sight_on(
+            id,
+            position,
+            new_radius,
+            SightShape::Circle,
+            SightCentre::Tile,
+        )?;
         Ok(())
     }
 

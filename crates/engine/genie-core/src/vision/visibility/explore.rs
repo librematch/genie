@@ -5,10 +5,10 @@ use crate::GenieError;
 use crate::map::Tile;
 use crate::map::TileRect;
 use crate::players::PlayerId;
+use crate::vision::SightCentre;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
-use crate::vision::los_tables::{CENTRED, OFFSET};
 use crate::vision::visibility::{ANCHOR, LINKED, MOST, Visibility};
 use crate::world::slots::CheckedIndex;
 
@@ -16,19 +16,19 @@ impl Visibility {
     // The visible map's routines (`RGE_Visible_Map`).
 
     /// `explore_terrain` (`FUN_141284a40`): the tiles of a circle of `los` (at most 20) around
-    /// tile `centre`, from the table [`OFFSET`] for a building whose centre is on a tile corner,
-    /// count one more seer. A tile seen for the first time counts as explored, and its first sight
+    /// tile `origin`, centred on the tile's centre or, for a building whose centre is on a tile
+    /// corner, on its corner (`centre`), count one more seer. A tile seen for the first time counts as explored, and its first sight
     /// of a building's tile whose anchor it never saw explores the building's tiles. Returns the
     /// tiles explored.
     pub fn explore(
         &mut self,
         player: PlayerId,
-        centre: Tile,
+        origin: Tile,
         los: SightTiles,
-        offset: bool,
+        centre: SightCentre,
     ) -> Result<TileCount, GenieError> {
-        let (x, y) = (centre.x(), centre.y());
-        let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
+        let (x, y) = (origin.x(), origin.y());
+        let table = *centre.table().checked(los.row())?;
         let (visible, seen) = (VisionBits::visible(player), VisionBits::explored(player));
         let mut newly = TileCount::ZERO;
         for &(dy, dx0, dx1) in table {
@@ -115,12 +115,12 @@ impl Visibility {
     pub fn unexplore(
         &mut self,
         player: PlayerId,
-        centre: Tile,
+        origin: Tile,
         los: SightTiles,
-        offset: bool,
+        centre: SightCentre,
     ) -> Result<(), GenieError> {
-        let (x, y) = (centre.x(), centre.y());
-        let table = *(if offset { &OFFSET } else { &CENTRED }).checked(los.row())?;
+        let (x, y) = (origin.x(), origin.y());
+        let table = *centre.table().checked(los.row())?;
         let hidden = !VisionBits::visible(player);
         for &(dy, dx0, dx1) in table {
             let ty = y + i32::from(dy);

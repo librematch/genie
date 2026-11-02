@@ -31,6 +31,8 @@ use crate::players::PlayerId;
 use crate::production::spawn::{
     Facing, NOT_MOVING, Placing, Site, WorldMap, corner_tiles, placement, spawn_point,
 };
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -169,7 +171,7 @@ impl World {
                     kind: made.kind,
                 },
             );
-            let _ = v.sight_on(id, at, made.radius, false, false)?;
+            let _ = v.sight_on(id, at, made.radius, SightShape::Circle, SightCentre::Tile)?;
         }
         Ok(())
     }

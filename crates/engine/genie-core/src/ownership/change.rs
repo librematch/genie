@@ -22,6 +22,8 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
@@ -221,7 +223,13 @@ impl World {
         placed: Option<crate::map::spatial::Placed>,
     ) -> Result<(), GenieError> {
         if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
-            v.sight_off(id, p.position, p.radius, true, false)?;
+            v.sight_off(
+                id,
+                p.position,
+                p.radius,
+                SightShape::Footprint,
+                SightCentre::Tile,
+            )?;
         }
         Ok(())
     }
@@ -234,7 +242,13 @@ impl World {
         placed: Option<crate::map::spatial::Placed>,
     ) -> Result<(), GenieError> {
         if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
-            let _ = v.sight_on(id, p.position, p.radius, true, false)?;
+            let _ = v.sight_on(
+                id,
+                p.position,
+                p.radius,
+                SightShape::Footprint,
+                SightCentre::Tile,
+            )?;
         }
         Ok(())
     }

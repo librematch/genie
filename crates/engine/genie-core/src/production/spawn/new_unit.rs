@@ -29,6 +29,8 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::IN_PRODUCTION;
 use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 
@@ -358,7 +360,13 @@ impl World {
                     kind: made.kind,
                 },
             );
-            let _ = v.sight_on(id, position, made.radius, false, false)?;
+            let _ = v.sight_on(
+                id,
+                position,
+                made.radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+            )?;
         }
         if let Some(e) = self.take_sight_unsupported() {
             return Err(e);

@@ -7,6 +7,7 @@ the player's masters, resources or other technologies.
   the research test and the payment.
 - `effect/` holds a research's completion and the effects it gives.
 - `upgrade.rs` holds an object's upgrade to another master, as the upgrade of its master runs it.
+  `upgrade/` holds the damage sprites' check, which the upgrade runs with the new master.
 
 ## In the game
 
@@ -32,6 +33,7 @@ the player's masters, resources or other technologies.
 | [`upgrade.rs`](upgrade.rs) | An object's upgrade to another master: slot 0x98 (`FUN_141201a60` for a combat object, `FUN_1411c4660` for a building), down the classes' overrides (`FUN_14107cb70`, `FUN_14106a530`, `FUN_14114cb80`) to the static object's `FUN_141186580`, as the upgrade of its master runs it (`FUN_141657d10`, `World::upgrade_objects`); and the damage sprites' check (`FUN_1411859a0`), which the static part runs around the hit points' change. |
 | [`upgrade_mode.rs`](upgrade_mode.rs) | How an upgrade effect changes a master's objects (`UpgradeMode`). |
 | [`effect/`](effect/) | A research's completion and the effects it gives: `FUN_1413cdcd0` (the technology done, its effect, the technologies that depend on it, the player's statistics), the effects' `TRIBE_Effects::do_effect` (`FUN_141462440`, then the base `FUN_140ec2ac0`) with every kind for every party, and what they reach: the player's attribute modifier (slots 0x150, 0x158, 0x160 -> slot 0x148, `FUN_1416121b0`: the hooks `FUN_141614f40` around `FUN_14165a000`, the objects' slots 0x78, 0x80, 0x88 and the masters' 0x18, 0x20, 0x28 of `crate::objects::masters`), the resource commands (slots 0x1b0, 0x1b8, the player's attribute set and add), the technology changes (`'e'`, `'f'`, `'g'`, kind 8), the enables, upgrades, spawns and cost entries. |
+| [`upgrade/`](upgrade/) |  |
 <!-- /files -->
 
 ## How it connects

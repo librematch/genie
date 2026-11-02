@@ -19,6 +19,8 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::technology::effect::{Change, OBJECT_GONE};
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -227,8 +229,21 @@ impl World {
             return Ok(());
         };
         if let Some(sight) = self.spatial.sight.as_mut() {
-            sight.sight_off(id, placed.position, placed.radius, false, false)?;
-            let _ = sight.sight_on_los(id, placed.position, placed.radius, false, los, false)?;
+            sight.sight_off(
+                id,
+                placed.position,
+                placed.radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+            )?;
+            let _ = sight.sight_on_los(
+                id,
+                placed.position,
+                placed.radius,
+                SightShape::Circle,
+                los,
+                SightCentre::Tile,
+            )?;
         }
         Ok(())
     }

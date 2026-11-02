@@ -34,6 +34,8 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::VisionBits;
 use crate::vision::registry::UnitUpdate;
 use crate::world::Seconds;
@@ -487,7 +489,13 @@ impl Unit {
                 .copied()
                 .ok_or(GenieError::unsupported("an entering unit without a place"))?;
         if let Some(v) = c.w.spatial.sight.as_mut() {
-            v.sight_off(id, self.position(), placed.radius, false, false)?;
+            v.sight_off(
+                id,
+                self.position(),
+                placed.radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+            )?;
         }
         let (bp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
@@ -596,9 +604,9 @@ impl Unit {
                 target.id(),
                 at,
                 radius,
-                false,
+                SightShape::Circle,
                 crate::garrison::INSIDE_SIGHT,
-                false,
+                SightCentre::Tile,
             )?;
         }
         Ok(())

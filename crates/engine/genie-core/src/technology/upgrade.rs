@@ -4,15 +4,15 @@
 //! its master runs it (`FUN_141657d10`, [`World::upgrade_objects`]); and the damage sprites'
 //! check (`FUN_1411859a0`), which the static part runs around the hit points' change.
 
+mod damage;
+
 use crate::GenieError;
 use crate::combat::Charge;
-use crate::math::rng::{Stream, Well512};
+use crate::math::rng::Stream;
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
-use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::DamageSpriteMode;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
@@ -22,6 +22,9 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
+use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::world::World;
 use crate::world::index::Place;
@@ -29,33 +32,8 @@ use crate::world::slots::PlayerSlots;
 
 /// A master's hit points this near 0 give no share (`ABS(x) <= 1.1920929e-07`).
 const NO_HIT_POINTS: f32 = f32::EPSILON;
-/// The whole of a damage share (`DAT_14330ebcc`, 100).
-const WHOLE: f32 = crate::math::image::upgrade::WHOLE;
 /// A sprite the data file does not have.
 const NO_SPRITE: GenieError = GenieError::unsupported("a sprite the data file does not have");
-/// The resource classes whose damage share is the share of their storage left from state 3 on
-/// (`FUN_141193590`), and those whose share is it once dead (state above 2).
-const RESOURCE_CLASSES: [ClassId; 11] = [
-    class::CLASS_5,
-    class::PREY,
-    class::PREDATOR,
-    class::CLASS_29,
-    class::CLASS_31,
-    class::CLASS_33,
-    class::CLASS_38,
-    class::CLASS_40,
-    class::CLASS_41,
-    class::LIVESTOCK,
-    class::CLASS_61,
-];
-const RESOURCE_CLASSES_DEAD: [ClassId; 6] = [
-    class::CLASS_7,
-    class::CLASS_8,
-    class::TREE,
-    class::CLASS_32,
-    class::CLASS_48,
-    class::CLASS_63,
-];
 /// The class pairs whose change makes no new unit AI (`FUN_1415c6aa0`: the new class first).
 const SAME_AI_CLASSES: [(ClassId, ClassId); 3] = [
     (class::CLASS_12, class::CLASS_47),
@@ -63,162 +41,12 @@ const SAME_AI_CLASSES: [(ClassId, ClassId); 3] = [
     (class::CLASS_43, class::MONK),
 ];
 
-/// What a damage sprite apply mode does to the simulation (`FUN_1411859a0`'s switch on the
-/// entry's `+0x9`).
-const SPRITE_PLACED: DamageSpriteMode = DamageSpriteMode::PLACED;
-const SPRITE_SCATTERED: DamageSpriteMode = DamageSpriteMode::SCATTERED;
-const SPRITE_SHOWN: DamageSpriteMode = DamageSpriteMode::SHOWN;
-
 /// Slot 0xa8 (`FUN_141201670` for a combat object and a building; the base's `FUN_14106a520`
 /// answers 1): whether an object of a master of type `kind` in state `state` takes an upgrade
 /// (below state 4) rather than a master of its own.
 #[must_use]
 pub fn upgradable(kind: MasterKind, state: ObjectState) -> bool {
     kind < master_type::COMBAT || state < ObjectState::DyingSprite
-}
-
-/// `FUN_141193590`: an object of `master` in `state` whose damage share is its storage's
-/// (`+0x681` set, or a resource class: those of [`RESOURCE_CLASSES`] and
-/// [`RESOURCE_CLASSES_DEAD`] in a state above 2).
-fn storage_share(master: &Master, state: ObjectState) -> bool {
-    master.auto_gather
-        || ((RESOURCE_CLASSES.contains(&master.class)
-            || RESOURCE_CLASSES_DEAD.contains(&master.class))
-            && ObjectState::Alive < state)
-}
-
-/// The damage sprites' check (`FUN_1411859a0`) of object `u` reading `master`, whose damage share
-/// (`+0xd`) is `before`: a master without damage sprites leaves it. Else the share is that of its
-/// storage left for a resource object ([`storage_share`]: the first storage entry of the kind it
-/// holds, `100 - amount * 100 / storage`, CVTTSS2SI; 0 for none), or of its hit points, which
-/// first stay within 0 and the master's (COMISS: a NaN stays; a master below 1 hit point leaves
-/// the share). A changed share below 100 that moves the object to another damage sprite (the
-/// last entry whose percent lies below the share, the old one's below the old share) removes the
-/// object's attachments and shows the new entry by its apply mode: mode 0 places it on the
-/// object (`FUN_14118a9d0`, else a decal), mode 1 at a random spot of its footprint (two draws of
-/// the Object stream, `CheckDamageSprites`, then a decal), mode 2 as the object's sprite (slot
-/// 0x68); then the old entry goes: a decal of mode 0 or 1, or for mode 2 the master's standing
-/// sprite (slots 0x798 and 0x68) unless the new entry also shows one. The attachments and decals
-/// are drawn, not simulated. Returns the share (`+0xd`), which the slice does not hold.
-///
-/// # Errors
-///
-/// A sprite the data file does not have.
-pub(crate) fn damage_sprites(
-    (u, mut motion): (&mut Unit, MotionMut<'_>),
-    master: &Master,
-    before: HpPercent,
-    (graphics, object, sprite): (&crate::objects::Graphics, &mut Well512, &mut Well512),
-) -> Result<HpPercent, GenieError> {
-    let entries = &master.damage_graphics;
-    let Some((share, hp)) = share_of(u, master) else {
-        return Ok(before);
-    };
-    u.life.hp = HitPoints::new(hp);
-    if share == before || HpPercent::WHOLE <= share {
-        return Ok(share);
-    }
-    let (mut now, mut was) = (None, None);
-    for (i, e) in entries.iter().enumerate() {
-        if e.percent < share {
-            now = Some(i);
-        }
-        if e.percent < before {
-            was = Some(i);
-        }
-    }
-    if now == was {
-        return Ok(share);
-    }
-    let shown = |i: Option<usize>| {
-        i.and_then(|i| entries.get(i).copied())
-            .filter(|e| e.sprite.is_some())
-    };
-    let graphic =
-        |id: Option<SpriteId>| id.and_then(|id| graphics.get(id)).copied().ok_or(NO_SPRITE);
-    if let Some(e) = shown(now) {
-        match e.apply_mode {
-            SPRITE_SCATTERED => {
-                let _ = (object.rand15(), object.rand15());
-            }
-            SPRITE_SHOWN if !graphics.is_empty() => {
-                if u.sprite.is_some() {
-                    crate::objects::sprite::new_sprite(
-                        &mut u.sprite,
-                        motion.move_stats_mut(),
-                        graphic(e.sprite)?,
-                        sprite,
-                    );
-                } else {
-                    let _ = crate::objects::sprite::ActiveSprite::start(graphic(e.sprite)?, sprite);
-                }
-            }
-            _ => {}
-        }
-    }
-    if let Some(e) = shown(was)
-        && e.apply_mode == SPRITE_SHOWN
-        && shown(now).is_none_or(|n| n.apply_mode != SPRITE_SHOWN)
-        && !graphics.is_empty()
-    {
-        let standing = graphic(master.standing_sprite)?;
-        if u.sprite.is_some() {
-            crate::objects::sprite::new_sprite(
-                &mut u.sprite,
-                motion.move_stats_mut(),
-                standing,
-                sprite,
-            );
-        } else {
-            let _ = crate::objects::sprite::ActiveSprite::start(standing, sprite);
-        }
-    }
-    let _ = SPRITE_PLACED;
-    Ok(share)
-}
-
-/// The damage share [`damage_sprites`] finds for object `u` under `master`, with its hit points
-/// after it (within 0 and the master's for a share of hit points); None where it leaves the
-/// share (no damage sprites, or a master below 1 hit point).
-fn share_of(u: &Unit, master: &Master) -> Option<(HpPercent, f32)> {
-    if master.damage_graphics.is_empty() {
-        return None;
-    }
-    let mut hp = u.life.hp.get();
-    if storage_share(master, u.life.state) {
-        let held = master
-            .storage
-            .iter()
-            .take(3)
-            .find(|&&(kind, _, _)| kind == u.life.attribute_type);
-        let share = held.map_or(HpPercent::of_data(0), |&(_, amount, _)| {
-            HpPercent::of_data(crate::math::conversions::cvttss2si(
-                WHOLE - u.life.amount.get() * WHOLE / amount.get(),
-            ) as u8)
-        });
-        return Some((share, hp));
-    }
-    if master.hit_points.get() < 1 {
-        return None;
-    }
-    let most = HitPoints::of_master(master.hit_points).get();
-    // COMISS hp, most; JBE: a NaN keeps; then COMISS 0, hp; JBE
-    if most < hp {
-        hp = most;
-    } else if hp < 0.0 {
-        hp = 0.0;
-    }
-    Some((
-        HpPercent::of_data(crate::math::conversions::cvttss2si(WHOLE - hp * WHOLE / most) as u8),
-        hp,
-    ))
-}
-
-/// The damage share (`+0xd`) object `u` holds under `master`, which every change of its hit
-/// points or master set through [`damage_sprites`] (the slice does not hold it); 0 where that
-/// check would leave it.
-fn damage_share_of(u: &Unit, master: &Master) -> HpPercent {
-    share_of(u, master).map_or(HpPercent::of_data(0), |(s, _)| s)
 }
 
 /// `FUN_1415c6aa0` on player `p`'s masters `new` and `old` (by id): the unit's new class needs
@@ -437,14 +265,20 @@ impl World {
         {
             let now = sight.seer(id).map_or(old.line_of_sight, |s| s.los);
             let los = (now - old.line_of_sight) + new.line_of_sight;
-            sight.sight_off(id, placed.position, placed.radius, false, false)?;
+            sight.sight_off(
+                id,
+                placed.position,
+                placed.radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+            )?;
             let _ = sight.sight_on_los(
                 id,
                 placed.position,
                 placed.radius,
-                false,
+                SightShape::Circle,
                 SightTiles::of(los),
-                false,
+                SightCentre::Tile,
             )?;
             if let Some(s) = sight.seer_mut(id) {
                 s.los = los;
@@ -707,15 +541,18 @@ mod tests {
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Position;
+    use crate::math::rng::Well512;
     use crate::objects::ListIndex;
     use crate::objects::MasterHitPoints;
     use crate::objects::ObjectId;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::WorkRate;
+    use crate::objects::layers::MotionMut;
     use crate::objects::lifecycle::Held;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ChargeType;
+    use crate::objects::masters::DamageSpriteMode;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::TaskSprites;
     use crate::objects::masters::action_type;
@@ -728,6 +565,7 @@ mod tests {
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
     use crate::technology::UpgradeMode;
+    use crate::technology::upgrade::damage::{SPRITE_PLACED, SPRITE_SCATTERED, SPRITE_SHOWN};
     use crate::test_ids::carrying;
     use crate::test_ids::class_id;
     use crate::test_ids::master_id;
@@ -923,31 +761,6 @@ mod tests {
 
     fn object_of(hp: HitPoints) -> Unit {
         object(1, ids::HOUSE, ObjectState::Alive, hp)
-    }
-
-    /// `FUN_141193590`: a dead tree's share is that of its storage left (the entry of the kind
-    /// it holds; none, 0), a living one's that of its hit points.
-    #[test]
-    fn resource_object_damage_share_is_its_storage_s() {
-        let tree = Master {
-            class: class::TREE,
-            hit_points: MasterHitPoints::of_data(20),
-            storage: vec![(Some(attribute::WOOD), Amount::new(100.0), 0)],
-            damage_graphics: vec![DamageGraphic {
-                sprite: None,
-                percent: HpPercent::of_data(50),
-                apply_mode: DamageSpriteMode::of_data(0),
-            }],
-            ..Master::default()
-        };
-        let mut u = object(1, master_id(1), ObjectState::Dying, HitPoints::new(20.0));
-        (u.life.attribute_type, u.life.amount) = (Some(attribute::WOOD), Amount::new(25.0));
-        assert_eq!(share_of(&u, &tree), Some((HpPercent::of_data(75), 20.0)));
-        u.life.attribute_type = Some(attribute::STONE);
-        assert_eq!(share_of(&u, &tree), Some((HpPercent::of_data(0), 20.0)));
-        u.life.state = ObjectState::Alive;
-        u.life.hp = HitPoints::new(5.0);
-        assert_eq!(share_of(&u, &tree), Some((HpPercent::of_data(75), 5.0)));
     }
 
     /// Slot 0xa8 and `FUN_1415c6aa0`: a combat object or building takes an upgrade below state

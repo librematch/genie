@@ -8,6 +8,8 @@ use crate::objects::masters::master_type;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerType;
 use crate::test_ids::object_id;
+use crate::vision::SightCentre;
+use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
 
@@ -255,7 +257,13 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
     let mut v = world(PlayerId::new(3));
     v.add_seer(object_id(7), unit(PlayerId::new(0), Distance::new(2.0)));
     let _ = v
-        .sight_on(object_id(7), at, Footprint::new(0.2, 0.2), false, false)
+        .sight_on(
+            object_id(7),
+            at,
+            Footprint::new(0.2, 0.2),
+            SightShape::Circle,
+            SightCentre::Tile,
+        )
         .unwrap();
     let tile = |x: i32, y: i32| (y * 120 + x) as usize;
     assert_eq!(v.maps[0].counts[tile(12, 10)], 1);
@@ -380,7 +388,7 @@ fn newly_explored_tiles_join_the_player_tile_list_until_its_update_ends() {
             PlayerId::new(1),
             Tile::new(10, 10),
             SightTiles::new(0),
-            false,
+            SightCentre::Tile,
         )
         .unwrap();
     let _ = v
@@ -388,7 +396,7 @@ fn newly_explored_tiles_join_the_player_tile_list_until_its_update_ends() {
             PlayerId::new(1),
             Tile::new(10, 10),
             SightTiles::new(1),
-            false,
+            SightCentre::Tile,
         )
         .unwrap();
     assert_eq!(
@@ -434,7 +442,7 @@ fn resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
             PlayerId::new(2),
             Tile::new(20, 30),
             SightTiles::new(0),
-            false,
+            SightCentre::Tile,
         )
         .unwrap();
     v.forget_resource(
@@ -456,7 +464,7 @@ fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
             PlayerId::new(2),
             Tile::new(10, 10),
             SightTiles::new(1),
-            false
+            SightCentre::Tile
         )
         .unwrap(),
         TileCount::new(9)
@@ -470,7 +478,7 @@ fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
             PlayerId::new(2),
             Tile::new(11, 10),
             SightTiles::new(1),
-            false
+            SightCentre::Tile
         )
         .unwrap(),
         TileCount::new(3)
@@ -480,7 +488,7 @@ fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
         PlayerId::new(2),
         Tile::new(10, 10),
         SightTiles::new(1),
-        false,
+        SightCentre::Tile,
     )
     .unwrap();
     assert_eq!(v.maps[2].counts[i], 1);
@@ -488,7 +496,7 @@ fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
         PlayerId::new(2),
         Tile::new(11, 10),
         SightTiles::new(1),
-        false,
+        SightCentre::Tile,
     )
     .unwrap();
     assert_eq!(v.maps[2].counts[i], 0);
@@ -503,7 +511,7 @@ fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
         PlayerId::new(2),
         Tile::new(10, 10),
         SightTiles::new(0),
-        false,
+        SightCentre::Tile,
     )
     .unwrap();
     assert_eq!(v.maps[2].counts[i], 0);
@@ -511,7 +519,7 @@ fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
         PlayerId::new(2),
         Tile::new(20, 20),
         SightTiles::new(0),
-        false,
+        SightCentre::Tile,
     )
     .unwrap();
     assert_eq!(v.maps[2].counts[v.index(Tile::new(20, 20))], -2);
@@ -523,7 +531,13 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
     v.add_seer(object_id(7), unit(PlayerId::new(1), Distance::new(2.0)));
     let r = Footprint::new(0.5, 0.5);
     let _ = v
-        .sight_on(object_id(7), Position::new(5.5, 5.5, 0.0), r, false, false)
+        .sight_on(
+            object_id(7),
+            Position::new(5.5, 5.5, 0.0),
+            r,
+            SightShape::Circle,
+            SightCentre::Tile,
+        )
         .unwrap();
     let before = v.maps[1].counts.clone();
     v.moved(
@@ -692,7 +706,7 @@ fn first_sight_of_building_tile_explores_the_building() {
             PlayerId::new(1),
             Tile::new(27, 92),
             SightTiles::new(0),
-            false
+            SightCentre::Tile
         )
         .unwrap(),
         TileCount::ONE
@@ -718,11 +732,19 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
     v.add_seer(object_id(9), site);
     let (at, r) = (Position::new(10.0, 10.0, 0.0), Footprint::new(1.0, 1.0));
     assert_eq!(
-        v.sight_on(object_id(9), at, r, false, false).unwrap(),
+        v.sight_on(object_id(9), at, r, SightShape::Circle, SightCentre::Tile)
+            .unwrap(),
         TileCount::ZERO,
         "not started"
     );
-    v.sight_off(object_id(9), at, r, true, false).unwrap();
+    v.sight_off(
+        object_id(9),
+        at,
+        r,
+        SightShape::Footprint,
+        SightCentre::Tile,
+    )
+    .unwrap();
     assert!(v.maps[2].counts.iter().all(|&c| c == -1));
     v.construction_started(object_id(9), at, r).unwrap();
     let seen = |v: &Visibility| (0..120 * 120).filter(|&i| 0 < v.maps[2].counts[i]).count();
@@ -733,8 +755,17 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
         .as_mut()
         .unwrap()
         .built = true;
-    v.sight_off(object_id(9), at, r, true, false).unwrap();
-    let _ = v.sight_on(object_id(9), at, r, false, false).unwrap();
+    v.sight_off(
+        object_id(9),
+        at,
+        r,
+        SightShape::Footprint,
+        SightCentre::Tile,
+    )
+    .unwrap();
+    let _ = v
+        .sight_on(object_id(9), at, r, SightShape::Circle, SightCentre::Tile)
+        .unwrap();
     // the table of a tile corner: at LOS 2 a 4 by 4 square around the corner
     assert_eq!(seen(&v), 16);
     assert_eq!(v.maps[2].counts[v.index(Tile::new(8, 9))], 1);
@@ -752,7 +783,7 @@ fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
             PlayerId::new(1),
             Tile::new(10, 10),
             SightTiles::new(0),
-            false
+            SightCentre::Tile
         ),
         Ok(TileCount::ONE)
     );
@@ -761,7 +792,7 @@ fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
             PlayerId::new(1),
             Tile::new(10, 10),
             SightTiles::new(0),
-            false
+            SightCentre::Tile
         ),
         Ok(TileCount::ZERO)
     );
@@ -770,7 +801,7 @@ fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
             PlayerId::new(2),
             Tile::new(20, 20),
             SightTiles::new(0),
-            false
+            SightCentre::Tile
         ),
         Ok(TileCount::ONE)
     );
