@@ -22,6 +22,7 @@ use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
+use crate::orders::Dispatch;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
@@ -29,6 +30,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::IN_PRODUCTION;
 use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::QueueEnd;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
@@ -207,7 +209,7 @@ impl World {
                     ready: true,
                     ..*o
                 };
-                let _ = ai.queue_order(state, order, false, false)?;
+                let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
             }
         }
         Ok(())

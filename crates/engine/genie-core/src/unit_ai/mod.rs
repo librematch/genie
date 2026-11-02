@@ -43,6 +43,7 @@ mod order_kinds;
 mod order_outcome;
 mod order_priority;
 mod process_order;
+mod queue_end;
 mod retarget;
 mod side;
 mod stop_order;
@@ -113,6 +114,7 @@ pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;
 pub use self::order_outcome::OrderOutcome;
 pub use self::order_priority::OrderPriority;
+pub use self::queue_end::QueueEnd;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{
     Gatherable, NO_POINT, Named, NearestAttacker, OffFootprint, ResourceSearch, TargetFlags,

@@ -9,11 +9,13 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
+use crate::orders::Dispatch;
 use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -456,28 +458,29 @@ impl UnitAi {
     /// queue: a unit in a state above 2 takes none (false); an order of kind −1 neither (true),
     /// which no [`QueuedOrder`] holds: its callers without an order ([`UnitAi::queue_current`])
     /// stop first;
-    /// an order that is not immediate goes into the queue (`FUN_140c42640`: before the first
-    /// queued order when `in_front`, else after the last). An immediate one, which keeps or drops
-    /// the current order and runs the queue at once, is not modelled.
+    /// an order [`Dispatch::Queued`] goes into the queue at its `end` (`FUN_140c42640`: before
+    /// the first queued order at [`QueueEnd::Front`], else after the last). One
+    /// [`Dispatch::Now`], which keeps or drops the current order and runs the queue at once, is
+    /// not modelled.
     pub fn queue_order(
         &mut self,
         unit_state: ObjectState,
         order: QueuedOrder,
-        immediate: bool,
-        in_front: bool,
+        dispatch: Dispatch,
+        end: QueueEnd,
     ) -> Result<bool, GenieError> {
         if ObjectState::Alive < unit_state {
             return Ok(false);
         }
 
-        if immediate {
+        if dispatch == Dispatch::Now {
             // the immediate branch is [`UnitAi::order_now`], which reads the unit's id and place
             // and gives effects; [`UnitAi::take_order_now`] is its entry
             return Err(GenieError::unsupported(
                 "an immediate order for the unit AI's queue",
             ));
         }
-        self.insert_order(order, in_front);
+        self.insert_order(order, end);
         Ok(true)
     }
 

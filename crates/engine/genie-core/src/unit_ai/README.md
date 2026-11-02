@@ -61,6 +61,7 @@ show in checkpoint word 9.
 | [`order_outcome.rs`](order_outcome.rs) | What an order's processing answers (`OrderOutcome`). |
 | [`order_priority.rs`](order_priority.rs) | An order's priority. |
 | [`process_order.rs`](process_order.rs) | An order's processing: the combat and work orders, the top target and the attack slots. |
+| [`queue_end.rs`](queue_end.rs) | Where a queued order joins its unit AI's queue (`QueueEnd`). |
 | [`retarget.rs`](retarget.rs) | The retarget check and search, and the types' other checks (slot 73, processMisc). |
 | [`side.rs`](side.rs) | What the unit AI asks of the world (`UnitSide`) and the commands it gives its unit. |
 | [`stop_order.rs`](stop_order.rs) | What a stop of the unit AI's current action does to its order (`StopOrder`). |

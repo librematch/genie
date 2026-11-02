@@ -13,6 +13,7 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::class;
+use crate::orders::Dispatch;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
@@ -23,6 +24,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, FOUNDATION_REACH, GO_ON,
@@ -418,7 +420,8 @@ impl UnitAi {
             ready: true,
             target_type: self.target_class.and_then(OrderTargetType::of_class),
         };
-        self.queue_order(at.state, record, false, false).map(|_| ())
+        self.queue_order(at.state, record, Dispatch::Queued, QueueEnd::Back)
+            .map(|_| ())
     }
 
     /// The building's damage notify (`FUN_140c22610`, case 500): at no hit points left it gives

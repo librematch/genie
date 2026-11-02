@@ -21,6 +21,7 @@ use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::sprite::Graphic;
+use crate::orders::Dispatch;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -28,6 +29,7 @@ use crate::players::attribute::PASTURE_WORKERS;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::{AiMove, Issuer, Notify, OrderPriority, OrderTargetType, QueuedOrder};
@@ -131,7 +133,7 @@ impl World {
                 ready: order.direct,
                 target_type,
             };
-            let _ = ai.queue_order(state, queued, false, false)?;
+            let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
             if !order.queued && !order.direct {
                 readiness(&mut ai.orders, true);
                 // the pass's tail: the unit's stop (its slot 0x148)

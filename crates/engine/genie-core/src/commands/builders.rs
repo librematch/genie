@@ -26,11 +26,13 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::orders::Dispatch;
 use crate::orders::{Work, readiness};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::task_finder::world::{TaskWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::task_finder::{Actor, TaskTarget};
 use crate::unit_ai::task_finder::{TaskOn, enabled};
@@ -304,7 +306,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a queued build order without a unit AI",
             ))?;
-        let _ = ai.queue_order(state, order, false, false)?;
+        let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
         Ok(())
     }
 

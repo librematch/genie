@@ -20,6 +20,7 @@ use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -405,8 +406,8 @@ impl UnitAi {
                 ready: true,
                 target_type: Some(OrderTargetType::of_master(o.master)),
             };
-            self.insert_order(order(&site, OrderKind::Foundation), true);
-            self.insert_order(order(&target, OrderKind::OnTarget), false);
+            self.insert_order(order(&site, OrderKind::Foundation), QueueEnd::Front);
+            self.insert_order(order(&target, OrderKind::OnTarget), QueueEnd::Back);
         }
         Ok(GO_ON)
     }

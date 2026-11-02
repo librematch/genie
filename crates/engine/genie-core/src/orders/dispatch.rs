@@ -1,12 +1,13 @@
 //! How an order reaches its units ([`Dispatch`]).
 
-/// How an order reaches its units: each takes it at once, or one with a unit AI has its unit AI
-/// queue it behind its other orders (slot 0x30 into slot 0x28, not immediate, behind).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+/// How an order reaches its units: at once, or queued in their unit AIs behind their other
+/// orders (slot 0x28's `immediate`, the AI order's: 0 queues).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Dispatch {
-    /// The unit takes the order at once (a garrison's slot 0x7e8).
-    #[default]
+    /// At once: a garrison's unit takes its task (slot 0x7e8), a unit AI its order (slot 0x28
+    /// with `immediate` 1).
     Now,
-    /// A unit with a unit AI has it queue the order; one without takes it at once.
+    /// Into the unit AI's queue (slot 0x28 with `immediate` 0, slot 0x30 into it); a unit
+    /// without a unit AI takes a garrison's task at once.
     Queued,
 }

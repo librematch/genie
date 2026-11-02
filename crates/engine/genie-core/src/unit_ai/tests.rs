@@ -37,6 +37,7 @@ use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, Task};
+use crate::orders::Dispatch;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::Chance;
@@ -54,6 +55,7 @@ use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
@@ -6242,19 +6244,23 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
         ai.queue_order(
             ObjectState::Dying,
             order(Some(object_id(1)), true),
-            false,
-            false
+            Dispatch::Queued,
+            QueueEnd::Back
         ),
         Ok(false)
     );
     assert_eq!(ai.orders, Vec::<QueuedOrder>::new());
-    for (target, front) in [(1, true), (2, false), (3, true)] {
+    for (target, end) in [
+        (1, QueueEnd::Front),
+        (2, QueueEnd::Back),
+        (3, QueueEnd::Front),
+    ] {
         assert_eq!(
             ai.queue_order(
                 ObjectState::Alive,
                 order(ObjectId::of_field(target), true),
-                false,
-                front
+                Dispatch::Queued,
+                end
             ),
             Ok(true)
         );
@@ -6269,8 +6275,8 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
         .queue_order(
             ObjectState::Alive,
             order(Some(object_id(4)), false),
-            false,
-            false,
+            Dispatch::Queued,
+            QueueEnd::Back,
         )
         .unwrap();
     assert!(ai.has_unready_order());
@@ -6278,8 +6284,8 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
         ai.queue_order(
             ObjectState::Alive,
             order(Some(object_id(5)), true),
-            true,
-            false
+            Dispatch::Now,
+            QueueEnd::Back
         )
         .is_err()
     );
@@ -7377,10 +7383,10 @@ fn an_inserted_order_goes_in_front_only_of_queue_that_holds_one() {
         ..QueuedOrder::default()
     };
     let mut u = idle(UnitAiType::SOLDIER);
-    u.insert_order(order(Some(object_id(1))), true);
-    u.insert_order(order(Some(object_id(2))), false);
-    u.insert_order(order(Some(object_id(3))), true);
-    u.insert_order(order(Some(object_id(4))), false);
+    u.insert_order(order(Some(object_id(1))), QueueEnd::Front);
+    u.insert_order(order(Some(object_id(2))), QueueEnd::Back);
+    u.insert_order(order(Some(object_id(3))), QueueEnd::Front);
+    u.insert_order(order(Some(object_id(4))), QueueEnd::Back);
     let targets: Vec<Option<ObjectId>> = u.orders.iter().map(|o| o.target).collect();
     assert_eq!(
         targets,

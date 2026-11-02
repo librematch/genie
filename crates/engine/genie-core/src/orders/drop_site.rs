@@ -20,6 +20,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::orders::Dispatch;
 use crate::orders::object_gone;
 use crate::orders::{HUNTED_LOADS, NO_POINT, Work, nearest_table_site};
 use crate::players::Amount;
@@ -28,6 +29,7 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
 use crate::world::Seconds;
@@ -301,7 +303,7 @@ impl World {
                 ready: true,
                 target_type: Some(OrderTargetType::of_master(master)),
             };
-            let _ = ai.queue_order(state, order, false, false)?;
+            let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
         }
         Ok(())
     }
@@ -372,7 +374,7 @@ impl World {
                 ready: true,
                 target_type,
             },
-            true,
+            QueueEnd::Front,
         );
         Ok(())
     }

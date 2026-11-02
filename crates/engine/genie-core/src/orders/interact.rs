@@ -13,12 +13,14 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::MOVING;
+use crate::orders::Dispatch;
 use crate::orders::{
     Interact, LISTED, MoveOrder, Place, Split, Work, grid_point, ignore_unit, offset_point,
     readiness, set_differentiator_groups,
 };
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -166,7 +168,7 @@ impl World {
             .unit_ai
             .get_mut(unit.id)
             .ok_or(GenieError::unreachable("unreachable: no unit AI"))?;
-        let _ = ai.queue_order(state, queued, false, false)?;
+        let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
         if !order.queued && !order.direct {
             readiness(&mut ai.orders, true);
             // the pass's tail: the unit's stop (its slot 0x148)

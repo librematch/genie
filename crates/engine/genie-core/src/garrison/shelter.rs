@@ -34,6 +34,7 @@ use crate::orders::{GARRISON, Work};
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
@@ -426,7 +427,7 @@ impl World {
                     .unit_ai
                     .get_mut(self.players.live(p, idx)?.id)
                     .ok_or(NO_UNIT_AI)?;
-                let _ = ai.queue_order(state, order, false, false)?;
+                let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
                 continue;
             }
             let work = Work {

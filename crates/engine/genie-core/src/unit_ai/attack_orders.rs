@@ -14,6 +14,7 @@ use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
@@ -60,9 +61,9 @@ impl UnitAi {
                 ready: order.ready,
                 target_type: self.target_class.and_then(OrderTargetType::of_class),
             };
-            self.insert_order(kept, true);
+            self.insert_order(kept, QueueEnd::Front);
         }
-        self.insert_order(order, true);
+        self.insert_order(order, QueueEnd::Front);
         if order.order != OrderKind::AttackRoundup {
             self.remove_target();
             self.stop_with(StopOrder::Keep, place, side, ai)?;
@@ -78,12 +79,12 @@ impl UnitAi {
         Ok(())
     }
 
-    /// `FUN_140c42640`: an order joins the queue, in front of the first when `in_front` and the
-    /// queue holds one, else after the last. A full queue doubles its capacity first, its new
+    /// `FUN_140c42640`: an order joins the queue at its `end`: in front of the first at
+    /// [`QueueEnd::Front`] when the queue holds one, else after the last. A full queue doubles its capacity first, its new
     /// records filled with a stop order (`0x2c2`) to nothing (Vec's own growth here); a failed
     /// allocation, the routine's only other way out, cannot happen (`operator new` throws).
-    pub(crate) fn insert_order(&mut self, order: QueuedOrder, in_front: bool) {
-        if in_front && !self.orders.is_empty() {
+    pub(crate) fn insert_order(&mut self, order: QueuedOrder, end: QueueEnd) {
+        if end == QueueEnd::Front && !self.orders.is_empty() {
             self.orders.insert(0, order);
         } else {
             self.orders.push(order);
