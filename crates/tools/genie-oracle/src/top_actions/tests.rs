@@ -987,7 +987,8 @@ fn enter(b: RgeAction) -> Action {
 #[test]
 fn an_enter_takes_its_task_and_retry() {
     use genie_core::garrison::{ENTER, EnterState};
-    let mut b = base(EnterState::Done.get());
+    let walking = EnterState::Walk { move_to: None };
+    let mut b = base(walking.get());
     b.short_val = 1;
     let e = imported(ENTER, enter(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
@@ -995,10 +996,10 @@ fn an_enter_takes_its_task_and_retry() {
         .enter()
         .copied()
         .unwrap();
-    let m = e.move_to.unwrap();
+    let m = e.state.move_to().copied().unwrap();
     assert_eq!(
-        (e.state, m.state, m.quiet, e.task_class),
-        (EnterState::Done, MoveTo::Moving, true, Some(class_id(3)))
+        (e.state.bare(), m.state, m.quiet, e.task_class),
+        (walking, MoveTo::Moving, true, Some(class_id(3)))
     );
     assert!(e.retry);
     assert_eq!(
@@ -1021,6 +1022,16 @@ fn an_enter_takes_its_task_and_retry() {
         imported(ENTER, enter(base(7))).unwrap_err(),
         GenieError::unsupported("a saved Enter in a state the slice does not model")
     );
+    // a MoveTo belongs to a walk: in any other state it is no state of the game
+    let done = with_sub(base(EnterState::Done.get()), MOVE_TO, move_to(4, 0.5));
+    let stray = imported(ENTER, enter(done)).unwrap_err();
+    assert_eq!(
+        (stray.kind(), stray.reason()),
+        (
+            genie_core::ErrorKind::InvalidInput,
+            "a MoveTo of an Enter that does not walk"
+        )
+    );
     assert_eq!(
         imported(ENTER, explore(base(EnterState::Done.get()))).unwrap_err(),
         GenieError::unsupported("a saved Enter without its own part")
@@ -1034,20 +1045,21 @@ fn transport_takes_its_base_alone() {
         rge_action_transport: Some(Box::new(b)),
         ..Action::default()
     };
+    let sailing = TransportState::Sail { move_to: None };
     let t = imported(
         TRANSPORT,
-        transport(with_sub(base(2), MOVE_TO, move_to(4, 0.5))),
+        transport(with_sub(base(sailing.get()), MOVE_TO, move_to(4, 0.5))),
     )
     .unwrap()
     .list
     .transport()
     .copied()
     .unwrap();
-    let m = t.move_to.unwrap();
+    let m = t.state.move_to().copied().unwrap();
     assert_eq!(
-        (t.state, t.mode, m.state, m.quiet),
+        (t.state.bare(), t.mode, m.state, m.quiet),
         (
-            TransportState::Idle,
+            sailing,
             genie_core::garrison::transport::TransportMode::NEW,
             MoveTo::Moving,
             true
@@ -1065,6 +1077,19 @@ fn transport_takes_its_base_alone() {
         )
         .unwrap_err(),
         GenieError::unreachable("a saved Transport with another sub-action")
+    );
+    // a MoveTo belongs to a sail: an idle Transport's is no state of the game
+    let idle = imported(
+        TRANSPORT,
+        transport(with_sub(base(2), MOVE_TO, move_to(4, 0.5))),
+    )
+    .unwrap_err();
+    assert_eq!(
+        (idle.kind(), idle.reason()),
+        (
+            genie_core::ErrorKind::InvalidInput,
+            "a MoveTo of a Transport that does not sail"
+        )
     );
 }
 

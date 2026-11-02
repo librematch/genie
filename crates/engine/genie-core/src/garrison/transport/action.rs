@@ -51,7 +51,6 @@ impl TransportAction {
             state: TransportState::New,
             mode: TransportMode::NEW,
             point: at,
-            move_to: None,
             retarget: false,
             task,
         }
@@ -76,7 +75,7 @@ impl TransportAction {
             && crate::math::fmath::at_most_or_unordered(0.0, y);
         self.set_state(
             if sails {
-                TransportState::Sail
+                TransportState::Sail { move_to: None }
             } else {
                 TransportState::Idle
             },
@@ -105,21 +104,24 @@ impl TransportAction {
         shore: &mut impl Shore,
     ) -> Result<Changed, GenieError> {
         let mut changed = Changed {
-            stopped: self.move_to.take().is_some(),
+            stopped: self.state.take_move_to().is_some(),
             stands: false,
         };
-        self.state = state;
-        match state {
+        self.state = state.bare();
+        match self.state {
             TransportState::Idle => changed.stands = true,
-            TransportState::SailToUnload | TransportState::Sail => {
+            TransportState::SailToUnload { .. } | TransportState::Sail { .. } => {
                 if let Some(shore_at) =
                     shore.shore_point(ship.position.ground(), self.point.ground())?
                 {
                     self.point = self.point.with_x(shore_at.x()).with_y(shore_at.y());
                 }
-                self.move_to =
-                    ship.walk
-                        .to_point(self.point, Distance::new(MOVE_RANGE), ship.given)?;
+                let sail = ship
+                    .walk
+                    .to_point(self.point, Distance::new(MOVE_RANGE), ship.given)?;
+                if let Some(move_to) = self.state.walk_mut() {
+                    *move_to = sail;
+                }
             }
             _ => {}
         }
@@ -142,7 +144,7 @@ impl TransportAction {
     ) -> Result<Changed, GenieError> {
         self.point = point;
         self.mode = TransportMode::MOVE;
-        self.set_state(TransportState::Sail, ship, shore)
+        self.set_state(TransportState::Sail { move_to: None }, ship, shore)
     }
 
     /// Slot 7 (`FUN_140aa4620`), the stop: `set_state(2)`.
@@ -191,9 +193,9 @@ impl TransportAction {
         {
             return Ok(Changed::default());
         } else if by_self {
-            TransportState::SailToUnload
+            TransportState::SailToUnload { move_to: None }
         } else {
-            TransportState::Sail
+            TransportState::Sail { move_to: None }
         };
         self.point = point;
         self.set_state(state, ship, shore)
@@ -298,10 +300,10 @@ impl TransportAction {
     ) -> Result<Updated, GenieError> {
         let (changed, code) = match self.state {
             TransportState::Done => return Ok(Updated::Code(UpdateCode::DONE)),
-            TransportState::SailToUnload | TransportState::Sail
+            TransportState::SailToUnload { .. } | TransportState::Sail { .. }
                 if (1..=5).contains(&walked.get()) =>
             {
-                let next = if self.state == TransportState::Sail {
+                let next = if matches!(self.state, TransportState::Sail { .. }) {
                     TransportState::Idle
                 } else {
                     TransportState::Unload
@@ -410,7 +412,7 @@ impl TransportAction {
         unit: &mut Unit,
         me: Me,
     ) -> Result<UpdateCode, GenieError> {
-        let Some(state) = self.move_to.as_ref().map(|m| m.state) else {
+        let Some(state) = self.state.move_to().map(|m| m.state) else {
             return Ok(UpdateCode::DONE);
         };
         let start = state == MoveTo::Start;
@@ -428,7 +430,11 @@ impl TransportAction {
             ask,
             ..ListUpdate::default()
         };
-        let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
+        let code = match self.state.walk_mut() {
+            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            // a state that does not sail has no sub-action: its list's update is the empty one's
+            None => update_sub_actions(&mut None, c, unit, me, how)?,
+        };
         if walks {
             unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }

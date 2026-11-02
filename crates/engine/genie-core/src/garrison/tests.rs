@@ -295,8 +295,11 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
         Ok(Walking::Walk(None))
     );
     assert_eq!(
-        (far.state, far.move_to.map(|m| m.state)),
-        (EnterState::Walk, Some(MoveTo::Start))
+        (
+            far.state.bare(),
+            far.state.move_to().copied().map(|m| m.state)
+        ),
+        (EnterState::Walk { move_to: None }, Some(MoveTo::Start))
     );
     // within ARRIVED of its footprint the MoveTo starts arrived (state 1)
     let mut close = EnterAction::new(
@@ -308,7 +311,10 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
         t.enter_walk_again(PlayerId::new(1), v, &mut close, &tc, start(Distance::ZERO)),
         Ok(Walking::Walk(None))
     );
-    assert_eq!(close.move_to.map(|m| m.state), Some(MoveTo::Arrived));
+    assert_eq!(
+        close.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Arrived)
+    );
     // 10049 of update 4409 stands within the task's range: it enters at once
     let mut near = EnterAction::new(
         ContainerId::new(object_id(100)),
@@ -329,7 +335,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
         ),
         Ok(Walking::Enter)
     );
-    assert_eq!(near.move_to, None);
+    assert_eq!(near.state.move_to().copied(), None);
     // the reach is the footprints' squared gap against the range squared (COMISS/JBE: a NaN
     // gap is in); a target with speed within a range of 1 (COMISS/JC: a NaN range is not
     // tested) asks the tiles about the two: on a walled map a reach that skips them is in
@@ -436,7 +442,10 @@ fn an_enter_of_unit_without_speed_starts_failed_beyond_arrived() {
         ),
         Ok(Walking::Walk(None))
     );
-    assert_eq!(e.move_to.map(|m| m.state), Some(MoveTo::Failed));
+    assert_eq!(
+        e.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Failed)
+    );
 }
 
 #[test]
@@ -468,7 +477,7 @@ fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
         Ok(Walking::Walk(Some(Position::new(5.5, 17.5, 0.25))))
     );
     assert_eq!(
-        (enter.point, enter.move_to.map(|m| m.state)),
+        (enter.point, enter.state.move_to().copied().map(|m| m.state)),
         (Position::new(5.5, 17.5, 0.0), Some(MoveTo::Start))
     );
     assert_eq!(enter.walk_range(false), Distance::ZERO);
@@ -537,7 +546,7 @@ fn ship_enter(point: Position, state: MoveTo) -> EnterAction {
     )
     .walking(state);
     // a transport's MoveTo walks to it within 0
-    if let Some(m) = e.move_to.as_mut() {
+    if let Some(m) = e.state.walk_mut().and_then(Option::as_mut) {
         m.range = Distance::ZERO;
     }
     e
@@ -605,8 +614,11 @@ fn transport_that_moved_off_the_point_makes_the_enter_walk_again() {
     assert_eq!(ship_goal(&t), Some(Position::new(5.5, 17.5, 0.0)));
     let e = enter_of(&t);
     assert_eq!(
-        (e.state, e.point),
-        (EnterState::Walk, Position::new(5.5, 17.5, 0.0))
+        (e.state.bare(), e.point),
+        (
+            EnterState::Walk { move_to: None },
+            Position::new(5.5, 17.5, 0.0)
+        )
     );
     // within half a tile on each axis it does not walk again, and a NaN is not off: code 1
     // out of reach waits (set_state(2))
@@ -620,7 +632,7 @@ fn transport_that_moved_off_the_point_makes_the_enter_walk_again() {
         assert_eq!(ship_goal(&t), None);
         let e = enter_of(&t);
         assert_eq!(
-            (e.state, e.timer, e.move_to),
+            (e.state.bare(), e.timer, e.state.move_to().copied()),
             (EnterState::Wait, Seconds::new(1.0), None)
         );
     }
@@ -643,7 +655,7 @@ fn transport_that_moved_off_the_point_makes_the_enter_walk_again() {
 #[test]
 fn an_enter_waiting_move_to_asks_again_at_its_delay() {
     let mut e = ship_enter(Position::new(5.5, 30.5, 0.0), MoveTo::Waiting);
-    if let Some(m) = e.move_to.as_mut() {
+    if let Some(m) = e.state.walk_mut().and_then(Option::as_mut) {
         m.wait = crate::movement::move_to::MoveWait {
             state: MoveWaitState::Waiting,
             timer: Seconds::ZERO,
@@ -654,8 +666,14 @@ fn an_enter_waiting_move_to_asks_again_at_its_delay() {
     assert_eq!(enter_update(&mut t, 500), Ok(HeadCode::Keeps));
     let e = enter_of(&t);
     assert_eq!(
-        (e.state, e.move_to.map(|m| (m.state, m.wait.timer))),
-        (EnterState::Walk, Some((MoveTo::Waiting, Seconds::new(0.5))))
+        (
+            e.state.bare(),
+            e.state.move_to().copied().map(|m| (m.state, m.wait.timer))
+        ),
+        (
+            EnterState::Walk { move_to: None },
+            Some((MoveTo::Waiting, Seconds::new(0.5)))
+        )
     );
     t.parts
         .actions
@@ -664,15 +682,16 @@ fn an_enter_waiting_move_to_asks_again_at_its_delay() {
         .list
         .enter_mut()
         .unwrap()
-        .move_to
-        .as_mut()
+        .state
+        .walk_mut()
+        .and_then(Option::as_mut)
         .unwrap()
         .wait
         .timer = Seconds::new(1.0);
     assert_eq!(enter_update(&mut t, 500), Ok(HeadCode::Keeps));
     let e = enter_of(&t);
     assert_eq!(
-        e.move_to.map(|m| (m.state, m.wait.timer)),
+        e.state.move_to().copied().map(|m| (m.state, m.wait.timer)),
         Some((MoveTo::Start, Seconds::ZERO))
     );
 }
@@ -725,8 +744,16 @@ fn failed_move_walks_again_once_then_waits_and_wait_walks_again() {
     assert_eq!(enter_update(&mut t, 500), Ok(HeadCode::Keeps));
     let e = enter_of(&t);
     assert_eq!(
-        (e.retry, e.move_to.map(|m| m.state), e.state),
-        (false, Some(MoveTo::Start), EnterState::Walk)
+        (
+            e.retry,
+            e.state.move_to().copied().map(|m| m.state),
+            e.state.bare()
+        ),
+        (
+            false,
+            Some(MoveTo::Start),
+            EnterState::Walk { move_to: None }
+        )
     );
     t.parts
         .actions
@@ -735,27 +762,28 @@ fn failed_move_walks_again_once_then_waits_and_wait_walks_again() {
         .list
         .enter_mut()
         .unwrap()
-        .move_to
-        .as_mut()
+        .state
+        .walk_mut()
+        .and_then(Option::as_mut)
         .unwrap()
         .state = MoveTo::Failed;
     assert_eq!(enter_update(&mut t, 500), Ok(HeadCode::Keeps));
     let e = enter_of(&t);
     assert_eq!(
-        (e.state, e.move_to, e.timer),
+        (e.state.bare(), e.state.move_to().copied(), e.timer),
         (EnterState::Wait, None, Seconds::new(1.0))
     );
     // the wait counts down by dt (0.5): at 0 it walks again
     assert_eq!(enter_update(&mut t, 500), Ok(HeadCode::Keeps));
     assert_eq!(
-        (enter_of(&t).state, enter_of(&t).timer),
+        (enter_of(&t).state.bare(), enter_of(&t).timer),
         (EnterState::Wait, Seconds::new(0.5))
     );
     assert_eq!(enter_update(&mut t, 500), Ok(HeadCode::Keeps));
     let e = enter_of(&t);
     assert_eq!(
-        (e.state, e.move_to.map(|m| m.state)),
-        (EnterState::Walk, Some(MoveTo::Start))
+        (e.state.bare(), e.state.move_to().copied().map(|m| m.state)),
+        (EnterState::Walk { move_to: None }, Some(MoveTo::Start))
     );
 }
 
@@ -2696,13 +2724,13 @@ fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
         (
             enter.target,
             enter.point,
-            enter.state,
-            enter.move_to.map(|m| m.state)
+            enter.state.bare(),
+            enter.state.move_to().copied().map(|m| m.state)
         ),
         (
             Some(container_id(200)),
             Position::new(5.5, 17.5, 0.0),
-            EnterState::Walk,
+            EnterState::Walk { move_to: None },
             Some(MoveTo::Start)
         )
     );
@@ -2753,7 +2781,7 @@ fn villager_meets_moving_ship_where_it_goes() {
         .copied()
         .unwrap();
     assert_eq!(
-        (enter.point, enter.move_to.map(|m| m.state)),
+        (enter.point, enter.state.move_to().copied().map(|m| m.state)),
         (Position::new(9.5, 19.5, 0.0), Some(MoveTo::Start))
     );
     assert_eq!(
@@ -2805,9 +2833,10 @@ fn villager_meets_sailing_transport_where_it_sails() {
         .unwrap()
         .list
         .set_transport(Some(transport::TransportAction {
-            state: TransportState::Sail,
+            state: TransportState::Sail {
+                move_to: Some(MoveToAction::sub_in(MoveTo::Start)),
+            },
             point: Position::new(9.5, 19.5, 0.0),
-            move_to: Some(MoveToAction::sub_in(MoveTo::Start)),
             ..transport::TransportAction::new(Position::new(5.5, 30.5, 0.0))
         }));
     t.garrison_order(
@@ -2826,7 +2855,7 @@ fn villager_meets_sailing_transport_where_it_sails() {
         .copied()
         .unwrap();
     assert_eq!(
-        (enter.point, enter.move_to.map(|m| m.state)),
+        (enter.point, enter.state.move_to().copied().map(|m| m.state)),
         (Position::new(9.5, 19.5, 0.0), Some(MoveTo::Start))
     );
 }
@@ -2962,14 +2991,14 @@ fn an_unload_command_sends_transport_toward_the_shore() {
         .expect("the Transport");
     assert_eq!(
         (
-            tr.state,
+            tr.state.bare(),
             tr.mode,
             tr.point,
-            tr.move_to.map(|m| m.state),
+            tr.state.move_to().copied().map(|m| m.state),
             tr.retarget
         ),
         (
-            TransportState::SailToUnload,
+            TransportState::SailToUnload { move_to: None },
             TransportMode::WORK,
             Position::new(14.5, 10.5, 0.0),
             Some(MoveTo::Start),
@@ -3008,7 +3037,10 @@ fn an_unload_command_sends_transport_toward_the_shore() {
         .transport()
         .copied()
         .unwrap();
-    assert_eq!((again.state, again.point), (tr.state, tr.point));
+    assert_eq!(
+        (again.state.bare(), again.point),
+        (tr.state.bare(), tr.point)
+    );
     // slot 0x3a8 with the Transport on top: "Telling existing action to work" at the ship's
     // own place, whose zone lies under the ship: it unloads there (set_state(6)), its MoveTo
     // gone
@@ -3023,7 +3055,7 @@ fn an_unload_command_sends_transport_toward_the_shore() {
         .copied()
         .unwrap();
     assert_eq!(
-        (tr.state, tr.point, tr.move_to),
+        (tr.state.bare(), tr.point, tr.state.move_to().copied()),
         (TransportState::Unload, Position::new(10.5, 10.5, 0.0), None)
     );
 }
@@ -3094,14 +3126,14 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
         .expect("the Transport");
     assert_eq!(
         (
-            tr.state,
+            tr.state.bare(),
             tr.mode,
             tr.task,
             tr.point,
-            tr.move_to.map(|m| m.state)
+            tr.state.move_to().copied().map(|m| m.state)
         ),
         (
-            TransportState::Sail,
+            TransportState::Sail { move_to: None },
             TransportMode::NEW,
             Some(TaskId::test(7)),
             Position::new(14.5, 10.5, 0.0),
@@ -3131,8 +3163,12 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
         .copied()
         .unwrap();
     assert_eq!(
-        (again.state, again.mode, again.task),
-        (TransportState::Sail, TransportMode::WORK, tr.task)
+        (again.state.bare(), again.mode, again.task),
+        (
+            TransportState::Sail { move_to: None },
+            TransportMode::WORK,
+            tr.task
+        )
     );
     // water: no task, no Transport
     let (mut t, idx) = transport_task_world();
@@ -3234,7 +3270,7 @@ fn transport_beside_the_shore_puts_its_units_ashore() {
         .copied()
         .unwrap();
     assert_eq!(
-        (tr.state, tr.point, tr.move_to),
+        (tr.state.bare(), tr.point, tr.state.move_to().copied()),
         (TransportState::Unload, Position::new(15.5, 10.5, 0.0), None)
     );
     let spot = ashore(&mut t, Point::new(14.5, 10.5), 0.5);
@@ -3255,7 +3291,7 @@ fn transport_beside_the_shore_puts_its_units_ashore() {
             .actions_of(object_id(200))
             .list
             .transport()
-            .map(|t| t.state),
+            .map(|t| t.state.bare()),
         Some(TransportState::Idle)
     );
     // a move to a point: the idle Transport takes it (its slot 8, 0x140aa3e40) and sails
@@ -3273,14 +3309,14 @@ fn transport_beside_the_shore_puts_its_units_ashore() {
     assert!(taken);
     assert_eq!(
         (
-            tr.state,
+            tr.state.bare(),
             tr.mode,
             tr.point,
-            tr.move_to.map(|m| m.state),
+            tr.state.move_to().copied().map(|m| m.state),
             t.parts.actions_of(object_id(200)).list.move_to().copied()
         ),
         (
-            TransportState::Sail,
+            TransportState::Sail { move_to: None },
             TransportMode::MOVE,
             Position::new(5.5, 5.5, 0.0),
             Some(MoveTo::Start),
@@ -3326,10 +3362,16 @@ fn transport_without_drop_location_sails_on_to_new_point() {
         .copied()
         .unwrap();
     assert!(tr.retarget);
-    assert_eq!(tr.state, TransportState::SailToUnload);
+    assert_eq!(
+        tr.state.bare(),
+        TransportState::SailToUnload { move_to: None }
+    );
     if 15.0 <= x {
         // the first draw is on land: the MoveTo's point is the shore on the way to it
-        assert_eq!(tr.move_to.map(|m| m.state), Some(MoveTo::Start));
+        assert_eq!(
+            tr.state.move_to().copied().map(|m| m.state),
+            Some(MoveTo::Start)
+        );
         assert!(tr.point.x() < 15.0, "{:?} from ({x}, {y})", tr.point);
     }
 }
@@ -3887,7 +3929,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
             .actions_of(object_id(200))
             .list
             .transport()
-            .map(|t| t.state),
+            .map(|t| t.state.bare()),
         Some(TransportState::Idle)
     );
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
@@ -3925,13 +3967,19 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
         .copied()
         .unwrap();
     assert_eq!(
-        (tr.state, tr.move_to.map(|m| m.state)),
-        (TransportState::SailToUnload, Some(MoveTo::Moving))
+        (
+            tr.state.bare(),
+            tr.state.move_to().copied().map(|m| m.state)
+        ),
+        (
+            TransportState::SailToUnload { move_to: None },
+            Some(MoveTo::Moving)
+        )
     );
     // an unload far from the point's land cannot unload: the owner hears it (a human's
     // interface only) and the Transport idles with the villager inside
     let far = |tr: &mut transport::TransportAction| {
-        (tr.state, tr.move_to, tr.retarget) = (TransportState::Unload, None, false);
+        (tr.state, tr.retarget) = (TransportState::Unload, false);
         tr.point = Position::new(17.5, 10.5, 0.0);
     };
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), far);
@@ -3942,7 +3990,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
         .transport()
         .copied()
         .unwrap();
-    assert_eq!(tr.state, TransportState::Idle);
+    assert_eq!(tr.state.bare(), TransportState::Idle);
     assert_eq!(
         t.object(object_id(1000)).unwrap().1.life.inside,
         Some(container_id(200))
@@ -3980,7 +4028,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
     // the list holds the Transport as the update left it before the error (idle), which the
     // stop's context reads
     let tr = t.parts.actions_of(object_id(200)).list.transport().copied();
-    assert_eq!(tr.map(|tr| tr.state), Some(TransportState::Idle));
+    assert_eq!(tr.map(|tr| tr.state.bare()), Some(TransportState::Idle));
     let done = |tr: &mut transport::TransportAction| tr.state = TransportState::Done;
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), done);
     let ship = t.object(object_id(200)).unwrap().1;
@@ -4302,7 +4350,10 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
 
 /// A quiet `MoveTo` to ship 200 in `state`.
 fn enter_of_move(state: MoveTo) -> Option<MoveToAction> {
-    ship_enter(Position::new(5.5, 30.5, 0.0), state).move_to
+    ship_enter(Position::new(5.5, 30.5, 0.0), state)
+        .state
+        .move_to()
+        .copied()
 }
 
 /// Object `value` as a container.

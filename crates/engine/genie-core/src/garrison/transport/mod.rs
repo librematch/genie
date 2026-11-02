@@ -22,7 +22,7 @@ use crate::map::Position;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
-use crate::movement::move_to::{MoveDefaults, MoveToAction, MoveToReads};
+use crate::movement::move_to::{MoveDefaults, MoveToReads};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ActionType;
@@ -87,15 +87,14 @@ pub const STACK_PLACE: GenieError =
 /// A unit's Transport action.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct TransportAction {
-    /// The action state (`+0x18`), which word 9 adds.
+    /// The action state (`+0x18`), which word 9 adds, with its sail's `MoveTo` sub-action to
+    /// the point within [`MOVE_RANGE`]: quiet, with the sprite [`Ship::given`] (`set_state` 4
+    /// and 11).
     pub state: TransportState,
     /// `+0x34` (the base's `+0x30` pair's second): how it was last ordered.
     pub mode: TransportMode,
     /// `+0x38`..`+0x40`: where it sails or unloads; x [`NONE`] for nowhere.
     pub point: Position,
-    /// Its `MoveTo` sub-action to the point within [`MOVE_RANGE`]: quiet, with the sprite
-    /// [`Ship::given`] (`set_state` 4 and 11).
-    pub move_to: Option<MoveToAction>,
     /// `+0x68`: the unload found no drop location and the action sails to a new point.
     pub retarget: bool,
     /// `+0x48`: the task it works on, none from the unload command (the work command's

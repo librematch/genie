@@ -142,7 +142,7 @@ impl Artifact {
         let walked = self.move_to.take().is_some();
         let enter = self.enter.take();
         SubActionsGone {
-            stops: walked || enter.is_some_and(|e| e.move_to.is_some()),
+            stops: walked || enter.is_some_and(|e| e.state.move_to().is_some()),
             released: enter.and_then(|e| e.target).map(ContainerId::id),
         }
     }
@@ -804,7 +804,7 @@ mod tests {
             gone(true, Some(object_id(7934)))
         );
         assert_eq!(
-            a.enter.map(|e| (e.target, e.move_to)),
+            a.enter.map(|e| (e.target, e.state.move_to().copied())),
             Some((Some(ContainerId::new(object_id(7934))), None))
         );
         // an Enter not walking only lets its target go

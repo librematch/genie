@@ -147,7 +147,7 @@ fn run_on(
     ),
     computer: bool,
 ) -> Result<Updated, GenieError> {
-    let walked = match t.move_to.map(|m| m.state) {
+    let walked = match t.state.move_to().copied().map(|m| m.state) {
         Some(MoveTo::Failed) => UpdateCode::FAILED,
         Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => UpdateCode::UNDER_WAY,
         None | Some(MoveTo::Arrived) => UpdateCode::DONE,
@@ -206,7 +206,7 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     let mut c = coast(true);
     let mut t = TransportAction::new(s.position);
     assert_eq!(
-        (t.state, t.mode, t.retarget),
+        (t.state.bare(), t.mode, t.retarget),
         (TransportState::New, TransportMode::NEW, false)
     );
     // the list's add (first_in_stack with 1): set_state(11), its MoveTo to the shore point
@@ -214,21 +214,24 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     let changed = t.start(true, &s, &mut c).unwrap();
     assert_eq!(changed, Changed::default());
     assert_eq!(
-        (t.state, t.move_to.map(|m| m.state)),
-        (TransportState::Sail, Some(MoveTo::Start))
+        (t.state.bare(), t.state.move_to().copied().map(|m| m.state)),
+        (TransportState::Sail { move_to: None }, Some(MoveTo::Start))
     );
     assert_eq!(c.asked, [(Point::new(12.5, 8.5), Point::new(12.5, 8.5))]);
     // a NaN point sails too (COMISS/JA, JBE)
     let mut nan = TransportAction::new(Position::new(f32::NAN, 1.0, 0.0));
     let _ = nan.start(true, &s, &mut c).unwrap();
-    assert_eq!(nan.state, TransportState::Sail);
+    assert_eq!(nan.state.bare(), TransportState::Sail { move_to: None });
     // below 0, or not first: idle with the standing sprite
     let mut off = TransportAction::new(Position::new(3.0, -1.0, 0.0));
     assert!(off.start(true, &s, &mut c).unwrap().stands);
-    assert_eq!((off.state, off.move_to), (TransportState::Idle, None));
+    assert_eq!(
+        (off.state.bare(), off.state.move_to().copied()),
+        (TransportState::Idle, None)
+    );
     let mut later = TransportAction::new(s.position);
     let _ = later.start(false, &s, &mut c).unwrap();
-    assert_eq!(later.state, TransportState::Idle);
+    assert_eq!(later.state.bare(), TransportState::Idle);
 }
 
 #[test]
@@ -241,11 +244,14 @@ fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
     t.point = Position::new(25.0, 8.0, 0.0);
     // set_state(4) again: the old MoveTo's teardown stops the unit, the new one starts
     let changed = t
-        .set_state(TransportState::SailToUnload, &s, &mut c)
+        .set_state(TransportState::SailToUnload { move_to: None }, &s, &mut c)
         .unwrap();
     assert!(changed.stopped && !changed.stands);
     assert_eq!(t.point, Position::new(19.5, 8.5, 0.0));
-    assert_eq!(t.move_to.map(|m| m.state), Some(MoveTo::Start));
+    assert_eq!(
+        t.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Start)
+    );
     assert_eq!(c.asked[1], (Point::new(12.5, 8.5), Point::new(25.0, 8.0)));
     // a unit without speed: its quiet MoveTo fails at its start
     let still = Ship {
@@ -255,8 +261,13 @@ fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
         },
         ..s
     };
-    let _ = t.set_state(TransportState::Sail, &still, &mut c).unwrap();
-    assert_eq!(t.move_to.map(|m| m.state), Some(MoveTo::Failed));
+    let _ = t
+        .set_state(TransportState::Sail { move_to: None }, &still, &mut c)
+        .unwrap();
+    assert_eq!(
+        t.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Failed)
+    );
     // a unit in state 3 or later adds no MoveTo (`FUN_140a977e0`)
     let dying = Ship {
         walk: MoveToReads {
@@ -265,8 +276,10 @@ fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
         },
         ..s
     };
-    let _ = t.set_state(TransportState::Sail, &dying, &mut c).unwrap();
-    assert_eq!(t.move_to, None);
+    let _ = t
+        .set_state(TransportState::Sail { move_to: None }, &dying, &mut c)
+        .unwrap();
+    assert_eq!(t.state.move_to().copied(), None);
 }
 
 #[test]
@@ -284,9 +297,14 @@ fn move_sails_to_its_point_and_stop_idles() {
         .unwrap();
     assert_eq!(changed, Changed::default());
     assert_eq!(
-        (t.state, t.mode, t.point, t.move_to.map(|m| m.state)),
         (
-            TransportState::Sail,
+            t.state.bare(),
+            t.mode,
+            t.point,
+            t.state.move_to().copied().map(|m| m.state)
+        ),
+        (
+            TransportState::Sail { move_to: None },
             TransportMode::MOVE,
             Position::new(19.5, 8.5, 2.0),
             Some(MoveTo::Start)
@@ -295,7 +313,10 @@ fn move_sails_to_its_point_and_stop_idles() {
     assert_eq!(c.asked, [(Point::new(12.5, 8.5), Point::new(25.0, 8.0))]);
     let stopped = t.stop(&s, &mut c).unwrap();
     assert!(stopped.stopped && stopped.stands);
-    assert_eq!((t.state, t.move_to), (TransportState::Idle, None));
+    assert_eq!(
+        (t.state.bare(), t.state.move_to().copied()),
+        (TransportState::Idle, None)
+    );
 }
 
 #[test]
@@ -308,7 +329,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         .work(Position::new(15.0, 8.5, 1.0), true, &s, &mut c)
         .unwrap();
     assert_eq!(
-        (t.state, t.mode, t.point),
+        (t.state.bare(), t.mode, t.point),
         (
             TransportState::Unload,
             TransportMode::WORK,
@@ -321,21 +342,27 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         .work(Position::new(15.1, 8.5, 1.0), true, &s, &mut c)
         .unwrap();
     assert_eq!(
-        (t.state, t.point),
-        (TransportState::SailToUnload, Position::new(15.1, 8.5, 1.0))
+        (t.state.bare(), t.point),
+        (
+            TransportState::SailToUnload { move_to: None },
+            Position::new(15.1, 8.5, 1.0)
+        )
     );
     let mut t = TransportAction::new(s.position);
     let _ = t
         .work(Position::new(15.1, 8.5, 1.0), false, &s, &mut c)
         .unwrap();
-    assert_eq!(t.state, TransportState::Sail);
+    assert_eq!(t.state.bare(), TransportState::Sail { move_to: None });
     // not near the zone: sail
     let mut far = coast(false);
     let mut t = TransportAction::new(s.position);
     let _ = t
         .work(Position::new(13.0, 8.5, 0.0), true, &s, &mut far)
         .unwrap();
-    assert_eq!(t.state, TransportState::SailToUnload);
+    assert_eq!(
+        t.state.bare(),
+        TransportState::SailToUnload { move_to: None }
+    );
     // a point below 0 or NaN far away changes nothing but +0x34
     for bad in [
         Position::new(-1.0, 3.0, 0.0),
@@ -344,7 +371,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         let mut t = TransportAction::new(s.position);
         assert_eq!(t.work(bad, true, &s, &mut far).unwrap(), Changed::default());
         assert_eq!(
-            (t.state, t.mode, t.point),
+            (t.state.bare(), t.mode, t.point),
             (TransportState::New, TransportMode::WORK, s.position)
         );
     }
@@ -357,7 +384,10 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let _ = t
         .work(Position::new(12.5, 8.5, 0.0), true, &nan_ship, &mut c)
         .unwrap();
-    assert_eq!(t.state, TransportState::SailToUnload);
+    assert_eq!(
+        t.state.bare(),
+        TransportState::SailToUnload { move_to: None }
+    );
 }
 
 #[test]
@@ -454,10 +484,10 @@ fn an_unload_beside_the_shore_is_the_caller_then_idles_unless_it_sails_on() {
     assert!(t.unloaded(&s, &mut c).unwrap().stands);
     assert_eq!(t.state, TransportState::Idle);
     // a retarget's set_state(4) stays
-    t.state = TransportState::SailToUnload;
+    t.state = TransportState::SailToUnload { move_to: None };
     t.retarget = true;
     assert_eq!(t.unloaded(&s, &mut c), Ok(Changed::default()));
-    assert_eq!(t.state, TransportState::SailToUnload);
+    assert_eq!(t.state, TransportState::SailToUnload { move_to: None });
 }
 
 #[test]
@@ -466,7 +496,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let mut c = coast(true);
     // state 4 without a MoveTo: the list answers 1, so it unloads
     let mut t = TransportAction {
-        state: TransportState::SailToUnload,
+        state: TransportState::SailToUnload { move_to: None },
         ..TransportAction::new(s.position)
     };
     assert_eq!(
@@ -476,8 +506,9 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     assert_eq!(t.state, TransportState::Unload);
     // state 11 with an ended MoveTo: idle, the MoveTo gone (its teardown stops the unit)
     let mut t = TransportAction {
-        state: TransportState::Sail,
-        move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
+        state: TransportState::Sail {
+            move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
+        },
         ..TransportAction::new(s.position)
     };
     let (
@@ -490,8 +521,9 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     assert!(stopped && stands);
     // a failed MoveTo (code 3) ends a sail to unload too
     let mut t = TransportAction {
-        state: TransportState::SailToUnload,
-        move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
+        state: TransportState::SailToUnload {
+            move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
+        },
         ..TransportAction::new(s.position)
     };
     let _ = run(&mut t, &s, &mut c);
@@ -560,14 +592,16 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     };
     // its MoveTo to the point with the sprite its maker resolved
     let sailing = |state: Option<MoveTo>| TransportAction {
-        move_to: state.map(|state| MoveToAction {
-            state,
-            ..MoveToAction::sub_to_point(
-                Position::new(35.5, 88.5, 0.0),
-                Distance::new(MOVE_RANGE),
-                Some(graphic),
-            )
-        }),
+        state: TransportState::Sail {
+            move_to: state.map(|state| MoveToAction {
+                state,
+                ..MoveToAction::sub_to_point(
+                    Position::new(35.5, 88.5, 0.0),
+                    Distance::new(MOVE_RANGE),
+                    Some(graphic),
+                )
+            }),
+        },
         point: Position::new(35.5, 88.5, 0.0),
         ..TransportAction::new(Position::new(28.0, 89.0, 0.0))
     };
@@ -575,7 +609,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         human_order: crate::world::WorldTime::ZERO,
         id: object_id(9177),
         group: None,
-        action_state: ActionState::new(TransportState::Sail.get()),
+        action_state: ActionState::new(TransportState::Sail { move_to: None }.get()),
     };
     let rig = || {
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
@@ -591,7 +625,10 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
         Ok(UpdateCode::UNDER_WAY)
     );
-    assert_eq!(t.move_to.map(|m| m.state), Some(MoveTo::Moving));
+    assert_eq!(
+        t.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Moving)
+    );
     assert_eq!(walker.mover().paths.len(), 2);
     assert_eq!(
         (walker.sprite(), walker.posted()),
@@ -604,7 +641,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         Ok(UpdateCode::UNDER_WAY)
     );
     assert_eq!(
-        (t.move_to.map(|m| m.state), walker.posted()),
+        (t.state.move_to().copied().map(|m| m.state), walker.posted()),
         (Some(MoveTo::Moving), in_the_way)
     );
     // a waiting MoveTo (only a human's villager waits; a saved one) runs its timer: no walk
@@ -615,7 +652,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         Ok(UpdateCode::UNDER_WAY)
     );
     assert_eq!(
-        (t.move_to.map(|m| m.state), walker.posted()),
+        (t.state.move_to().copied().map(|m| m.state), walker.posted()),
         (Some(MoveTo::Waiting), vec![])
     );
     // the ended, the failed and a missing MoveTo walk nothing

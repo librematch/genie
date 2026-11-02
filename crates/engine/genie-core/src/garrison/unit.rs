@@ -309,7 +309,7 @@ impl Unit {
             .list
             .enter_mut()
             .ok_or(GenieError::unsupported("an entered unit without its Enter"))?;
-        if enter.move_to.take().is_some()
+        if enter.state.take_move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(self.id)
         {
             m.stop()?;

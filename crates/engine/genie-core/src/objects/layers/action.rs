@@ -120,8 +120,8 @@ impl Action {
             actions::Action::Gather(g) => walking(g.move_to.map(|m| m.state)),
             actions::Action::Attack(a) => walking(a.move_to.map(|m| m.state)),
             actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
-            actions::Action::Enter(e) => walking(e.move_to.map(|m| m.state)),
-            actions::Action::Transport(t) => walking(t.move_to.map(|m| m.state)),
+            actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),
+            actions::Action::Transport(t) => walking(t.state.move_to().map(|m| m.state)),
             actions::Action::MoveTo(_)
             | actions::Action::Missile(_)
             | actions::Action::Make(_)

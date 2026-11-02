@@ -6796,8 +6796,11 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
         .copied()
         .expect("the Enter");
     assert_eq!(
-        (first.target, first.state),
-        (Some(container_id(10028)), crate::garrison::EnterState::Walk)
+        (first.target, first.state.bare()),
+        (
+            Some(container_id(10028)),
+            crate::garrison::EnterState::Walk { move_to: None }
+        )
     );
     t.parts
         .actions
@@ -7026,7 +7029,7 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .enter()
-            .and_then(|e| e.move_to);
+            .and_then(|e| e.state.move_to().copied());
         assert_eq!(
             made.map(|m| (m.state, m.sprite.map(|g| g.id))),
             Some((MoveTo::Start, Some(shown)))
@@ -7044,7 +7047,7 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
                 .actions_of(v.id)
                 .list
                 .enter()
-                .and_then(|e| e.move_to)
+                .and_then(|e| e.state.move_to().copied())
                 .map(|m| m.state),
             Some(MoveTo::Moving)
         );
@@ -11589,7 +11592,6 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .set_enter(Some(crate::garrison::EnterAction {
             target: Some(ContainerId::new(object_id(9150))),
             state: crate::garrison::EnterState::Wait,
-            move_to: None,
             point: Position::new(20.0, 20.0, 0.0),
             range: Distance::ZERO,
             timer: Seconds::ZERO,
@@ -17552,7 +17554,11 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
         .list
         .artifact_mut()
         .unwrap();
-    if let Some(m) = art.enter.as_mut().and_then(|e| e.move_to.as_mut()) {
+    if let Some(m) = art
+        .enter
+        .as_mut()
+        .and_then(|e| e.state.walk_mut().and_then(Option::as_mut))
+    {
         m.state = MoveTo::Arrived;
     }
     t.tick(Millis::new(50));

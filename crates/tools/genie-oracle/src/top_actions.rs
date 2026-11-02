@@ -446,22 +446,19 @@ fn import_enter(
     let move_to = sub
         .map(|s| saved_move_to(s, saved.graphics, true))
         .transpose()?;
-    let state = EnterState::of_byte(base.state)
-        .ok()
-        .filter(|s| {
-            matches!(
-                s,
-                EnterState::Done | EnterState::Wait | EnterState::Walk | EnterState::Failed
-            )
-        })
-        .ok_or(GenieError::unsupported(
+    // the states the slice models: all but the walk to the meeting point (11)
+    if !EnterState::of_byte(base.state, None)
+        .is_ok_and(|s| !matches!(s, EnterState::WalkPoint { .. }))
+    {
+        return Err(GenieError::unsupported(
             "a saved Enter in a state the slice does not model",
-        ))?;
+        ));
+    }
+    let state = EnterState::of_byte(base.state, move_to)?;
     let task = saved.task(task_at)?;
     actions.list.set_enter(Some(EnterAction {
         target: ContainerId::of_field(base.target_id),
         state,
-        move_to,
         point: saved.point(),
         range: task.work_range,
         timer: Seconds::new(base.timer),
@@ -483,13 +480,14 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(
     actions
         .list
         .set_transport(Some(genie_core::garrison::transport::TransportAction {
-            state: genie_core::garrison::transport::TransportState::of_byte(base.state)?,
+            // its quiet MoveTo to the point (`0x140aa42a0`: `FUN_140a7a170` with 1)
+            state: genie_core::garrison::transport::TransportState::of_byte(
+                base.state,
+                sub.map(|s| saved_move_to(s, saved.graphics, true))
+                    .transpose()?,
+            )?,
             mode: genie_core::garrison::transport::TransportMode::of_data(base.target2_id),
             point: saved.point(),
-            // its quiet MoveTo to the point (`0x140aa42a0`: `FUN_140a7a170` with 1)
-            move_to: sub
-                .map(|s| saved_move_to(s, saved.graphics, true))
-                .transpose()?,
             retarget: false,
             // the save writes the task's id, −1 for none
             task: genie_core::objects::masters::TaskId::of_field(base.short_val)?,

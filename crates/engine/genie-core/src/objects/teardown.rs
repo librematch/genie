@@ -89,10 +89,10 @@ impl Action {
                 stop_if_moving(motion, f.state.move_to().is_some())?;
             }
             Self::Enter(e) => {
-                stop_if_moving(motion, e.move_to.is_some())?;
+                stop_if_moving(motion, e.state.move_to().is_some())?;
                 torn.release(e.target.map(ContainerId::id));
             }
-            Self::Transport(t) => stop_if_moving(motion, t.move_to.is_some())?,
+            Self::Transport(t) => stop_if_moving(motion, t.state.move_to().is_some())?,
             Self::Build(b) => {
                 if b.added
                     && let Some(target) = b.target

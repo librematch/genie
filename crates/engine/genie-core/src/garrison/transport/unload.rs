@@ -252,7 +252,11 @@ impl crate::world::World {
             let (x, y) = (point.x(), point.y());
             t.point = t.point.with_x(x).with_y(y);
             if sails {
-                changes.push(t.set_state(TransportState::SailToUnload, &ship, &mut shore)?);
+                changes.push(t.set_state(
+                    TransportState::SailToUnload { move_to: None },
+                    &ship,
+                    &mut shore,
+                )?);
                 t.retarget = true;
             } else {
                 crate::unit_ai::alert_owner(computer)?;

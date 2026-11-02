@@ -28,7 +28,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`container_id.rs`](container_id.rs) | A container's id as its own type: the object a unit is inside, enters or leaves. |
 | [`damage_rate.rs`](damage_rate.rs) | The damage an object deals per second (`DamageRate`). |
 | [`enter.rs`](enter.rs) | The enter command and the Enter's construction, install and start, at once or with the transport's move. |
-| [`enter_state.rs`](enter_state.rs) | An Enter's state: walking to a building or transport, waiting, inside. |
+| [`enter_state.rs`](enter_state.rs) | An Enter's state: walking to a building or transport, waiting, inside; each walk with its `MoveTo`. |
 | [`firepower.rs`](firepower.rs) | A unit's attack rate and firepower, and its share of a building's volleys (`FUN_141213520`). |
 | [`inside_count.rs`](inside_count.rs) | How many units an object holds inside (`InsideCount`). |
 | [`let_out.rs`](let_out.rs) | A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its place on the map. |
