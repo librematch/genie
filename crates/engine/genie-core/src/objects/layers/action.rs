@@ -116,10 +116,10 @@ impl Action {
                 .or_else(|| walking(h.move_to.map(|m| m.state))),
             actions::Action::Build(b) => walking(b.move_to.map(|m| m.state)),
             actions::Action::Repair(r) => walking(r.move_to.map(|m| m.state)),
-            actions::Action::Fly(f) => walking(f.move_to.map(|m| m.state)),
+            actions::Action::Fly(f) => walking(f.state.move_to().map(|m| m.state)),
             actions::Action::Gather(g) => walking(g.move_to.map(|m| m.state)),
             actions::Action::Attack(a) => walking(a.move_to.map(|m| m.state)),
-            actions::Action::Explore(e) => walking(e.move_to.map(|m| m.state)),
+            actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
             actions::Action::Enter(e) => walking(e.move_to.map(|m| m.state)),
             actions::Action::Transport(t) => walking(t.move_to.map(|m| m.state)),
             actions::Action::MoveTo(_)

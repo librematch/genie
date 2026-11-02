@@ -588,20 +588,20 @@ fn a_birds_fly_takes_its_home_and_move_to() {
         .copied()
         .unwrap();
     assert_eq!(
-        (f.state, f.move_to, f.task.id),
-        (FlyState::Choosing, None, TaskId::of_task(8))
+        (f.state, f.task.id),
+        (FlyState::Choosing, TaskId::of_task(8))
     );
     assert_eq!(
         f.home.get().map(f32::to_bits),
         [1.0_f32, 2.0].map(f32::to_bits)
     );
-    let f = imported(FLY, bird(with_sub(base(3), MOVE_TO, move_to(4, 0.5))))
+    let f = imported(FLY, bird(with_sub(base(4), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
         .list
         .fly()
         .copied()
         .unwrap();
-    let flight = f.move_to.unwrap();
+    let flight = f.state.move_to().copied().unwrap();
     assert_eq!((flight.state, flight.quiet), (MoveTo::Moving, false));
     assert_eq!(
         (flight.target, bits3(flight.point)),
@@ -618,6 +618,13 @@ fn a_birds_fly_takes_its_home_and_move_to() {
         )
         .unwrap_err(),
         GenieError::unsupported("a saved Fly action with another sub-action")
+    );
+    // state 3 drops the MoveTo and makes the flight's only as it flies (4)
+    assert_eq!(
+        imported(FLY, bird(with_sub(base(3), MOVE_TO, move_to(4, 0.5))))
+            .unwrap_err()
+            .reason(),
+        "a MoveTo of a Fly that does not fly"
     );
 }
 
@@ -1070,11 +1077,11 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
         .explore()
         .copied()
         .unwrap();
-    assert_eq!((e.state, e.move_to), (ExploreState::Wait, None));
+    assert_eq!(e.state, ExploreState::Wait);
     let e = imported(
         EXPLORE,
         explore(with_sub(
-            base(ExploreState::Walk.get()),
+            base(ExploreState::Walk { move_to: None }.get()),
             MOVE_TO,
             move_to(4, 0.5),
         )),
@@ -1085,7 +1092,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     .copied()
     .unwrap();
     // a quiet MoveTo (its maker's `+0x60`, which the save does not hold) with the saved wait
-    let m = e.move_to.unwrap();
+    let m = e.state.move_to().copied().unwrap();
     assert_eq!(
         (m.state, m.quiet, m.wait.state),
         (MoveTo::Moving, true, MoveWaitState::AskedAgain)
@@ -1094,7 +1101,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
         imported(
             EXPLORE,
             explore(with_sub(
-                base(ExploreState::Walk.get()),
+                base(ExploreState::Walk { move_to: None }.get()),
                 EXPLORE,
                 explore(base(3))
             ))
@@ -1105,6 +1112,20 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     assert_eq!(
         imported(EXPLORE, explore(base(1))).unwrap_err(),
         GenieError::unsupported("a saved Explore in a state the slice does not model")
+    );
+    // every set_state drops the sub-actions and only the walk makes one
+    assert_eq!(
+        imported(
+            EXPLORE,
+            explore(with_sub(
+                base(ExploreState::Wait.get()),
+                MOVE_TO,
+                move_to(4, 0.5)
+            ))
+        )
+        .unwrap_err()
+        .reason(),
+        "a MoveTo of an Explore that does not walk"
     );
 }
 

@@ -86,7 +86,7 @@ impl Action {
             }
             Self::Fly(f) => {
                 motion.set_anim_speed(motion.mover().map_or(Speed::ZERO, |m| m.stats.speed));
-                stop_if_moving(motion, f.move_to.is_some())?;
+                stop_if_moving(motion, f.state.move_to().is_some())?;
             }
             Self::Enter(e) => {
                 stop_if_moving(motion, e.move_to.is_some())?;
@@ -112,7 +112,7 @@ impl Action {
                 torn.release(r.target);
                 stop_if_moving(motion, r.move_to.is_some())?;
             }
-            Self::Explore(e) => stop_if_moving(motion, e.move_to.is_some())?,
+            Self::Explore(e) => stop_if_moving(motion, e.state.move_to().is_some())?,
             Self::Hunt(mut h) => {
                 h.tear_down(motion.mover_mut())?;
                 torn.release(h.target);

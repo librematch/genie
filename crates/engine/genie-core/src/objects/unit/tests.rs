@@ -557,7 +557,9 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         Position::new(1.0, 2.0, 0.0),
         &mut crate::math::rng::Well512::default(),
     );
-    fly.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
+    fly.state = crate::movement::fly::FlyState::Flying {
+        move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
+    };
     assert_eq!(of(Action::Fly(fly)), walking);
     let mut attack =
         crate::combat::attack::tests::own_attack(7, AttackState::Move, Distance::new(0.5));
@@ -568,7 +570,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         &crate::movement::explore::bare_walk(),
     )
     .unwrap();
-    if let Some(m) = explore.move_to.as_mut() {
+    if let Some(m) = explore.state.move_to_mut() {
         m.state = MoveTo::Moving;
     }
     assert_eq!(of(Action::Explore(explore)), walking);

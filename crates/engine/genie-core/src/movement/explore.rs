@@ -16,7 +16,7 @@ use crate::map::{Tile, TileOffset};
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Mover;
-use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToAction, MoveToReads, SpriteReads};
+use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
@@ -61,13 +61,11 @@ pub enum Owner {
 /// An Explore action.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct ExploreAction {
-    /// `+0x18`.
+    /// `+0x18`, with state 11's `MoveTo` to the point (quiet, range 0, the master's walking
+    /// sprite, [`ExploreAction::move_shown`]).
     pub state: ExploreState,
     /// The point it walks to (`+0x38`..`+0x40`), x −1 for none.
     pub point: Position,
-    /// Its `MoveTo` to the point: state 11's sub-action, quiet, range 0, with the master's walking
-    /// sprite ([`ExploreAction::move_shown`]).
-    pub move_to: Option<MoveToAction>,
 }
 
 /// What an Explore's `MoveTo` reads of its unit as `set_state(11)` makes it: [`MoveToReads`], and
@@ -112,12 +110,11 @@ impl ExploreAction {
         let mut a = Self {
             state: ExploreState::New,
             point,
-            move_to: None,
         };
         let state = if a.point.x() == NO_POINT {
             ExploreState::Wait
         } else {
-            ExploreState::Walk
+            ExploreState::Walk { move_to: None }
         };
         let owner = a.set_state(state, Some(walk))?;
         Ok((a, owner))
@@ -136,8 +133,11 @@ impl ExploreAction {
         state: ExploreState,
         walk: Option<&ExploreMove<'_>>,
     ) -> Result<Owner, GenieError> {
-        self.move_to = None;
-        self.state = state;
+        // the sub-actions go: a new state holds none until it makes its own
+        self.state = match state {
+            ExploreState::Walk { .. } => ExploreState::Walk { move_to: None },
+            other => other,
+        };
         Ok(match state {
             ExploreState::Stopped => {
                 self.point = Position::from([-1.0; 3]);
@@ -145,11 +145,13 @@ impl ExploreAction {
             }
             ExploreState::Wait => Owner::WantsPoint,
             ExploreState::Done | ExploreState::Failed | ExploreState::Ended => Owner::Standing,
-            ExploreState::Walk => {
+            ExploreState::Walk { .. } => {
                 let walk = walk.ok_or(WALK_WITHOUT_READS)?;
-                self.move_to = walk
-                    .reads
-                    .to_point(self.point, Distance::ZERO, walk.given)?;
+                self.state = ExploreState::Walk {
+                    move_to: walk
+                        .reads
+                        .to_point(self.point, Distance::ZERO, walk.given)?,
+                };
                 Owner::Nothing
             }
             ExploreState::New => Owner::Nothing,
@@ -170,7 +172,7 @@ impl ExploreAction {
     ) -> Result<Owner, GenieError> {
         if 0.0 <= point.x() && 0.0 <= point.y() {
             self.point = point;
-            return self.set_state(ExploreState::Walk, Some(walk));
+            return self.set_state(ExploreState::Walk { move_to: None }, Some(walk));
         }
         self.set_state(ExploreState::Wait, None)
     }
@@ -217,7 +219,7 @@ impl ExploreAction {
             ExploreState::Failed => Err(GenieError::unsupported(
                 "a failed Explore (notify 0x1f9, set_state 2)",
             )),
-            ExploreState::Walk => self.walk(c, explorer, me),
+            ExploreState::Walk { .. } => self.walk(c, explorer, me),
             _ => Ok(()),
         }
     }
@@ -246,10 +248,12 @@ impl ExploreAction {
             gives_up,
             ..ListUpdate::default()
         };
-        let code = update_sub_actions(&mut self.move_to, c, explorer, me, how)?;
-        let walked = self.move_to.is_some();
+        let mut move_to = self.state.move_to().copied();
+        let code = update_sub_actions(&mut move_to, c, explorer, me, how)?;
+        self.state = ExploreState::Walk { move_to };
+        let walked = move_to.is_some();
         let owner = self.after_walk(code)?;
-        if walked && self.move_to.is_none() {
+        if walked && self.state.move_to().is_none() {
             crate::movement::stop_mover(c.w.parts.mover_mut(explorer.id))?;
         }
         explorer.explore_owner(owner, c)
@@ -552,7 +556,7 @@ impl Unit {
         let at = Position::new(point.x(), point.y(), self.position().z());
         let walk = self.explore_move(c);
         let owner = if let Some(e) = actions.list.explore_mut() {
-            let walked = e.move_to.is_some();
+            let walked = e.state.move_to().is_some();
             let owner = e.take_point(at, &walk)?;
             if walked {
                 crate::movement::stop_mover(c.w.parts.mover_mut(self.id))?;
@@ -726,7 +730,7 @@ mod tests {
         let sprite = |given| {
             let walk = walk_of(&table, given);
             let (a, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &walk).unwrap();
-            a.move_to.and_then(|m| m.sprite).map(|g| g.id)
+            a.state.move_to().and_then(|m| m.sprite).map(|g| g.id)
         };
         assert_eq!(sprite(Some(SpriteId::named(7))), Some(SpriteId::named(7)));
         assert_eq!(sprite(None), Some(SpriteId::named(20)));
@@ -775,16 +779,13 @@ mod tests {
         let table = Graphics::from([(SpriteId::named(7), WALKING)]);
         let walk = walk_of(&table, Some(SpriteId::named(7)));
         let (mut a, owner) = ExploreAction::new(Position::new(-1.0, -1.0, 0.0), &walk).unwrap();
-        assert_eq!(
-            (a.state, owner, a.move_to),
-            (ExploreState::Wait, Owner::WantsPoint, None)
-        );
+        assert_eq!((a.state, owner), (ExploreState::Wait, Owner::WantsPoint));
         let walking = WALKING;
         assert_eq!(
             a.take_point(Position::new(19.0, 84.0, 0.0), &walk),
             Ok(Owner::Nothing)
         );
-        let made = MoveToAction {
+        let made = crate::movement::move_to::MoveToAction {
             state: crate::movement::move_to::MoveTo::Start,
             point: Position::new(19.0, 84.0, 0.0),
             target: None,
@@ -794,10 +795,15 @@ mod tests {
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::NEW,
         };
-        assert_eq!((a.state, a.move_to), (ExploreState::Walk, Some(made)));
+        assert_eq!(
+            a.state,
+            ExploreState::Walk {
+                move_to: Some(made)
+            }
+        );
         assert_eq!(a.after_walk(UpdateCode::UNDER_WAY), Ok(Owner::Nothing));
         assert_eq!(a.after_walk(UpdateCode::DONE), Ok(Owner::WantsPoint));
-        assert_eq!((a.state, a.move_to), (ExploreState::Wait, None));
+        assert_eq!(a.state, ExploreState::Wait);
         assert_eq!(
             a.take_point(Position::new(-1.0, 5.0, 0.0), &walk),
             Ok(Owner::WantsPoint)
@@ -807,12 +813,12 @@ mod tests {
         stuck.reads.speed = Speed::ZERO;
         let (b, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck).unwrap();
         assert_eq!(
-            b.move_to.map(|m| m.state),
+            b.state.move_to().map(|m| m.state),
             Some(crate::movement::move_to::MoveTo::Failed)
         );
         stuck.reads.state = ObjectState::Dying;
         let (b, _) = ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck).unwrap();
-        assert_eq!(b.move_to, None);
+        assert_eq!(b.state, ExploreState::Walk { move_to: None });
     }
 
     /// An area where every point but the unexplored ones counts, at its distance from (20, 92).

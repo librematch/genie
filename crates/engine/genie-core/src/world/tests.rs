@@ -4032,15 +4032,12 @@ fn the_unit_ai_s_explore_walks_to_its_point_or_asks_for_one() {
         .explore()
         .copied()
         .unwrap();
-    assert_eq!(
-        (e.state, e.point),
-        (ExploreState::Walk, Position::new(40.0, 90.0, 0.0))
-    );
-    assert!(e.move_to.is_some());
+    assert!(matches!(e.state, ExploreState::Walk { move_to: Some(_) }));
+    assert_eq!(e.point, Position::new(40.0, 90.0, 0.0));
     with_effects(&mut t, vec![Effect::Explore(Point::new(-1.0, 90.0))]).unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     let e = t.parts.actions_of(v.id).list.explore().copied().unwrap();
-    assert_eq!((e.state, e.move_to), (ExploreState::Wait, None));
+    assert_eq!(e.state, ExploreState::Wait);
     let notifies = &t.parts.unit_ai.get(v.id).unwrap().notifies;
     assert_eq!(
         notifies.last().map(|n| (n.kind, n.p)),
@@ -11517,13 +11514,18 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .unwrap()
         .list
         .set_fly(Some(Fly {
-            state: FlyState::Choosing,
+            state: FlyState::Flying {
+                move_to: Some(MoveToAction {
+                    state: MoveTo::Moving,
+                    quiet: false,
+                    ..MoveToAction::sub_to_point(
+                        Position::new(12.0, 12.0, 0.0),
+                        Distance::ZERO,
+                        None,
+                    )
+                }),
+            },
             timer: Seconds::new(1.0),
-            move_to: Some(MoveToAction {
-                state: MoveTo::Moving,
-                quiet: false,
-                ..MoveToAction::sub_to_point(Position::new(12.0, 12.0, 0.0), Distance::ZERO, None)
-            }),
             home: Point::new(10.0, 10.0),
             task: crate::objects::masters::Task::default(),
         }));
@@ -11544,7 +11546,10 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .of_mut(bird.id)
         .unwrap()
         .list
-        .set_fly(flying.map(|f| Fly { move_to: None, ..f }));
+        .set_fly(flying.map(|f| Fly {
+            state: FlyState::Flying { move_to: None },
+            ..f
+        }));
     t.clear_actions(PlayerId::new(1), ListIndex::new(1))
         .unwrap();
     let bird = &t.players[1].objects[ListIndex::new(1)];
@@ -19188,13 +19193,18 @@ fn flown(move_to: MoveTo, setup: impl FnOnce(&mut World)) -> Flown {
         .unwrap()
         .list
         .set_fly(Some(Fly {
-            state: FlyState::Flying,
+            state: FlyState::Flying {
+                move_to: Some(MoveToAction {
+                    state: move_to,
+                    quiet: false,
+                    ..MoveToAction::sub_to_point(
+                        Position::new(40.5, 89.5, 0.0),
+                        Distance::ZERO,
+                        None,
+                    )
+                }),
+            },
             timer: Seconds::new(2.0),
-            move_to: Some(MoveToAction {
-                state: move_to,
-                quiet: false,
-                ..MoveToAction::sub_to_point(Position::new(40.5, 89.5, 0.0), Distance::ZERO, None)
-            }),
             home: Point::new(29.5, 89.5),
             task,
         }));
@@ -19228,7 +19238,7 @@ fn a_bird_s_failed_flight_tells_its_unit_ai_and_rests() {
     let (r, fly, heard) = flown(MoveTo::Failed, |_| ());
     assert_eq!(r, Ok(()));
     let fly = fly.unwrap();
-    assert_eq!((fly.state, fly.move_to), (FlyState::Resting, None));
+    assert_eq!(fly.state, FlyState::Resting);
     assert_eq!(
         fly.timer,
         Seconds::new(2.0) - Millis::new(50).seconds() + Seconds::new(2.0)
@@ -19277,7 +19287,9 @@ fn explored(set: impl FnOnce(&mut crate::movement::explore::ExploreAction)) -> E
                 human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
-                action_state: ActionState::new(crate::movement::explore::ExploreState::Walk.get()),
+                action_state: ActionState::new(
+                    crate::movement::explore::ExploreState::Walk { move_to: None }.get(),
+                ),
             };
             unit.explore_part(actions, c, me)
         },
@@ -19324,7 +19336,9 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
                 human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
-                action_state: ActionState::new(crate::movement::explore::ExploreState::Walk.get()),
+                action_state: ActionState::new(
+                    crate::movement::explore::ExploreState::Walk { move_to: None }.get(),
+                ),
             };
             unit.explore_part(actions, c, me)
         },
@@ -19336,7 +19350,7 @@ fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
         .actions_of(v.id)
         .list
         .explore()
-        .and_then(|e| e.move_to);
+        .and_then(|e| e.state.move_to().copied());
     assert_eq!(
         move_to.map(|m| (m.state, m.sprite.map(|g| g.id))),
         Some((MoveTo::Moving, Some(SpriteId::named(31))))
@@ -19362,10 +19376,8 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
     let (r, e, heard) = explored(|_| ());
     assert_eq!(r, Ok(()));
     let e = e.unwrap();
-    assert_eq!(
-        (e.state, e.move_to.map(|m| m.state)),
-        (ExploreState::Walk, Some(MoveTo::Moving))
-    );
+    assert_eq!(e.state.get(), 11);
+    assert_eq!(e.state.move_to().map(|m| m.state), Some(MoveTo::Moving));
     assert_eq!(heard, []);
     let asked = vec![(
         NotifyKind::REQUIRES_SEARCH,
@@ -19373,13 +19385,13 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
     )];
     for end in [MoveTo::Arrived, MoveTo::Failed] {
         let (r, e, heard) = explored(|e| {
-            if let Some(m) = e.move_to.as_mut() {
+            if let Some(m) = e.state.move_to_mut() {
                 m.state = end;
             }
         });
         assert_eq!(r, Ok(()));
         let e = e.unwrap();
-        assert_eq!((e.state, e.move_to), (ExploreState::Wait, None));
+        assert_eq!(e.state, ExploreState::Wait);
         assert_eq!(heard, asked);
     }
     let (r, e, heard) = explored(|e| {

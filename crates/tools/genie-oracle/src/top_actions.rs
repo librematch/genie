@@ -348,9 +348,8 @@ fn import_fly(
         .map(|s| saved_move_to(s, saved.graphics, false))
         .transpose()?;
     actions.list.set_fly(Some(Fly {
-        state: genie_core::movement::fly::FlyState::of_byte(base.state)?,
+        state: genie_core::movement::fly::FlyState::of_byte(base.state, move_to)?,
         timer: Seconds::new(base.timer),
-        move_to,
         home: Point::new(base.target_x, base.target_y),
         task: fly_task(saved.s.master_obj)?,
     }));
@@ -511,18 +510,17 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
     let move_to = sub
         .map(|s| saved_move_to(s, saved.graphics, true))
         .transpose()?;
-    let state = ExploreState::of_byte(base.state)
-        .ok()
-        .filter(|s| matches!(s, ExploreState::Wait | ExploreState::Walk))
-        .ok_or(GenieError::unsupported(
+    let state = ExploreState::of_byte(base.state, move_to)?;
+    if !matches!(state, ExploreState::Wait | ExploreState::Walk { .. }) {
+        return Err(GenieError::unsupported(
             "a saved Explore in a state the slice does not model",
-        ))?;
+        ));
+    }
     actions
         .list
         .set_explore(Some(genie_core::movement::explore::ExploreAction {
             state,
             point: saved.point(),
-            move_to,
         }));
     Ok(())
 }

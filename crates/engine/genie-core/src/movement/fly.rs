@@ -45,12 +45,10 @@ const NO_MOVER: GenieError = GenieError::unsupported("a bird without movement st
 /// A bird's Fly action (type 10).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Fly {
-    /// `+0x18`.
+    /// `+0x18`, with state 4's `MoveTo` sub-action to the flight's point (not quiet).
     pub state: FlyState,
     /// `+0x44`, in seconds: the flight's time left, or the rest's.
     pub timer: Seconds,
-    /// Its `MoveTo` sub-action to the flight's point (not quiet).
-    pub move_to: Option<MoveToAction>,
     /// `+0x38`, `+0x3c`: the point the bird keeps within its task's leash.
     pub home: Point,
     /// The action's task (`+0x48`): its leash (`+0x19`, tiles), rest (`+0x1c`), distance factor
@@ -81,7 +79,6 @@ impl Fly {
         let mut fly = Self {
             state: FlyState::New,
             timer: Seconds::ZERO,
-            move_to: None,
             home: position.ground(),
             task,
         };
@@ -90,15 +87,15 @@ impl Fly {
     }
 
     /// `set_state` (`0x140a84a50`): 2 and 3 drop the `MoveTo` (its teardown stops the bird, the
-    /// caller's: the returned flag); 2 gives the bird its master's sprite (slot 0x68, not held
-    /// for a bird); 3 draws the flight's time, `r * 10 / 0x7fff + 5` seconds, from the Action
-    /// stream.
+    /// caller's: the returned flag); 4 takes the flight's (`state`'s); 2 gives the bird its
+    /// master's sprite (slot 0x68, not held for a bird); 3 draws the flight's time,
+    /// `r * 10 / 0x7fff + 5` seconds, from the Action stream.
     fn set_state(&mut self, state: FlyState, action: &mut Well512) -> bool {
+        let walked = self.state.move_to().is_some();
         self.state = state;
-        if state == FlyState::Flying {
+        if matches!(state, FlyState::Flying { .. }) {
             return false;
         }
-        let walked = self.move_to.take().is_some();
         if state == FlyState::Choosing {
             let r = action.rand15() as i32;
             self.timer = Seconds::new(((r * 10) / 0x7fff + 5) as f32);
@@ -146,7 +143,7 @@ impl Fly {
                     self.choose(bird.position(), mover, c.w.spatial.map, action, &sprites)?;
                 stop_if(c.w.parts.mover_mut(bird.id), dropped)
             }
-            FlyState::Flying => {
+            FlyState::Flying { .. } => {
                 if self.timer <= Seconds::ZERO {
                     self.set_state_of(bird, FlyState::Resting, c)?;
                     if EPSILON < rest.get() {
@@ -157,8 +154,12 @@ impl Fly {
                 // (1) or its failure (3) end the flight. A bird is no villager: a motion step
                 // that gives up fails its MoveTo (set_state 13, LAB_140aa320c)
                 // (its set_state(4) shows its sprite, +0x58, before the motion step)
-                let code =
-                    update_sub_actions(&mut self.move_to, c, bird, me, ListUpdate::default())?;
+                // a rest set above dropped the MoveTo: the list's update finds none
+                let mut move_to = self.state.move_to().copied();
+                let code = update_sub_actions(&mut move_to, c, bird, me, ListUpdate::default())?;
+                if let FlyState::Flying { move_to: m } = &mut self.state {
+                    *m = move_to;
+                }
                 if code == UpdateCode::UNDER_WAY {
                     return Ok(());
                 }
@@ -255,16 +256,22 @@ impl Fly {
             ));
         }
         let sprite = graphic_of(sprites.graphics, Self::flight_sprite(t, action, sprites)?)?;
-        // FUN_140aa0d30 to the point within 0 with the flight's sprite, not quiet
-        self.move_to = Some(MoveToAction {
+        // FUN_140aa0d30 to the point within 0 with the flight's sprite, not quiet, then
+        // set_state(4) keeps it
+        let flight = MoveToAction {
             quiet: false,
             ..MoveToAction::sub_to_point(
                 Position::new(point[0], point[1], z),
                 Distance::ZERO,
                 sprite,
             )
-        });
-        let _ = self.set_state(FlyState::Flying, action);
+        };
+        let _ = self.set_state(
+            FlyState::Flying {
+                move_to: Some(flight),
+            },
+            action,
+        );
         Ok(false)
     }
 
@@ -425,7 +432,6 @@ mod tests {
         Fly {
             state,
             timer: Seconds::new(timer),
-            move_to: None,
             home: Point::new(78.5, 103.5),
             task: Task {
                 action_type: FLY,
@@ -550,13 +556,15 @@ mod tests {
         // update 717: the timer of 0.016 runs out: set_state(2) drops the MoveTo (the bird
         // stops), the empty list's update is 1 and the task has no rest: set_state(3) draws the
         // next flight's time
-        let fly = Fly {
-            move_to: Some(flight(
-                MoveTo::Moving,
-                Position::new(57.844_986, 104.49953, 9.0),
-            )),
-            ..hawk(FlyState::Flying, 0.015_977_083)
-        };
+        let fly = hawk(
+            FlyState::Flying {
+                move_to: Some(flight(
+                    MoveTo::Moving,
+                    Position::new(57.844_986, 104.49953, 9.0),
+                )),
+            },
+            0.015_977_083,
+        );
         let mut t = sky_world(fly, 1.32, 1);
         let mut e = t.streams.get(Stream::Action).clone();
         let fly = flown(&mut t).unwrap();
@@ -564,8 +572,8 @@ mod tests {
         assert_eq!(failures(&t), 0);
         let time = ((e.rand15() as i32 * 10) / 0x7fff + 5) as f32;
         assert_eq!(
-            (fly.state, fly.timer, fly.move_to),
-            (FlyState::Choosing, Seconds::new(time), None)
+            (fly.state, fly.timer),
+            (FlyState::Choosing, Seconds::new(time))
         );
         assert_eq!(t.streams.get(Stream::Action).draws, 1);
     }
@@ -593,7 +601,7 @@ mod tests {
         assert_eq!(fly.state, FlyState::Resting);
         let mut fly = hawk(FlyState::Choosing, 10.0);
         let _ = choose(&mut fly, GridSize::new(1, 1)).0.unwrap();
-        assert_eq!((fly.state, fly.move_to), (FlyState::Resting, None));
+        assert_eq!(fly.state, FlyState::Resting);
         let plain = |task: Task| Fly {
             task,
             ..hawk(FlyState::Choosing, 10.0)
@@ -605,7 +613,7 @@ mod tests {
         let mut fly = plain(unsprited);
         let (got, draws) = choose(&mut fly, GridSize::new(120, 120));
         assert_eq!((got, draws), (Ok(false), 1));
-        assert_eq!(fly.state, FlyState::Flying);
+        assert!(matches!(fly.state, FlyState::Flying { move_to: Some(_) }));
         for task in [
             Task {
                 terrain: TaskTerrain::of_data(2),
@@ -690,49 +698,53 @@ mod tests {
         let to = point.with_height(9.0);
         let sprite = hawk_graphics().get(SpriteId::named(drawn)).copied();
         assert_eq!(
-            (fly.state, fly.move_to),
-            (
-                FlyState::Flying,
-                Some(MoveToAction {
+            fly.state,
+            FlyState::Flying {
+                move_to: Some(MoveToAction {
                     sprite,
                     ..flight(MoveTo::Start, to)
                 })
-            )
+            }
         );
         assert_eq!(t.streams.get(Stream::Action).draws, 2);
         assert!(!stopped(&t));
     }
 
     #[test]
-    fn a_failed_flight_posts_its_failure_and_rests() {
+    fn a_failed_flight_posts_its_failure_and_ends() {
         // records/425906646's update 2025: the hawk 30594's MoveTo failed (state 13) the update
-        // before; its update returns 3, the flight ends as an arrived one does
-        let fly = Fly {
-            move_to: Some(flight(
-                MoveTo::Failed,
-                Position::new(57.844_986, 104.49953, 9.0),
-            )),
-            ..hawk(FlyState::Flying, 5.0)
-        };
+        // before; its update returns 3, the flight ends as an arrived one does (no rest: the
+        // next flight's choice, without the MoveTo)
+        let fly = hawk(
+            FlyState::Flying {
+                move_to: Some(flight(
+                    MoveTo::Failed,
+                    Position::new(57.844_986, 104.49953, 9.0),
+                )),
+            },
+            5.0,
+        );
         let mut t = sky_world(fly, 1.32, 1);
         let fly = flown(&mut t).unwrap();
         assert_eq!(failures(&t), 1);
         assert!(stopped(&t));
-        assert_eq!(fly.move_to, None);
+        assert_eq!(fly.state, FlyState::Choosing);
     }
 
     /// The motion step gives up in the update the flight's start runs (a bird without speed
     /// here): the bird's `MoveTo` fails there, as in its moving state; the next update posts it.
     #[test]
     fn a_flight_the_motion_step_gives_up_at_its_start_fails() {
-        let fly = Fly {
-            move_to: Some(flight(MoveTo::Start, Position::new(60.5, 104.5, 9.0))),
-            ..hawk(FlyState::Flying, 5.0)
-        };
+        let fly = hawk(
+            FlyState::Flying {
+                move_to: Some(flight(MoveTo::Start, Position::new(60.5, 104.5, 9.0))),
+            },
+            5.0,
+        );
         let mut t = sky_world(fly, 0.0, 1);
         let fly = flown(&mut t).unwrap();
         assert_eq!(
-            (fly.move_to.map(|m| m.state), failures(&t)),
+            (fly.state.move_to().map(|m| m.state), failures(&t)),
             (Some(MoveTo::Failed), 0)
         );
         assert!(!stopped(&t));
