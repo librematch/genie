@@ -98,7 +98,7 @@ impl BuildAction {
     /// The builder count's, and the unit's stop that the motion step does not model.
     pub(super) fn leave(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
         self.uncount(c)?;
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(builder.id)
         {
             m.stop()?;
@@ -386,7 +386,9 @@ impl BuildAction {
         builders: Option<&mut crate::construction::BuilderCount>,
         computer: bool,
     ) -> Result<(), GenieError> {
-        if self.state == BuildState::Work || (self.state == BuildState::Move && computer) {
+        if self.state == BuildState::Work
+            || (matches!(self.state, BuildState::Move { .. }) && computer)
+        {
             return Ok(());
         }
         if self.added {
@@ -395,7 +397,7 @@ impl BuildAction {
             ))?;
             *b = b.left();
         }
-        if self.move_to.is_some()
+        if self.state.move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
@@ -422,7 +424,7 @@ impl BuildAction {
         walk: Option<MoveToAction>,
         mover: Option<&mut crate::movement::Mover>,
     ) -> Result<(), GenieError> {
-        if self.move_to.is_some()
+        if self.state.move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
@@ -448,7 +450,7 @@ impl BuildAction {
         mover: Option<&mut crate::movement::Mover>,
     ) -> Result<(bool, [Option<ObjectId>; 2]), GenieError> {
         let counted = std::mem::replace(&mut self.added, false);
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
@@ -491,7 +493,7 @@ impl BuildAction {
     ///
     /// A Build with its `MoveTo` (`set_state`'s teardown is not modelled for it).
     pub const fn no_more_work(&mut self) -> Result<(), GenieError> {
-        if self.move_to.is_some() {
+        if self.state.move_to().is_some() {
             return Err(GenieError::unsupported("a Build waiting with its MoveTo"));
         }
         self.target = None;

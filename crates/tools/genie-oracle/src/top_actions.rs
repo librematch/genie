@@ -371,8 +371,7 @@ fn import_build(
     let task = work(saved.s.master_obj)?;
     actions.list.set_build(Some(BuildAction {
         target: ObjectId::of_field(base.target_id),
-        state: genie_core::construction::build::BuildState::of_byte(base.state)?,
-        move_to,
+        state: genie_core::construction::build::BuildState::of_byte(base.state, move_to)?,
         point: saved.point(),
         task,
         added: saved
@@ -408,8 +407,7 @@ fn import_repair(
         .list
         .set_repair(Some(genie_core::construction::repair::RepairAction {
             target: ObjectId::of_field(base.target_id),
-            state: genie_core::construction::repair::RepairState::of_byte(base.state)?,
-            move_to,
+            state: genie_core::construction::repair::RepairState::of_byte(base.state, move_to)?,
             point: saved.point(),
             timer: Seconds::new(base.timer),
             task: genie_core::construction::repair::RepairTask::of(&t),

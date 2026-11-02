@@ -501,7 +501,9 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
             moving: None,
         },
     );
-    build.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
+    build.state = crate::construction::build::BuildState::Move {
+        move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
+    };
     let builder = crate::objects::layers::Action {
         list: ActionList::default().with_build(Some(build)),
         ..Default::default()

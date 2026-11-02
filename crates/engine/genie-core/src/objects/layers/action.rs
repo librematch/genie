@@ -114,8 +114,8 @@ impl Action {
                     state: ActionState::new(a.state.get()),
                 })
                 .or_else(|| walking(h.move_to.map(|m| m.state))),
-            actions::Action::Build(b) => walking(b.move_to.map(|m| m.state)),
-            actions::Action::Repair(r) => walking(r.move_to.map(|m| m.state)),
+            actions::Action::Build(b) => walking(b.state.move_to().map(|m| m.state)),
+            actions::Action::Repair(r) => walking(r.state.move_to().map(|m| m.state)),
             actions::Action::Fly(f) => walking(f.state.move_to().map(|m| m.state)),
             actions::Action::Gather(g) => walking(g.move_to.map(|m| m.state)),
             actions::Action::Attack(a) => walking(a.move_to.map(|m| m.state)),

@@ -465,16 +465,16 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         .build()
         .copied()
         .unwrap();
-    let walk = build.move_to.unwrap();
+    let walk = build.state.move_to().copied().unwrap();
     assert_eq!(
         (
-            build.state,
+            build.state.bare(),
             build.site,
             ObjectId::field(walk.target),
             walk.range
         ),
         (
-            BuildState::Drop,
+            BuildState::Drop { move_to: None },
             Some(DropSiteId::new(object_id(503))),
             503,
             Distance::new(0.1)
@@ -516,11 +516,15 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
         .unwrap();
     assert_eq!(
         (
-            build.state,
+            build.state.bare(),
             build.site,
-            build.move_to.map(|m| ObjectId::field(m.target))
+            build
+                .state
+                .move_to()
+                .copied()
+                .map(|m| ObjectId::field(m.target))
         ),
-        (BuildState::Move, None, Some(600))
+        (BuildState::Move { move_to: None }, None, Some(600))
     );
     // carrying nothing: not ordered
     let mut t = world();
@@ -536,7 +540,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             .actions_of(t.players[0].objects[ListIndex::new(0)].id)
             .list
             .build()
-            .map(|b| b.state),
+            .map(|b| b.state.bare()),
         Some(BuildState::Work)
     );
     // 7 asks the Build as 8 does; 6 does not ask it: the search alone (no drop site in the
@@ -555,8 +559,11 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             .actions_of(t.players[0].objects[ListIndex::new(0)].id)
             .list
             .build()
-            .map(|b| (b.state, b.site)),
-        Some((BuildState::Drop, Some(DropSiteId::new(object_id(503)))))
+            .map(|b| (b.state.bare(), b.site)),
+        Some((
+            BuildState::Drop { move_to: None },
+            Some(DropSiteId::new(object_id(503)))
+        ))
     );
     let mut t = world();
     t.unit_order(
@@ -570,7 +577,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             .actions_of(t.players[0].objects[ListIndex::new(0)].id)
             .list
             .build()
-            .map(|b| b.state),
+            .map(|b| b.state.bare()),
         Some(BuildState::Work)
     );
     assert!(
@@ -3273,7 +3280,6 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
         .set_build(Some(crate::construction::build::BuildAction {
             target: Some(object_id(60)),
             state: BuildState::Work,
-            move_to: None,
             point: Position::new(-1.0, -1.0, -1.0),
             task: crate::construction::build::BuildTask {
                 range: Distance::new(0.1),

@@ -654,7 +654,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         .build()
         .copied()
         .unwrap();
-    let walk = a.move_to.unwrap();
+    let walk = a.state.move_to().copied().unwrap();
     assert_eq!(
         (a.target, a.site, walk.target, walk.state, walk.quiet),
         (
@@ -673,7 +673,7 @@ fn a_build_takes_its_task_move_to_and_site() {
     // a MoveTo without a sprite (−1) keeps none
     assert_eq!(walk.sprite, None);
     let mut dropping = b.clone();
-    dropping.state = genie_core::construction::build::BuildState::Drop.get();
+    dropping.state = genie_core::construction::build::BuildState::Drop { move_to: None }.get();
     // the drop-off's MoveTo with the carrying sprite 12 (its `+0x58`)
     let mut carrying = move_to(4, 0.75);
     carrying
@@ -700,7 +700,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         .build()
         .copied()
         .unwrap();
-    let walk = a.move_to.unwrap();
+    let walk = a.state.move_to().copied().unwrap();
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(walk.sprite, Some(carried));
     let a = imported(BUILD, build(b.clone()))
@@ -709,7 +709,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         .build()
         .copied()
         .unwrap();
-    assert_eq!(a.move_to, None);
+    assert_eq!(a.state.move_to().copied(), None);
     // without a MoveTo, the task's moving sprite for the next
     assert_eq!(a.task.moving, Some(SpriteId::named(9)));
     assert_eq!(
@@ -752,7 +752,7 @@ fn a_repair_takes_its_task_and_counts_its_builder() {
     .repair()
     .copied()
     .unwrap();
-    let walk = r.move_to.unwrap();
+    let walk = r.state.move_to().copied().unwrap();
     assert_eq!(
         (r.task.id, walk.state, walk.quiet, r.range.get().to_bits()),
         (TaskId::of_task(2), MoveTo::Moving, true, 0)
@@ -769,7 +769,7 @@ fn a_repair_takes_its_task_and_counts_its_builder() {
         .repair()
         .copied()
         .unwrap();
-    assert_eq!(r.move_to, None);
+    assert_eq!(r.state.move_to().copied(), None);
     assert_eq!(
         imported(
             REPAIR,

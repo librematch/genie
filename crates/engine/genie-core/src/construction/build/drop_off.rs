@@ -181,7 +181,7 @@ impl BuildAction {
         by: crate::objects::release::Releaser,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
-        self.state = BuildState::Drop;
+        self.state = BuildState::Drop { move_to: None };
         let found = match search {
             DropSearch::Empty => return self.restart(c, builder),
             DropSearch::Nothing => None,
@@ -214,7 +214,9 @@ impl BuildAction {
             .walk_to(c.w, Some(id.id()))?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         let given = sprite.or(self.task.moving);
-        self.move_to = move_reads.to_object(to, range, given, TargetMoved::AsksAgain)?;
+        self.state = BuildState::Drop {
+            move_to: move_reads.to_object(to, range, given, TargetMoved::AsksAgain)?,
+        };
         Ok(())
     }
 

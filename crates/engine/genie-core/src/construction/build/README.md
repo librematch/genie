@@ -30,7 +30,7 @@ build time completes the building.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`build_state.rs`](build_state.rs) | A Build's state: the steps of its update from the walk to the finished building. |
+| [`build_state.rs`](build_state.rs) | A Build's state: the steps of its update from the walk to the finished building, each walk with its `MoveTo`. |
 | [`clearing.rs`](clearing.rs) | The footprint clearing (`FUN_1415c3620`) of a building: the objects on its tiles that go. |
 | [`completion.rs`](completion.rs) | A foundation's completion on the world (`FUN_1411dbb70` from state 0 to 2): each of its parts is the call the game makes, where the game makes it. |
 | [`construction.rs`](construction.rs) | A foundation's construction (`Construction`): its start and its work's share of hit points, with the completion's storage, ground and counts (`crate::world::World::complete_building`). |

@@ -81,6 +81,10 @@ impl BuildAction {
             gives_up: Self::gives_up(c, builder, reads)?,
             ..ListUpdate::default()
         };
-        update_sub_actions(&mut self.move_to, c, builder, me, how)
+        match self.state.walk_mut() {
+            Some(move_to) => update_sub_actions(move_to, c, builder, me, how),
+            // a state that does not walk has no sub-action: its list's update is the empty one's
+            None => update_sub_actions(&mut None, c, builder, me, how),
+        }
     }
 }

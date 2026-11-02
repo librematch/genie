@@ -10,7 +10,9 @@ use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::terrain::TileTerrain;
 use crate::movement::Speed;
-use crate::movement::move_to::{MoveDefaults, MoveTo, MoveToReads, SpriteReads, WalkTo};
+use crate::movement::move_to::{
+    MoveDefaults, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo,
+};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
@@ -511,7 +513,12 @@ fn a_build_s_move_to_takes_its_task_s_moving_sprite() {
         MOVING_TASK,
     );
     assert_eq!(
-        moving.move_to.and_then(|m| m.sprite).map(|g| g.id),
+        moving
+            .state
+            .move_to()
+            .copied()
+            .and_then(|m| m.sprite)
+            .map(|g| g.id),
         Some(SpriteId::named(3))
     );
 }
@@ -543,8 +550,9 @@ fn house() -> crate::map::spatial::Placed {
 fn a_stop_halts_the_build_and_lets_its_foundation_go() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut b = BuildAction {
-        state: BuildState::Move,
-        move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
+        state: BuildState::Move {
+            move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
+        },
         added: true,
         ..started(object_id(31148), Position::ORIGIN, Distance::ZERO, TASK)
     };
@@ -553,7 +561,7 @@ fn a_stop_halts_the_build_and_lets_its_foundation_go() {
         Ok((true, [Some(object_id(31148)), None]))
     );
     assert_eq!(
-        (b.state, b.added, b.move_to, b.target),
+        (b.state, b.added, b.state.move_to().copied(), b.target),
         (BuildState::Halted, false, None, None)
     );
     assert_eq!(b.point, Position::new(-1.0, -1.0, -1.0));
@@ -561,7 +569,6 @@ fn a_stop_halts_the_build_and_lets_its_foundation_go() {
     // one not counted among the builders, standing: nothing to stop
     let mut idle = BuildAction {
         state: BuildState::Work,
-        move_to: None,
         ..started(object_id(31150), Position::ORIGIN, Distance::ZERO, TASK)
     };
     assert_eq!(idle.halt(None), Ok((false, [Some(object_id(31150)), None])));
@@ -577,7 +584,7 @@ fn a_build_s_point_is_its_foundation_s_place() {
         Distance::new(0.8),
         TASK,
     );
-    let walk = b.move_to.unwrap();
+    let walk = b.state.move_to().copied().unwrap();
     assert_eq!(
         (
             b.point,
@@ -598,12 +605,14 @@ fn a_build_s_point_is_its_foundation_s_place() {
 fn a_builder_sent_to_another_foundation_starts_over() {
     let mut b = BuildAction {
         state: BuildState::Work,
-        move_to: None,
         added: true,
         timer: Seconds::new(0.5),
         ..started(object_id(31148), Position::ORIGIN, Distance::ZERO, TASK)
     };
-    let walk = started(object_id(31150), Position::ORIGIN, Distance::ZERO, TASK).move_to;
+    let walk = started(object_id(31150), Position::ORIGIN, Distance::ZERO, TASK)
+        .state
+        .move_to()
+        .copied();
     b.retarget(object_id(31150), Position::ORIGIN, walk, None)
         .unwrap();
     // set_state(4) keeps the timer
@@ -615,8 +624,16 @@ fn a_builder_sent_to_another_foundation_starts_over() {
         }
     );
     assert_eq!(
-        (b.state, b.added, b.move_to.map(|m| m.state)),
-        (BuildState::Move, false, Some(MoveTo::Arrived))
+        (
+            b.state.bare(),
+            b.added,
+            b.state.move_to().copied().map(|m| m.state)
+        ),
+        (
+            BuildState::Move { move_to: None },
+            false,
+            Some(MoveTo::Arrived)
+        )
     );
 }
 
@@ -640,11 +657,13 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
     };
     let mut b = BuildAction {
         state: BuildState::Place,
-        move_to: None,
         added: true,
         ..started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
     };
-    let walk = started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK).move_to;
+    let walk = started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
+        .state
+        .move_to()
+        .copied();
     b.retake(Position::ORIGIN, walk, None, Some(&mut c.builders), false)
         .unwrap();
     assert_eq!(c.builders, crate::construction::BuilderCount::of_data(1));
@@ -652,10 +671,12 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
         b,
         started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
     );
-    assert_eq!(b.move_to.map(|m| m.state), Some(MoveTo::Arrived));
+    assert_eq!(
+        b.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Arrived)
+    );
     let mut working = BuildAction {
         state: BuildState::Work,
-        move_to: None,
         ..started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
     };
     let before = working;

@@ -32,7 +32,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        if self.state == BuildState::Clear {
+        if matches!(self.state, BuildState::Clear { .. }) {
             return self.restart(c, builder);
         }
         if self.target.is_none() {
@@ -191,7 +191,7 @@ impl BuildAction {
         builder: &Unit,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
-        self.state = BuildState::WalkPoint;
+        self.state = BuildState::WalkPoint { move_to: None };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
@@ -201,7 +201,9 @@ impl BuildAction {
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
         )?;
-        self.move_to = move_reads.to_point(self.point, Distance::ZERO, self.task.moving)?;
+        self.state = BuildState::WalkPoint {
+            move_to: move_reads.to_point(self.point, Distance::ZERO, self.task.moving)?,
+        };
         Ok(())
     }
 }

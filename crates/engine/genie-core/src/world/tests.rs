@@ -2026,7 +2026,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
                 .actions_of(p.objects[i].id)
                 .list
                 .build()
-                .map(|b| b.state),
+                .map(|b| b.state.bare()),
         )
     };
     // the builder at the foundation works in its first update; the other's MoveTo fails at once
@@ -2034,7 +2034,10 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
     // failed walk's path test needs that state
     assert_eq!(
         (builder(ListIndex::new(0)), builder(ListIndex::new(1))),
-        ((118, Some(BuildState::Work)), (212, Some(BuildState::Move)))
+        (
+            (118, Some(BuildState::Work)),
+            (212, Some(BuildState::Move { move_to: None }))
+        )
     );
     // each idle villager's town-bell record: no work, at its own place
     assert_eq!(
@@ -2604,10 +2607,16 @@ fn a_work_command_on_a_damaged_building_starts_a_repair() {
     );
     let r = t.parts.actions_of(v.id).list.repair().copied().unwrap();
     assert_eq!(
-        (r.target, r.state, r.range, r.task.id, r.task.work_value),
+        (
+            r.target,
+            r.state.bare(),
+            r.range,
+            r.task.id,
+            r.task.work_value
+        ),
         (
             Some(object_id(10028)),
-            RepairState::Move,
+            RepairState::Move { move_to: None },
             Distance::new(0.5),
             TaskId::test(4),
             crate::objects::masters::WorkValue::new(0.5)
@@ -2707,10 +2716,10 @@ fn a_work_command_on_another_building_moves_the_repair_there() {
         .copied()
         .unwrap();
     assert_eq!(
-        (r.target, r.state, r.counted, r.point),
+        (r.target, r.state.bare(), r.counted, r.point),
         (
             Some(object_id(10031)),
-            RepairState::Move,
+            RepairState::Move { move_to: None },
             false,
             Position::new(34.0, 88.0, 0.0)
         )
@@ -2757,15 +2766,18 @@ fn a_work_command_on_a_foundation_starts_a_build_as_its_builder() {
     assert_eq!(
         (
             b.target,
-            b.state,
-            b.move_to.map(|m| ObjectId::field(m.target)),
+            b.state.bare(),
+            b.state
+                .move_to()
+                .copied()
+                .map(|m| ObjectId::field(m.target)),
             b.point,
-            b.move_to.map(|m| m.state),
+            b.state.move_to().copied().map(|m| m.state),
             b.added
         ),
         (
             Some(object_id(10028)),
-            BuildState::Move,
+            BuildState::Move { move_to: None },
             Some(10028),
             Position::new(30.0, 88.0, 0.0),
             Some(MoveTo::Start),
@@ -2935,7 +2947,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .build()
-            .map(|b| b.state),
+            .map(|b| b.state.bare()),
         Some(BuildState::Work)
     );
     {
@@ -2947,7 +2959,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
             .list
             .build_mut()
             .unwrap();
-        (b.state, b.added, b.move_to) = (BuildState::Wait, true, None);
+        (b.state, b.added) = (BuildState::Wait, true);
     }
     t.parts
         .building_mut(t.players[1].objects[ListIndex::new(1)].id)
@@ -2967,9 +2979,14 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
         .copied()
         .unwrap();
     assert_eq!(
-        (b.state, b.added, b.move_to.map(|m| m.state), b.target),
         (
-            BuildState::Move,
+            b.state.bare(),
+            b.added,
+            b.state.move_to().copied().map(|m| m.state),
+            b.target
+        ),
+        (
+            BuildState::Move { move_to: None },
             false,
             Some(MoveTo::Arrived),
             Some(object_id(10028))
@@ -3061,14 +3078,17 @@ fn a_work_command_on_another_foundation_moves_the_build_there() {
     assert_eq!(
         (
             b.target,
-            b.state,
+            b.state.bare(),
             b.added,
             b.point,
-            b.move_to.map(|m| ObjectId::field(m.target))
+            b.state
+                .move_to()
+                .copied()
+                .map(|m| ObjectId::field(m.target))
         ),
         (
             Some(object_id(10031)),
-            BuildState::Move,
+            BuildState::Move { move_to: None },
             false,
             Position::new(34.0, 88.0, 0.0),
             Some(10031)
@@ -3131,8 +3151,8 @@ fn a_queued_order_on_a_target_works_on_it_with_the_order_s_priority() {
             .actions_of(v.id)
             .list
             .build()
-            .map(|b| (b.target, b.state)),
-        Some((Some(object_id(10028)), BuildState::Move))
+            .map(|b| (b.target, b.state.bare())),
+        Some((Some(object_id(10028)), BuildState::Move { move_to: None }))
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
     assert_eq!(
@@ -6540,10 +6560,10 @@ fn the_unit_ai_s_repair_order_switches_a_villager_to_the_repairer() {
         .copied()
         .expect("the Repair");
     assert_eq!(
-        (r.target, r.state, r.range, r.task.id),
+        (r.target, r.state.bare(), r.range, r.task.id),
         (
             Some(object_id(10028)),
-            RepairState::Move,
+            RepairState::Move { move_to: None },
             Distance::new(0.5),
             TaskId::test(4)
         )
@@ -11619,7 +11639,6 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .set_build(Some(BuildAction {
             target: Some(object_id(10028)),
             state: BuildState::Idle,
-            move_to: None,
             point: Position::new(-1.0, -1.0, -1.0),
             task: BuildTask {
                 range: Distance::ZERO,
@@ -11760,7 +11779,6 @@ fn deaths_world() -> World {
     layers[2].list.set_build(Some(BuildAction {
         target: Some(object_id(10028)),
         state: BuildState::Place,
-        move_to: None,
         point: Position::new(-1.0, -1.0, -1.0),
         task: BuildTask {
             range: Distance::ZERO,
@@ -18892,9 +18910,9 @@ fn drop_again_with(held: Held) -> (BuildState, Option<ObjectId>, f32, i32, Vec<N
         .map(|n| n.kind)
         .collect();
     (
-        b.state,
+        b.state.bare(),
         b.site.map(DropSiteId::id),
-        b.move_to.map_or(0.0, |m| m.range.get()),
+        b.state.move_to().copied().map_or(0.0, |m| m.range.get()),
         t.players[1].objects[ListIndex::new(2)].workers.get(),
         heard,
     )
@@ -18908,20 +18926,32 @@ fn drop_again_with(held: Held) -> (BuildState, Option<ObjectId>, f32, i32, Vec<N
 fn a_loaded_builder_s_drop_off_finds_its_town_centre() {
     assert_eq!(
         drop_again_with(carrying(Some(AttributeId::numbered(17)), 6.0)),
-        (BuildState::Drop, Some(object_id(700)), 0.25, 1, vec![])
+        (
+            BuildState::Drop { move_to: None },
+            Some(object_id(700)),
+            0.25,
+            1,
+            vec![]
+        )
     );
     assert_eq!(
         drop_again_with(carrying(Some(attribute::STONE), 6.0)),
-        (BuildState::Drop, Some(object_id(700)), 0.0, 1, vec![])
+        (
+            BuildState::Drop { move_to: None },
+            Some(object_id(700)),
+            0.0,
+            1,
+            vec![]
+        )
     );
     assert_eq!(
         drop_again_with(carrying(None, 0.0)),
-        (BuildState::Move, None, 0.0, 0, vec![])
+        (BuildState::Move { move_to: None }, None, 0.0, 0, vec![])
     );
     assert_eq!(
         drop_again_with(carrying(Some(AttributeId::numbered(5)), 6.0)),
         (
-            BuildState::Move,
+            BuildState::Move { move_to: None },
             None,
             0.0,
             0,
@@ -19744,7 +19774,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
         .list
         .build_mut()
         .unwrap();
-    (b.target, b.move_to, b.state) = (Some(object_id(700)), None, BuildState::Finished);
+    (b.target, b.state) = (Some(object_id(700)), BuildState::Finished);
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     centre.workers = crate::objects::WorkerCount::of_data(1);
     let centre = centre.id;
@@ -19851,8 +19881,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
         .list
         .build_mut()
         .unwrap();
-    (b.target, b.state, b.added, b.move_to) =
-        (ObjectId::of_field(site), BuildState::Place, true, None);
+    (b.target, b.state, b.added) = (ObjectId::of_field(site), BuildState::Place, true);
     b.task = BuildTask {
         range: Distance::new(0.1),
         work_value: crate::objects::masters::WorkValue::new(1.0),
@@ -20339,7 +20368,7 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .repair()
-            .map(|r| r.state),
+            .map(|r| r.state.bare()),
     ];
     for _ in 0..n {
         in_update(
@@ -20365,7 +20394,7 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .repair()
-            .map(|r| r.state);
+            .map(|r| r.state.bare());
         if states.last() != Some(&state) {
             states.push(state);
         }
@@ -20385,7 +20414,11 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
     let mut t = repairing(Position::new(29.5, 89.5, 0.0));
     assert_eq!(
         repair_for(&mut t, 10),
-        [Some(RepairState::Move), Some(RepairState::Failed), None]
+        [
+            Some(RepairState::Move { move_to: None }),
+            Some(RepairState::Failed),
+            None
+        ]
     );
     let house = &t.players[1].objects[ListIndex::new(1)];
     assert_eq!(
@@ -20419,7 +20452,7 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
     assert_eq!(
         repair_for(&mut t, 400),
         [
-            Some(RepairState::Move),
+            Some(RepairState::Move { move_to: None }),
             Some(RepairState::Face),
             Some(RepairState::Work)
         ]
@@ -20450,7 +20483,7 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
     assert_eq!(
         repair_for(&mut t, 100),
         [
-            Some(RepairState::Move),
+            Some(RepairState::Move { move_to: None }),
             Some(RepairState::Face),
             Some(RepairState::Work)
         ]
@@ -20497,7 +20530,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     assert_eq!(
         repair_for(&mut t, 100),
         [
-            Some(RepairState::Move),
+            Some(RepairState::Move { move_to: None }),
             Some(RepairState::Face),
             Some(RepairState::Work)
         ]
@@ -20537,7 +20570,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     assert_eq!(
         repair_for(&mut t, 100),
         [
-            Some(RepairState::Move),
+            Some(RepairState::Move { move_to: None }),
             Some(RepairState::Face),
             Some(RepairState::Work)
         ]
@@ -20559,7 +20592,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     assert_eq!(
         states,
         [
-            Some(RepairState::Move),
+            Some(RepairState::Move { move_to: None }),
             Some(RepairState::Face),
             Some(RepairState::Work),
             Some(RepairState::Done),
@@ -20631,7 +20664,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         allied(HitPoints::new(300.0)),
         (
             vec![
-                Some(RepairState::Move),
+                Some(RepairState::Move { move_to: None }),
                 Some(RepairState::Face),
                 Some(RepairState::Work)
             ],
@@ -20645,7 +20678,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         allied(HitPoints::new(549.0)),
         (
             vec![
-                Some(RepairState::Move),
+                Some(RepairState::Move { move_to: None }),
                 Some(RepairState::Face),
                 Some(RepairState::Work),
                 Some(RepairState::Done),
@@ -20686,7 +20719,7 @@ fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
     assert_eq!(
         repair_for(&mut t, 100),
         [
-            Some(RepairState::Move),
+            Some(RepairState::Move { move_to: None }),
             Some(RepairState::Face),
             Some(RepairState::Work)
         ]
@@ -20857,7 +20890,11 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
             .copied()
             .unwrap();
         let house = t.players[1].objects[ListIndex::new(1)].life.state;
-        let now = (b.state, b.move_to.map(|m| m.state), house);
+        let now = (
+            b.state.bare(),
+            b.state.move_to().copied().map(|m| m.state),
+            house,
+        );
         if seen.last().is_none_or(|&(_, last)| last != now) {
             seen.push((n, now));
         }
@@ -20868,7 +20905,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
             (
                 0,
                 (
-                    BuildState::Move,
+                    BuildState::Move { move_to: None },
                     Some(MoveTo::Moving),
                     ObjectState::Foundation
                 )
@@ -20876,7 +20913,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
             (
                 8,
                 (
-                    BuildState::Move,
+                    BuildState::Move { move_to: None },
                     Some(MoveTo::Arrived),
                     ObjectState::Foundation
                 )
@@ -20968,8 +21005,8 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
         let v = &t.players[1].objects[ListIndex::new(0)];
         let b = t.parts.actions_of(v.id).list.build().copied().unwrap();
         let now = (
-            b.state,
-            b.move_to.map(|m| m.state),
+            b.state.bare(),
+            b.state.move_to().copied().map(|m| m.state),
             b.site,
             v.life.amount.get(),
         );
@@ -20977,7 +21014,7 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
             seen.push((n, now));
         }
     }
-    let drop = BuildState::Drop;
+    let drop = BuildState::Drop { move_to: None };
     assert_eq!(
         seen,
         [
@@ -20999,9 +21036,33 @@ fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
                     6.0
                 )
             ),
-            (178, (BuildState::Move, Some(MoveTo::Start), None, 0.0)),
-            (179, (BuildState::Move, Some(MoveTo::Moving), None, 0.0)),
-            (342, (BuildState::Move, Some(MoveTo::Arrived), None, 0.0)),
+            (
+                178,
+                (
+                    BuildState::Move { move_to: None },
+                    Some(MoveTo::Start),
+                    None,
+                    0.0
+                )
+            ),
+            (
+                179,
+                (
+                    BuildState::Move { move_to: None },
+                    Some(MoveTo::Moving),
+                    None,
+                    0.0
+                )
+            ),
+            (
+                342,
+                (
+                    BuildState::Move { move_to: None },
+                    Some(MoveTo::Arrived),
+                    None,
+                    0.0
+                )
+            ),
             (343, (BuildState::Work, None, None, 0.0)),
             (344, (BuildState::Place, None, None, 0.0)),
         ]
@@ -21539,7 +21600,11 @@ fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
             .copied()
             .unwrap();
         let house = t.players[1].objects[ListIndex::new(1)].life.state;
-        let now = (b.state, b.move_to.map(|m| m.state), house);
+        let now = (
+            b.state.bare(),
+            b.state.move_to().copied().map(|m| m.state),
+            house,
+        );
         if seen.last().is_none_or(|&(_, last)| last != now) {
             seen.push((n, now));
         }
@@ -21550,7 +21615,7 @@ fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
             (
                 0,
                 (
-                    BuildState::Move,
+                    BuildState::Move { move_to: None },
                     Some(MoveTo::Moving),
                     ObjectState::Foundation
                 )
@@ -21558,7 +21623,7 @@ fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
             (
                 8,
                 (
-                    BuildState::Move,
+                    BuildState::Move { move_to: None },
                     Some(MoveTo::Arrived),
                     ObjectState::Foundation
                 )

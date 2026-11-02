@@ -14,7 +14,6 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
-use crate::movement::move_to::MoveToAction;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -114,10 +113,9 @@ impl RepairTask {
 pub struct RepairAction {
     /// The target's id (`+0x30`).
     pub target: Option<ObjectId>,
-    /// The action state (`+0x18`), which word 9 adds.
+    /// The action state (`+0x18`), which word 9 adds, with its quiet `MoveTo` sub-action: to
+    /// the target (state 4) or to the point (state 11).
     pub state: RepairState,
-    /// Its quiet `MoveTo` sub-action: to the target (state 4) or to the point (state 11).
-    pub move_to: Option<MoveToAction>,
     /// `+0x38`..`+0x40`: the target's place as the action last took it (the constructor, states
     /// 4, 6 and 7), or the point the unit was sent to.
     pub point: Position,

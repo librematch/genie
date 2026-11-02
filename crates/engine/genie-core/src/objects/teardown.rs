@@ -101,7 +101,7 @@ impl Action {
                 }
                 torn.release(b.target);
                 torn.release(b.site.map(DropSiteId::id));
-                stop_if_moving(motion, b.move_to.is_some())?;
+                stop_if_moving(motion, b.state.move_to().is_some())?;
             }
             Self::Repair(r) => {
                 if r.counted
@@ -110,7 +110,7 @@ impl Action {
                     torn.builder_leaves.push(target);
                 }
                 torn.release(r.target);
-                stop_if_moving(motion, r.move_to.is_some())?;
+                stop_if_moving(motion, r.state.move_to().is_some())?;
             }
             Self::Explore(e) => stop_if_moving(motion, e.state.move_to().is_some())?,
             Self::Hunt(mut h) => {
@@ -288,11 +288,13 @@ mod tests {
     fn a_build_s_destructor_leaves_its_building_and_stops_its_walk() {
         let mut motion = moving();
         let mut b = build();
-        (b.added, b.move_to) = (
+        (b.added, b.state) = (
             true,
-            Some(MoveToAction::sub_in(
-                crate::movement::move_to::MoveTo::Moving,
-            )),
+            crate::construction::build::BuildState::Move {
+                move_to: Some(MoveToAction::sub_in(
+                    crate::movement::move_to::MoveTo::Moving,
+                )),
+            },
         );
         let torn = Action::Build(b).tear_down(motion.lent()).unwrap();
         assert_eq!(
@@ -303,7 +305,11 @@ mod tests {
             }
         );
         assert!(!moves(&motion));
-        (b.added, b.move_to, b.site) = (false, None, Some(DropSiteId::new(object_id(10050))));
+        (b.added, b.state, b.site) = (
+            false,
+            crate::construction::build::BuildState::Move { move_to: None },
+            Some(DropSiteId::new(object_id(10050))),
+        );
         let torn = Action::Build(b).tear_down(moving().lent()).unwrap();
         assert_eq!(
             (torn.releases, torn.builder_leaves),

@@ -108,8 +108,7 @@ impl RepairAction {
     ) -> Result<Self, GenieError> {
         let mut repair = Self {
             target: to.id,
-            state: RepairState::Move,
-            move_to: None,
+            state: RepairState::Move { move_to: None },
             point: to.at,
             timer: Seconds::ZERO,
             task,
@@ -117,7 +116,9 @@ impl RepairAction {
             counted: false,
             quiet: false,
         };
-        repair.move_to = repair.walk(move_reads, Some(to))?;
+        repair.state = RepairState::Move {
+            move_to: repair.walk(move_reads, Some(to))?,
+        };
         Ok(repair)
     }
 
@@ -191,11 +192,11 @@ impl RepairAction {
         }
         match self.state {
             RepairState::Done => return Ok(HeadCode::Deletes),
-            RepairState::Move => self.walking(c, repairer, me, reads)?,
+            RepairState::Move { .. } => self.walking(c, repairer, me, reads)?,
             RepairState::Face => self.facing(c, repairer, reads)?,
             RepairState::Work => self.work(c, repairer, reads)?,
             RepairState::Wait => self.waiting(c, repairer, reads)?,
-            RepairState::WalkPoint => self.walking_to_point(c, repairer, me, reads)?,
+            RepairState::WalkPoint { .. } => self.walking_to_point(c, repairer, me, reads)?,
             RepairState::Failed => {
                 notify(c, repairer, NotifyKind::ACTION_FAILED)?;
                 self.set_state(c, repairer, RepairState::Halted, reads)?;
@@ -270,7 +271,7 @@ impl RepairAction {
             0 => Ok(()),
             4 => {
                 self.drop_target(c, repairer, reads)?;
-                self.set_state(c, repairer, RepairState::WalkPoint, reads)
+                self.set_state(c, repairer, RepairState::WalkPoint { move_to: None }, reads)
             }
             _ => self.set_state(c, repairer, RepairState::Done, reads),
         }
@@ -360,7 +361,11 @@ impl RepairAction {
             },
             ..ListUpdate::default()
         };
-        update_sub_actions(&mut self.move_to, c, repairer, me, how)
+        match self.state.walk_mut() {
+            Some(move_to) => update_sub_actions(move_to, c, repairer, me, how),
+            // a state that does not walk has no sub-action: its list's update is the empty one's
+            None => update_sub_actions(&mut None, c, repairer, me, how),
+        }
     }
 
     /// The reach test of states 4 and 10: the footprints' gap (`FUN_14118f680`) less
@@ -406,7 +411,7 @@ impl RepairAction {
         if moved {
             let gap = Self::gap(repairer, reads, t);
             if REACH < gap.get() {
-                return self.set_state(c, repairer, RepairState::Move, reads);
+                return self.set_state(c, repairer, RepairState::Move { move_to: None }, reads);
             }
             self.point = t.position;
         }
@@ -487,12 +492,12 @@ impl RepairAction {
             Self::count(c, reads, -1)?;
             self.counted = false;
         }
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(repairer.id)
         {
             m.stop()?;
         }
-        self.state = state;
+        self.state = state.bare();
         self.enter(c, repairer, reads)
     }
 
@@ -510,7 +515,7 @@ impl RepairAction {
                 notify(c, repairer, NotifyKind::REQUIRES_SEARCH)?;
                 standing(c, repairer)?;
             }
-            RepairState::Move => self.enter_walk(c, repairer, reads)?,
+            RepairState::Move { .. } => self.enter_walk(c, repairer, reads)?,
             RepairState::Face => {
                 if let Some(t) = reads.target {
                     self.point = t.position;
@@ -531,7 +536,7 @@ impl RepairAction {
                     return Err(SHIP_REPAIR);
                 }
             }
-            RepairState::WalkPoint => self.enter_walk_point(c, repairer)?,
+            RepairState::WalkPoint { .. } => self.enter_walk_point(c, repairer)?,
             // 13 has no case in set_state
             RepairState::Failed => {}
         }
@@ -564,7 +569,9 @@ impl RepairAction {
                 c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
             ),
         )?;
-        self.move_to = self.to_point(self.point, &move_reads)?;
+        self.state = RepairState::WalkPoint {
+            move_to: self.to_point(self.point, &move_reads)?,
+        };
         Ok(())
     }
 
@@ -594,7 +601,9 @@ impl RepairAction {
             ),
         )?;
         let to = move_reads.walk_to(c.w, self.target)?;
-        self.move_to = self.walk(&move_reads, to)?;
+        self.state = RepairState::Move {
+            move_to: self.walk(&move_reads, to)?,
+        };
         Ok(())
     }
 
@@ -612,14 +621,13 @@ impl RepairAction {
         move_reads: &MoveToReads<'_>,
     ) -> Result<(), GenieError> {
         let walk = self.walk(move_reads, Some(to))?;
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
         }
         self.point = to.at;
-        self.state = RepairState::Move;
-        self.move_to = walk;
+        self.state = RepairState::Move { move_to: walk };
         Ok(())
     }
 
@@ -642,13 +650,12 @@ impl RepairAction {
         self.point = point;
         let counted = std::mem::replace(&mut self.counted, false);
         let old = self.target.take();
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
         }
-        self.state = RepairState::WalkPoint;
-        self.move_to = walk;
+        self.state = RepairState::WalkPoint { move_to: walk };
         Ok((old, counted))
     }
 
@@ -661,7 +668,7 @@ impl RepairAction {
     /// The unit's stop that the motion step does not model.
     pub fn halt(&mut self, mover: Option<&mut crate::movement::Mover>) -> Result<bool, GenieError> {
         let counted = std::mem::replace(&mut self.counted, false);
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;

@@ -24,7 +24,7 @@ target's cost.
 | [`action.rs`](action.rs) | The Repair action's start, update and states (`RepairAction`): the walk, the face, the wait, the work, a new target, a move and the halt. |
 | [`mod.rs`](mod.rs) | A repairer's Repair action (`TRIBE_Action_Repair`, type 106, vtable `0x142ed7b88`): the action walks to its target (state 4, a `MoveTo` sub-action within the unit's weapon range), faces it (state 6) and repairs it each update (state 7) until the target holds its most hit points or the player cannot pay for more; a target out of reach makes it wait (state 10) or fail (state 13). |
 | [`payment.rs`](payment.rs) | What a repair reaches and pays: a building's and a combat unit's slot 0x8c8 by the repairer's player. |
-| [`repair_state.rs`](repair_state.rs) | A Repair's state: the steps of its update from the walk to the work. |
+| [`repair_state.rs`](repair_state.rs) | A Repair's state: the steps of its update from the walk to the work, each walk with its `MoveTo`. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`unit.rs`](unit.rs) | The repair part of the update and the unit's attackers and seen target. |
 <!-- /files -->

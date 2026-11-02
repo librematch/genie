@@ -61,7 +61,6 @@ impl BuildAction {
                 .is_some_and(|k| k.desolid);
         // every set_state first takes the builder out of FUN_140aaddb0's building's builders
         self.uncount(c)?;
-        self.move_to = None;
         self.state = BuildState::Place;
         if !desolid {
             return self.join(c, builder);
@@ -392,7 +391,7 @@ impl BuildAction {
                 .ok_or(GenieError::unsupported(
                     "no free tile beside the footprint (set_state 2)",
                 ))?;
-        self.state = BuildState::Clear;
+        self.state = BuildState::Clear { move_to: None };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
@@ -402,8 +401,13 @@ impl BuildAction {
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
         )?;
-        self.move_to =
-            move_reads.to_point(spot.with_height(at.z()), Distance::ZERO, self.task.moving)?;
+        self.state = BuildState::Clear {
+            move_to: move_reads.to_point(
+                spot.with_height(at.z()),
+                Distance::ZERO,
+                self.task.moving,
+            )?,
+        };
         Ok(())
     }
 }

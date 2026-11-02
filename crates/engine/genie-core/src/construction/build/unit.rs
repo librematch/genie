@@ -130,7 +130,7 @@ impl Unit {
                     })
                     .collect()
             });
-        let (deposit, gone_orders) = if action.state == BuildState::Drop {
+        let (deposit, gone_orders) = if matches!(action.state, BuildState::Drop { .. }) {
             (
                 self.build_deposit(c, others, action.site)?,
                 Self::gone_drop_orders(&c.w.spatial, c.w.parts.unit_ai.get(self.id)),

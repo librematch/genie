@@ -361,7 +361,7 @@ impl World {
         let same = repair.target == Some(target);
         let stays = same
             && (repair.state == RepairState::Face
-                || (repair.state == RepairState::Move && computer));
+                || (matches!(repair.state, RepairState::Move { .. }) && computer));
         if !stays {
             if !same && repair.counted {
                 self.leave_builders(repair.target)?;

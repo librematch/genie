@@ -34,7 +34,6 @@ use std::collections::BTreeMap;
 
 use crate::GenieError;
 use crate::map::spatial::Obstruction;
-use crate::movement::move_to::MoveToAction;
 use crate::objects::masters::{Master, Task};
 use crate::unit_ai::OrderKind;
 use genie_diff::Diff;
@@ -88,11 +87,10 @@ const UNSEEN_SITE: GenieError =
 pub struct BuildAction {
     /// The foundation's id; none once it is gone.
     pub target: Option<ObjectId>,
-    /// The action state (`+0x18`), which word 9 adds.
+    /// The action state (`+0x18`), which word 9 adds, with its sub-action list's `MoveTo`
+    /// (`+0x50`): to the foundation (`set_state(4)`), to the drop site (8), to its point (11) or
+    /// off the footprint (223).
     pub state: BuildState,
-    /// Its sub-action list's `MoveTo` (`+0x50`), None for an empty list: to the foundation
-    /// (`set_state(4)`), to the drop site (8), to its point (11) or off the footprint (223).
-    pub move_to: Option<MoveToAction>,
     /// `+0x38`..`+0x40`, the action's own point: the foundation's place from the constructor
     /// (`FUN_140aad4e0`) and each `set_state(4)` with a target, −1 each from `set_state(2)`;
     /// `set_state(11)` walks there.
