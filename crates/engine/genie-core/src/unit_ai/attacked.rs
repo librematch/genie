@@ -13,6 +13,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::master_type::MISSILE;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
@@ -68,7 +69,7 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -78,7 +79,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         // slot 0x48's notify and the alert 0x201 reach the same owner
-        alert_owner(computer)?;
+        alert_owner(player_type)?;
         let _ = self.attackers.add(n.caller);
         side.set_under_attack(true);
         if n.p[1] < 1 {
@@ -94,15 +95,19 @@ impl UnitAi {
         }
         // `IsIdle` (FUN_141017ad0) of the unit's group, read at the handler's start
         let held_by_group = at.group.is_some_and(|g| !g.idle);
-        if !known && !computer && self.current_target != Some(attacker_id) && !held_by_group {
-            self.ask_for_help(attacker_id, at, computer, side)?;
+        if !known
+            && !player_type.is_computer()
+            && self.current_target != Some(attacker_id)
+            && !held_by_group
+        {
+            self.ask_for_help(attacker_id, at, player_type, side)?;
         }
-        if self.ignores_attacker(&attacker, attacker_id, computer, held_by_group) {
+        if self.ignores_attacker(&attacker, attacker_id, player_type, held_by_group) {
             return Ok(GO_ON);
         }
         let current = Self::world_object(self.current_target, at, side)?;
         if self.best_this_update.is_none() {
-            self.best_against(attacker_id, current.as_ref(), at, computer, side)?;
+            self.best_against(attacker_id, current.as_ref(), at, player_type, side)?;
         }
         if self.best_this_update.is_none()
             && self.current_target.is_none()
@@ -113,13 +118,13 @@ impl UnitAi {
             if at.speed < Speed::new(STILL) {
                 return Ok(GO_ON);
             }
-            let ran = self.run_away(true, at, computer, ai_rng, side)?;
+            let ran = self.run_away(true, at, player_type, ai_rng, side)?;
             return Ok(if ran { BREAK } else { GO_ON });
         }
         if self.best_this_update != Some(attacker_id) {
             return Ok(GO_ON);
         }
-        self.answer_attacker(&attacker, current, at, computer, ai_rng, side)
+        self.answer_attacker(&attacker, current, at, player_type, ai_rng, side)
     }
 
     /// [`UnitAi::damaged`]'s step 3 after the call for help: true when the unit ignores
@@ -130,7 +135,7 @@ impl UnitAi {
         &self,
         attacker: &UnitSeen,
         attacker_id: ObjectId,
-        computer: bool,
+        player_type: PlayerType,
         held_by_group: bool,
     ) -> bool {
         if matches!(self.current_action, Some(ActionKind::Attack))
@@ -138,7 +143,7 @@ impl UnitAi {
         {
             return true;
         }
-        if !computer
+        if !player_type.is_computer()
             && !matches!(
                 self.current_order,
                 None | Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -146,10 +151,10 @@ impl UnitAi {
         {
             return true;
         }
-        if !computer && held_by_group {
+        if !player_type.is_computer() && held_by_group {
             return true;
         }
-        computer
+        player_type.is_computer()
             && matches!(self.current_order, Some(OrderKind::Explore))
             && attacker.owner != PlayerId::GAIA
     }
@@ -163,18 +168,22 @@ impl UnitAi {
         attacker_id: ObjectId,
         current: Option<&UnitSeen>,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
         let from = current.map_or(at.position, |t| t.position);
-        let (classes, radius) = self.search_area(at, computer)?;
+        let (classes, radius) = self.search_area(at, player_type)?;
         let found = side.closest(&Search {
             at: from.ground(),
             radius,
             classes,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !computer { 2 } else { 0 },
+                lowest: if at.scenario && !player_type.is_computer() {
+                    2
+                } else {
+                    0
+                },
                 seeker: self.seeker(at),
                 ask: AttackAsk {
                     distance: Distance::ZERO,
@@ -188,7 +197,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, computer)?;
+        self.attack_search_alert(found, player_type)?;
         self.best_this_update = found.id;
         Ok(())
     }
@@ -203,7 +212,7 @@ impl UnitAi {
         attacker: &UnitSeen,
         current: Option<UnitSeen>,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -214,14 +223,14 @@ impl UnitAi {
                 return self.strike_back(attacker_id, at, ai_rng, side);
             }
             if self.current_action != Some(ActionKind::Move) {
-                let _ = self.run_away(true, at, computer, ai_rng, side)?;
+                let _ = self.run_away(true, at, player_type, ai_rng, side)?;
             }
             return Ok(BREAK);
         };
         if !reaches {
             return Ok(GO_ON);
         }
-        if !computer {
+        if !player_type.is_computer() {
             if matches!(target.class, class::BUILDING | class::WALL | class::TOWER) {
                 return self.strike_back(attacker_id, at, ai_rng, side);
             }
@@ -262,7 +271,7 @@ impl UnitAi {
             ) {
                 self.save_patrol(side);
             }
-            self.ask_for_help(attacker_id, at, true, side)?;
+            self.ask_for_help(attacker_id, at, PlayerType::COMPUTER, side)?;
             if self.attack_slot(attacker_id, true, at, side, ai_rng)? {
                 self.leave_patrol_timers(ai_rng);
                 self.current_order = None;
@@ -376,7 +385,7 @@ impl UnitAi {
                 rng,
             )?;
         }
-        if !off.computer
+        if !off.player_type.is_computer()
             // The villager class (`-0xea8` raw): a boar attacking one turns furious.
             && off.class == class::VILLAGER
             && let (Some(site), Some(target)) = (off.site, off.action_target)
@@ -454,17 +463,17 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         let action = self.current_action;
         let auto = action == Some(ActionKind::AutoScout);
         // a computer player's unit AI finds no tile (slot 0x90 gives 0 without a draw)
-        if !auto && !computer {
+        if !auto && !player_type.is_computer() {
             closest_undiscovered_tile()?;
         }
-        let found = if computer && !auto {
+        let found = if player_type.is_computer() && !auto {
             None
         } else {
             side.seek_unexplored(self, ai_rng)?
@@ -486,7 +495,9 @@ impl UnitAi {
                     // FUN_14162dab0: no case for it but the old short pather's hulled area, a
                     // computer player's AI would hear it); processing breaks
                     side.make_scout_map()?;
-                    if computer && self.current_action == Some(ActionKind::AutoScout) {
+                    if player_type.is_computer()
+                        && self.current_action == Some(ActionKind::AutoScout)
+                    {
                         return Err(GenieError::unsupported(
                             "a computer player's AI told its scout found nothing (0x202)",
                         ));

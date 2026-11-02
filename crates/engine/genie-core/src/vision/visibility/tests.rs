@@ -6,6 +6,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type;
 use crate::ownership::CaptureKind;
+use crate::players::PlayerType;
 use crate::test_ids::object_id;
 use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
@@ -24,7 +25,7 @@ fn world(players: PlayerId) -> Visibility {
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![false; players.index()],
+        vec![PlayerType::HUMAN; players.index()],
     )
 }
 
@@ -745,7 +746,7 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
 #[test]
 fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
     let mut v = world(PlayerId::new(3));
-    v.computer = vec![false, true, false];
+    v.player_types = vec![PlayerType::HUMAN, PlayerType::COMPUTER, PlayerType::HUMAN];
     assert_eq!(
         v.explore(
             PlayerId::new(1),

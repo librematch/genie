@@ -176,7 +176,7 @@ impl Unit {
                 .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
             farm_stops: c.w.settings.walkable_farms,
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             stop_productivity: crate::gathering::gather::productivity_of(
                 task.productivity,
                 attributes,
@@ -434,7 +434,7 @@ impl Unit {
                 pathing: &mut c.w.pathing,
                 object: c.w.streams.get(Stream::Object),
                 world_time: c.w.world_time,
-                computer: c.w.players.player(c.player)?.kind.is_computer(),
+                player_type: c.w.players.player(c.player)?.kind,
                 groups: &c.w.groups,
             };
             // the notify's record holds the drop site's id, 0 for none

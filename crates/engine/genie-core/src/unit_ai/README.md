@@ -10,7 +10,8 @@ show in checkpoint word 9.
 
 - `mod.rs` holds the `UnitAi` state, its notifies and its order queue.
 - `unit.rs` is the unit AI's part of the object's update.
-- `update.rs`, `retarget.rs` and `idle.rs` hold the full update, the retarget and the idle checks.
+- `update.rs`, `idle_part.rs`, `retarget.rs` and `idle.rs` hold the full update, its idle part,
+  the retarget and the idle checks.
 - `notifies.rs`, `handle.rs` and `type_notifies.rs` process the notifies: `handle.rs` hands each to
   its unit-AI type's handler (`type_notifies.rs`), most of which pass it on to the base handler.
 - `process_order.rs`, `order_kinds.rs` and `attack_orders.rs` process the orders by kind.
@@ -48,6 +49,7 @@ show in checkpoint word 9.
 | [`handle.rs`](handle.rs) | The notifies' handling, the artifact's and the base's. |
 | [`idle.rs`](idle.rs) | The idle checks of ships, siege, soldiers, units that do not attack and towers. |
 | [`idle_animals.rs`](idle_animals.rs) | The idle checks of the boar, the hunted animals and the lions. |
+| [`idle_part.rs`](idle_part.rs) | The idle part of the update (`0x140c66b10` after slot 73): slot 72's idle timer, the patrol branch, class 3's and 52's making branch and the end. |
 | [`ids.rs`](ids.rs) | The orders, actions, timers and reaches the unit AI names, its factory types and stances. |
 | [`issuer.rs`](issuer.rs) | A queued order's issuer: the player whose command gave the order, or the object that queued it. |
 | [`life.rs`](life.rs) | A unit AI's construction, its order and target, its patrol and its moves. |
@@ -59,7 +61,7 @@ show in checkpoint word 9.
 | [`order_outcome.rs`](order_outcome.rs) | What an order's processing answers (`OrderOutcome`). |
 | [`order_priority.rs`](order_priority.rs) | An order's priority. |
 | [`process_order.rs`](process_order.rs) | An order's processing: the combat and work orders, the top target and the attack slots. |
-| [`retarget.rs`](retarget.rs) | The idle part of the update, the retarget check and search, and the types' other checks. |
+| [`retarget.rs`](retarget.rs) | The retarget check and search, and the types' other checks (slot 73, processMisc). |
 | [`side.rs`](side.rs) | What the unit AI asks of the world (`UnitSide`) and the commands it gives its unit. |
 | [`surroundings.rs`](surroundings.rs) | What the unit AI knows of its surroundings: the searches' results, its home, its targets and what it has seen. |
 | [`target_type.rs`](target_type.rs) | A queued order's target type: the number its writer puts there, a master id or a class, and the two ways the game reads it. |

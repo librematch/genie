@@ -432,7 +432,7 @@ fn builder_on_an_annex_counts_among_its_main_building_builders() {
         None,
         None,
         Some(&mut main.builders),
-        false,
+        PlayerType::HUMAN,
     )
     .unwrap();
     assert_eq!(
@@ -1039,11 +1039,8 @@ fn builder_set_state_7_clears_stump_and_joins() {
 #[test]
 fn another_player_marks_on_the_footprint_halt_the_build() {
     for (kind, kept) in [
-        (crate::players::PlayerType::HUMAN, ObjectState::Removed),
-        (
-            crate::players::PlayerType::COMPUTER,
-            ObjectState::Foundation,
-        ),
+        (PlayerType::HUMAN, ObjectState::Removed),
+        (PlayerType::COMPUTER, ObjectState::Foundation),
     ] {
         let mut t = site_world(class::VILLAGER, Position::new(12.5, 10.5, 0.0), placing());
         t.players[1].kind = kind;

@@ -27,6 +27,7 @@ use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_id;
@@ -731,7 +732,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
         vec![VisionBits::NONE; 400],
         Vec::new(),
         0,
-        vec![false; 3],
+        vec![PlayerType::HUMAN; 3],
     );
     v.add_seer(
         object_id(id),

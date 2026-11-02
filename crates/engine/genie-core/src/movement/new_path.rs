@@ -453,7 +453,7 @@ impl Mover {
         to: Point,
         radii: Distance,
     ) -> Result<Option<(Found, Distance)>, GenieError> {
-        let full = !plan.computer;
+        let full = !plan.player_type.is_computer();
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
             return Ok(None);
         };

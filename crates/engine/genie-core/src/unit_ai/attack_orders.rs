@@ -8,6 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
@@ -39,7 +40,7 @@ impl UnitAi {
         order: QueuedOrder,
         keep_from: Option<ObjectId>,
         place: Option<(Point, Option<ClassId>)>,
-        world: Option<(&Surroundings, bool)>,
+        world: Option<(&Surroundings, PlayerType)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {

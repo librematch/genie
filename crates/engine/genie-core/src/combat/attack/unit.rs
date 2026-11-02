@@ -15,6 +15,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
@@ -94,10 +95,10 @@ impl Unit {
     ) -> Result<HeadCode, GenieError> {
         let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = self.master(c.w.master_tables(), c.player)?;
-        let computer =
+        let player_type =
             c.w.players
                 .get(c.player.index())
-                .is_some_and(|q| q.kind.is_computer());
+                .map_or(PlayerType::PHANTOM, |q| q.kind);
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,
@@ -109,7 +110,7 @@ impl Unit {
                 &c.w.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
-            (computer, c.w.world_time),
+            (player_type, c.w.world_time),
         );
         let code = attack.update_gone(c, self, me, &r, master_class);
         if let Some(a) = actions.list.attack_mut() {
@@ -135,10 +136,10 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
-        let computer =
+        let player_type =
             c.w.players
                 .get(c.player.index())
-                .is_some_and(|q| q.kind.is_computer());
+                .map_or(PlayerType::PHANTOM, |q| q.kind);
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,
@@ -150,7 +151,7 @@ impl Unit {
                 &c.w.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
-            (computer, c.w.world_time),
+            (player_type, c.w.world_time),
         );
         let victim = victim(c, attack.target)?.ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold live",

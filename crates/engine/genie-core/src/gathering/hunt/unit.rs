@@ -161,7 +161,7 @@ impl Unit {
                 pathing: &mut c.w.pathing,
                 object: c.w.streams.get(Stream::Object),
                 world_time: c.w.world_time,
-                computer: c.w.players.player(c.player)?.kind.is_computer(),
+                player_type: c.w.players.player(c.player)?.kind,
                 groups: &c.w.groups,
             };
             let (site, _) = self.drop_site(
@@ -462,7 +462,7 @@ impl Unit {
         let mut plan = Planning {
             pathing: &mut c.w.pathing,
             now: c.w.world_time,
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             object: c.w.streams.get(Stream::Object),
             groups: &c.w.groups,
         };

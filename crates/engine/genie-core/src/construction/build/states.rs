@@ -16,6 +16,7 @@ use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
@@ -383,10 +384,10 @@ impl BuildAction {
         walk: Option<MoveToAction>,
         mover: Option<&mut crate::movement::Mover>,
         builders: Option<&mut crate::construction::BuilderCount>,
-        computer: bool,
+        player_type: PlayerType,
     ) -> Result<(), GenieError> {
         if self.state == BuildState::Work
-            || (matches!(self.state, BuildState::Move { .. }) && computer)
+            || (matches!(self.state, BuildState::Move { .. }) && player_type.is_computer())
         {
             return Ok(());
         }

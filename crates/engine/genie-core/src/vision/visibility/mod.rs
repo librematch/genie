@@ -38,6 +38,7 @@ use crate::objects::masters::ids;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
@@ -239,9 +240,9 @@ pub struct Visibility {
     pub extents: Vec<Extent>,
     /// The UMV list's capacity (`+0x5e04`): it grows by 8.
     pub extents_capacity: i32,
-    /// Players whose type is 3: a computer player's map tells its AI of a newly explored tile
-    /// (its slot 0x88, [`crate::players::ai_module`]).
-    pub computer: Vec<bool>,
+    /// Each player's type: a computer player's (type 3) map tells its AI of a newly explored
+    /// tile (its slot 0x88, [`crate::players::ai_module`]).
+    pub player_types: Vec<PlayerType>,
     /// The tiles a computer player's map explored that its AI module has not heard of yet, in
     /// order ([`Visibility::take_ai_tiles`]).
     ai_tiles: Vec<(PlayerId, Tile)>,
@@ -314,7 +315,7 @@ impl Visibility {
         unified: Vec<VisionBits>,
         extents: Vec<Extent>,
         extents_capacity: i32,
-        computer: Vec<bool>,
+        player_types: Vec<PlayerType>,
     ) -> Self {
         let n = (size.width().max(0) * size.height().max(0)) as usize;
         let players = maps.len();
@@ -325,7 +326,7 @@ impl Visibility {
             links: vec![(0, 0); n],
             extents,
             extents_capacity,
-            computer,
+            player_types,
             ai_tiles: Vec::new(),
             seers: crate::objects::IdTable::new(),
             registry: None,

@@ -38,6 +38,7 @@ use crate::map::{Tile, TileRect};
 use crate::math::fmath::BVector;
 use crate::pathing::tile_path::Path;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
 
@@ -178,8 +179,9 @@ pub struct LongRequest {
     pub moves: bool,
     /// The terrain classes the unit may stand on (its restriction's mask).
     pub mask: crate::map::TerrainMask,
-    /// The owner is a computer player (`FUN_141659cf0`): a shorter budget.
-    pub computer: bool,
+    /// The owner's type (`player+0x10`): a computer player (`FUN_141659cf0`) has a shorter
+    /// budget.
+    pub player_type: PlayerType,
     /// The tiles of the ignored units the search lowers the tall count of, once each
     /// (`FUN_140f60440`: the unit itself and its moving ignored units, not inside another, whose
     /// master has a height).
@@ -531,7 +533,7 @@ fn search(
     *front.cost.checked_mut(cell(map, req.from))? = start_cost;
     front.heap.slots = vec![(Tile::new(0, 0), SENTINEL), (req.from, start_cost)];
     let straight = crate::math::fmath::sqrt(gap2 as f32) as i32;
-    let budget = if req.computer {
+    let budget = if req.player_type.is_computer() {
         straight.wrapping_mul(COMPUTER_FACTOR)
     } else {
         straight.wrapping_mul(HUMAN_PERCENT) / 100
@@ -632,7 +634,7 @@ mod tests {
             target: None,
             moves: true,
             mask: TerrainMask::of_bits(1),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             lowered: Vec::new(),
             within_range: false,
             near_player: false,

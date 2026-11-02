@@ -19,6 +19,7 @@ use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
@@ -226,7 +227,7 @@ impl Unit {
 
     /// Runs `f` on the unit's AI with its side ([`UnitView`]: the unit without its AI, on the
     /// update's step, the owner as `view` names it) and the AI stream, with `attacker` for the
-    /// attack tests ([`Unit::attacker_of`]), as player `player` (`computer`); the AI is the
+    /// attack tests ([`Unit::attacker_of`]), as player `player` (of `player_type`); the AI is the
     /// unit's again after it and is posted the notifies the side's calls gave it.
     ///
     /// # Panics
@@ -243,7 +244,7 @@ impl Unit {
         c: &mut Step<'_>,
         view: &OwnerView,
         attacker: crate::unit_ai::Attacker,
-        (player, computer): (PlayerId, bool),
+        (player, player_type): (PlayerId, PlayerType),
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let mut ai = c.w.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
@@ -257,7 +258,7 @@ impl Unit {
             actions,
             attacker,
             player,
-            computer,
+            player_type,
             new_owner: view.new_owner,
             civ: view.civ,
             ai_settings: view.ai_settings,
@@ -295,7 +296,7 @@ impl Unit {
             &mut UnitAi,
             &Surroundings,
             &mut dyn crate::unit_ai::UnitSide,
-            bool,
+            PlayerType,
             &mut Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {
@@ -307,7 +308,7 @@ impl Unit {
         let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
         let master = Some(self.master(c.w.master_tables(), c.player)?);
         let class = master.map(|ms| ms.class);
-        let (player, computer) = (c.player, c.w.players.player(c.player)?.kind.is_computer());
+        let (player, player_type) = (c.player, c.w.players.player(c.player)?.kind);
         let view = OwnerView::of(c, None)?;
         let interruptible = actions.interruptible(c.w.parts.unread.get(self.id))?;
         let at = self.surroundings(
@@ -321,7 +322,7 @@ impl Unit {
             actions,
             ai_type,
             master,
-            (player, computer),
+            (player, player_type),
             c.w.settings.game_mode.scenario(),
             (
                 at.capture,
@@ -336,8 +337,8 @@ impl Unit {
             c,
             &view,
             attacker,
-            (player, computer),
-            |ai, side, rng| f(ai, &at, side, computer, rng),
+            (player, player_type),
+            |ai, side, rng| f(ai, &at, side, player_type, rng),
         )
     }
 
@@ -365,13 +366,13 @@ impl Unit {
             ));
         };
         let master = Some(self.master(c.w.master_tables(), c.player)?);
-        let (player, computer) = (c.player, c.w.players.player(c.player)?.kind.is_computer());
+        let (player, player_type) = (c.player, c.w.players.player(c.player)?.kind);
         let view = OwnerView::of(c, None)?;
         let attacker = self.attacker_of(
             actions,
             ai_type,
             master,
-            (player, computer),
+            (player, player_type),
             c.w.settings.game_mode.scenario(),
             (
                 self.capture_kind(c),
@@ -386,7 +387,7 @@ impl Unit {
             c,
             &view,
             attacker,
-            (player, computer),
+            (player, player_type),
             |ai, side, rng| f(ai, side, rng),
         )
     }
@@ -427,7 +428,7 @@ impl Unit {
         let class = master.map(|ms| ms.class);
         // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
         // owner then): on that player's turn, with its time as it stands
-        let (turn, player, computer) = match captured {
+        let (turn, player, player_type) = match captured {
             Some(k) if k.main => (
                 (k.new == c.w.player_turn)
                     .then(|| c.w.player_time.get(k.new.index()).copied())
@@ -435,13 +436,9 @@ impl Unit {
                 k.new,
                 c.w.players
                     .get(k.new.index())
-                    .is_some_and(|q| q.kind.is_computer()),
+                    .map_or(PlayerType::PHANTOM, |q| q.kind),
             ),
-            _ => (
-                c.turn,
-                c.player,
-                c.w.players.player(c.player)?.kind.is_computer(),
-            ),
+            _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
         };
         let view = OwnerView::of(c, captured.filter(|k| k.main).map(|k| k.new))?;
         // RGE_Combat_Object::update: on the owner's turn the full update (slot 4), else
@@ -492,7 +489,7 @@ impl Unit {
             actions,
             ai_type,
             master,
-            (player, computer),
+            (player, player_type),
             c.w.settings.game_mode.scenario(),
             (
                 at.capture,
@@ -507,15 +504,19 @@ impl Unit {
             c,
             &view,
             attacker,
-            (player, computer),
+            (player, player_type),
             |ai, side, ai_stream| {
                 // an order on a target comes only from a full update, on the owner's turn
                 match (turn, after) {
                     (Some(_), Some(after)) => ai
-                        .after_order(after, world_time, computer, &at, ai_stream, side)
+                        .after_order(after, world_time, player_type, &at, ai_stream, side)
                         .map(|()| None),
-                    (Some(dt), None) => ai.update(dt, world_time, computer, &at, ai_stream, side),
-                    (None, _) => ai.off_turn(&at, side, computer, ai_stream).map(|()| None),
+                    (Some(dt), None) => {
+                        ai.update(dt, world_time, player_type, &at, ai_stream, side)
+                    }
+                    (None, _) => ai
+                        .off_turn(&at, side, player_type, ai_stream)
+                        .map(|()| None),
                 }
             },
         )

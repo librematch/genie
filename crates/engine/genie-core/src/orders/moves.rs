@@ -328,7 +328,7 @@ impl World {
             class,
             reach,
             target.is_none(),
-            self.players.player(player)?.kind.is_computer(),
+            self.players.player(player)?.kind,
         );
         // a class 54 under an action the slice does not hold may be under its Pack or Unpack
         if packs || (class == class::CLASS_54 && self.parts.unread.contains(unit.id)) {

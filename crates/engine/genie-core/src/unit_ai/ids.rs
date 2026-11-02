@@ -13,6 +13,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::Posture;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
@@ -293,8 +294,8 @@ pub struct NewObject {
     /// through slot 0x8a8, `FUN_141206d50`: the work range of its master's last task of action
     /// type 6, else 0): the hunted animal's leash.
     pub hunt_range: Distance,
-    /// The owner is a computer player (`FUN_141659cf0`: `+0x10` 3).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// The owner's posture (`+0x71c`, its slot 0x90 `FUN_1416224f0`).
     pub posture: Posture,
     /// The owner's attribute 6, the current age (`player+0x100` at `+0x30`).
@@ -303,7 +304,7 @@ pub struct NewObject {
 
 impl NewObject {
     /// The object at `position` of master `made` (id `master`), its owner's fields left at a
-    /// human player's in the Dark Age with posture 0 ([`NewObject::computer`],
+    /// human player's in the Dark Age with posture 0 ([`NewObject::player_type`],
     /// [`NewObject::posture`], [`NewObject::age`] are the caller's).
     #[must_use]
     pub fn of(
@@ -325,7 +326,7 @@ impl NewObject {
                 .rev()
                 .find(|t| t.action_type == crate::objects::masters::action_type::HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             posture: Posture::AGGRESSIVE,
             age: Amount::ZERO,
         }
@@ -361,17 +362,17 @@ pub(super) const NO_ATTACK_CLASS: ClassId = class::CLASS_61;
 /// else the owner's posture (slot 0x90, `+0x71c`, its low byte).
 pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
     // UCOMISS with JP, JNZ: the age equals 0 (a NaN does not)
-    if !new.computer
+    if !new.player_type.is_computer()
         && new.object_flags.contains(ObjectFlags::SCOUT)
         && new.copy_id == Some(new.master)
         && new.age == Amount::ZERO
     {
         return UnitStance::STAND_GROUND;
     }
-    if !new.computer && DEFENSIVE_MASTERS.contains(&new.master) {
+    if !new.player_type.is_computer() && DEFENSIVE_MASTERS.contains(&new.master) {
         return UnitStance::DEFENSIVE;
     }
-    if !new.computer && NO_ATTACK_CLASSES.contains(&new.class) {
+    if !new.player_type.is_computer() && NO_ATTACK_CLASSES.contains(&new.class) {
         return UnitStance::NO_ATTACK;
     }
     // TEST 9, then a signed byte at least 0 or bit 3 clear
@@ -388,7 +389,7 @@ pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
 /// for a computer player's and for classes 51 and 54 (`-0xe79`, `-0xe76` raw); the owner's
 /// posture (slot 0x90, its low byte) for class 55 (`-0xe75`); 1 for any other.
 pub(super) fn siege_stance(new: &NewObject) -> UnitStance {
-    if new.computer || matches!(new.class, class::CLASS_51 | class::CLASS_54) {
+    if new.player_type.is_computer() || matches!(new.class, class::CLASS_51 | class::CLASS_54) {
         return UnitStance::AGGRESSIVE;
     }
     if new.class == class::CLASS_55 {
@@ -408,8 +409,8 @@ pub(super) fn dodges(at: &Surroundings, ai: &mut Well512) -> bool {
 /// and 0x207 from a transport, units left inside or no unload there; `FUN_14162dab0`): a human
 /// player's alert list or interface message and the old pather's hulled-area reset, not held;
 /// a computer player's AI hears it (slot 0x3c8), which is not modelled.
-pub(crate) const fn alert_owner(computer: bool) -> Result<(), GenieError> {
-    if computer {
+pub(crate) const fn alert_owner(player_type: PlayerType) -> Result<(), GenieError> {
+    if player_type.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)",
         ));

@@ -413,7 +413,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             class: a.class,
             kind: a.kind,
             attack_priority: a.attack_priority,
-            computer: a.computer,
+            player_type: a.player_type,
             walls_allowed: self.ai_settings.may_attack_walls,
             can_move: seeker.can_move(),
             sight: crate::unit_ai::attack_sight(a)?,

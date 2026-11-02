@@ -152,7 +152,7 @@ impl World {
                 plan: Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,
-                    computer: player.kind.is_computer(),
+                    player_type: player.kind,
                     object: self.streams.get(Stream::Object),
                     groups: &self.groups,
                 },

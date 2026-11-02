@@ -219,7 +219,7 @@ impl World {
     ) -> Result<NewObject, GenieError> {
         let owner = self.players.player(p)?;
         Ok(NewObject {
-            computer: owner.kind.is_computer(),
+            player_type: owner.kind,
             posture: owner.posture,
             // The player's attribute a new soldier's unit AI reads: the current age (`player+0x100` at
             // `+0x30`, `FUN_140c12300`).

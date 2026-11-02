@@ -22,6 +22,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -164,8 +165,8 @@ pub struct Attacker {
     pub ai_type: UnitAiType,
     /// The unit's player.
     pub player: PlayerId,
-    /// The owner is a computer player (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// The unit's state.
     pub state: ObjectState,
     /// The kind it holds (`attribute_type_held`, `+0x308`), none for −1.
@@ -468,7 +469,7 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
     if !t.targeting {
         return Ok(false);
     }
-    if me.computer {
+    if me.player_type.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's soldier's attack check",
         ));

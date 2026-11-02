@@ -24,14 +24,15 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::step::Step;
 
 /// Who walks to a hunt's point ([`HuntAction::update_point_walk`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PointWalker {
-    /// The owner is a computer player (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// The unit is a villager (class 4): its `MoveTo` waits once when the motion step gives up.
     pub villager: bool,
     /// Its unit AI's stance (`+0x1a9`), 0 without one: the wait is a second below 2, else two.
@@ -65,8 +66,8 @@ pub struct HuntStart<'a> {
     pub target: &'a Quarry,
     /// The owner.
     pub player: PlayerId,
-    /// The owner's type test (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// The game settings' test `FUN_141302150`.
     pub carry_rule: bool,
     /// What the hunter carries, its resource kind and amount.
@@ -114,7 +115,7 @@ impl HuntAction {
     /// keeps the amount as the task's kind (`FUN_14119d310` on `held`); a loaded hunter sent to
     /// one of its own drop sites carries the load there (`set_state` 8); else `set_state(4)`. A
     /// target of another, unallied player (or of class 49) that is not dead yet is attacked first
-    /// (`set_state` 12). `computer` is the owner's type test (`FUN_141659cf0`); `carry_rule` the
+    /// (`set_state` 12). `player_type` is the owner's type (`FUN_141659cf0` tests it); `carry_rule` the
     /// game settings' test `FUN_141302150`, with which a hunter drops another resource it carries
     /// (a computer player's does when it carries none).
     pub fn start(
@@ -127,7 +128,7 @@ impl HuntAction {
             task,
             target,
             player,
-            computer,
+            player_type,
             carry_rule,
             held,
             walks,
@@ -146,7 +147,7 @@ impl HuntAction {
         if Amount::ZERO < target.amount {
             let kind = task.resource;
             let both_food = crate::gathering::both_food(kind, held.kind);
-            let drops = computer && held.amount == Amount::ZERO;
+            let drops = player_type.is_computer() && held.amount == Amount::ZERO;
             if held.kind != kind {
                 if both_food {
                     held.kind = kind;
@@ -403,7 +404,7 @@ impl HuntAction {
         who: PointWalker,
     ) -> Result<PointWalk, GenieError> {
         let gives_up = GiveUp {
-            waits: !who.computer && who.villager,
+            waits: !who.player_type.is_computer() && who.villager,
             stance: who.stance,
         };
         let ended = match self.update_list(c, unit, me, gives_up)?.get() {
@@ -412,7 +413,7 @@ impl HuntAction {
             3 => false,
             code => return Err(QUIET_CODE.with("code", code)),
         };
-        if who.computer {
+        if who.player_type.is_computer() {
             return Err(GenieError::unsupported(if ended {
                 "a computer player's hunt after its walk (set_state 1)"
             } else {

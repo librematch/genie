@@ -723,6 +723,7 @@ mod tests {
     use crate::objects::masters::{MasterId, ids};
     use crate::objects::sprite::Graphic;
     use crate::ownership::CaptureKind;
+    use crate::players::PlayerType;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
@@ -1726,7 +1727,7 @@ mod tests {
                 vec![VisionBits::NONE; 400],
                 Vec::new(),
                 0,
-                vec![false],
+                vec![PlayerType::HUMAN],
             );
             v.add_seer(
                 object_id(10),

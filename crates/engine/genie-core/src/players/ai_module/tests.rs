@@ -8,6 +8,7 @@ use crate::movement::explore::Area;
 use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::ai_module::search::{DEAD_END, EXPLORED, PUNTED, UNEXPLORED};
 use crate::players::ai_module::{
     AiModule, AiModules, InfoModule, SLOTS, SearchArea, SearchUnit, TacticalModule,
@@ -104,7 +105,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![false, true, false],
+        vec![PlayerType::HUMAN, PlayerType::COMPUTER, PlayerType::HUMAN],
     );
     assert_eq!(
         v.explore(PlayerId::new(1), Tile::new(3, 2), SightTiles::new(0), false),

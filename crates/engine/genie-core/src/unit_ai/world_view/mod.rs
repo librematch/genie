@@ -9,6 +9,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::others::OthersRef;
@@ -40,7 +41,7 @@ pub(crate) struct DropWorld<'a> {
     pub pathing: &'a mut Pathing,
     pub object: &'a mut Well512,
     pub world_time: WorldTime,
-    pub computer: bool,
+    pub player_type: PlayerType,
     pub groups: &'a crate::groups::UnitGroups,
 }
 
@@ -193,8 +194,8 @@ pub(crate) struct UnitView<'u, 's> {
     /// The owner, as the AI runs (a captured unit's new one): its diplomacy, attributes and
     /// civ are what the task search reads of it.
     pub(crate) player: PlayerId,
-    /// The owner is a computer player.
-    pub(crate) computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub(crate) player_type: PlayerType,
     /// The player that took the unit over in its update ([`changed_view`]).
     pub(crate) new_owner: Option<PlayerId>,
     /// The owner's civ.

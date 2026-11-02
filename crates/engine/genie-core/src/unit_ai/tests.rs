@@ -31,6 +31,7 @@ use crate::objects::masters::master_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::Posture;
 use crate::players::QueryRelation;
 use crate::players::attribute::AttributeId;
@@ -64,7 +65,7 @@ impl UnitAi {
         &mut self,
         dt: Millis,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -72,7 +73,7 @@ impl UnitAi {
         if !self.is_idle() {
             return Err(GenieError::unsupported("unit is not idle"));
         }
-        let fx = self.update_fx(dt, world_time, computer, at, ai, side)?;
+        let fx = self.update_fx(dt, world_time, player_type, at, ai, side)?;
         Ok(first_move(&fx))
     }
 
@@ -82,7 +83,7 @@ impl UnitAi {
         &mut self,
         dt: Millis,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -91,7 +92,7 @@ impl UnitAi {
         let after = self.update(
             dt,
             world_time,
-            computer,
+            player_type,
             at,
             ai,
             &mut With::at(side, &mut fx, at),
@@ -104,12 +105,12 @@ impl UnitAi {
         &mut self,
         dt: Millis,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<Vec<Effect>, GenieError> {
-        self.update_after(dt, world_time, computer, at, ai, side)
+        self.update_after(dt, world_time, player_type, at, ai, side)
             .map(|(fx, _)| fx)
     }
 
@@ -118,11 +119,11 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<Vec<Effect>, GenieError> {
         let mut fx = Vec::new();
-        self.off_turn(at, &mut With::at(side, &mut fx, at), computer, ai)?;
+        self.off_turn(at, &mut With::at(side, &mut fx, at), player_type, ai)?;
         Ok(fx)
     }
 
@@ -132,7 +133,7 @@ impl UnitAi {
         &mut self,
         after: AfterOrder,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -141,7 +142,7 @@ impl UnitAi {
         self.after_order(
             after,
             world_time,
-            computer,
+            player_type,
             at,
             ai,
             &mut With::at(side, &mut fx, at),
@@ -523,7 +524,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         walks: Vec::new(),
     };
     let mut gate = idle(BUILDING_AI);
-    gate.ask_for_help(object_id(7955), &at, false, &mut gone)
+    gate.ask_for_help(object_id(7955), &at, PlayerType::HUMAN, &mut gone)
         .unwrap();
     assert_eq!((gone.searches.len(), gone.walks.len()), (0, 0));
     let mut side = HelpSide {
@@ -531,7 +532,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         searches: Vec::new(),
         walks: Vec::new(),
     };
-    gate.ask_for_help(object_id(7955), &at, false, &mut side)
+    gate.ask_for_help(object_id(7955), &at, PlayerType::HUMAN, &mut side)
         .unwrap();
     assert_eq!(side.searches, [(BUILDING_CARED.to_vec(), 7.0)]);
     assert_eq!(side.walks, [object_id(7955)]);
@@ -543,7 +544,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         walks: Vec::new(),
     };
     villager
-        .ask_for_help(object_id(7955), &at, false, &mut side)
+        .ask_for_help(object_id(7955), &at, PlayerType::HUMAN, &mut side)
         .unwrap();
     assert_eq!(side.searches, [(CIVILIAN_CARED.to_vec(), 14.0)]);
     for (ai_type, class, cared) in [
@@ -562,7 +563,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
             walks: Vec::new(),
         };
         idle(ai_type)
-            .ask_for_help(object_id(7955), &at, false, &mut side)
+            .ask_for_help(object_id(7955), &at, PlayerType::HUMAN, &mut side)
             .unwrap();
         assert_eq!(side.searches, [(cared.to_vec(), 7.0)]);
     }
@@ -572,7 +573,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         walks: Vec::new(),
     };
     idle(FISHING_AI)
-        .ask_for_help(object_id(7955), &at, false, &mut side)
+        .ask_for_help(object_id(7955), &at, PlayerType::HUMAN, &mut side)
         .unwrap();
     assert_eq!(side.searches, [(FISHING_CARED.to_vec(), 14.0)]);
 }
@@ -639,7 +640,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
         spot: Some(Point::new(29.5, 89.5)),
         z: 2.0,
         class: class::VILLAGER,
-        computer: false,
+        player_type: PlayerType::HUMAN,
         player: player_id(1),
         site: Some(site),
         action_target: Some(tree),
@@ -716,7 +717,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         spot: Some(Point::new(164.5, 51.5)),
         z: 0.0,
         class: class::PREY,
-        computer: false,
+        player_type: PlayerType::HUMAN,
         player: player_id(0),
         site: None,
         action_target: None,
@@ -732,7 +733,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         .update_fx(
             Millis::new(50),
             WorldTime::from_millis(22643),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut side,
@@ -887,7 +888,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
     let r = ai
         .process_order(
             &order,
-            Some((&at, false)),
+            Some((&at, PlayerType::HUMAN)),
             None,
             &mut rng(),
             &mut With::new(&mut side, &mut fx),
@@ -935,7 +936,12 @@ fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
     let mut ai = sent_off_queue();
     let mut side = WaitSide(true, Vec::new());
     let fx = ai
-        .off_turn_fx(&scout_at(true, false), &mut side, false, &mut rng())
+        .off_turn_fx(
+            &scout_at(true, false),
+            &mut side,
+            PlayerType::HUMAN,
+            &mut rng(),
+        )
         .unwrap();
     assert_eq!(fx, vec![]);
     assert_eq!(side.1, vec![object_id(10028)]);
@@ -969,7 +975,9 @@ fn foundation_order_without_wait_goes_and_the_work_runs() {
         }],
         ..scout_at(true, false)
     };
-    let fx = ai.off_turn_fx(&at, &mut side, false, &mut rng()).unwrap();
+    let fx = ai
+        .off_turn_fx(&at, &mut side, PlayerType::HUMAN, &mut rng())
+        .unwrap();
     assert_eq!(side.1, vec![object_id(10028)]);
     assert_eq!(
         (ai.current_action, ai.last_action),
@@ -1166,25 +1174,44 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
         ..ResourceSide::default()
     };
     let mut u = hunter(-1, -1);
-    assert_eq!(search(&mut u, &mut deer(), 9, false).0, Ok(BREAK));
+    assert_eq!(
+        search(&mut u, &mut deer(), 9, PlayerType::HUMAN).0,
+        Ok(BREAK)
+    );
     assert_eq!(
         (u.current_target, u.target_class),
         (Some(object_id(40)), class_of(9))
     );
     let mut u = hunter(9, -1);
-    assert_eq!(search(&mut u, &mut deer(), -1, false).0, Ok(BREAK));
+    assert_eq!(
+        search(&mut u, &mut deer(), -1, PlayerType::HUMAN).0,
+        Ok(BREAK)
+    );
     let mut u = hunter(-1, 9);
-    assert_eq!(search(&mut u, &mut deer(), -1, false).0, Ok(BREAK));
+    assert_eq!(
+        search(&mut u, &mut deer(), -1, PlayerType::HUMAN).0,
+        Ok(BREAK)
+    );
     let mut u = hunter(-1, -1);
-    assert_eq!(search(&mut u, &mut deer(), -1, false).0, Ok(GO_ON));
+    assert_eq!(
+        search(&mut u, &mut deer(), -1, PlayerType::HUMAN).0,
+        Ok(GO_ON)
+    );
     assert_eq!((u.current_target, u.current_action), (None, None));
     let mut none = ResourceSide {
         closest: Some(found_at(-1)),
         ..ResourceSide::default()
     };
     let mut u = hunter(-1, -1);
-    assert_eq!(search(&mut u, &mut none, 9, false), (Ok(GO_ON), vec![]));
-    assert!(search(&mut hunter(-1, -1), &mut none, 9, true).0.is_err());
+    assert_eq!(
+        search(&mut u, &mut none, 9, PlayerType::HUMAN),
+        (Ok(GO_ON), vec![])
+    );
+    assert!(
+        search(&mut hunter(-1, -1), &mut none, 9, PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
     let mut placeless = ResourceSide {
         closest: Some(Found {
             position: None,
@@ -1193,18 +1220,18 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
         ..ResourceSide::default()
     };
     assert!(
-        search(&mut hunter(-1, -1), &mut placeless, 9, false)
+        search(&mut hunter(-1, -1), &mut placeless, 9, PlayerType::HUMAN)
             .0
             .is_err()
     );
     assert!(
-        search(&mut hunter(-1, -1), &mut deer(), 49, false)
+        search(&mut hunter(-1, -1), &mut deer(), 49, PlayerType::HUMAN)
             .0
             .is_err()
     );
     let mut boar = ResourceSide::default();
     assert_eq!(
-        search(&mut hunter(-1, -1), &mut boar, 0x21, false).0,
+        search(&mut hunter(-1, -1), &mut boar, 0x21, PlayerType::HUMAN).0,
         Ok(GO_ON)
     );
     assert_eq!(
@@ -1256,12 +1283,12 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
     };
     let mut u = gatherer(-1, -1);
     assert_eq!(
-        search(&mut u, &mut ResourceSide::default(), -1, false).0,
+        search(&mut u, &mut ResourceSide::default(), -1, PlayerType::HUMAN).0,
         Ok(GO_ON)
     );
     assert_eq!((u.current_target, u.current_action), (None, None));
     let mut stone = ResourceSide::default();
-    let _ = search(&mut gatherer(-1, 8), &mut stone, -1, false);
+    let _ = search(&mut gatherer(-1, 8), &mut stone, -1, PlayerType::HUMAN);
     assert_eq!(
         stone.searches,
         vec![(
@@ -1276,7 +1303,7 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
         ..ResourceSide::default()
     };
     let mut u = gatherer(-1, -1);
-    let (r, fx) = search(&mut u, &mut farm, 49, false);
+    let (r, fx) = search(&mut u, &mut farm, 49, PlayerType::HUMAN);
     assert_eq!(
         (r, fx),
         (
@@ -1289,10 +1316,16 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
         ..ResourceSide::default()
     };
     let mut u = gatherer(-1, -1);
-    assert_eq!(search(&mut u, &mut none, 49, false), (Ok(GO_ON), vec![]));
+    assert_eq!(
+        search(&mut u, &mut none, 49, PlayerType::HUMAN),
+        (Ok(GO_ON), vec![])
+    );
     assert_eq!(u.current_target, Some(object_id(28202)));
     let mut u = gatherer(-1, -1);
-    assert_eq!(search(&mut u, &mut none, 49, true).0, Ok(GO_ON));
+    assert_eq!(
+        search(&mut u, &mut none, 49, PlayerType::COMPUTER).0,
+        Ok(GO_ON)
+    );
     assert_eq!(u.current_target, None);
     let mut placeless = ResourceSide {
         closest: Some(Found {
@@ -1302,7 +1335,7 @@ fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
         ..ResourceSide::default()
     };
     assert!(
-        search(&mut gatherer(-1, -1), &mut placeless, 49, false)
+        search(&mut gatherer(-1, -1), &mut placeless, 49, PlayerType::HUMAN)
             .0
             .is_err()
     );
@@ -1342,17 +1375,26 @@ fn villager_searches_by_its_action() {
         ..ResourceSide::default()
     };
     assert_eq!(
-        run(&mut villager(Some(ActionKind::Hunt)), &mut deer, false).0,
+        run(
+            &mut villager(Some(ActionKind::Hunt)),
+            &mut deer,
+            PlayerType::HUMAN
+        )
+        .0,
         Ok(BREAK)
     );
     let mut u = villager(Some(ActionKind::Gather));
-    assert_eq!(run(&mut u, &mut deer, false).0, Ok(BREAK));
+    assert_eq!(run(&mut u, &mut deer, PlayerType::HUMAN).0, Ok(BREAK));
     let building = |foundation| ResourceSide {
         foundation: Some(foundation),
         ..ResourceSide::default()
     };
     let mut u = villager(Some(ActionKind::Build));
-    let (r, fx) = run(&mut u, &mut building((Some(object_id(10028)), true)), false);
+    let (r, fx) = run(
+        &mut u,
+        &mut building((Some(object_id(10028)), true)),
+        PlayerType::HUMAN,
+    );
     assert_eq!(
         (r, fx),
         (
@@ -1368,14 +1410,22 @@ fn villager_searches_by_its_action() {
     );
     for foundation in [(Some(object_id(10028)), false), (None, false)] {
         let mut u = villager(Some(ActionKind::Build));
-        let got = run(&mut u, &mut building(foundation), false);
+        let got = run(&mut u, &mut building(foundation), PlayerType::HUMAN);
         assert_eq!(got, (Ok(BREAK), vec![Effect::Stop]), "{foundation:?}");
     }
     let mut u = villager(Some(ActionKind::Build));
-    assert!(run(&mut u, &mut building((None, false)), true).0.is_err());
+    assert!(
+        run(&mut u, &mut building((None, false)), PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
     for action in [ActionKind::Shepherd, ActionKind::Explore].map(Some) {
         let mut u = villager(action);
-        assert!(run(&mut u, &mut ResourceSide::default(), false).0.is_err());
+        assert!(
+            run(&mut u, &mut ResourceSide::default(), PlayerType::HUMAN)
+                .0
+                .is_err()
+        );
     }
 }
 
@@ -1474,7 +1524,7 @@ fn gatherer_asked_for_another_target_gathers_what_its_search_finds() {
         ai.gatherer_search(
             n,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
@@ -1522,7 +1572,7 @@ fn gatherer_asked_for_another_target_gathers_what_its_search_finds() {
         ai.gatherer_search(
             n,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
@@ -1569,7 +1619,7 @@ fn hunter_of_kind_searches_by_it_from_its_drop_site() {
         ai.hunter_search(
             n,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
@@ -1613,7 +1663,7 @@ fn hunter_of_kind_searches_by_it_from_its_drop_site() {
         ai.hunter_search(
             n,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
@@ -1722,7 +1772,14 @@ fn stop_before_an_attack_command_runs_first() {
         NotifyKind::ACTION_COMPLETED,
         [600, 31126, 0],
     );
-    let r = u.handle(done, Millis::ZERO, &at, false, &mut rng(), &mut side);
+    let r = u.handle(
+        done,
+        Millis::ZERO,
+        &at,
+        PlayerType::HUMAN,
+        &mut rng(),
+        &mut side,
+    );
     assert_eq!((r, side.fx.clone()), (Ok(GO_ON), vec![Effect::Stop]));
     let hit = Notify {
         caller: Some(object_id(27240)),
@@ -1730,7 +1787,14 @@ fn stop_before_an_attack_command_runs_first() {
         kind: NotifyKind::DAMAGED,
         p: [27240, 3, 33],
     };
-    let _ = u.handle(hit, Millis::ZERO, &at, false, &mut rng(), &mut side);
+    let _ = u.handle(
+        hit,
+        Millis::ZERO,
+        &at,
+        PlayerType::HUMAN,
+        &mut rng(),
+        &mut side,
+    );
     // the stop came with no attack before it, the attack after it
     assert_eq!(
         (side.stops, side.attacks),
@@ -1796,7 +1860,7 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
         n,
         Millis::ZERO,
         &at(CombatLevel::ANIMAL),
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -1810,7 +1874,7 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
         n,
         Millis::ZERO,
         &at(CombatLevel::MILITARY),
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -1828,7 +1892,7 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
         n,
         Millis::ZERO,
         &at(CombatLevel::MILITARY),
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2164,7 +2228,7 @@ fn villager_evades_another_player_attacker() {
         hit,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2225,7 +2289,7 @@ fn villager_invalidated_action_off_its_searches_stops_it() {
         u.villager_search(
             n,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
@@ -2246,7 +2310,7 @@ fn villager_invalidated_action_off_its_searches_stops_it() {
             u.villager_search(
                 n,
                 &at,
-                false,
+                PlayerType::HUMAN,
                 &mut With::new(&mut side, &mut fx),
                 &mut rng()
             ),
@@ -2264,7 +2328,7 @@ fn villager_invalidated_action_off_its_searches_stops_it() {
             .villager_search(
                 gather,
                 &at,
-                false,
+                PlayerType::HUMAN,
                 &mut With::new(&mut side, &mut Vec::new()),
                 &mut rng()
             )
@@ -2280,7 +2344,7 @@ fn villager_invalidated_action_off_its_searches_stops_it() {
         moving().villager_search(
             tree,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
@@ -2329,61 +2393,101 @@ fn an_invalidated_action_of_the_order_or_an_attack_stops_the_unit() {
     let kept = (Ok(GO_ON), Some(object_id(30)));
     let mut u = unit(Some(OrderKind::Attack), Some(ActionKind::Attack));
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Attack.value(), 0), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Attack.value(), 0),
+            PlayerType::HUMAN
+        ),
         gone
     );
     assert_eq!(u.current_order, None);
     let mut u = unit(None, None);
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Attack.value(), 0x202), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Attack.value(), 0x202),
+            PlayerType::HUMAN
+        ),
         gone
     );
     let mut u = unit(Some(OrderKind::Attack), Some(ActionKind::Attack));
     assert!(
-        run(&mut u, invalid(ActionKind::Attack.value(), 0), true)
-            .0
-            .is_err()
+        run(
+            &mut u,
+            invalid(ActionKind::Attack.value(), 0),
+            PlayerType::COMPUTER
+        )
+        .0
+        .is_err()
     );
     let mut u = UnitAi {
         retarget_disabled: 1,
         ..unit(Some(OrderKind::Attack), Some(ActionKind::Attack))
     };
     assert!(
-        run(&mut u, invalid(ActionKind::Attack.value(), 0), false)
-            .0
-            .is_err()
+        run(
+            &mut u,
+            invalid(ActionKind::Attack.value(), 0),
+            PlayerType::HUMAN
+        )
+        .0
+        .is_err()
     );
     let mut u = unit(None, Some(ActionKind::Move));
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Move.value(), 0), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Move.value(), 0),
+            PlayerType::HUMAN
+        ),
         gone
     );
     let mut u = unit(None, Some(ActionKind::Move));
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Gather.value(), 0), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Gather.value(), 0),
+            PlayerType::HUMAN
+        ),
         kept
     );
     let mut u = unit(Some(OrderKind::Move), Some(ActionKind::Move));
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Move.value(), 0), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Move.value(), 0),
+            PlayerType::HUMAN
+        ),
         gone
     );
     let mut u = unit(Some(OrderKind::Follow), Some(ActionKind::Move));
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Move.value(), 0), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Move.value(), 0),
+            PlayerType::HUMAN
+        ),
         kept
     );
     let mut u = unit(Some(OrderKind::Follow), Some(ActionKind::Move));
     assert_eq!(
-        run(&mut u, invalid(ActionKind::Attack.value(), 0), false),
+        run(
+            &mut u,
+            invalid(ActionKind::Attack.value(), 0),
+            PlayerType::HUMAN
+        ),
         gone
     );
     for order in [OrderKind::GroupGather, OrderKind::Defend] {
         let mut u = unit(Some(order), Some(ActionKind::Move));
         assert!(
-            run(&mut u, invalid(ActionKind::Move.value(), 0), false)
-                .0
-                .is_err()
+            run(
+                &mut u,
+                invalid(ActionKind::Move.value(), 0),
+                PlayerType::HUMAN
+            )
+            .0
+            .is_err()
         );
     }
 }
@@ -2420,7 +2524,7 @@ fn completed_action_of_the_order_or_an_attack_stops_the_unit() {
         let r = u.action_completed(
             done(p0),
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new()),
         );
@@ -2524,7 +2628,7 @@ fn the_base_handler_takes_each_kind_it_models() {
             n,
             Millis::ZERO,
             at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx),
         );
@@ -2613,7 +2717,7 @@ fn villager_dodges_missile_warning_or_takes_it_as_damage() {
             warning,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut ai,
             &mut With::new(&mut side, &mut fx)
         ),
@@ -2626,7 +2730,7 @@ fn villager_dodges_missile_warning_or_takes_it_as_damage() {
             warning,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -2654,7 +2758,7 @@ fn villager_attacks_harmless_attacker_back() {
         hit,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2679,7 +2783,7 @@ fn moving_villager_keeps_its_way() {
         hit,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2694,7 +2798,7 @@ fn moving_villager_keeps_its_way() {
         hit,
         Millis::ZERO,
         &nan,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2709,7 +2813,7 @@ fn moving_villager_keeps_its_way() {
         hit,
         Millis::ZERO,
         &still,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2726,7 +2830,7 @@ fn moving_villager_keeps_its_way() {
             hit,
             Millis::ZERO,
             &unknown,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         )
@@ -2784,7 +2888,12 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
         };
         let mut fx = Vec::new();
         assert_eq!(
-            u.defend_misc(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+            u.defend_misc(
+                &at,
+                PlayerType::HUMAN,
+                &mut rng(),
+                &mut With::new(&mut side, &mut fx)
+            ),
             Ok(true)
         );
         assert_eq!(
@@ -2805,7 +2914,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
     assert_eq!(
         u.defend_misc(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -2824,7 +2933,12 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
     };
     let mut fx = Vec::new();
     assert_eq!(
-        u.defend_misc(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.defend_misc(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(false)
     );
     assert_eq!(
@@ -2846,7 +2960,12 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
     };
     let mut fx = Vec::new();
     assert_eq!(
-        u.defend_misc(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.defend_misc(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -2870,7 +2989,12 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
     };
     let mut fx = Vec::new();
     assert_eq!(
-        u.defend_misc(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.defend_misc(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(true)
     );
     assert_eq!(side.attacks, vec![object_id(40)]);
@@ -2883,7 +3007,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
     assert_eq!(
         u.defend_misc(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut DamageSide::default(), &mut fx)
         ),
@@ -2906,7 +3030,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
     assert_eq!(
         u.defend_misc(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut DamageSide::default(), &mut Vec::new())
         ),
@@ -2976,7 +3100,7 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
         damage(7, 20),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -2994,7 +3118,7 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
         damage(7, 0),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3017,7 +3141,7 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
         damage(7, 20),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3038,7 +3162,7 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
         damage(7, 20),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3055,34 +3179,59 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
 /// computer player's soldier's with 10.
 #[test]
 fn each_unit_ai_type_searches_its_constructor_classes() {
-    let list = |t: UnitAiType, class: ClassId, computer: bool| {
-        cared_classes(t, Some(class), computer).unwrap()
+    let list = |t: UnitAiType, class: ClassId, player_type: PlayerType| {
+        cared_classes(t, Some(class), player_type).unwrap()
     };
-    assert_eq!(list(UnitAiType::HUNTED, class::PREY, false), &HUNTED_CARED);
     assert_eq!(
-        list(UnitAiType::PREDATOR, class::PREDATOR, false),
+        list(UnitAiType::HUNTED, class::PREY, PlayerType::HUMAN),
+        &HUNTED_CARED
+    );
+    assert_eq!(
+        list(UnitAiType::PREDATOR, class::PREDATOR, PlayerType::HUMAN),
         &[class::LIVESTOCK, class::VILLAGER]
     );
     let none: &[ClassId] = &[];
-    assert_eq!(list(BOAR_AI, class::PREDATOR, false), none);
+    assert_eq!(list(BOAR_AI, class::PREDATOR, PlayerType::HUMAN), none);
     assert_eq!(
         (
-            list(UnitAiType::RANGED_6, class::CLASS_0, false),
-            list(UnitAiType::RANGED_7, class::CLASS_0, false)
+            list(UnitAiType::RANGED_6, class::CLASS_0, PlayerType::HUMAN),
+            list(UnitAiType::RANGED_7, class::CLASS_0, PlayerType::HUMAN)
         ),
         (none, none)
     );
-    assert_eq!(list(UnitAiType::LION, class::PREDATOR, false), &LION_CARED);
-    assert_eq!(list(PRIEST_AI, class::MONK, false).len(), 30);
-    assert_eq!(list(TRADE_AI, class::TRADE_BOAT, false), &TRADE_SHIP_CARED);
-    assert_eq!(list(TRADE_AI, class::TRADE_CART, false), &TRADE_CART_CARED);
     assert_eq!(
-        list(SOLDIER_AI, class::CLASS_6, true).last(),
+        list(UnitAiType::LION, class::PREDATOR, PlayerType::HUMAN),
+        &LION_CARED
+    );
+    assert_eq!(list(PRIEST_AI, class::MONK, PlayerType::HUMAN).len(), 30);
+    assert_eq!(
+        list(TRADE_AI, class::TRADE_BOAT, PlayerType::HUMAN),
+        &TRADE_SHIP_CARED
+    );
+    assert_eq!(
+        list(TRADE_AI, class::TRADE_CART, PlayerType::HUMAN),
+        &TRADE_CART_CARED
+    );
+    assert_eq!(
+        list(SOLDIER_AI, class::CLASS_6, PlayerType::COMPUTER).last(),
         Some(&class::PREDATOR)
     );
-    assert_eq!(list(SOLDIER_AI, class::CLASS_6, false), &SOLDIER_CARED);
-    assert_eq!(list(LIVESTOCK_AI, class::LIVESTOCK, false), none);
-    assert!(cared_classes(UnitAiType::of_value(1), Some(class::LIVESTOCK), false).is_err());
+    assert_eq!(
+        list(SOLDIER_AI, class::CLASS_6, PlayerType::HUMAN),
+        &SOLDIER_CARED
+    );
+    assert_eq!(
+        list(LIVESTOCK_AI, class::LIVESTOCK, PlayerType::HUMAN),
+        none
+    );
+    assert!(
+        cared_classes(
+            UnitAiType::of_value(1),
+            Some(class::LIVESTOCK),
+            PlayerType::HUMAN
+        )
+        .is_err()
+    );
 }
 
 /// Slot 0xa8 by factory type: the civilian and the building never attack a neutral object,
@@ -3200,7 +3349,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         damage(7, 20),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3215,7 +3364,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         damage(8, 20),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3237,7 +3386,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         damage(7, 20),
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3258,7 +3407,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
         damage(7, 20),
         Millis::ZERO,
         &still,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3298,7 +3447,7 @@ fn soldier_with_target_attacks_back_from_buildings_only() {
                 damage(7, 20),
                 Millis::ZERO,
                 &at,
-                false,
+                PlayerType::HUMAN,
                 &mut rng(),
                 &mut With::new(&mut side, &mut fx),
             )
@@ -3499,7 +3648,12 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
         };
         let mut fx = Vec::new();
         scout
-            .next_after_kill(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx))
+            .next_after_kill(
+                &at,
+                PlayerType::HUMAN,
+                &mut rng(),
+                &mut With::new(&mut side, &mut fx),
+            )
             .unwrap();
         (scout, side.attacks, fx)
     };
@@ -3555,7 +3709,7 @@ fn patrol_kill_ends_the_patrol_order_with_its_timers() {
     scout
         .next_after_kill(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new()),
         )
@@ -3584,7 +3738,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
         scout(UnitStance::STAND_GROUND).retarget_outcome(
             sheep,
             Distance::ZERO,
-            false,
+            PlayerType::HUMAN,
             Some(ActionState::new(4)),
             Some(true)
         ),
@@ -3594,7 +3748,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
         scout(UnitStance::AGGRESSIVE).retarget_outcome(
             sheep,
             Distance::ZERO,
-            false,
+            PlayerType::HUMAN,
             Some(ActionState::new(6)),
             Some(true)
         ),
@@ -3604,7 +3758,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
         scout(UnitStance::AGGRESSIVE).retarget_outcome(
             sheep,
             Distance::ZERO,
-            false,
+            PlayerType::HUMAN,
             Some(ActionState::new(4)),
             Some(true)
         ),
@@ -3618,7 +3772,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
         scout(UnitStance::AGGRESSIVE).retarget_outcome(
             Some((PlayerId::new(1), class::BUILDING)),
             Distance::ZERO,
-            true,
+            PlayerType::COMPUTER,
             Some(ActionState::new(6)),
             Some(true)
         ),
@@ -3640,7 +3794,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
         entering.retarget_outcome(
             Some((PlayerId::new(8), class::BUILDING)),
             Distance::ZERO,
-            false,
+            PlayerType::HUMAN,
             Some(ActionState::new(4)),
             Some(false)
         ),
@@ -3652,7 +3806,7 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             .retarget_outcome(
                 Some((PlayerId::new(8), class::BUILDING)),
                 Distance::ZERO,
-                false,
+                PlayerType::HUMAN,
                 None,
                 None
             )
@@ -3709,7 +3863,7 @@ fn hunter_hit_by_its_boar_ignores_the_damage() {
         hit,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -3740,7 +3894,7 @@ fn hunter_hit_by_its_boar_ignores_the_damage() {
             hit,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         )
@@ -3816,7 +3970,7 @@ fn released_attacker_leaves_the_set_through_notify_699() {
         released(Some(object_id(10049))),
         Millis::ZERO,
         &Surroundings::default(),
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut Vec::new()),
     );
@@ -3848,7 +4002,7 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
         .update_fx(
             Millis::new(50),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut no_search,
@@ -3869,7 +4023,7 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
         .update_fx(
             Millis::new(50),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut no_search,
@@ -3953,7 +4107,7 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
     assert!(
         u.retarget_check(
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut With::new(&mut finds_nothing(), &mut fx)
@@ -3967,7 +4121,7 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
     assert_eq!(
         u.retarget_check(
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut With::new(&mut finds_nothing(), &mut fx)
@@ -4001,7 +4155,7 @@ fn retarget_waits_for_the_timer() {
         .update_idle(
             Millis::new(50),
             WorldTime::from_millis(899),
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4012,7 +4166,7 @@ fn retarget_waits_for_the_timer() {
         .update_idle(
             Millis::new(50),
             WorldTime::from_millis(900),
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4036,7 +4190,7 @@ fn last_retarget_ahead_of_the_world_time_wraps_and_retargets() {
         .update_idle(
             Millis::new(50),
             WorldTime::from_millis(100),
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4057,7 +4211,7 @@ fn villagers_and_livestock_never_retarget() {
             .update_idle(
                 Millis::new(50),
                 WorldTime::from_millis(5000),
-                false,
+                PlayerType::HUMAN,
                 &Surroundings::default(),
                 &mut r,
                 &mut no_search,
@@ -4082,7 +4236,7 @@ fn the_look_around_timeout_is_redrawn_once_exceeded() {
         .update_idle(
             Millis::new(1000),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4093,7 +4247,7 @@ fn the_look_around_timeout_is_redrawn_once_exceeded() {
         .update_idle(
             Millis::new(1),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4116,7 +4270,7 @@ fn retarget_draws_before_look_around() {
         .update_idle(
             Millis::new(1),
             WorldTime::from_millis(900),
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4153,7 +4307,7 @@ fn the_idle_timer_restarts_after_its_timeout_and_the_secondary_timer_stops_at_0(
         .update_idle(
             Millis::new(3001),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -4176,7 +4330,7 @@ fn non_idle_units_and_unknown_types_are_unsupported() {
         busy.update_idle(
             Millis::new(1),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search
@@ -4189,7 +4343,7 @@ fn non_idle_units_and_unknown_types_are_unsupported() {
             .update_idle(
                 Millis::new(1),
                 WorldTime::ZERO,
-                false,
+                PlayerType::HUMAN,
                 &Surroundings::default(),
                 &mut r,
                 &mut no_search
@@ -4448,7 +4602,7 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
         unexplored: Some(Tile::new(5, 6)),
         ..ScoutSide::default()
     };
-    let (r, fx) = seek(&mut u, &mut side, false);
+    let (r, fx) = seek(&mut u, &mut side, PlayerType::HUMAN);
     assert_eq!(
         (r, fx),
         (Ok(BREAK), vec![Effect::Explore(Point::new(5.0, 6.0))])
@@ -4462,7 +4616,7 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
         beyond: Some(Tile::new(7, 8)),
         ..ScoutSide::default()
     };
-    let (r, fx) = seek(&mut u, &mut side, false);
+    let (r, fx) = seek(&mut u, &mut side, PlayerType::HUMAN);
     assert_eq!(
         (r, fx),
         (Ok(BREAK), vec![Effect::Explore(Point::new(7.0, 8.0))])
@@ -4473,27 +4627,48 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
     );
     let mut u = scout(Some(OrderKind::AutoScout));
     let mut side = ScoutSide::default();
-    assert_eq!(seek(&mut u, &mut side, false), (Ok(BREAK), vec![]));
+    assert_eq!(
+        seek(&mut u, &mut side, PlayerType::HUMAN),
+        (Ok(BREAK), vec![])
+    );
     assert!(side.mapped);
     let mut u = scout(Some(OrderKind::AutoScout));
-    assert!(seek(&mut u, &mut ScoutSide::default(), true).0.is_err());
+    assert!(
+        seek(&mut u, &mut ScoutSide::default(), PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
     let mut u = scout(None);
-    assert_eq!(seek(&mut u, &mut ScoutSide::default(), false).0, Ok(GO_ON));
+    assert_eq!(
+        seek(&mut u, &mut ScoutSide::default(), PlayerType::HUMAN).0,
+        Ok(GO_ON)
+    );
     assert_eq!((u.current_target, u.current_action), (None, None));
     let mut u = scout(Some(OrderKind::Scout));
-    assert!(seek(&mut u, &mut ScoutSide::default(), false).0.is_err());
+    assert!(
+        seek(&mut u, &mut ScoutSide::default(), PlayerType::HUMAN)
+            .0
+            .is_err()
+    );
     let mut u = UnitAi {
         current_action: Some(ActionKind::Explore),
         ..scout(None)
     };
-    assert!(seek(&mut u, &mut ScoutSide::default(), false).0.is_err());
+    assert!(
+        seek(&mut u, &mut ScoutSide::default(), PlayerType::HUMAN)
+            .0
+            .is_err()
+    );
     // a computer player's explorer finds no tile (slot 0x90 gives none for it): the target goes,
     // the action stops and its owner hears the notify
     let mut u = UnitAi {
         current_action: Some(ActionKind::Explore),
         ..scout(None)
     };
-    assert_eq!(seek(&mut u, &mut ScoutSide::default(), true).0, Ok(GO_ON));
+    assert_eq!(
+        seek(&mut u, &mut ScoutSide::default(), PlayerType::COMPUTER).0,
+        Ok(GO_ON)
+    );
     assert_eq!((u.current_target, u.current_action), (None, None));
 }
 
@@ -4534,7 +4709,12 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
     let (mut ai, at) = rock_church();
     let mut side = ArtifactSide::finding(500, 1, Some(PlayerId::new(2)));
     let mut fx = Vec::new();
-    let took = ai.process_idle(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx));
+    let took = ai.process_idle(
+        &at,
+        PlayerType::HUMAN,
+        &mut rng(),
+        &mut With::new(&mut side, &mut fx),
+    );
     assert_eq!(took, Ok(true));
     assert_eq!(fx, [Effect::ChangeOwner(PlayerId::new(2))]);
     assert_eq!(side.searches, [(6.0, ARTIFACT_CARED.to_vec(), false)]);
@@ -4546,7 +4726,12 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
     ] {
         let mut side = ArtifactSide::finding(id, players, owner);
         let mut fx = Vec::new();
-        let took = ai.process_idle(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx));
+        let took = ai.process_idle(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx),
+        );
         assert_eq!((took, fx), (Ok(false), vec![]));
     }
     // a moving one asks for the reach test
@@ -4557,7 +4742,7 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
     let mut side = ArtifactSide::finding(-1, 0, None);
     let _ = ai.process_idle(
         &walking,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut Vec::new()),
     );
@@ -4576,7 +4761,7 @@ fn the_artifact_update_hands_it_over_then_stops() {
         .update_fx(
             Millis::new(100),
             WorldTime::from_millis(5000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut side,
@@ -4591,7 +4776,7 @@ fn the_artifact_update_hands_it_over_then_stops() {
         .update_fx(
             Millis::new(100),
             WorldTime::from_millis(5000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut side,
@@ -4620,7 +4805,7 @@ fn the_artifact_notifies_stop_it_or_go_on() {
             n,
             Millis::ZERO,
             at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx),
         );
@@ -4892,7 +5077,7 @@ fn new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
 #[test]
 fn new_soldier_takes_its_stance_from_its_master_and_owner() {
     let mut computer = placed(Position::ORIGIN, class::CLASS_6);
-    computer.computer = true;
+    computer.player_type = PlayerType::COMPUTER;
     computer.posture = Posture::DEFENSIVE;
     let mut r = rng();
     let ai = UnitAi::constructed(SOLDIER_AI, &computer, &mut r).unwrap();
@@ -4953,7 +5138,7 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(
         stance(&|n| {
             n.object_flags = ObjectFlags::SCOUT;
-            n.computer = true;
+            n.player_type = PlayerType::COMPUTER;
         }),
         UnitStance::AGGRESSIVE
     );
@@ -4970,7 +5155,7 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(
         stance(&|n| {
             n.master = ids::ID_527;
-            n.computer = true;
+            n.player_type = PlayerType::COMPUTER;
         }),
         UnitStance::AGGRESSIVE
     );
@@ -4986,7 +5171,7 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(
         stance(&|n| {
             n.class = class::CLASS_35;
-            n.computer = true;
+            n.player_type = PlayerType::COMPUTER;
         }),
         UnitStance::AGGRESSIVE
     );
@@ -5026,7 +5211,7 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
     assert_eq!(
         stance(&|n| {
             n.class = class::CLASS_61;
-            n.computer = true;
+            n.player_type = PlayerType::COMPUTER;
         }),
         UnitStance::NO_ATTACK
     );
@@ -5036,22 +5221,46 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
 /// 54) 0, the scorpion's (55) the owner's posture, any other's 1.
 #[test]
 fn new_siege_unit_takes_its_stance_from_its_class_and_owner() {
-    let stance = |class: ClassId, computer: bool, posture: i32| {
+    let stance = |class: ClassId, player_type: PlayerType, posture: i32| {
         siege_stance(&NewObject {
             class,
-            computer,
+            player_type,
             posture: Posture::of_data(posture),
             ..NewObject::default()
         })
     };
-    assert_eq!(stance(class::SIEGE, false, 0), UnitStance::DEFENSIVE);
-    assert_eq!(stance(class::SIEGE, true, 0), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(class::CLASS_51, false, 1), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(class::CLASS_54, false, 1), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(class::CLASS_55, false, 1), UnitStance::DEFENSIVE);
-    assert_eq!(stance(class::CLASS_55, false, 0), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(class::CLASS_55, true, 1), UnitStance::AGGRESSIVE);
-    assert_eq!(stance(class::CLASS_6, false, 0), UnitStance::DEFENSIVE);
+    assert_eq!(
+        stance(class::SIEGE, PlayerType::HUMAN, 0),
+        UnitStance::DEFENSIVE
+    );
+    assert_eq!(
+        stance(class::SIEGE, PlayerType::COMPUTER, 0),
+        UnitStance::AGGRESSIVE
+    );
+    assert_eq!(
+        stance(class::CLASS_51, PlayerType::HUMAN, 1),
+        UnitStance::AGGRESSIVE
+    );
+    assert_eq!(
+        stance(class::CLASS_54, PlayerType::HUMAN, 1),
+        UnitStance::AGGRESSIVE
+    );
+    assert_eq!(
+        stance(class::CLASS_55, PlayerType::HUMAN, 1),
+        UnitStance::DEFENSIVE
+    );
+    assert_eq!(
+        stance(class::CLASS_55, PlayerType::HUMAN, 0),
+        UnitStance::AGGRESSIVE
+    );
+    assert_eq!(
+        stance(class::CLASS_55, PlayerType::COMPUTER, 1),
+        UnitStance::AGGRESSIVE
+    );
+    assert_eq!(
+        stance(class::CLASS_6, PlayerType::HUMAN, 0),
+        UnitStance::DEFENSIVE
+    );
 }
 
 /// [`NewObject::of`]: the master's copy, class, flags and hero flag, and the work range of
@@ -5090,6 +5299,8 @@ fn new_object_takes_its_hunt_range_from_its_master_last_task_of_type_6() {
             object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
             hero_flag: HeroFlags::REGENERATES,
             hunt_range: Distance::new(3.5),
+            // the owner's fields are a human player's until the caller's
+            player_type: PlayerType::HUMAN,
             ..NewObject::default()
         }
     );
@@ -5187,7 +5398,7 @@ fn boar_at_home_draws_its_leash_and_mostly_stays() {
     let moved = u.update_idle(
         Millis::new(10),
         WorldTime::ZERO,
-        false,
+        PlayerType::HUMAN,
         &at(Position::new(23.5, 105.5, 0.0)),
         &mut r,
         &mut no_search,
@@ -5211,7 +5422,7 @@ fn boar_wanders_up_to_three_tiles_once_in_seven() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at(Position::new(23.5, 105.5, 0.0)),
             &mut r,
             &mut no_search,
@@ -5250,7 +5461,7 @@ fn boar_away_from_home_goes_back_and_furious_one_stays() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at(Position::new(26.0, 105.5, 0.5)),
             &mut r,
             &mut no_search,
@@ -5265,7 +5476,7 @@ fn boar_away_from_home_goes_back_and_furious_one_stays() {
     let moved = far.update_idle(
         Millis::new(10),
         WorldTime::ZERO,
-        false,
+        PlayerType::HUMAN,
         &at(Position::new(43.5, 105.5, 0.0)),
         &mut r,
         &mut no_search,
@@ -5283,7 +5494,7 @@ fn boar_away_from_home_goes_back_and_furious_one_stays() {
     let moved = heading.update_idle(
         Millis::new(10),
         WorldTime::ZERO,
-        false,
+        PlayerType::HUMAN,
         &at(Position::new(43.5, 105.5, 0.0)),
         &mut r,
         &mut no_search,
@@ -5302,7 +5513,7 @@ fn boar_away_from_home_goes_back_and_furious_one_stays() {
             u.update_idle(
                 Millis::new(10),
                 WorldTime::ZERO,
-                false,
+                PlayerType::HUMAN,
                 &place,
                 &mut r,
                 &mut no_search
@@ -5366,7 +5577,7 @@ fn an_idle_transport_ship_retargets_like_soldier() {
         .update_idle(
             Millis::new(50),
             WorldTime::from_millis(900),
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -5437,7 +5648,7 @@ fn deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &place,
             &mut r,
             &mut nothing,
@@ -5466,7 +5677,7 @@ fn deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &place,
             &mut r,
             &mut |_: &Search<'_>| Ok(Found::NONE),
@@ -5490,7 +5701,7 @@ fn deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &away,
             &mut r,
             &mut |_: &Search<'_>| Ok(Found::NONE),
@@ -5507,7 +5718,7 @@ fn deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &away,
             &mut r,
             &mut no_search,
@@ -5547,7 +5758,7 @@ fn deer_that_sees_an_object_evades_it() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &place,
             &mut r,
             &mut enemy.clone(),
@@ -5583,7 +5794,7 @@ fn an_animal_whose_wander_ended_drops_its_move_action_and_turns_idle() {
         .update_fx(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &place,
             &mut r,
             &mut no_search,
@@ -5606,7 +5817,7 @@ fn an_animal_whose_wander_ended_drops_its_move_action_and_turns_idle() {
         .update_fx(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &walking,
             &mut r,
             &mut no_search,
@@ -5667,7 +5878,12 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
     // its point) and the unit's, forced and walking; the order leaves the queue
     let mut u = scout();
     let fx = u
-        .off_turn_fx(&scout_at(true, true), &mut no_search, false, &mut rng())
+        .off_turn_fx(
+            &scout_at(true, true),
+            &mut no_search,
+            PlayerType::HUMAN,
+            &mut rng(),
+        )
         .unwrap();
     assert_eq!(
         fx,
@@ -5694,7 +5910,12 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
 fn between_turns_walking_unit_or_one_with_notifies_keeps_its_queue() {
     let mut walking = scout();
     assert_eq!(
-        walking.off_turn_fx(&scout_at(false, true), &mut no_search, false, &mut rng()),
+        walking.off_turn_fx(
+            &scout_at(false, true),
+            &mut no_search,
+            PlayerType::HUMAN,
+            &mut rng()
+        ),
         Ok(vec![])
     );
     assert_eq!(walking.orders.len(), 2);
@@ -5707,7 +5928,12 @@ fn between_turns_walking_unit_or_one_with_notifies_keeps_its_queue() {
         ..scout()
     };
     assert_eq!(
-        told.off_turn_fx(&scout_at(true, true), &mut no_search, false, &mut rng()),
+        told.off_turn_fx(
+            &scout_at(true, true),
+            &mut no_search,
+            PlayerType::HUMAN,
+            &mut rng()
+        ),
         Ok(vec![])
     );
     assert_eq!(told.orders.len(), 2);
@@ -5715,7 +5941,12 @@ fn between_turns_walking_unit_or_one_with_notifies_keeps_its_queue() {
     let mut u = scout();
     u.orders[0].ready = false;
     let _ = u
-        .off_turn_fx(&scout_at(true, true), &mut no_search, false, &mut rng())
+        .off_turn_fx(
+            &scout_at(true, true),
+            &mut no_search,
+            PlayerType::HUMAN,
+            &mut rng(),
+        )
         .unwrap();
     assert_eq!(u.orders.len(), 1);
     assert_eq!(u.orders[0].point, Position::new(89.09375, 60.677_082, 0.0));
@@ -5739,7 +5970,7 @@ fn completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
         .update_fx(
             Millis::new(60),
             WorldTime::from_millis(900),
-            false,
+            PlayerType::HUMAN,
             &scout_at(true, false),
             &mut r,
             &mut no_search,
@@ -5778,7 +6009,7 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         u.action_failed(
             n,
             &at(Position::new(10.0, 10.0, 0.0)),
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut Recorder::default(), &mut fx)
         )
@@ -5804,7 +6035,7 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         .action_failed(
             n,
             &at(Position::new(10.0, 12.0, 0.0)),
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut Recorder::default(), &mut fx),
         )
@@ -5822,7 +6053,7 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         .action_failed(
             n,
             &at(Position::new(10.0, 12.0, 0.0)),
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut Recorder::default(), &mut fx),
         )
@@ -5837,7 +6068,7 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         u.action_failed(
             attack,
             &at(Position::new(10.0, 12.0, 0.0)),
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut Recorder::default(), &mut fx)
         )
@@ -5869,7 +6100,7 @@ fn boar_failed_attack_runs_its_idle_check() {
     let r = u.action_failed(
         attack,
         &at(Position::new(169.5, 50.6, 0.0)),
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -5888,7 +6119,7 @@ fn boar_failed_attack_runs_its_idle_check() {
     let r = u.action_failed(
         attack,
         &at(Position::new(169.5, 50.6, 0.0)),
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -5919,7 +6150,7 @@ fn an_animal_completed_wander_becomes_its_last_action() {
         .update_fx(
             Millis::new(60),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &deer_at(Position::new(31.5, 106.5, 0.0)),
             &mut r,
             &mut no_search,
@@ -5981,7 +6212,7 @@ fn livestock_ownership_notify_drops_its_action_value_and_breaks_off() {
         .update_fx(
             Millis::new(60),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &Surroundings::default(),
             &mut r,
             &mut no_search,
@@ -6148,7 +6379,7 @@ fn making_building_runs_process_idle_only_without_target() {
             true,
             at.group,
             at,
-            false,
+            PlayerType::HUMAN,
             &mut Well512::default(),
             &mut With::new(&mut Recorder::default(), &mut Vec::new()),
         )
@@ -6259,7 +6490,7 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
         let r = u.update_fx(
             Millis::new(10),
             WorldTime::from_millis(100),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut TailSide::default(),
@@ -6289,7 +6520,7 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
     let mut fx = Vec::new();
     u.target_block(
         &standing,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6310,7 +6541,7 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
     };
     u.target_block(
         &gone,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6325,7 +6556,7 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
     let mut u = builder_done();
     u.target_block(
         &inside,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6353,7 +6584,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
     let mut fx = Vec::new();
     u.target_block(
         &dead,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6376,7 +6607,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
     let mut fx = Vec::new();
     u.target_block(
         &dead,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6397,7 +6628,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
     let mut fx = Vec::new();
     u.target_block(
         &swinging,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6411,7 +6642,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
     let mut fx = Vec::new();
     u.target_block(
         &over,
-        false,
+        PlayerType::HUMAN,
         &mut Well512::default(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     )
@@ -6436,7 +6667,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
         attack()
             .target_block(
                 &dead,
-                false,
+                PlayerType::HUMAN,
                 &mut Well512::default(),
                 &mut With::new(&mut Recorder::default(), &mut Vec::new())
             )
@@ -6539,7 +6770,7 @@ fn moved_target_notify_runs_process_idle_with_saved_patrol() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut r,
             &mut With::new(&mut side, &mut fx)
         ),
@@ -6554,7 +6785,7 @@ fn moved_target_notify_runs_process_idle_with_saved_patrol() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut r,
             &mut With::new(&mut side, &mut fx)
         ),
@@ -6599,7 +6830,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut closest,
@@ -6632,7 +6863,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
         u.update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut found
@@ -6649,7 +6880,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut none,
@@ -6685,7 +6916,7 @@ fn gaia_soldier_that_takes_owners_by_sight_does_not_search() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &gaia,
             &mut rng(),
             &mut no_search,
@@ -6701,7 +6932,7 @@ fn gaia_soldier_that_takes_owners_by_sight_does_not_search() {
 const TC: Attacker = Attacker {
     ai_type: UnitAiType::TOWER,
     player: PlayerId::new(2),
-    computer: false,
+    player_type: PlayerType::HUMAN,
     state: ObjectState::Alive,
     held: None,
     top_action: None,
@@ -6982,7 +7213,7 @@ fn an_idle_tower_searches_with_its_classes() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut closest,
@@ -7297,7 +7528,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
         roundup,
         None,
         None,
-        Some((&at, false)),
+        Some((&at, PlayerType::HUMAN)),
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     )
@@ -7410,7 +7641,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut look,
@@ -7437,7 +7668,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
     let mut fx = Vec::new();
     u.no_attack_idle(
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut With::new(&mut |_: &Search<'_>| Ok(Found::NONE), &mut fx),
         &mut rng(),
     )
@@ -7478,7 +7709,7 @@ fn grouped_unit_full_update_reads_its_group() {
         u.update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             at,
             &mut rng(),
             &mut no_search,
@@ -7559,7 +7790,7 @@ fn grouped_unit_full_update_reads_its_group() {
     assert_eq!(
         u.target_block(
             &target_at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut no_search, &mut fx)
         ),
@@ -7568,7 +7799,7 @@ fn grouped_unit_full_update_reads_its_group() {
     assert_eq!(
         u.target_block(
             &target_at,
-            true,
+            PlayerType::COMPUTER,
             &mut rng(),
             &mut With::new(&mut no_search, &mut fx)
         ),
@@ -7616,7 +7847,7 @@ fn an_idle_transport_ship_check_caps_its_human_order_time_and_does_nothing() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut no_search,
@@ -7631,7 +7862,7 @@ fn an_idle_transport_ship_check_caps_its_human_order_time_and_does_nothing() {
         assert_eq!(
             u.process_idle(
                 &at,
-                false,
+                PlayerType::HUMAN,
                 &mut rng(),
                 &mut With::new(&mut no_search, &mut fx)
             ),
@@ -7661,7 +7892,7 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
     let mut fx = Vec::new();
     u.next_after_kill(
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut no_search, &mut fx),
     )
@@ -7715,8 +7946,13 @@ fn wolf_whose_attack_target_died_attacks_the_next_villager() {
         attacks: Vec::new(),
     };
     let mut fx = Vec::new();
-    u.next_after_kill(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx))
-        .unwrap();
+    u.next_after_kill(
+        &at,
+        PlayerType::HUMAN,
+        &mut rng(),
+        &mut With::new(&mut side, &mut fx),
+    )
+    .unwrap();
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
     assert_eq!(side.attacks, Vec::new());
     assert_eq!(
@@ -7761,7 +7997,7 @@ fn no_attack_tower_only_searches() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut closest,
@@ -7800,7 +8036,7 @@ fn an_idle_tower_attacks_what_its_search_found() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut side,
@@ -7834,7 +8070,12 @@ fn human_player_king_idle_check_only_caps() {
     let mut r = rng();
     let mut fx = Vec::new();
     assert_eq!(
-        u.process_idle(&at, false, &mut r, &mut With::new(&mut no_search, &mut fx)),
+        u.process_idle(
+            &at,
+            PlayerType::HUMAN,
+            &mut r,
+            &mut With::new(&mut no_search, &mut fx)
+        ),
         Ok(false)
     );
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
@@ -7842,7 +8083,7 @@ fn human_player_king_idle_check_only_caps() {
     assert!(
         u.process_idle(
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut r,
             &mut With::new(&mut no_search, &mut Vec::new())
         )
@@ -7856,7 +8097,7 @@ fn human_player_king_idle_check_only_caps() {
     assert_eq!(
         u.process_idle(
             &unled,
-            true,
+            PlayerType::COMPUTER,
             &mut r,
             &mut With::new(&mut no_search, &mut Vec::new())
         ),
@@ -7866,7 +8107,7 @@ fn human_player_king_idle_check_only_caps() {
     assert_eq!(
         u.process_idle(
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut r,
             &mut With::new(&mut no_search, &mut Vec::new())
         ),
@@ -8008,7 +8249,7 @@ fn handled(
     u: &mut UnitAi,
     n: Notify,
     at: &Surroundings,
-    computer: bool,
+    player_type: PlayerType,
 ) -> (Result<u32, GenieError>, Vec<Effect>, Recorder) {
     let mut side = Recorder::default();
     let mut fx = Vec::new();
@@ -8016,7 +8257,7 @@ fn handled(
         n,
         Millis::ZERO,
         at,
-        computer,
+        player_type,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -8042,7 +8283,7 @@ fn boar_whose_move_aside_completed_heads_home_next() {
         NotifyKind::ACTION_COMPLETED,
         [ActionKind::MoveAside.value(), 0, 0],
     );
-    let (r, fx, _) = handled(&mut u, n, &Surroundings::default(), false);
+    let (r, fx, _) = handled(&mut u, n, &Surroundings::default(), PlayerType::HUMAN);
     assert_eq!(r, Ok(GO_ON));
     assert_eq!(fx, vec![Effect::Stop]);
     assert_eq!(u.idle_timeout, Millis::new(3101));
@@ -8077,7 +8318,7 @@ fn lion_completed_attack_resets_its_idle_timeout_and_stops() {
         n,
         Millis::ZERO,
         &Surroundings::default(),
-        false,
+        PlayerType::HUMAN,
         &mut r,
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -8108,7 +8349,7 @@ fn lion_drops_moved_target_out_of_its_sight() {
     };
     let n = Notify::own(object_id(800), NotifyKind::TARGET_MOVED, [0, 0, 0]);
     let mut u = lion();
-    let (r, fx, _) = handled(&mut u, n, &Surroundings::default(), false);
+    let (r, fx, _) = handled(&mut u, n, &Surroundings::default(), PlayerType::HUMAN);
     assert_eq!((r, fx), (Ok(GO_ON), vec![Effect::Stop]));
     assert_eq!((u.current_target, u.current_action), (None, None));
     // the villager 700 the lion attacks (class 4, which it attacks by its classes)
@@ -8135,7 +8376,7 @@ fn lion_drops_moved_target_out_of_its_sight() {
     };
     // 5 tiles apart, 4 between the footprints: at its sight, attacked again
     let mut u = lion();
-    let (r, fx, side) = handled(&mut u, n, &at(15.0), false);
+    let (r, fx, side) = handled(&mut u, n, &at(15.0), PlayerType::HUMAN);
     assert_eq!(
         (r, fx, side.attacks),
         (Ok(BREAK), vec![], vec![(object_id(700), true)])
@@ -8151,14 +8392,14 @@ fn lion_drops_moved_target_out_of_its_sight() {
         flags: ObjectFlags::SCOUT,
         ..t
     });
-    let (r, fx, side) = handled(&mut u, n, &flagged, false);
+    let (r, fx, side) = handled(&mut u, n, &flagged, PlayerType::HUMAN);
     assert_eq!(
         (r, fx, side.attacks),
         (Ok(GO_ON), vec![Effect::Stop], vec![])
     );
     // 6 apart, 5 between: beyond it
     let mut u = lion();
-    let (r, fx, _) = handled(&mut u, n, &at(16.0), false);
+    let (r, fx, _) = handled(&mut u, n, &at(16.0), PlayerType::HUMAN);
     assert_eq!((r, fx), (Ok(GO_ON), vec![Effect::Stop]));
     assert_eq!(u.current_target, None);
 }
@@ -8175,21 +8416,21 @@ fn building_counts_its_attackers() {
         &mut u,
         Notify::own(object_id(70), NotifyKind::ATTACKED, [0; 3]),
         &at,
-        false,
+        PlayerType::HUMAN,
     );
     assert_eq!((r, side.under_attack), (Ok(GO_ON), Some(true)));
     let _ = handled(
         &mut u,
         Notify::own(object_id(60), NotifyKind::ATTACKED, [0; 3]),
         &at,
-        false,
+        PlayerType::HUMAN,
     );
     assert_eq!(u.attackers, Attackers::of_saved(&[60, 70]));
     let (r, _, _) = handled(
         &mut u,
         Notify::own(object_id(70), NotifyKind::NO_LONGER_ON_ME, [0; 3]),
         &at,
-        false,
+        PlayerType::HUMAN,
     );
     assert_eq!(
         (r, u.attackers.clone()),
@@ -8199,7 +8440,7 @@ fn building_counts_its_attackers() {
         &mut u,
         Notify::own(object_id(99), NotifyKind::NO_LONGER_ON_ME, [0; 3]),
         &at,
-        false,
+        PlayerType::HUMAN,
     );
     assert_eq!(
         (r, u.attackers.clone()),
@@ -8207,22 +8448,26 @@ fn building_counts_its_attackers() {
     );
     let hit =
         |caller: ObjectId, hp| Notify::own(caller, NotifyKind::DAMAGED, [caller.get(), hp, 0]);
-    let (r, _, side) = handled(&mut u, hit(object_id(60), 5), &at, false);
+    let (r, _, side) = handled(&mut u, hit(object_id(60), 5), &at, PlayerType::HUMAN);
     assert_eq!((r, side.under_attack), (Ok(GO_ON), Some(true)));
     u.current_target = Some(object_id(61));
-    let (r, _, _) = handled(&mut u, hit(object_id(61), 5), &at, false);
+    let (r, _, _) = handled(&mut u, hit(object_id(61), 5), &at, PlayerType::HUMAN);
     assert_eq!(
         (r, u.attackers.clone()),
         (Ok(GO_ON), Attackers::of_saved(&[60, 61]))
     );
     assert!(
-        handled(&mut u, hit(object_id(62), 5), &at, false)
+        handled(&mut u, hit(object_id(62), 5), &at, PlayerType::HUMAN)
             .0
             .is_err()
     );
-    assert!(handled(&mut u, hit(object_id(60), 5), &at, true).0.is_err());
+    assert!(
+        handled(&mut u, hit(object_id(60), 5), &at, PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
     u.notifies = vec![hit(object_id(60), 0)];
-    let (r, _, _) = handled(&mut u, hit(object_id(60), 0), &at, false);
+    let (r, _, _) = handled(&mut u, hit(object_id(60), 0), &at, PlayerType::HUMAN);
     assert_eq!((r, u.notifies.len()), (Ok(DEAD), 0));
 }
 
@@ -8235,11 +8480,11 @@ fn destroyed_tower_gives_up() {
         ..idle(UnitAiType::TOWER)
     };
     let n = Notify::own(object_id(60), NotifyKind::DAMAGED, [60, 0, 0]);
-    let (r, _, _) = handled(&mut u, n, &Surroundings::default(), false);
+    let (r, _, _) = handled(&mut u, n, &Surroundings::default(), PlayerType::HUMAN);
     assert_eq!((r, u.notifies.len()), (Ok(DEAD), 0));
     let mut u = idle(UnitAiType::TOWER);
     assert!(
-        handled(&mut u, n, &Surroundings::default(), true)
+        handled(&mut u, n, &Surroundings::default(), PlayerType::COMPUTER)
             .0
             .is_err()
     );
@@ -8272,7 +8517,7 @@ fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &place,
             &mut r,
             &mut on_top.clone(),
@@ -8301,7 +8546,7 @@ fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
         .update_idle(
             Millis::new(10),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &near_edge,
             &mut wander_seed(false),
             &mut on_it.clone(),
@@ -8730,7 +8975,7 @@ fn human_player_king_runs_from_its_attacker() {
         n,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -8753,7 +8998,7 @@ fn human_player_king_runs_from_its_attacker() {
         n,
         Millis::ZERO,
         &at,
-        true,
+        PlayerType::COMPUTER,
         &mut rng(),
         &mut With::new(&mut side, &mut Vec::new()),
     );
@@ -8824,7 +9069,10 @@ fn unit_runs_from_its_attackers_within_its_leash() {
             stance,
             ..runner(vec![77])
         };
-        assert_eq!(run(&mut u, &at, true, false), (Ok(false), vec![]));
+        assert_eq!(
+            run(&mut u, &at, true, PlayerType::HUMAN),
+            (Ok(false), vec![])
+        );
         let gaia = Surroundings {
             player: PlayerId::new(0),
             ..at.clone()
@@ -8834,7 +9082,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
             ..runner(vec![77])
         };
         assert_eq!(
-            run(&mut u, &gaia, true, false).1,
+            run(&mut u, &gaia, true, PlayerType::HUMAN).1,
             to(Position::new(18.0, 30.0, 0.0))
         );
     }
@@ -8842,10 +9090,13 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         current_action: Some(ActionKind::Attack),
         ..runner(vec![77])
     };
-    assert_eq!(run(&mut u, &at, false, false), (Ok(false), vec![]));
+    assert_eq!(
+        run(&mut u, &at, false, PlayerType::HUMAN),
+        (Ok(false), vec![])
+    );
     let mut u = runner(vec![77, 4242]);
     assert_eq!(
-        run(&mut u, &at, true, false).1,
+        run(&mut u, &at, true, PlayerType::HUMAN).1,
         to(Position::new(18.0, 30.0, 0.0))
     );
     // 77 and 78 on either side: the way two draws give
@@ -8858,7 +9109,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     let d = crate::math::fmath::sqrt(vy * vy + vx * vx);
     let away = Position::new(20.0 - (vx / d) * 2.0, 30.0 - (vy / d) * 2.0, 0.0);
     let mut u = runner(vec![77, 78]);
-    assert_eq!(run(&mut u, &at, true, false).1, to(away));
+    assert_eq!(run(&mut u, &at, true, PlayerType::HUMAN).1, to(away));
     // a defensive unit with its state position 5 tiles east runs no farther than that
     let mut u = UnitAi {
         stance: UnitStance::DEFENSIVE,
@@ -8866,16 +9117,28 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         ..runner(vec![77])
     };
     assert_eq!(
-        run(&mut u, &at, true, false).1,
+        run(&mut u, &at, true, PlayerType::HUMAN).1,
         to(Position::new(20.0, 30.0, 0.0))
     );
-    assert!(run(&mut runner(vec![79]), &at, true, true).0.is_err());
+    assert!(
+        run(&mut runner(vec![79]), &at, true, PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
     let ship = Surroundings {
         class: Some(class::TRANSPORT),
         ..at.clone()
     };
-    assert!(run(&mut runner(vec![77]), &ship, true, true).0.is_err());
-    assert!(run(&mut idle(SIEGE_AI), &at, true, true).0.is_err());
+    assert!(
+        run(&mut runner(vec![77]), &ship, true, PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
+    assert!(
+        run(&mut idle(SIEGE_AI), &at, true, PlayerType::COMPUTER)
+            .0
+            .is_err()
+    );
 }
 
 /// `FUN_140c64c10`: the target and its class become the last ones, the id and the point are
@@ -9096,7 +9359,7 @@ fn patrol_waits_for_its_secondary_timer() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut side,
@@ -9133,7 +9396,7 @@ fn patrol_saves_itself_and_attacks_what_it_finds() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut side,
@@ -9171,7 +9434,7 @@ fn patrol_attacking_building_keeps_at_it() {
         .update_fx(
             Millis::new(28),
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut side,
@@ -9212,7 +9475,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
     assert_eq!(
         u.soldier_idle(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::at(&mut side, &mut fx, &at)
         ),
@@ -9230,7 +9493,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
     assert_eq!(
         u.soldier_idle(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::at(&mut side, &mut Vec::new(), &at)
         ),
@@ -9263,19 +9526,19 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     let (mut u, mut at) = patroller(0);
     at.master = SOLDIER_IDLE_MASTER;
     let mut s = side(77);
-    assert_eq!(idle(&mut u, &at, &mut s, false), Ok(false));
+    assert_eq!(idle(&mut u, &at, &mut s, PlayerType::HUMAN), Ok(false));
     assert_eq!(s.attacks, []);
     let (mut u, mut at) = patroller(0);
     (u.current_order, u.retarget_disabled, u.current_target) = (None, 1, Some(object_id(60)));
     at.target = Some(Seen::default());
     let mut s = side(77);
-    assert_eq!(idle(&mut u, &at, &mut s, false), Ok(true));
+    assert_eq!(idle(&mut u, &at, &mut s, PlayerType::HUMAN), Ok(true));
     assert_eq!(
         (s.attacks, u.current_order),
         (vec![(object_id(60), true)], None)
     );
     let (mut u, at) = patroller(0);
-    assert!(idle(&mut u, &at, &mut side(77), true).is_err());
+    assert!(idle(&mut u, &at, &mut side(77), PlayerType::COMPUTER).is_err());
     let (mut u, at) = patroller(0);
     let mut s = SoldierSide {
         refuses: true,
@@ -9285,12 +9548,12 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
         )),
         ..side(77)
     };
-    assert_eq!(idle(&mut u, &at, &mut s, false), Ok(false));
+    assert_eq!(idle(&mut u, &at, &mut s, PlayerType::HUMAN), Ok(false));
     assert_eq!((&u.patrol_path, u.patrol_waypoint.get()), (&None, 0));
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
     at.task_0x69 = true;
-    assert!(idle(&mut u, &at, &mut side(-1), false).is_err());
+    assert!(idle(&mut u, &at, &mut side(-1), PlayerType::HUMAN).is_err());
 }
 
 /// A stop earlier in the update (a failed Enter's notify, slot 0xb0) emptied the action list
@@ -9349,7 +9612,12 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
     };
     let mut fx = Vec::new();
     assert_eq!(
-        u.soldier_idle(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.soldier_idle(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -9368,7 +9636,7 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
     assert_eq!(
         u.soldier_idle(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -9524,7 +9792,7 @@ fn full_update_stops_at_its_order_on_target() {
         .update_after(
             Millis::new(100),
             WorldTime::from_millis(10_000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut no_search,
@@ -9576,7 +9844,7 @@ fn the_rest_after_an_order_that_gave_an_action_reads_it() {
         .after_order_fx(
             AfterOrder::default(),
             WorldTime::from_millis(10_000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut no_search,
@@ -9622,7 +9890,7 @@ fn the_rest_after_an_order_that_gave_no_action_runs_the_idle_check() {
         .after_order_fx(
             AfterOrder::default(),
             WorldTime::from_millis(10_000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut r,
             &mut no_search,
@@ -9641,7 +9909,7 @@ fn the_rest_after_an_order_that_gave_no_action_runs_the_idle_check() {
         .after_order_fx(
             busy,
             WorldTime::from_millis(10_000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut no_search,
@@ -9657,7 +9925,7 @@ fn the_rest_after_an_order_that_gave_no_action_runs_the_idle_check() {
         .after_order_fx(
             busy,
             WorldTime::from_millis(10_000),
-            false,
+            PlayerType::HUMAN,
             &gaia,
             &mut rng(),
             &mut no_search,
@@ -9713,7 +9981,7 @@ fn the_transport_ship_passes_other_notifies_to_the_base_handler() {
         n,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -9721,7 +9989,7 @@ fn the_transport_ship_passes_other_notifies_to_the_base_handler() {
         n,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut base_fx),
     );
@@ -9747,7 +10015,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -9771,7 +10039,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -9788,7 +10056,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -9802,7 +10070,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             dead,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -9814,7 +10082,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             n,
             Millis::ZERO,
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         )
@@ -9829,7 +10097,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -9858,7 +10126,7 @@ fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
             warning,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut ai,
             &mut With::new(&mut side, &mut fx)
         ),
@@ -9873,7 +10141,7 @@ fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
             warning,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -9893,7 +10161,7 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
     assert_eq!(
         u.process_idle(
             &Surroundings::default(),
-            false,
+            PlayerType::HUMAN,
             &mut r,
             &mut With::new(&mut Recorder::default(), &mut fx)
         ),
@@ -9924,7 +10192,7 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -9941,7 +10209,7 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10069,7 +10337,12 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
     let mut fx = Vec::new();
     let mut side = ShipSide::default();
     assert_eq!(
-        u.process_idle(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.process_idle(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(false)
     );
     assert_eq!(
@@ -10090,7 +10363,12 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
     };
     let mut fx = Vec::new();
     assert_eq!(
-        u.process_idle(&at, true, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.process_idle(
+            &at,
+            PlayerType::COMPUTER,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -10126,7 +10404,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
     assert_eq!(
         cart.process_idle(
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -10155,7 +10433,7 @@ fn trade_ship_whose_action_needs_search_stops() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut Recorder::default(), &mut fx)
         ),
@@ -10172,7 +10450,7 @@ fn trade_ship_whose_action_needs_search_stops() {
                 n,
                 Millis::ZERO,
                 &at,
-                false,
+                PlayerType::HUMAN,
                 &mut rng(),
                 &mut With::new(&mut Recorder::default(), &mut fx)
             )
@@ -10197,7 +10475,7 @@ fn trade_ship_stops_and_runs_from_its_attackers() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10215,7 +10493,7 @@ fn trade_ship_stops_and_runs_from_its_attackers() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10240,7 +10518,7 @@ fn fishing_ship_on_the_move_takes_its_damage_without_running() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10256,7 +10534,7 @@ fn fishing_ship_on_the_move_takes_its_damage_without_running() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10312,7 +10590,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10352,7 +10630,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
             n,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10365,7 +10643,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
             n,
             Millis::ZERO,
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -10735,7 +11013,12 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
     };
     let mut fx = Vec::new();
     assert_eq!(
-        u.process_idle(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.process_idle(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(true)
     );
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
@@ -10759,7 +11042,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
     assert_eq!(
         u.process_idle(
             &grouped,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
@@ -10768,7 +11051,12 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
     assert_eq!(fx.len(), 1);
     let mut fx = Vec::new();
     assert_eq!(
-        u.process_idle(&at, false, &mut rng(), &mut With::new(&mut side, &mut fx)),
+        u.process_idle(
+            &at,
+            PlayerType::HUMAN,
+            &mut rng(),
+            &mut With::new(&mut side, &mut fx)
+        ),
         Ok(false)
     );
     assert!(matches!(fx.last(), Some(Effect::Move(_))));
@@ -10782,7 +11070,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
     assert_eq!(
         idle(SIEGE_AI).process_idle(
             &gaia,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -10824,7 +11112,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
     assert_eq!(
         u.process_idle(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::at(&mut side, &mut Vec::new(), &at)
         ),
@@ -10838,7 +11126,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
     assert_eq!(
         u.process_idle(
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::at(&mut side, &mut Vec::new(), &at)
         ),
@@ -10869,7 +11157,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
             under,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         )
@@ -10881,7 +11169,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
             executed,
             Millis::ZERO,
             &at,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -10894,7 +11182,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
             executed,
             Millis::ZERO,
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut r,
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -10912,7 +11200,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
             executed,
             Millis::ZERO,
             &at,
-            true,
+            PlayerType::COMPUTER,
             &mut r,
             &mut With::new(&mut side, &mut Vec::new())
         ),
@@ -10929,7 +11217,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
         u.run_away(
             true,
             &pinned,
-            false,
+            PlayerType::HUMAN,
             &mut rng(),
             &mut With::at(&mut side, &mut fx, &pinned)
         ),
@@ -10954,10 +11242,10 @@ fn priest_retargets_but_on_an_order_on_target() {
         look_around_timeout: Millis::new(9000),
         ..idle(PRIEST_AI)
     };
-    for (order, computer, draws) in [
-        (None, false, 1),
-        (Some(OrderKind::OnTarget), false, 0),
-        (None, true, 0),
+    for (order, player_type, draws) in [
+        (None, PlayerType::HUMAN, 1),
+        (Some(OrderKind::OnTarget), PlayerType::HUMAN, 0),
+        (None, PlayerType::COMPUTER, 0),
     ] {
         let mut u = priest(order);
         let mut r = rng();
@@ -10965,7 +11253,7 @@ fn priest_retargets_but_on_an_order_on_target() {
             UpdateTail {
                 retarget: Retarget::Priest,
                 world_time: WorldTime::from_millis(10_000),
-                computer,
+                player_type,
                 busy: false,
                 group: None,
             },
@@ -10973,7 +11261,7 @@ fn priest_retargets_but_on_an_order_on_target() {
             &mut r,
             &mut With::new(&mut Recorder::default(), &mut Vec::new()),
         );
-        assert_eq!(r.draws, draws, "order {order:?}, computer {computer}");
+        assert_eq!(r.draws, draws, "order {order:?}, computer {player_type}");
     }
     assert!(matches!(retarget_kind(PRIEST_AI), Ok(Retarget::Priest)));
 }
@@ -11333,7 +11621,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
     assert_eq!(
         u.retarget_check(
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut With::new(&mut finds_nothing(), &mut fx)
@@ -11385,7 +11673,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
         let _ = u
             .retarget_check(
                 WorldTime::ZERO,
-                false,
+                PlayerType::HUMAN,
                 at,
                 &mut rng(),
                 &mut With::new(&mut finds_nothing(), &mut fx),
@@ -11402,7 +11690,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
     let _ = u
         .retarget_check(
             WorldTime::ZERO,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut With::new(&mut finds_nothing(), &mut fx),
@@ -11497,7 +11785,7 @@ fn unit_with_patrol_information_leashes_to_its_patrol_path() {
         let mut fx = Vec::new();
         let r = u.retarget_check(
             WorldTime::from_millis(1000),
-            false,
+            PlayerType::HUMAN,
             at,
             &mut rng(),
             &mut With::new(&mut finds_nothing(), &mut fx),
@@ -11565,7 +11853,7 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
         .update_fx(
             Millis::new(10),
             WorldTime::from_millis(1000),
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut rng(),
             &mut TailSide::default(),
@@ -11747,7 +12035,7 @@ fn run_order(
     let mut r = rng();
     let res = u.process_order(
         &o,
-        Some((&at, false)),
+        Some((&at, PlayerType::HUMAN)),
         None,
         &mut r,
         &mut With::new(side, &mut fx),
@@ -11833,7 +12121,7 @@ fn the_attack_order_attacks_by_the_unit_ai_type_and_becomes_the_ai_s() {
     };
     let r = u.process_order(
         &o,
-        Some((&at, false)),
+        Some((&at, PlayerType::HUMAN)),
         None,
         &mut rng(),
         &mut With::new(&mut side, &mut Vec::new()),
@@ -11988,7 +12276,7 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
     let o = queued(OrderKind::Defend, -1);
     let r = u.process_order(
         &o,
-        Some((&at, false)),
+        Some((&at, PlayerType::HUMAN)),
         None,
         &mut rng(),
         &mut With::new(&mut side, &mut Vec::new()),
@@ -12058,7 +12346,7 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
     assert!(
         u.process_order(
             &o,
-            Some((&at, false)),
+            Some((&at, PlayerType::HUMAN)),
             None,
             &mut rng(),
             &mut With::new(&mut tail, &mut Vec::new())
@@ -12881,7 +13169,7 @@ fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
     };
     let moved = Notify::own(object_id(6116), NotifyKind::TARGET_MOVED, [0, 0, 0]);
     let mut u = attacking(true);
-    let (r, fx, _) = handled(&mut u, moved, &at, false);
+    let (r, fx, _) = handled(&mut u, moved, &at, PlayerType::HUMAN);
     assert_eq!((r, fx), (Ok(GO_ON), Vec::new()));
     assert_eq!(
         u.notifies,
@@ -12892,7 +13180,7 @@ fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
         )]
     );
     let mut u = attacking(false);
-    let (r, fx, _) = handled(&mut u, moved, &at, false);
+    let (r, fx, _) = handled(&mut u, moved, &at, PlayerType::HUMAN);
     assert_eq!((r, fx), (Ok(GO_ON), Vec::new()));
     assert_eq!(u.notifies, Vec::new());
     assert_eq!(u.current_action, Some(ActionKind::Attack));
@@ -12903,7 +13191,7 @@ fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
         NotifyKind::ACTION_INVALIDATED,
         [ActionKind::Attack.value(), 0, 0],
     );
-    let (r, _, _) = handled(&mut u, invalid, &at, false);
+    let (r, _, _) = handled(&mut u, invalid, &at, PlayerType::HUMAN);
     assert!(r.is_ok());
     assert_eq!(u.current_action, None);
 }
@@ -12930,7 +13218,7 @@ fn villager_drops_another_resource_at_the_table_building() {
         other,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
@@ -12948,7 +13236,7 @@ fn villager_drops_another_resource_at_the_table_building() {
         other,
         Millis::ZERO,
         &at,
-        false,
+        PlayerType::HUMAN,
         &mut rng(),
         &mut With::new(&mut none, &mut fx),
     );
@@ -12978,7 +13266,7 @@ fn villager_works_the_pasture_it_built() {
             NotifyKind::PASTURE_BUILT,
             [action, 15342, 0],
         );
-        let (r, fx, _) = handled(&mut idle(CIVILIAN), built, &at, false);
+        let (r, fx, _) = handled(&mut idle(CIVILIAN), built, &at, PlayerType::HUMAN);
         assert_eq!(r, Ok(GO_ON));
         assert_eq!(
             fx,
@@ -12994,7 +13282,7 @@ fn villager_works_the_pasture_it_built() {
         [ActionKind::Gather.value(), 15342, 0],
     );
     assert_eq!(
-        handled(&mut idle(CIVILIAN), other, &at, false).1,
+        handled(&mut idle(CIVILIAN), other, &at, PlayerType::HUMAN).1,
         Vec::new()
     );
 }
@@ -13023,7 +13311,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         class: Some(class::TRANSPORT),
         ..Surroundings::default()
     };
-    let (r, fx, _) = handled(&mut u, done, &here, false);
+    let (r, fx, _) = handled(&mut u, done, &here, PlayerType::HUMAN);
     assert_eq!(r, Ok(GO_ON));
     assert_eq!(fx, [Effect::CapHumanOrder(HUMAN_ORDER_CAP), Effect::Stop]);
     assert_eq!(
@@ -13047,7 +13335,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         done,
         Millis::ZERO,
         &at(Position::new(43.5, 105.5, 0.0)),
-        false,
+        PlayerType::HUMAN,
         &mut seed_for(false),
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -13074,7 +13362,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         }),
         ..here.clone()
     };
-    let (r, fx, _) = handled(&mut u, done, &grouped, false);
+    let (r, fx, _) = handled(&mut u, done, &grouped, PlayerType::HUMAN);
     assert_eq!((r, fx), (Ok(GO_ON), vec![Effect::Stop]));
     assert_eq!(u.state_position, Point::new(5.0, 6.0));
     let mut u = UnitAi {
@@ -13082,7 +13370,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         current_target: Some(object_id(70)),
         ..idle(SOLDIER_AI)
     };
-    let _ = handled(&mut u, done, &here, false);
+    let _ = handled(&mut u, done, &here, PlayerType::HUMAN);
     assert_eq!(u.state_position, Point::new(0.0, 0.0));
 }
 
@@ -13128,7 +13416,7 @@ fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
         n,
         Millis::ZERO,
         &at,
-        true,
+        PlayerType::COMPUTER,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -13150,7 +13438,7 @@ fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
         stranger,
         Millis::ZERO,
         &at,
-        true,
+        PlayerType::COMPUTER,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut fx),
     );
@@ -13161,7 +13449,7 @@ fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
         dead,
         Millis::ZERO,
         &at,
-        true,
+        PlayerType::COMPUTER,
         &mut rng(),
         &mut With::new(&mut Recorder::default(), &mut Vec::new()),
     );
@@ -13305,7 +13593,7 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
     assert_eq!(
         u.retarget_search(
             plain,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
@@ -13322,7 +13610,7 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
     assert_eq!(
         u.retarget_search(
             plain,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
@@ -13334,7 +13622,7 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
     assert_eq!(
         none.retarget_search(
             plain,
-            false,
+            PlayerType::HUMAN,
             &at,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
@@ -13369,28 +13657,28 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
         (r, side.soldier.attacks)
     };
     assert_eq!(
-        attacked(40, 30, false),
+        attacked(40, 30, PlayerType::HUMAN),
         (Ok(10), vec![(object_id(30), true)])
     );
-    assert_eq!(attacked(40, 40, false), (Ok(10), vec![]));
-    assert_eq!(attacked(30, 41, false), (Ok(10), vec![]));
+    assert_eq!(attacked(40, 40, PlayerType::HUMAN), (Ok(10), vec![]));
+    assert_eq!(attacked(30, 41, PlayerType::HUMAN), (Ok(10), vec![]));
     assert_eq!(
-        attacked(43, 41, false),
+        attacked(43, 41, PlayerType::HUMAN),
         (Ok(10), vec![(object_id(40), true)])
     );
     assert_eq!(
-        attacked(40, 42, false),
+        attacked(40, 42, PlayerType::HUMAN),
         (Ok(10), vec![(object_id(42), true)])
     );
-    assert_eq!(attacked(43, 43, false), (Ok(10), vec![]));
-    assert_eq!(attacked(30, 30, false), (Ok(9), vec![]));
+    assert_eq!(attacked(43, 43, PlayerType::HUMAN), (Ok(10), vec![]));
+    assert_eq!(attacked(30, 30, PlayerType::HUMAN), (Ok(9), vec![]));
     // on the attack order a computer's unit in stance 0 keeps its building target past the
     // category test: the archer is attacked
     let (mut u, at) = retargeting(40);
     let mut side = RetargetSide::finding(30);
     let r = u.retarget_search(
         building,
-        true,
+        PlayerType::COMPUTER,
         &at,
         &mut With::new(&mut side, &mut Vec::new()),
         &mut rng(),

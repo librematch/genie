@@ -382,7 +382,7 @@ impl World {
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
-        let computer = self.players.player(p)?.kind.is_computer();
+        let player_type = self.players.player(p)?.kind;
         let unit = self.players.live_mut(p, idx)?;
         let Some(gather) = self.parts.actions.of_mut(unit.id)?.list.gather_mut() else {
             return Ok(());
@@ -395,7 +395,7 @@ impl World {
         );
         let released = gather.after_reseed(
             arrived,
-            computer,
+            player_type,
             self.parts.motion.mover_mut(unit.id),
             stand,
             &mut unit.sprite,

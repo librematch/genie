@@ -89,7 +89,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
     let attacker = crate::unit_ai::Attacker {
         ai_type: UnitAiType::CIVILIAN,
         player: PlayerId::new(1),
-        computer: false,
+        player_type: PlayerType::HUMAN,
         state: ObjectState::Alive,
         held: None,
         top_action: None,
@@ -206,7 +206,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
     let attacker = crate::unit_ai::Attacker {
         ai_type: UnitAiType::SOLDIER,
         player: PlayerId::new(1),
-        computer: false,
+        player_type: PlayerType::HUMAN,
         state: ObjectState::Alive,
         held: None,
         top_action: None,
@@ -369,7 +369,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     let attacker = crate::unit_ai::Attacker {
         ai_type: UnitAiType::SOLDIER,
         player: PlayerId::new(1),
-        computer: false,
+        player_type: PlayerType::HUMAN,
         state: ObjectState::Alive,
         held: None,
         top_action: None,

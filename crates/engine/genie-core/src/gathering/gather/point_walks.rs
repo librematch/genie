@@ -23,6 +23,7 @@ use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::step::Step;
 
@@ -241,7 +242,7 @@ impl GatherAction {
     pub(crate) fn after_reseed(
         &mut self,
         arrived: bool,
-        computer: bool,
+        player_type: PlayerType,
         mover: Option<&mut Mover>,
         stand: Option<crate::objects::sprite::Graphic>,
         sprite: &mut Option<ActiveSprite>,
@@ -253,7 +254,7 @@ impl GatherAction {
         if let Some(s) = stand {
             new_sprite(sprite, mover.map(|m| &mut m.stats), s, rng);
         }
-        if arrived && computer {
+        if arrived && player_type.is_computer() {
             // State 1: done; its update returns 1 and the action list removes it.
             self.state = GatherState::Done;
             return Ok([None; 2]);
@@ -321,7 +322,7 @@ impl GatherAction {
             0 => Ok(Next::Stay),
             code @ (1 | 2 | 3 | 5) => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                if code != 3 && r.computer {
+                if code != 3 && r.player_type.is_computer() {
                     self.set_done(c, unit, r);
                 } else {
                     self.set_idle(c, unit, r);

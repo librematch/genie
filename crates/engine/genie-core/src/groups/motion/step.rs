@@ -72,7 +72,7 @@ pub(crate) fn path_step(
     if motion.paths.is_empty() {
         return Ok(false);
     }
-    let budget = budget && group.computer;
+    let budget = budget && group.player_type.is_computer();
     let dt = world.dt;
     let level = motion.paths.checked_mut(0)?;
     if Seconds::ZERO < level.pause_time {

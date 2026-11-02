@@ -34,13 +34,13 @@ impl Unit {
         // FUN_1411dbb70 to state 3 from 2: the storage leaves (FUN_1411e63f0), the owner's
         // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
         // a monastery's, wonder's or castle's count leaves, at least 0 left
-        let computer = c.w.players.player(c.player)?.kind.is_computer();
+        let player_type = c.w.players.player(c.player)?.kind;
         let (id, annex_of) = (self.id, c.w.parts.building_of(self.id).annex_of);
         let death = built_death(
             (self, c.w.parts.combat_mut(id)?),
             annex_of,
             master,
-            computer,
+            player_type,
         )?;
         c.w.players
             .player_mut(c.player)?
@@ -188,7 +188,7 @@ impl Unit {
             master: Some(master),
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
             masters: c.w.masters.of(c.player),
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             ai,
         };
         let part = completion.first_part(construction)?;

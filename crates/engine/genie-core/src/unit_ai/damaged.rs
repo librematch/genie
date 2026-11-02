@@ -12,6 +12,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
@@ -58,7 +59,7 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -70,7 +71,7 @@ impl UnitAi {
             return Ok(GO_ON);
         };
         let caller = attacker.id;
-        if computer {
+        if player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer villager's damage notify (its slot 0x50)",
             ));
@@ -79,7 +80,7 @@ impl UnitAi {
         let fierce =
             attacker.class == class::PREDATOR && attacker.combat_level == CombatLevel::ANIMAL;
         if added && self.current_target != Some(caller) && !fierce {
-            self.ask_for_help(caller, at, computer, side)?;
+            self.ask_for_help(caller, at, player_type, side)?;
         }
         side.set_under_attack(true);
         if self.villager_ignores(at, &attacker, fierce)? {
@@ -97,14 +98,14 @@ impl UnitAi {
             }
             self.queue_current(at)?;
             self.stop_current(true, at, side, ai_rng)?;
-            let _ = self.run_away(true, at, computer, ai_rng, side)?;
+            let _ = self.run_away(true, at, player_type, ai_rng, side)?;
             return Ok(BREAK);
         }
         // "I have a GAIA attacker" (or a harmless one): with an order not on the attacker, the current order goes back
         // into the queue at once (slot 0x30) and the order becomes the attack (700,
         // `FUN_140c64b60` with 0: the last order kept) at priority 100
         if self.current_order.is_some() && Some(caller) != self.current_target {
-            self.requeue_current(at, side, computer, ai_rng)?;
+            self.requeue_current(at, side, player_type, ai_rng)?;
             self.set_order_with(Some(OrderKind::Attack), false, ai_rng);
             self.order_priority = OrderPriority::COMMAND;
         }
@@ -166,11 +167,11 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
-        alert_owner(computer)?;
+        alert_owner(player_type)?;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -178,23 +179,23 @@ impl UnitAi {
         let new = !self.attackers.contains(n.caller);
         // a help request on no attacker asks no one (`AskForHelp` finds none)
         if new
-            && !computer
+            && !player_type.is_computer()
             && self.current_target != n.caller
             && let Some(caller) = n.caller
         {
-            self.ask_for_help(caller, at, computer, side)?;
+            self.ask_for_help(caller, at, player_type, side)?;
         }
         let _ = self.attackers.add(n.caller);
         side.set_under_attack(true);
         if self.current_order.is_some() {
             return Ok(GO_ON);
         }
-        let held_by_group = at.group.is_some_and(|g| !g.idle) && !computer;
+        let held_by_group = at.group.is_some_and(|g| !g.idle) && !player_type.is_computer();
         if self.ai_type == SIEGE_TOWER_AI && held_by_group {
             return Ok(GO_ON);
         }
         if !at.busy || held_action_state(at.action_state)?.get() == 2 {
-            let _ = self.run_away(true, at, computer, ai_rng, side)?;
+            let _ = self.run_away(true, at, player_type, ai_rng, side)?;
         }
         Ok(BREAK)
     }
@@ -257,26 +258,26 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         if n.p[1] < 1 {
-            alert_owner(computer)?;
+            alert_owner(player_type)?;
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        if self.attackers.is_empty() || computer {
-            alert_owner(computer)?;
+        if self.attackers.is_empty() || player_type.is_computer() {
+            alert_owner(player_type)?;
         }
         let new = !self.attackers.contains(n.caller);
         // a help request on no attacker asks no one (`AskForHelp` finds none)
         if new
-            && !computer
+            && !player_type.is_computer()
             && self.current_target != n.caller
             && let Some(caller) = n.caller
         {
-            self.ask_for_help(caller, at, computer, side)?;
+            self.ask_for_help(caller, at, player_type, side)?;
         }
         let _ = self.attackers.add(n.caller);
         side.set_under_attack(true);
@@ -287,7 +288,7 @@ impl UnitAi {
             self.queue_current(at)?;
             self.stop_current(true, at, side, ai_rng)?;
         }
-        let _ = self.run_away(true, at, computer, ai_rng, side)?;
+        let _ = self.run_away(true, at, player_type, ai_rng, side)?;
         Ok(BREAK)
     }
 
@@ -302,11 +303,11 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
-        alert_owner(computer)?;
+        alert_owner(player_type)?;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -314,11 +315,11 @@ impl UnitAi {
         let new = !self.attackers.contains(n.caller);
         // a help request on no attacker asks no one (`AskForHelp` finds none)
         if new
-            && !computer
+            && !player_type.is_computer()
             && self.current_target != n.caller
             && let Some(caller) = n.caller
         {
-            self.ask_for_help(caller, at, computer, side)?;
+            self.ask_for_help(caller, at, player_type, side)?;
         }
         let _ = self.attackers.add(n.caller);
         side.set_under_attack(true);
@@ -328,7 +329,7 @@ impl UnitAi {
         if self.current_action != Some(ActionKind::Move) {
             self.queue_current(at)?;
             self.stop_current(true, at, side, ai_rng)?;
-            let _ = self.run_away(true, at, computer, ai_rng, side)?;
+            let _ = self.run_away(true, at, player_type, ai_rng, side)?;
         }
         Ok(BREAK)
     }
@@ -344,7 +345,7 @@ impl UnitAi {
     pub(super) fn fishing_builder_search(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
@@ -379,7 +380,7 @@ impl UnitAi {
             let _ = self.build_object(FoundationId::new(site), true, at, side, rng)?;
             return Ok(BREAK);
         }
-        if computer {
+        if player_type.is_computer() {
             self.post(
                 Notify::own(
                     at.id,
@@ -431,21 +432,21 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         let new = !self.attackers.contains(n.caller);
-        alert_owner(computer)?;
-        if n.p[1] >= 1 {
-            alert_owner(at.guest_computer)?;
+        alert_owner(player_type)?;
+        if n.p[1] >= 1 && at.guest_computer {
+            alert_owner(PlayerType::COMPUTER)?;
         }
         if n.p[1] >= 1
             && new
             && self.current_target != n.caller
             && let Some(caller) = n.caller
         {
-            self.ask_for_help(caller, at, computer, side)?;
+            self.ask_for_help(caller, at, player_type, side)?;
         }
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, rng)?;
@@ -519,7 +520,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         let Some(order) = self
@@ -545,7 +546,7 @@ impl UnitAi {
             record,
             Some(at.id),
             Some(place),
-            Some((at, computer)),
+            Some((at, player_type)),
             ai,
             side,
         )

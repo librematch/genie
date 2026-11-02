@@ -578,7 +578,7 @@ pub(crate) fn reads() -> AttackReads {
         hit_chance: HitChance::of_data(100),
         armed: true,
         swing_sprites: SwingSprites::default(),
-        computer: false,
+        player_type: PlayerType::HUMAN,
         world_time: WorldTime::ZERO,
         can_move: true,
         stance: UnitStance::AGGRESSIVE,
@@ -1418,7 +1418,7 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
 #[test]
 fn an_attack_arrived_where_it_saw_its_target_looks_again() {
     let at = Position::new(13.0, 10.0, 0.0);
-    let run = |state: AttackState, seen: bool, range: Distance, computer: bool| {
+    let run = |state: AttackState, seen: bool, range: Distance, player_type: PlayerType| {
         let mut world = world_with(7, PlayerId::new(2), class::CLASS_6, at);
         world.sight = Some(sight(seen));
         let victim = Victim {
@@ -1429,7 +1429,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
             ..Victim::default()
         };
         let mut rig = Rig::on(world, 0.8, victim).holding(7, PlayerId::new(2));
-        rig.r.computer = computer;
+        rig.r.player_type = player_type;
         rig.f.own.source.weapon_range = Distance::new(4.0);
         let mut a = soldier_attack(7, range, 0.0, at);
         (a.state, a.seen) = (state, at);
@@ -1446,7 +1446,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         AttackState::GotoSeen { move_to: None },
         true,
         Distance::new(2.0),
-        false,
+        PlayerType::HUMAN,
     );
     assert_eq!(code, UpdateCode::UNDER_WAY);
     assert!(
@@ -1461,7 +1461,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         AttackState::GotoSeen { move_to: None },
         false,
         Distance::new(1.0),
-        false,
+        PlayerType::HUMAN,
     );
     assert_eq!(
         (
@@ -1479,13 +1479,29 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
             vec![]
         )
     );
-    for (state, range, computer) in [
-        (AttackState::GotoSeen { move_to: None }, 0.9, false),
-        (AttackState::GotoSeen { move_to: None }, f32::NAN, false),
-        (AttackState::GotoSeen { move_to: None }, 2.0, true),
-        (AttackState::GotoPoint { move_to: None }, 2.0, false),
+    for (state, range, player_type) in [
+        (
+            AttackState::GotoSeen { move_to: None },
+            0.9,
+            PlayerType::HUMAN,
+        ),
+        (
+            AttackState::GotoSeen { move_to: None },
+            f32::NAN,
+            PlayerType::HUMAN,
+        ),
+        (
+            AttackState::GotoSeen { move_to: None },
+            2.0,
+            PlayerType::COMPUTER,
+        ),
+        (
+            AttackState::GotoPoint { move_to: None },
+            2.0,
+            PlayerType::HUMAN,
+        ),
     ] {
-        let (code, a, posted, let_go) = run(state, false, Distance::new(range), computer);
+        let (code, a, posted, let_go) = run(state, false, Distance::new(range), player_type);
         assert_eq!(
             (code, a.state.bare(), a.target, let_go, posted),
             (
@@ -1495,7 +1511,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
                 true,
                 vec![(NotifyKind::ACTION_FAILED, [600, 0, 0])]
             ),
-            "{state} {range} {computer}"
+            "{state} {range} {player_type}"
         );
     }
 }
@@ -3592,7 +3608,10 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
     assert_eq!((villager.0, villager.2), (Ok(UpdateCode::CODE_5), false));
     let posted_1fb = vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])];
     assert_eq!(lost(AiOrder::Idle, |_| {}).1, posted_1fb);
-    assert_eq!(lost(order, |rig| rig.r.computer = true).1, posted_1fb);
+    assert_eq!(
+        lost(order, |rig| rig.r.player_type = PlayerType::COMPUTER).1,
+        posted_1fb
+    );
     let queued = lost(order, |rig| rig.r.queue_empty = false);
     assert_eq!(
         (queued.0, queued.1, queued.2),

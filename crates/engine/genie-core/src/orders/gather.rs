@@ -83,7 +83,7 @@ impl World {
             state: t.life.state,
             radius: tm.radius,
         };
-        let computer = owner.kind.is_computer();
+        let player_type = owner.kind;
         let farm_stops = self.settings.walkable_farms;
         let by = self.releaser(player, idx)?;
         // a stop farm's time per stop: the gatherer's work rate (its master's plus its powerup),
@@ -127,7 +127,7 @@ impl World {
             GatherRetarget {
                 target: &resource,
                 player,
-                computer,
+                player_type,
                 walks,
                 farm_stops,
                 rate,
@@ -407,7 +407,7 @@ impl World {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
         self.clear_actions(player, idx)?;
-        let computer = self.players.player(player)?.kind.is_computer();
+        let player_type = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
@@ -429,7 +429,7 @@ impl World {
             GatherStart {
                 target: &resource,
                 player,
-                computer,
+                player_type,
                 carry_rule,
                 held: &mut held,
                 walks,
@@ -632,7 +632,7 @@ impl World {
         let target = quarry.id;
         let engagement = self.engagement(player, idx, target)?;
         let arms = self.arms(player, idx, &task)?;
-        let computer = self.players.player(player)?.kind.is_computer();
+        let player_type = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
@@ -654,7 +654,7 @@ impl World {
                 task,
                 target: quarry,
                 player,
-                computer,
+                player_type,
                 carry_rule,
                 held: &mut held,
                 walks,

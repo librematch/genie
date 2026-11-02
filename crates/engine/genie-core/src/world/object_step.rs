@@ -143,7 +143,7 @@ impl World {
             &mut crate::unit_ai::UnitAi,
             &crate::unit_ai::Surroundings,
             &mut dyn crate::unit_ai::UnitSide,
-            bool,
+            crate::players::PlayerType,
             &mut crate::math::rng::Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {

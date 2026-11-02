@@ -375,7 +375,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 near: Amount::new(near),
             },
             masters: Some(&masters),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             ai: false,
         }
         .first_part(c)
@@ -424,7 +424,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 near: Amount::ZERO,
             },
             masters: None,
-            computer: false,
+            player_type: PlayerType::HUMAN,
             ai,
         }
         .first_part(&built)
@@ -680,8 +680,14 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
         .state
         .move_to()
         .copied();
-    b.retake(Position::ORIGIN, walk, None, Some(&mut c.builders), false)
-        .unwrap();
+    b.retake(
+        Position::ORIGIN,
+        walk,
+        None,
+        Some(&mut c.builders),
+        PlayerType::HUMAN,
+    )
+    .unwrap();
     assert_eq!(c.builders, crate::construction::BuilderCount::of_data(1));
     assert_eq!(
         b,
@@ -697,7 +703,13 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
     };
     let before = working;
     working
-        .retake(Position::ORIGIN, walk, None, Some(&mut c.builders), false)
+        .retake(
+            Position::ORIGIN,
+            walk,
+            None,
+            Some(&mut c.builders),
+            PlayerType::HUMAN,
+        )
         .unwrap();
     assert_eq!(working, before);
     assert_eq!(c.builders, crate::construction::BuilderCount::of_data(1));

@@ -538,13 +538,17 @@ impl World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let computer = self.players.player(owner)?.kind.is_computer();
+        let player_type = self.players.player(owner)?.kind;
         let annex_of = self.parts.building_of(id).annex_of;
         let held = self
             .object_and_combat_mut(id)?
             .ok_or(crate::construction::build::NOT_HELD)?;
-        let death =
-            crate::objects::lifecycle::death_parts::built_death(held, annex_of, master, computer)?;
+        let death = crate::objects::lifecycle::death_parts::built_death(
+            held,
+            annex_of,
+            master,
+            player_type,
+        )?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?

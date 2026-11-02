@@ -28,6 +28,7 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::step::Step;
@@ -40,8 +41,8 @@ pub struct GatherStart<'a> {
     pub target: &'a Resource,
     /// The owner.
     pub player: PlayerId,
-    /// The owner's type test (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// The game settings' test `FUN_141302150`.
     pub carry_rule: bool,
     /// What the gatherer carries, its resource kind and amount.
@@ -58,8 +59,8 @@ pub struct GatherRetarget<'a> {
     pub target: &'a Resource,
     /// The owner.
     pub player: PlayerId,
-    /// The owner's type test (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// What the gatherer carries and the sprites its `MoveTo`s take for none.
     pub walks: Walks<'a>,
     /// The game's farm setting: a stop farm or a fish trap keeps its place as the farm's.
@@ -220,14 +221,14 @@ impl GatherAction {
         let GatherStart {
             target,
             player,
-            computer,
+            player_type,
             carry_rule,
             held,
             walks,
         } = start;
         let kind = self.task.resource;
         let both_food = crate::gathering::both_food(kind, held.kind);
-        let drops = computer && held.amount == Amount::ZERO;
+        let drops = player_type.is_computer() && held.amount == Amount::ZERO;
         if (!carry_rule && !drops) || held.kind == kind || both_food {
             if held.kind != kind && both_food {
                 held.kind = kind;
@@ -294,7 +295,7 @@ impl GatherAction {
         let GatherRetarget {
             target,
             player,
-            computer,
+            player_type,
             walks,
             farm_stops,
             rate,
@@ -306,7 +307,9 @@ impl GatherAction {
                 GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
                     return Ok(true);
                 }
-                GatherState::Walk { .. } | GatherState::WalkBack { .. } if computer => {
+                GatherState::Walk { .. } | GatherState::WalkBack { .. }
+                    if player_type.is_computer() =>
+                {
                     return Ok(true);
                 }
                 _ => {}

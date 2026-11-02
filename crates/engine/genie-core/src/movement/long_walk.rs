@@ -7,6 +7,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionType;
 use crate::pathing::long_path::gate_lets_pass;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 
 use crate::map::Footprint;
 use crate::map::Point;
@@ -127,7 +128,7 @@ pub(crate) fn long_path_for(
     walker: &LongWalker<'_>,
     from: Point,
     world: &Spatial,
-    computer: bool,
+    player_type: PlayerType,
     (to, range): (BVector, f32),
     target: Option<(ObjectId, &Placed)>,
     by_id: crate::world::index::ObjectsRef<'_>,
@@ -151,7 +152,7 @@ pub(crate) fn long_path_for(
         target: long_target,
         moves: walker.moves,
         mask: walker.mask,
-        computer,
+        player_type,
         lowered,
         within_range: false,
         near_player: false,
@@ -207,7 +208,7 @@ pub struct ShortAsk<'a> {
 /// `level_target`, the object the world holds, with a main building's annexes over it); None
 /// without a planner for the walker's restriction. The planner reads the first byte of the
 /// target's record (`+0x658`): 3, a box, for the obstruction types 2, 10, 11 and 13
-/// (`FUN_141056460`). A computer's plan (`plan.computer`) is not full.
+/// (`FUN_141056460`). A computer's plan (`plan.player_type`) is not full.
 ///
 /// # Errors
 ///
@@ -242,7 +243,7 @@ pub(crate) fn tile_plan_for(
         radii,
         range,
         closed: Vec::new(),
-        full: !plan.computer,
+        full: !plan.player_type.is_computer(),
     };
     let annexes = level_target
         .filter(|&t| by_id.annex_of(t).is_none())

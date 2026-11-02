@@ -144,14 +144,14 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<bool, GenieError> {
-        let computer = c.w.players.player(c.player)?.kind.is_computer();
+        let player_type = c.w.players.player(c.player)?.kind;
         let site = Self::site_unit(c, reads)?;
         let pasture = match site {
             Some(u) => u.master(c.w.master_tables(), c.player)?.id == PASTURE_1889,
             None => false,
         };
         let built = site.is_some_and(|u| u.life.state != ObjectState::Foundation);
-        if computer || !pasture || !built {
+        if player_type.is_computer() || !pasture || !built {
             return Ok(false);
         }
         let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) else {
@@ -357,9 +357,9 @@ impl BuildAction {
         builder: &Unit,
         reads: &BuildReads,
     ) -> Result<GiveUp, GenieError> {
-        let computer = c.w.players.player(c.player)?.kind.is_computer();
+        let player_type = c.w.players.player(c.player)?.kind;
         Ok(GiveUp {
-            waits: reads.class == Some(class::VILLAGER) && !computer,
+            waits: reads.class == Some(class::VILLAGER) && !player_type.is_computer(),
             stance: c
                 .w
                 .parts

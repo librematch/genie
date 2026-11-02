@@ -30,6 +30,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use genie_diff::Diff;
 
@@ -236,9 +237,9 @@ pub(crate) struct GatherReads {
     /// The game's setting at `FUN_140c87b90()`'s `+0x69` (farmers walk their farm's stops); with
     /// it `set_state(7)` leaves `mGatherX`, `mGatherY` as they are.
     pub(crate) farm_stops: bool,
-    /// The gatherer's player is a computer (`FUN_141659cf0`): its moved gatherer is done at the
-    /// point.
-    pub(crate) computer: bool,
+    /// The gatherer's player's type (`player+0x10`): a computer player's (`FUN_141659cf0`)
+    /// moved gatherer is done at the point.
+    pub(crate) player_type: PlayerType,
     /// The player's attribute the task's `attribute_type2` names (none: 1.0), as the time per
     /// stop reads it.
     pub(crate) stop_productivity: Amount,

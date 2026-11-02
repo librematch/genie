@@ -81,7 +81,7 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         self.timer += c.dt.seconds();
         let gives_up = GiveUp {
-            waits: !r.computer && master_class == class::VILLAGER,
+            waits: !r.player_type.is_computer() && master_class == class::VILLAGER,
             stance: r.stance,
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {
@@ -504,7 +504,7 @@ impl Attack {
         if matches!(self.state, AttackState::GotoSeen { .. })
             && f.own.player != PlayerId::new(0)
             && SEEN_RANGE <= self.range.get()
-            && !r.computer
+            && !r.player_type.is_computer()
         {
             self.enter(
                 AttackState::GotoPoint { move_to: None },

@@ -230,8 +230,8 @@ impl Unit {
         let (owner, resource) =
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
         let master = self.master(c.w.master_tables(), c.player)?;
-        let (computer, farm_stops) = (
-            c.w.players.player(c.player)?.kind.is_computer(),
+        let (player_type, farm_stops) = (
+            c.w.players.player(c.player)?.kind,
             c.w.settings.walkable_farms,
         );
         let walks = self.move_walks(
@@ -263,7 +263,7 @@ impl Unit {
             GatherRetarget {
                 target: &resource,
                 player: c.player,
-                computer,
+                player_type,
                 walks,
                 farm_stops,
                 rate,
@@ -355,7 +355,7 @@ impl Unit {
             pathing: &mut c.w.pathing,
             object: c.w.streams.get(Stream::Object),
             world_time: c.w.world_time,
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
@@ -533,7 +533,7 @@ impl Unit {
         outside: bool,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
-        let by_path = !c.computer;
+        let by_path = !c.player_type.is_computer();
         self.drop_site_with(
             (actions, mover),
             c,
@@ -574,7 +574,7 @@ impl Unit {
         let mut plan = Planning {
             pathing: &mut *c.pathing,
             now: c.world_time,
-            computer: c.computer,
+            player_type: c.player_type,
             object: &mut *c.object,
             groups: c.groups,
         };

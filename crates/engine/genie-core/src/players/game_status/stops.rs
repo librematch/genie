@@ -135,7 +135,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<bool, GenieError> {
-        let computer = self.players.player(p)?.kind.is_computer();
+        let player_type = self.players.player(p)?.kind;
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
@@ -156,7 +156,7 @@ impl World {
             crate::gathering::hunt::HUNT => {}
             _ => return self.halt_other(p, idx, kind),
         }
-        if computer {
+        if player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt stopped (set_state 1)",
             ));

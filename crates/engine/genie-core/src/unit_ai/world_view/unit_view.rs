@@ -12,6 +12,7 @@ use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker};
 use crate::world::slots::PlayerSlots;
@@ -144,8 +145,8 @@ impl UnitView<'_, '_> {
                 return Ok(false);
             }
         }
-        let computer = if owner == self.player {
-            self.computer
+        let player_type = if owner == self.player {
+            self.player_type
         } else {
             owner_view(
                 &self.c.w.players,
@@ -155,7 +156,7 @@ impl UnitView<'_, '_> {
             )?
             .players()
             .player(owner)
-            .is_some_and(|q| q.kind.is_computer())
+            .map_or(PlayerType::PHANTOM, |q| q.kind)
         };
         let capture = self
             .c
@@ -169,7 +170,7 @@ impl UnitView<'_, '_> {
             actions,
             ai.ai_type,
             Some(m),
-            (owner, computer),
+            (owner, player_type),
             self.attacker.scenario,
             (
                 capture,

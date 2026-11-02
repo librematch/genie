@@ -1,4 +1,4 @@
-//! The idle part of the update, the retarget check and search, and the types' other checks.
+//! The retarget check and search, and the types' other checks (slot 73, processMisc).
 
 use crate::GenieError;
 use crate::map::Distance;
@@ -11,16 +11,16 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, AttackAsk, DEFEND_LEASH, DEFEND_PATROL_LEASH, DEFEND_SLACK, Effect, FOLLOW_SLACK_HIGH,
-    FOLLOW_SLACK_LOW, GroupState, INVALID_POINT, Pick, RETARGET_RANGE, RETARGET_REACH,
-    RetargetSearch, SINGLE_VOLLEY, STAND_GROUND_PATROL_LEASH, STAND_GROUND_SLACK, Search,
-    Surroundings, UnitAi, UnitSide, group_lets_idle, held_action_state, patrol_distance,
-    point_gap_squared, searches_on_class,
+    FOLLOW_SLACK_LOW, INVALID_POINT, Pick, RETARGET_RANGE, RETARGET_REACH, RetargetSearch,
+    STAND_GROUND_PATROL_LEASH, STAND_GROUND_SLACK, Search, Surroundings, UnitAi, UnitSide,
+    held_action_state, patrol_distance, point_gap_squared, searches_on_class,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -30,153 +30,6 @@ use crate::world::WorldTime;
 const RETARGET_SPAN_LEAST: Millis = Millis::new(1000);
 
 impl UnitAi {
-    /// The idle part of the full update (`0x140c66b10` after slot 73): a unit without an action
-    /// value (and without a target or not busy) runs slot 72 once its idle timer passes its
-    /// timeout, unless it is a busy unit of class 20 or its group ([`group_lets_idle`]) holds it;
-    /// else the patrol branch ([`UnitAi::patrol_idle_part`]), class 3's and 52's on actions
-    /// `0x26b`/`0x26c` ([`UnitAi::making_idle_part`]) or the end ([`UnitAi::idle_part_end`]).
-    /// `busy` and `group` are what the update read before its order queue.
-    pub(super) fn idle_part(
-        &mut self,
-        busy: bool,
-        group: Option<GroupState>,
-        at: &Surroundings,
-        computer: bool,
-        ai: &mut Well512,
-        side: &mut dyn UnitSide,
-    ) -> Result<(), GenieError> {
-        let class_20 = busy && at.class == Some(class::TRANSPORT);
-        if !class_20
-            && self.adjusted_idle_timeout < self.idle_timer
-            && self.current_action.is_none()
-            && (self.current_target.is_none() || !busy)
-            && group_lets_idle(group)
-        {
-            // slot 0x240 with 1; the idle part reads no result
-            self.idle_timer = Millis::ZERO;
-            let _ = self.process_idle(at, computer, ai, side)?;
-            return Ok(());
-        }
-        if self.patrols(group) {
-            return self.patrol_idle_part(at, computer, ai, side);
-        }
-        // Classes whose actions `0x26b`, `0x26c` take another branch of the idle part (`-0xea9`,
-        // `-0xe78` raw).
-        // A building's master type (`'P'`, `FUN_1411942c0`).
-        // The combat type (`0x46`), from which on the full update's tail reads a target's `+0x924`.
-        if matches!(at.class, Some(class::BUILDING | class::TOWER))
-            && matches!(
-                self.current_action,
-                Some(ActionKind::Make | ActionKind::Research)
-            )
-        {
-            return self.making_idle_part(at, computer, ai, side);
-        }
-        self.idle_part_end(at.class, at.player, group)
-    }
-
-    /// The idle part's patrol branch (`0x140c67f0b`): "I have a patrol order, checking to see if
-    /// my secondary timer (%d) has expired." While it runs nothing more happens. Expired, it
-    /// restarts at 750 (`PATROL_ATTACK_DELAY`; an adjusted idle timeout of exactly 750 is redrawn,
-    /// slot 0x1a8) and processIdle runs (slot 0x240 with 1, [`UnitAi::process_idle`]) unless the
-    /// unit's top action holds a building as its target (slot 400). The branch on the byte
-    /// `DAT_143f01835` cannot run: nothing writes it.
-    pub(super) fn patrol_idle_part(
-        &mut self,
-        at: &Surroundings,
-        computer: bool,
-        ai: &mut Well512,
-        side: &mut dyn UnitSide,
-    ) -> Result<(), GenieError> {
-        if self.secondary_timer != Millis::ZERO {
-            return Ok(());
-        }
-        self.secondary_timer = Millis::new(750);
-        if self.adjusted_idle_timeout == Millis::new(750) {
-            self.update_adjusted_idle_timeout(ai);
-        }
-        if Self::top_target_live(at, side)?.is_some_and(|t| t.kind == BUILDING) {
-            return Ok(());
-        }
-        let _ = self.process_idle(at, computer, ai, side)?;
-        Ok(())
-    }
-
-    /// The idle part's patrol branch (`0x140c67f0b`): a patrol order (`0x2c7`, `0x2dd`), or a
-    /// group that patrols ([`GroupState::patrol`]) off the hero power's order (`0x326`).
-    pub(super) fn patrols(&self, group: Option<GroupState>) -> bool {
-        matches!(
-            self.current_order,
-            Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) || group.is_some_and(|g| g.patrol && self.current_order != Some(OrderKind::HeroPower))
-    }
-
-    /// The idle part past slot 72's test of a unit of class 3 or 52 on the make action (`0x26b`,
-    /// `0x26c`): a building (`FUN_1411942c0`; `FUN_1411206a0` rules out classes 51 and 54) whose
-    /// master has no missile (`+0x83c` below 0, `FUN_1410bfca0`) and whose firepower (`+0xa00`)
-    /// is at most 1 (`DAT_14330eb8c`) forgets its target (`FUN_140c5e1e0`). With no target and its
-    /// idle timer past its timeout, the timer restarts and processIdle runs (slot 0x240 with 1,
-    /// [`UnitAi::process_idle`]); the idle timer is not reset otherwise.
-    pub(super) fn making_idle_part(
-        &mut self,
-        at: &Surroundings,
-        computer: bool,
-        ai: &mut Well512,
-        side: &mut dyn UnitSide,
-    ) -> Result<(), GenieError> {
-        if self.current_target.is_some()
-            && at.kind == BUILDING
-            && !at.ranged
-            && at.firepower <= SINGLE_VOLLEY
-        {
-            self.remove_target();
-        }
-        if self.idle_timer <= self.adjusted_idle_timeout || self.current_target.is_some() {
-            return Ok(());
-        }
-        self.idle_timer = Millis::ZERO;
-        self.process_idle(at, computer, ai, side).map(|_| ())
-    }
-
-    /// The idle part past slot 72: the patrol branch ([`UnitAi::patrols`]) and class 3's and
-    /// 52's actions `0x26b`/`0x26c` (but in [`UnitAi::idle_part`], [`UnitAi::making_idle_part`])
-    /// are not modelled. Action `0x2c0` (a member moved aside) ends, the last action taking it,
-    /// unless the unit's group moves (`FUN_141046600`); an action or a target keeps the idle timer
-    /// of a player above Gaia at 0.
-    pub(super) fn idle_part_end(
-        &mut self,
-        class: Option<ClassId>,
-        player: PlayerId,
-        group: Option<GroupState>,
-    ) -> Result<(), GenieError> {
-        if self.patrols(group) {
-            return Err(GenieError::unsupported("a patrol order's idle part"));
-        }
-        if matches!(class, Some(class::BUILDING | class::TOWER))
-            && matches!(
-                self.current_action,
-                Some(ActionKind::Make | ActionKind::Research)
-            )
-        {
-            return Err(GenieError::unsupported(
-                "a unit of class 3 or 52 on action 0x26b/0x26c",
-            ));
-        }
-        if self.current_action == Some(ActionKind::GroupAside) {
-            if group.is_none_or(|g| !g.moving) {
-                self.last_action = Some(ActionKind::GroupAside);
-                self.current_action = None;
-            }
-            return Ok(());
-        }
-        if (self.current_action.is_some() || self.current_target.is_some())
-            && player != PlayerId::GAIA
-        {
-            self.idle_timer = Millis::ZERO;
-        }
-        Ok(())
-    }
-
     /// Slot 73 (`0x140c567c0`, processMisc). Its order part first, by the order (an action's
     /// value plus 100 without one): the follow order's ([`UnitAi::follow`]) and the defend
     /// order's ([`UnitAi::defend_misc`]). Then the leash checks (not on the orders 0x2c7, 0x2dd and 0x323, nor in a
@@ -200,7 +53,7 @@ impl UnitAi {
     pub(super) fn retarget_check(
         &mut self,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -209,7 +62,7 @@ impl UnitAi {
         let order = self
             .current_order
             .or_else(|| self.current_action.and_then(ActionKind::order));
-        if order == Some(OrderKind::Defend) && self.defend_misc(at, computer, ai, side)? {
+        if order == Some(OrderKind::Defend) && self.defend_misc(at, player_type, ai, side)? {
             return Ok(false);
         }
         if order == Some(OrderKind::Follow) && self.follow(at, side, ai)? {
@@ -228,10 +81,14 @@ impl UnitAi {
         self.retarget_timer = Millis::new(750 + ai.rand15() % 500);
         let target = at.target.map(|t| (t.owner, t.class));
         let listed = at.action_state.map(|_| at.attack_listed);
-        if let Some(search) =
-            self.retarget_outcome(target, at.weapon_range, computer, at.action_state, listed)?
-        {
-            let _ = self.retarget_search(search, computer, at, side, ai)?;
+        if let Some(search) = self.retarget_outcome(
+            target,
+            at.weapon_range,
+            player_type,
+            at.action_state,
+            listed,
+        )? {
+            let _ = self.retarget_search(search, player_type, at, side, ai)?;
         }
         Ok(true)
     }
@@ -328,7 +185,7 @@ impl UnitAi {
     pub(super) fn retarget_search(
         &mut self,
         search: RetargetSearch,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
@@ -343,14 +200,18 @@ impl UnitAi {
                     search.work_state,
                 )
             });
-        let (classes, radius) = self.search_area(at, computer)?;
+        let (classes, radius) = self.search_area(at, player_type)?;
         let found = side.closest(&Search {
             at: from.ground(),
             radius,
             classes,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !computer { 2 } else { 0 },
+                lowest: if at.scenario && !player_type.is_computer() {
+                    2
+                } else {
+                    0
+                },
                 seeker: self.seeker(at),
                 ask: AttackAsk {
                     distance: Distance::new(distance),
@@ -364,8 +225,9 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, computer)?;
-        let keeps = search.building && computer && self.stance == UnitStance::AGGRESSIVE;
+        self.attack_search_alert(found, player_type)?;
+        let keeps =
+            search.building && player_type.is_computer() && self.stance == UnitStance::AGGRESSIVE;
         let new = Self::world_object(found.id, at, side)?;
         if !keeps
             && self.current_order == Some(OrderKind::Attack)
@@ -414,12 +276,12 @@ impl UnitAi {
         &self,
         target: Option<(PlayerId, ClassId)>,
         weapon_range: Distance,
-        computer: bool,
+        player_type: PlayerType,
         action_state: Option<ActionState>,
         attack_listed: Option<bool>,
     ) -> Result<Option<RetargetSearch>, GenieError> {
         let attack_order = self.current_order == Some(OrderKind::Attack);
-        if attack_order && RETARGET_RANGE < weapon_range.get() && !computer {
+        if attack_order && RETARGET_RANGE < weapon_range.get() && !player_type.is_computer() {
             return Ok(None);
         }
         let mut search = false;
@@ -427,7 +289,7 @@ impl UnitAi {
             match target {
                 Some((PlayerId::GAIA, _)) => return Ok(None),
                 Some((_, class)) if searches_on_class(class) => {
-                    if attack_order && !computer {
+                    if attack_order && !player_type.is_computer() {
                         return Ok(None);
                     }
                     search = true;
@@ -499,7 +361,7 @@ impl UnitAi {
     pub(super) fn defend_misc(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -567,7 +429,7 @@ impl UnitAi {
                     let _ = self.attack_slot(attacker, true, at, side, ai)?;
                     return Ok(true);
                 }
-                NearestAttacker::NoAttacker => return self.process_idle(at, computer, ai, side),
+                NearestAttacker::NoAttacker => return self.process_idle(at, player_type, ai, side),
                 NearestAttacker::NoUnitAi => {}
             }
         }
@@ -682,12 +544,12 @@ impl UnitAi {
     /// timeout restarts with a timeout drawn around 5 s.
     pub(super) fn look_around(
         &mut self,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.look_around_timer > self.look_around_timeout {
             // the human branch; `FUN_14152b470` sends players allied with a computer elsewhere
-            if computer {
+            if player_type.is_computer() {
                 return Err(GenieError::unsupported(
                     "look-around timer of a computer player",
                 ));

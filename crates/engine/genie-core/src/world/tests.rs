@@ -680,7 +680,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
         vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
-        vec![false; players],
+        vec![PlayerType::HUMAN; players],
     ));
 }
 
@@ -4369,7 +4369,12 @@ fn unit_sent_off_foundation_finds_the_spot_beside_it() {
     .unwrap();
     let off = found.unwrap();
     assert_eq!(
-        (off.spot, off.class, off.player, off.computer),
+        (
+            off.spot,
+            off.class,
+            off.player,
+            off.player_type.is_computer()
+        ),
         (None, class::VILLAGER, player_id(1), false)
     );
     assert_eq!(
@@ -6284,7 +6289,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 actions,
                 UnitAiType::SOLDIER,
                 None,
-                (PlayerId::new(1), false),
+                (PlayerId::new(1), PlayerType::HUMAN),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6299,7 +6304,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), false),
+                (PlayerId::new(1), PlayerType::HUMAN),
                 |ai, side, _| {
                     side.release(by.id, by)?;
                     Ok((side.unit.workers.get(), ai.notifies.len()))
@@ -6343,7 +6348,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 actions,
                 UnitAiType::SOLDIER,
                 None,
-                (PlayerId::new(1), false),
+                (PlayerId::new(1), PlayerType::HUMAN),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6358,7 +6363,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), false),
+                (PlayerId::new(1), PlayerType::HUMAN),
                 |ai, side, _| {
                     side.c.notify_own(side.unit, n)?;
                     Ok(ai.notifies.len())
@@ -6395,7 +6400,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     actions,
                     UnitAiType::SOLDIER,
                     None,
-                    (PlayerId::new(1), false),
+                    (PlayerId::new(1), PlayerType::HUMAN),
                     false,
                     (
                         CaptureKind::NONE,
@@ -6410,7 +6415,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     c,
                     &view,
                     attacker,
-                    (PlayerId::new(1), false),
+                    (PlayerId::new(1), PlayerType::HUMAN),
                     |_, side, rng| {
                         if world_draws {
                             let _ = side.c.w.streams.get(Stream::Ai).rand15();
@@ -6669,7 +6674,7 @@ fn villager_side<R>(
                 actions,
                 UnitAiType::BOAR,
                 None,
-                (PlayerId::new(1), false),
+                (PlayerId::new(1), PlayerType::HUMAN),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6684,7 +6689,7 @@ fn villager_side<R>(
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), false),
+                (PlayerId::new(1), PlayerType::HUMAN),
                 |_, side, _| f(side),
             )?;
             Ok((answer, c.w.parts.unit_ai.get(unit.id).cloned()))
@@ -7517,7 +7522,7 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
     t.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
         |ai, at, side, _, rng| {
-            let r = ai.process_order(&order, Some((at, false)), None, rng, side)?;
+            let r = ai.process_order(&order, Some((at, PlayerType::HUMAN)), None, rng, side)?;
             assert_eq!(r, OrderOutcome::Taken);
             Ok(())
         },
@@ -10612,7 +10617,7 @@ pub(crate) fn hands_world(
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![false; 3],
+        vec![PlayerType::HUMAN; 3],
     );
     let mut r = crate::vision::registry::Registry::new(3, 65);
     r.entries
@@ -12418,7 +12423,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             pathing: &mut t.pathing,
             object: t.streams.get(Stream::Object),
             world_time: WorldTime::ZERO,
-            computer: false,
+            player_type: PlayerType::HUMAN,
             groups: &t.groups,
         };
         hunter.drop_off_in(
@@ -16050,7 +16055,7 @@ fn on_side<R>(
                 attacker: crate::unit_ai::Attacker {
                     ai_type: UnitAiType::SOLDIER,
                     player: PlayerId::new(1),
-                    computer: false,
+                    player_type: PlayerType::HUMAN,
                     state: ObjectState::Alive,
                     held: None,
                     top_action: None,
@@ -16073,7 +16078,7 @@ fn on_side<R>(
                     capture: CaptureKind::NONE,
                 },
                 player: PlayerId::new(1),
-                computer: false,
+                player_type: PlayerType::HUMAN,
                 new_owner: None,
                 civ: CivId::new(0),
                 ai_settings: AiSettings::default(),
@@ -19125,7 +19130,7 @@ fn drop_site_sought(
         pathing: &mut t.pathing,
         object: t.streams.get(Stream::Object),
         world_time: WorldTime::ZERO,
-        computer: false,
+        player_type: PlayerType::HUMAN,
         groups: &t.groups,
     };
     let objects = OthersRef::of(&t.players, &t.index, PlayerId::new(1)).unwrap();

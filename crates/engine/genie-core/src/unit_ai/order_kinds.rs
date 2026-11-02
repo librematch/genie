@@ -12,6 +12,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderOutcome;
@@ -513,13 +514,13 @@ impl UnitAi {
     pub fn take_order_now_with(
         &mut self,
         order: QueuedOrder,
-        (at, side, computer): (&Surroundings, &mut dyn UnitSide, bool),
+        (at, side, player_type): (&Surroundings, &mut dyn UnitSide, PlayerType),
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         if ObjectState::Alive < at.state {
             return Ok(());
         }
         let place = (at.position.ground(), at.class);
-        self.order_now(order, None, Some(place), Some((at, computer)), ai, side)
+        self.order_now(order, None, Some(place), Some((at, player_type)), ai, side)
     }
 }

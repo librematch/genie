@@ -32,6 +32,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::ID_45;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
@@ -576,30 +577,32 @@ pub(crate) fn gate_gap(
     gap
 }
 
-/// [`Mover::avoid`]'s rank for the pause of a walker (`me` of `player`, a `computer`'s or not)
+/// [`Mover::avoid`]'s rank for the pause of a walker (`me` of `player`, of `player_type`)
 /// over the hit `id` (`other` its record): a human walker ranks another player's unit, or one of
 /// its own ordered at another time, by their last human order times (`+0x650`: the older order
 /// pauses); else two members of one unit group by their places in it (None for a group the world
 /// does not hold: neither pauses), any other two by id (slot 0x5f8).
 fn pause_rank(
     me: &Me,
-    (player, computer): (PlayerId, bool),
+    (player, player_type): (PlayerId, PlayerType),
     (id, other): (ObjectId, &Placed),
     groups: Option<&crate::groups::UnitGroups>,
     by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Option<bool> {
     let mine = me.human_order;
     let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
-    Some(if !computer && (other.player != player || theirs != mine) {
-        theirs < mine
-    } else if let Some(group) = me.group
-        && by_id.gait(id).and_then(|g| g.group) == Some(group)
-    {
-        let g = groups.and_then(|gs| gs.get(group))?;
-        g.index_of(me.id) < g.index_of(id)
-    } else {
-        me.id < id
-    })
+    Some(
+        if !player_type.is_computer() && (other.player != player || theirs != mine) {
+            theirs < mine
+        } else if let Some(group) = me.group
+            && by_id.gait(id).and_then(|g| g.group) == Some(group)
+        {
+            let g = groups.and_then(|gs| gs.get(group))?;
+            g.index_of(me.id) < g.index_of(id)
+        } else {
+            me.id < id
+        },
+    )
 }
 
 /// [`Mover::reached`]'s waypoints too near the map's edge for the unit (`FUN_140f98d50`): from

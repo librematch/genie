@@ -10,6 +10,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::best_target::Candidate;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
 use crate::world::WorldTime;
@@ -38,8 +39,8 @@ pub struct Searcher {
     pub kind: MasterKind,
     /// Its master's `attack_priority` (`+0x92c`, `FUN_141202220`).
     pub attack_priority: crate::objects::masters::AttackPriority,
-    /// Its owner is a computer player (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// Its owner may attack walls (`player+0x611`, the AI's slot 0x18's player).
     pub walls_allowed: bool,
     /// The AI's slot 0x1d0 with −1: the unit may move to attack.

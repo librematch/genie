@@ -342,7 +342,7 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
         umv.umv_data_list_size,
         players
             .iter()
-            .map(|p| p.world_player().type_ == 3)
+            .map(|p| genie_core::players::PlayerType::from(p.world_player().type_))
             .collect(),
     );
     sight.resources = players

@@ -237,7 +237,7 @@ impl UnitView<'_, '_> {
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
                 now: self.c.w.world_time,
-                computer: self.computer,
+                player_type: self.player_type,
                 object: self.c.w.streams.get(Stream::Object),
                 groups: &self.c.w.groups,
             },
@@ -337,7 +337,7 @@ impl Unit {
             plan: Planning {
                 pathing: &mut c.w.pathing,
                 now: c.w.world_time,
-                computer: c.w.players.player(c.player)?.kind.is_computer(),
+                player_type: c.w.players.player(c.player)?.kind,
                 object: c.w.streams.get(Stream::Object),
                 groups: &c.w.groups,
             },

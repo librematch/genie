@@ -32,6 +32,7 @@ mod flight;
 mod handle;
 mod idle;
 mod idle_animals;
+mod idle_part;
 mod ids;
 mod issuer;
 mod life;

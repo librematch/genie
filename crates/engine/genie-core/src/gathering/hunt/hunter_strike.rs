@@ -118,7 +118,7 @@ impl Unit {
                     &c.w.graphics,
                 ),
                 c.w.parts.unit_ai.get(self.id),
-                (owner.kind.is_computer(), c.w.world_time),
+                (owner.kind, c.w.world_time),
             ),
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),

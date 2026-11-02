@@ -151,8 +151,8 @@ impl World {
                 issuer: Some(Issuer::Player(p)),
                 ..order
             };
-            self.run_unit_ai((p, idx), |ai, at, side, computer, rng| {
-                ai.take_order_now_with(order, (at, side, computer), rng)
+            self.run_unit_ai((p, idx), |ai, at, side, player_type, rng| {
+                ai.take_order_now_with(order, (at, side, player_type), rng)
             })?;
         }
         Ok(())

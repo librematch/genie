@@ -483,7 +483,7 @@ impl World {
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
-            computer: self.players.player(tp)?.kind.is_computer(),
+            player_type: self.players.player(tp)?.kind,
             object: self.streams.get(crate::math::rng::Stream::Object),
             groups: &self.groups,
         };

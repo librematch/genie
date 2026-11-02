@@ -130,14 +130,14 @@ impl OrderCommand {
         if source.overruns() && !last {
             return Ok(None);
         }
-        let Some(computer) = w.players.get(player.index()).map(|p| p.kind.is_computer()) else {
+        let Some(player_type) = w.players.get(player.index()).map(|p| p.kind) else {
             return Ok(None);
         };
         let checked = w.checked_units(player, &w.command_units(player, source));
         if last {
             w.set_last_commanded(player, checked.clone());
         }
-        if !computer && checked.iter().all(Option::is_none) {
+        if !player_type.is_computer() && checked.iter().all(Option::is_none) {
             return Ok(None);
         }
         if !last {

@@ -282,8 +282,10 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
-        let computer = self.players.player(player)?.kind.is_computer();
-        let checked = ids.len().min(if computer { 500 } else { 60 });
+        let player_type = self.players.player(player)?.kind;
+        let checked = ids
+            .len()
+            .min(if player_type.is_computer() { 500 } else { 60 });
         let mut ids = ids.to_vec();
         let mut dropped = 0;
         for id in ids.iter_mut().take(checked) {
@@ -295,7 +297,7 @@ impl World {
                 dropped += 1;
             }
         }
-        if checked <= dropped && !computer {
+        if checked <= dropped && !player_type.is_computer() {
             return Ok(None);
         }
         Ok(Some(ids))
@@ -320,10 +322,10 @@ impl World {
         ids: &[Option<ObjectId>],
         pick: crate::commands::UnloadPick,
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
-        let computer = self.players.player(player)?.kind.is_computer();
+        let player_type = self.players.player(player)?.kind;
         let mut ids: Vec<Option<ObjectId>> = ids
             .iter()
-            .take(if computer { 500 } else { 60 })
+            .take(if player_type.is_computer() { 500 } else { 60 })
             .copied()
             .collect();
         let tied = |owner: PlayerId| {
@@ -353,7 +355,7 @@ impl World {
                 dropped += 1;
             }
         }
-        if ids.len() <= dropped && !computer {
+        if ids.len() <= dropped && !player_type.is_computer() {
             return Ok(None);
         }
         Ok(Some(ids))

@@ -356,7 +356,7 @@ impl World {
             tm.class,
             crate::construction::repair::SHIPS.contains(&tm.class),
         );
-        let computer = self.players.player(player)?.kind.is_computer();
+        let player_type = self.players.player(player)?.kind;
         let repair = self
             .parts
             .actions_of(self.players.live(player, idx)?.id)
@@ -368,7 +368,7 @@ impl World {
         let same = repair.target == Some(crate::construction::RepairTargetId::new(target));
         let stays = same
             && (repair.state == RepairState::Face
-                || (matches!(repair.state, RepairState::Move { .. }) && computer));
+                || (matches!(repair.state, RepairState::Move { .. }) && player_type.is_computer()));
         if !stays {
             if !same && repair.counted {
                 self.leave_builders(repair.target)?;
@@ -523,7 +523,7 @@ impl World {
             build.retarget(foundation, target_at, walk, mover)?;
             return Ok(class);
         }
-        let computer = self.players.player(player)?.kind.is_computer();
+        let player_type = self.players.player(player)?.kind;
         let Some(Place::Live(fp, fi)) = self.place(target) else {
             return Err(GenieError::unsupported("a Build's foundation that sleeps"));
         };
@@ -548,7 +548,7 @@ impl World {
             walk,
             mover.as_mut(),
             builders,
-            computer,
+            player_type,
         );
         let unit = self.players.live_mut(player, idx)?;
         self.parts.actions.of_mut(unit.id)?.list.set_build(build);

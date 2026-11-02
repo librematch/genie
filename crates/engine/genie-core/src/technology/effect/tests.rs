@@ -34,6 +34,7 @@ use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::production::LocationButton;
@@ -833,7 +834,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             vec![VisionBits::NONE; n],
             Vec::new(),
             0,
-            vec![false],
+            vec![PlayerType::HUMAN],
         );
         let seer = crate::vision::visibility::Seer {
             player: PlayerId::new(0),

@@ -19,6 +19,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::{Found, Path};
+use crate::players::PlayerType;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
@@ -171,10 +172,10 @@ impl World {
                 radius: Distance::new(grow),
                 ..mover.walker(id)
             },
-            computer: self
+            player_type: self
                 .players
                 .get(p.index())
-                .is_some_and(|q| q.kind.is_computer()),
+                .map_or(PlayerType::PHANTOM, |q| q.kind),
             at: u.moved_vector(self.parts.mover_of(u.id)),
             here: u.position(),
             mask: mover.stats.restriction_mask,
@@ -220,7 +221,7 @@ impl World {
             let from = r.at.ground();
             let res = self.round_short(
                 r.walker,
-                r.computer,
+                r.player_type,
                 from,
                 to,
                 r.differentiators,
@@ -267,7 +268,7 @@ impl World {
             let from = r.at.ground();
             way.result = self.round_short(
                 r.walker,
-                r.computer,
+                r.player_type,
                 from,
                 step,
                 r.differentiators,
@@ -315,7 +316,7 @@ impl World {
             let from = r.at.ground();
             way.result = self.round_short(
                 r.walker,
-                r.computer,
+                r.player_type,
                 from,
                 place,
                 r.differentiators,
@@ -357,12 +358,12 @@ impl World {
     }
 
     /// The way round's short pather ([`World::way_round`], `FUN_140f9e540` with the record) for
-    /// `walker` (of a `computer` player or not) from `from` to `to`, range 0, no target, `ignore`
+    /// `walker` (its owner of `player_type`) from `from` to `to`, range 0, no target, `ignore`
     /// its ignore list; the record measured after (`FUN_140f95a60`). Its result.
     pub(super) fn round_short(
         &mut self,
         walker: crate::movement::Walker,
-        computer: bool,
+        player_type: PlayerType,
         from: Point,
         to: BVector,
         ignore: &[ObjectId],
@@ -377,7 +378,7 @@ impl World {
         let mut plan = crate::movement::Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
-            computer,
+            player_type,
             object: self.streams.get(crate::math::rng::Stream::Object),
             groups: &self.groups,
         };
@@ -405,10 +406,10 @@ impl World {
     ) -> Result<(bool, Path), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
-        let computer = self
+        let player_type = self
             .players
             .get(p.index())
-            .is_some_and(|q| q.kind.is_computer());
+            .map_or(PlayerType::PHANTOM, |q| q.kind);
         let walker = crate::movement::LongWalker {
             id,
             position: u.position(),
@@ -423,7 +424,7 @@ impl World {
             &walker,
             from,
             &self.spatial,
-            computer,
+            player_type,
             (to, 0.0),
             None,
             crate::world::index::ObjectsRef::new(
@@ -471,7 +472,7 @@ impl World {
 pub(super) struct Rounder<'d> {
     pub(super) id: ObjectId,
     pub(super) walker: crate::movement::Walker,
-    pub(super) computer: bool,
+    pub(super) player_type: PlayerType,
     pub(super) at: BVector,
     pub(super) here: Position,
     pub(super) mask: crate::map::TerrainMask,

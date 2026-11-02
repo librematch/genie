@@ -57,7 +57,7 @@ impl Attack {
         (target, radius): (Position, Footprint),
     ) -> Result<UpdateCode, GenieError> {
         let gives_up = GiveUp {
-            waits: !r.computer && f.own.class == class::VILLAGER,
+            waits: !r.player_type.is_computer() && f.own.class == class::VILLAGER,
             stance: r.stance,
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {

@@ -322,7 +322,7 @@ impl UnitView<'_, '_> {
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
                 now: self.c.w.world_time,
-                computer: self.computer,
+                player_type: self.player_type,
                 object: self.c.w.streams.get(Stream::Object),
                 groups: &self.c.w.groups,
             },

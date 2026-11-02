@@ -28,6 +28,7 @@ use crate::objects::layers::MotionMut;
 use crate::objects::masters::{Master, TaskId};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
+use crate::players::PlayerType;
 use crate::unit_ai::{ActionKind, UnitAi};
 use crate::world::World;
 use crate::world::parts::PartTable;
@@ -219,7 +220,7 @@ impl TransportAction {
         r: &TransportReads,
     ) -> Result<UpdateCode, GenieError> {
         let walked = self.walk(c, unit, me)?;
-        let computer = c.w.players.player(c.player)?.kind.is_computer();
+        let player_type = c.w.players.player(c.player)?.kind;
         let World {
             spatial,
             zones,
@@ -239,7 +240,7 @@ impl TransportAction {
         let look = (r.standing, streams.get(Stream::Sprite));
         let id = unit.id;
         let posts = (&mut *unit, parts.motion.layer_mut(id), &mut parts.unit_ai);
-        match self.state_update(walked, (&ship, &mut shore), posts, look, computer)? {
+        match self.state_update(walked, (&ship, &mut shore), posts, look, player_type)? {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
                 self.unload(c, unit, actions)?;
@@ -278,7 +279,7 @@ impl TransportAction {
     /// value, slot 0x328), idles and returns 3. State 6 unloads:
     /// - with a point, its zone's tile ([`Shore::zone`]) must lie within [`NEAR`] of the unit
     ///   ([`Shore::near`]), else the owner hears that it cannot unload there (0x207, its slot
-    ///   0x2e8: [`crate::unit_ai::alert_owner`] for a `computer` player); `+0x68` clears either
+    ///   0x2e8: [`crate::unit_ai::alert_owner`] for a computer player); `+0x68` clears either
     ///   way.
     /// - with units inside, a unit beside the shore ([`TransportAction::next_to_shore`]) unloads
     ///   ([`Updated::Unload`]); one that is not, over water at the point (`FUN_1413fbf30`,
@@ -296,7 +297,7 @@ impl TransportAction {
         (ship, shore): (&Ship<'_>, &mut impl Shore),
         (unit, mut motion, ais): (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
-        computer: bool,
+        player_type: PlayerType,
     ) -> Result<Updated, GenieError> {
         let (changed, code) = match self.state {
             TransportState::Done => return Ok(Updated::Code(UpdateCode::DONE)),
@@ -345,7 +346,7 @@ impl TransportAction {
                 let changed = self.unloaded(ship, shore)?;
                 stand((unit, motion.reborrow()), changed, look)?;
                 if cannot_unload {
-                    crate::unit_ai::alert_owner(computer)?;
+                    crate::unit_ai::alert_owner(player_type)?;
                 }
                 return Ok(Updated::Code(UpdateCode::UNDER_WAY));
             }

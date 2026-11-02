@@ -142,14 +142,14 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing) -> bo
     let captured = COMBAT <= t.kind && t.capture;
     // nothing held (`+0x310` at most 0) and not taken by sight
     let free = t.held <= Amount::ZERO && !captured;
-    if me.computer && t.owner == PlayerId::GAIA && !free {
+    if me.player_type.is_computer() && t.owner == PlayerId::GAIA && !free {
         return false;
     }
     let boat_free = me.class == Some(class::TOWER)
         || BOAT_HUNTERS.contains(&me.master)
         || !BOATS.contains(&t.class);
     let is_boat = me.class.is_some_and(|c| BOATS.contains(&c));
-    !(me.computer && !boat_free && !is_boat)
+    !(me.player_type.is_computer() && !boat_free && !is_boat)
 }
 
 /// The ranges the statistics' walks test an object at `gap` by: at least the least range,
@@ -349,7 +349,7 @@ impl Walked {
         st: &mut Statistics,
         world: &mut dyn Battlefield,
     ) -> Result<(), crate::GenieError> {
-        let lowest = if me.scenario && !me.computer {
+        let lowest = if me.scenario && !me.player_type.is_computer() {
             UnitRelation::ALLY
         } else {
             UnitRelation::GAIA

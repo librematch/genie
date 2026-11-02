@@ -13,6 +13,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
 use crate::objects::masters::TaskSprites;
 use crate::pathing::zones::ZoneId;
+use crate::players::PlayerType;
 use crate::test_ids::object_id;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
@@ -145,7 +146,7 @@ fn run_on(
         crate::objects::layers::MotionMut<'_>,
         &mut PartTable<UnitAi>,
     ),
-    computer: bool,
+    player_type: PlayerType,
 ) -> Result<Updated, GenieError> {
     let walked = match t.state.move_to().copied().map(|m| m.state) {
         Some(MoveTo::Failed) => UpdateCode::FAILED,
@@ -153,7 +154,7 @@ fn run_on(
         None | Some(MoveTo::Arrived) => UpdateCode::DONE,
     };
     let look = (Some(STANDING), &mut Well512::default());
-    t.state_update(walked, (s, c), hull, look, computer)
+    t.state_update(walked, (s, c), hull, look, player_type)
 }
 
 /// [`run_on`] on a fresh [`hull`] of a human player: the update's answer and what it left.
@@ -163,7 +164,13 @@ fn run(
     c: &mut Coast,
 ) -> (Result<Updated, GenieError>, Left) {
     let (mut unit, mut motion, mut ais) = hull();
-    let r = run_on(t, s, c, (&mut unit, motion.lent(), &mut ais), false);
+    let r = run_on(
+        t,
+        s,
+        c,
+        (&mut unit, motion.lent(), &mut ais),
+        PlayerType::HUMAN,
+    );
     (r, left((&unit, &motion, &ais)))
 }
 
@@ -171,7 +178,14 @@ fn run(
 fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
     let mut t = *t;
     let (mut unit, mut motion, mut ais) = hull();
-    run_on(&mut t, s, c, (&mut unit, motion.lent(), &mut ais), true).is_err_and(|e| {
+    run_on(
+        &mut t,
+        s,
+        c,
+        (&mut unit, motion.lent(), &mut ais),
+        PlayerType::COMPUTER,
+    )
+    .is_err_and(|e| {
         e.reason()
             == "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)"
     })
@@ -573,7 +587,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
             (&s, &mut c),
             (&mut unit, motion.lent(), &mut ais),
             look,
-            false
+            PlayerType::HUMAN
         )
         .is_err()
     );

@@ -228,7 +228,7 @@ impl Unit {
             None => None,
         };
         let who = crate::gathering::hunt::PointWalker {
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             villager: master.class == class::VILLAGER,
             stance: c
                 .w
@@ -298,7 +298,7 @@ impl Unit {
             c.w.masters.of(c.player),
         )?;
         let who = crate::gathering::hunt::PointWalker {
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             villager: master.class == class::VILLAGER,
             stance: c
                 .w

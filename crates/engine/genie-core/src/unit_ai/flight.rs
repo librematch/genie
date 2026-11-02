@@ -11,6 +11,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
@@ -36,7 +37,7 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -46,7 +47,7 @@ impl UnitAi {
         }
         // an animal that is not Gaia's alerts its owner (slot 0x2e8 with 0x201)
         if at.player != PlayerId::GAIA {
-            alert_owner(computer)?;
+            alert_owner(player_type)?;
         }
         let _ = self.attackers.add(n.caller);
         side.set_under_attack(true);
@@ -54,7 +55,7 @@ impl UnitAi {
         // ([`ActionKind`])
         // The class of the king's branch of the hunted animal's idle check (`-0xe71` raw).
         let uncon = at.class != Some(class::KING);
-        let _ = self.run_away(uncon, at, computer, ai_rng, side)?;
+        let _ = self.run_away(uncon, at, player_type, ai_rng, side)?;
         Ok(BREAK)
     }
 
@@ -70,7 +71,7 @@ impl UnitAi {
         &mut self,
         uncon: bool,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -81,7 +82,7 @@ impl UnitAi {
             if at.class == Some(class::CLASS_54) || Self::top_target_live(at, side)?.is_some() {
                 return Ok(false);
             }
-            if computer {
+            if player_type.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's siege unit running away (FUN_141225c40)",
                 ));
@@ -110,12 +111,12 @@ impl UnitAi {
             // The class whose attackers make a computer's unit warn its group (`FUN_140c5e900`: 22).
             class_22 |= u.class == class::WARSHIP;
         }
-        if computer && class_22 && Speed::ZERO < at.speed {
+        if player_type.is_computer() && class_22 && Speed::ZERO < at.speed {
             return Err(GenieError::unsupported(
                 "a computer's unit running from class 22 (its group's runs)",
             ));
         }
-        if computer && at.class == Some(class::TRANSPORT) {
+        if player_type.is_computer() && at.class == Some(class::TRANSPORT) {
             return Err(GenieError::unsupported(
                 "a computer's transport ship running away",
             ));
@@ -273,13 +274,13 @@ impl UnitAi {
         &mut self,
         attacker: ObjectId,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
         if side.seen_unit(attacker)?.is_none() {
             return Ok(());
         }
-        let (classes, radius) = self.search_area(at, computer)?;
+        let (classes, radius) = self.search_area(at, player_type)?;
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius,
@@ -288,7 +289,7 @@ impl UnitAi {
             pick: Pick::Look,
             memory: Memory::default(),
         })?;
-        self.attack_search_alert(found, computer)?;
+        self.attack_search_alert(found, player_type)?;
         side.call_for_help(attacker)
     }
 
@@ -305,9 +306,15 @@ impl UnitAi {
     pub(super) fn search_area(
         &self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
     ) -> Result<(&'static [ClassId], Distance), GenieError> {
-        search_area(self.ai_type, at.class, at.los, at.search_radius, computer)
+        search_area(
+            self.ai_type,
+            at.class,
+            at.los,
+            at.search_radius,
+            player_type,
+        )
     }
 
     /// The villager's cases 0x1fb, 0x1fc and 0x202 off the attack action (`FUN_140c22bf0`,
@@ -328,16 +335,16 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         match self.current_action {
-            Some(ActionKind::Hunt) => return self.hunter_search(n, at, computer, side, rng),
+            Some(ActionKind::Hunt) => return self.hunter_search(n, at, player_type, side, rng),
             Some(ActionKind::Shepherd) => {
                 return Err(VILLAGER_NOTIFY.with("action", ActionKind::Shepherd.value()));
             }
-            Some(ActionKind::Gather) => return self.gatherer_search(n, at, computer, side, rng),
+            Some(ActionKind::Gather) => return self.gatherer_search(n, at, player_type, side, rng),
             Some(ActionKind::Build) => {
                 if let Some(found) = side.foundation_search()?
                     && side.reaches(found, FOUNDATION_REACH)?
@@ -345,7 +352,7 @@ impl UnitAi {
                     let _ = self.build_object(FoundationId::new(found), true, at, side, rng)?;
                     return Ok(BREAK);
                 }
-                if computer {
+                if player_type.is_computer() {
                     return Err(GenieError::unsupported(
                         "a computer builder without a foundation",
                     ));

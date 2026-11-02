@@ -113,7 +113,7 @@ impl HuntAction {
             return Ok(Dropped::Again);
         }
         let gives_up = GiveUp {
-            waits: !who.computer && who.villager,
+            waits: !who.player_type.is_computer() && who.villager,
             stance: who.stance,
         };
         match self.update_list(c, unit, me, gives_up)?.get() {
@@ -225,7 +225,7 @@ impl Unit {
             pathing: &mut c.w.pathing,
             object: c.w.streams.get(Stream::Object),
             world_time: c.w.world_time,
-            computer: c.w.players.player(c.player)?.kind.is_computer(),
+            player_type: c.w.players.player(c.player)?.kind,
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;

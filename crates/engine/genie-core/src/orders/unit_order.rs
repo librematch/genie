@@ -393,7 +393,7 @@ impl World {
             pathing: &mut self.pathing,
             object: self.streams.get(Stream::Object),
             world_time: self.world_time,
-            computer: player.kind.is_computer(),
+            player_type: player.kind,
             groups: &self.groups,
         };
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;

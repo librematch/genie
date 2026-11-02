@@ -253,7 +253,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let mut plan = Planning {
             pathing: &mut self.c.w.pathing,
             now: self.c.w.world_time,
-            computer: self.computer,
+            player_type: self.player_type,
             object: self.c.w.streams.get(Stream::Object),
             groups: &self.c.w.groups,
         };
@@ -342,7 +342,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         let mut plan = Planning {
             pathing: &mut self.c.w.pathing,
             now: self.c.w.world_time,
-            computer: self.computer,
+            player_type: self.player_type,
             object: self.c.w.streams.get(Stream::Object),
             groups: &self.c.w.groups,
         };
@@ -474,7 +474,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             self.c.player,
             self.new_owner,
         )?)?;
-        let (at, computer) = (self.unit.position(), self.computer);
+        let (at, player_type) = (self.unit.position(), self.player_type);
         // the search about the town centre only while the player has no scout map
         let scout_map = self.c.w.spatial.scout_map(self.player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
@@ -489,7 +489,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             line_of_sight,
             order: ai.current_order,
             target_point: ai.target_point.ground(),
-            computer,
+            player_type,
         };
         crate::movement::explore::closest_undiscovered(&mut area, seeker, map, rng)
     }

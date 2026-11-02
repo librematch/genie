@@ -8,6 +8,7 @@ use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::masters::class;
+use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
@@ -143,7 +144,7 @@ impl UnitAi {
     pub(super) fn hunted_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -152,7 +153,7 @@ impl UnitAi {
             let led = at.master != KING_UNLED
                 && !at.garrisoned
                 && self.current_order.is_none()
-                && computer;
+                && player_type.is_computer();
             if led {
                 return Err(GenieError::unsupported(
                     "a computer player's king's idle check (FUN_140c16930, slot 0x7e8)",

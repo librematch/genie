@@ -182,7 +182,7 @@ fn tile_plan(
     let spatial = &mut *world.spatial;
     let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
     let mut planning = world.plan.reborrow();
-    planning.computer = lead.computer;
+    planning.player_type = lead.player_type;
     let r = tile_plan_for(
         lead.walker,
         leg.from,
@@ -244,7 +244,7 @@ fn short_plan(
     let mut r = ShortFound::InRange;
     if lead.solid {
         let mut planning = world.plan.reborrow();
-        planning.computer = lead.computer;
+        planning.player_type = lead.player_type;
         r = short_path_for(
             lead.walker,
             leg.from,
@@ -364,7 +364,7 @@ fn long_plan(
         &walker,
         leg.from,
         spatial,
-        lead.computer,
+        lead.player_type,
         (leg.waypoint, leg.range.get()),
         leg.target_id.zip(target),
         by_id,

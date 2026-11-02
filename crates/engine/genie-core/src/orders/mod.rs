@@ -31,6 +31,7 @@ use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::pathing::tile_path::Found;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
@@ -124,11 +125,16 @@ pub(crate) struct Work {
 /// the unit's `reach` ([`work_reach`]) class 54 packs (`FUN_140ad4ff0`), within it class 51
 /// unpacks (`FUN_140ae58a0`); without a reach, a computer's class 54 packs when the order has
 /// no target the world holds (`targetless`).
-fn packs(class: ClassId, reach: Option<(bool, bool)>, targetless: bool, computer: bool) -> bool {
+fn packs(
+    class: ClassId,
+    reach: Option<(bool, bool)>,
+    targetless: bool,
+    player_type: PlayerType,
+) -> bool {
     match reach {
         // Masters and classes the order handler and slot 0x7e8 treat apart (decoded; the game stores a
         // class as its value − 0xeac, a master id as its id + 0x609c).
-        None => targetless && class == class::CLASS_54 && computer,
+        None => targetless && class == class::CLASS_54 && player_type.is_computer(),
         Some((within, _)) => {
             (class == class::CLASS_54 && !within) || (class == class::CLASS_51 && within)
         }

@@ -158,7 +158,7 @@ fn attribute_22_is_the_explored_share_in_percent() {
         vec![VisionBits::NONE; 100],
         Vec::new(),
         0,
-        vec![false; 4],
+        vec![PlayerType::HUMAN; 4],
     ));
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(
@@ -742,7 +742,7 @@ fn the_scout_map_takes_the_new_tiles() {
         unified,
         Vec::new(),
         0,
-        vec![false; 4],
+        vec![PlayerType::HUMAN; 4],
     );
     sight.new_tiles[1] = vec![Tile::new(0, 0), Tile::new(1, 0)];
     t.spatial.sight = Some(sight);

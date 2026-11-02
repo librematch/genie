@@ -18,6 +18,7 @@ use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -79,9 +80,9 @@ pub(crate) struct Lead {
     pub(crate) solid: bool,
     /// Its ignore units (`+0x670`).
     pub(crate) ignore_units: Vec<ObjectId>,
-    /// Its owner's index and whether that is a computer player (`FUN_141659cf0`).
+    /// Its owner's index and type (`FUN_141659cf0` tests it for a computer player).
     pub(crate) player: PlayerId,
-    pub(crate) computer: bool,
+    pub(crate) player_type: PlayerType,
     /// Its group (`+0x6d0`), when the world holds it.
     pub(crate) group: Option<LeadGroup>,
 }
@@ -122,7 +123,7 @@ impl World {
 /// None for a member the world does not hold.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct GroupView {
-    pub(crate) computer: bool,
+    pub(crate) player_type: PlayerType,
     pub(crate) members: Vec<Option<(Option<ObjectId>, BVector)>>,
 }
 
@@ -278,10 +279,10 @@ impl World {
             solid: mover.stats.radius.sized(),
             ignore_units: mover.ignore_units.clone(),
             player: p,
-            computer: self
+            player_type: self
                 .players
                 .get(p.index())
-                .is_some_and(|q| q.kind.is_computer()),
+                .map_or(PlayerType::PHANTOM, |q| q.kind),
             group,
         })
     }

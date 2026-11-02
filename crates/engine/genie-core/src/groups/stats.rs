@@ -307,7 +307,8 @@ impl World {
             .get(u.id)
             .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
         let ai_type = ai.ai_type;
-        if self.players.player(p)?.kind.is_computer() {
+        let player_type = self.players.player(p)?.kind;
+        if player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's group member's search (its cared classes)",
             ));
@@ -319,7 +320,7 @@ impl World {
             Some(master.class),
             master.line_of_sight,
             master.search_radius,
-            false,
+            player_type,
         )?;
         let search = crate::unit_ai::Search {
             at: u.position().ground(),

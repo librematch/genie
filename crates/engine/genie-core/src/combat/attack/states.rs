@@ -141,7 +141,7 @@ impl Attack {
         let target = self.target.take();
         let_go(c, unit, target)?;
         self.point = Position::from([NONE; 3]);
-        let human = f.own.player != PlayerId::new(0) && !r.computer;
+        let human = f.own.player != PlayerId::new(0) && !r.player_type.is_computer();
         let waits = match r.ai_order {
             AiOrder::Absent => true,
             AiOrder::Idle => false,

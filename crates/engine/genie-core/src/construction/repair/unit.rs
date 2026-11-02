@@ -27,6 +27,7 @@ use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
@@ -106,14 +107,14 @@ impl Unit {
         actions: &crate::objects::layers::Action,
         ai_type: UnitAiType,
         master: Option<&Master>,
-        (player, computer): (PlayerId, bool),
+        (player, player_type): (PlayerId, PlayerType),
         scenario: bool,
         (capture, firepower, speed): (CaptureKind, crate::combat::Firepower, Speed),
     ) -> crate::unit_ai::Attacker {
         crate::unit_ai::Attacker {
             ai_type,
             player,
-            computer,
+            player_type,
             state: self.life.state,
             held: self.life.attribute_type,
             top_action: actions.top_action_kind(),

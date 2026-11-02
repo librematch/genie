@@ -233,17 +233,17 @@ impl World {
         range: &mut f32,
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
-        let Some(computer) = g
+        let Some(player_type) = g
             .owner
             .and_then(|o| self.players.get(o.index()))
-            .map(|p| p.kind.is_computer())
+            .map(|p| p.kind)
         else {
             return Ok(());
         };
         let ids: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
         for id in ids {
             if self.in_reach_of(id, target, order, range)? {
-                self.send_in_reach(group, id, target, (order, computer))?;
+                self.send_in_reach(group, id, target, (order, player_type))?;
             }
         }
         Ok(())

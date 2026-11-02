@@ -26,6 +26,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -65,7 +66,7 @@ impl World {
         group: GroupId,
         id: ObjectId,
         target: ObjectId,
-        (order, computer): (AttackOrder, bool),
+        (order, player_type): (AttackOrder, PlayerType),
     ) -> Result<(), GenieError> {
         let part = self.gate_part(id, target)?;
         self.stand_unit(id)?;
@@ -90,7 +91,7 @@ impl World {
         if matches!(state.get(), 6 | 7) {
             self.stand_unit(id)?;
         }
-        if !computer {
+        if !player_type.is_computer() {
             return self.set_travel_timer(id, part, Travel::Any);
         }
         if self.groups.held(group)?.special_units.contains(&id) {

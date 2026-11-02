@@ -39,7 +39,7 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
-        if r.attack.computer {
+        if r.attack.player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt (FUN_140fde4f0)",
             ));
@@ -163,7 +163,7 @@ impl HuntAction {
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
         let gives_up = GiveUp {
-            waits: !r.attack.computer && f.own.class == class::VILLAGER,
+            waits: !r.attack.player_type.is_computer() && f.own.class == class::VILLAGER,
             stance: r.attack.stance,
         };
         match self.update_list(c, unit, me, gives_up)?.get() {

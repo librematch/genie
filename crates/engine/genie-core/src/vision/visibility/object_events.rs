@@ -22,7 +22,7 @@ const NO_REGISTRY: GenieError =
 
 /// `RGE_Combat_Object::update`'s takeover by sight (`0x14107dfb0`, once the registry took a
 /// changed `mask` of an object with `+0x924` 1, [`Visibility::combat_sight`]): the players from
-/// 1 on, in order, each with its computer flag (`player+0x10 == 3`, [`Player::computer`]) and
+/// 1 on, in order, each with its type (`player+0x10`, [`Player::kind`]) and
 /// its `mAllowCapturingGaiaUnits` (`+0x670`, `allows`, the world's
 /// `allow_gaia_capture`), as they stand. Outside the game modes whose descriptor's `+0x9c` is 1
 /// (`standard`, `FUN_141302450`) a computer player that does not allow it is passed over; the

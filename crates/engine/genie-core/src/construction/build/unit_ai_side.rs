@@ -250,7 +250,7 @@ impl UnitView<'_, '_> {
             spot,
             z: unit.position().z(),
             class: master.class,
-            computer: self.computer,
+            player_type: self.player_type,
             player,
             site: named(site.id()),
             action_target: target.and_then(named),

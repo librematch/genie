@@ -27,6 +27,7 @@ use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
 use crate::objects::masters::{MasterId, ids};
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -178,8 +179,8 @@ pub struct Completion<'a> {
     pub farm_bonus: FarmBonus,
     /// The owner's masters, whose table `FUN_141659d20` reads.
     pub masters: Option<&'a crate::objects::masters::Masters>,
-    /// The owner is a computer player (`FUN_141659cf0`).
-    pub computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub player_type: PlayerType,
     /// The building has a unit AI (`+0x6b0`): a mule cart's.
     pub ai: bool,
 }
@@ -220,7 +221,7 @@ impl Completion<'_> {
         let master = self.master.ok_or(GenieError::unsupported(
             "a completion of a master the slice does not have",
         ))?;
-        if self.computer {
+        if self.player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's building part (FUN_1411e7ca0)",
             ));

@@ -271,7 +271,7 @@ impl Mover {
             &walker,
             self.moved_at.ground(),
             world,
-            plan.computer,
+            plan.player_type,
             (waypoint, range.get()),
             target,
             by_id,

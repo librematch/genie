@@ -15,6 +15,7 @@ use crate::movement::{
 };
 use crate::objects::ObjectKey;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::{GenieError, math::fmath};
@@ -36,7 +37,7 @@ impl Mover {
         me: &Me,
         world: &Spatial,
         hits: &[RecordId],
-        computer: bool,
+        player_type: PlayerType,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let level = self.paths.walked()?;
@@ -61,7 +62,7 @@ impl Mover {
             let outranks = if player == PlayerId::GAIA || other.player != PlayerId::GAIA {
                 let mine = me.human_order;
                 let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
-                if !computer && (other.player != player || theirs != mine) {
+                if !player_type.is_computer() && (other.player != player || theirs != mine) {
                     theirs < mine
                 } else {
                     me.id < id

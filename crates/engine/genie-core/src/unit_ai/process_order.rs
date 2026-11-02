@@ -8,6 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -76,7 +77,7 @@ impl UnitAi {
     pub(crate) fn process_order(
         &mut self,
         o: &QueuedOrder,
-        world: Option<(&Surroundings, bool)>,
+        world: Option<(&Surroundings, PlayerType)>,
         place: Option<(Point, Option<ClassId>)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -164,12 +165,12 @@ impl UnitAi {
     pub(super) fn combat_order(
         &mut self,
         o: &QueuedOrder,
-        world: Option<(&Surroundings, bool)>,
+        world: Option<(&Surroundings, PlayerType)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
         attack_move: &mut bool,
     ) -> Result<bool, GenieError> {
-        let (at, computer) = world.ok_or(OUTSIDE_ORDER)?;
+        let (at, player_type) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
             (OrderKind::Attack, Some(t)) => self.attack_slot(t, true, at, side, ai)?,
@@ -182,7 +183,7 @@ impl UnitAi {
                     Some(t) => self.defend_object(t, o.range, true, at, side)?,
                 }
             }
-            (OrderKind::RunAway, _) => self.run_away(true, at, computer, ai, side)?,
+            (OrderKind::RunAway, _) => self.run_away(true, at, player_type, ai, side)?,
             (OrderKind::SeekAndDestroy, Some(t)) => {
                 let tiles = o.point.tile();
                 self.seek_and_destroy(t, tiles, true, at, side)?
@@ -213,7 +214,7 @@ impl UnitAi {
     pub(super) fn work_order(
         &mut self,
         o: &QueuedOrder,
-        world: Option<(&Surroundings, bool)>,
+        world: Option<(&Surroundings, PlayerType)>,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
@@ -257,7 +258,7 @@ impl UnitAi {
     pub(super) fn object_move_order(
         &mut self,
         o: &QueuedOrder,
-        world: Option<(&Surroundings, bool)>,
+        world: Option<(&Surroundings, PlayerType)>,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {

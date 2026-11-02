@@ -153,7 +153,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
 ///
 /// A computer player's unit.
 pub fn attack_sight(me: &Attacker) -> Result<Distance, GenieError> {
-    if me.computer {
+    if me.player_type.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's bestUnitToAttack",
         ));
@@ -399,7 +399,7 @@ pub fn siege_can_attack(
     if (t.kind == BUILDING && t.desolid) || me.state < ObjectState::Alive {
         return Ok(false);
     }
-    if !me.computer && !any && me.class == Some(PACKED_UNIT_CLASS) {
+    if !me.player_type.is_computer() && !any && me.class == Some(PACKED_UNIT_CLASS) {
         return Ok(false);
     }
     if matches!(

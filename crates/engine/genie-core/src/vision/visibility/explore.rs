@@ -51,7 +51,11 @@ impl Visibility {
                     newly += TileCount::ONE;
                     self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
-                    if self.computer.get(player.index()).copied().unwrap_or(false) {
+                    if self
+                        .player_types
+                        .get(player.index())
+                        .is_some_and(|t| t.is_computer())
+                    {
                         self.ai_tiles.push((player, tile));
                     }
                     if self.links.checked(i)?.0 & (LINKED | ANCHOR) != 0 {

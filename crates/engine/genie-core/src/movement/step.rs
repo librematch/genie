@@ -22,6 +22,7 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::objects::layers::Static;
 use crate::pathing::Pathing;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::{GenieError, math::fmath};
@@ -70,8 +71,8 @@ pub(super) struct WalkStep<'a> {
     pub(super) goal: Goal<'a>,
     /// The world's time.
     pub(super) now: WorldTime,
-    /// Whether the unit's player is a computer.
-    pub(super) computer: bool,
+    /// The unit's player's type.
+    pub(super) player_type: PlayerType,
     /// The objects the old pather tests even moving.
     pub(super) include: &'a mut Vec<ObjectId>,
     /// The waypoint once it is not left behind (`local_1860`).
@@ -454,9 +455,11 @@ impl Mover {
                     ));
                 }
             }
-            let (now, computer) = plan
+            let (now, player_type) = plan
                 .as_deref()
-                .map_or((WorldTime::ZERO, false), |p| (p.now, p.computer));
+                .map_or((WorldTime::ZERO, PlayerType::PHANTOM), |p| {
+                    (p.now, p.player_type)
+                });
             let groups = plan.as_deref().map(|p| p.groups);
             let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
             let step = self.walk(
@@ -469,7 +472,7 @@ impl Mover {
                     pathing,
                     goal,
                     now,
-                    computer,
+                    player_type,
                     include: &mut include,
                     walked: &mut walked,
                     heading: &mut heading,
@@ -504,7 +507,7 @@ impl Mover {
             pathing,
             goal,
             now,
-            computer,
+            player_type,
             include,
             walked,
             heading,
@@ -560,7 +563,7 @@ impl Mover {
                     &hits,
                     projected,
                     dt,
-                    (now, computer),
+                    (now, player_type),
                 )?;
                 if !avoided.kept.is_empty() {
                     include_kept(world, pathing, &avoided.kept, include)?;
@@ -577,7 +580,7 @@ impl Mover {
                 }
                 self.pauses.extend(avoided.pauses);
                 if !avoided.kept.is_empty() {
-                    return self.go_round(me, world, &hits, computer, by_id);
+                    return self.go_round(me, world, &hits, player_type, by_id);
                 }
             }
         }

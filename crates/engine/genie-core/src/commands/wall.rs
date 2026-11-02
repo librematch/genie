@@ -244,19 +244,20 @@ impl World {
             return Ok(());
         }
         let (radius, trained_at) = (site.radius, site.trained_at.clone());
-        let computer = self.players.player(player)?.kind.is_computer();
-        let builders: &[Option<ObjectId>] = if computer && builders.first() == Some(&None) {
-            &[]
-        } else {
-            builders
-        };
+        let player_type = self.players.player(player)?.kind;
+        let builders: &[Option<ObjectId>] =
+            if player_type.is_computer() && builders.first() == Some(&None) {
+                &[]
+            } else {
+                builders
+            };
         let mut capable = 0;
         for &id in builders.iter().flatten() {
             if self.builds((master, &trained_at), id)? {
                 capable += 1;
             }
         }
-        if !computer && capable == 0 {
+        if !player_type.is_computer() && capable == 0 {
             return Ok(());
         }
         let placed = self.wall_foundations(w, radius)?;

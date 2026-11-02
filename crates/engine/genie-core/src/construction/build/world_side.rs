@@ -67,7 +67,7 @@ impl crate::world::World {
                 &self.players.player(owner)?.attributes,
             ),
             masters: self.masters.of(owner),
-            computer: self.players.player(owner)?.kind.is_computer(),
+            player_type: self.players.player(owner)?.kind,
             ai: self.parts.unit_ai.contains(u.id),
         };
         let part = completion.first_part(&construction)?;

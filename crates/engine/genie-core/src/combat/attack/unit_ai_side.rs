@@ -379,7 +379,7 @@ impl UnitView<'_, '_> {
                 &self.c.w.graphics,
             ),
             Some(ai),
-            (self.computer, self.c.w.world_time),
+            (self.player_type, self.c.w.world_time),
         );
         Ok(Some(crate::combat::attack::ReadyReads {
             reads,

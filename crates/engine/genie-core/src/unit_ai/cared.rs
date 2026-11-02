@@ -7,6 +7,7 @@ use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
@@ -169,7 +170,7 @@ pub const FISHING_CARED: [ClassId; 13] =
 pub(crate) fn cared_classes(
     ai_type: UnitAiType,
     class: Option<ClassId>,
-    computer: bool,
+    player_type: PlayerType,
 ) -> Result<&'static [ClassId], GenieError> {
     match ai_type {
         UnitAiType::HUNTED => Ok(&HUNTED_CARED),
@@ -191,7 +192,7 @@ pub(crate) fn cared_classes(
         FISHING_AI => Ok(&FISHING_CARED),
         ARTIFACT_AI => Ok(&ARTIFACT_CARED),
         TOWER_AI => Ok(&TOWER_CARED),
-        SOLDIER_AI if computer => Ok(&SOLDIER_CARED_COMPUTER),
+        SOLDIER_AI if player_type.is_computer() => Ok(&SOLDIER_CARED_COMPUTER),
         SOLDIER_AI => Ok(&SOLDIER_CARED),
         SIEGE_AI => Ok(&SIEGE_CARED),
         _ => Err(GenieError::unsupported(
@@ -213,9 +214,9 @@ pub(crate) fn search_area(
     class: Option<ClassId>,
     los: Distance,
     radius: Distance,
-    computer: bool,
+    player_type: PlayerType,
 ) -> Result<(&'static [ClassId], Distance), GenieError> {
-    let classes = cared_classes(ai_type, class, computer)?;
+    let classes = cared_classes(ai_type, class, player_type)?;
     let radius = if matches!(ai_type, CIVILIAN | FISHING_AI) {
         civilian_search_radius(los, radius)
     } else {

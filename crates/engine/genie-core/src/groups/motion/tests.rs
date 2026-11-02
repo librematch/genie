@@ -426,7 +426,7 @@ impl Fixture {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: WorldTime::from_millis(100),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             object: &mut self.object,
             groups: &self.groups,
         };
@@ -454,7 +454,7 @@ fn lead() -> Lead {
         solid: true,
         ignore_units: Vec::new(),
         player: PlayerId::new(1),
-        computer: false,
+        player_type: PlayerType::HUMAN,
         group: None,
     }
 }
@@ -554,7 +554,7 @@ impl Fixture {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: WorldTime::from_millis(100),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             object: &mut self.object,
             groups: &self.groups,
         };
@@ -1022,7 +1022,7 @@ impl Fixture {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: WorldTime::from_millis(100),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             object: &mut self.object,
             groups: &self.groups,
         };
@@ -1238,13 +1238,13 @@ fn the_members_centre_pulls_group_whose_members_all_act() {
         m.paths[0].state = PathState::Walking;
         m.new_position[0] = BVector::new(5.0, 0.0, 5.0);
         let group = GroupView {
-            computer: false,
+            player_type: PlayerType::HUMAN,
             members,
         };
         let mut plan = Planning {
             pathing: &mut fx.pathing,
             now: WorldTime::from_millis(100),
-            computer: false,
+            player_type: PlayerType::HUMAN,
             object: &mut fx.object,
             groups: &fx.groups,
         };

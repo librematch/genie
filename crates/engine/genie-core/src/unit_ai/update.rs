@@ -11,6 +11,7 @@ use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
@@ -33,8 +34,8 @@ pub(super) struct UpdateTail {
     pub(super) retarget: Retarget,
     /// The world's time.
     pub(super) world_time: WorldTime,
-    /// The owner's type test (`player+0x10 == 3`).
-    pub(super) computer: bool,
+    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
+    pub(super) player_type: PlayerType,
     /// The unit was busy after the notifies, as the update read it before its order queue.
     pub(super) busy: bool,
     /// The unit's group as the update read it.
@@ -44,7 +45,7 @@ pub(super) struct UpdateTail {
 impl UnitAi {
     /// The full update (slot 4, `0x140c66b10`; the boar's `0x140c2c010` adds its tail):
     /// `dt` is the time the owner accumulated since its last turn (`world+0x18c[player]`),
-    /// `computer` the owner's type test (`player+0x10 == 3`). In the game's order: the target
+    /// `player_type` the owner's type (`player+0x10`). In the game's order: the target
     /// block ([`UnitAi::target_block`]), the state position of a unit with an order, the timers, the notifies ([`UnitAi::post`]: each through
     /// slot 0x238, then `FUN_140c5dc10`), the reset of an action value whose actions ended, the
     /// order check of a unit no longer busy, the order queue ([`UnitAi::run_orders`]), slot 73's
@@ -61,7 +62,7 @@ impl UnitAi {
         &mut self,
         dt: Millis,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -72,7 +73,7 @@ impl UnitAi {
         // the full update's start: the time since the last enemy sighting grows by the world's dt
         self.time_since_enemy += at.dt_seconds;
         self.expire_retries(world_time, &mut |id| Self::world_object(id, at, side))?;
-        self.target_block(at, computer, ai, side)?;
+        self.target_block(at, player_type, ai, side)?;
         self.keep_attackers(at, side);
         // a unit with an order, or in a group with a command (`+0x3a8`), keeps its place as its
         // state position (0x140c674c9)
@@ -82,9 +83,9 @@ impl UnitAi {
         self.secondary_timer = self.secondary_timer.saturating_sub(dt);
         self.look_around_timer = self.look_around_timer.wrapping_add(dt);
         self.idle_timer = self.idle_timer.wrapping_add(dt);
-        let result = self.process_notifies(dt, at, computer, ai, side)?;
+        let result = self.process_notifies(dt, at, player_type, ai, side)?;
         if result == DEAD {
-            self.boar_tail(at, computer, ai, side)?;
+            self.boar_tail(at, player_type, ai, side)?;
             return Ok(None);
         }
         self.end_notifies(dt, at, side, ai)?;
@@ -104,7 +105,7 @@ impl UnitAi {
             && at.group.is_none_or(|g| g.idle)
             && !at.garrisoned
         {
-            self.run_orders(at, side, computer, ai)?;
+            self.run_orders(at, side, player_type, ai)?;
         }
         // an order on a target ran its work here (slot 0x230's case 0x2db, the unit's slot
         // 0x128): the rest of the update reads what it gave the AI ([`UnitAi::after_order`])
@@ -117,7 +118,7 @@ impl UnitAi {
         let tail = UpdateTail {
             retarget,
             world_time,
-            computer,
+            player_type,
             busy,
             group: at.group,
         };
@@ -139,7 +140,7 @@ impl UnitAi {
         &mut self,
         after: AfterOrder,
         world_time: WorldTime,
-        computer: bool,
+        player_type: PlayerType,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -148,7 +149,7 @@ impl UnitAi {
         let tail = UpdateTail {
             retarget,
             world_time,
-            computer,
+            player_type,
             busy: after.busy,
             group: after.group,
         };
@@ -170,29 +171,29 @@ impl UnitAi {
         let UpdateTail {
             retarget,
             world_time,
-            computer,
+            player_type,
             busy,
             group,
         } = tail;
         match retarget {
             Retarget::Base => {
-                let _ = self.retarget_check(world_time, computer, at, ai, side)?;
+                let _ = self.retarget_check(world_time, player_type, at, ai, side)?;
             }
             // the priest's checks but on the order on a target and for a computer player's
             Retarget::Priest => {
-                if self.current_order != Some(OrderKind::OnTarget) && !computer {
-                    let _ = self.retarget_check(world_time, computer, at, ai, side)?;
+                if self.current_order != Some(OrderKind::OnTarget) && !player_type.is_computer() {
+                    let _ = self.retarget_check(world_time, player_type, at, ai, side)?;
                 }
             }
             Retarget::Civilian => self.civilian_misc(at, side, ai)?,
             Retarget::Never => {}
             Retarget::Artifact => self.artifact_misc(at, side, ai)?,
         }
-        self.idle_part(busy, group, at, computer, ai, side)?;
-        self.look_around(computer, ai)?;
+        self.idle_part(busy, group, at, player_type, ai, side)?;
+        self.look_around(player_type, ai)?;
         self.top_target_tail(at, side, ai)?;
         self.drop_started_builds(side)?;
-        self.boar_tail(at, computer, ai, side)
+        self.boar_tail(at, player_type, ai, side)
     }
 
     /// The full update's tail on the target of its unit's top action (slot 400 at `0x140c684fc`,
@@ -272,7 +273,7 @@ impl UnitAi {
     pub(super) fn boar_tail(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
@@ -281,7 +282,7 @@ impl UnitAi {
             && self.adjusted_idle_timeout < self.idle_timer
         {
             self.idle_timer = Millis::ZERO;
-            let _ = self.process_idle(at, computer, ai, side)?;
+            let _ = self.process_idle(at, player_type, ai, side)?;
         }
         self.calm_down();
         Ok(())
@@ -301,7 +302,7 @@ impl UnitAi {
     pub(super) fn target_block(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
@@ -338,7 +339,7 @@ impl UnitAi {
                     {
                         self.stop_after_kill = false;
                         if action == Some(ActionKind::Attack) {
-                            self.next_after_kill(at, computer, ai, side)?;
+                            self.next_after_kill(at, player_type, ai, side)?;
                         } else if !matches!(action, Some(ActionKind::Hunt | ActionKind::BoarLuring))
                         {
                             self.remove_target();
@@ -349,7 +350,7 @@ impl UnitAi {
                 // on a patrol order, or in a group that patrols (`FUN_141017c40`,
                 // `FUN_141017c30`), FUN_140c41690 tests the target's range; for a player that
                 // is not a computer (FUN_141659cf0) it answers 0 at once
-                if computer
+                if player_type.is_computer()
                     && (matches!(
                         self.current_order,
                         Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -384,7 +385,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
@@ -449,7 +450,7 @@ impl UnitAi {
             }
         };
         let Some(found) = found else {
-            if computer {
+            if player_type.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's hunter that found nothing",
                 ));
@@ -478,7 +479,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
@@ -540,7 +541,7 @@ impl UnitAi {
             }
         };
         let Some(found) = found else {
-            if computer {
+            if player_type.is_computer() {
                 self.remove_target();
                 self.stop_current(true, at, side, rng)?;
             }
@@ -579,11 +580,11 @@ impl UnitAi {
     pub(super) fn next_after_kill(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
-        let produced = self.process_idle(at, computer, ai, side)?;
+        let produced = self.process_idle(at, player_type, ai, side)?;
         if !produced {
             let m = self.move_to(AiMove {
                 point: self.target_point,

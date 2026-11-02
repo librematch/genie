@@ -324,8 +324,8 @@ impl World {
         if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
         }
-        self.run_unit_ai((player, idx), |ai, at, side, computer, rng| {
-            ai.take_order_now_with(order, (at, side, computer), rng)
+        self.run_unit_ai((player, idx), |ai, at, side, player_type, rng| {
+            ai.take_order_now_with(order, (at, side, player_type), rng)
         })
     }
 

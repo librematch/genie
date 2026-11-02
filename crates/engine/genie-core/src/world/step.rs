@@ -11,6 +11,7 @@ use crate::objects::layers::Action;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::UnitAi;
 use crate::world::Millis;
@@ -54,12 +55,12 @@ pub(crate) struct Step<'a> {
 }
 
 /// What a walk takes of the update beside the world: the dt in seconds, the world's time and
-/// the owner's computer flag.
+/// the owner's type.
 #[derive(Clone, Copy)]
 pub(crate) struct Pace {
     pub(crate) dt: Seconds,
     pub(crate) now: WorldTime,
-    pub(crate) computer: bool,
+    pub(crate) player_type: PlayerType,
 }
 
 /// The world's parts beside a walk ([`World::walk_beside`]), which an update reads and changes
@@ -102,7 +103,7 @@ impl World {
             plan: Some(Planning {
                 pathing,
                 now: pace.now,
-                computer: pace.computer,
+                player_type: pace.player_type,
                 object,
                 groups,
             }),
@@ -252,7 +253,7 @@ impl Step<'_> {
         Ok(Pace {
             dt: self.dt.seconds(),
             now: self.w.world_time,
-            computer: self.w.players.player(self.player)?.kind.is_computer(),
+            player_type: self.w.players.player(self.player)?.kind,
         })
     }
 }
@@ -268,7 +269,7 @@ impl Step<'_> {
         place: &'b mut crate::objects::layers::Static,
         me: Me,
     ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
-        let computer = self.w.players.player(self.player)?.kind.is_computer();
+        let player_type = self.w.players.player(self.player)?.kind;
         let (object, sprite) = self.w.streams.object_and_sprite();
         let parts = &mut self.w.parts;
         let (motion, motions) = parts.motion.lend(me.id);
@@ -282,7 +283,7 @@ impl Step<'_> {
                 plan: Some(Planning {
                     pathing: &mut self.w.pathing,
                     now: self.w.world_time,
-                    computer,
+                    player_type,
                     object,
                     groups: &self.w.groups,
                 }),

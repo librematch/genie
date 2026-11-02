@@ -21,6 +21,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
 use crate::players::Amount;
+use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::attribute::CASTLES;
@@ -199,12 +200,16 @@ pub(crate) fn built_death(
     (u, combat): (&mut Unit, &mut Combat),
     annex_of: Option<crate::construction::MainBuildingId>,
     master: &Master,
-    computer: bool,
+    player_type: PlayerType,
 ) -> Result<BuiltDeath, GenieError> {
     let building = master.building.ok_or(GenieError::unsupported(
         "a dying building of a master without its building part",
     ))?;
-    if computer || u.pasture.is_some() || u.my_pasture.is_some() || !u.garrison.is_empty() {
+    if player_type.is_computer()
+        || u.pasture.is_some()
+        || u.my_pasture.is_some()
+        || !u.garrison.is_empty()
+    {
         return Err(GenieError::unsupported(
             "a dying building of a computer player, with a pasture or units inside",
         ));

@@ -33,6 +33,7 @@ use crate::objects::masters::class;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{OrderKind, UnitAi};
@@ -279,8 +280,9 @@ pub(crate) struct AttackReads {
     /// The swing's own sprites ([`Attack::set_swing`]): its terrain look's attack sprite and its
     /// master's special graphic.
     pub(crate) swing_sprites: SwingSprites,
-    /// The unit's player is a computer (`player+0x10 == 3`, `FUN_141659cf0`).
-    pub(crate) computer: bool,
+    /// The unit's player's type (`player+0x10`; [`PlayerType::is_computer`] is
+    /// `FUN_141659cf0`).
+    pub(crate) player_type: PlayerType,
     /// The world's time (`FUN_1415300d0`), which a facing over time and the reload read.
     pub(crate) world_time: WorldTime,
     /// The unit AI's canMoveToAttack (slot 0x1d0, `FUN_140c48420`), which readyToAttack reads
@@ -315,7 +317,7 @@ impl AttackReads {
             &crate::objects::Graphics,
         ),
         ai: Option<&UnitAi>,
-        (computer, now): (bool, WorldTime),
+        (player_type, now): (PlayerType, WorldTime),
     ) -> Self {
         Self {
             standing: master
@@ -327,7 +329,7 @@ impl AttackReads {
             hit_chance: master.hit_chance,
             armed: crate::combat::volley::armed(master, combat.firepower),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
-            computer,
+            player_type,
             world_time: now,
             can_move: ai
                 .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE),

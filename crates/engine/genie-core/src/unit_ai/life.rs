@@ -107,7 +107,7 @@ impl UnitAi {
                 made.set_idle_timeout(PRIEST_IDLE_TIMEOUT, ai);
             }
             SOLDIER_AI => {
-                let timeout = if new.computer {
+                let timeout = if new.player_type.is_computer() {
                     COMPUTER_SOLDIER_IDLE_TIMEOUT
                 } else {
                     SOLDIER_IDLE_TIMEOUT

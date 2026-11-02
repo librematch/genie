@@ -217,7 +217,7 @@ impl crate::world::World {
             Some(shore.zone(t.point.tile())?)
         };
         let count = self.unload_all(p, i, zone)?;
-        let computer = self.players.player(p)?.kind.is_computer();
+        let player_type = self.players.player(p)?.kind;
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
@@ -259,10 +259,10 @@ impl crate::world::World {
                 )?);
                 t.retarget = true;
             } else {
-                crate::unit_ai::alert_owner(computer)?;
+                crate::unit_ai::alert_owner(player_type)?;
             }
         } else if ship.loaded {
-            crate::unit_ai::alert_owner(computer)?;
+            crate::unit_ai::alert_owner(player_type)?;
         }
         let mut shore = MapShore::new(
             &self.spatial,

@@ -18,6 +18,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::master_type::BUILDING;
+use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -91,10 +92,10 @@ impl World {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let g = self.groups.held(group)?;
-        let computer = self
+        let player_type = self
             .players
             .get(p.index())
-            .is_some_and(|q| q.kind.is_computer());
+            .map_or(PlayerType::PHANTOM, |q| q.kind);
         let solid = mover.stats.radius.sized();
         let found = if solid {
             let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
@@ -103,7 +104,7 @@ impl World {
             let mut plan = crate::movement::Planning {
                 pathing: &mut self.pathing,
                 now: self.world_time,
-                computer,
+                player_type,
                 object: self.streams.get(crate::math::rng::Stream::Object),
                 groups: &self.groups,
             };
@@ -141,7 +142,7 @@ impl World {
                 &walker,
                 u.position().ground(),
                 &self.spatial,
-                computer,
+                player_type,
                 (to, 0.0),
                 None,
                 crate::world::index::ObjectsRef::new(

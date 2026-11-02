@@ -8,6 +8,7 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
+use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -37,7 +38,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -53,11 +54,11 @@ impl UnitAi {
         let attack = ActionKind::Attack.value();
         if p0 == attack && (order == Some(OrderKind::Attack) || action == Some(ActionKind::Attack))
         {
-            let produced = self.process_idle(at, computer, ai, side)?;
+            let produced = self.process_idle(at, player_type, ai, side)?;
             if produced {
                 return Ok(PRODUCED);
             }
-            if computer {
+            if player_type.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's failed attack without a new action",
                 ));
@@ -107,7 +108,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -119,11 +120,11 @@ impl UnitAi {
                     "an invalidated attack with retargeting off (+0x1d6)",
                 ));
             }
-            let produced = self.process_idle(at, computer, ai, side)?;
+            let produced = self.process_idle(at, player_type, ai, side)?;
             if produced {
                 return Ok(GO_ON);
             }
-            if computer {
+            if player_type.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's invalidated attack (slot 0x130)",
                 ));
@@ -163,7 +164,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -182,7 +183,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         if order == Some(OrderKind::Attack) && p1 == attack {
-            if self.process_idle(at, computer, ai_rng, side)? {
+            if self.process_idle(at, player_type, ai_rng, side)? {
                 return Ok(PRODUCED);
             }
             self.remove_target();
@@ -428,7 +429,7 @@ impl UnitAi {
     /// for a unit of a type below 70 or not inside another): with no notifies queued, a unit
     /// without an action value or with an action it may interrupt (slot 0x2d0) runs its order
     /// queue. Its effects, as the full update's; `side` answers what the orders ask of the unit,
-    /// `computer` is its owner's type and `ai` the AI stream.
+    /// `player_type` is its owner's type and `ai` the AI stream.
     ///
     /// # Errors
     ///
@@ -437,7 +438,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         if !self.notifies.is_empty() || self.orders.is_empty() {
@@ -447,7 +448,7 @@ impl UnitAi {
             return Ok(());
         }
         if self.can_order(at, false) {
-            self.run_orders(at, side, computer, ai)?;
+            self.run_orders(at, side, player_type, ai)?;
         }
         Ok(())
     }
@@ -491,7 +492,7 @@ impl UnitAi {
 
     /// The order queue (`FUN_140c5d790`): while the AI has an action, an order below priority
     /// 100 waits; each order runs through slot 0x230 ([`UnitAi::process_order`] with the unit's
-    /// `at`, `side` and owner's type `computer`, the AI stream `ai`): one that is not ready (0xe)
+    /// `at`, `side` and owner's type `player_type`, the AI stream `ai`): one that is not ready (0xe)
     /// stays and the next is tried, any other result removes it, and 1 (taken) ends the queue's
     /// turn.
     ///
@@ -502,7 +503,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         let mut k = 0;
@@ -511,7 +512,7 @@ impl UnitAi {
                 return Ok(());
             }
             let order = *self.orders.checked(k)?;
-            let r = self.process_order(&order, Some((at, computer)), None, ai, side)?;
+            let r = self.process_order(&order, Some((at, player_type)), None, ai, side)?;
             if r == OrderOutcome::NotReady {
                 k += 1;
                 continue;

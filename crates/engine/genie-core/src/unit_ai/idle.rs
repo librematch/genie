@@ -10,6 +10,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::COMBAT;
 use crate::players::PlayerId;
+use crate::players::PlayerType;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
@@ -35,12 +36,12 @@ impl UnitAi {
     pub(super) fn process_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         match self.ai_type {
-            UnitAiType::HUNTED => self.hunted_idle(at, computer, ai, side),
+            UnitAiType::HUNTED => self.hunted_idle(at, player_type, ai, side),
             BOAR_AI => Ok(self.boar_idle(at, ai, side)?),
             UnitAiType::LION => self.lion_idle(at, ai, side),
             // the civilian's (FUN_140c1e610), the transport ship's (0x140c21d20) and the siege
@@ -49,10 +50,10 @@ impl UnitAi {
                 self.cap_human_order(side, ai)?;
                 Ok(false)
             }
-            SOLDIER_AI => self.soldier_idle(at, computer, ai, side),
-            TRADE_AI | FISHING_AI => self.ship_idle(at, computer, ai, side),
-            SIEGE_AI => self.siege_idle(at, computer, ai, side),
-            TOWER_AI => self.tower_idle(at, computer, side, ai),
+            SOLDIER_AI => self.soldier_idle(at, player_type, ai, side),
+            TRADE_AI | FISHING_AI => self.ship_idle(at, player_type, ai, side),
+            SIEGE_AI => self.siege_idle(at, player_type, ai, side),
+            TOWER_AI => self.tower_idle(at, player_type, side, ai),
             ARTIFACT_AI => self.artifact_idle(at, side, ai),
             UnitAiType::BUILDING | UnitAiType::LIVESTOCK => Ok(false),
             _ => Err(GenieError::unsupported(
@@ -72,12 +73,12 @@ impl UnitAi {
     pub(super) fn ship_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        if !computer || at.garrisoned {
+        if !player_type.is_computer() || at.garrisoned {
             return Ok(false);
         }
         let (classes, radius): (&[ClassId], f32) = if self.ai_type == FISHING_AI {
@@ -151,7 +152,7 @@ impl UnitAi {
     pub(super) fn siege_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -161,7 +162,7 @@ impl UnitAi {
             return Ok(false);
         }
         if self.stance == UnitStance::NO_ATTACK {
-            self.siege_no_attack(at, computer, side, ai)?;
+            self.siege_no_attack(at, player_type, side, ai)?;
             return Ok(false);
         }
         let mut target = Self::top_target_in_range(at, side)?;
@@ -174,18 +175,18 @@ impl UnitAi {
             }
             self.retarget_disabled = 0;
         }
-        if computer {
+        if player_type.is_computer() {
             computer_idle_check()?;
         }
         if target.is_none() {
-            target = self.siege_best(at, computer, side)?;
+            target = self.siege_best(at, player_type, side)?;
         }
         if let Some(t) = target
             && self.siege_attack(t, at, ai, side)?
         {
             return Ok(true);
         }
-        self.siege_idle_end(at, computer, ai, side)
+        self.siege_idle_end(at, player_type, ai, side)
     }
 
     /// [`UnitAi::siege_idle`]'s attack on `target` (slot 0xb8 forced, any 0,
@@ -234,7 +235,7 @@ impl UnitAi {
     pub(super) fn siege_no_attack(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
@@ -246,7 +247,7 @@ impl UnitAi {
             pick: Pick::Look,
             memory: Memory::default(),
         })?;
-        self.attack_search_alert(found, computer)?;
+        self.attack_search_alert(found, player_type)?;
         if !matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -265,7 +266,7 @@ impl UnitAi {
     pub(super) fn siege_best(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<Option<ObjectId>, GenieError> {
         let found = side.closest(&Search {
@@ -281,7 +282,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, computer)?;
+        self.attack_search_alert(found, player_type)?;
         Ok(found.id)
     }
 
@@ -291,7 +292,7 @@ impl UnitAi {
     pub(super) fn siege_idle_end(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -301,7 +302,7 @@ impl UnitAi {
         ) {
             return Ok(false);
         }
-        if !computer {
+        if !player_type.is_computer() {
             if at.group.is_some() {
                 return Ok(false);
             }
@@ -331,7 +332,7 @@ impl UnitAi {
     pub(super) fn soldier_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -341,7 +342,9 @@ impl UnitAi {
             return Ok(false);
         }
         if self.stance == UnitStance::NO_ATTACK {
-            return self.no_attack_idle(at, computer, side, ai).map(|()| false);
+            return self
+                .no_attack_idle(at, player_type, side, ai)
+                .map(|()| false);
         }
         if at.master == SOLDIER_IDLE_MASTER {
             return Ok(false);
@@ -355,12 +358,12 @@ impl UnitAi {
             Some(t) => Some(t),
             None => Self::top_target_in_range(at, side)?.map(Some),
         };
-        if computer {
+        if player_type.is_computer() {
             computer_idle_check()?;
         }
         let target = match target {
             Some(t) => t,
-            None => self.soldier_best(at, computer, side)?,
+            None => self.soldier_best(at, player_type, side)?,
         };
         if let Some(t) = target
             && self.soldier_attack(t, at, ai, side)?
@@ -379,7 +382,7 @@ impl UnitAi {
     fn soldier_best(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<Option<ObjectId>, GenieError> {
         let found = side.closest(&Search {
@@ -395,7 +398,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, computer)?;
+        self.attack_search_alert(found, player_type)?;
         Ok(found.id)
     }
 
@@ -484,7 +487,7 @@ impl UnitAi {
     pub(super) fn no_attack_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
@@ -493,7 +496,7 @@ impl UnitAi {
                 "a defend order's search (its target's objects)",
             ));
         }
-        if computer {
+        if player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's soldier's NoAttack search",
             ));
@@ -539,7 +542,7 @@ impl UnitAi {
     pub(super) fn tower_idle(
         &mut self,
         at: &Surroundings,
-        computer: bool,
+        player_type: PlayerType,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
@@ -553,7 +556,7 @@ impl UnitAi {
                 pick: Pick::Look,
                 memory: Memory::default(),
             })?;
-            self.attack_search_alert(found, computer)?;
+            self.attack_search_alert(found, player_type)?;
             return Ok(false);
         }
         let found = side.closest(&Search {
@@ -562,14 +565,18 @@ impl UnitAi {
             classes: &TOWER_CARED,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !computer { 2 } else { 0 },
+                lowest: if at.scenario && !player_type.is_computer() {
+                    2
+                } else {
+                    0
+                },
                 seeker: self.seeker(at),
                 ask: AttackAsk::IDLE,
             },
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, computer)?;
+        self.attack_search_alert(found, player_type)?;
         let Some(id) = found.id else {
             return Ok(false);
         };
@@ -612,14 +619,14 @@ impl UnitAi {
     pub(super) fn attack_search_alert(
         &mut self,
         found: Found,
-        computer: bool,
+        player_type: PlayerType,
     ) -> Result<(), GenieError> {
         if !found.fresh {
             return Ok(());
         }
         self.alert_mode = found.enemies;
         if found.enemies {
-            if ENEMY_SIGHTING_GAP < self.time_since_enemy && computer {
+            if ENEMY_SIGHTING_GAP < self.time_since_enemy && player_type.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's notify of enemies sighted (0x210, slot 0x3c8)",
                 ));
