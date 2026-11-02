@@ -7,10 +7,10 @@
 //! ```rust
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use std::fs::File;
-//! use genie_drs::DRSReader;
+//! use genie_drs::DrsReader;
 //!
 //! let mut file = File::open("test.drs")?;
-//! let drs = DRSReader::new(&mut file)?;
+//! let drs = DrsReader::new(&mut file)?;
 //!
 //! for table in drs.tables() {
 //!     for resource in table.resources() {

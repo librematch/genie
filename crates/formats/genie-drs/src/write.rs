@@ -272,10 +272,10 @@ where
 ///
 /// ```rust
 /// use std::{io::Cursor, fs::File};
-/// use genie_drs::{DRSWriter, InMemoryStrategy};
+/// use genie_drs::{DrsWriter, InMemoryStrategy};
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let buf = Cursor::new(vec![]);
-/// let mut writer = DRSWriter::new(buf, InMemoryStrategy::default())?;
+/// let mut writer = DrsWriter::new(buf, InMemoryStrategy::default())?;
 /// writer.add("bina", 50500, "JASC-PAL\r\n0100\r\n...".as_bytes())?;
 /// writer.add("slp", 2, &b"some bytes"[..])?;
 /// let buf = writer.flush()?;

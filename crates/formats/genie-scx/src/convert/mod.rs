@@ -27,8 +27,8 @@ pub enum ConvertError {
 /// ## Usage
 ///
 /// ```rust,ignore
-/// use genie_scx::convert::AutoToWK;
-/// AutoToWK::default().convert(&mut scenario)?
+/// use genie_scx::convert::AutoToWk;
+/// AutoToWk::default().convert(&mut scenario)?
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AutoToWk {}
