@@ -30,6 +30,7 @@ use crate::world::WholeSeconds;
 use crate::world::slots::CheckedIndex;
 use genie_diff::Diff;
 
+mod batch;
 mod button;
 mod cost_count;
 mod costs;
@@ -40,6 +41,7 @@ mod queue_counts;
 pub mod spawn;
 mod unit_index;
 
+pub use self::batch::Batch;
 pub use self::button::{LocationButton, QueueButton};
 pub use self::cost_count::CostCount;
 pub use self::costs::{

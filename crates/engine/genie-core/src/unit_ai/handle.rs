@@ -10,6 +10,7 @@ use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
     ARTIFACT_AI, ARTIFACT_CARED, Effect, FISHING_AI, GO_ON, Memory, Notify, Pick, SIEGE_AI,
@@ -102,7 +103,7 @@ impl UnitAi {
         };
         if stops {
             self.remove_target();
-            self.stop_current(true, at, side, ai_rng)?;
+            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         }
         Ok(GO_ON)
     }
@@ -162,7 +163,7 @@ impl UnitAi {
     ) -> Result<(), GenieError> {
         if self.artifact_idle(at, side, rng)? {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
             self.idle_timer = Millis::ZERO;
         }
         Ok(())
@@ -193,7 +194,7 @@ impl UnitAi {
             NotifyKind::OWNER_CHANGED => {
                 side.effect_now(Effect::Stop, self, ai_rng)?;
                 self.remove_target();
-                self.stop_current(true, at, side, ai_rng)?;
+                self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 self.end_notifies(time, at, side, ai_rng)?;
                 self.orders.clear();
                 Ok(GO_ON)

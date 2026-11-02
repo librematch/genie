@@ -23,6 +23,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, FOUNDATION_REACH, GO_ON,
     Memory, NO_ANIM_SPEED, Notify, Pick, QueuedOrder, SIEGE_TOWER_AI, Search, Surroundings, UnitAi,
@@ -99,7 +100,7 @@ impl UnitAi {
                 return Ok(BREAK);
             }
             self.queue_current(at)?;
-            self.stop_current(true, at, side, ai_rng)?;
+            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             let _ = self.run_away(true, at, player_type, ai_rng, side)?;
             return Ok(BREAK);
         }
@@ -241,7 +242,7 @@ impl UnitAi {
             closest_undiscovered_tile()?;
         }
         self.remove_target();
-        self.stop_current(true, at, side, rng)?;
+        self.stop_current(StopOrder::Keep, at, side, rng)?;
         Ok(GO_ON)
     }
 
@@ -288,7 +289,7 @@ impl UnitAi {
         }
         if self.current_action != Some(ActionKind::Move) {
             self.queue_current(at)?;
-            self.stop_current(true, at, side, ai_rng)?;
+            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         }
         let _ = self.run_away(true, at, player_type, ai_rng, side)?;
         Ok(BREAK)
@@ -330,7 +331,7 @@ impl UnitAi {
         }
         if self.current_action != Some(ActionKind::Move) {
             self.queue_current(at)?;
-            self.stop_current(true, at, side, ai_rng)?;
+            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             let _ = self.run_away(true, at, player_type, ai_rng, side)?;
         }
         Ok(BREAK)
@@ -505,7 +506,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.stop_current(true, at, side, rng)?;
+        self.stop_current(StopOrder::Keep, at, side, rng)?;
         side.effect_now(Effect::Command(AiCommand::HuntObject(target)), self, rng)?;
         self.set_action(Some(ActionKind::Hunt));
         self.set_target(Some(target), class.or_none(), point);

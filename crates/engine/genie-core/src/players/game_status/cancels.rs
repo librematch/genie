@@ -14,6 +14,7 @@ use crate::players::attribute;
 use crate::players::attribute::QUEUED;
 use crate::players::game_status::ONE_UNIT_AGE;
 use crate::players::tracker::Key;
+use crate::production::Batch;
 use crate::production::QueuedUnits;
 use crate::production::UnitIndex;
 use crate::production::{Entry, Queue, QueueLength, population};
@@ -154,11 +155,11 @@ impl World {
     /// `UNIT_ORDER`'s action 4 (`FUN_14161e370` case 4 -> `FUN_1411d66b0`) at the building at
     /// `idx` of player `p`: the entry of the `index`-th unit
     /// ([`crate::production::Queue::entry_of_unit`]; none past the last unit) is cancelled.
-    /// A unit entry with `all` (the command's `+0x1d`) gives up to five of its kind back
-    /// ([`World::cancel_five`]); without, one unit ([`World::give_back_one`]). A research entry,
+    /// A unit entry with [`Batch::Five`] (the command's `+0x1d`) gives up to five of its kind
+    /// back ([`World::cancel_five`]); with [`Batch::One`], one unit ([`World::give_back_one`]). A research entry,
     /// for a player with a tech tree: for the first unit the list's first action (the research)
-    /// loses its progress (`+0x70`) and the technology its work done; then one research, five
-    /// with `all`, goes ([`World::cancel_some`] with the entry and its technology). Otherwise
+    /// loses its progress (`+0x70`) and the technology its work done; then the batch's
+    /// researches go ([`World::cancel_some`] with the entry and its technology). Otherwise
     /// (one unit, or a research entry of a player without a tech tree, which gives nothing
     /// back) the entry's count, the total and the change counter lower, an emptied entry going
     /// ([`crate::production::Queue::close`]), and for the first unit (index 0) the production
@@ -169,7 +170,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         index: UnitIndex,
-        all: bool,
+        batch: Batch,
     ) -> Result<(), GenieError> {
         let Some(production) = self.parts.production.get(self.players.live(p, idx)?.id) else {
             return Ok(());
@@ -179,7 +180,7 @@ impl World {
         };
         let entry = *production.queue.slots.checked(e)?;
         if entry.tech.is_none() {
-            if all {
+            if batch == Batch::Five {
                 return self.cancel_five(p, idx, index, e);
             }
             self.give_back_one(p, &entry)?;
@@ -200,7 +201,7 @@ impl World {
                     }
                 }
             }
-            let count = QueuedUnits::of_data(i16::from(all) * 4 + 1);
+            let count = batch.units();
             return self.cancel_some(p, idx, (None, count), e as i32, entry.tech);
         }
         let owner = self.players.player_mut(p)?;

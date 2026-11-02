@@ -76,8 +76,6 @@ pub const SHIPS: [ClassId; 5] = [
     class::CLASS_53,
 ];
 
-/// A ship's repair: its meeting point (`FUN_140ad9120`: the unit's slot 0x428 toward the
-/// shore, the ship's slot 0x340 there and its command count `+0x888`) is not modelled.
 /// The masters a unit of task swap group 1 or 2 (`+0x7b8`) becomes for a repair command (slot
 /// 0x378): its player's master table's entries at `+0x4e0` and `+0x6f0`, the repairers 156
 /// and 222, when the player has them.

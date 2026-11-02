@@ -7,6 +7,7 @@ use genie_core::commands::GameSub;
 use genie_core::commands::GatherPointState;
 use genie_core::commands::QueueId;
 use genie_core::commands::ResourceWord;
+use genie_core::commands::Shift;
 use genie_core::commands::SpriteOverride;
 use genie_core::commands::TradeLots;
 use genie_core::commands::{
@@ -18,6 +19,7 @@ use genie_core::commands::{
     TributeCommand, UnitAiStateCommand, UnitList, UnitOrderAction, UnitOrderCommand, UnloadCommand,
     UnloadPick, UnmodelledCommand, Waypoints,
 };
+use genie_core::garrison::GarrisonScope;
 use genie_core::groups::FormationKind;
 use genie_core::map::Point;
 use genie_core::map::Tile;
@@ -216,8 +218,8 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             target: ObjectId::of_field(c.tid),
             point: Point::new(c.x, c.y),
             queue_id: QueueId::of_data(c.qid),
-            through_ai: c.field_0x1d != 0,
-            nearby: c.field_0x1e != 0,
+            shift: Shift::of_byte(c.field_0x1d),
+            scope: GarrisonScope::of_byte(c.field_0x1e),
             action: UnitOrderAction::of(c.action),
             param: UnitIndex::of_data(c.param.cast_unsigned()),
             human: c.field_0x20 == 1,

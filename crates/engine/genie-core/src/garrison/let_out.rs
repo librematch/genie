@@ -25,6 +25,7 @@ use crate::objects::masters::master_type::COMBAT;
 use crate::orders::Work;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
+use crate::unit_ai::StopOrder;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::world::World;
@@ -304,7 +305,7 @@ impl World {
             let place = (unit.position().ground(), Some(class));
             if self.parts.unit_ai.contains(unit.id) {
                 self.run_ai_calls((up, ui), |ai, side, rng| {
-                    ai.stop_with(true, Some(place), side, rng)?;
+                    ai.stop_with(StopOrder::Keep, Some(place), side, rng)?;
                     ai.remove_target();
                     let stance = ai.stance;
                     set_stance(ai, stance, place, side, rng)

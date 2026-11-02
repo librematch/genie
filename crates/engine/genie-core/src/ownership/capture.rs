@@ -24,6 +24,7 @@ use crate::ownership::change::change_hands;
 use crate::ownership::change::dead_master_of;
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::StopOrder;
 use crate::world::lets::{release, torn_down};
 use crate::world::others::OthersRef;
 use crate::world::parts::Part;
@@ -134,7 +135,7 @@ impl Unit {
             let place = (self.place.position().ground(), Some(class));
             // slot 0xb0 with 0, its stopAction a call on the unit at once
             self.run_calls(actions, c, |ai, side, rng| {
-                ai.stop_with(false, Some(place), side, rng)?;
+                ai.stop_with(StopOrder::End, Some(place), side, rng)?;
                 ai.forget_targets();
                 Ok(())
             })?;

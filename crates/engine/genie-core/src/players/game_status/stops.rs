@@ -30,6 +30,7 @@ use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
 use crate::players::game_status::{KEEPING_TYPES, UNSTOPPED_BUILDINGS};
 use crate::unit_ai::ActionKind;
+use crate::unit_ai::StopOrder;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -131,7 +132,7 @@ impl World {
         }
         // slot 0xb0 with 0, its stopAction a call on the unit at once
         self.run_ai_calls((p, idx), |ai, side, rng| {
-            ai.stop_with(false, Some(place), side, rng)?;
+            ai.stop_with(StopOrder::End, Some(place), side, rng)?;
             ai.forget_targets();
             Ok(())
         })

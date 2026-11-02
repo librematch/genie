@@ -30,6 +30,7 @@ The files hold the orders by kind:
 | [`actions.rs`](actions.rs) | Taking and releasing targets, the order record, actions cleared, transformations, gates and master switches. |
 | [`attack.rs`](attack.rs) | An attack's start, a hunt's and an action's retarget. |
 | [`commands.rs`](commands.rs) | The unit AI's state, gates, the auto scout and the STOP, EXPLORE and standing commands. |
+| [`dispatch.rs`](dispatch.rs) | How an order reaches its units (`Dispatch`). |
 | [`drop_site.rs`](drop_site.rs) | The drop-offs: an unasked one, the ordered drop site, the table's, one now and elsewhere, and the way back. |
 | [`follow.rs`](follow.rs) | FOLLOW and GUARD, a move to an object and the head action's move. |
 | [`form.rs`](form.rs) | `FORM_FORMATION`'s handler (`FUN_14161dba0`): the listed units are split into groups, which lock to the formation the command names. |

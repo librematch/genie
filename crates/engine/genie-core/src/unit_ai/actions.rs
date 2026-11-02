@@ -14,6 +14,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, ENDED_ACTIONS, Effect, GO_ON, Notify, PRODUCED, QueuedOrder, Surroundings, UnitAi,
@@ -65,20 +66,20 @@ impl UnitAi {
                 ));
             }
             self.remove_target();
-            self.stop_current(true, at, side, ai)?;
+            self.stop_current(StopOrder::Keep, at, side, ai)?;
             return Ok(GO_ON);
         }
         let own = order.map_or_else(|| ActionKind::field(action) == p0, |o| o.owns(action));
         if own {
             self.remove_target();
-            self.stop_current(true, at, side, ai)?;
+            self.stop_current(StopOrder::Keep, at, side, ai)?;
             return Ok(GO_ON);
         }
         let moved = p0 == ActionKind::Move.value();
         match order {
             Some(OrderKind::GroupGather) if moved => {
                 self.remove_target();
-                self.stop_current(false, at, side, ai)?;
+                self.stop_current(StopOrder::End, at, side, ai)?;
                 return Ok(GO_ON);
             }
             Some(OrderKind::Defend) if moved => {
@@ -89,7 +90,7 @@ impl UnitAi {
         }
         if p0 == attack {
             self.remove_target();
-            self.stop_current(true, at, side, ai)?;
+            self.stop_current(StopOrder::Keep, at, side, ai)?;
         }
         Ok(GO_ON)
     }
@@ -131,7 +132,7 @@ impl UnitAi {
                 ));
             }
             self.remove_target();
-            self.stop_current(true, at, side, ai)?;
+            self.stop_current(StopOrder::Keep, at, side, ai)?;
             return Ok(GO_ON);
         }
         let own = if order.is_none() {
@@ -148,7 +149,7 @@ impl UnitAi {
         };
         if own || p0 == attack {
             self.remove_target();
-            self.stop_current(true, at, side, ai)?;
+            self.stop_current(StopOrder::Keep, at, side, ai)?;
         }
         Ok(GO_ON)
     }
@@ -179,7 +180,7 @@ impl UnitAi {
         if order.is_none() {
             if ActionKind::field(action) == p1 || p1 == attack {
                 self.remove_target();
-                self.stop_current(true, at, side, ai_rng)?;
+                self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             }
             return Ok(GO_ON);
         }
@@ -188,19 +189,19 @@ impl UnitAi {
                 return Ok(PRODUCED);
             }
             self.remove_target();
-            self.stop_current(false, at, side, ai_rng)?;
+            self.stop_current(StopOrder::End, at, side, ai_rng)?;
             return Ok(GO_ON);
         }
         if ActionKind::field(action) == p1 && order.is_some_and(|o| o.owns(action)) {
             self.remove_target();
-            self.stop_current(true, at, side, ai_rng)?;
+            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             return Ok(GO_ON);
         }
         let moved = p1 == ActionKind::Move.value();
         match order {
             Some(OrderKind::GroupGather) if moved => {
                 self.remove_target();
-                self.stop_current(false, at, side, ai_rng)?;
+                self.stop_current(StopOrder::End, at, side, ai_rng)?;
                 return Ok(GO_ON);
             }
             Some(OrderKind::Defend) if moved => {
@@ -215,7 +216,7 @@ impl UnitAi {
         }
         if p1 == attack {
             self.remove_target();
-            self.stop_current(true, at, side, ai_rng)?;
+            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         }
         Ok(GO_ON)
     }
@@ -232,47 +233,42 @@ impl UnitAi {
     }
 
     /// Slot 0xb0 (`FUN_140c64ed0`), stopping the current action: it becomes the last action; with
-    /// `keep_order` false or an action of the order (action + 100 = order) the order ends too
+    /// [`StopOrder::End`] or an action of the order (action + 100 = order) the order ends too
     /// (its priority with it), the state position taking the unit's place but for class 18. Then
     /// the unit's stopAction (slot 0x3c0), no action, and `+0x1a8` cleared. A patrol order (711,
-    /// 733) ends however `keep_order` stands, its secondary timer capped; the redraw of an
+    /// 733) ends however `order` stands, its secondary timer capped; the redraw of an
     /// adjusted idle timeout of exactly 750 (the AI stream's) is not modelled here.
     pub(super) fn stop_current(
         &mut self,
-        keep_order: bool,
+        order: StopOrder,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.stop_with(
-            keep_order,
-            Some((at.position.ground(), at.class)),
-            side,
-            rng,
-        )
+        self.stop_with(order, Some((at.position.ground(), at.class)), side, rng)
     }
 
     /// [`UnitAi::stop_current`] with the unit's position and master's class (`place`), which only
     /// an order the stop ends reads (None: the caller knows it does not end one).
     pub(crate) fn stop_with(
         &mut self,
-        keep_order: bool,
+        order: StopOrder,
         place: Option<(Point, Option<ClassId>)>,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let action = self.current_action;
-        let order = self.current_order;
+        let current = self.current_order;
         if self.patrol_redraws() {
             return Err(GenieError::unsupported("a stop on a patrol order"));
         }
         self.last_action = action;
-        if !keep_order
-            || order.is_some_and(|o| o.owns(action))
-            || matches!(order, Some(OrderKind::Patrol | OrderKind::AttackMove))
+        if order == StopOrder::End
+            || current.is_some_and(|o| o.owns(action))
+            || matches!(current, Some(OrderKind::Patrol | OrderKind::AttackMove))
         {
             self.cap_patrol_secondary();
-            self.last_order = order;
+            self.last_order = current;
             self.current_order = None;
             self.order_priority = OrderPriority::NONE;
             let (position, class) = place.ok_or(GenieError::unsupported(

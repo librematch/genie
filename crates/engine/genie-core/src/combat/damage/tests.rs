@@ -959,7 +959,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
     let mut near = enemy(2, 10.8);
     let mut far = enemy(3, 12.0);
     let mut friend = Victim {
-        allied: Allied::new(true, true),
+        allied: Allied::BOTH,
         ..enemy(4, 10.7)
     };
     let center = elephant.position;
@@ -1415,7 +1415,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         .is_err()
     );
     let mut h = Victim {
-        allied: Allied::new(true, true),
+        allied: Allied::BOTH,
         ..house()
     };
     take(
@@ -2016,7 +2016,7 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
             ..enemy.clone()
         },
         Victim {
-            allied: Allied::new(true, true),
+            allied: Allied::BOTH,
             ..enemy.clone()
         },
         Victim {

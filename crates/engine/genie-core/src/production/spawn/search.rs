@@ -87,15 +87,22 @@ enum Side {
     Right,
 }
 
-/// One run of a segment's spots on a side: from `start` by `step` while below `end` (`rising`)
-/// or above it, the other coordinate `fixed` (the side's line).
+/// Which way a run's coordinate goes: up while below its end, or down while above it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Course {
+    Rising,
+    Falling,
+}
+
+/// One run of a segment's spots on a side: from `start` by `step` while below `end`
+/// ([`Course::Rising`]) or above it, the other coordinate `fixed` (the side's line).
 #[derive(Clone, Copy)]
 struct Run {
     side: Side,
     start: f32,
     step: f32,
     end: f32,
-    rising: bool,
+    course: Course,
     fixed: f32,
 }
 
@@ -178,8 +185,18 @@ impl Frame {
             let (bx, by) = (self.half.x(), self.half.y());
             let (right, bottom) = (self.right, self.bottom);
             out.push(vec![
-                run(Side::Down, (right, -sx, right - bx), false, bottom),
-                run(Side::Right, (bottom, sy, bottom + by), true, right),
+                run(
+                    Side::Down,
+                    (right, -sx, right - bx),
+                    Course::Falling,
+                    bottom,
+                ),
+                run(
+                    Side::Right,
+                    (bottom, sy, bottom + by),
+                    Course::Rising,
+                    right,
+                ),
             ]);
         }
         out
@@ -204,19 +221,29 @@ impl Frame {
         let (no_x, no_y) = (self.no_x, self.no_y);
         if no_y || second || ((y < gy && dx <= dy) && (no_x || gx < x)) {
             let end = bx * SIDE_SHARE + bx + left;
-            out.push(vec![run(Side::Up, (left, sx, end), true, top)]);
+            out.push(vec![run(Side::Up, (left, sx, end), Course::Rising, top)]);
         }
         if no_x || second || ((gx < x && dy < dx) && (no_y || y < gy)) {
             let end = top - (by * SIDE_SHARE + by);
-            out.push(vec![run(Side::Left, (top, -sy, end), false, left)]);
+            out.push(vec![run(
+                Side::Left,
+                (top, -sy, end),
+                Course::Falling,
+                left,
+            )]);
         }
         if !right_top && (no_y || second || (y < gy && dx <= dy)) {
             let (start, end) = (bx * SIDE_SHARE + bx + left, bx + bx + left + sx + sx);
-            out.push(vec![run(Side::Up, (start, sx, end), true, top)]);
+            out.push(vec![run(Side::Up, (start, sx, end), Course::Rising, top)]);
         }
         if !left_bottom && (no_x || second || (gx < x && dy < dx)) {
             let (start, end) = (top - (by * SIDE_SHARE + by), top - (by + by + sy + sy));
-            out.push(vec![run(Side::Left, (start, -sy, end), false, left)]);
+            out.push(vec![run(
+                Side::Left,
+                (start, -sy, end),
+                Course::Falling,
+                left,
+            )]);
         }
     }
 
@@ -227,11 +254,21 @@ impl Frame {
         let (sy, by) = (self.step.y(), self.half.y());
         let (right, top) = (self.right, self.top);
         if self.no_y || second || y < self.gather.y() {
-            out.push(vec![run(Side::Right, (top, -sy, top - by), false, right)]);
+            out.push(vec![run(
+                Side::Right,
+                (top, -sy, top - by),
+                Course::Falling,
+                right,
+            )]);
         }
         if !self.walls[2] {
             let (start, end) = (top - by, top - (by + by + sy + sy));
-            out.push(vec![run(Side::Right, (start, -sy, end), false, right)]);
+            out.push(vec![run(
+                Side::Right,
+                (start, -sy, end),
+                Course::Falling,
+                right,
+            )]);
         }
     }
 
@@ -242,11 +279,21 @@ impl Frame {
         let (sx, bx) = (self.step.x(), self.half.x());
         let (left, bottom) = (self.left, self.bottom);
         if self.no_x || second || self.gather.x() < x {
-            out.push(vec![run(Side::Down, (left, sx, left + bx), true, bottom)]);
+            out.push(vec![run(
+                Side::Down,
+                (left, sx, left + bx),
+                Course::Rising,
+                bottom,
+            )]);
         }
         if !self.walls[2] {
             let (start, end) = (left + bx, bx + bx + sx + sx + left);
-            out.push(vec![run(Side::Down, (start, sx, end), true, bottom)]);
+            out.push(vec![run(
+                Side::Down,
+                (start, sx, end),
+                Course::Rising,
+                bottom,
+            )]);
         }
     }
 
@@ -257,7 +304,10 @@ impl Frame {
         let (sx, sy) = (self.step.x(), self.step.y());
         let mut spots = Vec::new();
         let mut c = r.start;
-        while if r.rising { c < r.end } else { r.end < c } {
+        while match r.course {
+            Course::Rising => c < r.end,
+            Course::Falling => r.end < c,
+        } {
             let (at, step, dir) = match r.side {
                 Side::Up => (Point::new(c, r.fixed), GroundOffset::new(0.0, sy), UP),
                 Side::Down => (Point::new(c, r.fixed), GroundOffset::new(0.0, sy), DOWN),
@@ -276,14 +326,14 @@ impl Frame {
     }
 }
 
-/// A run on `side` from `start` by `step` to `end` (rising or falling), on the line `fixed`.
-const fn run(side: Side, (start, step, end): (f32, f32, f32), rising: bool, fixed: f32) -> Run {
+/// A run on `side` from `start` by `step` to `end` (its `course`), on the line `fixed`.
+const fn run(side: Side, (start, step, end): (f32, f32, f32), course: Course, fixed: f32) -> Run {
     Run {
         side,
         start,
         step,
         end,
-        rising,
+        course,
         fixed,
     }
 }

@@ -16,16 +16,25 @@ pub struct Allied {
 
 impl Allied {
     /// Neither counts the other allied.
-    pub const NONE: Self = Self::new(false, false);
-
-    /// `by_attacker` and `by_target`.
-    #[must_use]
-    pub const fn new(by_attacker: bool, by_target: bool) -> Self {
-        Self {
-            by_attacker,
-            by_target,
-        }
-    }
+    pub const NONE: Self = Self {
+        by_attacker: false,
+        by_target: false,
+    };
+    /// Each counts the other allied.
+    pub const BOTH: Self = Self {
+        by_attacker: true,
+        by_target: true,
+    };
+    /// Only the attacker's player counts the target's allied.
+    pub const BY_ATTACKER: Self = Self {
+        by_attacker: true,
+        by_target: false,
+    };
+    /// Only the target's player counts the attacker's allied.
+    pub const BY_TARGET: Self = Self {
+        by_attacker: false,
+        by_target: true,
+    };
 
     /// Each counts the other allied.
     #[must_use]
@@ -41,8 +50,8 @@ mod tests {
     /// Both only when each player counts the other allied.
     #[test]
     fn both_needs_each_side() {
-        assert!(Allied::new(true, true).both());
-        assert!(!Allied::new(true, false).both() && !Allied::new(false, true).both());
+        assert!(Allied::BOTH.both());
+        assert!(!Allied::BY_ATTACKER.both() && !Allied::BY_TARGET.both());
         assert_eq!(Allied::NONE, Allied::default());
     }
 }

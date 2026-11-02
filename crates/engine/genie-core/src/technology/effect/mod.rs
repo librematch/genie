@@ -21,6 +21,7 @@ pub(crate) use self::attribute_modifier::{MasterSprites, follow_master};
 use self::object_slots::{CAPPED, ONE, ROUND, has_actions, within_table};
 #[cfg(test)]
 use self::object_slots::{POPULATION, RESOURCE_19, charge_after};
+use crate::GenieError;
 #[cfg(test)]
 use crate::math::rng::Stream;
 use crate::objects::masters::MasterId;
@@ -29,11 +30,9 @@ use crate::technology::EffectCommand;
 #[cfg(test)]
 use crate::world::World;
 
-/// The attribute counting the technologies researched (`0x15`) and the one summing their costs
-/// (`0x63`), which a research done at a location with a button adds to.
 /// A tech effect finds an object it changes gone from the lists it was found in.
-const OBJECT_GONE: crate::GenieError =
-    crate::GenieError::unreachable("an object a tech effect changes gone from its list");
+const OBJECT_GONE: GenieError =
+    GenieError::unreachable("an object a tech effect changes gone from its list");
 
 /// The attribute the dependents' update sets to 1 when none of them is left (`+0x138`).
 const ATTRIBUTE_39: usize = 39;

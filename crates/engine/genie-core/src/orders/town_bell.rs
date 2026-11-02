@@ -5,6 +5,7 @@
 
 use crate::GenieError;
 use crate::garrison::ContainerId;
+use crate::garrison::ShelterReach;
 use crate::garrison::{Shelters, TOWN_BELL_REACH};
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
@@ -25,6 +26,7 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::orders::Dispatch;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
 use crate::players::PlayerId;
@@ -288,7 +290,13 @@ impl World {
                 self.parts.set_town_bell_flag(id, true);
             }
         }
-        self.shelter(owner, &units, &shelters, true, false)
+        self.shelter(
+            owner,
+            &units,
+            &shelters,
+            ShelterReach::TownBell,
+            Dispatch::Now,
+        )
     }
 
     /// `FUN_14163ab80`: player `owner`'s town centre `tc` (master 109; any other object does

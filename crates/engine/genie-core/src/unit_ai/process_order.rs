@@ -14,6 +14,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     CIVILIAN, DEFENDLESS_MASTER, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI,
     Surroundings, TREBUCHET_CLASS, TREBUCHET_PACKED_CLASS, UnitAi, UnitCommand, UnitSeen, UnitSide,
@@ -117,7 +118,7 @@ impl UnitAi {
             OrderKind::Explore => self.explore_at(o.point.tile(), true, side, ai)?,
             OrderKind::Stop => {
                 self.remove_target();
-                self.stop_with(true, place, side, ai)?;
+                self.stop_with(StopOrder::Keep, place, side, ai)?;
                 true
             }
             OrderKind::Move | OrderKind::GroupGather => {

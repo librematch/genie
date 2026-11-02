@@ -2,6 +2,7 @@
 //! the packet's bytes; a packet whose command would not stays raw.
 
 use crate::{decode, encode};
+use genie_core::commands::Shift;
 use genie_core::commands::{
     AllBackToWorkCommand, AttackMoveCommand, AutoScoutCommand, BuildCommand, BuildWallCommand,
     BuildingQueueCommand, Command, DeleteCommand, FlareCommand, FormFormationCommand, GameCommand,
@@ -15,6 +16,7 @@ use genie_core::commands::{
     GameSub, GatherPointState, QueueId, ResourceWord, SpriteOverride, TradeLots,
 };
 use genie_core::garrison::ENTER;
+use genie_core::garrison::GarrisonScope;
 use genie_core::groups::FormationKind;
 use genie_core::map::Point;
 use genie_core::map::Tile;
@@ -562,8 +564,8 @@ fn unload_and_unit_order_keep_their_lists_and_counts() {
             target: Some(object_id(70)),
             point: Point::new(3.0, 4.0),
             queue_id: QueueId::of_data(71),
-            through_ai: true,
-            nearby: false,
+            shift: Shift::Held,
+            scope: GarrisonScope::Target,
             action: UnitOrderAction::Garrison,
             param: UnitIndex::of_data(u32::MAX),
             human: true,

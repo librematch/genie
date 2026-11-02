@@ -50,7 +50,10 @@ pub(crate) fn victim_in(
         spatial.terrain.as_ref(),
         mode_680,
     );
-    v.allied = Allied::new(dip.allied(attacker, p, true), dip.allied(p, attacker, true));
+    v.allied = Allied {
+        by_attacker: dip.allied(attacker, p, true),
+        by_target: dip.allied(p, attacker, true),
+    };
     v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
     v.tile_place = spatial.tile_place(u.id);
     if let Some(b) = v.building.as_mut() {

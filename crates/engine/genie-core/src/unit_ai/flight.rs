@@ -15,6 +15,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, BREAK, DEAD, EVADE_EDGE, EVASIVE_NEAR, Effect, FOUNDATION_REACH, GO_ON, Memory, Notify,
@@ -376,7 +377,7 @@ impl UnitAi {
             )
         {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
         }
         Ok(GO_ON)
     }

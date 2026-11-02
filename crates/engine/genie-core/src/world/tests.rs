@@ -16,6 +16,7 @@ use crate::combat::{AttackCount, AttackTargetId, MissileCount};
 use crate::commands::GameSub;
 use crate::commands::GatherPointState;
 use crate::commands::ResourceWord;
+use crate::commands::Shift;
 use crate::commands::UnloadPick;
 use crate::commands::game::GameCommand;
 use crate::commands::{
@@ -38,6 +39,7 @@ use crate::construction::repair::{BUILDING_REPAIR_COST, REPAIR};
 use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::construction::{Annexes, BuilderCount, RepairTargetId};
 use crate::garrison::ContainerId;
+use crate::garrison::GarrisonScope;
 use crate::garrison::tests::enter_task;
 use crate::garrison::{ENTER, EnterAction, EnterState, RaiderCountdown, UNREACHED};
 use crate::gathering::DropSiteId;
@@ -153,6 +155,7 @@ use crate::objects::sprite::Graphic;
 use crate::objects::unit::{Outcome, TAKEN_OUT};
 use crate::objects::unit::{Unit, loses_actions};
 use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount};
+use crate::orders::Dispatch;
 use crate::orders::town_bell::BackToWork;
 use crate::orders::{Interact, MoveOrder, Sweep, Work};
 use crate::ownership::CaptureKind;
@@ -178,6 +181,7 @@ use crate::players::relation_row;
 use crate::players::relations;
 use crate::players::tracker::ListKey;
 use crate::players::tracker::{Tracker, key};
+use crate::production::Batch;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
@@ -210,6 +214,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::DropTarget;
@@ -7572,7 +7577,7 @@ fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
     let seen = t
         .run_ai_calls((PlayerId::new(1), ListIndex::new(0)), |ai, side, rng| {
             let before = side.busy_now()?;
-            ai.stop_with(true, None, side, rng)?;
+            ai.stop_with(StopOrder::Keep, None, side, rng)?;
             Ok((before, side.busy_now()?))
         })
         .unwrap();
@@ -21627,8 +21632,8 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             target: Some(object_id(700)),
             point: Point::new(-1.0, -1.0),
             queue_id: QueueId::of_data(-1),
-            through_ai: true,
-            nearby: false,
+            shift: Shift::Held,
+            scope: GarrisonScope::Target,
             action: UnitOrderAction::of(action),
             param: UnitIndex::FIRST,
             human,
@@ -21746,10 +21751,16 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             |w| w.transform_object(player_id(1), object_id(9175), master_id(120)),
         ),
         routes(&t, &unit_order(5, false), PlayerId::new(1), |w| {
-            w.garrison_order(player_id(1), &v, Some(object_id(700)), true, false)
+            w.garrison_order(
+                player_id(1),
+                &v,
+                Some(object_id(700)),
+                Dispatch::Queued,
+                GarrisonScope::Target,
+            )
         }),
         routes(&t, &unit_order(4, false), PlayerId::new(1), |w| {
-            w.cancel_order(&v, UnitIndex::of_data(0), true)
+            w.cancel_order(&v, UnitIndex::of_data(0), Batch::Five)
         }),
         routes(&t, &unit_order(9, true), PlayerId::new(1), |w| {
             w.human_order(&v);

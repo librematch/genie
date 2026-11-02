@@ -14,6 +14,7 @@ use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
     ARTIFACT_AI, CIVILIAN, Notify, QueuedOrder, SIEGE_AI, SIEGE_TOWER_AI, Surroundings, UnitAi,
@@ -64,7 +65,7 @@ impl UnitAi {
         self.insert_order(order, true);
         if order.order != OrderKind::AttackRoundup {
             self.remove_target();
-            self.stop_with(true, place, side, ai)?;
+            self.stop_with(StopOrder::Keep, place, side, ai)?;
         }
         match &world {
             Some((at, _)) => self.end_notifies(Millis::ZERO, at, side, ai)?,

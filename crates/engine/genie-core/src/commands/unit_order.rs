@@ -2,7 +2,9 @@
 
 use crate::GenieError;
 use crate::commands::QueueId;
+use crate::commands::Shift;
 use crate::commands::UnitList;
+use crate::garrison::GarrisonScope;
 use crate::map::Point;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
@@ -83,11 +85,11 @@ pub struct UnitOrderCommand {
     pub point: Point,
     /// `+0x14`, the formatter's `qId`, which the actions modelled do not read.
     pub queue_id: QueueId,
-    /// `+0x1d`: a garrison goes through the units' unit AIs (their slot 0x30); a cancel cancels
-    /// up to five of a kind.
-    pub through_ai: bool,
-    /// `+0x1e`: a garrison takes the buildings of the target's master near it.
-    pub nearby: bool,
+    /// `+0x1d`: shift held, which a garrison reads as its dispatch (through the units' unit AIs,
+    /// their slot 0x30) and a cancel as its batch (up to five of a kind).
+    pub shift: Shift,
+    /// `+0x1e`: the shelters a garrison takes (the target's line near it, or the target alone).
+    pub scope: GarrisonScope,
     /// The order's action.
     pub action: UnitOrderAction,
     /// `+0x18`: a cancel's unit index in the queue.
@@ -110,10 +112,14 @@ impl UnitOrderCommand {
             w.human_order(ids);
         }
         match self.action {
-            UnitOrderAction::Garrison => {
-                w.garrison_order(self.player, ids, self.target, self.through_ai, self.nearby)
-            }
-            UnitOrderAction::Cancel => w.cancel_order(ids, self.param, self.through_ai),
+            UnitOrderAction::Garrison => w.garrison_order(
+                self.player,
+                ids,
+                self.target,
+                self.shift.dispatch(),
+                self.scope,
+            ),
+            UnitOrderAction::Cancel => w.cancel_order(ids, self.param, self.shift.batch()),
             action => w.unit_order(self.player, ids, action),
         }
     }

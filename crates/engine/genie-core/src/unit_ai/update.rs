@@ -19,6 +19,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
     LIVE_TARGET_ACTIONS, Memory, NO_POINT, Notify, Pick, ResourceSearch, Retarget, Search,
@@ -233,11 +234,11 @@ impl UnitAi {
             && action != Some(ActionKind::Trade);
         if captured_again {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
         }
         if untargeted {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
         }
         Ok(())
     }
@@ -345,7 +346,7 @@ impl UnitAi {
                         } else if !matches!(action, Some(ActionKind::Hunt | ActionKind::BoarLuring))
                         {
                             self.remove_target();
-                            self.stop_current(true, at, side, ai)?;
+                            self.stop_current(StopOrder::Keep, at, side, ai)?;
                         }
                     }
                 }
@@ -396,7 +397,7 @@ impl UnitAi {
             .or(self.last_target_class);
         let Some(class) = class else {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
             return Ok(GO_ON);
         };
         let kind = civilian_kind(class);
@@ -489,7 +490,7 @@ impl UnitAi {
         let class = self.target_class.or(self.last_target_class).or(noted);
         let Some(class) = class else {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
             return Ok(GO_ON);
         };
         let kind = civilian_kind(class);
@@ -545,7 +546,7 @@ impl UnitAi {
         let Some(found) = found else {
             if player_type.is_computer() {
                 self.remove_target();
-                self.stop_current(true, at, side, rng)?;
+                self.stop_current(StopOrder::Keep, at, side, rng)?;
             }
             return Ok(GO_ON);
         };

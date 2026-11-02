@@ -63,6 +63,7 @@ show in checkpoint word 9.
 | [`process_order.rs`](process_order.rs) | An order's processing: the combat and work orders, the top target and the attack slots. |
 | [`retarget.rs`](retarget.rs) | The retarget check and search, and the types' other checks (slot 73, processMisc). |
 | [`side.rs`](side.rs) | What the unit AI asks of the world (`UnitSide`) and the commands it gives its unit. |
+| [`stop_order.rs`](stop_order.rs) | What a stop of the unit AI's current action does to its order (`StopOrder`). |
 | [`surroundings.rs`](surroundings.rs) | What the unit AI knows of its surroundings: the searches' results, its home, its targets and what it has seen. |
 | [`target_type.rs`](target_type.rs) | A queued order's target type: the number its writer puts there, a master id or a class, and the two ways the game reads it. |
 | [`test_sides.rs`](test_sides.rs) | Tests: The tests' sides that record the unit's calls (`UnitSide::effect_now`): a list of them standing for a side without a unit, and `With` around another test side. |

@@ -16,6 +16,7 @@ use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::category;
 use crate::unit_ai::{
@@ -130,7 +131,7 @@ impl UnitAi {
                 STAND_GROUND_PATROL_LEASH
             };
             if leash < patrol_distance(&saved.path.points, at.moved_at)? {
-                self.stop_current(true, at, side, ai)?;
+                self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.restore_patrol(at, ai, side)?;
                 return Ok(true);
@@ -145,7 +146,7 @@ impl UnitAi {
             // too far out, returning."), then on to the retarget check
             let gap = point_gap_squared(self.state_position, at.position, at.size);
             if DEFEND_LEASH < gap.get() {
-                self.stop_current(true, at, side, ai)?;
+                self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.walk_back(at, side, ai)?;
             }
@@ -163,7 +164,7 @@ impl UnitAi {
             // and slot 73 returns 10 ("We're too far out, returning.", "SO Call 40.")
             let gap = point_gap_squared(self.state_position, at.position, at.size).get();
             if (at.weapon_range + STAND_GROUND_SLACK).get() < gap && self.current_action.is_some() {
-                self.stop_current(true, at, side, ai)?;
+                self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.walk_back(at, side, ai)?;
                 return Ok(true);
@@ -334,7 +335,7 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.current_order == Some(OrderKind::Attack) && self.current_target.is_none() {
-            self.stop_current(false, at, side, rng)?;
+            self.stop_current(StopOrder::End, at, side, rng)?;
         }
         Ok(())
     }
@@ -384,7 +385,7 @@ impl UnitAi {
             if ends {
                 self.defend_target = None;
                 self.remove_target();
-                self.stop_current(true, at, side, ai)?;
+                self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.leave_patrol_timers(ai);
                 self.current_order = None;
                 return Ok(true);
@@ -460,7 +461,7 @@ impl UnitAi {
         ) else {
             self.defend_target = None;
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
             self.current_order = None;
             return Ok(true);
         };

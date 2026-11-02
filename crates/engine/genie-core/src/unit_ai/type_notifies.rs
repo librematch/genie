@@ -13,6 +13,7 @@ use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, PACKED_UNIT_CLASS, Surroundings,
     UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner, back_up, dodges,
@@ -89,7 +90,7 @@ impl UnitAi {
                     // FUN_140c41bc0 with 1000: the idle timeout, then slot 0x1a8
                     self.set_idle_timeout(LION_ATTACKED_TIMEOUT, ai_rng);
                     self.remove_target();
-                    self.stop_current(true, at, side, ai_rng)?;
+                    self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
                 self.base_notify(n, time, at, player_type, ai_rng, side)
             }
@@ -138,7 +139,7 @@ impl UnitAi {
         // goes, the action stops (slot 0xb0 with 1) and slot 0x48 hands the notify
         // to the owner (not held)
         self.remove_target();
-        self.stop_current(true, at, side, ai_rng)?;
+        self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         self.base_notify(n, time, at, player_type, ai_rng, side)
     }
 
@@ -189,7 +190,7 @@ impl UnitAi {
             NotifyKind::ACTION_COMPLETED | NotifyKind::ACTION_FAILED => {
                 if ActionKind::field(self.current_action) == n.p[0] {
                     self.remove_target();
-                    self.stop_current(true, at, side, ai_rng)?;
+                    self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
                 Ok(GO_ON)
             }
@@ -379,7 +380,7 @@ impl UnitAi {
         if at.unit(n.caller).is_none() {
             return Ok(GO_ON);
         }
-        self.stop_current(true, at, side, ai_rng)?;
+        self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         let _ = self.run_away(true, at, player_type, ai_rng, side)?;
         Ok(BREAK)
     }
@@ -447,7 +448,7 @@ impl UnitAi {
                     || at.target.is_none_or(|t| ObjectState::Alive < t.state);
                 if gone {
                     self.remove_target();
-                    self.stop_current(true, at, side, ai_rng)?;
+                    self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
                 Ok(GO_ON)
             }

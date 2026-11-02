@@ -48,6 +48,7 @@ use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::relation_row;
+use crate::production::Batch;
 use crate::production::LocationButton;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
@@ -524,7 +525,7 @@ fn cancel_gives_back_one_queued_unit() {
         villager(Some(ids::VILLAGER_MALE), 1, 45.0),
     ]);
     t.players[1].attributes[80] = Amount::new(2.0);
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), false)
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), Batch::One)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(
@@ -540,10 +541,10 @@ fn cancel_gives_back_one_queued_unit() {
     assert_eq!((q.count.get(), q.total.get(), q.changes.get()), (1, 1, 1));
     assert!(production.action.is_some());
     assert_eq!(p.tracker.queued, -1);
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(5), false)
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(5), Batch::One)
         .unwrap();
     assert_eq!(t.players[1].attributes[0], Amount::new(45.0));
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), false)
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::One)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(
@@ -557,7 +558,7 @@ fn cancel_gives_back_one_queued_unit() {
         .unwrap();
     assert!(production.queue.entries().is_empty() && production.action.is_none());
     assert!(
-        t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
+        t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::Five)
             .is_ok()
     );
 }
@@ -648,7 +649,7 @@ fn cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
         PlayerId::new(1),
         ListIndex::new(0),
         UnitIndex::of_data(0),
-        false,
+        Batch::One,
     )
     .unwrap();
     let p = &t.players[1];
@@ -703,7 +704,7 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
                 .clone()
         },
     ]);
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::Five)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(
@@ -741,7 +742,7 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
         villager(Some(ids::VILLAGER_FEMALE), 4, 46.0),
     ]);
     t2.players[1].attributes[80] = Amount::new(7.0);
-    t2.cancel_order(&object_ids([9]), UnitIndex::of_data(1), true)
+    t2.cancel_order(&object_ids([9]), UnitIndex::of_data(1), Batch::Five)
         .unwrap();
     let production = t2
         .parts
@@ -795,7 +796,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         PlayerId::new(1),
         ListIndex::new(0),
         UnitIndex::of_data(0),
-        true,
+        Batch::Five,
     )
     .unwrap();
     let p = &t.players[1];
@@ -833,7 +834,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         PlayerId::new(1),
         ListIndex::new(0),
         UnitIndex::of_data(0),
-        true,
+        Batch::Five,
     )
     .unwrap();
     let q = &t
@@ -931,7 +932,7 @@ fn researching(progress: f32) -> World {
 #[test]
 fn cancel_of_all_researches_gives_back_the_entry_three() {
     let mut t = researching(10.0);
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::Five)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(p.attributes[3], Amount::new(150.0));
@@ -956,7 +957,7 @@ fn cancel_of_all_researches_gives_back_the_entry_three() {
     // one research of the second unit: 50 gold, the technology in state 1 though two stay
     // queued, the research going on
     let mut t = researching(10.0);
-    t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), false)
+    t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), Batch::One)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(
@@ -1069,7 +1070,7 @@ fn cancel_in_game_mode_16_clears_the_military_flag() {
             villager(Some(ids::VILLAGER_MALE), 1, 46.0),
             villager(Some(master_id(4)), 1, 0.0),
         ]);
-        t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), false)
+        t.cancel_order(&object_ids([9]), UnitIndex::of_data(1), Batch::One)
             .unwrap();
         t.players[1].one_military_queued
     };

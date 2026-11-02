@@ -18,6 +18,7 @@ use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderOutcome;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
     AiMove, CIVILIAN, EXPLORE_Z, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
@@ -172,7 +173,7 @@ impl UnitAi {
             None => None,
         };
         let Some((target, t)) = held else {
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
             return Ok(false);
         };
         self.hunt_object(target, t.class, t.position, at, side, rng)?;

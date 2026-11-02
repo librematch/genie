@@ -5,6 +5,8 @@ use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
 use crate::construction::MainBuildingId;
+use crate::garrison::GarrisonScope;
+use crate::garrison::ShelterReach;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::gathering::hunt::tests::walker as tests_walker;
@@ -70,6 +72,7 @@ use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, WorkerCount};
+use crate::orders::Dispatch;
 use crate::orders::Work;
 use crate::orders::town_bell::{BackToWork, TownBell};
 use crate::pathing::Pathing;
@@ -2467,8 +2470,8 @@ fn garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
             player_id(1),
             &object_ids([1000]),
             Some(object_id(100)),
-            false,
-            true,
+            Dispatch::Now,
+            GarrisonScope::Nearby,
         )
         .unwrap();
         t.parts
@@ -2496,8 +2499,8 @@ fn garrison_through_the_unit_ais_queues_their_enter_orders() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(100)),
-        true,
-        false,
+        Dispatch::Queued,
+        GarrisonScope::Target,
     )
     .unwrap();
     let v = t.object(object_id(1000)).unwrap().1;
@@ -2563,8 +2566,8 @@ fn garrison_into_transport_pairs_the_units_whose_class_has_the_flags() {
         player_id(1),
         &object_ids([1000, 1001, 200]),
         Some(object_id(200)),
-        true,
-        false,
+        Dispatch::Queued,
+        GarrisonScope::Target,
     )
     .unwrap();
     let orders = |t: &World, id| {
@@ -2602,8 +2605,8 @@ fn garrison_into_transport_pairs_the_units_whose_class_has_the_flags() {
         PlayerId::new(1),
         &object_id_list([1000]),
         &shelters,
-        true,
-        true,
+        ShelterReach::TownBell,
+        Dispatch::Queued,
     )
     .unwrap();
     assert_eq!(orders(&t, 1000), Some(vec![]));
@@ -2611,8 +2614,8 @@ fn garrison_into_transport_pairs_the_units_whose_class_has_the_flags() {
         PlayerId::new(1),
         &object_id_list([1000]),
         &shelters,
-        false,
-        true,
+        ShelterReach::Far,
+        Dispatch::Queued,
     )
     .unwrap();
     assert_eq!(
@@ -2621,7 +2624,13 @@ fn garrison_into_transport_pairs_the_units_whose_class_has_the_flags() {
     );
     // with no unit the transport is never asked
     assert_eq!(
-        t.garrison_order(player_id(1), &[], Some(object_id(200)), false, false),
+        t.garrison_order(
+            player_id(1),
+            &[],
+            Some(object_id(200)),
+            Dispatch::Now,
+            GarrisonScope::Target
+        ),
         Ok(())
     );
 }
@@ -2709,8 +2718,8 @@ fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     let ship = t
@@ -2790,8 +2799,8 @@ fn villager_meets_moving_ship_where_it_goes() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     let enter = t
@@ -2829,8 +2838,8 @@ fn villager_meets_moving_ship_where_it_goes() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     let enter = t
@@ -2864,8 +2873,8 @@ fn villager_meets_sailing_transport_where_it_sails() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     let enter = t
@@ -3523,8 +3532,8 @@ fn villager_beside_ship_enters_it_at_once() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     let v = t.object(object_id(1000)).unwrap().1;
@@ -3573,8 +3582,8 @@ fn villager_enters_an_allys_ship_with_its_owners_masters() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     assert_eq!(
@@ -3594,8 +3603,8 @@ fn villager_enters_an_allys_ship_with_its_owners_masters() {
         player_id(1),
         &object_ids([1000]),
         Some(object_id(200)),
-        false,
-        false,
+        Dispatch::Now,
+        GarrisonScope::Target,
     )
     .unwrap();
     assert_eq!(

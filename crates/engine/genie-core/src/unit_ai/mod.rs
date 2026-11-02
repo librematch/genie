@@ -45,6 +45,7 @@ mod order_priority;
 mod process_order;
 mod retarget;
 mod side;
+mod stop_order;
 mod surroundings;
 mod target_type;
 pub mod task_finder;
@@ -117,6 +118,7 @@ pub use self::side::{
     Gatherable, NO_POINT, Named, NearestAttacker, OffFootprint, ResourceSearch, TargetFlags,
     UnitCommand, UnitSide,
 };
+pub use self::stop_order::StopOrder;
 pub use self::surroundings::{
     AiMove, Duel, Found, GroupState, Home, Seen, Surroundings, TopTarget, UnitSeen, flood_search,
     no_search,

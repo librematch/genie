@@ -1646,7 +1646,10 @@ fn an_attack_on_target_its_player_counts_as_its_own_ends() {
             class,
             player: PlayerId::new(1),
             position: at,
-            allied: Allied::new(allied, allied),
+            allied: Allied {
+                by_attacker: allied,
+                by_target: allied,
+            },
             ..Victim::default()
         };
         let mut rig = Rig::on(world_with(7, PlayerId::new(1), class, at), 0.8, victim);

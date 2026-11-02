@@ -4,7 +4,9 @@
 use crate::GenieError;
 use crate::garrison::ClassFlags;
 use crate::garrison::ContainerId;
+use crate::garrison::GarrisonScope;
 use crate::garrison::InsideCount;
+use crate::garrison::ShelterReach;
 use crate::garrison::{
     COMPUTER_IDS, FAR, HUMAN_IDS, NEARBY, TOWN_BELL_REACH, class_has_flags, has_garrison_task,
 };
@@ -26,6 +28,7 @@ use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
+use crate::orders::Dispatch;
 use crate::orders::object_gone;
 use crate::orders::{GARRISON, Work};
 use crate::players::PlayerId;
@@ -68,17 +71,17 @@ pub(super) const LEAST_HP_SHARE: f64 = GARRISON_LEAST_HP_SHARE;
 impl World {
     /// `UNIT_ORDER`'s garrison (action 5) on `target`, which the world holds (`FUN_140e7f200`; the
     /// UI's sound for it, `FUN_1409648c0`, is not held): `FUN_14161e370` lists the order's units
-    /// (the ids the world holds of a type 70 or more), then the shelters ([`Shelters`]). Without
-    /// `nearby` (the packet's `+0x1e`) the target alone: one of a type below 80 a transport,
+    /// (the ids the world holds of a type 70 or more), then the shelters ([`Shelters`]). With
+    /// [`GarrisonScope::Target`] (the packet's `+0x1e`) the target alone: one of a type below 80 a transport,
     /// else a building (an annex its main building, but a gate's), with its count
-    /// ([`World::garrisoned`]). With it, each object of the target's owner's tracker under the
+    /// ([`World::garrisoned`]). With [`GarrisonScope::Nearby`], each object of the target's owner's tracker under the
     /// master the target's line stands for (`FUN_140fdd6c0`, `FUN_140fdd6f0`, [`UnitLines::base`];
     /// `FUN_14104f960`, [`crate::players::tracker::Tracker::list`]), in the tracker's order, within
     /// [`NEARBY`] of the target (`FUN_14118f8c0`, the squared footprint gap; `COMISS`/`JC`: a NaN
     /// is out): one of a type below 80 is a transport, one not a gate (class 39) and no annex
     /// (`+0xbb8`) a building, and each one in reach pushes its count, the gates and annexes
-    /// left out too. Then [`World::shelter`] (`param_6` 0) with the unit AI's queue when
-    /// `through_ai` (the packet's `+0x1d`).
+    /// left out too. Then [`World::shelter`] (`param_6` 0, [`ShelterReach::Far`]) by `dispatch`
+    /// (the packet's `+0x1d`: through the unit AIs' queues with [`Dispatch::Queued`]).
     ///
     /// [`UnitLines::base`]: crate::objects::lines::UnitLines::base
     pub(crate) fn garrison_order(
@@ -86,8 +89,8 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
         target: Option<ObjectId>,
-        through_ai: bool,
-        nearby: bool,
+        dispatch: Dispatch,
+        scope: GarrisonScope,
     ) -> Result<(), GenieError> {
         let Some((tp, t)) = self.object(target) else {
             return Ok(());
@@ -104,7 +107,7 @@ impl World {
                 units.push(id);
             }
         }
-        let shelters = if nearby {
+        let shelters = if scope == GarrisonScope::Nearby {
             self.shelters_near(tp, target, target_master)?
         } else {
             let tm = self.master(tp, target_master)?;
@@ -128,7 +131,7 @@ impl World {
                 }
             }
         };
-        self.shelter(player, &units, &shelters, false, through_ai)
+        self.shelter(player, &units, &shelters, ShelterReach::Far, dispatch)
     }
 
     /// `SEEK_SHELTER` (0x2c, `FUN_140e6a3a0`), after the command's check (`FUN_140e558b0`): of
@@ -195,7 +198,7 @@ impl World {
             counts,
         };
         // FUN_141622450: no transports, no gap limit, not through the unit AIs
-        self.shelter(player, &units, &shelters, false, false)
+        self.shelter(player, &units, &shelters, ShelterReach::Far, Dispatch::Now)
     }
 
     /// `FUN_14161e370`'s shelters near `target` (of player `tp` and master `master`, its
@@ -249,7 +252,7 @@ impl World {
     /// ([`World::takes_in`]), and with each transport of a unit whose master's class has a flag
     /// of 0x10002 ([`class_has_flags`]) when the commanding player's master of the unit's master
     /// id has a task of action 3 on the transport's class ([`has_garrison_task`]), within the reach
-    /// (`near`, `param_6`: [`TOWN_BELL_REACH`], else [`FAR`]; `COMISS`/`JBE`: a NaN is out); a
+    /// (`reach`, `param_6`: [`TOWN_BELL_REACH`] or [`FAR`]; `COMISS`/`JBE`: a NaN is out); a
     /// pair names its shelter by its index, a transport's after the buildings. The pairs sorted
     /// by their squared footprint gap (`FUN_1415f0830`, MSVC's `std::sort`) give each unit, in
     /// that order, the first shelter whose count is below its master's capacity, then any unit
@@ -257,16 +260,19 @@ impl World {
     /// (the list holds what its caller pushed, in its own order: an index into it need not be
     /// its shelter's), which each taker raises. The shelters go in a hash map by id
     /// (`FUN_1415f0c40`), whose order ([`crate::math::msvc::unordered_map_order`]) the next part
-    /// follows ([`World::shelter_in`]). Not modelled: the groups the splitter forms.
+    /// follows ([`World::shelter_in`] by `dispatch`). Not modelled: the groups the splitter forms.
     pub(crate) fn shelter(
         &mut self,
         player: PlayerId,
         units: &[ObjectId],
         shelters: &Shelters,
-        near: bool,
-        through_ai: bool,
+        reach: ShelterReach,
+        dispatch: Dispatch,
     ) -> Result<(), GenieError> {
-        let reach = if near { TOWN_BELL_REACH } else { FAR };
+        let reach = match reach {
+            ShelterReach::TownBell => TOWN_BELL_REACH,
+            ShelterReach::Far => FAR,
+        };
         let all: Vec<ContainerId> = shelters
             .buildings
             .iter()
@@ -333,7 +339,7 @@ impl World {
                 .iter()
                 .position(|&b| b == building)
                 .ok_or(NO_LISTED_BUILDING)?;
-            self.shelter_in(building, going.checked(j)?, through_ai)?;
+            self.shelter_in(building, going.checked(j)?, dispatch)?;
         }
         Ok(())
     }
@@ -358,7 +364,7 @@ impl World {
     /// command `0x2713`) on its units, which keeps those whose unit AI's test passes
     /// ([`World::ai_takes`]); then each loose unit (not in a group, `+0x6d0`; in state 2 or 6 or
     /// less, of a type 70 or more) takes slot 0x7e8 on the shelter at its place with task
-    /// filter 3, or, `through_ai` (`param_7`) and with a unit AI, the unit AI's slot 0x30 (into
+    /// filter 3, or, with [`Dispatch::Queued`] (`param_7`) and a unit AI, the unit AI's slot 0x30 (into
     /// slot 0x28, `FUN_140c55c90`: not immediate, behind) queues the enter order (`0x2cd`) on
     /// the shelter at its place: issued by the unit's own id, of the shelter's owner and master,
     /// range 0, priority 100, the point shown, ready.
@@ -366,7 +372,7 @@ impl World {
         &mut self,
         building: ContainerId,
         going: &[ObjectId],
-        through_ai: bool,
+        dispatch: Dispatch,
     ) -> Result<(), GenieError> {
         let (bp, b) = self
             .object(building)
@@ -401,7 +407,7 @@ impl World {
             {
                 continue;
             }
-            if through_ai && self.parts.unit_ai.contains(unit.id) {
+            if dispatch == Dispatch::Queued && self.parts.unit_ai.contains(unit.id) {
                 let state = unit.life.state;
                 let order = QueuedOrder {
                     issuer: Some(Issuer::Object(id)),

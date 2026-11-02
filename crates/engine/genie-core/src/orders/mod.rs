@@ -37,6 +37,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::task_finder::TaskTarget;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -48,6 +49,7 @@ use crate::world::slots::PlayerSlots;
 mod actions;
 mod attack;
 mod commands;
+mod dispatch;
 mod drop_site;
 mod follow;
 mod form;
@@ -65,6 +67,7 @@ mod work;
 
 #[cfg(test)]
 use self::actions::{SwitchWorld, switch_master};
+pub use self::dispatch::Dispatch;
 use self::points::{centroid, follow_axis, follow_spread, grid_point, offset_point};
 use crate::combat::AttackPowerup;
 use crate::gathering::DropSiteId;
@@ -565,7 +568,7 @@ pub(crate) fn set_stance(
         && (ai.current_order == Some(OrderKind::Attack)
             || ai.current_action == Some(ActionKind::Attack))
     {
-        ai.stop_with(true, Some(place), side, rng)?;
+        ai.stop_with(StopOrder::Keep, Some(place), side, rng)?;
         ai.remove_target();
     }
     Ok(())

@@ -58,6 +58,7 @@ building commands, the unit commands and the players' each have their own dispat
 | [`run.rs`](run.rs) | A command's run in the command phase (`World::run`), a human player's order and the order units' reset. |
 | [`seek_shelter.rs`](seek_shelter.rs) | `SEEK_SHELTER` (0x2c): the player's villagers seek shelter. |
 | [`set_gather_state.rs`](set_gather_state.rs) | SET GATHER STATE (0x82): the gather point of a player's buildings is the building itself. |
+| [`shift.rs`](shift.rs) | A command's shift flag (`Shift`). |
 | [`stop.rs`](stop.rs) | STOP (0x01): the player's units stop. |
 | [`tests.rs`](tests.rs) | Tests: The command enum's issuing player and the lane a failed run stops. |
 | [`town_bell.rs`](town_bell.rs) | `TOWN_BELL` (0x7f): a town centre's bell. |

@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::commands::GameSub;
 use crate::commands::ResourceWord;
+use crate::commands::Shift;
 use crate::commands::UnloadPick;
 use crate::commands::{
     AllBackToWorkCommand, AttackMoveCommand, AutoScoutCommand, BuildCommand, BuildWallCommand,
@@ -13,6 +14,7 @@ use crate::commands::{
     UnitOrderAction, UnitOrderCommand, UnloadCommand, UnmodelledCommand, Waypoints,
 };
 use crate::commands::{QueueId, SpriteOverride, TradeLots};
+use crate::garrison::GarrisonScope;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::objects::Frame;
@@ -216,8 +218,8 @@ fn one_of_each(p: u8) -> Vec<Command> {
             target: None,
             point: Point::new(-1.0, -1.0),
             queue_id: QueueId::of_data(-1),
-            through_ai: false,
-            nearby: false,
+            shift: Shift::Released,
+            scope: GarrisonScope::Target,
             action: UnitOrderAction::DropOff,
             param: UnitIndex::FIRST,
             human: false,

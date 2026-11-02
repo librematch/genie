@@ -25,6 +25,7 @@ use crate::orders::object_gone;
 use crate::orders::{HERD_MOST, NO_POINT};
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::production::Batch;
 use crate::production::UnitIndex;
 use crate::unit_ai::world_view::DropWorld;
 use crate::world::WALKER_UNMOVING;
@@ -201,13 +202,13 @@ impl World {
 
     /// `UNIT_ORDER`'s action 4 (`FUN_14161e370` case 4) to the objects `ids`: each the world
     /// holds (any player's) that is a building in state 2 cancels the `index`-th unit of its
-    /// queue ([`World::cancel_queued`], `all` the command's `+0x1d`), then game mode 16's tail
+    /// queue ([`World::cancel_queued`], `batch` the command's `+0x1d`), then game mode 16's tail
     /// ([`World::cancel_tail`]).
     pub(crate) fn cancel_order(
         &mut self,
         ids: &[Option<ObjectId>],
         index: UnitIndex,
-        all: bool,
+        batch: Batch,
     ) -> Result<(), GenieError> {
         for &id in ids.iter().flatten() {
             let Some(place) = self.place(id) else {
@@ -222,7 +223,7 @@ impl World {
             {
                 continue;
             }
-            self.cancel_queued(p, idx, index, all)?;
+            self.cancel_queued(p, idx, index, batch)?;
             self.cancel_tail(p, idx, index)?;
         }
         Ok(())

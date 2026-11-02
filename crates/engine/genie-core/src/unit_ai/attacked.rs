@@ -20,6 +20,7 @@ use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, NEVER_KILLED, Named, Notify, OrderTargetType,
@@ -514,7 +515,7 @@ impl UnitAi {
             }
             _ => {
                 self.remove_target();
-                self.stop_current(true, at, side, ai_rng)?;
+                self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 side.owner_hears(n)?;
                 Ok(GO_ON)
             }

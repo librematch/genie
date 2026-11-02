@@ -9,6 +9,7 @@ use crate::objects::masters::ClassId;
 use crate::players::PlayerType;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi, UnitSide};
 use crate::world::Millis;
 use crate::world::slots::CheckedIndex;
@@ -104,7 +105,7 @@ impl UnitAi {
     ) -> Result<(), GenieError> {
         if self.completes() {
             self.remove_target();
-            self.stop_current(true, at, side, rng)?;
+            self.stop_current(StopOrder::Keep, at, side, rng)?;
         }
         self.last_update_time = time;
         self.notifies.clear();

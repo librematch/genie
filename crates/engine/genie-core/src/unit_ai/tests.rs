@@ -54,6 +54,7 @@ use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::StopOrder;
 use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
 
@@ -772,7 +773,8 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
     let mut side = Recorder::default();
     let at = Surroundings::default();
     ai.cap_human_order(&mut side, &mut rng()).unwrap();
-    ai.stop_with(true, None, &mut side, &mut rng()).unwrap();
+    ai.stop_with(StopOrder::Keep, None, &mut side, &mut rng())
+        .unwrap();
     assert_eq!(
         ai.attack_command(object_id(70), true, &at, &mut side),
         Ok(true)
@@ -9672,7 +9674,7 @@ fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
     };
     let mut fx = Vec::new();
     u.stop_with(
-        true,
+        StopOrder::Keep,
         Some((Point::new(3.0, 4.0), Some(class::CLASS_6))),
         &mut fx,
         &mut rng(),
@@ -9692,7 +9694,7 @@ fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
         ..idle(SOLDIER_AI)
     };
     assert!(
-        u.stop_with(true, None, &mut Vec::new(), &mut rng())
+        u.stop_with(StopOrder::Keep, None, &mut Vec::new(), &mut rng())
             .is_err()
     );
 }

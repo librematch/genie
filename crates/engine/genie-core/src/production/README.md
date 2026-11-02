@@ -26,6 +26,7 @@ A building's update runs its production action after its combat update.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`batch.rs`](batch.rs) | How many units of a kind a cancel takes back (`Batch`). |
 | [`button.rs`](button.rs) | A train or research button: as a QUEUE command and a queue entry hold it (`QueueButton`), and as a train or research location holds it (`LocationButton`). |
 | [`cost_count.rs`](cost_count.rs) | How many times a payment or a cost test takes a master's costs. |
 | [`costs.rs`](costs.rs) | A queue entry's costs: the test and the payment of a unit's or a technology's costs, and their refunds when an entry is cancelled (`FUN_141630530` and the cancels' calls). |
