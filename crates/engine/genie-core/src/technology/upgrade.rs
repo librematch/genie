@@ -10,6 +10,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::DamageSpriteMode;
 use crate::objects::masters::HpPercent;
@@ -104,7 +105,7 @@ fn storage_share(master: &Master, state: ObjectState) -> bool {
 ///
 /// A sprite the data file does not have.
 pub(crate) fn damage_sprites(
-    u: &mut Unit,
+    (u, mut motion): (&mut Unit, MotionMut<'_>),
     master: &Master,
     before: HpPercent,
     (graphics, object, sprite): (&crate::objects::Graphics, &mut Well512, &mut Well512),
@@ -144,7 +145,7 @@ pub(crate) fn damage_sprites(
                 if u.sprite.is_some() {
                     crate::objects::sprite::new_sprite(
                         &mut u.sprite,
-                        u.body.move_stats_mut(),
+                        motion.move_stats_mut(),
                         graphic(e.sprite)?,
                         sprite,
                     );
@@ -164,7 +165,7 @@ pub(crate) fn damage_sprites(
         if u.sprite.is_some() {
             crate::objects::sprite::new_sprite(
                 &mut u.sprite,
-                u.body.move_stats_mut(),
+                motion.move_stats_mut(),
                 standing,
                 sprite,
             );
@@ -523,8 +524,14 @@ impl World {
         let graphics = std::mem::take(&mut self.graphics);
         let mut object = std::mem::take(self.streams.get(Stream::Object));
         let mut sprite = std::mem::take(self.streams.get(Stream::Sprite));
-        let u = self.object_at_mut(place)?;
-        let r = damage_sprites(u, master, before, (&graphics, &mut object, &mut sprite));
+        let u = self.players.at_mut(place)?;
+        let motion = self.parts.motion_mut(u.id);
+        let r = damage_sprites(
+            (u, motion),
+            master,
+            before,
+            (&graphics, &mut object, &mut sprite),
+        );
         self.graphics = graphics;
         *self.streams.get(Stream::Object) = object;
         *self.streams.get(Stream::Sprite) = sprite;
@@ -561,7 +568,7 @@ impl World {
             Place::Live(q, i) => self.players.live_mut(q, i)?,
             Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
-        crate::objects::sprite::new_sprite(&mut u.sprite, u.body.move_stats_mut(), g, rng);
+        crate::objects::sprite::new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
         Ok(())
     }
 
@@ -798,7 +805,7 @@ mod tests {
         };
         let mut u = object_of(HitPoints::new(150.0));
         let r = damage_sprites(
-            &mut u,
+            (&mut u, MotionMut::new(None)),
             &bare,
             HpPercent::of_data(7),
             (&graphics, &mut object, &mut sprite),
@@ -809,7 +816,7 @@ mod tests {
         );
         let placed = building(70, 100, SPRITE_PLACED, -1);
         let r = damage_sprites(
-            &mut u,
+            (&mut u, MotionMut::new(None)),
             &placed,
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
@@ -820,7 +827,7 @@ mod tests {
         );
         let mut low = object_of(HitPoints::new(-5.0));
         let r = damage_sprites(
-            &mut low,
+            (&mut low, MotionMut::new(None)),
             &placed,
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
@@ -831,7 +838,7 @@ mod tests {
         );
         let mut nan = object_of(HitPoints::new(f32::NAN));
         let _ = damage_sprites(
-            &mut nan,
+            (&mut nan, MotionMut::new(None)),
             &placed,
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
@@ -842,7 +849,7 @@ mod tests {
         let mut hurt = object_of(HitPoints::new(40.0));
         assert_eq!(
             damage_sprites(
-                &mut hurt,
+                (&mut hurt, MotionMut::new(None)),
                 &placed,
                 HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite)
@@ -857,7 +864,7 @@ mod tests {
         let mut hurt = object_of(HitPoints::new(40.0));
         assert_eq!(
             damage_sprites(
-                &mut hurt,
+                (&mut hurt, MotionMut::new(None)),
                 &scattered,
                 HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite)
@@ -869,7 +876,7 @@ mod tests {
         let mut hurt = object_of(HitPoints::new(60.0));
         assert_eq!(
             damage_sprites(
-                &mut hurt,
+                (&mut hurt, MotionMut::new(None)),
                 &scattered,
                 HpPercent::of_data(30),
                 (&graphics, &mut object, &mut sprite)
@@ -888,7 +895,7 @@ mod tests {
         };
         assert_eq!(
             damage_sprites(
-                &mut u,
+                (&mut u, MotionMut::new(None)),
                 &shown,
                 HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite)
@@ -899,7 +906,7 @@ mod tests {
         u.life.hp = HitPoints::new(100.0);
         assert_eq!(
             damage_sprites(
-                &mut u,
+                (&mut u, MotionMut::new(None)),
                 &shown,
                 HpPercent::of_data(60),
                 (&graphics, &mut object, &mut sprite)

@@ -10,6 +10,7 @@ use crate::gathering::hunt::{
 };
 use crate::map::Position;
 use crate::math::rng::Stream;
+use crate::movement::Mover;
 use crate::movement::footprint_gap_squared;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -31,16 +32,20 @@ impl HuntAction {
         r: &HuntReads,
         herd: &Herd,
     ) -> Result<(), GenieError> {
-        self.tear_down(unit.body.mover_mut())?;
+        self.tear_down(c.w.parts.mover_mut(unit.id))?;
         self.state = HuntState::Lead;
         self.lead.still_time = 0;
         let at = f.victim.position;
         self.lead.start = at.ground();
-        self.face_animal(unit, at, r.attack.world_time)?;
+        self.face_animal(
+            (unit.position(), c.w.parts.mover_mut(unit.id)),
+            at,
+            r.attack.world_time,
+        )?;
         if let Some(g) = herd.special_graphic {
             new_sprite(
                 &mut unit.sprite,
-                unit.body.move_stats_mut(),
+                c.w.parts.move_stats_mut(unit.id),
                 g,
                 c.w.streams.get(Stream::Sprite),
             );
@@ -50,15 +55,14 @@ impl HuntAction {
     }
 
     /// `FUN_141162db0` on the animal at `to` at once (a unit without a turn time turns by the
-    /// facets between) at the world's time `now`.
+    /// facets between) at the world's time `now`, of the hunter at `at` with its mover.
     pub(super) fn face_animal(
         &self,
-        unit: &mut Unit,
+        (at, mover): (Position, Option<&mut Mover>),
         to: Position,
         now: WorldTime,
     ) -> Result<(), GenieError> {
-        let at = unit.body.position();
-        let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = mover.ok_or(crate::world::HUNTER_UNMOVING)?;
         if !crate::combat::attack::face_target(mover, at, to, now)? {
             return Err(GenieError::unsupported(
                 "a hunter that turns over time to face its target",
@@ -100,20 +104,30 @@ impl HuntAction {
             self.start_attack(c, unit, &herd)?;
             return Ok(HuntNext::Stay);
         }
-        let ground = unit
-            .body
-            .mover()
-            .map(|m| m.stats.radius.ground())
-            .ok_or(crate::world::HUNTER_UNMOVING)?;
-        if footprint_gap_squared(unit.body.position(), ground, v, f.victim.radius) <= LEAD_REACH {
+        let ground =
+            c.w.parts
+                .mover_of(unit.id)
+                .map(|m| m.stats.radius.ground())
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
+        if footprint_gap_squared(unit.place.position(), ground, v, f.victim.radius) <= LEAD_REACH {
             self.lead.start = v.ground();
-            self.face_animal(unit, v, r.attack.world_time)?;
+            self.face_animal(
+                (unit.position(), c.w.parts.mover_mut(unit.id)),
+                v,
+                r.attack.world_time,
+            )?;
             self.timer = LEAD_WAIT;
             return Ok(HuntNext::Stay);
         }
-        let walks = r.walks(&c.w.graphics, unit);
+        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let player = f.own.player;
-        self.set_walk(&c.w.spatial, &mut unit.body, &f.victim, player, &walks)?;
+        self.set_walk(
+            (&c.w.spatial, unit.position()),
+            c.w.parts.motion_mut(unit.id),
+            &f.victim,
+            player,
+            &walks,
+        )?;
         Ok(HuntNext::Stay)
     }
 

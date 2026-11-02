@@ -7,6 +7,7 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -99,7 +100,7 @@ impl World {
         else {
             return Ok(());
         };
-        let position = u.moved_vector();
+        let position = u.moved_vector(self.parts.mover_of(u.id));
         let Some((q, t)) = self.object(target) else {
             return Ok(());
         };
@@ -111,7 +112,7 @@ impl World {
             position,
             target: Some(target),
             category: crate::unit_ai::best_target::category(t.life.master_id, class),
-            target_position: t.moved_vector(),
+            target_position: t.moved_vector(self.parts.mover_of(t.id)),
         };
         if let Some(ai) = self
             .parts
@@ -135,7 +136,9 @@ impl World {
     ) -> Result<(), GenieError> {
         let by = self.releaser(player, idx)?;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
-        self.players.live_mut(player, idx)?.clear_own_actions(
+        let unit = self.players.live_mut(player, idx)?;
+        unit.clear_own_actions(
+            self.parts.motion_mut(unit.id),
             &mut releases,
             &mut builder_leaves,
             by,
@@ -243,10 +246,8 @@ impl World {
             for u in units {
                 self.shut_in_gate(u)?;
             }
-            self.players
-                .live_mut(player, idx)?
-                .body
-                .mover_mut()
+            self.parts
+                .mover_mut(self.players.live(player, idx)?.id)
                 .ok_or(GenieError::unsupported(
                     "a shut gate without its moving part",
                 ))?
@@ -322,8 +323,8 @@ impl World {
             sprite: self.streams.get(Stream::Sprite),
         };
         let unit = self.players.live_mut(player, idx)?;
-        let combat = self.parts.combat_mut(unit.id)?;
-        let switched = switch_master((unit, combat), &old, &next, world)?;
+        let (combat, motion) = self.parts.combat_and_motion_mut(unit.id)?;
+        let switched = switch_master((unit, combat, motion), &old, &next, world)?;
         let owner = self.players.player_mut(player)?;
         for &(kind, amount) in &switched.leaving {
             owner.add_attribute(kind, amount)?;
@@ -362,7 +363,7 @@ pub(crate) struct Switched {
 }
 
 /// Slot 0x90's unit part (`FUN_141225b70` with 0) of a master change from `old` to `next` of
-/// `unit` with its combat layer `combat`, its action list cleared by the caller: in a state below 3 (`FUN_1411a6a70`) the old master's
+/// `unit` with its combat layer `combat` and its motion layer `motion`, its action list cleared by the caller: in a state below 3 (`FUN_1411a6a70`) the old master's
 /// storage leaves its player's attributes and the new one's comes in (`FUN_1411a56c0`, flag 2:
 /// the owner's, [`Switched`]), its hit points keep their share of the new master's (whole, at
 /// least 1), its sight goes and the new master's comes (slots 0x1d8, 0x1d0), its place and
@@ -377,7 +378,11 @@ pub(crate) struct Switched {
 /// A change of its damage sprites, a moving unit's new master that does not move and a standing
 /// sprite the data file lacks.
 pub(crate) fn switch_master(
-    (unit, combat): (&mut Unit, &mut crate::objects::layers::Combat),
+    (unit, combat, mut motion): (
+        &mut Unit,
+        &mut crate::objects::layers::Combat,
+        MotionMut<'_>,
+    ),
     old: &Master,
     next: &Master,
     world: SwitchWorld<'_>,
@@ -414,11 +419,10 @@ pub(crate) fn switch_master(
             ));
         }
         unit.life.master_id = new;
-        let moving = unit
-            .body
+        let moving = motion
             .mover()
             .is_some_and(crate::movement::Mover::is_moving);
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = motion.mover_mut() {
             m.stats = next.moving.ok_or(GenieError::unsupported(
                 "a moving unit's new master does not move",
             ))?;
@@ -471,7 +475,7 @@ pub(crate) fn switch_master(
             if unit.sprite.is_some() {
                 crate::objects::sprite::new_sprite(
                     &mut unit.sprite,
-                    unit.body.move_stats_mut(),
+                    motion.move_stats_mut(),
                     g,
                     world.sprite,
                 );

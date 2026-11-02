@@ -87,8 +87,8 @@ impl World {
             }
             u.group.id = None;
             if self.member_idle(m.id)? {
-                if let Some((_, u)) = self.object_mut(m.id)
-                    && let Some(mover) = u.body.mover_mut()
+                if self.object(m.id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(m.id)
                 {
                     mover.stand()?;
                 }
@@ -150,15 +150,15 @@ impl World {
             let (id, owner) = (m.id, g.owner);
             let leaves = match self.world_object(id) {
                 None | Some(WorldObject::Ghost(..)) => true,
-                Some(WorldObject::Unit(p, u)) => {
+                Some(WorldObject::Unit(p, u, _)) => {
                     !self.parts.unit_ai.contains(u.id)
                         || u.life.hp < HitPoints::new(1.0)
                         || Some(p) != owner
                 }
             };
             if leaves && self.remove_unit(group, id, None, false)? {
-                if let Some((_, u)) = self.object_mut(id)
-                    && let Some(mover) = u.body.mover_mut()
+                if self.object(id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(id)
                 {
                     mover.stop()?;
                 }
@@ -233,7 +233,7 @@ impl World {
         let Some(object) = self.world_object(target) else {
             return Ok(false);
         };
-        let WorldObject::Unit(p, u) = object else {
+        let WorldObject::Unit(p, u, _) = object else {
             return Err(GenieError::unsupported(
                 "a hibernating repair of a ghost (its hit points, +0x278)",
             ));

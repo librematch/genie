@@ -226,9 +226,14 @@ impl UnitView<'_, '_> {
         };
         let spot = match self.c.w.spatial.get(site) {
             Some(placed) => {
-                let mover = unit.body.mover().ok_or(GenieError::unsupported(
-                    "a unit sent off without movement state",
-                ))?;
+                let mover = self
+                    .c
+                    .w
+                    .parts
+                    .mover_of(unit.id)
+                    .ok_or(GenieError::unsupported(
+                        "a unit sent off without movement state",
+                    ))?;
                 self.c.w.spatial.spot_off(
                     unit.position(),
                     (unit.id, mover.stats.radius.x()),

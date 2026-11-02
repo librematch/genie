@@ -63,11 +63,11 @@ impl Attack {
         match self.update_list(c, unit, me, r, gives_up)?.get() {
             0 => self.within_reach(c, unit, f, r, (target, radius)),
             1 | 2 => {
-                self.delete_move_to(unit)?;
+                self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
                 if self.state != AttackState::Move {
                     return self.arrived_at_seen(c, unit, f, r, target);
                 }
-                self.ready(unit, &mut c.w.attack_ground(), f, r)?;
+                self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
                 Ok(UpdateCode::UNDER_WAY)
             }
             3 => self.walk_failed(c, unit),
@@ -86,18 +86,18 @@ impl Attack {
         r: &AttackReads,
         (target, radius): (Position, Footprint),
     ) -> Result<UpdateCode, GenieError> {
-        let ground = unit
-            .body
-            .mover()
-            .map(|m| m.stats.radius.ground())
-            .ok_or(crate::world::ATTACKER_UNMOVING)?;
-        let at = unit.body.position();
+        let ground =
+            c.w.parts
+                .mover_of(unit.id)
+                .map(|m| m.stats.radius.ground())
+                .ok_or(crate::world::ATTACKER_UNMOVING)?;
+        let at = unit.place.position();
         let reach = squared_reach(self.range);
         if reach.get().abs() <= EPSILON || reach < footprint_gap_squared(at, ground, target, radius)
         {
             return Ok(UpdateCode::UNDER_WAY);
         }
-        self.ready(unit, &mut c.w.attack_ground(), f, r)?;
+        self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
         Ok(UpdateCode::UNDER_WAY)
     }
 
@@ -110,7 +110,12 @@ impl Attack {
         unit: &mut Unit,
     ) -> Result<UpdateCode, GenieError> {
         self.move_to = None;
-        self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
+        self.finish_in(
+            AttackState::Failed,
+            unit,
+            c.w.parts.motion_mut(unit.id),
+            c.w.streams.get(Stream::Sprite),
+        )?;
         if !self.sub_action {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
@@ -243,7 +248,7 @@ impl Attack {
         }
         self.pending = false;
         if f.victim.hp <= HitPoints::ZERO {
-            return self.enter(AttackState::Killed, unit);
+            return self.enter(AttackState::Killed, c.w.parts.motion_mut(unit.id));
         }
         let rest = r.reload
             - Seconds::new(sprite.graphic.frames.as_f32() * sprite.graphic.frame_duration.get());
@@ -270,7 +275,7 @@ impl Attack {
     ) -> Result<(), GenieError> {
         let ranged = self.arms.missile.is_some();
         let timer = c.w.parts.combat_of(unit.id).attack_timer;
-        let mut g = c.w.attack_ground();
+        let mut g = c.w.attack_ground(unit.id);
         match after_hit(
             ranged,
             timer,
@@ -279,7 +284,7 @@ impl Attack {
             self.arms.fire_frame,
             sprite.frame,
         ) {
-            AfterHit::Done => return self.enter(AttackState::Killed, unit),
+            AfterHit::Done => return self.enter(AttackState::Killed, g.motion.reborrow()),
             AfterHit::Ready => return self.ready(unit, &mut g, f, r),
             // readyToAttack with its third argument 0: a target out of reach is followed
             // (`set_state` 4); a ready unit only faces it; the swing goes on either way
@@ -310,14 +315,14 @@ impl Attack {
             let changed = sprite.graphic.id != idle.id;
             new_sprite(
                 &mut unit.sprite,
-                unit.body.move_stats_mut(),
+                g.motion.move_stats_mut(),
                 idle,
                 g.sprite_rng,
             );
             if changed && let Some(current) = unit.sprite.map(|sp| sp.graphic) {
                 let _ = reset_sprite(&mut unit.sprite, current);
             }
-            set_walker_anim(&mut unit.body, Speed::new(1.0));
+            set_walker_anim(g.motion.reborrow(), Speed::new(1.0));
         }
         self.ready(unit, &mut g, f, r)
     }

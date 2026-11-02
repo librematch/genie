@@ -733,7 +733,7 @@ mod tests {
     fn object(id: i32, master: MasterId, state: ObjectState, position: Position) -> Unit {
         let mut u = Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(position),
+            place: crate::objects::layers::Static::at(position),
             ..Unit::default()
         };
         u.life.master_id = master;

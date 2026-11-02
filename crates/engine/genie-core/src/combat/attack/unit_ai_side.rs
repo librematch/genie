@@ -110,7 +110,7 @@ impl UnitView<'_, '_> {
         }
         let by = self.attack_clears_actions(master.class)?;
         let unit = &mut *self.unit;
-        let speed = crate::combat::attack::speed_of(unit)?;
+        let speed = crate::combat::attack::speed_of(self.c.w.parts.mover_of(unit.id))?;
         let e = crate::combat::attack::engagement(
             Some(ai),
             speed,
@@ -127,7 +127,7 @@ impl UnitView<'_, '_> {
         }
         crate::objects::sprite::new_sprite(
             &mut unit.sprite,
-            unit.body.move_stats_mut(),
+            self.c.w.parts.move_stats_mut(unit.id),
             standing,
             self.c.w.streams.get(Stream::Sprite),
         );
@@ -174,7 +174,7 @@ impl UnitView<'_, '_> {
         let unit = &mut *self.unit;
         attack.fail_at_start(
             &mut unit.sprite,
-            &mut unit.body,
+            self.c.w.parts.motion_mut(unit.id),
             self.c.w.streams.get(Stream::Sprite),
         )?;
         let target = attack.target;
@@ -199,8 +199,12 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-        self.unit
-            .tear_down_actions(&mut releases, &mut leaves, by)?;
+        self.unit.tear_down_actions(
+            self.c.w.parts.motion.layer_mut(self.unit.id),
+            &mut releases,
+            &mut leaves,
+            by,
+        )?;
         self.torn_down((leaves, releases))?;
         Ok(by)
     }
@@ -256,7 +260,12 @@ impl UnitView<'_, '_> {
         let unit = &mut *self.unit;
         let wielder = crate::combat::attack::Wielder {
             area_effect: master.area_effect,
-            speed: unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+            speed: self
+                .c
+                .w
+                .parts
+                .mover_of(unit.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed),
             position: unit.position(),
             radius: master.radius,
         };

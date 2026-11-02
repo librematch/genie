@@ -10,7 +10,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::actions::{Action, ActionList};
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::release::Releaser;
 use crate::world::step::Step;
 
@@ -51,8 +51,8 @@ impl TornDown {
 
 /// The unit's stop (slot 0x5d0) for a torn-down action's `MoveTo`, when it had one (`moves`)
 /// and the unit moves at all.
-fn stop_if_moving(body: &mut Body, moves: bool) -> Result<(), GenieError> {
-    if moves && let Some(m) = body.mover_mut() {
+fn stop_if_moving(mut motion: MotionMut<'_>, moves: bool) -> Result<(), GenieError> {
+    if moves && let Some(m) = motion.mover_mut() {
         m.stop()?;
     }
     Ok(())
@@ -74,7 +74,7 @@ impl Action {
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub(crate) fn tear_down(self, body: &mut Body) -> Result<TornDown, GenieError> {
+    pub(crate) fn tear_down(self, mut motion: MotionMut<'_>) -> Result<TornDown, GenieError> {
         let mut torn = TornDown::default();
         match self {
             Self::WaitSolidify(_) | Self::Make(_) => {}
@@ -82,17 +82,17 @@ impl Action {
                 let (released, gone) = a.tear_down();
                 torn.release(released);
                 torn.release(gone.released);
-                stop_if_moving(body, gone.stops)?;
+                stop_if_moving(motion, gone.stops)?;
             }
             Self::Fly(f) => {
-                body.set_anim_speed(body.mover().map_or(Speed::ZERO, |m| m.stats.speed));
-                stop_if_moving(body, f.move_to.is_some())?;
+                motion.set_anim_speed(motion.mover().map_or(Speed::ZERO, |m| m.stats.speed));
+                stop_if_moving(motion, f.move_to.is_some())?;
             }
             Self::Enter(e) => {
-                stop_if_moving(body, e.move_to.is_some())?;
+                stop_if_moving(motion, e.move_to.is_some())?;
                 torn.release(e.target.map(ContainerId::id));
             }
-            Self::Transport(t) => stop_if_moving(body, t.move_to.is_some())?,
+            Self::Transport(t) => stop_if_moving(motion, t.move_to.is_some())?,
             Self::Build(b) => {
                 if b.added
                     && let Some(target) = b.target
@@ -101,7 +101,7 @@ impl Action {
                 }
                 torn.release(b.target);
                 torn.release(b.site.map(DropSiteId::id));
-                stop_if_moving(body, b.move_to.is_some())?;
+                stop_if_moving(motion, b.move_to.is_some())?;
             }
             Self::Repair(r) => {
                 if r.counted
@@ -110,26 +110,26 @@ impl Action {
                     torn.builder_leaves.push(target);
                 }
                 torn.release(r.target);
-                stop_if_moving(body, r.move_to.is_some())?;
+                stop_if_moving(motion, r.move_to.is_some())?;
             }
-            Self::Explore(e) => stop_if_moving(body, e.move_to.is_some())?,
+            Self::Explore(e) => stop_if_moving(motion, e.move_to.is_some())?,
             Self::Hunt(mut h) => {
-                h.tear_down(body.mover_mut())?;
+                h.tear_down(motion.mover_mut())?;
                 torn.release(h.target);
                 torn.release(h.carry_to.map(DropSiteId::id));
             }
             Self::Gather(mut g) => {
-                g.tear_down(body.mover_mut())?;
+                g.tear_down(motion.mover_mut())?;
                 torn.release(g.target);
                 torn.release(g.carry_to.map(DropSiteId::id));
             }
             Self::Attack(mut a) => {
-                a.tear_down(body.mover_mut())?;
+                a.tear_down(motion.mover_mut())?;
                 torn.release(a.target);
                 torn.release(a.target2);
             }
             Self::MoveTo(m) => {
-                stop_if_moving(body, true)?;
+                stop_if_moving(motion, true)?;
                 torn.release(m.target);
             }
             Self::Missile(m) => {
@@ -185,13 +185,13 @@ impl ActionList {
     /// The destructor's, and a second action under the head below state 3.
     pub(crate) fn delete_head(
         &mut self,
-        body: &mut Body,
+        motion: MotionMut<'_>,
         state: ObjectState,
     ) -> Result<TornDown, GenieError> {
         let Some(head) = self.pop_head() else {
             return Ok(TornDown::default());
         };
-        let torn = head.tear_down(body)?;
+        let torn = head.tear_down(motion)?;
         if !self.is_empty() && state < ObjectState::Dying {
             return Err(GenieError::unreachable(NEXT_HEAD));
         }
@@ -206,12 +206,12 @@ impl ActionList {
     /// The first deletion's that fails.
     pub(crate) fn delete_all(
         &mut self,
-        body: &mut Body,
+        mut motion: MotionMut<'_>,
         state: ObjectState,
     ) -> Result<TornDown, GenieError> {
         let mut all = TornDown::default();
         while !self.is_empty() {
-            let torn = self.delete_head(body, state)?;
+            let torn = self.delete_head(motion.reborrow(), state)?;
             all.releases.extend(torn.releases);
             all.builder_leaves.extend(torn.builder_leaves);
         }
@@ -229,19 +229,20 @@ mod tests {
     use crate::movement::move_to::MoveToAction;
     use crate::objects::UpdateCode;
     use crate::objects::WorkRate;
+    use crate::objects::layers::MotionLayer;
     use crate::objects::masters::TaskId;
     use crate::test_ids::object_id;
 
-    /// A moving body, moving (its velocity and animation speed set).
-    fn moving() -> Body {
+    /// A moving object's motion layer, moving (its velocity and animation speed set).
+    fn moving() -> MotionLayer {
         let mut m = crate::gathering::hunt::tests::walker();
         m.velocity = Some(crate::movement::Velocity {
             velocity: BVector::new(0.0, 0.0, 0.7),
             acceleration: BVector::new(0.0, 0.0, 1.0),
         });
-        let mut body = Body::new(Position::ORIGIN, None, Some(m));
-        body.set_anim_speed(Speed::new(0.8));
-        body
+        let mut motion = MotionLayer::Moving(m);
+        motion.lent().set_anim_speed(Speed::new(0.8));
+        motion
     }
 
     /// A Build of foundation 10028 at its edge (gap 0).
@@ -273,9 +274,10 @@ mod tests {
         assert_eq!(HeadCode::ended(false), HeadCode::Keeps);
     }
 
-    /// Whether `body` still moves.
-    fn moves(body: &Body) -> bool {
-        body.mover()
+    /// Whether `motion` still moves.
+    fn moves(motion: &MotionLayer) -> bool {
+        motion
+            .mover()
             .is_some_and(|m| m.velocity.is_some_and(|v| v.velocity.y() != 0.0))
     }
 
@@ -284,7 +286,7 @@ mod tests {
     /// target) go, and its `MoveTo` stops the unit; an uncounted one only lets go.
     #[test]
     fn a_build_s_destructor_leaves_its_building_and_stops_its_walk() {
-        let mut body = moving();
+        let mut motion = moving();
         let mut b = build();
         (b.added, b.move_to) = (
             true,
@@ -292,7 +294,7 @@ mod tests {
                 crate::movement::move_to::MoveTo::Moving,
             )),
         );
-        let torn = Action::Build(b).tear_down(&mut body).unwrap();
+        let torn = Action::Build(b).tear_down(motion.lent()).unwrap();
         assert_eq!(
             torn,
             TornDown {
@@ -300,9 +302,9 @@ mod tests {
                 builder_leaves: vec![object_id(10028)],
             }
         );
-        assert!(!moves(&body));
+        assert!(!moves(&motion));
         (b.added, b.move_to, b.site) = (false, None, Some(DropSiteId::new(object_id(10050))));
-        let torn = Action::Build(b).tear_down(&mut moving()).unwrap();
+        let torn = Action::Build(b).tear_down(moving().lent()).unwrap();
         assert_eq!(
             (torn.releases, torn.builder_leaves),
             (vec![object_id(10028), object_id(10050)], vec![])
@@ -322,16 +324,16 @@ mod tests {
     /// without a target lets nothing go.
     #[test]
     fn a_move_to_s_destructor_stops_the_unit() {
-        let mut body = moving();
+        let mut motion = moving();
         let to = MoveToAction::to_point(
             Position::new(5.0, 5.0, 0.0),
             Distance::ZERO,
             None,
-            body.mover_mut(),
+            motion.mover_mut(),
         );
-        let torn = Action::MoveTo(to).tear_down(&mut body).unwrap();
+        let torn = Action::MoveTo(to).tear_down(motion.lent()).unwrap();
         assert_eq!(torn, TornDown::default());
-        assert!(!moves(&body));
+        assert!(!moves(&motion));
     }
 
     /// `FUN_140a98e20` and `FUN_140a98620` on a list of one action: the head goes with its
@@ -339,33 +341,33 @@ mod tests {
     /// the head below state 3 (its slot 0x28) is not ported; at state 3 or more it stays.
     #[test]
     fn the_list_s_deletions_tear_down_the_head_and_stop_at_a_second_action() {
-        let mut body = moving();
+        let mut motion = moving();
         let mut list = ActionList::default().with_build(Some(build()));
-        let torn = list.delete_all(&mut body, ObjectState::Alive).unwrap();
+        let torn = list.delete_all(motion.lent(), ObjectState::Alive).unwrap();
         assert_eq!(torn.releases, [object_id(10028)]);
         assert!(list.is_empty());
         assert_eq!(
-            list.delete_head(&mut body, ObjectState::Alive),
+            list.delete_head(motion.lent(), ObjectState::Alive),
             Ok(TornDown::default())
         );
         let to = MoveToAction::to_point(
             Position::new(5.0, 5.0, 0.0),
             Distance::ZERO,
             None,
-            body.mover_mut(),
+            motion.mover_mut(),
         );
         let two = ActionList::default()
             .with_build(Some(build()))
             .with_move_to(Some(to));
         let err = two
             .clone()
-            .delete_head(&mut body, ObjectState::Alive)
+            .delete_head(motion.lent(), ObjectState::Alive)
             .unwrap_err();
         assert_eq!(err.reason(), NEXT_HEAD);
         let mut dying = two;
         assert_eq!(
             dying
-                .delete_head(&mut body, ObjectState::Dying)
+                .delete_head(motion.lent(), ObjectState::Dying)
                 .map(|t| t.releases),
             Ok(vec![])
         );

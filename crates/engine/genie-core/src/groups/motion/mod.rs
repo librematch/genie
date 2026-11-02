@@ -256,7 +256,7 @@ impl World {
     fn lead_view(&self, id: Option<ObjectId>) -> Option<Lead> {
         let id = id?;
         let (p, u) = self.object(id)?;
-        let mover = u.body.mover()?;
+        let mover = self.parts.mover_of(u.id)?;
         let group = u
             .group
             .id

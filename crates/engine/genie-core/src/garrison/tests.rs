@@ -233,7 +233,8 @@ fn walks_at(t: &mut World, idx: ListIndex, speed: f32) {
         base: Speed::new(speed),
         ..standing()
     };
-    t.players[1].objects[idx].body.put_mover(Some(walker));
+    t.parts
+        .put_mover(t.players[1].objects[idx].id, Some(walker));
 }
 
 /// [`garrison_world`] with villager 9149 of player 1, and its index.
@@ -512,8 +513,7 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
         }
     }
     // its walk turns by 16 facets
-    let v = t.object_mut(object_id(1000)).unwrap().1;
-    if let Some(m) = v.body.mover_mut() {
+    if let Some(m) = t.parts.mover_mut(object_id(1000)) {
         m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
             count: crate::objects::FacetCount::of_data(16),
             turns: false,
@@ -633,8 +633,7 @@ fn a_transport_that_moved_off_the_point_makes_the_enter_walk_again() {
         Point::new(5.5, 30.5),
         ship_enter(Position::new(5.5, 28.0, 0.0), MoveTo::Arrived),
     );
-    let ship = t.object_mut(object_id(200)).unwrap().1;
-    ship.body.mover_mut().unwrap().moved_at = Position::new(-1.0, 30.5, 0.0);
+    t.parts.mover_mut(object_id(200)).unwrap().moved_at = Position::new(-1.0, 30.5, 0.0);
     assert_eq!(
         enter_update(&mut t, 500).map_err(|e| e.reason().to_owned()),
         Err(UNREACHED.reason().to_owned())
@@ -1857,7 +1856,7 @@ fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
     v.place_for_test(Position::new(12.5, 10.0, 0.0));
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.stats = standing();
-    v.body.put_mover(Some(walker));
+    t.parts.put_mover(v.id, Some(walker));
     v.group.id = Some(group_id(7));
     let _ = t.push_live(PlayerId::new(1), v).unwrap();
     t.parts.set_town_bell_flag(object_id(400), true);
@@ -1903,7 +1902,10 @@ fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
     .unwrap();
     let v = &t.players[1].objects[idx];
     assert_eq!((v.life.inside, v.group.id), (Some(container_id(100)), None));
-    assert_eq!(v.body.mover().unwrap().animated.speed, Speed::new(0.0));
+    assert_eq!(
+        t.parts.mover_of(v.id).unwrap().animated.speed,
+        Speed::new(0.0)
+    );
     let members: Vec<ObjectId> = t.groups.groups[0].members.iter().map(|m| m.id).collect();
     assert_eq!(members, [object_id(401)]);
 }
@@ -1917,7 +1919,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
     v.place_for_test(Position::new(12.5, 10.0, 0.0));
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.stats = standing();
-    v.body.put_mover(Some(walker));
+    t.parts.put_mover(v.id, Some(walker));
     let v_ai = crate::unit_ai::UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
@@ -2243,32 +2245,35 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
         current_target: None,
         ..crate::unit_ai::UnitAi::default()
     };
-    v.body.put_mover(Some(crate::movement::Mover {
-        forward: BVector::new(1.0, 0.0, 0.0),
-        right: BVector::new(0.0, 0.0, -1.0),
-        velocity: None,
-        paths: vec![],
-        factor: 1.0,
-        stats: crate::movement::MoveStats {
-            speed: Speed::new(0.8),
-            base: Speed::new(0.8),
-            ..standing()
-        },
-        waiting: 0,
-        wait_delays: crate::movement::WaitDelays::of_data(0),
-        attack_moving: false,
-        last_move: WorldTime::ZERO,
-        moved_at: Position::ORIGIN,
-        substitute_count: crate::movement::SubstituteCount::of_data(0),
-        ignore_units: Vec::new(),
-        user_waypoints: Vec::new(),
-        last_turn: Seconds::ZERO,
-        angle: Angle::ZERO,
-        animated: crate::objects::layers::Animated::default(),
-        pauses: Vec::new(),
-        in_the_way: Vec::new(),
-        sprite_facets: None,
-    }));
+    t.parts.put_mover(
+        v.id,
+        Some(crate::movement::Mover {
+            forward: BVector::new(1.0, 0.0, 0.0),
+            right: BVector::new(0.0, 0.0, -1.0),
+            velocity: None,
+            paths: vec![],
+            factor: 1.0,
+            stats: crate::movement::MoveStats {
+                speed: Speed::new(0.8),
+                base: Speed::new(0.8),
+                ..standing()
+            },
+            waiting: 0,
+            wait_delays: crate::movement::WaitDelays::of_data(0),
+            attack_moving: false,
+            last_move: WorldTime::ZERO,
+            moved_at: Position::ORIGIN,
+            substitute_count: crate::movement::SubstituteCount::of_data(0),
+            ignore_units: Vec::new(),
+            user_waypoints: Vec::new(),
+            last_turn: Seconds::ZERO,
+            angle: Angle::ZERO,
+            animated: crate::objects::layers::Animated::default(),
+            pauses: Vec::new(),
+            in_the_way: Vec::new(),
+            sprite_facets: None,
+        }),
+    );
     let _ = t.push_live(p, Object::with_ai(v, v_ai)).unwrap();
     t.spatial.insert(
         object_id(id),
@@ -2619,19 +2624,9 @@ fn shore_world(at: Point, ship: Point) -> World {
         ..standing()
     };
     mover.moved_at = ship.with_height(0.0);
-    t.object_mut(object_id(200))
-        .unwrap()
-        .1
-        .body
-        .put_mover(Some(mover));
+    t.parts.put_mover(object_id(200), Some(mover));
     walker(&mut t, PlayerId::new(1), 1000, VILLAGER, at);
-    t.object_mut(object_id(1000))
-        .unwrap()
-        .1
-        .body
-        .mover_mut()
-        .unwrap()
-        .moved_at = at.with_height(0.0);
+    t.parts.mover_mut(object_id(1000)).unwrap().moved_at = at.with_height(0.0);
     t
 }
 
@@ -2910,8 +2905,8 @@ fn coast_world(ship: Point) -> World {
             ..crate::unit_ai::UnitAi::default()
         }),
     );
+    t.parts.put_mover(object_id(200), Some(mover));
     let s = t.object_mut(object_id(200)).unwrap().1;
-    s.body.put_mover(Some(mover));
     s.garrison = vec![object_id(1000)];
     walker(&mut t, PlayerId::new(1), 1000, VILLAGER, ship);
     t.object_mut(object_id(1000)).unwrap().1.life.inside = Some(ContainerId::new(object_id(200)));

@@ -552,10 +552,13 @@ pub(crate) fn set_stance(
 
 /// A building's slot 0x670 (`FUN_1411dba30`): its gate lock (`mGateLocked`, `+0xc7c`, an int its
 /// callers set to 0 or 1, in its building layer `layer`) takes `locked`; a lock also sets its
-/// last move time (`+0x870`, [`crate::movement::Mover::last_move`]) to the world time
+/// `mover`'s last move time (`+0x870`, [`crate::movement::Mover::last_move`]) to the world time
 /// (`FUN_1415300d0`) plus 1.
 pub(crate) fn lock_gate(
-    (unit, layer): (&mut Unit, &mut crate::objects::layers::Building),
+    (mover, layer): (
+        Option<&mut crate::movement::Mover>,
+        &mut crate::objects::layers::Building,
+    ),
     locked: bool,
     now: WorldTime,
 ) -> Result<(), GenieError> {
@@ -564,8 +567,7 @@ pub(crate) fn lock_gate(
     ))?;
     gate.locked = locked;
     if locked {
-        unit.body
-            .mover_mut()
+        mover
             .ok_or(GenieError::unsupported(
                 "a locked gate without its moving part",
             ))?

@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::map::Distance;
+use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::{Placed, Spatial, WalkQuery};
 use crate::math::fmath::BVector;
@@ -53,7 +54,7 @@ impl Mover {
     /// other exits that stop the unit (slot 0x5d0) are not modelled.
     pub(super) fn request(
         &mut self,
-        me: &Me,
+        (at, me): (Position, &Me),
         (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         goal: Goal<'_>,
@@ -63,7 +64,7 @@ impl Mover {
         // the request measures and plans from +0x824 (`pfVar14`, `local_18c8`), where the unit
         // last moved to
         let position = self.moved_at.vector();
-        if let Some(step) = self.in_reach(goal, position)? {
+        if let Some(step) = self.in_reach(at, goal, position)? {
             return Ok(step);
         }
         let solid = self.stats.radius.sized();
@@ -98,7 +99,7 @@ impl Mover {
                 target_id: level.target,
                 trade_cart,
             };
-            if let Some(step) = self.plan_solid(me, world, plan, &w, &mut np, by_id)? {
+            if let Some(step) = self.plan_solid((at, me), world, plan, &w, &mut np, by_id)? {
                 return Ok(step);
             }
         } else {
@@ -116,11 +117,12 @@ impl Mover {
     /// without one). Both go again.
     pub(super) fn in_reach(
         &mut self,
+        at: Position,
         goal: Goal<'_>,
         position: BVector,
     ) -> Result<Option<AfterRequest>, GenieError> {
         let ground_radius = self.stats.radius.ground();
-        let here = self.position();
+        let here = at;
         let level = self.paths.walked_mut()?;
         let reach = if level.range <= Distance::ZERO {
             RANGE_FLOOR
@@ -240,7 +242,7 @@ impl Mover {
     /// the goal and that gap.
     pub(super) fn long_plan(
         &mut self,
-        me: &Me,
+        (at, me): (Position, &Me),
         world: &mut Spatial,
         plan: &Planning<'_>,
         ask: LongAsk<'_>,
@@ -256,7 +258,7 @@ impl Mover {
         let master = world.get(me.id).map(|p| p.master);
         let walker = LongWalker {
             id: me.id,
-            position: self.position(),
+            position: at,
             radius: self.stats.radius.ground(),
             mask: self.stats.restriction_mask,
             moves: self.stats.speed != Speed::ZERO || master == Some(LONG_PATH_MOVER),

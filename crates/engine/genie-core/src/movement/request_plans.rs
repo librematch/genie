@@ -2,6 +2,7 @@
 //! the short pather's tail, the long pather for a far waypoint and the tile pathfinder again.
 
 use crate::map::Distance;
+use crate::map::Position;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathState;
@@ -77,7 +78,7 @@ impl Mover {
     /// stream's draw). A step where the planning ends the request.
     pub(super) fn plan_solid(
         &mut self,
-        me: &Me,
+        (at, me): (Position, &Me),
         world: &mut Spatial,
         plan: &mut Planning<'_>,
         w: &Way<'_>,
@@ -97,7 +98,7 @@ impl Mover {
             ControlFlow::Break(step) => return Ok(Some(step)),
             ControlFlow::Continue(tail) => tail,
         };
-        if tail && let Some(step) = self.long_tail(me, world, plan, w, np, by_id)? {
+        if tail && let Some(step) = self.long_tail((at, me), world, plan, w, np, by_id)? {
             return Ok(Some(step));
         }
         if (!np.found || too_short(&np.path)) && w.level == WaypointLevel::TOP && TILE_PATHER {
@@ -361,7 +362,7 @@ impl Mover {
     /// reached the goal, and the gap its end left. A step where the long plan stops the unit.
     fn long_tail(
         &mut self,
-        me: &Me,
+        (at, me): (Position, &Me),
         world: &mut Spatial,
         plan: &Planning<'_>,
         w: &Way<'_>,
@@ -375,7 +376,7 @@ impl Mover {
         let far = far_waypoint(
             w.distance,
             w.goal.target.map(|(_, t)| {
-                let gap = footprint_gap(self.position(), ground_radius, t.position, t.radius);
+                let gap = footprint_gap(at, ground_radius, t.position, t.radius);
                 (gap, t.master)
             }),
         );
@@ -390,7 +391,8 @@ impl Mover {
             range: w.range,
             target,
         };
-        let Some((reached, farther)) = self.long_plan(me, world, plan, ask, &mut np.path, by_id)?
+        let Some((reached, farther)) =
+            self.long_plan((at, me), world, plan, ask, &mut np.path, by_id)?
         else {
             return Ok(Some(AfterRequest::Paused));
         };

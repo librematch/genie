@@ -1,9 +1,11 @@
 //! A test's world with its parts: fixtures that file a test object's parts beside its row
 //! ([`World::with_parts`], [`World::split_layers`]) and the whole objects tests push.
 
+use crate::movement::Mover;
 use crate::objects::ObjectId;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
+use crate::objects::layers::MotionLayer;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::unit_ai::UnitAi;
@@ -64,6 +66,22 @@ impl Object {
             unit,
             parts: ObjectParts {
                 combat: layer,
+                ..ObjectParts::default()
+            },
+        }
+    }
+
+    /// A test's object: row `unit` with the moving layers of `mover` (its motion part).
+    pub(crate) fn moving(unit: Unit, mover: Mover) -> Self {
+        Self::with_motion(unit, MotionLayer::Moving(mover))
+    }
+
+    /// A test's object: row `unit` with the motion part `motion`.
+    pub(crate) fn with_motion(unit: Unit, motion: MotionLayer) -> Self {
+        Self {
+            unit,
+            parts: ObjectParts {
+                motion: Some(motion),
                 ..ObjectParts::default()
             },
         }
@@ -173,6 +191,34 @@ impl World {
         for (id, layer) in layers {
             self.set_part(id, Part::Combat(Box::new(layer)))
                 .expect("a combat layer of an object the world holds");
+        }
+        self
+    }
+
+    /// A test's object `id` takes the motion part `motion` in place of its own (none: a
+    /// static object).
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    pub(crate) fn set_motion(&mut self, id: ObjectId, motion: Option<MotionLayer>) {
+        self.set_part(id, Part::Motion(motion.map(Box::new)))
+            .expect("a motion part of an object the world holds");
+    }
+
+    /// A test's world with the motion parts `layers` set on the objects it holds.
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    #[must_use]
+    pub(crate) fn with_motions(
+        mut self,
+        layers: impl IntoIterator<Item = (ObjectId, MotionLayer)>,
+    ) -> Self {
+        for (id, layer) in layers {
+            self.set_part(id, Part::Motion(Some(Box::new(layer))))
+                .expect("a motion part of an object the world holds");
         }
         self
     }

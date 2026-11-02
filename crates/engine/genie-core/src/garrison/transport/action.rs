@@ -18,11 +18,13 @@ use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Me;
+use crate::movement::Mover;
 use crate::movement::PathAsk;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveTo, MoveToReads, SpriteReads};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::{Master, TaskId};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
@@ -228,11 +230,12 @@ impl TransportAction {
             defaults: r.defaults,
             graphics,
         };
-        let walk = MoveToReads::with_sprites(sprites, unit);
+        let walk = MoveToReads::with_sprites(sprites, (unit, parts.motion.mover(unit.id)));
         let ship = Ship::of(unit, r.radius, spatial.map, walk, r.given);
         let mut shore = MapShore::new(spatial, zones, pathing, r.restriction, ship.position)?;
         let look = (r.standing, streams.get(Stream::Sprite));
-        let posts = (&mut *unit, &mut parts.unit_ai);
+        let id = unit.id;
+        let posts = (&mut *unit, parts.motion.layer_mut(id), &mut parts.unit_ai);
         match self.state_update(walked, (&ship, &mut shore), posts, look, computer)? {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
@@ -283,7 +286,7 @@ impl TransportAction {
         &mut self,
         walked: UpdateCode,
         (ship, shore): (&Ship<'_>, &mut impl Shore),
-        (unit, ais): (&mut Unit, &mut PartTable<UnitAi>),
+        (unit, mut motion, ais): (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
         computer: bool,
     ) -> Result<Updated, GenieError> {
@@ -302,7 +305,7 @@ impl TransportAction {
             // Failed: the update returns 3.
             TransportState::Failed => {
                 let changed = self.set_state(TransportState::Idle, ship, shore)?;
-                stand(unit, changed, look)?;
+                stand((unit, motion.reborrow()), changed, look)?;
                 unit.post_own(
                     ais,
                     crate::unit_ai::NotifyKind::ACTION_FAILED,
@@ -332,7 +335,7 @@ impl TransportAction {
                     cannot_unload = !over_water;
                 }
                 let changed = self.unloaded(ship, shore)?;
-                stand(unit, changed, look)?;
+                stand((unit, motion.reborrow()), changed, look)?;
                 if cannot_unload {
                     crate::unit_ai::alert_owner(computer)?;
                 }
@@ -340,7 +343,7 @@ impl TransportAction {
             }
             _ => (Changed::default(), UpdateCode::UNDER_WAY),
         };
-        stand(unit, changed, look)?;
+        stand((unit, motion.reborrow()), changed, look)?;
         Ok(Updated::Code(code))
     }
 
@@ -409,7 +412,7 @@ impl TransportAction {
         let ask = if start {
             UnitAi::path_ask(
                 c.w.parts.unit_ai.get_mut(unit.id),
-                unit.body.position().ground(),
+                unit.place.position().ground(),
                 self.point.ground(),
             )
         } else {
@@ -421,7 +424,7 @@ impl TransportAction {
         };
         let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
         if walks {
-            unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }
         Ok(code)
     }
@@ -479,39 +482,39 @@ impl TransportAction {
 ///
 /// The stop's, and a unit whose sprite the slice holds without its standing sprite.
 pub(crate) fn stand(
-    unit: &mut Unit,
+    (unit, mut motion): (&mut Unit, MotionMut<'_>),
     changed: Changed,
     (standing, rng): (Option<Graphic>, &mut Well512),
 ) -> Result<(), GenieError> {
     if changed.stopped
-        && let Some(m) = unit.body.mover_mut()
+        && let Some(m) = motion.mover_mut()
     {
         m.stop()?;
     }
     if !changed.stands {
         return Ok(());
     }
-    if let Some(m) = unit.body.mover_mut() {
+    if let Some(m) = motion.mover_mut() {
         m.shows(standing.as_ref());
     }
     if unit.sprite.is_some() {
         let standing = standing.ok_or(GenieError::unsupported(
             "a stopped unit without its standing sprite",
         ))?;
-        new_sprite(&mut unit.sprite, unit.body.move_stats_mut(), standing, rng);
+        new_sprite(&mut unit.sprite, motion.move_stats_mut(), standing, rng);
     }
     Ok(())
 }
 
 impl<'a> Ship<'a> {
-    /// What the Transport on `task` reads of `unit` of `master` on a map of `map` tiles, with the
-    /// sprites' table and the unit's terrain look (`graphics`, [`Ship::of`]).
+    /// What the Transport on `task` reads of `unit` with its mover of `master` on a map of `map`
+    /// tiles, with the sprites' table and the unit's terrain look (`graphics`, [`Ship::of`]).
     ///
     /// # Errors
     ///
     /// A task the master lacks.
     pub(crate) fn of_unit(
-        unit: &Unit,
+        (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
         map: GridSize,
         graphics: (
@@ -520,7 +523,7 @@ impl<'a> Ship<'a> {
         ),
         task: Option<TaskId>,
     ) -> Result<Self, GenieError> {
-        let walk = MoveToReads::of(unit, master, graphics);
+        let walk = MoveToReads::of((unit, mover), master, graphics);
         let given = TransportAction::given_sprite(task, master)?;
         Ok(Self::of(unit, master.radius, map, walk, given))
     }

@@ -185,16 +185,15 @@ impl World {
         );
         let world_time = self.world_time;
         let unit = self.players.live_mut(up, ui)?;
-        let _ =
-            unit.body
-                .base_mut()
-                .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
+        let _ = unit
+            .place
+            .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
         self.pathing.tiles_changed(self.spatial.take_changes());
         unit.life.inside = None;
         // a unit out of its container no longer counts down to its raid (`+0x9a0` 0)
         self.parts.combat_mut(unit.id)?.raider_countdown = crate::garrison::RaiderCountdown::NONE;
         // the position setter's end: a place off where it last moved to is a move
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.mark_move(at, world_time);
         }
         let state = unit.life.state;
@@ -341,17 +340,16 @@ impl World {
         );
         let world_time = self.world_time;
         let unit = self.players.live_mut(up, ui)?;
-        let placed =
-            unit.body
-                .base_mut()
-                .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
+        let placed = unit
+            .place
+            .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
         self.pathing.tiles_changed(self.spatial.take_changes());
         if let Some(v) = self.spatial.sight.as_mut() {
             v.moved(id, from, at, placed.radius)?;
             v.registry_moved(id, placed.class, from, at);
         }
         let unit = self.players.live_mut(up, ui)?;
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.mark_move(at, world_time);
         }
         self.came_out(up, ui, made.class, rest)

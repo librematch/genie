@@ -88,8 +88,8 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
     ) -> Result<(), GenieError> {
-        self.enter(AttackState::Swing, unit)?;
-        let alternates = unit.body.mover().is_some_and(|m| {
+        self.enter(AttackState::Swing, g.motion.reborrow())?;
+        let alternates = g.motion.mover().is_some_and(|m| {
             m.stats
                 .move_algorithm
                 .contains(MoveAlgorithm::ALTERNATES_SPRITES)
@@ -122,7 +122,7 @@ impl Attack {
         ))?;
         new_sprite(
             &mut unit.sprite,
-            unit.body.move_stats_mut(),
+            g.motion.move_stats_mut(),
             shown,
             g.sprite_rng,
         );
@@ -134,7 +134,7 @@ impl Attack {
         let length = Seconds::new(shown.frames.as_f32() * shown.frame_duration.get());
         self.rest = r.reload - length;
         set_walker_anim(
-            &mut unit.body,
+            g.motion.reborrow(),
             if self.rest < Seconds::ZERO && Seconds::ZERO < r.reload {
                 Speed::new(length / r.reload)
             } else {

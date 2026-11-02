@@ -40,11 +40,11 @@ impl BuildAction {
         }
         if reads.class != Some(class::VILLAGER) {
             let at = builder.position();
-            let ground = builder
-                .body
-                .mover()
-                .map(|m| m.stats.radius.ground())
-                .ok_or(BUILDER_UNMOVING)?;
+            let ground =
+                c.w.parts
+                    .mover_of(builder.id)
+                    .map(|m| m.stats.radius.ground())
+                    .ok_or(BUILDER_UNMOVING)?;
             let t = *c.w.spatial.get_known(self.target)?.ok_or(SITE_GONE)?;
             let gap = crate::movement::footprint_gap_squared(at, ground, t.position, t.radius);
             let range = self.task.range;
@@ -101,7 +101,7 @@ impl BuildAction {
                 }
             }
         }
-        let mover = builder.body.mover().ok_or(BUILDER_UNMOVING)?;
+        let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let (restriction, ground, moved_at) = (
             mover.stats.restriction,
             mover.stats.radius.x(),
@@ -188,11 +188,12 @@ impl BuildAction {
     pub(super) fn walk_to_point(
         &mut self,
         c: &mut Step<'_>,
-        builder: &mut Unit,
+        builder: &Unit,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         self.state = BuildState::WalkPoint;
         let move_reads = builder.move_to_reads(
+            c.w.parts.motion.mover(builder.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (

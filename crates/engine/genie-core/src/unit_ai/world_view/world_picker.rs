@@ -360,7 +360,11 @@ impl WorldPicker<'_> {
             position: placed.position,
             radius: placed.radius,
         };
-        let moving = Speed::ZERO < t.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+        let moving = Speed::ZERO
+            < self
+                .parts
+                .mover_of(t.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed);
         Ok((target, moving))
     }
 }
@@ -443,7 +447,10 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
                 placed.position,
                 placed.radius,
             ),
-            speed: t.body.mover().map_or(Speed::ZERO, |mv| mv.stats.speed),
+            speed: self
+                .parts
+                .mover_of(t.id)
+                .map_or(Speed::ZERO, |mv| mv.stats.speed),
         }))
     }
 
@@ -494,7 +501,10 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             distance,
             category,
             class: m.class,
-            speed: t.body.mover().map_or(Speed::ZERO, |mv| mv.stats.speed),
+            speed: self
+                .parts
+                .mover_of(t.id)
+                .map_or(Speed::ZERO, |mv| mv.stats.speed),
             armed,
             reach: self.attacker.range_against()?,
             damage,

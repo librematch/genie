@@ -188,7 +188,7 @@ impl World {
             if u.sprite.is_some() {
                 crate::objects::sprite::new_sprite(
                     &mut u.sprite,
-                    u.body.move_stats_mut(),
+                    self.parts.move_stats_mut(u.id),
                     graphic,
                     rng,
                 );
@@ -482,7 +482,7 @@ impl World {
             .filter(|u| u.life.master_id == id)
         {
             ids.push(u.id);
-            if let Some(m) = u.body.mover_mut() {
+            if let Some(m) = self.parts.mover_mut(u.id) {
                 master.follow_moving(&mut m.stats, attribute, &self.graphics, terrain);
                 // the top speed the unit reads with the sprite it shows, from the new base
                 if let Some(shown) = u.sprite.as_ref().map(|s| &s.graphic) {

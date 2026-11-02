@@ -696,7 +696,7 @@ fn foundation_at(id: i32, at: Position, life: Lifecycle, construction: Construct
     Object::with_building(
         Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(at),
+            place: crate::objects::layers::Static::at(at),
             life,
             pasture: None,
             my_pasture: None,

@@ -136,9 +136,14 @@ impl World {
             groups: &self.groups,
         };
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
-        player
-            .live(idx)?
-            .drop_site_with(&mut world, others, state, (false, false, None), by_id)
+        player.live(idx)?.drop_site_with(
+            self.parts.mover_of(unit.id),
+            &mut world,
+            others,
+            state,
+            (false, false, None),
+            by_id,
+        )
     }
 
     /// `FUN_141658e20` for player `p` at `at`: of the buildings the drop-site table gives for the

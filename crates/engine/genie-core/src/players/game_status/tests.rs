@@ -333,7 +333,6 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             list: ActionList::default().with_attack(Some(attack)),
             ..Default::default()
         },
-        body: crate::objects::layers::Body::Moving(crate::gathering::hunt::tests::walker()),
         ..Unit::default()
     });
     let artifact = add(Unit {
@@ -345,6 +344,12 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         },
         ..Unit::default()
     });
+    t.set_motion(
+        object_id(33),
+        Some(crate::objects::layers::MotionLayer::Moving(
+            crate::gathering::hunt::tests::walker(),
+        )),
+    );
     assert_eq!(
         t.halt_other(PlayerId::new(1), gather, crate::gathering::gather::GATHER),
         Ok(true)
@@ -385,7 +390,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         a.actions.list.attack().map(|a| a.state),
         Some(AttackState::Done)
     );
-    assert_eq!(a.body.anim_speed(), Some(Speed::new(1.0)));
+    assert_eq!(t.parts.anim_speed_of(a.id), Some(Speed::new(1.0)));
     assert!(a.sprite.is_some());
     assert_eq!(
         objects[artifact].actions.list.artifact().map(|a| a.state),

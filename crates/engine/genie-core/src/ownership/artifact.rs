@@ -346,7 +346,10 @@ impl Artifact {
                 let code =
                     update_sub_actions(&mut self.move_to, c, unit, me, ListUpdate::default())?;
                 if state != MoveTo::Waiting {
-                    unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
+                    unit.post_in_the_way(
+                        c.w.parts.motion.mover_mut(unit.id),
+                        &mut c.w.parts.unit_ai,
+                    )?;
                 }
                 // its target let go (4, 5): it ends now, as at 1 to 3, its notify posted by the
                 // check
@@ -357,7 +360,7 @@ impl Artifact {
             }
         };
         let (quiet, released) = self.end_walk();
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = c.w.parts.mover_mut(unit.id) {
             m.stop()?;
         }
         if let Some(t) = released {
@@ -440,7 +443,7 @@ fn let_go_gone(
         crate::world::lets::release(c, unit, t, by)?;
     }
     if gone.stops
-        && let Some(m) = unit.body.mover_mut()
+        && let Some(m) = c.w.parts.mover_mut(unit.id)
     {
         m.stop()?;
     }
@@ -495,7 +498,7 @@ impl Unit {
         {
             // its sub-action list deletes it (FUN_140a98e20): the Enter's destructor
             Action::Enter(e)
-                .tear_down(&mut self.body)?
+                .tear_down(c.w.parts.motion_mut(self.id))?
                 .let_go(c, self, by)?;
         }
         if let Some(art) = self.actions.list.artifact_mut() {

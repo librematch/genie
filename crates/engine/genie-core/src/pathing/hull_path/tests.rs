@@ -326,7 +326,8 @@ fn a_unit_s_short_reach_is_its_old_short_path_s_length() {
         object_id(9149),
         placed(10.5, 5.5, 0.5, ObstructionType::TYPE_2),
     );
-    let mut mover = crate::gathering::hunt::tests::walker().placed(Position::new(2.0, 5.5, 0.0));
+    let at = Position::new(2.0, 5.5, 0.0);
+    let mut mover = crate::gathering::hunt::tests::walker();
     mover.stats.radius = Radii::new(0.2, 0.2, 0.2);
     mover.stats.restriction_mask = TerrainMask::of_bits(6);
     let me = crate::movement::Me {
@@ -337,6 +338,7 @@ fn a_unit_s_short_reach_is_its_old_short_path_s_length() {
     };
     let length = mover
         .short_reach(
+            at,
             &me,
             &mut w,
             object_id(9149),
@@ -371,6 +373,7 @@ fn a_unit_s_short_reach_is_its_old_short_path_s_length() {
     assert_eq!(
         mover
             .short_reach(
+                at,
                 &me,
                 &mut w,
                 object_id(777),

@@ -35,11 +35,16 @@ impl Unit {
     pub(crate) fn motion_step(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
-        if self.body.mover().is_some() {
+        if c.w.parts.mover_of(self.id).is_some() {
             self.count_down_human_order(c.dt);
         }
         // the velocity step (FUN_140f9ba80) runs for a unit with velocity data (+0x868)
-        let group = match self.body.mover().and_then(|m| m.velocity.as_ref()) {
+        let group = match c
+            .w
+            .parts
+            .mover_of(self.id)
+            .and_then(|m| m.velocity.as_ref())
+        {
             Some(_) => self.group_speed(
                 &c.w.groups,
                 crate::objects::masters::OwnerMasters::new(
@@ -50,8 +55,8 @@ impl Unit {
             )?,
             None => None,
         };
-        if let Some(mover) = self.body.mover_mut() {
-            let here = mover.position();
+        if let Some(mover) = c.w.parts.mover_mut(self.id) {
+            let here = self.place.position();
             let at = mover.step_velocity(
                 here,
                 c.dt.seconds(),
@@ -60,14 +65,19 @@ impl Unit {
                 (c.w.world_time, group),
             );
             if at != here {
-                mover.new_position(self.id, at, (&mut c.w.spatial, Some(&mut c.w.pathing)))?;
+                mover.new_position(
+                    &mut self.place,
+                    self.id,
+                    at,
+                    (&mut c.w.spatial, Some(&mut c.w.pathing)),
+                )?;
             }
             // RGE_Moving_Object::update: a unit that moves animates at its speed (+0x7b8)
             if let Some(v) = mover.velocity.as_ref() {
                 let [x, y, z] = v.velocity.get();
                 let speed = crate::math::fmath::sqrt(x * x + y * y + z * z);
                 if SPEED_EPSILON < speed {
-                    self.body.set_anim_speed(Speed::new(speed));
+                    c.w.parts.set_anim_speed(self.id, Speed::new(speed));
                 }
             }
         }
@@ -146,6 +156,7 @@ impl Unit {
                 .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
         self.own_move_gave_up(
+            c.w.parts.motion.layer_mut(self.id),
             villager && !c.w.players.player(c.player)?.computer,
             stance,
             (
@@ -199,7 +210,7 @@ impl Unit {
                 let ask = match point {
                     Some(p) if move_to.state == MoveTo::Start => UnitAi::path_ask(
                         c.w.parts.unit_ai.get_mut(self.id),
-                        self.body.position().ground(),
+                        self.place.position().ground(),
                         p,
                     ),
                     _ => crate::movement::PathAsk::default(),
@@ -217,7 +228,7 @@ impl Unit {
                 let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
-                let (walk, rng) = c.walk_and_sprites(&mut self.body, me)?;
+                let (walk, rng) = c.walk_and_sprites(&mut self.place, me)?;
                 let shows = Shows {
                     sprite: &mut self.sprite,
                     rng,

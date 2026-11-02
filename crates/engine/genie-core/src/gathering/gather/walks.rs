@@ -23,9 +23,9 @@ pub struct Walks<'a> {
 
 impl<'a> Walks<'a> {
     /// The reads of `unit` with the sprites `sprites`, and what it carries.
-    pub(crate) fn of(sprites: SpriteReads<'a>, unit: &Unit) -> Self {
+    pub(crate) fn of(sprites: SpriteReads<'a>, (unit, mover): (&Unit, Option<&Mover>)) -> Self {
         Self {
-            reads: MoveToReads::with_sprites(sprites, unit),
+            reads: MoveToReads::with_sprites(sprites, (unit, mover)),
             held: unit.life.held(),
         }
     }
@@ -41,11 +41,12 @@ impl<'a> Walks<'a> {
 }
 
 impl GatherReads {
-    /// What the `MoveTo`s the update makes read of `unit`, with the sprites' table `graphics`.
+    /// What the `MoveTo`s the update makes read of `unit` with its mover, with the sprites'
+    /// table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
         graphics: &'g crate::objects::Graphics,
-        unit: &Unit,
+        unit: (&Unit, Option<&Mover>),
     ) -> Walks<'g> {
         Walks::of(self.sprites_of(graphics), unit)
     }

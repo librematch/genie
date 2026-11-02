@@ -11,7 +11,6 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type::BUILDING;
-use crate::orders::object_gone;
 use crate::orders::{lock_gate, set_stance};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
@@ -98,12 +97,10 @@ impl World {
             return Ok(());
         }
         let now = self.world_time;
-        let (unit, layer) = self
-            .object_and_layer_mut(id)?
-            .ok_or_else(|| object_gone(id))?;
+        let (layer, mover) = self.parts.building_and_mover_mut(id)?;
         // slot 0x668: the lock's value (a building without its gate state is lock_gate's)
         let locked = layer.gate.is_some_and(|g| g.locked);
-        lock_gate((unit, layer), !locked, now)?;
+        lock_gate((mover, layer), !locked, now)?;
         Ok(())
     }
 
@@ -248,10 +245,10 @@ impl World {
                 ai.orders.clear();
                 ai.idle_timer = ai.adjusted_idle_timeout;
             }
-            let Some((_, u)) = self.object_mut(id) else {
+            if self.object(id).is_none() {
                 continue;
-            };
-            if let Some(m) = u.body.mover_mut() {
+            }
+            if let Some(m) = self.parts.mover_mut(id) {
                 m.ignore_units.clear();
             }
             // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep), whose
@@ -260,7 +257,7 @@ impl World {
                 continue;
             };
             self.object_stop(p, idx)?;
-            if let Some(m) = self.players.live_mut(p, idx)?.body.mover_mut() {
+            if let Some(m) = self.parts.mover_mut(self.players.live(p, idx)?.id) {
                 m.stand()?;
             }
         }
@@ -392,7 +389,7 @@ impl World {
         let standing = self.master(p, master)?.standing_sprite;
         let shown = standing.and_then(|s| self.graphics.get(s)).copied();
         let unit = self.players.live_mut(p, idx)?;
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.shows(shown.as_ref());
         }
         if unit.sprite.is_none() {
@@ -403,7 +400,7 @@ impl World {
         ))?;
         let rng = self.streams.get(Stream::Sprite);
         let u = self.players.live_mut(p, idx)?;
-        crate::objects::sprite::new_sprite(&mut u.sprite, u.body.move_stats_mut(), g, rng);
+        crate::objects::sprite::new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
         Ok(())
     }
 }

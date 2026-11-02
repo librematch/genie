@@ -8,7 +8,6 @@ use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::TOWN_CENTRE;
@@ -55,6 +54,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         // what its MoveTo's constructor (FUN_140aa0df0) reads of the unit and the target
         let reads = unit.move_to_reads(
+            self.parts.motion.mover(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -82,10 +82,8 @@ impl World {
             self.release(t, by)?;
         }
         if gone.stops {
-            self.players
-                .live_mut(player, idx)?
-                .body
-                .mover_mut()
+            self.parts
+                .mover_mut(self.players.live(player, idx)?.id)
                 .ok_or(crate::world::WALKER_UNMOVING)?
                 .stop()?;
         }
@@ -365,11 +363,11 @@ impl World {
     ) -> Result<(), GenieError> {
         let mut unit = self.take_out(p, idx)?;
         let player = &self.players.player(p)?;
+        let (mover, by_id) = self
+            .parts
+            .lend_mover(unit.id, (&self.players, &self.index, &self.masters));
         let world = crate::unit_ai::world_view::DropWorld {
-            masters: crate::objects::masters::OwnerMasters::new(
-                &self.parts.own_master,
-                self.masters.of(p),
-            ),
+            masters: by_id.masters().of(p),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
@@ -380,29 +378,9 @@ impl World {
         };
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         let result = if by == DropOffBy::Hunt {
-            unit.drop_off_in(
-                world,
-                others,
-                &self.graphics,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
-            )
+            unit.drop_off_in(mover, world, others, &self.graphics, by_id)
         } else {
-            unit.gather_drop_off_in(
-                world,
-                others,
-                &self.graphics,
-                crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                ),
-            )
+            unit.gather_drop_off_in(mover, world, others, &self.graphics, by_id)
         };
         let idx = self.put_back_own(p, unit)?;
         if let Some(site) = result? {

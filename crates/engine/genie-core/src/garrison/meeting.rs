@@ -11,6 +11,7 @@ use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::conversions::cvttss2si;
 use crate::movement::MoveStats;
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ActionState;
@@ -205,12 +206,13 @@ fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<us
     Ok(n)
 }
 
-/// [`MeetingTarget`] of the target `t` (of master `tm`) with `room` for the unit: its top speed
-/// ([`crate::movement::MoveStats::speed`]), its top action's state and its point (`+0x38`,
-/// `+0x3c`): a `MoveTo`'s ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's.
-/// An action the slice does not hold has neither; another no point the slice keeps.
+/// [`MeetingTarget`] of the target `t` with its mover `t_mover` (of master `tm`) with `room` for
+/// the unit: its top speed ([`crate::movement::MoveStats::speed`]), its top action's state and
+/// its point (`+0x38`, `+0x3c`): a `MoveTo`'s
+/// ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An action the slice
+/// does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    t: &crate::objects::unit::Unit,
+    (t, t_mover): (&crate::objects::unit::Unit, Option<&Mover>),
     tm: &Master,
     room: bool,
 ) -> Result<MeetingTarget, GenieError> {
@@ -230,7 +232,7 @@ pub(crate) fn meeting_target(
     };
     Ok(MeetingTarget {
         room,
-        speed: t.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+        speed: t_mover.map_or(Speed::ZERO, |m| m.stats.speed),
         state: t.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
         class: tm.class,
         position: t.position().ground(),
@@ -397,7 +399,7 @@ pub(crate) fn enter_reach(
     spatial: &mut Spatial,
     masters: &[Masters],
     (id, stats, moved_at): (ObjectId, &MoveStats, Position),
-    (target, target_mover): (ObjectId, Option<&crate::movement::Mover>),
+    (target, target_mover): (ObjectId, Option<&Mover>),
     range: Distance,
     by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
@@ -421,7 +423,8 @@ pub(crate) fn enter_reach(
     EnterAction::in_reach(range, gap, speed, &mut walls, by_id)
 }
 
-/// What an Enter's update reads of its target `t` (of master `tm`, with `room` for `unit`): the
+/// What an Enter's update reads of its target `t` with its mover (of master `tm`, with `room`
+/// for `unit`, with its mover): the
 /// [`EnterTarget`] (allied: its own player's; the reach by [`enter_reach`] with the task's
 /// `range`), and the footprints' gap (`FUN_14118f680`) and the unit's speed for a new `MoveTo`
 /// ([`WalkStart`]).
@@ -432,16 +435,15 @@ pub(crate) fn enter_reach(
 pub(crate) fn enter_view(
     spatial: &mut Spatial,
     masters: &[Masters],
-    unit: &crate::objects::unit::Unit,
-    (t, tm, room): (&crate::objects::unit::Unit, &Master, bool),
+    (unit, mover): (&crate::objects::unit::Unit, Option<&Mover>),
+    ((t, t_mover), tm, room): ((&crate::objects::unit::Unit, Option<&Mover>), &Master, bool),
     range: Distance,
     by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(EnterTarget, WalkStart), GenieError> {
     let building = tm.kind == BUILDING;
-    let mover = unit.body.mover();
     let stats = mover.map(|m| m.stats).ok_or(NO_SPEED)?;
     let moved_at = mover.map_or_else(|| unit.position(), |m| m.moved_at);
-    let target_mover = if building { None } else { t.body.mover() };
+    let target_mover = if building { None } else { t_mover };
     let in_reach = enter_reach(
         spatial,
         masters,
@@ -487,6 +489,10 @@ pub(crate) struct Meeting<'a> {
     pub(crate) room: bool,
     /// The entering unit.
     pub(crate) unit: &'a crate::objects::unit::Unit,
+    /// The entering unit's mover (its motion layer's), none for one that does not move.
+    pub(crate) mover: Option<&'a Mover>,
+    /// The target's mover, none for one that does not move.
+    pub(crate) target_mover: Option<&'a Mover>,
 }
 
 impl Meeting<'_> {
@@ -504,8 +510,8 @@ impl Meeting<'_> {
         if self.master.kind == BUILDING {
             return Ok((at.ground(), 0));
         }
-        let stats = self.unit.body.mover().map(|m| m.stats).ok_or(NO_SPEED)?;
-        let t = meeting_target(self.target, self.master, self.room)?;
+        let stats = self.mover.map(|m| m.stats).ok_or(NO_SPEED)?;
+        let t = meeting_target((self.target, self.target_mover), self.master, self.room)?;
         meeting_point(
             &t,
             (self.unit.id, self.unit.position(), &stats),
@@ -520,19 +526,19 @@ impl Meeting<'_> {
 /// [`ENTER_NEAR`] of the point's tile (the point truncated), [`crate::movement::Mover::reaches`]
 /// from where it last moved to; one without movement state does not.
 pub(crate) fn ship_reaches(
-    ship: &crate::objects::unit::Unit,
+    (ship, mover): (&crate::objects::unit::Unit, Option<&Mover>),
     world: &mut Spatial,
     plan: &mut crate::movement::Planning<'_>,
     to: Position,
     by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
-    let Some(m) = ship.body.mover() else {
+    let Some(m) = mover else {
         return Ok(false);
     };
     let me = ship.me();
     let goal = Point::new(cvttss2si(to.x()) as f32, cvttss2si(to.y()) as f32);
     m.reaches(
-        &me,
+        (ship.position(), &me),
         (world, by_id),
         plan,
         goal,

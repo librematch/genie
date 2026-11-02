@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::math::rng::{Stream, Well512};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
@@ -21,6 +22,7 @@ impl Unit {
         let sprite = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.stop_with(
+            c.w.parts.motion.layer_mut(self.id),
             (&mut releases, &mut leaves),
             by,
             crate::objects::masters::OwnerMasters::new(
@@ -35,18 +37,19 @@ impl Unit {
 
     /// [`Unit::stop_action`] on the parts of the world it changes: the targets its actions let
     /// go and the foundations its Build leaves (`by` the unit, [`Unit::clear_own_actions`]), its
-    /// masters and sprites, and the Sprite stream.
+    /// masters and sprites, and the Sprite stream; `motion` is its motion layer.
     pub(crate) fn stop_with(
         &mut self,
+        mut motion: MotionMut<'_>,
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
         masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.tear_down_actions(releases, builder_leaves, by)?;
+        self.tear_down_actions(motion.reborrow(), releases, builder_leaves, by)?;
         if self.life.state == ObjectState::Alive {
-            self.show_standing(masters, graphics, sprite)?;
+            self.show_standing(motion, masters, graphics, sprite)?;
         }
         Ok(())
     }
@@ -56,6 +59,7 @@ impl Unit {
     /// run.
     pub(crate) fn tear_down_actions(
         &mut self,
+        motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
@@ -65,7 +69,7 @@ impl Unit {
                 "a unit AI's stop of an action list the slice does not model",
             ));
         }
-        self.clear_own_actions(releases, builder_leaves, by)
+        self.clear_own_actions(motion, releases, builder_leaves, by)
     }
 
     /// The unit's slot 0x68 with its master's standing sprite (slot 0x798's, the master's
@@ -76,6 +80,7 @@ impl Unit {
     /// [`Mover::shows_standing`]: crate::movement::Mover::shows_standing
     pub(crate) fn show_standing(
         &mut self,
+        mut motion: MotionMut<'_>,
         masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
@@ -85,7 +90,7 @@ impl Unit {
             .standing_sprite
             .and_then(|s| graphics.get(s))
             .copied();
-        if let Some(m) = self.body.mover_mut() {
+        if let Some(m) = motion.mover_mut() {
             m.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
@@ -94,7 +99,7 @@ impl Unit {
             ))?;
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
-                self.body.move_stats_mut(),
+                motion.move_stats_mut(),
                 standing,
                 sprite,
             );
@@ -117,14 +122,12 @@ impl Unit {
     /// The unit's stop that the motion step does not model, and the list's deletion's.
     pub(crate) fn clear_own_actions(
         &mut self,
+        motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        let torn = self
-            .actions
-            .list
-            .delete_all(&mut self.body, self.life.state)?;
+        let torn = self.actions.list.delete_all(motion, self.life.state)?;
         releases.extend(torn.releases.into_iter().map(|t| (t, by)));
         builder_leaves.extend(torn.builder_leaves);
         Ok(())
@@ -144,7 +147,7 @@ impl Unit {
         let torn = self
             .actions
             .list
-            .delete_head(&mut self.body, self.life.state)?;
+            .delete_head(c.w.parts.motion_mut(self.id), self.life.state)?;
         torn.let_go(c, self, by)
     }
 
@@ -176,7 +179,10 @@ impl Unit {
                 ))?;
                 let m = match e {
                     Effect::Move(m) => Some(m),
-                    _ => self.restore_patrol(c.w.parts.unit_ai.get(self.id)),
+                    _ => Self::restore_patrol(
+                        c.w.parts.unit_ai.get(self.id),
+                        c.w.parts.motion.mover_mut(self.id),
+                    ),
                 };
                 m.map_or(Ok(()), |m| self.ai_move(m, class, c))
             }

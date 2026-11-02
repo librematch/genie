@@ -826,7 +826,7 @@ mod clearing_tests {
     fn object(id: i32, master: MasterId, x: f32, y: f32) -> Unit {
         Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+            place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
             life: Lifecycle {
                 master_id: master,
                 ..Lifecycle::default()

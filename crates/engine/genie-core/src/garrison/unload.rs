@@ -262,9 +262,7 @@ impl World {
         let (up, ui) = self.live_inside(inner)?;
         let unit = self.players.live_mut(up, ui)?;
         let inner_id = unit.id;
-        unit.body
-            .base_mut()
-            .inside_at(inner_id, at, &mut self.spatial);
+        unit.place.inside_at(inner_id, at, &mut self.spatial);
         self.leave_container((hp, hi), (up, ui), &made, spot.with_height(at.z()))?;
         let unit = self.players.live_mut(up, ui)?;
         let place = (unit.position().ground(), Some(made.class));
@@ -300,7 +298,7 @@ impl World {
         let id = self.players.live(player, idx)?.id;
         self.leave_group_of(id, None)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.ignore_units.clear();
         }
         let unit = self.players.live(player, idx)?;

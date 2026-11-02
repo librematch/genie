@@ -618,7 +618,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         .iter()
         .map(|&(id, master, x, y)| Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+            place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
             group: GroupLink {
                 id: Some(group_id(1)),
                 flag: -2,
@@ -634,7 +634,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         .collect();
     let target = Unit {
         id: object_id(60),
-        body: crate::objects::layers::Body::at(Position::new(40.0, 45.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(40.0, 45.0, 0.0)),
         attackable: true,
         life: Lifecycle {
             master_id: ids::HOUSE,
@@ -796,8 +796,8 @@ fn a_group_already_on_its_target_only_notes_the_place() {
         t.command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap()
     );
-    t.players[2].objects[ListIndex::new(0)].body =
-        crate::objects::layers::Body::at(Position::new(41.0, 45.0, 0.0));
+    t.players[2].objects[ListIndex::new(0)].place =
+        crate::objects::layers::Static::at(Position::new(41.0, 45.0, 0.0));
     assert!(
         !t.command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap()
@@ -848,8 +848,8 @@ fn the_reach_pass_raises_the_range_and_sends_a_member_in_reach() {
                 ..crate::unit_ai::UnitAi::default()
             }),
         );
-        u.body
-            .put_mover(Some(crate::gathering::hunt::tests::walker()));
+        t.parts
+            .put_mover(u.id, Some(crate::gathering::hunt::tests::walker()));
     }
     let mut reference = t.streams.clone();
     let draw = reference.get(crate::math::rng::Stream::Ai).rand15();

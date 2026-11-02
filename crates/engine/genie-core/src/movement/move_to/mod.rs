@@ -12,12 +12,13 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::{Me, Motion, Planning, footprint_gap, footprint_gap_squared};
 use crate::movement::{MoveStats, PathAsk};
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
-use crate::objects::layers::Body;
+use crate::objects::layers::{MotionLayer, Static};
 use crate::objects::masters::ActionType;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::unit_ai::UnitStance;
@@ -169,8 +170,11 @@ impl TryFrom<u8> for TargetMoved {
 /// a path request (None where the caller has none).
 #[derive(Debug)]
 pub struct Walk<'a> {
-    /// The unit's layers: its place ([`Body::position`]) and its mover, if it moves.
-    pub body: &'a mut Body,
+    /// The unit's place, its row's static layer.
+    pub place: &'a mut Static,
+    /// The unit's animated and moving layers, lent out of the world's table for the walk (none
+    /// for a static object).
+    pub motion: Option<&'a mut MotionLayer>,
     /// The unit.
     pub me: Me,
     /// The world's dt in seconds.
@@ -187,12 +191,38 @@ impl Walk<'_> {
     /// x, y, z on the map: the unit's place as it is now, after any step of its walk.
     #[must_use]
     pub const fn position(&self) -> Position {
-        self.body.position()
+        self.place.position()
+    }
+
+    /// The walking unit's mover, none for an object that does not move.
+    #[must_use]
+    pub fn mover(&self) -> Option<&Mover> {
+        self.motion.as_deref().and_then(MotionLayer::mover)
+    }
+
+    /// The walking unit's mover to change, none for an object that does not move.
+    pub fn mover_mut(&mut self) -> Option<&mut Mover> {
+        self.motion.as_deref_mut().and_then(MotionLayer::mover_mut)
+    }
+
+    /// The walking unit's place to change and its mover (none for an object that does not
+    /// move), each its own borrow.
+    pub fn place_and_mover(&mut self) -> (&mut Static, Option<&mut Mover>) {
+        (
+            &mut *self.place,
+            self.motion.as_deref_mut().and_then(MotionLayer::mover_mut),
+        )
+    }
+
+    /// The walking unit's movement values to change (its top speed among them), none for an
+    /// object that does not move.
+    pub fn move_stats_mut(&mut self) -> Option<&mut MoveStats> {
+        self.mover_mut().map(|m| &mut m.stats)
     }
 
     /// Sets the walking unit's animation speed (`+0x7b8`, the animated layer in its mover).
-    pub const fn set_anim_speed(&mut self, speed: Speed) {
-        if let Some(m) = self.body.mover_mut() {
+    pub fn set_anim_speed(&mut self, speed: Speed) {
+        if let Some(m) = self.mover_mut() {
             m.animated.speed = speed;
         }
     }
@@ -200,7 +230,8 @@ impl Walk<'_> {
     /// The same walk for a call that ends before this one is used again.
     pub fn reborrow(&mut self) -> Walk<'_> {
         Walk {
-            body: &mut *self.body,
+            place: &mut *self.place,
+            motion: self.motion.as_deref_mut(),
             me: self.me,
             dt: self.dt,
             world: &mut *self.world,
@@ -258,8 +289,8 @@ pub fn ask_walk(
         Goal::Point(p) => (p, None, Footprint::ZERO),
     };
     let now = walk.plan.as_ref().map_or(WorldTime::ZERO, |p| p.now);
-    let mover = walk.body.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
-    let here = mover.position();
+    let here = walk.position();
+    let mover = walk.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
     let ground = mover.stats.radius.ground();
     let squared = if target.is_none() {
         let gap = footprint_gap(here, ground, point, radius);
@@ -272,7 +303,7 @@ pub fn ask_walk(
     }
     mover.request_path_asked(here, point, Distance::new(range), target, now, ask);
     if let Some(mut shown) = shown {
-        shown.show(walk.body.move_stats_mut());
+        shown.show(walk.move_stats_mut());
     }
     // the MoveTo's point (`+0x38`): the target's place when it asks for the path
     Ok((walk_or_give_up(walk.reborrow())?, Some(point)))
@@ -403,22 +434,27 @@ impl Shown<'_> {
 /// modelled.
 pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
     let Walk {
-        body,
+        place,
+        motion,
         me,
         dt,
         world,
         mut plan,
         by_id,
     } = walk;
-    let mover = body.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
+    let mover = motion
+        .and_then(MotionLayer::mover_mut)
+        .ok_or(crate::world::WALKER_UNMOVING)?;
     if mover.paths.is_empty() {
         return Err(GenieError::unsupported("the path request (FUN_14114e410)"));
     }
-    Ok(match mover.motion(&me, dt, world, plan.as_mut(), by_id)? {
-        Motion::Moving => Some(MoveTo::Moving),
-        Motion::Arrived => Some(MoveTo::Arrived),
-        Motion::Done => None,
-    })
+    Ok(
+        match mover.motion(place, &me, dt, world, plan.as_mut(), by_id)? {
+            Motion::Moving => Some(MoveTo::Moving),
+            Motion::Arrived => Some(MoveTo::Arrived),
+            Motion::Done => None,
+        },
+    )
 }
 
 /// A target leaves the `MoveTo`'s point when it is more than this off it on either axis
@@ -489,7 +525,7 @@ pub fn target_left(
     if mode == TargetMoved::AsksAgain {
         return Ok(Follow::Again);
     }
-    let mover = walk.body.mover().ok_or(crate::world::WALKER_UNMOVING)?;
+    let mover = walk.mover().ok_or(crate::world::WALKER_UNMOVING)?;
     if mover.walks_to_path_end()? {
         let me = walk.position();
         let (a, b) = (me.ground(), at.ground());
@@ -960,10 +996,12 @@ mod tests {
         let moved = |classes: &[u8], point: Position, target, mode| {
             let mut world = crate::movement::tests::tiled_world(classes.to_vec());
             let mover = crate::movement::tests::builder_9177();
-            let mut mover = Body::new(Position::new(28.0, 89.0, 0.0), None, Some(mover));
+            let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
+            let mut motion = MotionLayer::Moving(mover);
             let mut walk = Walk {
                 by_id: ObjectsRef::empty(),
-                body: &mut mover,
+                place: &mut place,
+                motion: Some(&mut motion),
                 me: Me {
                     human_order: WorldTime::ZERO,
                     id: object_id(9177),

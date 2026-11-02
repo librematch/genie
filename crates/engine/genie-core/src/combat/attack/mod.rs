@@ -22,7 +22,7 @@ use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveToAction, TargetMoved};
 use crate::objects::ObjectId;
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HitChance;
@@ -402,6 +402,9 @@ pub(crate) struct Ground<'a> {
     pub(crate) graphics: &'a crate::objects::Graphics,
     /// The objects by id: a gate's annexes, which its reach measures.
     pub(crate) by_id: crate::world::index::ObjectsRef<'a>,
+    /// The unit's own motion layer (its mover and animation speed), lent out of the world's
+    /// table while `by_id` reads the others' (FD-045-D58).
+    pub(crate) motion: MotionMut<'a>,
 }
 
 /// Where [`Ground::post`] sends the unit's notifies.
@@ -436,9 +439,9 @@ impl Ground<'_> {
 }
 
 impl World {
-    /// The Attack's [`Ground`] in an update: the map, the Sprite and Object streams; the
-    /// notifies go to the unit AI at once.
-    pub(crate) fn attack_ground(&mut self) -> Ground<'_> {
+    /// The Attack's [`Ground`] in an update of unit `id`: the map, the Sprite and Object
+    /// streams, its motion layer; the notifies go to the unit AI at once.
+    pub(crate) fn attack_ground(&mut self, id: ObjectId) -> Ground<'_> {
         let Self {
             spatial,
             streams,
@@ -450,6 +453,7 @@ impl World {
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();
+        let (motion, motions) = parts.motion.lend(id);
         Ground {
             map: spatial,
             sprite_rng: sprite,
@@ -460,16 +464,17 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat),
+                (&parts.building, &parts.combat, motions),
             ),
+            motion: MotionMut::new(motion),
         }
     }
 }
 
 /// The unit's animation speed (`+0x7b8`) as the Attack sets it: a mover's; a building's stays
 /// (MISSING.md, "The Attack's animation speed of a building").
-pub(crate) const fn set_walker_anim(body: &mut Body, speed: Speed) {
-    if let Some(m) = body.mover_mut() {
+pub(crate) fn set_walker_anim(mut motion: MotionMut<'_>, speed: Speed) {
+    if let Some(m) = motion.mover_mut() {
         m.animated.speed = speed;
     }
 }

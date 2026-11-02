@@ -10,6 +10,7 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -46,8 +47,11 @@ impl HuntAction {
             HuntState::Attack => self.update_attack(c, unit, me, f, r),
             // case 3: a hunt that gave up on its MoveTo waits (its timer below 0), then set_state 11
             HuntState::Walk if self.timer < Seconds::ZERO => {
-                let walks = r.walks(&c.w.graphics, unit);
-                let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let mover =
+                    c.w.parts
+                        .mover_mut(unit.id)
+                        .ok_or(crate::world::HUNTER_UNMOVING)?;
                 self.wait_then_walk(c.dt.seconds(), mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
@@ -96,7 +100,7 @@ impl HuntAction {
         match attack.update(c, unit, me, f, &r.attack)?.get() {
             0 | 6.. => Ok(HuntNext::Stay),
             1 | 2 | 5 if self.target.is_none() => {
-                self.tear_down(unit.body.mover_mut())?;
+                self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 self.state = HuntState::Search;
                 Ok(HuntNext::Search)
             }
@@ -111,17 +115,26 @@ impl HuntAction {
             }
             1 | 2 | 5 => {
                 self.decay_check(c, unit, r.stops_decay, f)?;
-                let walks = r.walks(&c.w.graphics, unit);
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let player = f.own.player;
-                self.set_walk(&c.w.spatial, &mut unit.body, &f.victim, player, &walks)?;
+                self.set_walk(
+                    (&c.w.spatial, unit.position()),
+                    c.w.parts.motion_mut(unit.id),
+                    &f.victim,
+                    player,
+                    &walks,
+                )?;
                 Ok(HuntNext::Stay)
             }
             3 => Ok(HuntNext::AttackFailed),
             _ => {
                 let target = self.let_go();
                 unit.hunt_release(c, [target])?;
-                let walks = r.walks(&c.w.graphics, unit);
-                let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let mover =
+                    c.w.parts
+                        .mover_mut(unit.id)
+                        .ok_or(crate::world::HUNTER_UNMOVING)?;
                 self.set_point_walk(HuntState::WalkSearch, mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
@@ -149,7 +162,9 @@ impl HuntAction {
         match self.update_list(c, unit, me, gives_up)?.get() {
             0 => Ok(HuntNext::Stay),
             1 | 2 => self.walk_arrived(c, unit, f, r),
-            3 => self.walk_failed(unit, r).map(|()| HuntNext::Stay),
+            3 => self
+                .walk_failed(c.w.parts.motion_mut(unit.id), r)
+                .map(|()| HuntNext::Stay),
             4 | 5 => self.lost_on_the_way(c, unit, r).map(|()| HuntNext::Stay),
             code => Err(QUIET_CODE.with("code", code)),
         }
@@ -160,10 +175,10 @@ impl HuntAction {
     /// (`FUN_140c1c4f0`: 15, trees; the class its unit AI targets, else the hunt's: the caller's
     /// search, `Unit::hunt_tree_search`, which found none); then the hunt waits 3 seconds and the
     /// unit's animation stops (`FUN_141161850`).
-    fn walk_failed(&mut self, unit: &mut Unit, r: &HuntReads) -> Result<(), GenieError> {
+    fn walk_failed(&mut self, motion: MotionMut<'_>, r: &HuntReads) -> Result<(), GenieError> {
         self.no_tree_search(r)?;
         self.timer = Seconds::new(-3.0);
-        set_walker_anim(&mut unit.body, Speed::new(0.0));
+        set_walker_anim(motion, Speed::new(0.0));
         Ok(())
     }
 
@@ -177,7 +192,7 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
-        self.tear_down(unit.body.mover_mut())?;
+        self.tear_down(c.w.parts.mover_mut(unit.id))?;
         // a target the hunt let go (the `MoveTo`'s went from the world): `FUN_140ac44b0` does
         // nothing, and `set_state(6)` without a target only shows the walking sprite
         if self.target.is_none() {
@@ -199,9 +214,18 @@ impl HuntAction {
         f: &Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
-        self.face_animal(unit, f.victim.position, r.attack.world_time)?;
+        self.face_animal(
+            (unit.position(), c.w.parts.mover_mut(unit.id)),
+            f.victim.position,
+            r.attack.world_time,
+        )?;
         if Amount::ZERO < f.victim.amount {
-            self.set_gather(unit, c.w.streams.get(Stream::Sprite), r);
+            self.set_gather(
+                unit,
+                c.w.parts.motion_mut(unit.id),
+                c.w.streams.get(Stream::Sprite),
+                r,
+            );
             return Ok(HuntNext::Stay);
         }
         self.state = HuntState::Search;
@@ -214,14 +238,17 @@ impl HuntAction {
     /// 0x68 with none) and the hunt walks to its point (`set_state` 11).
     pub(super) fn lost_on_the_way(
         &mut self,
-        c: &Step<'_>,
-        unit: &mut Unit,
+        c: &mut Step<'_>,
+        unit: &Unit,
         r: &HuntReads,
     ) -> Result<(), GenieError> {
         self.no_tree_search(r)?;
         self.set_target(None);
-        let walks = r.walks(&c.w.graphics, unit);
-        let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let mover =
+            c.w.parts
+                .mover_mut(unit.id)
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
         self.set_point_walk(HuntState::WalkSearch, mover, &walks)
     }
 
@@ -250,6 +277,7 @@ impl HuntAction {
         herd: &Herd,
     ) -> Result<(), GenieError> {
         let reads = unit.move_to_reads(
+            c.w.parts.motion.mover(unit.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -257,7 +285,10 @@ impl HuntAction {
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover =
+            c.w.parts
+                .mover_mut(unit.id)
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
         self.move_to = None;
         self.state = HuntState::Attack;
         // the herd is read only on a live target
@@ -266,7 +297,11 @@ impl HuntAction {
         ))?;
         let (a, arrived) = Attack::start(target, &herd.engagement, herd.arms, mover, &reads)?;
         if arrived {
-            a.arrived_sprite(unit, c.w.streams.get(Stream::Sprite))?;
+            a.arrived_sprite(
+                unit,
+                c.w.parts.motion_mut(unit.id),
+                c.w.streams.get(Stream::Sprite),
+            )?;
         }
         self.attack = Some(a);
         Ok(())

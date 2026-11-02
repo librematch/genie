@@ -62,7 +62,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     fn patrol_information(
         &self,
     ) -> Option<(crate::unit_ai::PatrolPath, crate::movement::WaypointIndex)> {
-        patrol_information(self.unit.body.mover())
+        patrol_information(self.c.w.parts.mover_of(self.unit.id))
     }
 
     /// Slot 0x278 (`FUN_141158720`, [`Spatial::point_clear`]): the unit, of its radius and its
@@ -71,9 +71,14 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     /// [`Spatial::point_clear`]: crate::map::spatial::Spatial::point_clear
     fn can_stand(&mut self, point: Point) -> Result<bool, GenieError> {
         let unit = &*self.unit;
-        let mover = unit.body.mover().ok_or(GenieError::unsupported(
-            "a stand test of a unit without movement state",
-        ))?;
+        let mover = self
+            .c
+            .w
+            .parts
+            .mover_of(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a stand test of a unit without movement state",
+            ))?;
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
@@ -254,9 +259,14 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         };
         let unit = &*self.unit;
         let walker = unit.me();
-        let mover = unit.body.mover().ok_or(GenieError::unsupported(
-            "a reach test of a unit that does not move",
-        ))?;
+        let mover = self
+            .c
+            .w
+            .parts
+            .mover_of(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a reach test of a unit that does not move",
+            ))?;
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
@@ -264,7 +274,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             &self.c.w.parts,
         );
         mover.reaches_object(
-            &walker,
+            (unit.position(), &walker),
             (&mut self.c.w.spatial, by_id),
             &mut plan,
             target,
@@ -337,7 +347,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         };
         let unit = &*self.unit;
         let walker = unit.me();
-        let (mover, master_id) = (unit.body.mover(), unit.life.master_id);
+        let (mover, master_id, at) = (
+            self.c.w.parts.mover_of(unit.id),
+            unit.life.master_id,
+            unit.position(),
+        );
         let by_id = crate::world::index::ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
@@ -348,7 +362,14 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             let m = mover.ok_or(GenieError::unsupported(
                 "a reach test of a unit that does not move",
             ))?;
-            m.reaches_object(&walker, (spatial, by_id), &mut plan, id, range, master_id)
+            m.reaches_object(
+                (at, &walker),
+                (spatial, by_id),
+                &mut plan,
+                id,
+                range,
+                master_id,
+            )
         };
         let moving = |id: ObjectId| herded(others, id);
         // a class-10 searcher passes master 440 and the masters with object flag 0x10
@@ -544,7 +565,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     /// speeds up (slot 0x5a0: its forward acceleration above 0, `COMISS`/`JBE`) stops (slot
     /// 0x5d0).
     fn group_attack_stop(&mut self) -> Result<(), GenieError> {
-        let Some(m) = self.unit.body.mover_mut() else {
+        let Some(m) = self.c.w.parts.mover_mut(self.unit.id) else {
             return Ok(());
         };
         let speeding = m

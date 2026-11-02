@@ -8,6 +8,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
+use crate::movement::Mover;
 use crate::movement::Planning;
 use crate::objects::ObjectId;
 use crate::objects::masters::GatherGroup;
@@ -44,7 +45,7 @@ pub(crate) fn search_origin(point: Point, has_site: bool, unit: Position) -> Pos
     }
 }
 
-/// [`crate::gathering::gather_search::closest_resource_at`] for `unit` of gather group `kind` with fewer
+/// [`crate::gathering::gather_search::closest_resource_at`] for `unit` with its mover of gather group `kind` with fewer
 /// than `cap` workers (−1 any) from the drop site `site` (if any; one the world does not hold
 /// counts as none, `FUN_1415417a0`), its unit AI's current target `current` passed over, below
 /// state `min_state` nothing found, and without a site from `point` unless that is (−1, −1)
@@ -53,7 +54,7 @@ pub(crate) fn search_origin(point: Point, has_site: bool, unit: Position) -> Pos
 /// footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45 and
 /// 2172, `0x140c49d17`); the answer and the out argument's steps.
 pub(crate) fn closest_resource_of(
-    unit: &Unit,
+    (unit, mover): (&Unit, Option<&Mover>),
     c: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
     (kind, cap, site): (
@@ -81,9 +82,7 @@ pub(crate) fn closest_resource_of(
             ))?;
             let m = s.master(c.every, sp)?;
             let footprint = DOCKS.contains(&m.id) || {
-                let restriction = unit
-                    .body
-                    .mover()
+                let restriction = mover
                     .ok_or(GenieError::unsupported(
                         "a resource search without movement state",
                     ))?
@@ -113,7 +112,7 @@ pub(crate) fn closest_resource_of(
         ));
     }
     let master = unit.master_in(c.masters)?;
-    let mover = unit.body.mover().ok_or(GenieError::unsupported(
+    let mover = mover.ok_or(GenieError::unsupported(
         "a resource search without movement state",
     ))?;
     let mask = mover.stats.restriction_mask;
@@ -162,6 +161,7 @@ pub(crate) fn closest_resource_of(
         min_state,
     };
     let me_walk = unit.me();
+    let me_at = unit.position();
     let master_id = unit.life.master_id;
     let plan = &mut c.plan;
     let blocked = mask.blocked() | crate::map::spatial::BLOCKED;
@@ -178,7 +178,7 @@ pub(crate) fn closest_resource_of(
             objects: &objects,
             reach: &mut |spatial, id| {
                 mover.reaches_object(
-                    &me_walk,
+                    (me_at, &me_walk),
                     (spatial, by_id),
                     plan,
                     id,
@@ -243,7 +243,7 @@ impl UnitView<'_, '_> {
             },
         };
         let (id, _) = closest_resource_of(
-            self.unit,
+            (self.unit, self.c.w.parts.mover_of(self.unit.id)),
             &mut w,
             owner_view(
                 &self.c.w.players,
@@ -341,7 +341,14 @@ impl Unit {
             crate::objects::ObjectState::Alive,
             crate::unit_ai::NO_POINT,
         );
-        closest_resource_of(self, &mut w, others, (kind, cap, site), search, by_id)
-            .map(|(id, _)| id)
+        closest_resource_of(
+            (self, c.w.parts.mover_of(self.id)),
+            &mut w,
+            others,
+            (kind, cap, site),
+            search,
+            by_id,
+        )
+        .map(|(id, _)| id)
     }
 }

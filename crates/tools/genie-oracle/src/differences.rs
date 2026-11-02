@@ -1,6 +1,6 @@
 //! Where two object lists differ, object by object and field by field ([`Difference`]): every
 //! field the game's save holds, each named by its path in genie's object (`life.hp`,
-//! `body.mover.paths[0].points[2]`), compared by genie-diff (FD-045-D14). Each object compares
+//! `body.paths[0].points[2]`), compared by genie-diff (FD-045-D14). Each object compares
 //! whole, its row and its parts ([`ObjectView`]): the world's tables lend the slice's parts, the
 //! import's objects their own (FD-045-D51).
 

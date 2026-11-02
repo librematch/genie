@@ -676,7 +676,7 @@ fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, ta
 fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Point) {
     let mut u = Unit {
         id: object_id(id),
-        body: crate::objects::layers::Body::at(at.with_height(0.0)),
+        place: crate::objects::layers::Static::at(at.with_height(0.0)),
         ..Unit::default()
     };
     u.life.master_id = m;
@@ -898,9 +898,8 @@ fn trampler(t: &mut World) {
         velocity: BVector::new(1.0, 0.0, 0.0),
         acceleration: BVector::ZERO,
     });
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .put_mover(Some(mover));
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(mover));
 }
 
 #[test]
@@ -970,9 +969,8 @@ fn a_moving_unit_s_movement_damage_hits_the_enemies_about_it() {
         .unwrap()
         .abilities
         .movement_damage_timer = Seconds::ZERO;
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    t.parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .velocity = None;
     run(&mut t, PlayerId::new(1), 10);
@@ -1062,12 +1060,11 @@ fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() 
     );
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.moved_at = Position::new(5.5, 6.5, 0.0);
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .put_mover(Some(mover));
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(mover));
     run(&mut t, PlayerId::new(1), 70);
     let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(u.body.mover().unwrap().factor, 0.35);
+    assert_eq!(t.parts.mover_of(u.id).unwrap().factor, 0.35);
     let abilities = t.parts.combat_of(u.id).abilities;
     assert_eq!(abilities.attack_rate, 1.0);
     assert_eq!(
@@ -1082,14 +1079,13 @@ fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() 
         })
     );
     // where it last moved to decides, not its place
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    t.parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .moved_at = Position::new(5.5, 7.5, 0.0);
     run(&mut t, PlayerId::new(1), 70);
     let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(u.body.mover().unwrap().factor, 1.0);
+    assert_eq!(t.parts.mover_of(u.id).unwrap().factor, 1.0);
     let abilities = t.parts.combat_of(u.id).abilities;
     assert_eq!((abilities.attack_rate, abilities.look), (1.0, None));
 }

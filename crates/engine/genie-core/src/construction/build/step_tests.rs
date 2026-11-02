@@ -39,7 +39,6 @@ use crate::movement::Me;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
 use crate::objects::ObjectId;
 use crate::objects::actions::ActionList;
-use crate::objects::layers::Body;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Masters;
@@ -150,7 +149,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     mover.moved_at = at;
     let builder = Unit {
         id: BUILDER,
-        body: Body::new(at, None, Some(mover)),
+        place: crate::objects::layers::Static::at(at),
         life: Lifecycle {
             class: Class::Animated,
             state: ObjectState::Alive,
@@ -173,7 +172,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     };
     let house = Unit {
         id: HOUSE,
-        body: Body::at(AT_HOUSE),
+        place: crate::objects::layers::Static::at(AT_HOUSE),
         life: Lifecycle {
             class: Class::Animated,
             state: ObjectState::Foundation,
@@ -208,6 +207,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             ..Default::default()
         },
     )])
+    .with_motions([(BUILDER, crate::objects::layers::MotionLayer::Moving(mover))])
     .with_ais([(
         BUILDER,
         UnitAi {
@@ -510,7 +510,7 @@ fn a_builder_whose_foundation_dies_walks_to_its_point() {
     );
     // the task gives no sprite: FUN_140aa0d30's default, the master's walking one
     assert_eq!(walk.sprite.map(|g| g.id), Some(WALKING));
-    let mover = builder(&t).body.mover().unwrap();
+    let mover = t.parts.mover_of(BUILDER).unwrap();
     assert_eq!(mover.velocity.unwrap().velocity.y(), 0.0);
     assert_eq!((house(&t).0, house(&t).1), (0, 0));
     assert!(heard(&t).is_empty() && !stands(&t));
@@ -539,7 +539,7 @@ fn a_builder_without_its_foundation_walks_on_then_waits() {
     };
     let mut t = site_world(class::VILLAGER, Position::new(8.0, 9.0, 0.0), held);
     own(&mut t, HOUSE).life.state = ObjectState::Removed;
-    own(&mut t, BUILDER).body.mover_mut().unwrap().stats.speed = Speed::ZERO;
+    t.parts.mover_mut(BUILDER).unwrap().stats.speed = Speed::ZERO;
     let _ = code(&mut t, 20);
     assert_eq!(walk_state(&t), Some(MoveTo::Failed));
     for end in [Some(MoveTo::Arrived), Some(MoveTo::Failed), None] {
@@ -923,7 +923,7 @@ fn stump(t: &mut World) {
             PlayerId::new(0),
             Unit {
                 id: object_id(77),
-                body: Body::at(Position::new(10.2, 10.2, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(10.2, 10.2, 0.0)),
                 life: Lifecycle {
                     state: ObjectState::Alive,
                     hp: HitPoints::new(0.5),
@@ -1500,7 +1500,7 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
         (b.state, b.timer, walk_state(&t)),
         (BuildState::Drop, Seconds::new(-3.0), Some(MoveTo::Arrived))
     );
-    assert_eq!(builder(&t).body.anim_speed(), Some(Speed::ZERO));
+    assert_eq!(t.parts.anim_speed_of(BUILDER), Some(Speed::ZERO));
     assert_eq!(wood(&t).0, 10.0);
     let _ = code(&mut t, 250);
     assert_eq!(build(&t).timer, Seconds::new(-2.75));

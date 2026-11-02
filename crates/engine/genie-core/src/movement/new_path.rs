@@ -4,6 +4,7 @@
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Point;
+use crate::map::Position;
 use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
@@ -367,7 +368,7 @@ impl Mover {
     /// [`Mover::reach_test`] decides. `master` is the unit's master's id.
     pub fn reaches(
         &self,
-        me: &Me,
+        (at, me): (Position, &Me),
         (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         to: Point,
@@ -380,7 +381,7 @@ impl Mover {
             range,
             master,
         };
-        self.reach_test(me, world, plan, ask, by_id)
+        self.reach_test(at, me, world, plan, ask, by_id)
     }
 
     /// Slot 0x3d0 of the unit (`FUN_14114fea0` -> `FUN_140fa0370` with the target object): whether
@@ -388,7 +389,7 @@ impl Mover {
     /// as [`Mover::reach_test`] decides; a target that is gone is not reached.
     pub fn reaches_object(
         &self,
-        me: &Me,
+        (at, me): (Position, &Me),
         (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         target: ObjectId,
@@ -405,7 +406,7 @@ impl Mover {
             range,
             master,
         };
-        self.reach_test(me, world, plan, ask, by_id)
+        self.reach_test(at, me, world, plan, ask, by_id)
     }
 
     /// Slot 0x3e8 of the unit (`FUN_14114f790`): the length of its short path to object `target`
@@ -416,6 +417,7 @@ impl Mover {
     /// ([`Spatial::clear_tile_records`]).
     pub fn short_reach(
         &self,
+        at: Position,
         me: &Me,
         world: &mut Spatial,
         target: ObjectId,
@@ -434,7 +436,7 @@ impl Mover {
             mask,
             Distance::new(self.stats.radius.x()),
         );
-        let (result, path) = pather.find(self.position().ground(), to, Some(target), range)?;
+        let (result, path) = pather.find(at.ground(), to, Some(target), range)?;
         // the slot removes the manager's temporary tile records after (FUN_1410561f0)
         world.clear_tile_records();
         Ok(result.reaches().then(|| path.length()))
@@ -445,6 +447,7 @@ impl Mover {
     /// the planner's result; None without a planner for the unit's restriction.
     pub fn plan_length(
         &self,
+        at: Position,
         world: &Spatial,
         plan: &mut Planning<'_>,
         to: Point,
@@ -455,7 +458,7 @@ impl Mover {
             return Ok(None);
         };
         let req = Request {
-            from: self.position().ground(),
+            from: at.ground(),
             to,
             radii,
             range: Distance::ZERO,

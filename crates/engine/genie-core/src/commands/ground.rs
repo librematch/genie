@@ -72,10 +72,13 @@ impl World {
             {
                 continue;
             }
-            let walking = u.body.anim_speed().is_some_and(|s| Speed::ZERO < s);
-            let level = u
-                .body
-                .mover()
+            let walking = self
+                .parts
+                .anim_speed_of(u.id)
+                .is_some_and(|s| Speed::ZERO < s);
+            let level = self
+                .parts
+                .mover_of(u.id)
                 .and_then(|m| m.paths.first())
                 .map(|l| l.state);
             let stands = (owner == PlayerId::GAIA
@@ -144,9 +147,12 @@ impl World {
         let (_, first) = self
             .object(*units.checked(0)?)
             .ok_or(GenieError::unsupported("a unit sent off that is gone"))?;
-        let mover = first.body.mover().ok_or(GenieError::unsupported(
-            "a unit sent off without movement state",
-        ))?;
+        let mover = self
+            .parts
+            .mover_of(first.id)
+            .ok_or(GenieError::unsupported(
+                "a unit sent off without movement state",
+            ))?;
         let spot = self.spatial.spot_off(
             first.position(),
             (first.id, mover.stats.radius.x()),

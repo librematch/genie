@@ -243,11 +243,11 @@ impl Unit {
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
             ));
         }
-        let facing = self
-            .body
-            .mover()
-            .map(|m| m.angle)
-            .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
+        let facing =
+            c.w.parts
+                .mover_of(self.id)
+                .map(|m| m.angle)
+                .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
         let shot = Shot {
             made: master.missile.master().ok_or(GenieError::missing_data(
                 "a ranged unit whose master has no missile",
@@ -309,11 +309,11 @@ impl Unit {
             &c.w.parts.own_master,
             Some(masters),
         ))?;
-        let facing = self
-            .body
-            .mover()
-            .map(|m| m.angle)
-            .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
+        let facing =
+            c.w.parts
+                .mover_of(self.id)
+                .map(|m| m.angle)
+                .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
         let building = master.class == class::BUILDING;
         let at = crate::combat::missile::volley_spawn_point(
             self.position(),
@@ -572,7 +572,7 @@ impl Unit {
                 master_id: made.id,
                 master: made.life,
             },
-            body: crate::objects::layers::Body::new(position, None, Some(mover)),
+            place: crate::objects::layers::Static::at(position),
             actions: crate::objects::layers::ActionLayer {
                 list: ActionList::default().with_missile(Some(action)),
                 ..Default::default()
@@ -600,6 +600,7 @@ impl Unit {
             unit: missile,
             parts: crate::world::parts::ObjectParts {
                 missile: Some(own),
+                motion: Some(crate::objects::layers::MotionLayer::Moving(mover)),
                 // its +0x900, the firing object's attack count when fired
                 combat: crate::objects::layers::Combat {
                     attack_count: c.w.parts.combat_of(self.id).attack_count,

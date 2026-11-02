@@ -70,10 +70,10 @@ impl Unit {
             building: at.position,
             range: reach as i32 as i16,
         };
-        let mover = self
-            .body
-            .mover()
-            .ok_or(GenieError::unsupported("a builder without movement state"))?;
+        let mover =
+            c.w.parts
+                .mover_of(self.id)
+                .ok_or(GenieError::unsupported("a builder without movement state"))?;
         let restriction = mover.stats.restriction;
         let (player, me_id, every) = (
             c.player,

@@ -67,7 +67,7 @@ impl World {
                 i += 1;
                 continue;
             }
-            if let WorldObject::Unit(p, u) = object
+            if let WorldObject::Unit(p, u, _) = object
                 && self
                     .parts
                     .unit_ai
@@ -112,8 +112,8 @@ impl World {
                 }
             }
             let _ = self.groups.held_mut(group)?.objects.remove(i);
-            if let Some((_, u)) = self.object_mut(id)
-                && let Some(mover) = u.body.mover_mut()
+            if self.object(id).is_some()
+                && let Some(mover) = self.parts.mover_mut(id)
             {
                 mover.stand()?;
             }
@@ -132,7 +132,7 @@ impl World {
     /// An object of a master the slice does not have, and what [`crate::objects::unit::Unit::interruptible`] does not
     /// model.
     pub(super) fn may_interrupt(&self, object: WorldObject<'_>) -> Result<bool, GenieError> {
-        let WorldObject::Unit(p, u) = object else {
+        let WorldObject::Unit(p, u, _) = object else {
             return Ok(false);
         };
         if u.master(self.master_tables(), p)?.kind < ACTION {
@@ -168,8 +168,8 @@ impl World {
             return false;
         }
         !g.members.iter().any(|m| {
-            matches!(self.world_object(m.id), Some(WorldObject::Unit(_, u))
-                if u.body.mover().is_some_and(crate::movement::Mover::is_moving))
+            matches!(self.world_object(m.id), Some(WorldObject::Unit(_, u, _))
+                if self.parts.mover_of(u.id).is_some_and(crate::movement::Mover::is_moving))
         })
     }
 
@@ -185,7 +185,7 @@ impl World {
         &self,
         object: WorldObject<'_>,
     ) -> Result<Option<WorldObject<'_>>, GenieError> {
-        let WorldObject::Unit(p, u) = object else {
+        let WorldObject::Unit(p, u, _) = object else {
             return Ok(None);
         };
         if u.master(self.master_tables(), p)?.kind < ACTION {
@@ -291,7 +291,7 @@ impl World {
     pub(super) fn relic_pickup_pending(&self, g: &UnitGroup) -> Result<bool, GenieError> {
         let owner = g.owner_player()?;
         for m in &g.members {
-            let Some(WorldObject::Unit(_, u)) = self.world_object(m.id) else {
+            let Some(WorldObject::Unit(_, u, _)) = self.world_object(m.id) else {
                 continue;
             };
             let Some(ai) = self.parts.unit_ai.get(u.id) else {
@@ -321,7 +321,7 @@ impl World {
     pub(super) fn relic_delivery_pending(&self, g: &UnitGroup) -> Result<bool, GenieError> {
         let owner = g.owner_player()?;
         for m in &g.members {
-            let Some(WorldObject::Unit(_, u)) = self.world_object(m.id) else {
+            let Some(WorldObject::Unit(_, u, _)) = self.world_object(m.id) else {
                 continue;
             };
             let Some(ai) = self.parts.unit_ai.get(u.id) else {
@@ -407,7 +407,7 @@ impl World {
         let Some(object) = self.world_object(id) else {
             return Ok(false);
         };
-        let WorldObject::Unit(p, u) = object else {
+        let WorldObject::Unit(p, u, _) = object else {
             return Ok(true);
         };
         u.free_for_group(
@@ -508,8 +508,14 @@ impl World {
             return Ok(false);
         };
         let graphic = self.graphics.get(sprite).copied();
-        let (_, u) = self.object_mut(id).ok_or_else(|| member_gone(id))?;
-        if let Some(m) = u.body.mover_mut() {
+        let place = self.place(id).ok_or_else(|| member_gone(id))?;
+        let u = match place {
+            crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i).ok(),
+            crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i).ok(),
+        }
+        .ok_or_else(|| member_gone(id))?;
+        let mut motion = self.parts.motion.layer_mut(u.id);
+        if let Some(m) = motion.mover_mut() {
             m.shows(graphic.as_ref());
         }
         if u.sprite.is_none() {
@@ -518,13 +524,8 @@ impl World {
         let g = graphic.ok_or(GenieError::unsupported(
             "a unit without its sprite's graphic",
         ))?;
-        let place = self.place(id).ok_or_else(|| member_gone(id))?;
         let rng = self.streams.get(crate::math::rng::Stream::Sprite);
-        let u = match place {
-            crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
-            crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
-        };
-        crate::objects::sprite::new_sprite(&mut u.sprite, u.body.move_stats_mut(), g, rng);
+        crate::objects::sprite::new_sprite(&mut u.sprite, motion.move_stats_mut(), g, rng);
         Ok(true)
     }
 
@@ -542,7 +543,10 @@ impl World {
                 continue;
             };
             // slot 0x520: the game's vector of where it last moved to
-            let d = crate::math::fmath::sub(crate::groups::attack::moved_place(u), to);
+            let d = crate::math::fmath::sub(
+                crate::groups::attack::moved_place(u, self.parts.mover_of(u.id)),
+                to,
+            );
             let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
             if squared < best {
                 lead = Some(m.id);

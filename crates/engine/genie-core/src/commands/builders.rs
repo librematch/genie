@@ -118,7 +118,7 @@ impl World {
                 notified: true,
             };
             self.order_work(q, idx, &work)?;
-        } else if let Some(m) = self.players.live_mut(q, idx)?.body.mover_mut() {
+        } else if let Some(m) = self.parts.mover_mut(self.players.live(q, idx)?.id) {
             m.ignore_units.clear();
         }
         Ok(())
@@ -252,7 +252,7 @@ impl World {
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = MoveToReads::of(
-            unit,
+            (unit, self.parts.mover_of(unit.id)),
             builder,
             (
                 &self.graphics,
@@ -276,7 +276,7 @@ impl World {
         position: Position,
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(q, idx)?;
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.ignore_units.clear();
         }
         let state = unit.life.state;
@@ -317,7 +317,7 @@ impl World {
         position: Position,
     ) -> Result<(), GenieError> {
         let site_class = self.master(fp, master)?.class;
-        if let Some(m) = self.players.live_mut(player, idx)?.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(self.players.live(player, idx)?.id) {
             m.ignore_units.clear();
         }
         // slot 0x128 -> slot 0x7e8 (task filter -1): the villager's town-bell record, its
@@ -465,7 +465,7 @@ impl World {
             state: Some(f.life.state),
         };
         let move_reads = MoveToReads::of(
-            unit,
+            (unit, self.parts.mover_of(unit.id)),
             builder,
             (
                 &self.graphics,

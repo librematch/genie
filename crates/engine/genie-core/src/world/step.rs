@@ -76,7 +76,7 @@ impl World {
     pub(crate) fn walk_beside<'b>(
         &'b mut self,
         pace: Pace,
-        body: &'b mut crate::objects::layers::Body,
+        place: &'b mut crate::objects::layers::Static,
         me: Me,
     ) -> (Walk<'b>, Beside<'b>) {
         let Self {
@@ -91,8 +91,10 @@ impl World {
             ..
         } = self;
         let (object, sprite_rng) = streams.object_and_sprite();
+        let (motion, motions) = parts.motion.lend(me.id);
         let walk = Walk {
-            body,
+            place,
+            motion,
             me,
             dt: pace.dt,
             world: spatial,
@@ -107,7 +109,7 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat),
+                (&parts.building, &parts.combat, motions),
             ),
         };
         let beside = Beside {
@@ -253,14 +255,17 @@ impl Step<'_> {
     /// An updating player the world has not got.
     pub(crate) fn walk_and_sprites<'b>(
         &'b mut self,
-        body: &'b mut crate::objects::layers::Body,
+        place: &'b mut crate::objects::layers::Static,
         me: Me,
     ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
         let computer = self.w.players.player(self.player)?.computer;
         let (object, sprite) = self.w.streams.object_and_sprite();
+        let parts = &mut self.w.parts;
+        let (motion, motions) = parts.motion.lend(me.id);
         Ok((
             Walk {
-                body,
+                place,
+                motion,
                 me,
                 dt: self.dt.seconds(),
                 world: &mut self.w.spatial,
@@ -271,11 +276,11 @@ impl Step<'_> {
                     object,
                     groups: &self.w.groups,
                 }),
-                by_id: ObjectsRef::new(
+                by_id: ObjectsRef::of_tables(
                     &self.w.players,
                     &self.w.index,
-                    &self.w.masters,
-                    &self.w.parts,
+                    crate::objects::masters::MasterTables::new(&self.w.masters, &parts.own_master),
+                    (&parts.building, &parts.combat, motions),
                 ),
             },
             sprite,

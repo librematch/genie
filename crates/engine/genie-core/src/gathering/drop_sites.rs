@@ -73,10 +73,12 @@ impl Seeker<'_, '_> {
         let to = o.position().ground();
         let ground = self.mover.stats.radius.ground();
         let near = || {
-            footprint_gap_squared(self.mover.position(), ground, o.position(), master.radius)
+            footprint_gap_squared(self.unit.position(), ground, o.position(), master.radius)
                 <= FISHING_REACH
         };
-        let planned = self.mover.plan_length(self.spatial, self.plan, to, radii)?;
+        let planned =
+            self.mover
+                .plan_length(self.unit.position(), self.spatial, self.plan, to, radii)?;
         Ok(match planned {
             Some((found, length)) if counted(found, by_path, self.fishing(), near) => {
                 if !by_path {
@@ -85,6 +87,7 @@ impl Seeker<'_, '_> {
                 *last = length.get();
                 if length.get() <= SHORT_DROP_REACH
                     && let Some(short) = self.mover.short_reach(
+                        self.unit.position(),
                         &self.me,
                         self.spatial,
                         o.id,
@@ -294,7 +297,7 @@ mod tests {
     fn object(id: i32, master_id: MasterId, at: Point) -> Unit {
         Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(at.with_height(0.0)),
+            place: crate::objects::layers::Static::at(at.with_height(0.0)),
             life: Lifecycle {
                 state: ObjectState::Alive,
                 master_id,

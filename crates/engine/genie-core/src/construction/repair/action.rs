@@ -64,6 +64,7 @@ fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), Gen
 /// The repairer shows its master's standing sprite ([`Unit::show_standing`]).
 fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> Result<(), GenieError> {
     repairer.show_standing(
+        c.w.parts.motion.layer_mut(repairer.id),
         crate::objects::masters::OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
         &c.w.graphics,
         c.w.streams.get(Stream::Sprite),
@@ -85,7 +86,7 @@ fn show(
     };
     sprites
         .shown(id.or(standing))?
-        .show(repairer.body.move_stats_mut());
+        .show(c.w.parts.move_stats_mut(repairer.id));
     Ok(())
 }
 
@@ -220,10 +221,13 @@ impl RepairAction {
         let t = reads.target.ok_or(GenieError::unreachable(
             "a Repair facing its target without one",
         ))?;
-        let at = repairer.body.position();
-        let mover = repairer.body.mover_mut().ok_or(GenieError::unreachable(
-            "a repairer without movement state (an action object always has one)",
-        ))?;
+        let at = repairer.place.position();
+        let mover =
+            c.w.parts
+                .mover_mut(repairer.id)
+                .ok_or(GenieError::unreachable(
+                    "a repairer without movement state (an action object always has one)",
+                ))?;
         if crate::combat::attack::face_target(mover, at, t.position, c.w.world_time)? {
             self.set_state(c, repairer, RepairState::Work, reads)?;
         }
@@ -377,7 +381,7 @@ impl RepairAction {
         } else {
             0.0
         };
-        let at = repairer.body.position();
+        let at = repairer.place.position();
         footprint_gap(at, reads.radius, t.position, t.radius) - Distance::new(margin)
     }
 
@@ -484,7 +488,7 @@ impl RepairAction {
             self.counted = false;
         }
         if self.move_to.take().is_some()
-            && let Some(m) = repairer.body.mover_mut()
+            && let Some(m) = c.w.parts.mover_mut(repairer.id)
         {
             m.stop()?;
         }
@@ -552,6 +556,7 @@ impl RepairAction {
     /// `set_state(11)`'s case: the `MoveTo` to the action's point starts.
     fn enter_walk_point(&mut self, c: &Step<'_>, repairer: &Unit) -> Result<(), GenieError> {
         let move_reads = repairer.move_to_reads(
+            c.w.parts.motion.mover(repairer.id),
             c.w.master_tables(),
             c.player,
             (
@@ -580,6 +585,7 @@ impl RepairAction {
             self.point = t.position;
         }
         let move_reads = repairer.move_to_reads(
+            c.w.parts.motion.mover(repairer.id),
             c.w.master_tables(),
             c.player,
             (

@@ -101,6 +101,7 @@ impl World {
         };
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(
+            self.parts.mover_of(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -109,8 +110,10 @@ impl World {
             ),
         )?;
         let unit = self.players.live_mut(player, idx)?;
-        let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
-        else {
+        let (Some(gather), Some(mover)) = (
+            unit.actions.list.gather_mut(),
+            self.parts.mover_mut(unit.id),
+        ) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -188,6 +191,7 @@ impl World {
         });
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(
+            self.parts.mover_of(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -196,8 +200,10 @@ impl World {
             ),
         )?;
         let unit = self.players.live_mut(player, idx)?;
-        let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
-        else {
+        let (Some(gather), Some(mover)) = (
+            unit.actions.list.gather_mut(),
+            self.parts.mover_mut(unit.id),
+        ) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -260,6 +266,7 @@ impl World {
         let by = self.releaser(player, idx)?;
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
+            self.parts.mover_of(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -268,7 +275,8 @@ impl World {
             ),
         )?;
         let my_pasture = unit.my_pasture;
-        let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
+        let (Some(hunt), Some(mover)) =
+            (unit.actions.list.hunt_mut(), self.parts.mover_mut(unit.id))
         else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -411,6 +419,7 @@ impl World {
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
+            self.parts.mover_of(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -418,9 +427,9 @@ impl World {
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let mover = unit
-            .body
-            .mover_mut()
+        let mover = self
+            .parts
+            .mover_mut(unit.id)
             .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut held = unit.life.held();
         let rng = self.streams.get(Stream::Action);
@@ -490,7 +499,10 @@ impl World {
             .spatial
             .get_known(target)?
             .ok_or(crate::world::TARGET_UNPLACED)?;
-        let speed = unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+        let speed = self
+            .parts
+            .mover_of(unit.id)
+            .map_or(Speed::ZERO, |m| m.stats.speed);
         crate::combat::attack::engagement(
             self.parts.unit_ai.get(unit.id),
             speed,
@@ -600,6 +612,7 @@ impl World {
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
+            self.parts.mover_of(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -607,7 +620,10 @@ impl World {
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = self
+            .parts
+            .mover_mut(unit.id)
+            .ok_or(crate::world::HUNTER_UNMOVING)?;
         let mut held = unit.life.held();
         let (hunt, arrived) = HuntAction::start(
             HuntStart {
@@ -633,11 +649,11 @@ impl World {
             let g = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
             crate::objects::sprite::new_sprite(
                 &mut unit.sprite,
-                unit.body.move_stats_mut(),
+                self.parts.move_stats_mut(unit.id),
                 g,
                 self.streams.get(Stream::Sprite),
             );
-            unit.body.set_anim_speed(Speed::ZERO);
+            self.parts.set_anim_speed(unit.id, Speed::ZERO);
         }
         let drops = hunt.target.is_none() && hunt.carry_to.key() == Some(target);
         unit.actions.list.set_hunt(Some(hunt));

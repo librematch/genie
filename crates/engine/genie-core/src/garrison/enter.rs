@@ -241,7 +241,7 @@ impl World {
             }
             let unit = self.players.live_mut(player, idx)?;
             if gone.stops
-                && let Some(m) = unit.body.mover_mut()
+                && let Some(m) = self.parts.mover_mut(unit.id)
             {
                 m.stop()?;
             }
@@ -261,6 +261,7 @@ impl World {
             let unit = self.players.live_mut(player, idx)?;
             unit.place_enter(action, sub);
             unit.shows_standing_sprite(
+                self.parts.motion.layer_mut(unit.id),
                 masters,
                 &self.graphics,
                 self.streams.get(crate::math::rng::Stream::Sprite),
@@ -329,11 +330,12 @@ impl World {
         let tm = t.master(self.master_tables(), tp)?.clone();
         let room = self.has_room(tp, t, Some(id))?;
         let t = placed_object(&self.players, self.place(target))?;
+        let unit = self.players.live(player, idx)?;
         enter_view(
             &mut self.spatial,
             &self.masters,
-            self.players.live(player, idx)?,
-            (t, &tm, room),
+            (unit, self.parts.mover_of(unit.id)),
+            ((t, self.parts.mover_of(t.id)), &tm, room),
             range,
             by_id,
         )
@@ -366,7 +368,7 @@ impl World {
         let target = placed_object(&self.players, self.place(action.target))?;
         let unit = self.players.live(player, idx)?;
         let reads = MoveToReads::of(
-            unit,
+            (unit, self.parts.mover_of(unit.id)),
             unit.master(self.master_tables(), player)?,
             (
                 &self.graphics,
@@ -380,6 +382,8 @@ impl World {
             master: &master,
             room: t.room,
             unit,
+            mover: self.parts.mover_of(unit.id),
+            target_mover: self.parts.mover_of(target.id),
         };
         action.walk_again(t, start, meeting, &reads, by_id)
     }
@@ -409,13 +413,16 @@ impl World {
         let master = t.master(self.master_tables(), tp)?.clone();
         let room = self.has_room(tp, t, Some(id))?;
         let target = placed_object(&self.players, self.place(target))?;
+        let unit = self.players.live(player, idx)?;
         Meeting {
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             target,
             master: &master,
             room,
-            unit: self.players.live(player, idx)?,
+            unit,
+            mover: self.parts.mover_of(unit.id),
+            target_mover: self.parts.mover_of(target.id),
         }
         .point(by_id)
     }
@@ -447,7 +454,13 @@ impl World {
             object: self.streams.get(crate::math::rng::Stream::Object),
             groups: &self.groups,
         };
-        if !ship_reaches(ship, &mut self.spatial, &mut plan, to, by_id)? {
+        if !ship_reaches(
+            (ship, self.parts.mover_of(ship.id)),
+            &mut self.spatial,
+            &mut plan,
+            to,
+            by_id,
+        )? {
             return Err(UNREACHED);
         }
         self.ship_move(transport, to)

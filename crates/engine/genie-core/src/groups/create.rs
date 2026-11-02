@@ -216,7 +216,7 @@ impl World {
                 crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
             };
             if u.group.id == Some(group_id) {
-                if !keep_moving && let Some(m) = u.body.mover_mut() {
+                if !keep_moving && let Some(m) = self.parts.mover_mut(u.id) {
                     m.stand()?;
                 }
                 u.group.id = None;
@@ -354,7 +354,7 @@ impl World {
         };
         let sub = self.unit_category(Some(object))?;
         // a ghost (type 25) has no sub-formation: only a unit gets past this
-        let crate::groups::WorldObject::Unit(p, u) = object else {
+        let crate::groups::WorldObject::Unit(p, u, _) = object else {
             return Ok(false);
         };
         if sub == FormationCategory::ANY {
@@ -464,14 +464,14 @@ mod tests {
         let unit = |id: i32, master: MasterId, x: f32| {
             let mut u = Unit {
                 id: object_id(id),
-                body: crate::objects::layers::Body::at(Position::new(x, 0.0, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(x, 0.0, 0.0)),
                 ..Unit::default()
             };
             u.life.master_id = master;
             u.group.id = Some(group_id(1));
             u
         };
-        let mut walking = unit(11, master_id(4), 2.0);
+        let walking = unit(11, master_id(4), 2.0);
         let mut mover = crate::gathering::hunt::tests::walker();
         mover.paths = vec![
             mover
@@ -481,7 +481,6 @@ mod tests {
                 .unwrap_or(crate::movement::PathData::without_path()),
         ];
         mover.paths[0].state = PathState::Walking;
-        walking.body.put_mover(Some(mover));
         let player = Player {
             objects: vec![
                 unit(10, master_id(4), 1.0),
@@ -497,7 +496,11 @@ mod tests {
             PlayerId::new(0),
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), player],
-        );
+        )
+        .with_motions([(
+            object_id(11),
+            crate::objects::layers::MotionLayer::Moving(mover),
+        )]);
         let master = |id: MasterId, category: u8| Master {
             id,
             kind: master_type::COMBAT,
@@ -682,7 +685,7 @@ mod tests {
         );
         let u = &t.players[1].objects[ListIndex::new(1)];
         assert_eq!(u.group.id, None);
-        let m = u.body.mover().unwrap();
+        let m = t.parts.mover_of(u.id).unwrap();
         assert_eq!(m.paths[0].state, PathState::Idle);
         // not a member, or a group the world does not hold
         assert!(
@@ -836,9 +839,8 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(
-            t.players[1].objects[ListIndex::new(1)]
-                .body
-                .mover()
+            t.parts
+                .mover_of(t.players[1].objects[ListIndex::new(1)].id)
                 .unwrap()
                 .paths[0]
                 .state,

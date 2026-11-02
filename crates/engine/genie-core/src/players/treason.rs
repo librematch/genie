@@ -203,7 +203,7 @@ mod tests {
     fn king(id: i32, position: Position, inside: Option<ObjectId>) -> Unit {
         Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(position),
+            place: crate::objects::layers::Static::at(position),
             life: Lifecycle {
                 master_id: KING,
                 inside: inside.map(ContainerId::new),

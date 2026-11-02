@@ -7,7 +7,7 @@ use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::SpriteId;
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -80,12 +80,12 @@ pub(crate) fn volleys(
 pub(crate) fn show_arrived(
     arms: &Arms,
     sprite: &mut Option<ActiveSprite>,
-    body: &mut Body,
+    mut motion: MotionMut<'_>,
     rng: &mut Well512,
 ) -> Result<(), GenieError> {
     let g = arms.idle_sprite.ok_or(crate::world::NO_STANDING_SPRITE)?;
-    crate::objects::sprite::new_sprite(sprite, body.move_stats_mut(), g, rng);
-    body.set_anim_speed(Speed::ZERO);
+    crate::objects::sprite::new_sprite(sprite, motion.move_stats_mut(), g, rng);
+    motion.set_anim_speed(Speed::ZERO);
     Ok(())
 }
 

@@ -81,8 +81,8 @@ impl Unit {
         if let Some(artifact) = self.actions.list.artifact_mut() {
             let (gone, released) = artifact.stop();
             if gone.stops {
-                self.body
-                    .mover_mut()
+                c.w.parts
+                    .mover_mut(self.id)
                     .ok_or(GenieError::unsupported(
                         "a walking animal without movement state",
                     ))?
@@ -92,6 +92,7 @@ impl Unit {
                 crate::world::lets::release(c, self, t, by)?;
             }
             self.show_standing(
+                c.w.parts.motion.layer_mut(self.id),
                 crate::objects::masters::OwnerMasters::new(
                     &c.w.parts.own_master,
                     c.w.masters.of(c.player),
@@ -103,7 +104,12 @@ impl Unit {
             // any other top action's slot 0x38 is the base's false for what an animal or an
             // artifact holds (a `MoveTo` of its own), and the list goes
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-            self.tear_down_actions(&mut releases, &mut leaves, by)?;
+            self.tear_down_actions(
+                c.w.parts.motion.layer_mut(self.id),
+                &mut releases,
+                &mut leaves,
+                by,
+            )?;
             crate::world::lets::torn_down(c, self, (leaves, releases))?;
         }
         let trading = self.top_action_kind() == Some(TRADE_ACTION)
@@ -117,7 +123,7 @@ impl Unit {
                 .get(self.id)
                 .is_some_and(|ai| ai.current_action != Some(ActionKind::HeroPower))
         {
-            let place = (self.body.position().ground(), Some(class));
+            let place = (self.place.position().ground(), Some(class));
             // slot 0xb0 with 0, its stopAction a call on the unit at once
             self.run_calls(c, |ai, side, rng| {
                 ai.stop_with(false, Some(place), side, rng)?;

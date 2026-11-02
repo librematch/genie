@@ -20,8 +20,13 @@ use crate::players::PlayerId;
 /// the game (`RGE_Static_Object::recycle_out_of_game`) leaves its player's list, so the table.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum WorldObject<'a> {
-    /// An object of player `.0`'s live or sleeping list.
-    Unit(PlayerId, &'a crate::objects::unit::Unit),
+    /// An object of player `.0`'s live or sleeping list, with its mover (none for one that does
+    /// not move).
+    Unit(
+        PlayerId,
+        &'a crate::objects::unit::Unit,
+        Option<&'a crate::movement::Mover>,
+    ),
     /// A ghost of player `.0`'s doppelganger list (type 25, its master `243`).
     Ghost(PlayerId, &'a crate::vision::ghost::Ghost),
 }
@@ -30,14 +35,14 @@ impl WorldObject<'_> {
     /// The player whose list holds it (`+0x138`).
     pub(crate) const fn player(&self) -> PlayerId {
         match *self {
-            Self::Unit(p, _) | Self::Ghost(p, _) => p,
+            Self::Unit(p, _, _) | Self::Ghost(p, _) => p,
         }
     }
 
     /// Its master's id (`+0xa0`'s): a ghost's is its player's [`crate::vision::ghost::GHOST_MASTER`].
     pub(crate) const fn master_id(&self) -> MasterId {
         match *self {
-            Self::Unit(_, u) => u.life.master_id,
+            Self::Unit(_, u, _) => u.life.master_id,
             Self::Ghost(..) => crate::vision::ghost::GHOST_MASTER,
         }
     }
@@ -45,7 +50,7 @@ impl WorldObject<'_> {
     /// Its id (`+0x8`).
     pub(crate) const fn id(&self) -> ObjectId {
         match *self {
-            Self::Unit(_, u) => u.id,
+            Self::Unit(_, u, _) => u.id,
             Self::Ghost(_, g) => g.id,
         }
     }
@@ -53,7 +58,7 @@ impl WorldObject<'_> {
     /// Its state (`+0x640`): a ghost's own (2, then 7 and 8 once destroyed).
     pub(crate) const fn state(&self) -> crate::objects::ObjectState {
         match *self {
-            Self::Unit(_, u) => u.life.state,
+            Self::Unit(_, u, _) => u.life.state,
             Self::Ghost(_, g) => g.state,
         }
     }
@@ -61,7 +66,7 @@ impl WorldObject<'_> {
     /// It is inside another object (`+0x2f0`, `FUN_141188da0`); a ghost never is.
     pub(crate) const fn inside(&self) -> bool {
         match *self {
-            Self::Unit(_, u) => u.life.inside.is_some(),
+            Self::Unit(_, u, _) => u.life.inside.is_some(),
             Self::Ghost(..) => false,
         }
     }
@@ -69,7 +74,7 @@ impl WorldObject<'_> {
     /// Its place: x, y, z (`+0x3c8`, `+0x4c8`, `+0x5a8`).
     pub(crate) const fn position(&self) -> Position {
         match *self {
-            Self::Unit(_, u) => u.position(),
+            Self::Unit(_, u, _) => u.position(),
             Self::Ghost(_, g) => g.position,
         }
     }
@@ -79,7 +84,7 @@ impl WorldObject<'_> {
     /// animated or doppelganger object's `FUN_141071e30` (0).
     pub(crate) const fn moves(&self) -> bool {
         match *self {
-            Self::Unit(_, u) => u.body.mover().is_some(),
+            Self::Unit(_, _, m) => m.is_some(),
             Self::Ghost(..) => false,
         }
     }
@@ -88,7 +93,7 @@ impl WorldObject<'_> {
     /// animated or doppelganger object's (0, 0, 0) (`FUN_141071e10`).
     pub(crate) fn forward(&self) -> BVector {
         match *self {
-            Self::Unit(_, u) => u.body.mover().map_or(BVector::ZERO, |m| m.forward),
+            Self::Unit(_, _, m) => m.map_or(BVector::ZERO, |m| m.forward),
             Self::Ghost(..) => BVector::ZERO,
         }
     }
@@ -97,7 +102,7 @@ impl WorldObject<'_> {
     /// ([`crate::objects::unit::Unit::moved_vector`]), a ghost's place (`FUN_141196c10`).
     pub(crate) fn moved_vector(&self) -> BVector {
         match *self {
-            Self::Unit(_, u) => u.moved_vector(),
+            Self::Unit(_, u, m) => u.moved_vector(m),
             Self::Ghost(_, g) => g.position.vector(),
         }
     }
@@ -113,7 +118,7 @@ impl crate::world::World {
             return None;
         }
         if let Some((p, u)) = self.object(id) {
-            return Some(WorldObject::Unit(p, u));
+            return Some(WorldObject::Unit(p, u, self.parts.mover_of(u.id)));
         }
         if id.get() < 0 {
             for (p, player) in PlayerId::each(self.players.len()).zip(&self.players) {

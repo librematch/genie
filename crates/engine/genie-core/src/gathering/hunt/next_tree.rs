@@ -104,7 +104,10 @@ impl Unit {
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
         let (me_at, them) = (at(self.id)?, at(found)?);
-        let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+        let speed =
+            c.w.parts
+                .mover_of(self.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
@@ -114,6 +117,7 @@ impl Unit {
             c.w.world_time,
         )?;
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -129,7 +133,10 @@ impl Unit {
         let old = hunt.target;
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = crate::combat::attack::arms(master, &c.w.graphics, hunt.task.sprites, moving);
-        let mover = self.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover =
+            c.w.parts
+                .mover_mut(self.id)
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
         if let Some(arrived) = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
@@ -145,7 +152,7 @@ impl Unit {
                 crate::combat::attack::show_arrived(
                     &arms,
                     &mut self.sprite,
-                    &mut self.body,
+                    c.w.parts.motion_mut(self.id),
                     c.w.streams.get(Stream::Sprite),
                 )?;
             }

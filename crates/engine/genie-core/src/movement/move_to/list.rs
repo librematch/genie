@@ -39,7 +39,7 @@ pub(crate) fn update_sub_actions(
         return Ok(UpdateCode::DONE);
     };
     let held = c.w.object_state(move_to.target);
-    let (mut walk, beside) = c.w.walk_beside(c.pace()?, &mut unit.body, me);
+    let (mut walk, beside) = c.w.walk_beside(c.pace()?, &mut unit.place, me);
     let shown = (move_to.state == MoveTo::Start).then_some(Shown {
         sprite: &mut unit.sprite,
         rng: beside.sprite_rng,

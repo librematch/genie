@@ -416,7 +416,7 @@ impl HuntAction {
                 "a computer player's hunt whose walk to a point failed (set_state 13)"
             }));
         }
-        self.tear_down(unit.body.mover_mut())?;
+        self.tear_down(c.w.parts.mover_mut(unit.id))?;
         if self.state == HuntState::WalkSearch {
             self.state = HuntState::Search;
             return Ok(PointWalk::Search);

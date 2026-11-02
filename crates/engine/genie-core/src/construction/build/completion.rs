@@ -144,9 +144,9 @@ impl crate::world::World {
         let u = held(players, place)?;
         show_built(
             &mut u.sprite,
-            u.body.move_stats_mut(),
+            parts.motion.move_stats_mut(u.id),
             master,
-            parts.building_of(id).build_frame,
+            parts.building.of(id).build_frame,
             graphics,
             streams.get(crate::math::rng::Stream::Sprite),
         );

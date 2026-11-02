@@ -591,7 +591,7 @@ impl World {
             ));
         };
         self.object_stop(p, idx)?;
-        if let Some(m) = self.players.live_mut(p, idx)?.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(self.players.live(p, idx)?.id) {
             m.stand()?;
         }
         let g = self.groups.held_mut(group)?;

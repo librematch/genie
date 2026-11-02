@@ -122,9 +122,9 @@ impl World {
             return Ok(false);
         };
         let unit = self.players.live(p, i)?;
-        let at = unit
-            .body
-            .mover()
+        let at = self
+            .parts
+            .mover_of(unit.id)
             .map_or_else(|| unit.position(), |m| m.moved_at);
         let flags = self
             .spatial
@@ -149,7 +149,7 @@ impl World {
         } else {
             (ONE, ONE)
         };
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.factor = factor;
         }
         self.parts.combat_mut(unit.id)?.abilities.attack_rate = rate;

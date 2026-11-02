@@ -18,7 +18,7 @@ use crate::movement::move_to::{MoveToReads, TargetMoved};
 use crate::movement::{Mover, footprint_gap, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
@@ -183,6 +183,7 @@ impl Attack {
         cmd: &AttackCommand<'_>,
     ) -> Result<(Self, Vec<Posted>), GenieError> {
         let reads = unit.move_to_reads(
+            c.w.parts.motion.mover(unit.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -190,19 +191,19 @@ impl Attack {
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let mover = unit
-            .body
-            .mover_mut()
-            .ok_or(crate::world::ATTACKER_UNMOVING)?;
+        let (mover, by_id) =
+            c.w.parts
+                .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.masters));
+        let mover = mover.ok_or(crate::world::ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
-            Self::own_start(cmd, (&c.w.spatial, c.w.objects()), mover, &reads)?;
+            Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
         if begun.failed_first {
-            unit.body.set_anim_speed(Speed::new(1.0));
+            c.w.parts.set_anim_speed(unit.id, Speed::new(1.0));
         }
         if begun.failed {
             attack.fail_at_start(
                 &mut unit.sprite,
-                &mut unit.body,
+                c.w.parts.motion_mut(unit.id),
                 c.w.streams.get(Stream::Sprite),
             )?;
         }
@@ -210,23 +211,23 @@ impl Attack {
             let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
                 "an attack's target the slice does not hold live",
             ))?;
+            let (motion, by_id) =
+                c.w.parts
+                    .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.masters));
             let mut g = Ground {
                 map: &c.w.spatial,
                 sprite_rng: c.w.streams.get(Stream::Sprite),
                 object_rng: None,
                 posts: Posts::Held(&mut posted),
                 graphics: &c.w.graphics,
-                by_id: crate::world::index::ObjectsRef::new(
-                    &c.w.players,
-                    &c.w.index,
-                    &c.w.masters,
-                    &c.w.parts,
-                ),
+                by_id,
+                motion,
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }
         if begun.arrived {
             unit.shows_standing_sprite(
+                c.w.parts.motion.layer_mut(unit.id),
                 crate::objects::masters::OwnerMasters::new(
                     &c.w.parts.own_master,
                     c.w.masters.of(c.player),
@@ -343,16 +344,16 @@ impl Attack {
     pub fn fail_at_start(
         &mut self,
         sprite: &mut Option<ActiveSprite>,
-        body: &mut Body,
+        mut motion: MotionMut<'_>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         // State 13 ("Failed"): the target went out of sight.
         self.state = AttackState::Failed;
-        body.set_anim_speed(Speed::new(1.0));
+        motion.set_anim_speed(Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(sprite, body.move_stats_mut(), idle, rng);
+        new_sprite(sprite, motion.move_stats_mut(), idle, rng);
         Ok(())
     }
 

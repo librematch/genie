@@ -22,6 +22,7 @@ use crate::movement::{
     point_or_zero_of, remove_point,
 };
 use crate::objects::ObjectId;
+use crate::objects::layers::Static;
 use crate::pathing::Pathing;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
@@ -41,7 +42,7 @@ impl Mover {
     /// is not modelled.
     pub(super) fn reached(
         &mut self,
-        me: &Me,
+        (place, me): (&mut Static, &Me),
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
         goal: Goal<'_>,
@@ -50,7 +51,7 @@ impl Mover {
     ) -> Result<Next, GenieError> {
         let ground_radius = self.stats.radius.ground();
         if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
-            self.take_waypoint_place(me, world, pathing, now)?;
+            self.take_waypoint_place(place, me, world, pathing, now)?;
         }
         let level = self.paths.walked_mut()?;
         level.flags &= !LevelFlags::REACHED;
@@ -66,7 +67,7 @@ impl Mover {
                 Next::Dispatch
             });
         }
-        self.drop_held_waypoint(world, by_id)?;
+        self.drop_held_waypoint(place.position(), world, by_id)?;
         let parent_is_level_1 = self
             .paths
             .get(1)
@@ -81,7 +82,7 @@ impl Mover {
         let level = self.paths.walked()?;
         let left = point_or_zero_of(level, level.waypoint.previous());
         let back = footprint_gap(
-            self.position(),
+            place.position(),
             ground_radius,
             Position::new(left.x(), left.y(), 0.0),
             Footprint::new(0.0, 0.0),
@@ -90,10 +91,11 @@ impl Mover {
         let mut beyond =
             goal.target
                 .map_or((back - range) - Distance::new(RANGE_FLOOR), |(id, t)| {
-                    let own = (footprint_gap(self.position(), ground_radius, t.position, t.radius)
-                        - range)
-                        - Distance::new(RANGE_FLOOR);
-                    let near = (self.position(), ground_radius);
+                    let own =
+                        (footprint_gap(place.position(), ground_radius, t.position, t.radius)
+                            - range)
+                            - Distance::new(RANGE_FLOOR);
+                    let near = (place.position(), ground_radius);
                     gate_gap(
                         world,
                         near,
@@ -136,6 +138,7 @@ impl Mover {
     /// setter, on the ground), and the bit goes.
     pub(super) fn take_waypoint_place(
         &mut self,
+        place: &mut Static,
         me: &Me,
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
@@ -146,7 +149,7 @@ impl Mover {
             let p = level.point(level.waypoint);
             let at = self.set_position(p.position(), world.map);
             let at = self.grounded(at, world.terrain.as_ref());
-            self.moved_to(me, at, world, pathing, now)?;
+            self.moved_to(place, me, at, world, pathing, now)?;
         }
         self.paths.walked_mut()?.flags &= !LevelFlags::AT_WAYPOINT;
         Ok(())
@@ -164,6 +167,7 @@ impl Mover {
     /// A frozen object the query may meet.
     pub(super) fn drop_held_waypoint(
         &mut self,
+        at: Position,
         world: &Spatial,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
@@ -172,10 +176,7 @@ impl Mover {
         if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
             return Ok(());
         }
-        let d = fmath::sub(
-            self.position().vector(),
-            *level.points.checked(next.get() as usize)?,
-        );
+        let d = fmath::sub(at.vector(), *level.points.checked(next.get() as usize)?);
         // a NaN distance is not within
         if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() < TARGET_SHORT_REACH {
             let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
@@ -477,6 +478,7 @@ impl Mover {
     /// mesh follow (`0x1411a58b0` -> `FUN_14118c540`, [`Mover::new_position`]).
     pub(super) fn moved_to(
         &mut self,
+        place: &mut Static,
         me: &Me,
         at: Position,
         world: &mut Spatial,
@@ -484,7 +486,7 @@ impl Mover {
         now: WorldTime,
     ) -> Result<(), GenieError> {
         self.mark_move(at, now);
-        self.new_position(me.id, at, (world, pathing))?;
+        self.new_position(place, me.id, at, (world, pathing))?;
         Ok(())
     }
 

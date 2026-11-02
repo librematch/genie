@@ -15,7 +15,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
-use crate::objects::layers::{Animated, Body};
+use crate::objects::layers::{Animated, MotionLayer};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::TaskId;
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -51,33 +51,36 @@ fn a_static_object_flagged_to_sleep_ends_its_update() {
         ..Unit::default()
     };
     let mut u = flagged(Class::Static);
-    assert_eq!(u.go_to_sleep(false), Ok(true));
+    assert_eq!(u.go_to_sleep(None, false), Ok(true));
     assert!(!u.life.goto_sleep);
-    assert_eq!(u.go_to_sleep(false), Ok(false));
+    assert_eq!(u.go_to_sleep(None, false), Ok(false));
     let mut animated = flagged(Class::Animated);
     assert_eq!(
-        animated.go_to_sleep(false).unwrap_err().reason(),
+        animated.go_to_sleep(None, false).unwrap_err().reason(),
         "an object above the static type goes to sleep"
     );
+    // a static object flagged with movement state or a unit AI is not modelled either
+    let walker = crate::gathering::hunt::tests::walker();
+    for (mover, ai) in [(Some(&walker), false), (None, true)] {
+        assert!(flagged(Class::Static).go_to_sleep(mover, ai).is_err());
+    }
 }
 
 /// The movement state takes the current sprite's facets and its sequence flag bit 1; without a
 /// sprite it keeps what it had.
 #[test]
 fn the_movement_state_takes_the_sprite_s_facets() {
-    let mut u = Unit {
-        body: Body::Moving(crate::gathering::hunt::tests::walker()),
-        ..Unit::default()
-    };
-    u.take_sprite_facets();
-    assert_eq!(u.body.mover().unwrap().sprite_facets, None);
+    let mut u = Unit::default();
+    let mut mover = crate::gathering::hunt::tests::walker();
+    u.take_sprite_facets(Some(&mut mover));
+    assert_eq!(mover.sprite_facets, None);
     u.sprite = Some(ActiveSprite::start(
         WALKING,
         &mut crate::math::rng::Well512::default(),
     ));
-    u.take_sprite_facets();
+    u.take_sprite_facets(Some(&mut mover));
     assert_eq!(
-        u.body.mover().unwrap().sprite_facets,
+        mover.sprite_facets,
         Some(crate::objects::facing::SpriteFacets {
             count: crate::objects::FacetCount::of_data(16),
             turns: true,
@@ -97,12 +100,11 @@ fn an_animated_object_s_sprite_runs_by_the_update_s_dt() {
             &mut crate::math::rng::Well512::default(),
         ));
         // a static object has no animation speed, so no clock
-        let at = u.position();
-        u.body = speed.map_or_else(
-            || Body::at(at),
-            |speed| Body::new(at, Some(Animated::new(Speed::new(speed))), None),
-        );
-        let before = u.sprite;
+        let (id, before) = (u.id, u.sprite);
+        let motion =
+            speed.map(|speed| Box::new(MotionLayer::Animated(Animated::new(Speed::new(speed)))));
+        t.set_part(id, crate::world::parts::Part::Motion(motion))
+            .unwrap();
         in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
             u.animate(c);
             Ok(())
@@ -142,7 +144,10 @@ fn an_object_past_state_2_loses_its_actions() {
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.actions.list.move_to().copied(), None);
-    assert_eq!(u.body.mover().unwrap().animated.speed, Speed::new(0.0));
+    assert_eq!(
+        t.parts.mover_of(u.id).unwrap().animated.speed,
+        Speed::new(0.0)
+    );
     let mut t = forage_world();
     t.players[1].objects[ListIndex::new(0)]
         .actions
@@ -167,12 +172,11 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
     let at = t.players[1].objects[ListIndex::new(0)].position();
     let mut met = crate::gathering::hunt::tests::walker();
     met.paths = vec![crate::movement::PathData::without_path()];
-    t.players[0].objects[ListIndex::new(0)]
-        .body
-        .put_mover(Some(met));
-    let mover = t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    t.parts
+        .put_mover(t.players[0].objects[ListIndex::new(0)].id, Some(met));
+    let mover = t
+        .parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     mover.pauses = vec![
         (object_id(600), Seconds::new(0.5)),
@@ -185,7 +189,7 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
             .unwrap()
             .find(object_id(600))
             .unwrap();
-        let level = bush.body.mover().unwrap().paths[0].pause_time;
+        let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
         Ok((
             level,
             crate::world::index::ObjectsRef::new(
@@ -203,18 +207,14 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(u.position(), at);
     assert_eq!(t.spatial.get(object_id(9175)).map(|p| p.position), Some(at));
-    assert_eq!(u.body.mover().unwrap().pauses, []);
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    assert_eq!(t.parts.mover_of(u.id).unwrap().pauses, []);
+    t.parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .in_the_way = vec![object_id(600)];
-    let r = in_update(
-        &mut t,
-        (PlayerId::new(1), ListIndex::new(0)),
-        50,
-        Unit::after_actions,
-    );
+    let r = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
+        u.after_actions(c)
+    });
     assert_eq!(
         r.unwrap_err().reason(),
         "a walk's unit in the way (notify 0x215) the action does not pass on"

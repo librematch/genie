@@ -10,6 +10,7 @@ use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::fmath::BVector;
 use crate::movement::Me;
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -92,14 +93,15 @@ impl Unit {
 
     /// What the attack tests read of the unit as an attacker ([`crate::unit_ai::Attacker`]) with
     /// a unit AI of type `ai_type`, its master `master`, its owner and the owner's type, the game
-    /// mode (a scenario's), its `+0x924` and its missiles per volley (`+0xa00`).
+    /// mode (a scenario's), its `+0x924`, its missiles per volley (`+0xa00`) and its top speed
+    /// (its mover's, 0 for an object that does not move).
     pub(crate) fn attacker_of(
         &self,
         ai_type: UnitAiType,
         master: Option<&Master>,
         (player, computer): (PlayerId, bool),
         scenario: bool,
-        (capture, firepower): (CaptureKind, crate::combat::Firepower),
+        (capture, firepower, speed): (CaptureKind, crate::combat::Firepower, Speed),
     ) -> crate::unit_ai::Attacker {
         crate::unit_ai::Attacker {
             ai_type,
@@ -124,7 +126,7 @@ impl Unit {
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
             position: self.position(),
             radius: master.map_or(Footprint::ZERO, |m| m.radius),
-            speed: self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+            speed,
             scenario,
             firepower,
             capture,
@@ -158,8 +160,9 @@ impl Unit {
     /// waypoints go (slot 0x450) and become the saved patrol's points (slot 0x448 each, as x, y
     /// and height), and it moves to the saved waypoint (slot 0x340: range 0, forced, running; a
     /// waypoint outside the path is the game's static zero point): that move, the caller's
-    /// ([`Unit::ai_move`]). None without a saved patrol.
-    pub(crate) fn restore_patrol(&mut self, ai: Option<&UnitAi>) -> Option<AiMove> {
+    /// ([`Unit::ai_move`]). None without a saved patrol. `mover` is the unit's (none for one
+    /// that does not move).
+    pub(crate) fn restore_patrol(ai: Option<&UnitAi>, mover: Option<&mut Mover>) -> Option<AiMove> {
         let ai = ai?;
         let saved = ai.patrol_path.as_ref()?;
         let points = saved.path.points.clone();
@@ -169,7 +172,7 @@ impl Unit {
             .and_then(|i| points.get(i))
             .copied()
             .unwrap_or(BVector::ZERO);
-        if let Some(m) = self.body.mover_mut() {
+        if let Some(m) = mover {
             m.clear_user_waypoints();
             for p in &points {
                 m.add_user_waypoint(p.position());

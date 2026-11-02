@@ -135,7 +135,7 @@ impl GatherAction {
         unit: &mut Unit,
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
-        self.tear_down(unit.body.mover_mut())?;
+        self.tear_down(c.w.parts.mover_mut(unit.id))?;
         self.state = GatherState::FarmWait;
         self.timer = FARM_WAIT_TIME;
         Self::show(c, unit, self.stand_sprite(unit, r));
@@ -174,18 +174,18 @@ impl GatherAction {
             if self.target_class == Some(class::FARM)
                 && target.is_some_and(|t| crate::objects::WorkerCount::ONE < t.workers)
             {
-                let walks = r.walks(&c.w.graphics, unit);
-                let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(Distance::new(radius), mover, &walks)?;
                 self.target = None;
                 return Ok(Next::Stay);
             }
-            self.tear_down(unit.body.mover_mut())?;
+            self.tear_down(c.w.parts.mover_mut(unit.id))?;
             self.set_idle(c, unit, r);
             return Ok(Next::Stay);
         }
-        let walks = r.walks(&c.w.graphics, unit);
-        let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
+        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         self.begin_reseed_walk(Distance::new(radius), mover, &walks)?;
         Ok(Next::Stay)
     }
@@ -206,7 +206,7 @@ impl GatherAction {
         match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 | 5 => {
-                self.tear_down(unit.body.mover_mut())?;
+                self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 if let Some(t) = target
                     && !(ObjectState::Alive < t.state && t.state != ObjectState::Undead)
                 {
@@ -265,7 +265,7 @@ impl GatherAction {
         unit: &mut Unit,
         r: &GatherReads,
     ) -> Result<Next, GenieError> {
-        self.tear_down(unit.body.mover_mut())?;
+        self.tear_down(c.w.parts.mover_mut(unit.id))?;
         self.state = GatherState::Search;
         self.timer = SEARCH_WAIT;
         Self::show(c, unit, self.stand_sprite(unit, r));
@@ -310,7 +310,7 @@ impl GatherAction {
         match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             code @ (1 | 2 | 3 | 5) => {
-                self.tear_down(unit.body.mover_mut())?;
+                self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 if code != 3 && r.computer {
                     self.set_done(c, unit, r);
                 } else {

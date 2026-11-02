@@ -308,12 +308,7 @@ impl World {
                 default_make,
                 default_artifact: false,
             },
-            // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            body: crate::objects::layers::Body::new(
-                position,
-                Some(crate::objects::layers::Animated::default()),
-                mover,
-            ),
+            place: crate::objects::layers::Static::at(position),
             attackable: true,
             untargetable: false,
             under_attack: false,
@@ -365,6 +360,11 @@ impl World {
             unit_ai: ai,
             building: layer,
             combat,
+            // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
+            motion: crate::objects::layers::MotionLayer::of(
+                Some(crate::objects::layers::Animated::default()),
+                mover,
+            ),
             ..ObjectParts::default()
         };
         let _ = self.push_live(player, Object { unit, parts })?;

@@ -89,9 +89,12 @@ impl World {
             .map(|(tp, t)| (t.life.master_id, tp));
         let unit = self.players.live_mut(player, idx)?;
         // FUN_141197da0, then slot 0x2a0 with 1: it waits to move
-        let mover = unit.body.mover_mut().ok_or(GenieError::unsupported(
-            "a moved unit without movement state",
-        ))?;
+        let mover = self
+            .parts
+            .mover_mut(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a moved unit without movement state",
+            ))?;
         mover.ignore_units.clear();
         mover.waiting = 1;
         for &other in others {
@@ -208,10 +211,11 @@ impl World {
                 point,
                 Distance::ZERO,
                 sprite,
-                unit.body.mover_mut(),
+                self.parts.mover_mut(unit.id),
             );
             if move_to.shows_standing() {
                 unit.shows_standing_sprite(
+                    self.parts.motion.layer_mut(unit.id),
                     crate::objects::masters::OwnerMasters::new(
                         &self.parts.own_master,
                         self.masters.of(player),
@@ -257,6 +261,7 @@ impl World {
         let id = self.players.live(player, idx)?.id;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let sails = self.players.live_mut(player, idx)?.ai_move_with(
+            self.parts.motion.layer_mut(id),
             m,
             (class, player),
             (&mut releases, &mut builder_leaves, by),
@@ -267,7 +272,7 @@ impl World {
                 ),
                 (
                     &self.graphics,
-                    self.parts.combat_of(id).abilities.look.as_ref(),
+                    self.parts.combat.of(id).abilities.look.as_ref(),
                 ),
                 self.streams.get(Stream::Sprite),
             ),

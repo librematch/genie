@@ -261,6 +261,7 @@ impl EnterAction {
         self.state = EnterState::Wait;
         self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
+            c.w.parts.motion.layer_mut(unit.id),
             crate::objects::masters::OwnerMasters::new(
                 &c.w.parts.own_master,
                 c.w.masters.of(c.player),
@@ -447,7 +448,7 @@ impl EnterAction {
         reads: &EnterReads,
     ) -> Result<bool, GenieError> {
         if self.move_to.is_some()
-            && let Some(m) = unit.body.mover_mut()
+            && let Some(m) = c.w.parts.mover_mut(unit.id)
         {
             m.stop()?;
         }
@@ -469,12 +470,14 @@ impl EnterAction {
                 master,
                 room: t.room,
                 unit,
+                mover: w.parts.mover_of(unit.id),
+                target_mover: w.parts.mover_of(target.id),
             };
             let sprites = SpriteReads {
                 defaults: reads.defaults,
                 graphics: &w.graphics,
             };
-            let moves = MoveToReads::with_sprites(sprites, meeting.unit);
+            let moves = MoveToReads::with_sprites(sprites, (meeting.unit, meeting.mover));
             self.walk_again(
                 t,
                 reads.start,

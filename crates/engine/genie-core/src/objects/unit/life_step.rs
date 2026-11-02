@@ -173,15 +173,15 @@ impl Unit {
     /// `+0x5e6`, the `.dat`'s `blood_unit_id`, −1 for none) with its facet (`+0xe`) as its angle
     /// left it ([`crate::objects::facing::facet_of_angle`]).
     pub(crate) fn dying_sprite_ended(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        self.body.set_anim_speed(Speed::ZERO);
+        c.w.parts.set_anim_speed(self.id, Speed::ZERO);
         let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind < BUILDING
             && let Some(remains) = master.death_spawns[1]
         {
-            let facet = self
-                .body
-                .mover()
-                .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
+            let facet =
+                c.w.parts
+                    .mover_of(self.id)
+                    .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
             let (p, at) = (c.player, self.position());
             c.lend(self, |w| w.remains(p, remains, at, facet))?;
         }
@@ -197,10 +197,10 @@ impl Unit {
         let spawn = spawn.ok_or(GenieError::missing_data(
             "a death spawn the dead object's master no longer names",
         ))?;
-        let facet = self
-            .body
-            .mover()
-            .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
+        let facet =
+            c.w.parts
+                .mover_of(self.id)
+                .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
         let (p, at) = (c.player, self.position());
         c.lend(self, |w| w.remains(p, spawn, at, facet))
     }

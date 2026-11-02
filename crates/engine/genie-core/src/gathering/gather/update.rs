@@ -183,7 +183,7 @@ impl GatherAction {
     fn update_walk_wait(
         &mut self,
         c: &mut Step<'_>,
-        unit: &mut Unit,
+        unit: &Unit,
         target: &Victim,
         dt: Seconds,
         r: &GatherReads,
@@ -193,8 +193,8 @@ impl GatherAction {
             return Ok(Next::Stay);
         }
         self.timer = Seconds::ZERO;
-        let walks = r.walks(&c.w.graphics, unit);
-        let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
+        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         if self.stops.several() {
             let rng = c.w.streams.get(Stream::Action);
             let to = self.walk_to(target, Distance::ZERO);
@@ -239,8 +239,8 @@ impl GatherAction {
                 return self.begin_farm_wait(c, unit, r);
             }
         }
-        let at = unit.body.position();
-        let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
+        let at = unit.place.position();
+        let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         if !crate::combat::attack::face_target(mover, at, target.position, c.w.world_time)? {
             return Ok(Next::Stay);
         }
@@ -273,8 +273,8 @@ impl GatherAction {
                 if r.food_sold <= Amount::ZERO {
                     self.current_stop = self.current_stop.next();
                 }
-                let walks = r.walks(&c.w.graphics, unit);
-                let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 let rng = c.w.streams.get(Stream::Action);
                 let to = self.walk_to(target, Distance::ZERO);
                 self.set_walk(to, target.radius, mover, rng, &walks)?;
@@ -301,15 +301,15 @@ impl GatherAction {
         match self.update_list(c, unit, me, r)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 => {
-                self.tear_down(unit.body.mover_mut())?;
+                self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 self.set_face(c, unit, target, r)
             }
             // code 3: near a target with more than 3 workers it searches (set_state 3), else it
             // waits a random while (LAB_140a8ef80)
             3 => {
-                let mover = unit.body.mover().ok_or(UNMOVING)?;
+                let mover = c.w.parts.mover_of(unit.id).ok_or(UNMOVING)?;
                 let me = mover.stats.radius.ground();
-                let at = unit.body.position();
+                let at = unit.place.position();
                 let gap =
                     crate::movement::footprint_gap_squared(at, me, target.position, target.radius);
                 if target.workers.as_f32() <= WAIT_WORKERS || WAIT_GAP <= gap.get() {
@@ -322,8 +322,8 @@ impl GatherAction {
             // go), then `set_state(11)` with no target's radius
             4 | 5 => {
                 self.target = None;
-                let walks = r.walks(&c.w.graphics, unit);
-                let mover = unit.body.mover_mut().ok_or(UNMOVING)?;
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(Distance::ZERO, mover, &walks)?;
                 Ok(Next::Stay)
             }
@@ -364,7 +364,7 @@ impl GatherAction {
         };
         let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }
         Ok(code)
     }

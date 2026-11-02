@@ -10,12 +10,13 @@ use crate::gathering::hunt::{
     REMAINDER,
 };
 use crate::map::Distance;
+use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::footprint_gap;
 use crate::movement::move_to::WalkTo;
 use crate::objects::ObjectState;
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::class;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -34,13 +35,13 @@ impl HuntAction {
     /// not modelled.
     pub(super) fn set_walk(
         &mut self,
-        map: &Spatial,
-        body: &mut Body,
+        (map, at): (&Spatial, Position),
+        mut motion: MotionMut<'_>,
         victim: &Victim,
         player: PlayerId,
         walks: &Walks<'_>,
     ) -> Result<(), GenieError> {
-        self.tear_down(body.mover_mut())?;
+        self.tear_down(motion.mover_mut())?;
         self.state = HuntState::Walk;
         self.timer = Seconds::ZERO;
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
@@ -61,9 +62,9 @@ impl HuntAction {
         } else {
             self.task.range.get()
         };
-        let mover = body.mover().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover = motion.mover().ok_or(crate::world::HUNTER_UNMOVING)?;
         let ground = mover.stats.radius.ground();
-        let gap = footprint_gap(body.position(), ground, t.position, t.radius);
+        let gap = footprint_gap(at, ground, t.position, t.radius);
         let to = WalkTo {
             id: self.target,
             at: t.position,
@@ -129,17 +130,23 @@ impl HuntAction {
                 c.w.spatial
                     .get_known(self.target)?
                     .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
-            let ground = unit
-                .body
-                .mover()
-                .map(|m| m.stats.radius.ground())
-                .ok_or(crate::world::HUNTER_UNMOVING)?;
+            let ground =
+                c.w.parts
+                    .mover_of(unit.id)
+                    .map(|m| m.stats.radius.ground())
+                    .ok_or(crate::world::HUNTER_UNMOVING)?;
             if self.task.range + Distance::new(GAP)
-                < footprint_gap(unit.body.position(), ground, t.position, t.radius)
+                < footprint_gap(unit.place.position(), ground, t.position, t.radius)
             {
-                let walks = r.walks(&c.w.graphics, unit);
+                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let player = f.own.player;
-                self.set_walk(&c.w.spatial, &mut unit.body, &f.victim, player, &walks)?;
+                self.set_walk(
+                    (&c.w.spatial, unit.position()),
+                    c.w.parts.motion_mut(unit.id),
+                    &f.victim,
+                    player,
+                    &walks,
+                )?;
                 return Ok(HuntNext::Stay);
             }
         }
@@ -166,7 +173,7 @@ impl HuntAction {
         if let Some(g) = g {
             new_sprite(
                 &mut unit.sprite,
-                unit.body.move_stats_mut(),
+                c.w.parts.move_stats_mut(unit.id),
                 g,
                 c.w.streams.get(Stream::Sprite),
             );
@@ -176,7 +183,13 @@ impl HuntAction {
     /// `set_state(7)` (case 7): a food task keeps a load of food (`FUN_14119d310` keeps the
     /// amount), any other load is dropped; the unit takes the working sprite (slot 0x68; the
     /// standing one for none); the gathering sound is not held.
-    pub(super) fn set_gather(&mut self, unit: &mut Unit, sprite_rng: &mut Well512, r: &HuntReads) {
+    pub(super) fn set_gather(
+        &mut self,
+        unit: &mut Unit,
+        mut motion: MotionMut<'_>,
+        sprite_rng: &mut Well512,
+        r: &HuntReads,
+    ) {
         self.state = HuntState::Gather;
         let kind = self.task.resource;
         let keeps = crate::gathering::both_food(kind, unit.life.attribute_type);
@@ -189,7 +202,7 @@ impl HuntAction {
             unit.life.attribute_type = kind;
         }
         if let Some(g) = r.sprites.working.or(r.sprites.standing) {
-            new_sprite(&mut unit.sprite, unit.body.move_stats_mut(), g, sprite_rng);
+            new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, sprite_rng);
         }
     }
 

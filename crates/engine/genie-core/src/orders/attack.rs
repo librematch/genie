@@ -137,10 +137,8 @@ impl World {
                 && self.spatial.explored(player, Tile::new(tx, ty))?);
         let ready = self.attack_ready(player, idx, target, (master, world_time))?;
         let speed = self
-            .players
-            .live(player, idx)?
-            .body
-            .mover()
+            .parts
+            .mover_of(self.players.live(player, idx)?.id)
             .map_or(Speed::ZERO, |m| m.stats.speed);
         let e = crate::combat::attack::engagement(
             self.parts.unit_ai.get(self.players.live(player, idx)?.id),
@@ -161,7 +159,7 @@ impl World {
         self.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
         crate::objects::sprite::new_sprite(
             &mut unit.sprite,
-            unit.body.move_stats_mut(),
+            self.parts.move_stats_mut(unit.id),
             standing,
             self.streams.get(Stream::Sprite),
         );
@@ -311,6 +309,7 @@ impl World {
             .map(|h| h.target)
             .filter(|&t| t.is_some());
         let walks = unit.move_walks(
+            self.parts.mover_of(unit.id),
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
             (
@@ -318,7 +317,8 @@ impl World {
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
+        let (Some(hunt), Some(mover)) =
+            (unit.actions.list.hunt_mut(), self.parts.mover_mut(unit.id))
         else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -340,7 +340,7 @@ impl World {
                 crate::combat::attack::show_arrived(
                     &arms,
                     &mut unit.sprite,
-                    &mut unit.body,
+                    self.parts.motion_mut(unit.id),
                     self.streams.get(Stream::Sprite),
                 )?;
             }

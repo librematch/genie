@@ -51,7 +51,7 @@ use crate::world::WorldTime;
 fn a_gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
     let unit = |id, master, x: f32, y: f32| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
         life: Lifecycle {
             master_id: master,
             ..Lifecycle::default()
@@ -642,7 +642,10 @@ fn a_made_unit_moves_at_the_speed_of_its_standing_sprite() {
     .unwrap();
     let made = t.players[1].objects.last().unwrap();
     assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
-    assert_eq!(made.body.mover().unwrap().stats.speed, Speed::new(0.4));
+    assert_eq!(
+        t.parts.mover_of(made.id).unwrap().stats.speed,
+        Speed::new(0.4)
+    );
 }
 
 /// `FUN_140ace9c0` sends the new unit to its building's gather point only for a state of 1
@@ -699,7 +702,7 @@ fn only_a_gather_point_of_state_1_sends_the_new_unit() {
         t.players[1]
             .objects
             .last()
-            .and_then(|u| u.body.mover().map(|m| m.waiting))
+            .and_then(|u| t.parts.mover_of(u.id).map(|m| m.waiting))
     };
     assert_eq!(waits(GatherPointState::POINT), Some(1));
     assert_eq!(waits(GatherPointState::KEPT), Some(0));
@@ -859,7 +862,7 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
             .unwrap()
     };
     let u = walked(true);
-    assert_eq!(u.unit.body.mover().unwrap().waiting, 1);
+    assert_eq!(u.parts.mover().unwrap().waiting, 1);
     assert!(!u.parts.town_bell.flag);
     let ai = u.parts.unit_ai.as_ref().unwrap();
     assert_eq!(
@@ -897,9 +900,8 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
 #[test]
 fn a_gather_point_s_walk_waits_without_speed_and_stops_at_the_unmodelled() {
     let mut t = crate::world::tests::forage_world();
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    t.parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .stats
         .speed = Speed::ZERO;
@@ -911,7 +913,7 @@ fn a_gather_point_s_walk_waits_without_speed_and_stops_at_the_unmodelled() {
     )
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(u.body.mover().unwrap().waiting, 1);
+    assert_eq!(t.parts.mover_of(u.id).unwrap().waiting, 1);
     assert_eq!(u.actions.list.move_to().copied(), None);
     assert_eq!(t.parts.unit_ai.get(u.id).unwrap().current_order, None);
     // a second walk finds the first's `MoveTo`
@@ -1041,7 +1043,7 @@ fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
         turns: false,
     };
     assert_eq!(
-        u.body.mover().map(|m| m.angle),
+        t.parts.mover_of(u.id).map(|m| m.angle),
         Some(crate::objects::facing::angle_of_facet(
             crate::objects::Facet::of_data(2),
             facets

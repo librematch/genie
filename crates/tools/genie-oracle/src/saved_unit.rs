@@ -333,6 +333,12 @@ fn row(
             })
             .unwrap_or_default(),
     };
+    // the animated layer (types 20 and up); a moving object's mover takes it below
+    let animated = object.animated_part().map(|a| {
+        genie_core::objects::layers::Animated::new(genie_core::movement::Speed::new(
+            a.current_speed,
+        ))
+    });
     let mut unit = Unit {
         id,
         life,
@@ -346,16 +352,7 @@ fn row(
         workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
         damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
-        // the animated layer (types 20 and up); a moving object's mover takes it below
-        body: genie_core::objects::layers::Body::new(
-            Position::new(s.t_x, s.t_y, s.t_z),
-            object.animated_part().map(|a| {
-                genie_core::objects::layers::Animated::new(genie_core::movement::Speed::new(
-                    a.current_speed,
-                ))
-            }),
-            None,
-        ),
+        place: genie_core::objects::layers::Static::at(Position::new(s.t_x, s.t_y, s.t_z)),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
         sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
         roo_called: s.rooalready_called != 0,
@@ -403,7 +400,10 @@ fn row(
         unit.actions.default_fly = false;
     }
     let production = production(object).map(|_| ());
-    let moving = mover(object, s, objects, paths, civ, masters).map(|m| unit.body.put_mover(m));
+    let (mover, moving) = match mover(object, s, objects, paths, civ, masters) {
+        Ok(m) => (m, Ok(())),
+        Err(e) => (None, Err(e)),
+    };
     unit.actions.unmodelled_action = life_read
         .and(ai_read)
         .and(lists_read)
@@ -419,6 +419,7 @@ fn row(
             town_bell,
             building,
             combat,
+            motion: genie_core::objects::layers::MotionLayer::of(animated, mover),
             ..ObjectParts::default()
         },
     )

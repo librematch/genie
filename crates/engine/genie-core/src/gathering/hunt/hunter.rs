@@ -340,8 +340,9 @@ impl Unit {
 
     /// Case 3 waiting after a given-up `MoveTo`, its target gone: the timer runs by dt, then the
     /// walk to the point (`set_state` 11, [`crate::gathering::hunt::HuntAction::wait_then_walk`]).
-    pub(crate) fn hunt_wait_walk(&mut self, c: &Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn hunt_wait_walk(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -350,7 +351,10 @@ impl Unit {
             ),
         )?;
         let hunt = self.actions.list.hunt_mut().ok_or(NO_HUNT)?;
-        let mover = self.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover =
+            c.w.parts
+                .mover_mut(self.id)
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
         hunt.wait_then_walk(c.dt.seconds(), mover, &walks)
     }
 }

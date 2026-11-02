@@ -140,10 +140,10 @@ impl Unit {
         if to.x() < 0.0 || w as f32 <= to.x() || to.y() < 0.0 || h as f32 <= to.y() {
             self.life.hp = HitPoints::ZERO;
         }
-        let mover = self
-            .body
-            .mover_mut()
-            .ok_or(GenieError::unsupported("a missile without its moving part"))?;
+        let mover =
+            c.w.parts
+                .mover_mut(self.id)
+                .ok_or(GenieError::unsupported("a missile without its moving part"))?;
         let mut at = mover.set_position(to, c.w.spatial.map);
         let ground =
             c.w.spatial
@@ -160,7 +160,12 @@ impl Unit {
             stats.fly_mode,
         ));
         mover.mark_move(at, c.w.world_time);
-        mover.new_position(self.id, at, (&mut c.w.spatial, Some(&mut c.w.pathing)))?;
+        mover.new_position(
+            &mut self.place,
+            self.id,
+            at,
+            (&mut c.w.spatial, Some(&mut c.w.pathing)),
+        )?;
         if stats.projectile_type.meets_on_the_way() {
             let fired = Fired {
                 charge: missile.charge,

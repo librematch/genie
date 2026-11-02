@@ -131,7 +131,7 @@ impl World {
                 let Some(placed) = self.spatial.get(u.id) else {
                     continue;
                 };
-                let moving = u.body.mover().is_some_and(Mover::is_moving);
+                let moving = self.parts.mover_of(u.id).is_some_and(Mover::is_moving);
                 let desolid = self
                     .parts
                     .building_of(u.id)

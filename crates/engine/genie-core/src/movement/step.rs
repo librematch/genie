@@ -20,6 +20,7 @@ use crate::movement::{
     include_kept, moved_far, pause_holds, point_or_zero_of, reach,
 };
 use crate::objects::ObjectId;
+use crate::objects::layers::Static;
 use crate::pathing::Pathing;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -178,7 +179,7 @@ impl Mover {
         stats.show(shown);
         Self {
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            animated: crate::objects::layers::Animated::at(Speed::ZERO, at),
+            animated: crate::objects::layers::Animated::new(Speed::ZERO),
             forward: BVector::new(1.0, 0.0, 0.0),
             right: BVector::new(0.0, 0.0, crate::production::spawn::START_RIGHT_Z),
             velocity: None,
@@ -222,41 +223,17 @@ impl Mover {
         Some(self.set_position(to.position(), map))
     }
 
-    /// x, y, z on the map: the place of the static layer below it
-    /// ([`crate::objects::layers::Static`]).
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.animated.base().position()
-    }
-
-    /// A test's fixture puts the unit at `at` without the world's index, which the test sets
-    /// itself.
-    #[cfg(test)]
-    pub(crate) const fn place_for_test(&mut self, at: Position) {
-        self.animated.base_mut().place_for_test(at);
-    }
-
-    /// The same mover at `at`, for a test's fixture.
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) const fn placed(mut self, at: Position) -> Self {
-        self.place_for_test(at);
-        self
-    }
-
-    /// The unit's place setter from its moving layer ([`crate::objects::layers::Static::new_position`]):
-    /// its shape goes from the mesh while it moves (slot 185, [`Mover::is_moving`]).
+    /// The unit's place setter from its moving layer: its place `place` (the row's static
+    /// layer) moves to `at` ([`crate::objects::layers::Static::new_position`]), its shape going
+    /// from the mesh while it moves (slot 185, [`Mover::is_moving`]).
     pub(crate) fn new_position(
-        &mut self,
+        &self,
+        place: &mut Static,
         id: ObjectId,
         at: Position,
         places: (&mut Spatial, Option<&mut Pathing>),
     ) -> Result<(), GenieError> {
-        let moving = self.is_moving();
-        self.animated
-            .base_mut()
-            .new_position(id, at, moving, places)?;
-        Ok(())
+        place.new_position(id, at, self.is_moving(), places)
     }
 
     /// The position setter (slot 11 -> `FUN_141161950` -> `0x1411a58b0`): a unit that can move
@@ -305,13 +282,14 @@ impl Mover {
     /// reached waypoint's), in `me` and `world`.
     pub fn motion(
         &mut self,
+        place: &mut Static,
         me: &Me,
         dt: Seconds,
         world: &mut Spatial,
         mut plan: Option<&mut Planning<'_>>,
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<Motion, GenieError> {
-        let result = self.motion_passes(me, dt, world, plan.as_deref_mut(), by_id);
+        let result = self.motion_passes(place, me, dt, world, plan.as_deref_mut(), by_id);
         // every exit of the step removes the kept hits' temporary shapes (FUN_141055970)
         if let Some(p) = plan {
             p.pathing.drop_temporary_shapes();
@@ -329,6 +307,7 @@ impl Mover {
     /// A target whose place the slice does not know.
     pub(super) fn level_gaps(
         &self,
+        at: Position,
         world: &Spatial,
         target_id: Option<ObjectId>,
         ground_radius: Footprint,
@@ -344,8 +323,8 @@ impl Mover {
         // least over it and its first two annexes (slot 0x680), each annex's less 0.1
         // (`MINSS`, 0x1411512b8)
         let gap = target.as_ref().map_or(Distance::new(FAR), |(id, t)| {
-            let own = footprint_gap(self.position(), ground_radius, t.position, t.radius);
-            let near = (self.position(), ground_radius);
+            let own = footprint_gap(at, ground_radius, t.position, t.radius);
+            let near = (at, ground_radius);
             gate_gap(world, near, (*id, t), own, |g| g - ANNEX_GAP, by_id)
         });
         let to_end = match (&target, self.paths.len()) {
@@ -356,7 +335,7 @@ impl Mover {
                     .and_then(|p| p.last())
                     .map_or(Distance::new(FAR), |&end| {
                         footprint_gap(
-                            self.position(),
+                            at,
                             ground_radius,
                             end.position().with_z(0.0),
                             Footprint::new(0.0, 0.0),
@@ -378,7 +357,7 @@ impl Mover {
     /// model.
     pub(super) fn level_state(
         &mut self,
-        me: &Me,
+        (at, me): (Position, &Me),
         (world, by_id): (&mut Spatial, crate::world::index::ObjectsRef<'_>),
         plan: Option<&mut Planning<'_>>,
         goal: Goal<'_>,
@@ -392,7 +371,7 @@ impl Mover {
                     "a path request without the world's planners",
                 ))?;
                 Ok(
-                    match self.request(me, (world, by_id), plan, goal, plans, include)? {
+                    match self.request((at, me), (world, by_id), plan, goal, plans, include)? {
                         AfterRequest::Again => Next::Again,
                         AfterRequest::Walk => Next::Dispatch,
                         AfterRequest::Paused => Next::Done(Motion::Moving),
@@ -407,6 +386,7 @@ impl Mover {
     /// [`Mover::motion`]'s passes.
     pub(super) fn motion_passes(
         &mut self,
+        place: &mut Static,
         me: &Me,
         dt: Seconds,
         world: &mut Spatial,
@@ -440,7 +420,7 @@ impl Mover {
                 return Ok(Motion::Done);
             };
             let (target, gap, to_end) =
-                self.level_gaps(world, level.target, ground_radius, by_id)?;
+                self.level_gaps(place.position(), world, level.target, ground_radius, by_id)?;
             let goal = Goal {
                 target: target.as_ref().map(|(id, t)| (*id, t)),
                 gap,
@@ -449,7 +429,7 @@ impl Mover {
             if self.paths.walked()?.flags.contains(LevelFlags::REACHED) {
                 let now = plan.as_deref().map_or(WorldTime::ZERO, |p| p.now);
                 let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
-                match self.reached(me, world, pathing, goal, now, by_id)? {
+                match self.reached((place, me), world, pathing, goal, now, by_id)? {
                     Next::Again => continue,
                     Next::Dispatch => {}
                     Next::Done(m) => return Ok(m),
@@ -457,7 +437,7 @@ impl Mover {
                 }
             }
             match self.level_state(
-                me,
+                (place.position(), me),
                 (world, by_id),
                 plan.as_deref_mut(),
                 goal,
@@ -480,6 +460,7 @@ impl Mover {
             let groups = plan.as_deref().map(|p| p.groups);
             let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
             let step = self.walk(
+                place.position(),
                 me,
                 WalkStep {
                     time_step: dt,
@@ -511,6 +492,7 @@ impl Mover {
     /// world's unit groups (none for a walk without the world's planners).
     pub(super) fn walk(
         &mut self,
+        at: Position,
         me: &Me,
         step: WalkStep<'_>,
         by_id: crate::world::index::ObjectsRef<'_>,
@@ -573,7 +555,7 @@ impl Mover {
             })?;
             if !hits.is_empty() {
                 let avoided = self.avoid(
-                    me,
+                    (at, me),
                     (world, groups, by_id),
                     &hits,
                     projected,
@@ -599,7 +581,7 @@ impl Mover {
                 }
             }
         }
-        if let Some(next) = self.walk_ends(world, goal, by_id)? {
+        if let Some(next) = self.walk_ends(at, world, goal, by_id)? {
             return Ok(next);
         }
         let clipped = self.steer(direction, dt)?;
@@ -616,6 +598,7 @@ impl Mover {
     /// Path data without the walked level, and what the stop does not model.
     fn walk_ends(
         &mut self,
+        at: Position,
         world: &Spatial,
         goal: Goal<'_>,
         by_id: crate::world::index::ObjectsRef<'_>,
@@ -625,9 +608,8 @@ impl Mover {
         match goal.target {
             Some((id, t)) => {
                 let range = level.range;
-                let own =
-                    footprint_gap(self.position(), ground_radius, t.position, t.radius) - range;
-                let near = (self.position(), ground_radius);
+                let own = footprint_gap(at, ground_radius, t.position, t.radius) - range;
+                let near = (at, ground_radius);
                 let gap = gate_gap(world, near, (id, t), own, |g| g - range, by_id);
                 if gap.get() < EPSILON {
                     // in range of the target: the waypoint counts as reached
@@ -643,7 +625,7 @@ impl Mover {
             {
                 if let Some(&end) = self.top_path().and_then(|p| p.last()) {
                     let gap = footprint_gap(
-                        self.position(),
+                        at,
                         ground_radius,
                         end.position().with_z(0.0),
                         Footprint::new(0.0, 0.0),

@@ -161,7 +161,7 @@ impl crate::world::World {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
             Ship::of_unit(
-                unit,
+                (unit, self.parts.mover_of(unit.id)),
                 master,
                 self.spatial.map,
                 (

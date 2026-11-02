@@ -68,7 +68,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
         .map(|&(id, master, x, y)| {
             let mut u = crate::objects::unit::Unit {
                 id: object_id(id),
-                body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
                 ..crate::objects::unit::Unit::default()
             };
             u.life.master_id = master_id(master);

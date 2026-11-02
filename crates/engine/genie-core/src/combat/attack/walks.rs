@@ -7,6 +7,7 @@ use crate::combat::attack::{ATTACK_WITHOUT_TARGET, Attack, AttackReads};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Me;
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
@@ -21,37 +22,33 @@ use crate::world::step::Step;
 pub(super) const QUIET_CODE: GenieError =
     GenieError::unreachable("an Attack's quiet MoveTo's code that only a loud one gives");
 
-/// What a new `MoveTo` of `unit` reads as `set_state` makes it: the sprites' defaults of its
-/// master (`r`), the sprites' table `graphics`, and the unit's state and top speed now.
+/// What a new `MoveTo` of `unit` with its mover `mover` reads as `set_state` makes it: the
+/// sprites' defaults of its master (`r`), the sprites' table `graphics`, and the unit's state
+/// and top speed now.
 ///
 /// # Errors
 ///
 /// A unit that does not move.
 pub(super) fn move_reads<'g>(
-    unit: &Unit,
+    (unit, mover): (&Unit, Option<&Mover>),
     r: &AttackReads,
     graphics: &'g crate::objects::Graphics,
 ) -> Result<MoveToReads<'g>, GenieError> {
-    let _ = speed_of(unit)?;
+    let _ = speed_of(mover)?;
     let sprites = SpriteReads {
         defaults: r.move_defaults,
         graphics,
     };
-    Ok(MoveToReads::with_sprites(sprites, unit))
+    Ok(MoveToReads::with_sprites(sprites, (unit, mover)))
 }
 
-/// The unit's top speed (slot 0x208), which a `MoveTo`'s start reads.
+/// The top speed (slot 0x208) of a unit with the mover `mover`, which a `MoveTo`'s start reads.
 ///
 /// # Errors
 ///
 /// A unit that does not move.
-pub(crate) fn speed_of(unit: &Unit) -> Result<Speed, GenieError> {
-    Ok(unit
-        .body
-        .mover()
-        .ok_or(crate::world::ATTACKER_UNMOVING)?
-        .stats
-        .speed)
+pub(crate) fn speed_of(mover: Option<&Mover>) -> Result<Speed, GenieError> {
+    Ok(mover.ok_or(crate::world::ATTACKER_UNMOVING)?.stats.speed)
 }
 
 impl Attack {
@@ -146,7 +143,7 @@ impl Attack {
         };
         let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }
         Ok(code)
     }
@@ -157,12 +154,9 @@ impl Attack {
     /// # Errors
     ///
     /// A unit that does not move.
-    pub(super) fn delete_move_to(&mut self, unit: &mut Unit) -> Result<(), GenieError> {
+    pub(super) fn delete_move_to(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
         if self.move_to.take().is_some() {
-            unit.body
-                .mover_mut()
-                .ok_or(crate::world::ATTACKER_UNMOVING)?
-                .stop()?;
+            mover.ok_or(crate::world::ATTACKER_UNMOVING)?.stop()?;
         }
         Ok(())
     }

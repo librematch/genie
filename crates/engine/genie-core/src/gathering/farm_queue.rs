@@ -396,7 +396,7 @@ impl World {
         let released = gather.after_reseed(
             arrived,
             computer,
-            unit.body.mover_mut(),
+            self.parts.mover_mut(unit.id),
             stand,
             &mut unit.sprite,
             self.streams.get(crate::math::rng::Stream::Sprite),

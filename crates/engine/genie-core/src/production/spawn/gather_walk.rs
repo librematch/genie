@@ -60,7 +60,7 @@ impl World {
             // The villager class, whose new units count in attribute 248.
             self.players.live(p, new)?.master(self.master_tables(), p)?.class == class::VILLAGER;
         let unit = self.players.live_mut(p, new)?;
-        if let Some(m) = unit.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(unit.id) {
             m.waiting = 1;
         }
         if unit.top_action_kind().is_some() {
@@ -69,7 +69,12 @@ impl World {
             ));
         }
         // a unit without speed takes nothing; one not in state 2 would notify without moving
-        if unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed) <= Speed::ZERO {
+        if self
+            .parts
+            .mover_of(unit.id)
+            .map_or(Speed::ZERO, |m| m.stats.speed)
+            <= Speed::ZERO
+        {
             return Ok(());
         }
         if unit.life.state != ObjectState::Alive {
@@ -231,7 +236,7 @@ impl World {
             "unreachable: a gather point's target found",
         ))?;
         let on_building = t.master(self.master_tables(), owner)?.kind == BUILDING;
-        if let Some(m) = self.players.live_mut(p, new)?.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {
             m.waiting = 1;
         }
         let garrison = finder && on_building && self.garrison_task_found(p, new, target, at)?;

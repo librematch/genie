@@ -281,8 +281,11 @@ impl World {
             let g = self.groups.held(group)?;
             let at = g.motion.position[0];
             let from = u.position().ground();
-            let moved = u.body.mover().map_or_else(|| u.position(), |m| m.moved_at);
-            let restriction = u.body.mover().map(|m| m.stats.restriction);
+            let moved = self
+                .parts
+                .mover_of(u.id)
+                .map_or_else(|| u.position(), |m| m.moved_at);
+            let restriction = self.parts.mover_of(u.id).map(|m| m.stats.restriction);
             let tiles = self.spatial.tiles();
             if let Some(planner) = restriction.and_then(|r| self.pathing.planner(r, tiles)) {
                 let req = crate::pathing::tile_path::Request {
@@ -358,8 +361,9 @@ impl World {
         }
         let kind = u.master(self.master_tables(), p)?.kind;
         self.leave_group_of(id, None)?;
-        let (_, u) = self.object_mut(id).ok_or_else(|| object_gone(id))?;
-        if let Some(m) = u.body.mover_mut() {
+        let (_, u) = self.object(id).ok_or_else(|| object_gone(id))?;
+        let at = u.position();
+        if let Some(m) = self.parts.mover_mut(id) {
             m.clear_user_waypoints();
             m.ignore_units.clear();
             m.waiting = 1;
@@ -369,13 +373,13 @@ impl World {
                 }
             }
         }
-        let (x, y, z) = (u.position().x(), u.position().y(), u.position().z());
+        let (x, y, z) = (at.x(), at.y(), at.z());
         let kept = waypoints_from(Point::new(x, y), waypoints);
         let Some((last, before)) = kept.split_last() else {
             return Ok(());
         };
         let (lx, ly) = (last.x(), last.y());
-        if let Some(m) = u.body.mover_mut() {
+        if let Some(m) = self.parts.mover_mut(id) {
             for w in before {
                 m.add_user_waypoint(Position::new(w.x(), w.y(), z));
             }

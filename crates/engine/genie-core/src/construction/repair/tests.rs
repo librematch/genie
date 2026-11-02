@@ -523,7 +523,7 @@ fn a_repair_s_walk_to_its_point_shows_its_sprite_as_it_starts() {
     for (task, shown) in [(TASK, 20), (SHOWING, 3)] {
         let mut t = repair_at(NEAR, |r| r.task = task);
         let v = &mut t.players[1].objects[ListIndex::new(0)];
-        let mover = v.body.mover_mut();
+        let mover = t.parts.mover_mut(v.id);
         let r = v.actions.list.repair_mut().unwrap();
         let g = graphics();
         let _ = r

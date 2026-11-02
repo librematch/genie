@@ -151,7 +151,7 @@ impl Unit {
         let g = c.w.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
         crate::objects::sprite::new_sprite(
             &mut self.sprite,
-            self.body.move_stats_mut(),
+            c.w.parts.move_stats_mut(self.id),
             g,
             c.w.streams.get(Stream::Sprite),
         );
@@ -210,16 +210,15 @@ impl Unit {
                 Ok(())
             })?;
         }
-        let construction =
-            c.w.parts
-                .building_mut(self.id)?
-                .construction
-                .as_mut()
-                .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
+        let (layer, mover) = c.w.parts.building_and_mover_mut(self.id)?;
+        let construction = layer
+            .construction
+            .as_mut()
+            .ok_or(crate::construction::build::NO_CONSTRUCTION)?;
         let started = Construction::begin(
             self.id,
             construction,
-            self.body.mover_mut(),
+            mover,
             &mut c.w.spatial,
             &mut c.w.pathing,
             c.w.world_time,

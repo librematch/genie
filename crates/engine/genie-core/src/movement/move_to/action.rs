@@ -345,7 +345,7 @@ impl MoveToAction {
     fn ended(&self, walk: &mut Walk<'_>, shows: &mut Shows<'_>) {
         if matches!(self.state, MoveTo::Arrived | MoveTo::Failed) {
             if let Some(g) = shows.standing.or(shows.master_standing) {
-                new_sprite(shows.sprite, walk.body.move_stats_mut(), g, shows.rng);
+                new_sprite(shows.sprite, walk.move_stats_mut(), g, shows.rng);
             }
             walk.set_anim_speed(Speed::ZERO);
         }
@@ -461,7 +461,7 @@ impl MoveToAction {
         let follow = target_left(walk, target, self.point, self.on_target_moved)?;
         match follow {
             Follow::PathEnd(p) => {
-                let mover = walk.body.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
+                let mover = walk.mover_mut().ok_or(crate::world::WALKER_UNMOVING)?;
                 mover.follow_path_end(p);
                 self.point = p;
             }
@@ -693,7 +693,7 @@ mod tests {
         );
         // at the point already: state 1, which shows the standing sprite
         let mut rig = WalkRig::on_the_path();
-        rig.body.set_anim_speed(Speed::new(1.0));
+        rig.motion.animated_mut().speed = Speed::new(1.0);
         let mut looks = Looks::default();
         let mut at = own_move_to(MoveTo::Start, Some(RUNNING), -1);
         at.point = Position::new(28.0, 89.0, 0.0);

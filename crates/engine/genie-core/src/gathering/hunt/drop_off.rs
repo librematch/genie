@@ -18,7 +18,6 @@ use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
-use crate::objects::masters::PlayersMasters;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -122,10 +121,10 @@ impl HuntAction {
             // failed or its target let go: the hunt waits and the unit's animation stops
             3..=5 => {
                 self.timer = DROP_WAIT;
-                set_walker_anim(&mut unit.body, Speed::new(0.0));
+                set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 return Ok(Dropped::Going);
             }
-            1 | 2 => self.tear_down(unit.body.mover_mut())?,
+            1 | 2 => self.tear_down(c.w.parts.mover_mut(unit.id))?,
             code => return Err(QUIET_CODE.with("code", code)),
         }
         let site = site.ok_or(GenieError::unsupported(
@@ -138,7 +137,7 @@ impl HuntAction {
         }
         if DROP_REACH < site.gap_squared.get() {
             self.timer = DROP_WAIT;
-            set_walker_anim(&mut unit.body, Speed::new(0.0));
+            set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
@@ -212,17 +211,11 @@ impl Unit {
     /// [`HuntAction::set_drop`]: crate::gathering::hunt::HuntAction::set_drop
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
     pub(crate) fn hunt_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let (mover, by_id) =
+            c.w.parts
+                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.masters));
         let w = DropWorld {
-            masters: crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             pathing: &mut c.w.pathing,
@@ -232,7 +225,7 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.drop_off_in(w, others, &c.w.graphics, by_id)? {
+        if let Some(site) = self.drop_off_in(mover, w, others, &c.w.graphics, by_id)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;
         }

@@ -136,7 +136,7 @@ impl World {
                         turns: g.flags.contains(SpriteFlags::TURNS),
                     },
                 );
-                if let Some(m) = self.players.live_mut(p, new)?.body.mover_mut() {
+                if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {
                     m.angle = crate::objects::facing::angle_of_facet(facet, own);
                 }
             }
@@ -311,21 +311,24 @@ impl World {
                 master_id: master,
                 master: made.life,
             },
-            // an animated one's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            body: crate::objects::layers::Body::new(
-                at,
-                (ANIMATED <= made.kind).then(crate::objects::layers::Animated::default),
-                moving.map(|stats| {
-                    Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)
-                }),
-            ),
+            place: crate::objects::layers::Static::at(at),
             attackable: true,
             pasture: None,
             my_pasture: None,
             sprite: sprite.filter(|_| facing == Facing::Drawn),
             ..Unit::default()
         };
-        let idx = self.push_live(p, unit)?;
+        let parts = crate::world::parts::ObjectParts {
+            // an animated one's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
+            motion: crate::objects::layers::MotionLayer::of(
+                (ANIMATED <= made.kind).then(crate::objects::layers::Animated::default),
+                moving.map(|stats| {
+                    Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)
+                }),
+            ),
+            ..Default::default()
+        };
+        let idx = self.push_live(p, crate::world::parts::Object { unit, parts })?;
         // the static init's add to its player (slot 0x2d0) files it in the tracker
         self.track_add(p, id, master).map(|()| idx)
     }

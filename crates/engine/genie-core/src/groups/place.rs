@@ -276,7 +276,10 @@ impl World {
         let held: Vec<(ObjectId, BVector)> = g
             .members
             .iter()
-            .filter_map(|mb| self.object(mb.id).map(|(_, u)| (mb.id, u.moved_vector())))
+            .filter_map(|mb| {
+                self.object(mb.id)
+                    .map(|(_, u)| (mb.id, u.moved_vector(self.parts.mover_of(u.id))))
+            })
             .collect();
         let centre = if m.flags.contains(MotionFlags::NEW) {
             let mut c = [0.0f32; 3];
@@ -351,15 +354,18 @@ impl World {
         let spot = match self.object(chosen) {
             Some((p, u))
                 if !in_front.is_empty()
-                    || ground_squared(u.moved_vector(), front) <= nearest_d
+                    || ground_squared(u.moved_vector(self.parts.mover_of(u.id)), front)
+                        <= nearest_d
                     || {
                         let r = u.master(self.master_tables(), p)?.radius.x();
                         beside <= (r + r) * (r + r)
                     } =>
             {
-                Some(u.moved_vector())
+                Some(u.moved_vector(self.parts.mover_of(u.id)))
             }
-            _ => self.object(nearest).map(|(_, u)| u.moved_vector()),
+            _ => self
+                .object(nearest)
+                .map(|(_, u)| u.moved_vector(self.parts.mover_of(u.id))),
         };
         let Some(at) = spot else {
             return Ok(());
@@ -461,7 +467,7 @@ mod tests {
     fn unit(id: i32, x: f32, y: f32) -> crate::objects::unit::Unit {
         let mut u = crate::objects::unit::Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+            place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
             ..crate::objects::unit::Unit::default()
         };
         u.life.master_id = master_id(4);
@@ -470,9 +476,10 @@ mod tests {
 
     /// A 20 by 20 map of terrain class 1, its objects on the obstruction manager, and group 1 of
     /// them at (10, 10) facing x, spacing 2, two stored points.
-    fn front_world(units: Vec<crate::objects::unit::Unit>) -> World {
+    fn front_world(objects: Vec<impl Into<crate::world::parts::Object>>) -> World {
         use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
         use crate::map::terrain::{Terrain, TerrainKind};
+        let (units, parts) = World::split_layers(objects.into_iter().map(Into::into));
         let mut t = World::new(
             WorldTime::ZERO,
             crate::world::FrameSeed::of_data(1),
@@ -482,7 +489,8 @@ mod tests {
                 objects: units.clone().into(),
                 ..crate::world::Player::default()
             }],
-        );
+        )
+        .with_parts(parts);
         t.masters = vec![crate::objects::masters::Masters::new([
             crate::objects::masters::Master {
                 id: master_id(4),
@@ -599,7 +607,7 @@ mod tests {
                 0
             )
         );
-        let mut t = front_world(Vec::new());
+        let mut t = front_world(Vec::<crate::world::parts::Object>::new());
         t.groups.groups[0].members = vec![crate::groups::Member {
             id: object_id(99),
             ..crate::groups::Member::default()
@@ -658,11 +666,13 @@ mod tests {
     #[test]
     fn a_flanked_group_stays_where_its_lead_could_stand() {
         // the lead moves (slot 0x270 is `FUN_141158940`), where it last moved to its place
-        let mut lead = unit(10, 15.0, 10.5);
+        let lead = unit(10, 15.0, 10.5);
         let mut mover = crate::gathering::hunt::tests::walker();
         mover.moved_at = lead.position();
-        lead.body.put_mover(Some(mover));
-        let units = vec![lead, unit(11, 10.2, 10.1)];
+        let units = vec![
+            crate::world::parts::Object::moving(lead, mover),
+            unit(11, 10.2, 10.1).into(),
+        ];
         let flanked = |t: &mut World| {
             t.groups.groups[0].formation_locked_type = Some(FormationKind::FLANKED);
             t.groups.groups[0].motion.lead = Some(object_id(10));
@@ -680,7 +690,7 @@ mod tests {
             )
         );
         let mut other = units[1].clone();
-        other.id = object_id(50);
+        other.unit.id = object_id(50);
         let mut t = front_world(vec![units[0].clone(), units[1].clone(), other]);
         flanked(&mut t);
         t.groups.groups[0].members.truncate(2);
@@ -707,11 +717,15 @@ mod tests {
             t.groups.groups[0].members.truncate(2);
             t.groups.groups[0].motion.lead = Some(object_id(-2));
         };
-        let mut missile = unit(-2, 3.0, 3.0);
-        missile
-            .body
-            .put_mover(Some(crate::gathering::hunt::tests::walker()));
-        let mut t = front_world(vec![units[0].clone(), units[1].clone(), missile]);
+        let missile = crate::world::parts::Object::moving(
+            unit(-2, 3.0, 3.0),
+            crate::gathering::hunt::tests::walker(),
+        );
+        let mut t = front_world(vec![
+            units[0].clone().into(),
+            units[1].clone().into(),
+            missile,
+        ]);
         flanked(&mut t);
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
@@ -744,17 +758,19 @@ mod tests {
     #[test]
     fn the_initial_orientation_averages_the_members_forwards() {
         let facing = |forwards: &[Option<BVector>]| {
-            let units: Vec<crate::objects::unit::Unit> = forwards
+            let units: Vec<crate::world::parts::Object> = forwards
                 .iter()
                 .enumerate()
                 .map(|(i, f)| {
-                    let mut u = unit(10 + i as i32, 5.0, 5.0);
-                    if let Some(f) = f {
-                        let mut mover = crate::gathering::hunt::tests::walker();
-                        mover.forward = *f;
-                        u.body.put_mover(Some(mover));
+                    let u = unit(10 + i as i32, 5.0, 5.0);
+                    match f {
+                        Some(f) => {
+                            let mut mover = crate::gathering::hunt::tests::walker();
+                            mover.forward = *f;
+                            crate::world::parts::Object::moving(u, mover)
+                        }
+                        None => u.into(),
                     }
-                    u
                 })
                 .collect();
             let mut t = front_world(units);
@@ -772,7 +788,7 @@ mod tests {
             ]),
             BVector::new(0.0, 0.0, 1.0)
         );
-        let mut t = front_world(Vec::new());
+        let mut t = front_world(Vec::<crate::world::parts::Object>::new());
         t.groups.groups[0].members = vec![crate::groups::Member {
             id: object_id(99),
             ..crate::groups::Member::default()

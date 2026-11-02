@@ -71,7 +71,7 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     let u = &o.unit;
     assert_eq!(u.actions.list.move_to().copied(), None);
     assert_eq!(released, []);
-    let m = u.body.mover().unwrap();
+    let m = o.parts.mover().unwrap();
     assert_eq!(m.animated.speed, Speed::new(0.0));
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.0);
     let ai = o.parts.unit_ai.as_ref().unwrap();
@@ -133,11 +133,11 @@ fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
         )
     );
     assert_eq!(released, [600]);
-    assert_eq!(u.body.mover().unwrap().animated.speed, Speed::new(0.0));
+    assert_eq!(o.parts.mover().unwrap().animated.speed, Speed::new(0.0));
     let mut t = forage_world();
     let u = &mut t.players[1].objects[ListIndex::new(0)];
     u.actions.list.set_artifact(Some(artifact()));
-    u.body.put_mover(None);
+    t.parts.put_mover(u.id, None);
     assert_eq!(
         stopped(t, class::LIVESTOCK).unwrap_err().reason(),
         "a walking animal without movement state"

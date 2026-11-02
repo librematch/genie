@@ -62,7 +62,7 @@ impl crate::world::World {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
             Ship::of_unit(
-                unit,
+                (unit, self.parts.mover_of(unit.id)),
                 master,
                 self.spatial.map,
                 (
@@ -115,6 +115,7 @@ impl crate::world::World {
         let rng = self.streams.get(crate::math::rng::Stream::Sprite);
         let id = self.players.live(p, i)?.id;
         self.players.live_mut(p, i)?.transport_sail(
+            self.parts.motion.layer_mut(id),
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
             (
@@ -124,7 +125,7 @@ impl crate::world::World {
                 ),
                 (
                     &self.graphics,
-                    self.parts.combat_of(id).abilities.look.as_ref(),
+                    self.parts.combat.of(id).abilities.look.as_ref(),
                 ),
                 rng,
             ),
@@ -142,13 +143,14 @@ impl crate::world::World {
     ) -> Result<(), GenieError> {
         let unit = self.players.live_mut(p, i)?;
         if c.stopped
-            && let Some(m) = unit.body.mover_mut()
+            && let Some(m) = self.parts.mover_mut(unit.id)
         {
             m.stop()?;
         }
         if c.stands {
             let rng = self.streams.get(crate::math::rng::Stream::Sprite);
             unit.show_standing(
+                self.parts.motion.layer_mut(unit.id),
                 crate::objects::masters::OwnerMasters::new(
                     &self.parts.own_master,
                     self.masters.of(p),
@@ -204,7 +206,7 @@ impl crate::world::World {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
             Ship::of_unit(
-                unit,
+                (unit, self.parts.mover_of(unit.id)),
                 master,
                 self.spatial.map,
                 (
@@ -378,7 +380,7 @@ impl crate::world::World {
             .restriction(moving.restriction)
             .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
         let unit = self.object(id).map(|(_, u)| u);
-        let (grow, mask) = unit.and_then(|u| u.body.mover()).map_or_else(
+        let (grow, mask) = unit.and_then(|u| self.parts.mover_of(u.id)).map_or_else(
             || {
                 (
                     made.radius.x(),
@@ -466,9 +468,7 @@ impl crate::world::World {
         let (up, ui) = self.live_inside(id)?;
         let unit = self.players.live_mut(up, ui)?;
         let inner_id = unit.id;
-        unit.body
-            .base_mut()
-            .inside_at(inner_id, at, &mut self.spatial);
+        unit.place.inside_at(inner_id, at, &mut self.spatial);
         self.leave_container((p, i), (up, ui), made, spot.with_height(at.z()))?;
         let id = self.players.live(up, ui)?.id;
         if let Some(ai) = self.parts.unit_ai.get_mut(id) {

@@ -196,8 +196,11 @@ impl World {
                 id,
                 unit,
                 // the game's vector (x, height, y) of where it last moved to (x, y, height)
-                at: moved_place(u),
-                speed: u.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+                at: moved_place(u, self.parts.mover_of(u.id)),
+                speed: self
+                    .parts
+                    .mover_of(u.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
                 range: weapon_range(master),
                 under_attack: u.under_attack,
                 attacking: ai.current_action == Some(ActionKind::Attack),
@@ -205,7 +208,9 @@ impl World {
             self.member_objects(id, &mut objects)?;
             if far && self.far_from_slot(group, &view, largest)? {
                 if self.remove_unit(group, id, None, false)? {
-                    if let Some(m) = self.object_mut(id).and_then(|(_, u)| u.body.mover_mut()) {
+                    if self.object(id).is_some()
+                        && let Some(m) = self.parts.mover_mut(id)
+                    {
                         m.stop()?;
                     }
                     // the index steps back: the next member takes this one's place
@@ -247,7 +252,7 @@ impl World {
                     range = r;
                 }
                 let radius = match object {
-                    crate::groups::WorldObject::Unit(p, u) => {
+                    crate::groups::WorldObject::Unit(p, u, _) => {
                         FormationUnit::of(u.master(self.master_tables(), p)?).radius
                     }
                     crate::groups::WorldObject::Ghost(p, _) => {
@@ -347,7 +352,7 @@ impl World {
                     continue;
                 };
                 let state = match object {
-                    crate::groups::WorldObject::Unit(_, u) => u.life.state,
+                    crate::groups::WorldObject::Unit(_, u, _) => u.life.state,
                     crate::groups::WorldObject::Ghost(_, g) => g.state,
                 };
                 if ObjectState::Dying <= state {
@@ -392,7 +397,7 @@ impl World {
             return Ok(Distance::ZERO);
         }
         let range = weapon_range(master);
-        let crate::groups::WorldObject::Unit(_, u) = object else {
+        let crate::groups::WorldObject::Unit(_, u, _) = object else {
             return Ok(range);
         };
         let target = target.or_else(|| {
@@ -480,7 +485,9 @@ impl World {
         if !inside {
             return Ok(());
         }
-        if let Some(m) = self.object_mut(id).and_then(|(_, u)| u.body.mover_mut()) {
+        if self.object(id).is_some()
+            && let Some(m) = self.parts.mover_mut(id)
+        {
             m.stop()?;
         }
         Ok(())
@@ -604,7 +611,6 @@ mod tests {
     use crate::unit_ai::UnitAiType;
     use crate::vision::registry::UnitUpdate;
     use crate::world::Player;
-    use crate::world::parts::Object;
 
     /// Slot 0x238 (`FUN_14108d9b0`): the weapon range, plus `charge_event` for a ready charge of
     /// type 6 or 7 that works on the target (here every class, −1); without the charge ready, of
@@ -653,7 +659,7 @@ mod tests {
         let unit = |id: i32, master: MasterId, x: f32, y: f32| {
             let mut u = Unit {
                 id: object_id(id),
-                body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
                 ..Unit::default()
             };
             u.life.master_id = master;
@@ -810,17 +816,10 @@ mod tests {
     fn a_member_s_search_takes_its_type_s_classes_radius_and_neutral_test() {
         let world = |ai_type: UnitAiType| {
             let mut t = searched_world();
-            let mut far = t.players[2].objects[ListIndex::new(0)].clone();
-            let far_ai = t
-                .parts
-                .unit_ai
-                .get(t.players[2].objects[ListIndex::new(0)].id)
-                .cloned();
-            far.id = object_id(22);
-            far.place_for_test(Position::new(13.0, 5.0, 0.0));
-            let _ = t
-                .push_live(PlayerId::new(2), Object::with_ai(far, far_ai))
-                .unwrap();
+            let mut far = t.object_of(&t.players[2].objects[ListIndex::new(0)]);
+            far.unit.id = object_id(22);
+            far.unit.place_for_test(Position::new(13.0, 5.0, 0.0));
+            let _ = t.push_live(PlayerId::new(2), far).unwrap();
             let sight = t.spatial.sight.as_mut().unwrap();
             sight
                 .registry
@@ -929,23 +928,15 @@ mod tests {
                     m
                 }));
             }
-            let mut stray = t.players[1].objects[ListIndex::new(0)].clone();
-            let stray_ai = t
-                .parts
-                .unit_ai
-                .get(t.players[1].objects[ListIndex::new(0)].id)
-                .cloned();
-            stray.id = object_id(11);
-            stray.place_for_test(Position::new(6.0, 6.0, 0.0));
-            stray
-                .body
-                .put_mover(Some(crate::gathering::hunt::tests::walker()));
-            stray.body.mover_mut().unwrap().moved_at = Position::new(6.0, 6.0, 0.0);
-            stray.group.id = Some(group_id(1));
+            let mut stray = t.object_of(&t.players[1].objects[ListIndex::new(0)]);
+            stray.unit.id = object_id(11);
+            stray.unit.place_for_test(Position::new(6.0, 6.0, 0.0));
+            t.parts
+                .put_mover(stray.unit.id, Some(crate::gathering::hunt::tests::walker()));
+            t.parts.mover_mut(stray.unit.id).unwrap().moved_at = Position::new(6.0, 6.0, 0.0);
+            stray.unit.group.id = Some(group_id(1));
             t.players[1].objects[ListIndex::new(0)].group.id = Some(group_id(1));
-            let _ = t
-                .push_live(PlayerId::new(1), Object::with_ai(stray, stray_ai))
-                .unwrap();
+            let _ = t.push_live(PlayerId::new(1), stray).unwrap();
             let g = t.groups.get_mut(group_id(1)).unwrap();
             g.flags = GroupFlags::NONE;
             g.members = order
@@ -986,7 +977,10 @@ mod tests {
         assert_eq!(ids(&t), [object_id(10)]);
         let u = t.object(object_id(11)).unwrap().1;
         assert_eq!(u.group.id, None);
-        assert_eq!(u.body.mover().unwrap().animated.speed, Speed::new(0.0));
+        assert_eq!(
+            t.parts.mover_of(object_id(11)).unwrap().animated.speed,
+            Speed::new(0.0)
+        );
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(g.centroid, BVector::new(5.0, 0.0, 5.0));
         assert_eq!(g.largest_unit_radius, Distance::new(0.2));

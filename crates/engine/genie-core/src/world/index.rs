@@ -263,14 +263,15 @@ pub struct ObjectsRef<'a> {
     masters: crate::objects::masters::MasterTables<'a>,
     buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
     combats: &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
+    motions: crate::world::motions::Lent<'a, crate::objects::layers::MotionLayer>,
 }
 
 impl<'a> ObjectsRef<'a> {
     /// The objects of `players`, which the world's table `index` finds, with the players'
-    /// `masters` and the objects' `parts` (their own masters, their building and combat
+    /// `masters` and the objects' `parts` (their own masters, their building, combat and motion
     /// layers).
     #[must_use]
-    pub const fn new(
+    pub fn new(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: &'a [crate::objects::masters::Masters],
@@ -280,21 +281,23 @@ impl<'a> ObjectsRef<'a> {
             players,
             index,
             crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-            (&parts.building, &parts.combat),
+            (&parts.building, &parts.combat, parts.motion.unlent()),
         )
     }
 
     /// [`ObjectsRef::new`] of the part tables it reads, for a caller that holds another part
     /// table to change: the world's `masters` (the players' and the objects' own), the building
-    /// layers `buildings` and the combat layers `combats`.
+    /// layers `buildings`, the combat layers `combats` and the motion layers `motions` (one of
+    /// them lent out to a walk, [`crate::world::parts::PartTable::lend`]).
     #[must_use]
     pub const fn of_tables(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: crate::objects::masters::MasterTables<'a>,
-        (buildings, combats): (
+        (buildings, combats, motions): (
             &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
             &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
+            crate::world::motions::Lent<'a, crate::objects::layers::MotionLayer>,
         ),
     ) -> Self {
         Self {
@@ -303,7 +306,18 @@ impl<'a> ObjectsRef<'a> {
             masters,
             buildings,
             combats,
+            motions,
         }
+    }
+
+    /// Object `id`'s mover; none for an object that does not move, one the world does not hold
+    /// or one out for its update.
+    #[must_use]
+    pub fn mover_of(&self, id: impl ObjectKey) -> Option<&'a crate::movement::Mover> {
+        let u = self.get(id)?;
+        self.motions
+            .get(u.id)
+            .and_then(crate::objects::layers::MotionLayer::mover)
     }
 
     /// Object `id`'s combat layer, an object out for its update's too: a new object's where
@@ -311,6 +325,12 @@ impl<'a> ObjectsRef<'a> {
     #[must_use]
     pub fn combat_of(&self, id: ObjectId) -> &'a crate::objects::layers::Combat {
         self.combats.of(id)
+    }
+
+    /// The world's masters these objects read: the players' tables and the objects' own.
+    #[must_use]
+    pub const fn masters(&self) -> crate::objects::masters::MasterTables<'a> {
+        self.masters
     }
 
     /// No objects: a test's walk that meets none by id.
@@ -350,7 +370,12 @@ impl<'a> ObjectsRef<'a> {
     /// movement state, one the world does not hold or one out for its update.
     #[must_use]
     pub fn gait(&self, id: impl ObjectKey) -> Option<crate::map::spatial::Gait> {
-        self.get(id)?.gait()
+        let u = self.get(id)?;
+        u.gait(
+            self.motions
+                .get(u.id)
+                .and_then(crate::objects::layers::MotionLayer::mover),
+        )
     }
 
     /// The building layer of object `id` ([`crate::world::parts::Parts::building_of`]); none
@@ -421,9 +446,17 @@ impl TestObjects {
         let Some(player) = self.players.first_mut() else {
             return;
         };
-        let made = gait.map(|g| crate::movement::tests::unit_with_gait(id, g));
+        let made = gait.map(|g| {
+            let o = crate::movement::tests::unit_with_gait(id, g);
+            let _ = self
+                .parts
+                .motion
+                .insert(id, o.parts.motion.expect("a walker's motion part"));
+            o.unit
+        });
         if made.is_none() {
             let _ = self.parts.building.remove(id);
+            let _ = self.parts.motion.remove(id);
         }
         player.objects = player
             .objects

@@ -68,19 +68,19 @@ const DT: f32 = 0.069;
 
 /// A unit of master 4 at (`x`, `y`), where it last moved to, with the hunt tests' walker (top
 /// speed 0.8, radius 0.2, turn rate the largest); its unit AI [`free_ai`].
-fn member(id: i32, x: f32, y: f32) -> Unit {
+fn member(id: i32, x: f32, y: f32) -> Object {
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.moved_at = Position::new(x, y, 0.0);
     let mut u = Unit {
         id: object_id(id),
-        body: crate::objects::layers::Body::new(Position::new(x, y, 0.0), None, Some(mover)),
+        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
         ..Unit::default()
     };
     u.life.master_id = master_id(4);
     u.life.state = ObjectState::Alive;
     u.life.hp = HitPoints::new(50.0);
     u.group.id = Some(group_id(1));
-    u
+    Object::moving(u, mover)
 }
 
 /// A member's free unit AI: no order, action or target.
@@ -109,10 +109,11 @@ fn slot(unit: i32, x: f32, y: f32) -> Slot {
 /// 1.875), which the slice's graphics hold (not the units' sprites); a 32 by 32
 /// map of the terrain class bit 2 (in the walker's mask) at the world's time 100 and an update of 69 ms.
 fn world() -> World {
+    let (members, parts) = World::split_layers([member(10, 5.0, 5.0), member(11, 6.0, 5.0)]);
     let players = vec![
         Player::default(),
         Player {
-            objects: vec![member(10, 5.0, 5.0), member(11, 6.0, 5.0)].into(),
+            objects: members.into(),
             ..Player::default()
         },
     ];
@@ -123,6 +124,7 @@ fn world() -> World {
         vec![Millis::ZERO; 2],
         players,
     )
+    .with_parts(parts)
     .with_ais([(object_id(10), free_ai()), (object_id(11), free_ai())]);
     t.world_time = WorldTime::from_millis(100);
     t.dt_seconds = Seconds::new(DT);
@@ -177,7 +179,7 @@ fn widen(t: &mut World, r: f32) {
         *m = Masters::new(all);
     }
     for u in &mut t.players[1].objects {
-        if let Some(m) = u.body.mover_mut() {
+        if let Some(m) = t.parts.mover_mut(u.id) {
             m.stats.radius = Radii::new(r, r, m.stats.radius.z());
         }
     }
@@ -208,7 +210,7 @@ fn unit(t: &World, id: i32) -> &Unit {
 }
 
 fn mover(t: &World, id: i32) -> &crate::movement::Mover {
-    unit(t, id).body.mover().unwrap()
+    t.parts.mover_of(object_id(id)).unwrap()
 }
 
 fn state(t: &World, slot: usize) -> SlotState {
@@ -341,9 +343,9 @@ fn a_member_in_place_or_failing_too_often() {
     );
     // a NaN gap is not in place
     let mut t = world();
-    let m = t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    let m = t
+        .parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     m.moved_at = m.moved_at.with_x(f32::NAN);
     let g = t.groups.get_mut(group_id(1)).unwrap();
@@ -490,9 +492,9 @@ fn a_due_slot_takes_its_member() {
     assert_eq!(mover(&t, 10).animated.speed, Speed::new(0.0));
     assert_eq!(unit(&t, 10).position(), Position::new(5.0, 5.0, 0.0));
     let mut t = world();
-    let m = t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    let m = t
+        .parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     m.stats.radius = m.stats.radius.with_z(0.0);
     t.spatial.insert(
@@ -626,17 +628,16 @@ fn the_members_moves_end_wait_or_stop() {
     t.spatial.insert(object_id(50), post(6.0, 7.0));
     // the members walk: a stop clears their animation speed
     for u in &mut t.players[1].objects {
-        u.body.set_anim_speed(Speed::new(1.0));
+        t.parts.set_anim_speed(u.id, Speed::new(1.0));
     }
     let mut stray = member(12, 20.0, 20.0);
-    stray.body.set_anim_speed(Speed::new(1.0));
-    stray.body.mover_mut().unwrap().velocity = Some(crate::movement::Velocity {
+    stray.parts.unit_ai = Some(free_ai());
+    let _ = t.push_live(PlayerId::new(1), stray).unwrap();
+    t.parts.set_anim_speed(object_id(12), Speed::new(1.0));
+    t.parts.mover_mut(object_id(12)).unwrap().velocity = Some(crate::movement::Velocity {
         velocity: BVector::new(0.0, 0.0, 0.5),
         acceleration: BVector::ZERO,
     });
-    let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(stray, free_ai()))
-        .unwrap();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.members.push(Member {
         id: object_id(12),

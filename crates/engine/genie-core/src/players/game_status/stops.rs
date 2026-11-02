@@ -43,11 +43,11 @@ impl World {
             });
             // The classes a defeat stops besides explorers: villagers (4) and fishing boats (21).
             if matches!(class, class::VILLAGER | class::FISHING_SHIP) || explorer {
-                if let Some(m) = self.players.live_mut(p, idx)?.body.mover_mut() {
+                if let Some(m) = self.parts.mover_mut(self.players.live(p, idx)?.id) {
                     m.ignore_units.clear();
                 }
                 self.object_stop(p, idx)?;
-                if let Some(m) = self.players.live_mut(p, idx)?.body.mover_mut() {
+                if let Some(m) = self.parts.mover_mut(self.players.live(p, idx)?.id) {
                     m.stand()?;
                 }
             }
@@ -160,7 +160,7 @@ impl World {
             ));
         }
         let hunt = unit.actions.list.hunt_mut().ok_or(NO_TOP_ACTION)?;
-        hunt.tear_down(unit.body.mover_mut())?;
+        hunt.tear_down(self.parts.mover_mut(unit.id))?;
         hunt.state = crate::gathering::hunt::HuntState::Idle;
         let sprite = crate::gathering::hunt::stand_sprite(
             &hunt.task,
@@ -177,7 +177,7 @@ impl World {
         if let Some(g) = sprite {
             crate::objects::sprite::new_sprite(
                 &mut unit.sprite,
-                unit.body.move_stats_mut(),
+                self.parts.move_stats_mut(unit.id),
                 g,
                 self.streams.get(Stream::Sprite),
             );
@@ -220,7 +220,7 @@ impl World {
                 let unit = self.players.live_mut(p, idx)?;
                 let attack = unit.actions.list.attack_mut().ok_or(NO_TOP_ACTION)?;
                 attack.halt(
-                    &mut unit.body,
+                    self.parts.motion_mut(unit.id),
                     &mut unit.sprite,
                     self.streams.get(Stream::Sprite),
                 )?;
@@ -254,7 +254,7 @@ impl World {
             &self.graphics,
         );
         let released = gather.halt(
-            unit.body.mover_mut(),
+            self.parts.mover_mut(unit.id),
             stand,
             &mut unit.sprite,
             self.streams.get(Stream::Sprite),
@@ -276,7 +276,7 @@ impl World {
         let unit = self.players.live_mut(p, idx)?;
         let build = unit.actions.list.build_mut().ok_or(NO_TOP_ACTION)?;
         let foundation = build.target;
-        let (counted, targets) = build.halt(unit.body.mover_mut())?;
+        let (counted, targets) = build.halt(self.parts.mover_mut(unit.id))?;
         if counted {
             self.leave_builders(foundation)?;
         }
@@ -293,7 +293,7 @@ impl World {
         let unit = self.players.live_mut(p, idx)?;
         let repair = unit.actions.list.repair_mut().ok_or(NO_TOP_ACTION)?;
         let target = repair.target;
-        if repair.halt(unit.body.mover_mut())? {
+        if repair.halt(self.parts.mover_mut(unit.id))? {
             self.leave_builders(target)?;
         }
         self.standing_sprite(p, idx)
@@ -311,8 +311,8 @@ impl World {
         let artifact = unit.actions.list.artifact_mut().ok_or(NO_TOP_ACTION)?;
         let (gone, released) = artifact.stop();
         if gone.stops {
-            unit.body
-                .mover_mut()
+            self.parts
+                .mover_mut(unit.id)
                 .ok_or(GenieError::unsupported(
                     "a walking animal without movement state",
                 ))?

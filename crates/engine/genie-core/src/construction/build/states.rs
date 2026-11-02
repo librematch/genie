@@ -96,10 +96,10 @@ impl BuildAction {
     /// # Errors
     ///
     /// The builder count's, and the unit's stop that the motion step does not model.
-    pub(super) fn leave(&mut self, c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
+    pub(super) fn leave(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
         self.uncount(c)?;
         if self.move_to.take().is_some()
-            && let Some(m) = builder.body.mover_mut()
+            && let Some(m) = c.w.parts.mover_mut(builder.id)
         {
             m.stop()?;
         }
@@ -288,6 +288,7 @@ impl BuildAction {
     /// [`Unit::show_standing`]'s.
     pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
         builder.show_standing(
+            c.w.parts.motion.layer_mut(builder.id),
             crate::objects::masters::OwnerMasters::new(
                 &c.w.parts.own_master,
                 c.w.masters.of(c.player),
@@ -309,11 +310,7 @@ impl BuildAction {
     /// # Errors
     ///
     /// The prelude's, a builder without movement state, a foundation without a place.
-    pub(super) fn restart(
-        &mut self,
-        c: &mut Step<'_>,
-        builder: &mut Unit,
-    ) -> Result<(), GenieError> {
+    pub(super) fn restart(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         let (to, walk) = self.walk_to_foundation(c, builder)?;
         *self = self.restarted(self.target, to.map_or(self.point, |t| t.at), walk);
@@ -469,7 +466,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        let (counted, [target, second]) = self.halt(builder.body.mover_mut())?;
+        let (counted, [target, second]) = self.halt(c.w.parts.mover_mut(builder.id))?;
         if counted {
             Self::count(c, target, -1)?;
         }

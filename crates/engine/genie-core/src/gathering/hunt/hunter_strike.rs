@@ -157,7 +157,7 @@ impl Unit {
             return Ok(());
         }
         let hunt = self.actions.list.hunt_mut().ok_or(NO_HUNT)?;
-        hunt.tear_down(self.body.mover_mut())?;
+        hunt.tear_down(c.w.parts.mover_mut(self.id))?;
         hunt.state = HuntState::Search;
         self.hunt_search_state(c)
     }
@@ -187,7 +187,10 @@ impl Unit {
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
         let (me_at, them) = (at(Some(self.id))?, at(action.target)?);
-        let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+        let speed =
+            c.w.parts
+                .mover_of(self.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,

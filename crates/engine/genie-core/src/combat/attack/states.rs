@@ -14,7 +14,7 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveToReads;
 use crate::objects::UpdateCode;
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
@@ -32,14 +32,15 @@ impl Attack {
     pub(crate) fn arrived_sprite(
         &self,
         unit: &mut Unit,
+        mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         let g = self
             .arms
             .idle_sprite
             .ok_or(crate::world::NO_STANDING_SPRITE)?;
-        new_sprite(&mut unit.sprite, unit.body.move_stats_mut(), g, sprite_rng);
-        set_walker_anim(&mut unit.body, Speed::new(0.0));
+        new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, sprite_rng);
+        set_walker_anim(motion, Speed::new(0.0));
         Ok(())
     }
 
@@ -99,9 +100,13 @@ impl Attack {
 
     /// The start of every `set_state` (`0x140a820c0`): the sub-actions go (a `MoveTo`'s teardown stops
     /// the unit and its animation, `+0x7b8`), then the state.
-    pub(super) fn enter(&mut self, state: AttackState, unit: &mut Unit) -> Result<(), GenieError> {
+    pub(super) fn enter(
+        &mut self,
+        state: AttackState,
+        mut motion: MotionMut<'_>,
+    ) -> Result<(), GenieError> {
         if self.move_to.take().is_some() {
-            unit.body
+            motion
                 .mover_mut()
                 .ok_or(crate::world::ATTACKER_UNMOVING)?
                 .stop()?;
@@ -143,7 +148,10 @@ impl Attack {
             AiOrder::Order(_) => r.queue_empty,
         };
         if human && waits {
-            let speed = unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+            let speed =
+                c.w.parts
+                    .mover_of(unit.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed);
             if r.stance == UnitStance::AGGRESSIVE
                 && Speed::ZERO < speed
                 && f.own.class != class::VILLAGER
@@ -157,7 +165,7 @@ impl Attack {
                         [600, 0, 0x202],
                     )?;
                 }
-                self.wait_at_seen(unit, f, r, &c.w.graphics)?;
+                self.wait_at_seen(unit, c.w.parts.motion_mut(unit.id), f, r, &c.w.graphics)?;
                 return Ok(UpdateCode::CODE_5);
             }
             unit.post_own(
@@ -172,7 +180,11 @@ impl Attack {
                 [600, 0, 0x202],
             )?;
         }
-        self.finish(unit, c.w.streams.get(Stream::Sprite))?;
+        self.finish(
+            unit,
+            c.w.parts.motion_mut(unit.id),
+            c.w.streams.get(Stream::Sprite),
+        )?;
         Ok(UpdateCode::CODE_5)
     }
 
@@ -191,7 +203,12 @@ impl Attack {
         r: &AttackReads,
     ) -> Result<UpdateCode, GenieError> {
         let target = self.target.take();
-        self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
+        self.finish_in(
+            AttackState::Failed,
+            unit,
+            c.w.parts.motion_mut(unit.id),
+            c.w.streams.get(Stream::Sprite),
+        )?;
         // The predators' class (10), whose unit AI's slot 0x1f0 a failed Attack calls.
         // The boar's unit-AI type, whose slot 0x1f0 (`FUN_140c16d50`) sends it home.
         // The lion's unit-AI type, whose slot 0x1f0 (`FUN_140c16d60`) does nothing.
@@ -232,11 +249,12 @@ impl Attack {
     pub(super) fn finish(
         &mut self,
         unit: &mut Unit,
+        motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
         // The states the slice models: 1 done, 2 the target died, 4 on the way, 6 waiting to swing, 7
         // swinging, 13 failed.
-        self.finish_in(AttackState::Done, unit, sprite_rng)
+        self.finish_in(AttackState::Done, unit, motion, sprite_rng)
     }
 
     /// Slot 0x38 (`FUN_140a82ac0`) as the unit's stop calls it: `set_state(1)` (the
@@ -249,21 +267,22 @@ impl Attack {
     /// An attacker walking without movement state, or without a standing sprite.
     pub(crate) fn halt(
         &mut self,
-        body: &mut Body,
+        mut motion: MotionMut<'_>,
         sprite: &mut Option<ActiveSprite>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.move_to.take().is_some() {
-            body.mover_mut()
+            motion
+                .mover_mut()
                 .ok_or(crate::world::ATTACKER_UNMOVING)?
                 .stop()?;
         }
         self.state = AttackState::Done;
-        body.set_anim_speed(Speed::new(1.0));
+        motion.set_anim_speed(Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(sprite, body.move_stats_mut(), idle, rng);
+        new_sprite(sprite, motion.move_stats_mut(), idle, rng);
         Ok(())
     }
 
@@ -272,19 +291,15 @@ impl Attack {
         &mut self,
         state: AttackState,
         unit: &mut Unit,
+        mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.enter(state, unit)?;
-        set_walker_anim(&mut unit.body, Speed::new(1.0));
+        self.enter(state, motion.reborrow())?;
+        set_walker_anim(motion.reborrow(), Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(
-            &mut unit.sprite,
-            unit.body.move_stats_mut(),
-            idle,
-            sprite_rng,
-        );
+        new_sprite(&mut unit.sprite, motion.move_stats_mut(), idle, sprite_rng);
         Ok(())
     }
 }

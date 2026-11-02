@@ -161,10 +161,8 @@ impl Rig {
 
     /// Its movement state.
     fn mover_mut(&mut self) -> &mut Mover {
-        self.unit_mut()
-            .body
-            .mover_mut()
-            .expect("the rig's unit moves")
+        let id = self.unit().id;
+        self.t.parts.mover_mut(id).expect("the rig's unit moves")
     }
 
     /// What it carries: the resource and how much.
@@ -180,7 +178,7 @@ impl Rig {
 
     /// Its animation stopped (`+0x7b8` 0).
     fn anim_stopped(&self) -> bool {
-        self.unit().body.anim_speed() == Some(Speed::new(0.0))
+        self.t.parts.anim_speed_of(self.unit().id) == Some(Speed::new(0.0))
     }
 
     /// The next draw of the world's Action stream, less [`WAIT_SHIFT`]: a random wait's timer.
@@ -656,8 +654,10 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
     let mut rig = Rig::on_the_path();
     rig.t.world_time = WorldTime::from_millis(5000);
     rig.set_load(None, 0.0);
-    rig.unit_mut().body =
-        crate::objects::layers::Body::new(Position::new(30.0, 40.0, 0.0), None, Some(mover));
+    rig.unit_mut().place = crate::objects::layers::Static::at(Position::new(30.0, 40.0, 0.0));
+    let id = rig.unit().id;
+    rig.t
+        .set_motion(id, Some(crate::objects::layers::MotionLayer::Moving(mover)));
     let r = GatherReads {
         master: master_id(259),
         ..reads()
@@ -672,7 +672,7 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
     });
     assert_eq!(faced, Ok(Next::Stay));
     assert_eq!(g.state, GatherState::Face);
-    assert_ne!(rig.unit().body.mover().unwrap().angle, before);
+    assert_ne!(rig.t.parts.mover_of(rig.unit().id).unwrap().angle, before);
 }
 
 /// State 8's drop-off (`0x140a8e1d0` case 7) by its `MoveTo`: the timer's wait (below 0 it

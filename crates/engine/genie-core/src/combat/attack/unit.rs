@@ -61,11 +61,12 @@ impl Unit {
             return self.attack_walks_unseen(c, me, master_class);
         }
         let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
-        let (code, disarmed) = attack.update_targetless(c.dt.seconds(), armed, &mut self.body)?;
+        let (code, disarmed) =
+            attack.update_targetless(c.dt.seconds(), armed, c.w.parts.motion_mut(self.id))?;
         if disarmed {
             let posted = attack.disarmed(
                 &mut self.sprite,
-                &mut self.body,
+                c.w.parts.motion_mut(self.id),
                 c.w.streams.get(Stream::Sprite),
             )?;
             if let Some((kind, p)) = posted {

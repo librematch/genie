@@ -10,7 +10,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{MoveDefaults, SpriteReads};
-use crate::movement::{Me, footprint_gap, footprint_gap_squared};
+use crate::movement::{Me, Mover, footprint_gap, footprint_gap_squared};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -109,15 +109,16 @@ impl Unit {
         Ok(())
     }
 
-    /// What the Gather's `MoveTo` constructors read of this gatherer (`player`'s, whose masters
-    /// are `every`): the sprites' table `graphics` with the defaults of its master and terrain
-    /// look `look`, and what it carries now.
+    /// What the Gather's `MoveTo` constructors read of this gatherer with its mover `mover`
+    /// (`player`'s, whose masters are `every`): the sprites' table `graphics` with the defaults
+    /// of its master and terrain look `look`, and what it carries now.
     ///
     /// # Errors
     ///
     /// A gatherer whose master the table lacks.
     pub(crate) fn move_walks<'g>(
         &self,
+        mover: Option<&Mover>,
         every: crate::objects::masters::MasterTables<'_>,
         player: PlayerId,
         (graphics, look): (
@@ -126,7 +127,7 @@ impl Unit {
         ),
     ) -> Result<Walks<'g>, GenieError> {
         let sprites = SpriteReads::of(self.master(every, player)?, look, graphics);
-        Ok(Walks::of(sprites, self))
+        Ok(Walks::of(sprites, (self, mover)))
     }
 
     /// What the Gather's update reads of the gatherer and its player as it starts
@@ -277,6 +278,7 @@ impl Unit {
         crate::world::lets::release(c, self, gather.carry_to, by)?;
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -290,12 +292,12 @@ impl Unit {
             c.w.spatial
                 .get_known(gather.target)?
                 .ok_or(GenieError::unsupported("a gather's target without a place"))?;
-        let gap = footprint_gap(self.body.position(), radius, t.position, t.radius);
+        let gap = footprint_gap(self.place.position(), radius, t.position, t.radius);
         let state = c.w.object_state(gather.target);
-        let mover = self
-            .body
-            .mover_mut()
-            .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+        let mover =
+            c.w.parts
+                .mover_mut(self.id)
+                .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let rng = c.w.streams.get(Stream::Action);
         let to = WalkTo {
             id: gather.target,
@@ -419,8 +421,15 @@ impl Unit {
                 groups: &c.w.groups,
             };
             // the notify's record holds the drop site's id, 0 for none
-            self.drop_site_from(&mut w, others, ActionState::new(state.get()), false, by_id)?
-                .map_or(0, |s| s.id().get())
+            self.drop_site_from(
+                c.w.parts.mover_of(self.id),
+                &mut w,
+                others,
+                ActionState::new(state.get()),
+                false,
+                by_id,
+            )?
+            .map_or(0, |s| s.id().get())
         } else {
             -1
         };

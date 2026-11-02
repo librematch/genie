@@ -15,6 +15,7 @@ use crate::map::Position;
 use crate::map::{Tile, TileOffset};
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::movement::Mover;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToAction, MoveToReads, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
@@ -81,11 +82,11 @@ pub struct ExploreMove<'a> {
 }
 
 impl<'a> ExploreMove<'a> {
-    /// What the `MoveTo` of `unit` of `master` reads, with the sprites' table and the unit's
-    /// terrain look (`graphics`).
+    /// What the `MoveTo` of `unit` with its mover of `master` reads, with the sprites' table
+    /// and the unit's terrain look (`graphics`).
     #[must_use]
     pub fn of(
-        unit: &Unit,
+        unit: (&Unit, Option<&Mover>),
         master: &Master,
         graphics: (
             &'a crate::objects::Graphics,
@@ -249,7 +250,7 @@ impl ExploreAction {
         let walked = self.move_to.is_some();
         let owner = self.after_walk(code)?;
         if walked && self.move_to.is_none() {
-            explorer.stop_mover()?;
+            crate::movement::stop_mover(c.w.parts.mover_mut(explorer.id))?;
         }
         explorer.explore_owner(owner, c)
     }
@@ -549,7 +550,7 @@ impl Unit {
             let walked = e.move_to.is_some();
             let owner = e.take_point(at, &walk)?;
             if walked {
-                self.stop_mover()?;
+                crate::movement::stop_mover(c.w.parts.mover_mut(self.id))?;
             }
             owner
         } else {
@@ -580,13 +581,13 @@ impl Unit {
                         defaults: MoveDefaults::default(),
                         graphics: &c.w.graphics,
                     },
-                    self,
+                    (self, c.w.parts.mover_of(self.id)),
                 ),
                 given: None,
             },
             |master| {
                 ExploreMove::of(
-                    self,
+                    (self, c.w.parts.mover_of(self.id)),
                     master,
                     (
                         &c.w.graphics,
@@ -626,7 +627,7 @@ impl Unit {
             .standing_sprite
             .and_then(|s| c.w.graphics.get(s))
             .copied();
-        if let Some(m) = self.body.mover_mut() {
+        if let Some(m) = c.w.parts.mover_mut(self.id) {
             m.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
@@ -635,7 +636,7 @@ impl Unit {
             ))?;
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
-                self.body.move_stats_mut(),
+                c.w.parts.move_stats_mut(self.id),
                 standing,
                 c.w.streams.get(Stream::Sprite),
             );

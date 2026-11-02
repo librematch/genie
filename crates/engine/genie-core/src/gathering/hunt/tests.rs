@@ -853,7 +853,12 @@ fn a_walk_to_the_point_ends_in_a_search_or_done() {
             Victim::default(),
         );
         let at = Position::new(171.888_89, 59.053_39, 0.0);
-        rig.unit_mut().body = crate::objects::layers::Body::new(at, None, Some(walker()));
+        rig.unit_mut().place = crate::objects::layers::Static::at(at);
+        let id = rig.unit().id;
+        rig.t.set_motion(
+            id,
+            Some(crate::objects::layers::MotionLayer::Moving(walker())),
+        );
         let got = rig.run(500, |c, u, _, _| {
             h.update_point_walk(c, u, me(h.state), who)
         });
@@ -1089,11 +1094,15 @@ fn a_hunter_s_walks_pass_on_the_units_in_their_way() {
 fn a_hunt_walks_to_its_target_s_place_within_its_range() {
     let set_walk = |h: &mut HuntAction, rig: &mut Rig, victim: &Victim| {
         let crate::world::World {
-            spatial, players, ..
-        } = &mut rig.t;
-        h.set_walk(
             spatial,
-            &mut players[1].objects[ListIndex::new(0)].body,
+            players,
+            parts,
+            ..
+        } = &mut rig.t;
+        let u = &players[1].objects[ListIndex::new(0)];
+        h.set_walk(
+            (spatial, u.position()),
+            parts.motion_mut(u.id),
             victim,
             PlayerId::new(1),
             &walks(Held::default()),
@@ -1589,7 +1598,12 @@ fn a_drop_off_gives_the_load_to_the_player() {
         Victim::default(),
     );
     let at = Position::new(26.820_372, 94.718_056, 0.0);
-    rig.unit_mut().body = crate::objects::layers::Body::new(at, None, Some(walker()));
+    rig.unit_mut().place = crate::objects::layers::Static::at(at);
+    let id = rig.unit().id;
+    rig.t.set_motion(
+        id,
+        Some(crate::objects::layers::MotionLayer::Moving(walker())),
+    );
     rig.t.players[1].attributes = vec![Amount::ZERO; 230];
     let site = DropOff {
         takes: true,
@@ -1656,7 +1670,8 @@ fn a_drop_off_gives_the_load_to_the_player() {
         gap_squared: DistanceSquared::new(1.5),
         ..site
     };
-    rig.unit_mut().body.set_anim_speed(Speed::new(1.0));
+    let id = rig.unit().id;
+    rig.t.parts.set_anim_speed(id, Speed::new(1.0));
     assert_eq!(
         drop(
             &mut rig,
@@ -1667,7 +1682,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
         Ok(Dropped::Going)
     );
     assert_eq!(
-        (hunt.timer, rig.unit().body.anim_speed()),
+        (hunt.timer, rig.t.parts.anim_speed_of(rig.unit().id)),
         (DROP_WAIT, Some(Speed::ZERO))
     );
     hunt.timer = Seconds::new(-0.01);

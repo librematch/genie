@@ -291,6 +291,10 @@ impl World {
         let mut ai = g.parts.unit_ai.clone();
         keep_unsaved_ai(self.parts.unit_ai.get(id), ai.as_mut());
         self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;
+        self.set_part(
+            id,
+            crate::world::parts::Part::Motion(g.parts.motion.clone().map(Box::new)),
+        )?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
@@ -301,7 +305,7 @@ impl World {
         self.follow_state(p, &forced, before)?;
         self.spatial.unfreeze(id);
         if let Some(placed) = self.spatial.get(id).copied() {
-            let moving = forced.body.mover().is_some_and(Mover::is_moving);
+            let moving = self.parts.mover_of(forced.id).is_some_and(Mover::is_moving);
             self.pathing.moved(id, &placed, moving);
         }
         forced.stopped = false;
@@ -493,8 +497,8 @@ mod tests {
     }
 
     /// The forced objects: a frozen forager takes the game's (placed where the game has it,
-    /// running again, its gather point, production and town bell the game's) but keeps its
-    /// hunted record,
+    /// running again, its gather point, production, town bell and motion part the game's) but
+    /// keeps its hunted record,
     /// which no save holds; a frozen object the game no longer holds leaves; one that changed
     /// hands or masters stays, noted; an object that runs, and a dead one the game does not
     /// resync, are the slice's; an object the game made and the slice did not is noted.
@@ -533,8 +537,13 @@ mod tests {
         };
         game.players[1][0].parts.production = Some(production.clone());
         game.players[1][0].parts.town_bell.flag = true;
+        let mut walker = crate::gathering::hunt::tests::walker();
+        walker.waiting = 3;
+        let motion = crate::objects::layers::MotionLayer::Moving(walker);
+        game.players[1][0].parts.motion = Some(motion.clone());
         let notes = t.force(&game);
         assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(t.parts.motion.get(object_id(9175)), Some(&motion));
         assert_eq!(t.parts.gather_point.get(object_id(9175)), Some(&gather));
         assert_eq!(t.parts.production.get(object_id(9175)), Some(&production));
         assert!(t.parts.town_bell_of(object_id(9175)).flag);

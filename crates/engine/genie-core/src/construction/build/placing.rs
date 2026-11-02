@@ -371,7 +371,7 @@ impl BuildAction {
             &c.w.masters,
             &c.w.parts,
         );
-        let mover = builder.body.mover().ok_or(BUILDER_UNMOVING)?;
+        let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
         let at = builder.position();
@@ -389,6 +389,7 @@ impl BuildAction {
                 ))?;
         self.state = BuildState::Clear;
         let move_reads = builder.move_to_reads(
+            c.w.parts.motion.mover(builder.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (

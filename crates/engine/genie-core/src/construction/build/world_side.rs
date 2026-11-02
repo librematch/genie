@@ -110,17 +110,11 @@ impl crate::world::World {
             .volley_fire;
         let now = self.world_time;
         let u = held(&mut self.players, place)?;
-        let Some(c) = self.parts.building_mut(u.id)?.construction.as_mut() else {
+        let (layer, mover) = self.parts.building_and_mover_mut(u.id)?;
+        let Some(c) = layer.construction.as_mut() else {
             return Ok(());
         };
-        if Construction::begin(
-            id,
-            c,
-            u.body.mover_mut(),
-            &mut self.spatial,
-            &mut self.pathing,
-            now,
-        )? {
+        if Construction::begin(id, c, mover, &mut self.spatial, &mut self.pathing, now)? {
             self.parts.combat_mut(u.id)?.firepower = volley;
             self.watch_started(owner, id)?;
         }
@@ -363,8 +357,11 @@ impl crate::world::World {
         }
         // a gate's stack gate takes the old one's lock (its slot 0x670 with `+0xc7c`)
         if let Some(locked) = gate_lock {
-            let nu = self.object_and_layer_mut(new)?.ok_or(NOT_HELD)?;
-            crate::orders::lock_gate(nu, locked, now)?;
+            if self.place(new).is_none() {
+                return Err(NOT_HELD);
+            }
+            let (layer, mover) = self.parts.building_and_mover_mut(new)?;
+            crate::orders::lock_gate((mover, layer), locked, now)?;
         }
         Ok(())
     }

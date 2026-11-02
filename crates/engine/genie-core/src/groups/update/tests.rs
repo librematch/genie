@@ -69,7 +69,7 @@ use crate::world::{Player, World};
 fn soldier(id: i32, x: f32, y: f32) -> Unit {
     let mut u = Unit {
         id: object_id(id),
-        body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
         ..Unit::default()
     };
     u.life.master_id = master_id(4);
@@ -204,8 +204,8 @@ fn lost_members_leave_the_group_and_stop() {
     mute.group.id = Some(group_id(1));
     let _ = t.push_live(PlayerId::new(1), mute).unwrap();
     for u in &mut t.players[1].objects {
-        u.body
-            .put_mover(Some(crate::gathering::hunt::tests::walker()));
+        t.parts
+            .put_mover(u.id, Some(crate::gathering::hunt::tests::walker()));
     }
     let g = t.groups.get_mut(group_id(1)).unwrap();
     for id in [13, 99] {
@@ -228,7 +228,7 @@ fn lost_members_leave_the_group_and_stop() {
         assert_eq!(unit(&t, object_id(id)).group.id, None, "{id}");
     }
     let stopped = unit(&t, object_id(11));
-    let stopped = stopped.body.mover().unwrap();
+    let stopped = t.parts.mover_of(stopped.id).unwrap();
     assert_eq!(stopped.animated.speed, Speed::new(0.0));
     assert_eq!(stopped.velocity.unwrap().velocity.y(), 0.0);
     // a NaN's hit points stay (COMISS then JA)
@@ -518,11 +518,13 @@ fn a_group_rests_without_command_motion_or_moving_member() {
     let mut t = world();
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::NONE;
     assert!(t.at_rest(group_id(1)));
-    t.players[1].objects[ListIndex::new(1)]
-        .body
-        .put_mover(Some(crate::gathering::hunt::tests::walker()));
+    t.parts.put_mover(
+        t.players[1].objects[ListIndex::new(1)].id,
+        Some(crate::gathering::hunt::tests::walker()),
+    );
     assert!(!t.at_rest(group_id(1)));
-    t.players[1].objects[ListIndex::new(1)].body.put_mover(None);
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(1)].id, None);
     t.groups.get_mut(group_id(1)).unwrap().motion.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(!t.at_rest(group_id(1)));
     t.groups.get_mut(group_id(1)).unwrap().motion.velocity = BVector::ZERO;
@@ -537,17 +539,16 @@ fn a_group_rests_without_command_motion_or_moving_member() {
 #[test]
 fn kept_apart_units_leave_unless_busy() {
     let mut t = world();
-    let mut apart = soldier(15, 6.0, 6.0);
-    apart
-        .body
-        .put_mover(Some(crate::gathering::hunt::tests::walking()));
+    let apart = soldier(15, 6.0, 6.0);
+    t.parts
+        .put_mover(apart.id, Some(crate::gathering::hunt::tests::walking()));
     let apart_ai = UnitAi {
         orders: vec![crate::unit_ai::QueuedOrder::default()],
         ..soldier_ai()
     };
-    let mut free = soldier(16, 6.0, 6.0);
-    free.body
-        .put_mover(Some(crate::gathering::hunt::tests::walking()));
+    let free = soldier(16, 6.0, 6.0);
+    t.parts
+        .put_mover(free.id, Some(crate::gathering::hunt::tests::walking()));
     let attacker = soldier(17, 7.0, 7.0);
     let attacker_ai = UnitAi {
         current_action: Some(ActionKind::Attack),
@@ -566,14 +567,8 @@ fn kept_apart_units_leave_unless_busy() {
         vec![object_id(99), object_id(15), object_id(16), object_id(17)];
     t.keep_apart(group_id(1)).unwrap();
     assert_eq!(t.groups.get(group_id(1)).unwrap().objects, [object_id(15)]);
-    assert_eq!(
-        t.object(object_id(16)).unwrap().1.body.anim_speed(),
-        Some(Speed::ZERO)
-    );
-    assert_ne!(
-        t.object(object_id(15)).unwrap().1.body.anim_speed(),
-        Some(Speed::ZERO)
-    );
+    assert_eq!(t.parts.anim_speed_of(object_id(16)), Some(Speed::ZERO));
+    assert_ne!(t.parts.anim_speed_of(object_id(15)), Some(Speed::ZERO));
     // a member's group moving keeps the unit too
     t.parts
         .unit_ai
@@ -596,8 +591,8 @@ fn kept_apart_units_leave_unless_busy() {
 fn a_deleted_group_lets_its_members_go() {
     let mut t = world();
     for u in &mut t.players[1].objects {
-        u.body
-            .put_mover(Some(crate::gathering::hunt::tests::walking()));
+        t.parts
+            .put_mover(u.id, Some(crate::gathering::hunt::tests::walking()));
     }
     t.parts
         .unit_ai
@@ -613,15 +608,15 @@ fn a_deleted_group_lets_its_members_go() {
         [None, None, Some(group_id(7))]
     );
     assert_eq!(
-        unit(&t, object_id(10)).body.mover().unwrap().animated.speed,
+        t.parts.mover_of(object_id(10)).unwrap().animated.speed,
         Speed::new(0.0)
     );
     assert_ne!(
-        unit(&t, object_id(11)).body.mover().unwrap().animated.speed,
+        t.parts.mover_of(object_id(11)).unwrap().animated.speed,
         Speed::ZERO
     );
     assert_ne!(
-        unit(&t, object_id(12)).body.mover().unwrap().animated.speed,
+        t.parts.mover_of(object_id(12)).unwrap().animated.speed,
         Speed::ZERO
     );
     // the update of a group without members deletes it
@@ -640,19 +635,9 @@ fn a_deleted_group_lets_its_members_go() {
 fn a_unit_shows_its_standing_walking_or_running_sprite() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .put_mover(Some(walker));
-    let speed = |t: &World| {
-        t.object(object_id(10))
-            .unwrap()
-            .1
-            .body
-            .mover()
-            .unwrap()
-            .stats
-            .speed
-    };
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(walker));
+    let speed = |t: &World| t.parts.mover_of(object_id(10)).unwrap().stats.speed;
     let master = |t: &mut World, class: ClassId, sprites: [i16; 3]| {
         let m = Master {
             id: master_id(4),
@@ -1158,8 +1143,8 @@ fn a_member_moved_aside_waits_out_its_timer() {
     let mut t = world();
     t.dt_seconds = Seconds::new(0.5);
     for u in &mut t.players[1].objects {
-        u.body
-            .put_mover(Some(crate::gathering::hunt::tests::walking()));
+        t.parts
+            .put_mover(u.id, Some(crate::gathering::hunt::tests::walking()));
     }
     let aside = crate::groups::SpecificMove {
         active: 1,
@@ -1180,14 +1165,8 @@ fn a_member_moved_aside_waits_out_its_timer() {
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.members[0].specific_move.timer, Seconds::new(0.25));
     assert_eq!(g.members[1].specific_move, aside);
-    assert_eq!(
-        t.object(object_id(10)).unwrap().1.body.anim_speed(),
-        Some(Speed::ZERO)
-    );
-    assert_ne!(
-        t.object(object_id(11)).unwrap().1.body.anim_speed(),
-        Some(Speed::ZERO)
-    );
+    assert_eq!(t.parts.anim_speed_of(object_id(10)), Some(Speed::ZERO));
+    assert_ne!(t.parts.anim_speed_of(object_id(11)), Some(Speed::ZERO));
     t.specific_moves_step(group_id(1)).unwrap();
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(
@@ -1241,9 +1220,8 @@ fn a_member_s_own_move_walks_its_path() {
         WorldTime::ZERO,
         false,
     );
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .put_mover(Some(walker));
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(walker));
     t.spatial.insert(
         object_id(10),
         crate::map::spatial::Placed {
@@ -1271,7 +1249,7 @@ fn a_member_s_own_move_walks_its_path() {
     };
     t.specific_moves_step(group_id(1)).unwrap();
     let (_, u) = t.object(object_id(10)).unwrap();
-    let at = u.moved_vector();
+    let at = u.moved_vector(t.parts.mover_of(u.id));
     let own = t.groups.get(group_id(1)).unwrap().members[0].specific_move;
     assert_eq!(own.active, 1);
     assert_eq!(
@@ -1289,8 +1267,8 @@ fn a_group_update_leaves_its_members_gaits_current() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
     for u in &mut t.players[1].objects {
-        u.body.put_mover(Some(walker.clone()));
-        u.body.mover_mut().unwrap().moved_at = u.position();
+        t.parts.put_mover(u.id, Some(walker.clone()));
+        t.parts.mover_mut(u.id).unwrap().moved_at = u.position();
         t.parts.set_unit_ai(u.id, None);
     }
     assert!(t.objects().gait(object_id(10)).unwrap().moving);
@@ -1392,8 +1370,8 @@ fn a_player_s_groups_update_before_its_objects() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
     for u in &mut t.players[1].objects {
-        u.body.put_mover(Some(walker.clone()));
-        u.body.mover_mut().unwrap().moved_at = u.position();
+        t.parts.put_mover(u.id, Some(walker.clone()));
+        t.parts.mover_mut(u.id).unwrap().moved_at = u.position();
         t.parts.set_unit_ai(u.id, None);
     }
     let before = t.object(object_id(10)).unwrap().1.position();
@@ -1401,7 +1379,16 @@ fn a_player_s_groups_update_before_its_objects() {
     let u = t.object(object_id(10)).unwrap().1;
     assert_eq!(u.group.id, None);
     assert_eq!(u.position(), before);
-    assert_eq!(u.body.mover().unwrap().velocity.unwrap().velocity.y(), 0.0);
+    assert_eq!(
+        t.parts
+            .mover_of(object_id(10))
+            .unwrap()
+            .velocity
+            .unwrap()
+            .velocity
+            .y(),
+        0.0
+    );
 }
 
 /// Slot 0x5e0 (`FUN_14114f300`) in the members' own update: the group has no formation, so no
@@ -1420,11 +1407,10 @@ fn a_group_steers_its_free_members_speeds_in_their_own_update() {
             velocity: BVector::new(0.0, 0.0, 1.0),
             acceleration: BVector::ZERO,
         });
-        u.body.put_mover(Some(m));
+        t.parts.put_mover(u.id, Some(m));
     }
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .mover_mut()
+    t.parts
+        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .paths = vec![crate::movement::PathData {
         state: PathState::Walking,
@@ -1444,11 +1430,8 @@ fn a_group_steers_its_free_members_speeds_in_their_own_update() {
     t.tick(Millis::new(100));
     assert_eq!(t.players[1].unsupported, None);
     let speed = |t: &World, id| {
-        t.object(object_id(id))
-            .unwrap()
-            .1
-            .body
-            .mover()
+        t.parts
+            .mover_of(object_id(id))
             .unwrap()
             .velocity
             .unwrap()
@@ -1556,7 +1539,7 @@ fn the_update_end_stores_a_moved_group_s_new_position() {
 fn the_lead_is_the_member_nearest_the_targets_place() {
     let at = |id, x: f32, y: f32| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(x, y, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
         ..Unit::default()
     };
     let player = Player {
@@ -1714,10 +1697,13 @@ fn grounded() -> World {
     for p in PlayerId::each(4).skip(1) {
         for u in &mut t.players[p.index()].objects {
             t.parts.unit_ai.get_mut(u.id).unwrap().ai_type = crate::unit_ai::SOLDIER_AI;
-            u.body.put_mover(Some(crate::movement::Mover {
-                moved_at: u.position(),
-                ..crate::gathering::hunt::tests::walker()
-            }));
+            t.parts.put_mover(
+                u.id,
+                Some(crate::movement::Mover {
+                    moved_at: u.position(),
+                    ..crate::gathering::hunt::tests::walker()
+                }),
+            );
         }
         for u in t.players[p.index()].objects.clone() {
             t.spatial.insert(
@@ -1824,14 +1810,7 @@ fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
             .clone()
             .unwrap();
         let walks = [10, 11, 12].map(|id| {
-            let m = t
-                .object(object_id(id))
-                .unwrap()
-                .1
-                .body
-                .mover()
-                .cloned()
-                .unwrap();
+            let m = t.parts.mover_of(object_id(id)).cloned().unwrap();
             m.paths[0].points.clone()
         });
         (f, walks)
@@ -1970,8 +1949,8 @@ fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
     assert!(!relayout);
     // a far target: back to the first place
     attacking(&mut t);
-    t.players[2].objects[ListIndex::new(0)].body =
-        crate::objects::layers::Body::at(Position::new(7.5, 7.5, 0.0));
+    t.players[2].objects[ListIndex::new(0)].place =
+        crate::objects::layers::Static::at(Position::new(7.5, 7.5, 0.0));
     assert!(!t.attack_update(group_id(1), &mut relayout).unwrap());
     assert!(relayout);
     assert_eq!(
@@ -2056,8 +2035,8 @@ fn an_attack_releases_a_category_in_reach_or_arrived() {
 fn a_unit_in_contact_releases_its_category() {
     let mut t = world();
     attacking(&mut t);
-    t.players[1].objects[ListIndex::new(0)].body =
-        crate::objects::layers::Body::at(Position::new(3.0, 3.0, 0.0));
+    t.players[1].objects[ListIndex::new(0)].place =
+        crate::objects::layers::Static::at(Position::new(3.0, 3.0, 0.0));
     register(&mut t);
     light(&mut t, 1, 3, 3, true);
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
@@ -2172,9 +2151,10 @@ fn a_gate_out_of_reach_is_struck_at_its_nearest_part() {
 #[test]
 fn a_unit_s_speed_is_its_movers_unless_a_charge_runs() {
     let mut t = world();
-    t.players[1].objects[ListIndex::new(0)]
-        .body
-        .put_mover(Some(crate::gathering::hunt::tests::walker()));
+    t.parts.put_mover(
+        t.players[1].objects[ListIndex::new(0)].id,
+        Some(crate::gathering::hunt::tests::walker()),
+    );
     let speed = |t: &World, id| {
         let (p, u) = t.object(object_id(id)).unwrap();
         t.unit_speed(p, u)
@@ -2204,9 +2184,10 @@ fn a_released_special_unit_draws_its_retarget_timer() {
     attacking(&mut t);
     register(&mut t);
     light(&mut t, 1, 3, 3, true);
-    t.players[1].objects[ListIndex::new(1)]
-        .body
-        .put_mover(Some(crate::gathering::hunt::tests::walker()));
+    t.parts.put_mover(
+        t.players[1].objects[ListIndex::new(1)].id,
+        Some(crate::gathering::hunt::tests::walker()),
+    );
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.special_units = vec![object_id(11)];
     g.current_target.disable_retargeting = 1;

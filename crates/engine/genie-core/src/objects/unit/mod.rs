@@ -15,7 +15,7 @@ use crate::world::WorldTime;
 use genie_diff::Diff;
 
 use crate::GenieError;
-use crate::objects::layers::Body;
+use crate::objects::layers::Static;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::{Master, MasterTables, Masters, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
@@ -43,10 +43,11 @@ pub struct Unit {
     pub footprint_waits: crate::construction::FootprintWaits,
     /// Its life cycle: state, hit points, master, what it holds, its dying sprite.
     pub life: Lifecycle,
-    /// Its layers below the action layer ([`Body`]): the static layer with its place (every
-    /// object), the animated layer (`+0x7b8`, types 20 and up) and the moving one with its
-    /// movement state (types 30 and up).
-    pub body: Body,
+    /// Its static layer, its place (every object, [`Static`]); the layers above it its type has
+    /// are its motion, a part ([`crate::world::parts::Parts::motion`]). It compares at the step
+    /// the object's layers had, `body`.
+    #[diff(path = "body")]
+    pub place: Static,
     /// Its action layer (`RGE_Action_Object`, [`ActionLayer`]): its action list and its master's
     /// default task.
     ///
@@ -76,7 +77,7 @@ pub struct Unit {
     /// one off in each of its updates that passes whole seconds; the computer AI reads it.
     pub damaged_lately: crate::objects::DamagedTimer,
     /// Its active sprite, held from an attack's swing on; None while the slice does not know it.
-    /// Its clock runs at the animated layer's speed ([`Body::anim_speed`]).
+    /// Its clock runs at the animated layer's speed ([`crate::world::parts::Parts::anim_speed_of`]).
     #[diff(
         gap = "the actions' sprite changes are ported only in part (the attack's swing, the idle swap)"
     )]
@@ -141,29 +142,29 @@ impl Unit {
     /// static layer's ([`crate::objects::layers::Static`]).
     #[must_use]
     pub const fn position(&self) -> Position {
-        self.body.position()
+        self.place.position()
     }
 
     /// The object's place setter (`RGE_Static_Object::new_position`, `0x1411a58b0`): the place
     /// and the world's index of the places together, and its mesh shape where the caller holds
-    /// the mesh ([`crate::objects::layers::Static::new_position`]).
+    /// the mesh, a `moving` object's going ([`crate::objects::layers::Static::new_position`]).
     pub(crate) fn new_position(
         &mut self,
         at: Position,
+        moving: bool,
         places: (
             &mut crate::map::spatial::Spatial,
             Option<&mut crate::pathing::Pathing>,
         ),
     ) -> Result<(), GenieError> {
-        self.body.new_position(self.id, at, places)?;
-        Ok(())
+        self.place.new_position(self.id, at, moving, places)
     }
 
     /// A test's fixture puts the object at `at` without the world's index, which the test sets
     /// itself.
     #[cfg(test)]
     pub(crate) const fn place_for_test(&mut self, at: Position) {
-        self.body.base_mut().place_for_test(at);
+        self.place.place_for_test(at);
     }
 }
 

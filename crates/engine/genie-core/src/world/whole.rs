@@ -3,8 +3,10 @@
 
 use crate::combat::missile::Missile;
 use crate::commands::GatherPoint;
+use crate::movement::Mover;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
+use crate::objects::layers::MotionLayer;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::orders::town_bell::TownBell;
@@ -48,6 +50,18 @@ pub struct ObjectParts {
     /// Its combat layer ([`Parts::combat`]), a new object's where the table holds none.
     #[diff(path = "combat")]
     pub combat: Combat,
+    /// Its animated and moving layers ([`Parts::motion`]), none for a static object. They
+    /// compare at their old step, `body`, beside the row's place.
+    #[diff(path = "body")]
+    pub motion: Option<MotionLayer>,
+}
+
+impl ObjectParts {
+    /// Its mover (the motion part's moving layer), none for an object that does not move.
+    #[must_use]
+    pub fn mover(&self) -> Option<&Mover> {
+        self.motion.as_ref().and_then(MotionLayer::mover)
+    }
 }
 
 /// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
@@ -108,5 +122,27 @@ impl From<Unit> for Object {
             unit,
             parts: ObjectParts::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::objects::layers::{Animated, MotionLayer};
+    use crate::world::parts::ObjectParts;
+
+    #[test]
+    fn only_a_moving_object_s_parts_hold_a_mover() {
+        let walker = crate::gathering::hunt::tests::walker();
+        let moving = ObjectParts {
+            motion: Some(MotionLayer::Moving(walker.clone())),
+            ..ObjectParts::default()
+        };
+        assert_eq!(moving.mover(), Some(&walker));
+        let animated = ObjectParts {
+            motion: Some(MotionLayer::Animated(Animated::default())),
+            ..ObjectParts::default()
+        };
+        assert_eq!(animated.mover(), None);
+        assert_eq!(ObjectParts::default().mover(), None, "a static object");
     }
 }

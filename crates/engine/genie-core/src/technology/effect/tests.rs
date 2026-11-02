@@ -237,7 +237,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     let unit = |id, state: ObjectState, inside: Option<ObjectId>| {
         let mut u = Unit {
             id,
-            body: crate::objects::layers::Body::at(Position::new(5.5, 5.5, 0.0)),
+            place: crate::objects::layers::Static::at(Position::new(5.5, 5.5, 0.0)),
             ..Unit::default()
         };
         u.life.master_id = ids::HOUSE;
@@ -941,13 +941,11 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     };
     let moving = |id| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));
-        u.body = crate::objects::layers::Body::new(
-            Position::new(5.5, 5.5, 0.0),
-            None,
-            Some(crate::gathering::hunt::tests::walker()),
-        );
+        u.place = crate::objects::layers::Static::at(Position::new(5.5, 5.5, 0.0));
         u
     };
+    let walker =
+        || crate::objects::layers::MotionLayer::Moving(crate::gathering::hunt::tests::walker());
     let mut shows = moving(1);
     shows.sprite = Some(crate::objects::sprite::ActiveSprite::start(
         fast,
@@ -963,14 +961,19 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_motions([(object_id(1), walker()), (object_id(2), walker())]);
     let mut m = combat(master_id(4), class::CLASS_6, 60);
     (m.max_speed, m.move_sprite, m.run_sprite, m.standing_sprite) =
         (Speed::new(1.5), None, None, None);
     t.masters = vec![Masters::new([m])];
     t.master_followers(PlayerId::new(0), master_id(4), a::MOVEMENT_SPEED)
         .unwrap();
-    let speeds = |u: &Unit| u.body.mover().map(|m| (m.stats.base, m.stats.speed));
+    let speeds = |u: &Unit| {
+        t.parts
+            .mover_of(u.id)
+            .map(|m| (m.stats.base, m.stats.speed))
+    };
     assert_eq!(
         speeds(&t.players[0].objects[ListIndex::new(0)]),
         Some((Speed::new(1.5), Speed::new(3.0)))
@@ -1113,10 +1116,10 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
 /// A speed's change reaches what a unit of the master moves with (the game reads its master).
 #[test]
 fn a_speed_change_reaches_the_units_movement() {
-    let mut walker = unit_of(1, master_id(4), HitPoints::new(25.0));
+    let walker = unit_of(1, master_id(4), HitPoints::new(25.0));
     let mover = crate::gathering::hunt::tests::walker();
     let stats = mover.stats;
-    walker.body.put_mover(Some(mover));
+    let id = walker.id;
     let player = Player {
         objects: vec![walker].into(),
         ..Player::default()
@@ -1127,16 +1130,17 @@ fn a_speed_change_reaches_the_units_movement() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_motions([(id, crate::objects::layers::MotionLayer::Moving(mover))]);
     let mut villager = combat(master_id(4), class::VILLAGER, 25);
     villager.max_speed = Speed::new(0.8);
     villager.moving = Some(stats);
     t.masters = vec![Masters::new([villager])];
     t.do_effect(PlayerId::new(0), &[attribute(5, -1, 4, 5, 1.1)], None)
         .unwrap();
-    let s = t.players[0].objects[ListIndex::new(0)]
-        .body
-        .mover()
+    let s = t
+        .parts
+        .mover_of(t.players[0].objects[ListIndex::new(0)].id)
         .unwrap()
         .stats;
     // no graphics: the sprites' factors are 0, the speeds the master's
@@ -1148,9 +1152,9 @@ fn a_speed_change_reaches_the_units_movement() {
         t.do_effect(PlayerId::new(0), &[attribute(5, -1, 4, 5, 1.1)], None)
             .is_err()
     );
-    let stats = t.players[0].objects[ListIndex::new(0)]
-        .body
-        .mover()
+    let stats = t
+        .parts
+        .mover_of(t.players[0].objects[ListIndex::new(0)].id)
         .unwrap()
         .stats;
     assert_eq!(stats.speed, Speed::new(speed));

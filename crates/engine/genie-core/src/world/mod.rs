@@ -26,6 +26,7 @@
 pub mod checkpoint;
 pub mod index;
 pub(crate) mod lets;
+pub mod motions;
 pub(crate) mod others;
 pub mod parts;
 #[cfg(test)]

@@ -40,10 +40,13 @@ impl Unit {
         c: &mut Step<'_>,
     ) -> Result<Option<Outcome>, GenieError> {
         self.death_blast(c)?;
-        if self.go_to_sleep(c.w.parts.unit_ai.contains(self.id))? {
+        if self.go_to_sleep(
+            c.w.parts.mover_of(self.id),
+            c.w.parts.unit_ai.contains(self.id),
+        )? {
             return Ok(None);
         }
-        self.take_sprite_facets();
+        self.take_sprite_facets(c.w.parts.mover_mut(self.id));
         self.let_removed_links_go(c)?;
         self.gate_update(c)?;
         self.complete_on_update(c)?;
@@ -180,12 +183,16 @@ impl Unit {
     /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops
     /// the flag, is marked asleep (`+0x641`) and moves to its player's sleeping list (player
     /// slots 0x2d8 and 0x2d0), and its update ends (true); only static objects (type 10) are
-    /// flagged, so one with movement state or a unit AI is not modelled.
-    pub(crate) fn go_to_sleep(&mut self, has_ai: bool) -> Result<bool, GenieError> {
+    /// flagged, so one with movement state (its `mover`) or a unit AI is not modelled.
+    pub(crate) fn go_to_sleep(
+        &mut self,
+        mover: Option<&Mover>,
+        has_ai: bool,
+    ) -> Result<bool, GenieError> {
         if !self.life.goto_sleep {
             return Ok(false);
         }
-        if self.life.class != Class::Static || self.body.mover().is_some() || has_ai {
+        if self.life.class != Class::Static || mover.is_some() || has_ai {
             return Err(GenieError::unsupported(
                 "an object above the static type goes to sleep",
             ));
@@ -194,9 +201,10 @@ impl Unit {
         Ok(true)
     }
 
-    /// The yaw and the facing read the current sprite's facets: the movement state takes them.
-    pub(crate) const fn take_sprite_facets(&mut self) {
-        if let (Some(m), Some(s)) = (self.body.mover_mut(), self.sprite) {
+    /// The yaw and the facing read the current sprite's facets: the movement state (`mover`)
+    /// takes them.
+    pub(crate) const fn take_sprite_facets(&self, mover: Option<&mut Mover>) {
+        if let (Some(m), Some(s)) = (mover, self.sprite) {
             m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
                 count: s.graphic.facets,
                 turns: s.graphic.flags.contains(SpriteFlags::TURNS),
@@ -207,7 +215,9 @@ impl Unit {
     /// The animated object's update (`0x141071880`): its sprite's clock at its animation speed,
     /// then its idle swap, which reads the loop this update's clock made.
     pub(crate) fn animate(&mut self, c: &mut Step<'_>) {
-        if let (Some(sprite), Some(speed)) = (self.sprite.as_mut(), self.body.anim_speed()) {
+        if let (Some(sprite), Some(speed)) =
+            (self.sprite.as_mut(), c.w.parts.anim_speed_of(self.id))
+        {
             sprite.update(c.dt.seconds(), speed);
             if let Ok(master) = object_master(
                 c.w.parts.own_master.get(self.id),
@@ -216,6 +226,7 @@ impl Unit {
             ) {
                 let (standing, second) = (master.standing_sprite, master.standing_sprite_2);
                 self.idle_swap(
+                    c.w.parts.motion_mut(self.id),
                     standing,
                     second,
                     &c.w.graphics,
@@ -240,7 +251,12 @@ impl Unit {
         if loses_actions(&self.life) {
             let by = self.releaser(c)?;
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-            self.clear_own_actions(&mut releases, &mut leaves, by)?;
+            self.clear_own_actions(
+                c.w.parts.motion.layer_mut(self.id),
+                &mut releases,
+                &mut leaves,
+                by,
+            )?;
             crate::world::lets::torn_down(c, self, (leaves, releases))?;
         }
         Ok(())
@@ -249,20 +265,29 @@ impl Unit {
     /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
     /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
     /// whose walk met others in its way is not modelled.
-    pub(crate) fn after_actions(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        if let Some(m) = self.body.mover_mut() {
-            for (id, pause) in std::mem::take(&mut m.pauses) {
-                let Some((_, u)) = c.w.object_mut(id) else {
-                    continue;
-                };
-                let Some(level) = u.body.mover_mut().and_then(|m| m.paths.first_mut()) else {
-                    continue;
-                };
-                level.pause_time = pause;
+    pub(crate) fn after_actions(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+        let Some(pauses) =
+            c.w.parts
+                .mover_mut(self.id)
+                .map(|m| std::mem::take(&mut m.pauses))
+        else {
+            return Ok(());
+        };
+        for (id, pause) in pauses {
+            if c.w.object(id).is_none() {
+                continue;
             }
-            if !m.in_the_way.is_empty() {
-                return Err(crate::world::IN_THE_WAY);
-            }
+            let Some(level) = c.w.parts.mover_mut(id).and_then(|m| m.paths.first_mut()) else {
+                continue;
+            };
+            level.pause_time = pause;
+        }
+        if c.w
+            .parts
+            .mover_of(self.id)
+            .is_some_and(|m| !m.in_the_way.is_empty())
+        {
+            return Err(crate::world::IN_THE_WAY);
         }
         Ok(())
     }
@@ -274,7 +299,7 @@ impl Unit {
         if ACTION <= m.kind
             && let Some(p) = c.w.spatial.get(self.id).copied()
         {
-            let moving = self.body.mover().is_some_and(Mover::is_moving);
+            let moving = c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving);
             c.w.pathing.refresh(self.id, &p, moving, m.outline);
         }
         Ok(())

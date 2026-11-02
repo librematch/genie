@@ -339,9 +339,9 @@ impl World {
             if m.specific_move.active == 0 || !self.member_idle(m.id)? {
                 continue;
             }
-            let Some((_, u)) = self.object_mut(m.id) else {
+            if self.object(m.id).is_none() {
                 continue;
-            };
+            }
             if m.specific_move.reason != MoveReason::ASIDE {
                 // slot 0x608 (FUN_1411581e0): the unit's own motion step (FUN_141150f00), then
                 // its facet from its angle (FUN_14114d8b0, not held)
@@ -360,7 +360,7 @@ impl World {
                 let _ = self.show_walking(m.id)?;
                 let at = self
                     .object(m.id)
-                    .map(|(_, u)| u.moved_vector())
+                    .map(|(_, u)| u.moved_vector(self.parts.mover_of(u.id)))
                     .ok_or_else(|| member_gone(m.id))?;
                 let own = &mut self
                     .groups
@@ -376,7 +376,7 @@ impl World {
                 own.last_position = at;
                 continue;
             }
-            if let Some(mover) = u.body.mover_mut() {
+            if let Some(mover) = self.parts.mover_mut(m.id) {
                 mover.stop()?;
             }
             self.show_standing(m.id)?;
@@ -390,8 +390,8 @@ impl World {
                     reason: MoveReason::NONE,
                     ..SpecificMove::default()
                 };
-                if let Some((_, u)) = self.object_mut(m.id)
-                    && let Some(mover) = u.body.mover_mut()
+                if self.object(m.id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(m.id)
                 {
                     mover.stand()?;
                 }
@@ -423,7 +423,10 @@ impl World {
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(p, idx)?;
         let me = unit.me();
-        let stepped = match unit.body.mover_mut() {
+        let (mover, by_id) = self
+            .parts
+            .lend_mover(unit.id, (&self.players, &self.index, &self.masters));
+        let stepped = match mover {
             Some(mover) => {
                 let mut plan = Planning {
                     pathing: &mut self.pathing,
@@ -432,14 +435,9 @@ impl World {
                     object: self.streams.get(crate::math::rng::Stream::Object),
                     groups: &self.groups,
                 };
-                let by_id = crate::world::index::ObjectsRef::new(
-                    &self.players,
-                    &self.index,
-                    &self.masters,
-                    &self.parts,
-                );
                 mover
                     .motion(
+                        &mut unit.place,
                         &me,
                         self.dt_seconds,
                         &mut self.spatial,

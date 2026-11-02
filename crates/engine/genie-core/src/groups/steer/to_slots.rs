@@ -86,7 +86,7 @@ impl World {
                     .checked(slot)?
                     .transform_position;
                 let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
-                let from = u.moved_vector();
+                let from = u.moved_vector(self.parts.mover_of(u.id));
                 let clear = self.line_clear(m.id, from, to, CLEARANCE, &members)?;
                 let dt = self.dt_seconds;
                 let g = self.groups.held_mut(group)?;
@@ -101,8 +101,8 @@ impl World {
                 if !ends {
                     continue;
                 }
-                if let Some((_, u)) = self.object_mut(m.id)
-                    && let Some(mover) = u.body.mover_mut()
+                if self.object(m.id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(m.id)
                 {
                     mover.stand()?;
                 }
@@ -130,15 +130,15 @@ impl World {
         };
         let (keeps_moving, _) = self.action_list(p, u)?;
         if keeps_moving
-            || !u
-                .body
-                .mover()
+            || !self
+                .parts
+                .mover_of(u.id)
                 .is_some_and(crate::movement::Mover::is_moving)
         {
             return Ok(());
         }
-        if let Some((_, u)) = self.object_mut(id)
-            && let Some(mover) = u.body.mover_mut()
+        if self.object(id).is_some()
+            && let Some(mover) = self.parts.mover_mut(id)
         {
             mover.stop()?;
         }
@@ -191,7 +191,7 @@ impl World {
         let (_, u) = self.object(id).ok_or(GenieError::unreachable(
             "a steered member the world does not hold",
         ))?;
-        let mover = u.body.mover().ok_or(NO_MOVER)?;
+        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let (radius, mask) = (mover.stats.radius.x(), mover.stats.restriction_mask);
         let own = [id];
         let ignore: Vec<RecordId> = if ignore.is_empty() { &own[..] } else { ignore }
@@ -288,7 +288,7 @@ impl World {
             .checked(slot)?;
         let to = s.transform_position;
         let late = s.time < self.world_time;
-        let at = u.moved_vector();
+        let at = u.moved_vector(self.parts.mover_of(u.id));
         let mut d = fmath::sub(to, at);
         d = d.with_height(0.0);
         let gap = fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
@@ -341,7 +341,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
-        let from = u.moved_vector();
+        let from = u.moved_vector(self.parts.mover_of(u.id));
         if !self.line_clear(id, from, to, CLEARANCE, differentiators)? {
             return self.way_round(group, index, slot, Distance::new(gap), differentiators);
         }
@@ -361,8 +361,9 @@ impl World {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let (keeps_moving, _) = self.action_list(p, u)?;
         if !keeps_moving
-            && u.body
-                .mover()
+            && self
+                .parts
+                .mover_of(u.id)
                 .is_some_and(crate::movement::Mover::is_moving)
         {
             self.stop_member(id)?;

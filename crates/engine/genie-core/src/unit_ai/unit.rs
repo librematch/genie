@@ -112,7 +112,11 @@ impl Unit {
         Ok(Surroundings {
             position: self.position(),
             hp: self.life.hp,
-            speed: self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+            speed: c
+                .w
+                .parts
+                .mover_of(self.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed),
             map: c.w.spatial.map,
             dt_seconds: c.dt.seconds(),
             mode_1: c.w.mode_680.is_one(),
@@ -156,7 +160,7 @@ impl Unit {
             target: self.ai_target(c, view.player)?,
             under_attack: self.under_attack,
             id: self.id,
-            anim_speed: self.body.anim_speed(),
+            anim_speed: c.w.parts.anim_speed_of(self.id),
             action_state: if self.actions.unmodelled_action.is_some() {
                 None
             } else {
@@ -181,16 +185,17 @@ impl Unit {
                     idle: g.is_idle(),
                     patrol: g.patrols(),
                     moving: g.motion.moving(),
-                    member_moving: self.body.mover().is_some_and(Mover::is_moving),
+                    member_moving: c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
                 }
             }),
             top_target: self
                 .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
-            attack_moving: self.body.mover().is_some_and(|m| m.attack_moving),
-            moved_at: self
-                .body
-                .mover()
+            attack_moving: c.w.parts.mover_of(self.id).is_some_and(|m| m.attack_moving),
+            moved_at: c
+                .w
+                .parts
+                .mover_of(self.id)
                 .map_or_else(|| self.position(), |m| m.moved_at)
                 .vector(),
             dodge_chance: c
@@ -305,7 +310,13 @@ impl Unit {
             master,
             (player, computer),
             c.w.settings.game_mode.scenario(),
-            (at.capture, c.w.parts.combat_of(self.id).firepower),
+            (
+                at.capture,
+                c.w.parts.combat_of(self.id).firepower,
+                c.w.parts
+                    .mover_of(self.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
+            ),
         );
         self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
             f(ai, &at, side, computer, rng)
@@ -342,7 +353,13 @@ impl Unit {
             master,
             (player, computer),
             c.w.settings.game_mode.scenario(),
-            (self.capture_kind(c), c.w.parts.combat_of(self.id).firepower),
+            (
+                self.capture_kind(c),
+                c.w.parts.combat_of(self.id).firepower,
+                c.w.parts
+                    .mover_of(self.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
+            ),
         );
         self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
             f(ai, side, rng)
@@ -438,7 +455,13 @@ impl Unit {
             master,
             (player, computer),
             c.w.settings.game_mode.scenario(),
-            (at.capture, c.w.parts.combat_of(self.id).firepower),
+            (
+                at.capture,
+                c.w.parts.combat_of(self.id).firepower,
+                c.w.parts
+                    .mover_of(self.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
+            ),
         );
         self.with_side(
             c,
@@ -563,19 +586,18 @@ impl Unit {
     }
 
     /// The units in the way the motion step told the unit AI of ([`crate::unit_ai::NotifyKind::IN_THE_WAY`],
-    /// [`crate::movement::Mover::in_the_way`]), posted at once in their order (slot 0x328: the
-    /// walker is in state 2).
+    /// [`crate::movement::Mover::in_the_way`] of its `mover`), posted at once in their order
+    /// (slot 0x328: the walker is in state 2).
     ///
     /// # Errors
     ///
     /// The notifies'.
     pub(crate) fn post_in_the_way(
-        &mut self,
+        &self,
+        mover: Option<&mut Mover>,
         ais: &mut PartTable<UnitAi>,
     ) -> Result<(), GenieError> {
-        let in_the_way = self
-            .body
-            .mover_mut()
+        let in_the_way = mover
             .map(|m| std::mem::take(&mut m.in_the_way))
             .unwrap_or_default();
         for id in in_the_way {

@@ -94,7 +94,7 @@ impl Unit {
         if let Some(s) = stand {
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
-                self.body.move_stats_mut(),
+                c.w.parts.move_stats_mut(self.id),
                 s,
                 c.w.streams.get(Stream::Sprite),
             );
@@ -159,6 +159,7 @@ impl Unit {
                 groups: &c.w.groups,
             };
             let (site, _) = self.drop_site(
+                c.w.parts.mover_of(self.id),
                 &mut w,
                 others,
                 None,
@@ -260,7 +261,10 @@ impl Unit {
                 .get_known(v.id)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
         );
-        let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+        let speed =
+            c.w.parts
+                .mover_of(self.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
@@ -282,6 +286,7 @@ impl Unit {
             crate::world::lets::release(c, self, site, by)?;
         }
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -289,7 +294,8 @@ impl Unit {
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
+        let (Some(hunt), Some(mover)) =
+            (self.actions.list.hunt_mut(), c.w.parts.mover_mut(self.id))
         else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -406,7 +412,10 @@ impl Unit {
             ));
         }
         let master = self.master(c.w.master_tables(), c.player)?;
-        let mover = self.body.mover().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover =
+            c.w.parts
+                .mover_of(self.id)
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
         let radius =
             crate::unit_ai::civilian_search_radius(master.line_of_sight, master.search_radius);
         let search = Search {
@@ -447,7 +456,7 @@ impl Unit {
             object: c.w.streams.get(Stream::Object),
             groups: &c.w.groups,
         };
-        let master_id = self.life.master_id;
+        let (master_id, at) = (self.life.master_id, self.position());
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -455,7 +464,7 @@ impl Unit {
             &c.w.parts,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
-            mover.reaches_object(&me, (spatial, by_id), &mut plan, id, range, master_id)
+            mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
         };
         let mut no_attack = crate::unit_ai::NoAttack;
         let moving = |id: ObjectId| herded(others, id);
@@ -494,7 +503,7 @@ impl Unit {
     /// (`set_state(2)`), not modelled.
     fn hunt_found_nothing(
         &mut self,
-        c: &Step<'_>,
+        c: &mut Step<'_>,
         kind: Option<GatherGroup>,
     ) -> Result<(), GenieError> {
         if c.w.players.player(c.player)?.computer && kind != Some(GatherGroup::WOOD) {
@@ -503,6 +512,7 @@ impl Unit {
             ));
         }
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -520,7 +530,10 @@ impl Unit {
                 "a hunt without a point that found nothing after its drop-off (set_state 2)",
             ));
         }
-        let mover = self.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
+        let mover =
+            c.w.parts
+                .mover_mut(self.id)
+                .ok_or(crate::world::HUNTER_UNMOVING)?;
         hunt.search_walk(mover, &walks)
     }
 
@@ -571,7 +584,10 @@ impl Unit {
                 .get_known(found)?
                 .ok_or(GenieError::unsupported("a hunt's target without a place"))?,
         );
-        let speed = self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed);
+        let speed =
+            c.w.parts
+                .mover_of(self.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = crate::combat::attack::engagement(
             c.w.parts.unit_ai.get(self.id),
             speed,
@@ -591,6 +607,7 @@ impl Unit {
         let arms = crate::combat::attack::arms(master, &c.w.graphics, sprites, moving);
         let drops_here = master.drop_sites.contains(&t.life.master_id);
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -599,7 +616,8 @@ impl Unit {
             ),
         )?;
         let by = self.releaser(c)?;
-        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
+        let (Some(hunt), Some(mover)) =
+            (self.actions.list.hunt_mut(), c.w.parts.mover_mut(self.id))
         else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
@@ -620,7 +638,7 @@ impl Unit {
                 crate::combat::attack::show_arrived(
                     &arms,
                     &mut self.sprite,
-                    &mut self.body,
+                    c.w.parts.motion_mut(self.id),
                     c.w.streams.get(Stream::Sprite),
                 )?;
             }
@@ -645,7 +663,7 @@ impl Unit {
             .standing_sprite
             .and_then(|s| c.w.graphics.get(s))
             .copied();
-        if let Some(m) = self.body.mover_mut() {
+        if let Some(m) = c.w.parts.mover_mut(self.id) {
             m.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
@@ -654,7 +672,7 @@ impl Unit {
             ))?;
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
-                self.body.move_stats_mut(),
+                c.w.parts.move_stats_mut(self.id),
                 standing,
                 c.w.streams.get(Stream::Sprite),
             );

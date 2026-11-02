@@ -31,7 +31,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::ID_45;
-use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -633,14 +632,13 @@ fn remove_point(points: &mut Vec<BVector>, i: WaypointIndex) -> bool {
     }
 }
 
-impl Unit {
-    /// Slot 0x5d0 of a unit whose `MoveTo` went.
-    pub(crate) fn stop_mover(&mut self) -> Result<(), GenieError> {
-        self.body
-            .mover_mut()
-            .ok_or(crate::world::WALKER_UNMOVING)?
-            .stop()
-    }
+/// Slot 0x5d0 of a unit whose `MoveTo` went, on its `mover`.
+///
+/// # Errors
+///
+/// A unit that does not move ([`crate::world::WALKER_UNMOVING`]), and the stop's.
+pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
+    mover.ok_or(crate::world::WALKER_UNMOVING)?.stop()
 }
 
 #[cfg(test)]

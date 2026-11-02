@@ -15,6 +15,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
@@ -102,8 +103,8 @@ impl Unit {
                 let (mut view, start) = crate::garrison::enter_view(
                     &mut c.w.spatial,
                     &c.w.masters,
-                    self,
-                    (t, master, room),
+                    (self, c.w.parts.mover_of(self.id)),
+                    ((t, c.w.parts.mover_of(t.id)), master, room),
                     enter.range,
                     by_id,
                 )?;
@@ -228,9 +229,10 @@ impl Unit {
 
     /// The Transport's slot 8 on a move to `point` ([`crate::garrison::transport::TransportAction::move_to`])
     /// with the map about the unit, then what its state change leaves: the unit stops (its
-    /// `MoveTo`'s teardown) and takes its standing sprite.
+    /// `MoveTo`'s teardown) and takes its standing sprite; `motion` is the unit's motion layer.
     pub(crate) fn transport_sail(
         &mut self,
+        mut motion: MotionMut<'_>,
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
         (masters, (graphics, look), sprite_rng): (
@@ -250,7 +252,7 @@ impl Unit {
             .ok_or(GenieError::unreachable("a sail without its Transport"))?
             .task;
         let ship = crate::garrison::transport::Ship::of_unit(
-            self,
+            (self, motion.mover()),
             master,
             spatial.map,
             (graphics, look),
@@ -271,12 +273,12 @@ impl Unit {
             .ok_or(GenieError::unreachable("a sail without its Transport"))?;
         let changed = t.move_to(point, &ship, &mut shore)?;
         if changed.stopped
-            && let Some(m) = self.body.mover_mut()
+            && let Some(m) = motion.mover_mut()
         {
             m.stop()?;
         }
         if changed.stands {
-            self.show_standing(masters, graphics, sprite_rng)?;
+            self.show_standing(motion, masters, graphics, sprite_rng)?;
         }
         Ok(())
     }
@@ -304,12 +306,13 @@ impl Unit {
             .enter_mut()
             .ok_or(GenieError::unsupported("an entered unit without its Enter"))?;
         if enter.move_to.take().is_some()
-            && let Some(m) = self.body.mover_mut()
+            && let Some(m) = c.w.parts.mover_mut(self.id)
         {
             m.stop()?;
         }
         enter.state = EnterState::Done;
         self.shows_standing_sprite(
+            c.w.parts.motion.layer_mut(self.id),
             crate::objects::masters::OwnerMasters::new(
                 &c.w.parts.own_master,
                 c.w.masters.of(c.player),
@@ -488,7 +491,7 @@ impl Unit {
             building.life.state,
             c.w.parts.combat_of(building.id).reload_powerup,
         );
-        self.body.base_mut().go_inside(id, at, &mut c.w.spatial);
+        self.place.go_inside(id, at, &mut c.w.spatial);
         c.w.pathing.removed(id);
         // a member of a unit group (+0x6d0) leaves the group the world holds, then stands
         // (slot 0x560)
@@ -498,7 +501,7 @@ impl Unit {
                     w.remove_unit(group, id, Some(target.id()), false).map(drop)
                 })?;
             }
-            if let Some(m) = self.body.mover_mut() {
+            if let Some(m) = c.w.parts.mover_mut(self.id) {
                 m.stand()?;
             }
         }

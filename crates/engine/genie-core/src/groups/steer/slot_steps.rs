@@ -89,13 +89,13 @@ impl World {
         to: BVector,
     ) -> Result<bool, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let mover = u.body.mover().ok_or(NO_MOVER)?;
+        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let g = self.groups.held(group)?;
         let computer = self.players.get(p.index()).is_some_and(|q| q.computer);
         let solid = mover.stats.radius.sized();
         let found = if solid {
             let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
-            let at = u.moved_vector();
+            let at = u.moved_vector(self.parts.mover_of(u.id));
             let walker = mover.walker(id);
             let mut plan = crate::movement::Planning {
                 pathing: &mut self.pathing,
@@ -175,13 +175,13 @@ impl World {
             .checked(slot)?
             .transform_position;
         let dt = self.dt_seconds;
-        let (_, u) = self.object_mut(id).ok_or_else(|| member_gone(id))?;
+        let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let facets = u.sprite.map(|s| crate::objects::facing::SpriteFacets {
             count: s.graphic.facets,
             turns: s.graphic.flags.contains(SpriteFlags::TURNS),
         });
-        let at = u.moved_vector();
-        let mover = u.body.mover_mut().ok_or(NO_MOVER)?;
+        let at = u.moved_vector(self.parts.mover_of(id));
+        let mover = self.parts.mover_mut(id).ok_or(NO_MOVER)?;
         let direction = mover.direction_to(at, to);
         let (turn, _) = mover.turn_toward(mover.forward, direction, mover.turn_dt(dt));
         let facets = facets.or_else(|| mover.facets());
@@ -213,7 +213,10 @@ impl World {
     fn stop_at_slot(&mut self, group: GroupId, id: ObjectId) -> Result<(), GenieError> {
         self.stop_member(id)?;
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let paused = u.body.mover().is_some_and(crate::movement::Mover::paused);
+        let paused = self
+            .parts
+            .mover_of(u.id)
+            .is_some_and(crate::movement::Mover::paused);
         let g = self.groups.held(group)?;
         let patrol = crate::groups::formation::top_path(&g.motion.paths)
             .is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
@@ -282,8 +285,8 @@ impl World {
 
     /// Slot 0x5d0 of member `id`: it stops ([`crate::movement::Mover::stop`]).
     pub(super) fn stop_member(&mut self, id: ObjectId) -> Result<(), GenieError> {
-        if let Some((_, u)) = self.object_mut(id)
-            && let Some(mover) = u.body.mover_mut()
+        if self.object(id).is_some()
+            && let Some(mover) = self.parts.mover_mut(id)
         {
             mover.stop()?;
         }
@@ -292,8 +295,8 @@ impl World {
 
     /// Slot 0x598 of member `id` ([`crate::movement::Mover::set_speed`]).
     pub(super) fn set_member_speed(&mut self, id: ObjectId, speed: Speed) {
-        if let Some((_, u)) = self.object_mut(id)
-            && let Some(mover) = u.body.mover_mut()
+        if self.object(id).is_some()
+            && let Some(mover) = self.parts.mover_mut(id)
         {
             mover.set_speed(speed);
         }
@@ -304,8 +307,8 @@ impl World {
     pub(super) fn face_group(&mut self, group: GroupId, id: ObjectId) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
         let [_, forward, up, _] = g.motion.position;
-        if let Some((_, u)) = self.object_mut(id)
-            && let Some(mover) = u.body.mover_mut()
+        if self.object(id).is_some()
+            && let Some(mover) = self.parts.mover_mut(id)
         {
             mover.set_orientation(forward, up);
         }
@@ -339,7 +342,7 @@ impl World {
             crate::world::index::Place::Live(p, i) => self.players.live_mut(p, i)?,
             crate::world::index::Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
         };
-        let Some(mover) = u.body.mover_mut() else {
+        let Some(mover) = self.parts.mover_mut(u.id) else {
             return Ok(());
         };
         let map = self.spatial.map;
@@ -347,7 +350,12 @@ impl World {
         let at = mover.grounded(at, self.spatial.terrain.as_ref());
         mover.mark_move(at, self.world_time);
         let (speed, radius) = (mover.stats.speed, mover.stats.radius);
-        mover.new_position(id, at, (&mut self.spatial, Some(&mut self.pathing)))?;
+        mover.new_position(
+            &mut u.place,
+            id,
+            at,
+            (&mut self.spatial, Some(&mut self.pathing)),
+        )?;
         if !id.is_recyclable()
             // The types of action objects (`RGE_Action_Object`) and of buildings (`TRIBE_Building_Object`).
             && kind < BUILDING
@@ -382,7 +390,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(false);
         };
-        let last = u.moved_vector();
+        let last = u.moved_vector(self.parts.mover_of(u.id));
         let own = &mut self
             .groups
             .held_mut(group)?

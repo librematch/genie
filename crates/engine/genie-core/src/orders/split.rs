@@ -167,15 +167,18 @@ impl World {
                 kind: master.kind,
                 grouped: master.formation_category.grouped(),
                 turns: master.object_flags.contains(ObjectFlags::SHIP),
-                speed: u.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+                speed: self
+                    .parts
+                    .mover_of(u.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
                 position: u.position(),
-                moved_at: u
-                    .body
-                    .mover()
+                moved_at: self
+                    .parts
+                    .mover_of(u.id)
                     .map_or_else(|| u.position().ground(), |m| m.moved_at.ground()),
                 state: u.life.state,
                 radius: Distance::new(master.radius.x()),
-                restriction: u.body.mover().map(|m| m.stats.restriction),
+                restriction: self.parts.mover_of(u.id).map(|m| m.stats.restriction),
             });
         }
         // the units in a group the world holds, with the order's other members of their group

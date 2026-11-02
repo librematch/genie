@@ -19,11 +19,12 @@ pub(super) const QUIET_CODE: GenieError =
     GenieError::unreachable("a quiet sub-action MoveTo's code that only a loud one gives");
 
 impl HuntReads {
-    /// What the `MoveTo`s the update makes read of `unit`, with the sprites' table `graphics`.
+    /// What the `MoveTo`s the update makes read of `unit` with its mover, with the sprites'
+    /// table `graphics`.
     pub(crate) fn walks<'g>(
         &self,
         graphics: &'g crate::objects::Graphics,
-        unit: &Unit,
+        unit: (&Unit, Option<&Mover>),
     ) -> Walks<'g> {
         let sprites = SpriteReads {
             defaults: self.defaults,
@@ -104,7 +105,7 @@ impl HuntAction {
         };
         let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way(&mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }
         Ok(code)
     }

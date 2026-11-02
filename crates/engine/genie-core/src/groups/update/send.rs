@@ -106,8 +106,8 @@ impl World {
     ///
     /// What the stop does not model.
     pub(super) fn stand_unit(&mut self, id: ObjectId) -> Result<(), GenieError> {
-        if let Some((_, u)) = self.object_mut(id)
-            && let Some(mover) = u.body.mover_mut()
+        if self.object(id).is_some()
+            && let Some(mover) = self.parts.mover_mut(id)
         {
             mover.stand()?;
         }
@@ -133,7 +133,7 @@ impl World {
             .world_object(id)
             .zip(self.world_object(part))
             .ok_or_else(|| member_gone(id))?;
-        let WorldObject::Unit(player, u) = unit else {
+        let WorldObject::Unit(player, u, _) = unit else {
             return Ok(());
         };
         let speed = self.unit_speed(player, u)?;
@@ -228,7 +228,7 @@ impl World {
     ///
     /// A master the world lacks and a charge of special attack 3.
     pub(super) fn unit_speed(&self, player: PlayerId, unit: &Unit) -> Result<f32, GenieError> {
-        let Some(mover) = unit.body.mover() else {
+        let Some(mover) = self.parts.mover_of(unit.id) else {
             return Ok(0.0);
         };
         let speed = mover.stats.speed;

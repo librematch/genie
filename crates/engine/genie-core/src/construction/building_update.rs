@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::SpriteId;
+use crate::objects::layers::MotionMut;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
@@ -375,7 +376,7 @@ impl Unit {
     }
 
     /// The animated object's idle swap (the end of `RGE_Animated_Object::update`,
-    /// `0x141071880`): an object whose master has a second standing sprite (`+0x478`, `second`;
+    /// `0x141071880`) of an object with its motion layer `motion`: an object whose master has a second standing sprite (`+0x478`, `second`;
     /// the first, `+0x470`, is `standing`) and whose
     /// slot 0x5d8 answers 0 (an animated object's always; a moving one's while its master's move
     /// algorithm, `+0x768`, has bit 0 clear), showing either standing sprite, whose sprite's node
@@ -386,6 +387,7 @@ impl Unit {
     /// frame, [`crate::objects::sprite::ActiveSprite::reset_frame`]).
     pub(crate) fn idle_swap(
         &mut self,
+        mut motion: MotionMut<'_>,
         standing: Option<SpriteId>,
         second: Option<SpriteId>,
         graphics: &crate::objects::Graphics,
@@ -394,7 +396,7 @@ impl Unit {
         let Some(second) = second else {
             return;
         };
-        if self.body.mover().is_some_and(|m| {
+        if motion.mover().is_some_and(|m| {
             m.stats
                 .move_algorithm
                 .contains(MoveAlgorithm::ALTERNATES_SPRITES)
@@ -420,7 +422,7 @@ impl Unit {
         if let Some(&g) = next.and_then(|next| graphics.get(next)) {
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
-                self.body.move_stats_mut(),
+                motion.move_stats_mut(),
                 g,
                 sprite_rng,
             );

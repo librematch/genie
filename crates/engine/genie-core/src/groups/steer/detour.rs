@@ -94,8 +94,8 @@ impl World {
         }
         if serves {
             let now = self.world_time;
-            if let Some((_, u)) = self.object_mut(id)
-                && let Some(m) = u.body.mover_mut()
+            if self.object(id).is_some()
+                && let Some(m) = self.parts.mover_mut(id)
             {
                 m.take_record_path(way.record.points, way.record.length, now, way.planned);
             }
@@ -163,7 +163,7 @@ impl World {
     ) -> Result<Rounder<'d>, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let master = u.master(self.master_tables(), p)?;
-        let mover = u.body.mover().ok_or(NO_MOVER)?;
+        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let grow = master.radius.x() * ROUND_RADIUS;
         Ok(Rounder {
             id,
@@ -172,7 +172,7 @@ impl World {
                 ..mover.walker(id)
             },
             computer: self.players.get(p.index()).is_some_and(|q| q.computer),
-            at: u.moved_vector(),
+            at: u.moved_vector(self.parts.mover_of(u.id)),
             here: u.position(),
             mask: mover.stats.restriction_mask,
             restriction: mover.stats.restriction,
@@ -401,7 +401,7 @@ impl World {
         to: BVector,
     ) -> Result<(bool, Path), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let mover = u.body.mover().ok_or(NO_MOVER)?;
+        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let computer = self.players.get(p.index()).is_some_and(|q| q.computer);
         let walker = crate::movement::LongWalker {
             id,

@@ -215,7 +215,7 @@ fn a_drop_off_order_leaves_a_livestock_without_a_drop_site_alone() {
     ];
     let pen = |id, x: f32, state| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(x, 10.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, 10.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             master_id: ids::PASTURE,
             state,
@@ -309,11 +309,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
             amount: Amount::new(5.0),
             ..crate::objects::lifecycle::Lifecycle::default()
         },
-        body: crate::objects::layers::Body::new(
-            Position::new(10.0, 10.0, 0.0),
-            None,
-            Some(crate::gathering::hunt::tests::walker()),
-        ),
+        place: crate::objects::layers::Static::at(Position::new(10.0, 10.0, 0.0)),
         actions: crate::objects::layers::ActionLayer {
             list: ActionList::default().with_build(Some(crate::construction::build::BuildAction {
                 state: BuildState::Work,
@@ -339,7 +335,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     let foundation = Object::with_building(
         Unit {
             id: object_id(600),
-            body: crate::objects::layers::Body::at(Position::new(5.0, 10.0, 0.0)),
+            place: crate::objects::layers::Static::at(Position::new(5.0, 10.0, 0.0)),
             life: crate::objects::lifecycle::Lifecycle {
                 master_id: ids::HOUSE,
                 ..crate::objects::lifecycle::Lifecycle::default()
@@ -365,7 +361,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
     );
     let mill = Unit {
         id: object_id(503),
-        body: crate::objects::layers::Body::at(Position::new(15.0, 10.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(15.0, 10.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             master_id: master_id(68),
             state: ObjectState::Alive,
@@ -384,7 +380,11 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
                 ..crate::world::Player::default()
             }],
         )
-        .with_buildings([(foundation.unit.id, foundation.parts.building.clone())]);
+        .with_buildings([(foundation.unit.id, foundation.parts.building.clone())])
+        .with_motions([(
+            villager.id,
+            crate::objects::layers::MotionLayer::Moving(crate::gathering::hunt::tests::walker()),
+        )]);
         t.masters = vec![crate::objects::masters::Masters::new([
             Master {
                 id: ids::VILLAGER_MALE,
@@ -609,9 +609,9 @@ fn a_work_attack_on_a_touching_target_starts_its_move_to_arrived() {
         unit.sprite.map(|s| s.graphic.id),
         Some(SpriteId::named(300))
     );
-    assert_eq!(unit.body.anim_speed(), Some(Speed::ZERO));
+    assert_eq!(t.parts.anim_speed_of(unit.id), Some(Speed::ZERO));
     assert_eq!(
-        unit.body.mover().map(|m| m.stats.speed),
+        t.parts.mover_of(unit.id).map(|m| m.stats.speed),
         Some(Speed::new(0.8))
     );
 }
@@ -872,7 +872,7 @@ fn annexed(t: &mut World) {
         Object::with_building(
             Unit {
                 id,
-                body: crate::objects::layers::Body::at(position),
+                place: crate::objects::layers::Static::at(position),
                 life: crate::objects::lifecycle::Lifecycle {
                     master_id,
                     state: ObjectState::Alive,
@@ -966,7 +966,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
             PlayerId::new(0),
             Unit {
                 id: object_id(50),
-                body: crate::objects::layers::Body::at(Position::new(10.4, 10.0, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(10.4, 10.0, 0.0)),
                 life: crate::objects::lifecycle::Lifecycle {
                     master_id: master_id(126),
                     state: ObjectState::Alive,
@@ -1001,7 +1001,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
     );
     let mut rng = Well512::default();
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    unit.body.put_mover(Some(walker));
+    t.parts.put_mover(unit.id, Some(walker));
     unit.sprite = Some(crate::objects::sprite::ActiveSprite::start(
         Graphic {
             id: SpriteId::named(302),
@@ -1009,7 +1009,7 @@ fn work_attack(stance: UnitStance) -> (World, crate::objects::masters::Task) {
         },
         &mut rng,
     ));
-    unit.body.set_anim_speed(Speed::new(1.0));
+    t.parts.set_anim_speed(unit.id, Speed::new(1.0));
     t.parts.set_unit_ai(
         unit.id,
         Some(crate::unit_ai::UnitAi {
@@ -1037,7 +1037,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         .iter()
         .map(|&(id, master, at)| Unit {
             id: object_id(id),
-            body: crate::objects::layers::Body::at(at.with_height(0.0)),
+            place: crate::objects::layers::Static::at(at.with_height(0.0)),
             group: crate::groups::GroupLink {
                 id: if members.contains(&id) {
                     Some(group_id(5))
@@ -1414,7 +1414,7 @@ fn an_order_to_another_player_s_unit_goes_to_its_queue_with_the_setting() {
         m.moving = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    unit.body.put_mover(Some(walker));
+    t.parts.put_mover(unit.id, Some(walker));
     t.parts
         .set_unit_ai(unit.id, Some(crate::unit_ai::UnitAi::default()));
     assert_eq!(
@@ -1601,9 +1601,6 @@ fn a_gate_command_toggles_the_lock_of_a_building_of_its_player() {
             Object::with_building(
                 Unit {
                     id: object_id(50),
-                    body: crate::objects::layers::Body::Moving(
-                        crate::gathering::hunt::tests::walker(),
-                    ),
                     life: crate::objects::lifecycle::Lifecycle {
                         master_id: master_id(79),
                         state: ObjectState::Alive,
@@ -1618,11 +1615,17 @@ fn a_gate_command_toggles_the_lock_of_a_building_of_its_player() {
             ),
         )
         .unwrap();
+    t.set_motion(
+        object_id(50),
+        Some(crate::objects::layers::MotionLayer::Moving(
+            crate::gathering::hunt::tests::walker(),
+        )),
+    );
     let building = |t: &World| {
         let b = &t.players[1].objects[ListIndex::new(1)];
         (
             t.parts.building_of(b.id).gate.unwrap().locked,
-            b.body.mover().unwrap().last_move,
+            t.parts.mover_of(b.id).unwrap().last_move,
         )
     };
     t.gate(player_id(1), object_id(50)).unwrap();
@@ -1780,7 +1783,7 @@ fn an_order_to_a_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
         m.moving = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    unit.body.put_mover(Some(walker));
+    t.parts.put_mover(unit.id, Some(walker));
     (unit.pasture, unit.my_pasture) = (None, None);
     t.parts.set_unit_ai(
         unit.id,
@@ -1844,7 +1847,7 @@ fn an_interact_s_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
             m.moving = Some(walker.stats);
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
-        unit.body.put_mover(Some(walker));
+        t.parts.put_mover(unit.id, Some(walker));
         (unit.pasture, unit.my_pasture) = (None, None);
         t.parts
             .set_unit_ai(unit.id, Some(crate::unit_ai::UnitAi::default()));
@@ -1864,7 +1867,7 @@ fn an_interact_s_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     )
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
-    let m = u.body.mover().unwrap();
+    let m = t.parts.mover_of(u.id).unwrap();
     assert_eq!((m.waiting, &m.ignore_units[..]), (1, &[object_id(12)][..]));
     let queued: Vec<_> = t
         .parts
@@ -1903,7 +1906,8 @@ fn an_interact_s_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     assert_eq!(t.parts.unit_ai.get(u.id).unwrap().orders, []);
     assert_eq!(u.actions.list.move_to().copied(), None);
     let mut t = mover();
-    t.players[1].objects[ListIndex::new(0)].body.put_mover(None);
+    t.parts
+        .put_mover(t.players[1].objects[ListIndex::new(0)].id, None);
     let reason = |t: &mut World| {
         t.interact_unit(PlayerId::new(1), object_id(11), &[], None, &interact)
             .unwrap_err()
@@ -2124,7 +2128,7 @@ fn an_auto_scout_reaches_any_player_s_scout_of_its_first_60_ids() {
     };
     let unit = |id| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(20.0, 20.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(20.0, 20.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             master_id: ids::ID_448,
             state: ObjectState::Alive,
@@ -2314,7 +2318,7 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
     spatial.go_inside(object_id(7), Position::new(5.0, 5.0, 0.0));
     let mut unit = Unit {
         id: object_id(7),
-        body: crate::objects::layers::Body::at(Position::new(5.0, 5.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(5.0, 5.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             hp: HitPoints::new(20.0),
             master_id: master_id(4),
@@ -2333,7 +2337,17 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         sprite: &mut rng,
     };
     let mut combat = crate::objects::layers::Combat::default();
-    let switched = switch_master((&mut unit, &mut combat), &old, &next, world).unwrap();
+    let switched = switch_master(
+        (
+            &mut unit,
+            &mut combat,
+            crate::objects::layers::MotionMut::new(None),
+        ),
+        &old,
+        &next,
+        world,
+    )
+    .unwrap();
     assert!(switched.promoted);
     assert_eq!(
         (unit.life.master_id, unit.life.hp),
@@ -2355,11 +2369,11 @@ type InTheOpen = (
     crate::map::spatial::Placed,
 );
 
-/// Slot 0x90's unit part ([`switch_master`]) of `unit`, at (3.5, 3.5) in the open, from `old`
-/// to `next`, with the graphics `shown`: what it leaves to its owner, the unit after it with
-/// its combat layer and its record.
+/// Slot 0x90's unit part ([`switch_master`]) of `unit` (with the motion part `motion`), at
+/// (3.5, 3.5) in the open, from `old` to `next`, with the graphics `shown`: what it leaves to
+/// its owner, the unit after it with its combat layer and its record.
 fn switched_in_the_open(
-    mut unit: Unit,
+    (mut unit, mut motion): (Unit, Option<crate::objects::layers::MotionLayer>),
     old: &Master,
     next: &Master,
     shown: &[i16],
@@ -2408,7 +2422,16 @@ fn switched_in_the_open(
         sprite: &mut rng,
     };
     let mut combat = crate::objects::layers::Combat::default();
-    let switched = switch_master((&mut unit, &mut combat), old, next, world)?;
+    let switched = switch_master(
+        (
+            &mut unit,
+            &mut combat,
+            crate::objects::layers::MotionMut::new(motion.as_mut()),
+        ),
+        old,
+        next,
+        world,
+    )?;
     let record = spatial.get(unit.id).copied().unwrap();
     Ok((switched, (unit, combat), record))
 }
@@ -2461,7 +2484,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
     let (old, next) = switch_masters();
     let unit = |hp, state| Unit {
         id: object_id(7),
-        body: crate::objects::layers::Body::at(Position::new(3.5, 3.5, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(3.5, 3.5, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             hp,
             state,
@@ -2487,7 +2510,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         ..unit(HitPoints::new(20.0), ObjectState::Alive)
     };
     let (switched, (u, combat), record) =
-        switched_in_the_open(showing, &old, &next, &[10, 11]).unwrap();
+        switched_in_the_open((showing, None), &old, &next, &[10, 11]).unwrap();
     assert_eq!(
         switched.leaving,
         crate::test_ids::adds([
@@ -2526,9 +2549,13 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         })
     );
     let hp = |hp| {
-        let (_, (u, combat), _) =
-            switched_in_the_open(unit(hp, ObjectState::Unfinished), &old, &next, &[10, 11])
-                .unwrap();
+        let (_, (u, combat), _) = switched_in_the_open(
+            (unit(hp, ObjectState::Unfinished), None),
+            &old,
+            &next,
+            &[10, 11],
+        )
+        .unwrap();
         (u.life.hp, combat.firepower)
     };
     assert_eq!(
@@ -2540,7 +2567,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         (HitPoints::new(1.0), crate::combat::Firepower::new(0.0))
     );
     let (switched, (u, _), record) = switched_in_the_open(
-        unit(HitPoints::new(20.0), ObjectState::Dying),
+        (unit(HitPoints::new(20.0), ObjectState::Dying), None),
         &old,
         &next,
         &[],
@@ -2574,23 +2601,26 @@ fn a_master_change_s_unmodelled_parts_fail() {
     let reason = |r: Result<_, GenieError>| r.unwrap_err().reason();
     assert_eq!(
         reason(switched_in_the_open(
-            unit.clone(),
+            (unit.clone(), None),
             &damaged,
             &next,
             &[10, 11]
         )),
         "a master change that changes the damage sprites (FUN_1411859a0)"
     );
-    let walking = Unit {
-        body: crate::objects::layers::Body::Moving(crate::gathering::hunt::tests::walker()),
-        ..unit.clone()
-    };
+    let walking =
+        crate::objects::layers::MotionLayer::Moving(crate::gathering::hunt::tests::walker());
     assert_eq!(
-        reason(switched_in_the_open(walking, &old, &next, &[10, 11])),
+        reason(switched_in_the_open(
+            (unit.clone(), Some(walking)),
+            &old,
+            &next,
+            &[10, 11]
+        )),
         "a moving unit's new master does not move"
     );
     assert_eq!(
-        reason(switched_in_the_open(unit, &old, &next, &[10])),
+        reason(switched_in_the_open((unit, None), &old, &next, &[10])),
         "a new master's standing sprite the data file does not have"
     );
 }
@@ -2760,7 +2790,7 @@ fn followers() -> World {
         ..Master::default()
     }]);
     for u in &mut t.players[1].objects {
-        u.body.put_mover(Some(walker.clone()));
+        t.parts.put_mover(u.id, Some(walker.clone()));
         t.parts.set_unit_ai(
             u.id,
             Some(crate::unit_ai::UnitAi {
@@ -2786,7 +2816,7 @@ fn followers() -> World {
             PlayerId::new(2),
             Unit {
                 id: object_id(30),
-                body: crate::objects::layers::Body::at(Position::new(40.0, 20.0, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(40.0, 20.0, 0.0)),
                 life: crate::objects::lifecycle::Lifecycle {
                     master_id: master_id(5),
                     state: ObjectState::Alive,
@@ -2902,7 +2932,10 @@ fn followers_side_by_side_take_their_offsets_from_the_target() {
             (ai.current_target, ai.target_point),
             (Some(object_id(30)), Position::new(x, 20.0, 0.0))
         );
-        assert_eq!(unit.body.mover().unwrap().ignore_units, [object_id(other)]);
+        assert_eq!(
+            t.parts.mover_of(unit.id).unwrap().ignore_units,
+            [object_id(other)]
+        );
         assert_eq!(
             ObjectId::field(unit.actions.list.move_to().copied().unwrap().target),
             30
@@ -3454,19 +3487,20 @@ fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     t.reindex();
     t.masters
         .push(crate::objects::masters::Masters::new([sheep_master]));
-    let sheep = |id, x: f32, y: f32| Unit {
-        id,
-        body: crate::objects::layers::Body::new(
-            Position::new(x, y, 0.0),
-            None,
-            Some(walker.clone()),
-        ),
-        life: crate::objects::lifecycle::Lifecycle {
-            master_id: master_id(594),
-            state: ObjectState::Alive,
-            ..crate::objects::lifecycle::Lifecycle::default()
-        },
-        ..Unit::default()
+    let sheep = |id, x: f32, y: f32| {
+        Object::moving(
+            Unit {
+                id,
+                place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
+                life: crate::objects::lifecycle::Lifecycle {
+                    master_id: master_id(594),
+                    state: ObjectState::Alive,
+                    ..crate::objects::lifecycle::Lifecycle::default()
+                },
+                ..Unit::default()
+            },
+            walker.clone(),
+        )
     };
     t.extend_live(
         PlayerId::new(1),
@@ -3594,7 +3628,7 @@ fn a_target_is_in_reach_within_the_weapon_range_and_not_below_the_least() {
 fn soldier_and_enemy(x: f32, class: ClassId) -> World {
     let unit = |id, master, x: f32| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(x, 10.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, 10.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             master_id: master,
             state: ObjectState::Alive,
@@ -3911,8 +3945,8 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
     let mut t = soldiers(units, members);
     t.dt = Millis::new(100);
     for u in &mut t.players[1].objects {
-        u.body
-            .put_mover(Some(crate::gathering::hunt::tests::walker()));
+        t.parts
+            .put_mover(u.id, Some(crate::gathering::hunt::tests::walker()));
         t.parts.set_unit_ai(
             u.id,
             Some(crate::unit_ai::UnitAi {
@@ -3996,7 +4030,7 @@ fn a_formation_stops_the_units_that_march_and_ignores_gone_ones() {
     {
         let u = &mut t.players[1].objects[ListIndex::new(i)];
         t.parts.unit_ai.get_mut(u.id).unwrap().current_order = order;
-        u.body.mover_mut().unwrap().ignore_units = vec![object_id(99)];
+        t.parts.mover_mut(u.id).unwrap().ignore_units = vec![object_id(99)];
     }
     t.form_formation(
         player_id(1),
@@ -4005,13 +4039,16 @@ fn a_formation_stops_the_units_that_march_and_ignores_gone_ones() {
     )
     .unwrap();
     let marched = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(marched.body.mover().unwrap().ignore_units, []);
+    assert_eq!(t.parts.mover_of(marched.id).unwrap().ignore_units, []);
     assert_ne!(
         t.parts.unit_ai.get(marched.id).unwrap().current_order,
         Some(OrderKind::Defend)
     );
     let other = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!(other.body.mover().unwrap().ignore_units, [object_id(99)]);
+    assert_eq!(
+        t.parts.mover_of(other.id).unwrap().ignore_units,
+        [object_id(99)]
+    );
     // all gone: refused
     let before = t.groups.commands;
     t.form_formation(
@@ -4050,7 +4087,7 @@ fn a_lone_unit_patrols_to_its_waypoint() {
         ),
         (Some(Position::new(30.0, 20.0, 1.5)), -1, Distance::ZERO)
     );
-    let m = u.body.mover().unwrap();
+    let m = t.parts.mover_of(u.id).unwrap();
     assert_eq!(
         (m.waiting, m.ignore_units.len(), m.user_waypoints.len()),
         (1, 0, 0)
@@ -4095,7 +4132,7 @@ fn a_lone_unit_s_waypoints_but_the_last_become_its_own() {
         Some(Position::new(30.0, 20.0, 0.0))
     );
     assert_eq!(
-        u.body.mover().unwrap().user_waypoints,
+        t.parts.mover_of(u.id).unwrap().user_waypoints,
         [BVector::new(25.5, 0.0, 20.5)]
     );
     let ai = t.parts.unit_ai.get(u.id).unwrap();
@@ -4325,11 +4362,17 @@ fn loose_patrollers_ignore_each_other_and_one_at_its_waypoint_stays() {
     let [a, b] = t.players[1].objects.as_slice() else {
         panic!("two units")
     };
-    assert_eq!(a.body.mover().unwrap().ignore_units, [object_id(12)]);
-    assert_eq!(b.body.mover().unwrap().ignore_units, [object_id(11)]);
+    assert_eq!(
+        t.parts.mover_of(a.id).unwrap().ignore_units,
+        [object_id(12)]
+    );
+    assert_eq!(
+        t.parts.mover_of(b.id).unwrap().ignore_units,
+        [object_id(11)]
+    );
     assert!(a.actions.list.move_to().is_some() && b.actions.list.move_to().is_none());
     assert_eq!(t.parts.unit_ai.get(b.id).unwrap().current_order, None);
-    assert_eq!(b.body.mover().unwrap().waiting, 1);
+    assert_eq!(t.parts.mover_of(b.id).unwrap().waiting, 1);
 }
 
 /// `FUN_140fd9f40`: the splitter keeps group 5 (the order's 11 and 12 are all of it); the
@@ -4349,7 +4392,7 @@ fn a_kept_group_takes_the_loose_soldiers_about_it() {
     for u in &mut t.players[1].objects {
         let mut m = crate::gathering::hunt::tests::walker();
         m.moved_at = u.position();
-        u.body.put_mover(Some(m));
+        t.parts.put_mover(u.id, Some(m));
     }
     t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
     let mut split = Split {
@@ -4399,7 +4442,7 @@ fn a_kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
                 PlayerId::new(0),
                 Unit {
                     id: object_id(60),
-                    body: crate::objects::layers::Body::at(Position::new(target_x, 20.0, 0.0)),
+                    place: crate::objects::layers::Static::at(Position::new(target_x, 20.0, 0.0)),
                     life: crate::objects::lifecycle::Lifecycle {
                         master_id: ids::HOUSE,
                         state: ObjectState::Alive,
@@ -4413,7 +4456,7 @@ fn a_kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
         for u in &mut t.players[1].objects {
             let mut m = crate::gathering::hunt::tests::walker();
             m.moved_at = u.position();
-            u.body.put_mover(Some(m));
+            t.parts.put_mover(u.id, Some(m));
         }
         t
     };
@@ -4686,7 +4729,7 @@ fn a_gather_takes_a_farm_but_no_other_building() {
         Object::with_building(
             Unit {
                 id,
-                body: crate::objects::layers::Body::at(Position::new(26.5, 89.5, 0.0)),
+                place: crate::objects::layers::Static::at(Position::new(26.5, 89.5, 0.0)),
                 life: crate::objects::lifecycle::Lifecycle {
                     state,
                     master_id: ids::FARM,
@@ -5014,12 +5057,12 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
         if !ai {
             t.parts.set_unit_ai(unit.id, None);
         }
-        unit.body.set_anim_speed(Speed::new(0.5));
+        t.parts.set_anim_speed(unit.id, Speed::new(0.5));
         let mut wolf = *t.spatial.get(object_id(50)).unwrap();
         wolf.position = Position::new(at, 10.0, 0.0);
         t.spatial.insert(object_id(50), wolf);
-        t.players[0].objects[ListIndex::new(0)].body =
-            crate::objects::layers::Body::at(Position::new(at, 10.0, 0.0));
+        t.players[0].objects[ListIndex::new(0)].place =
+            crate::objects::layers::Static::at(Position::new(at, 10.0, 0.0));
         t.start_attack(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -5033,7 +5076,7 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
         let state = unit.actions.list.attack().map(|a| a.state);
         let notifies = t.parts.unit_ai.get(unit.id).map(|ai| ai.notifies.len());
         let sprite = unit.sprite.map(|s| s.graphic.id);
-        (state, unit.body.anim_speed(), sprite, notifies)
+        (state, t.parts.anim_speed_of(unit.id), sprite, notifies)
     };
     let (near, _, sprite, near_notifies) = started(true, 10.4);
     assert_eq!(sprite, Some(SpriteId::named(300)));
@@ -5169,7 +5212,7 @@ fn a_work_command_s_retarget_to_its_player_s_master_84_fails() {
                 PlayerId::new(1),
                 Unit {
                     id: object_id(800),
-                    body: crate::objects::layers::Body::at(Position::new(33.5, 89.5, 0.0)),
+                    place: crate::objects::layers::Static::at(Position::new(33.5, 89.5, 0.0)),
                     life: crate::objects::lifecycle::Lifecycle {
                         master_id: ids::MARKET,
                         state: ObjectState::Alive,
@@ -5357,7 +5400,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_a_group_that_attacks_it() 
     t.players.push(crate::world::Player::default());
     t.players[2].objects = vec![Unit {
         id: object_id(60),
-        body: crate::objects::layers::Body::at(Position::new(40.0, 40.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(40.0, 40.0, 0.0)),
         attackable: true,
         life: crate::objects::lifecycle::Lifecycle {
             master_id: ids::HOUSE,

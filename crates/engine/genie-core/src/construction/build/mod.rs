@@ -593,7 +593,7 @@ mod stack_tests {
         let ms = masters();
         let foundation = Unit {
             id: object_id(8759),
-            body: crate::objects::layers::Body::at(Position::new(54.0, 147.0, 0.0)),
+            place: crate::objects::layers::Static::at(Position::new(54.0, 147.0, 0.0)),
             life: Lifecycle {
                 class: Class::Animated,
                 state: ObjectState::Foundation,
@@ -903,7 +903,7 @@ mod stack_tests {
                 t.parts.building_of(gate.id).gate.map(|g| g.locked),
                 Some(locked)
             );
-            let last_move = gate.body.mover().map(|m| m.last_move);
+            let last_move = t.parts.mover_of(gate.id).map(|m| m.last_move);
             assert_eq!(
                 last_move,
                 Some(WorldTime::from_millis(if locked { 5001 } else { 5000 })),

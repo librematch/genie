@@ -67,7 +67,7 @@ impl GatherAction {
     pub(super) fn show(c: &mut Step<'_>, unit: &mut Unit, sprite: Option<Graphic>) {
         if let Some(s) = sprite {
             let rng = c.w.streams.get(Stream::Sprite);
-            new_sprite(&mut unit.sprite, unit.body.move_stats_mut(), s, rng);
+            new_sprite(&mut unit.sprite, c.w.parts.move_stats_mut(unit.id), s, rng);
         }
     }
 
@@ -81,7 +81,7 @@ impl GatherAction {
         self.worked = true;
         self.timer = Seconds::ZERO;
         if !r.farm_stops {
-            let at = unit.body.position();
+            let at = unit.place.position();
             self.gather_at = at.ground();
         }
         let kind = self.task.resource;
@@ -193,7 +193,7 @@ impl GatherAction {
                 self.random_wait(c, unit);
                 return Ok(Dropped::Going);
             }
-            1 | 2 => self.tear_down(unit.body.mover_mut())?,
+            1 | 2 => self.tear_down(c.w.parts.mover_mut(unit.id))?,
             code => return Err(QUIET_CODE.with("code", code)),
         }
         // the drop site gone: set_state(8) again
@@ -218,8 +218,8 @@ impl GatherAction {
 
     /// `LAB_140a8ef80`: the timer takes a draw of the Action stream (`GetRandFloat0to1`) less a
     /// half, and the unit's animation stops at once (`FUN_141161850`: its `+0x7b8` 0).
-    pub(super) fn random_wait(&mut self, c: &mut Step<'_>, unit: &mut Unit) {
+    pub(super) fn random_wait(&mut self, c: &mut Step<'_>, unit: &Unit) {
         self.timer = Seconds::new(c.w.streams.get(Stream::Action).float01() - WAIT_SHIFT);
-        unit.body.set_anim_speed(Speed::ZERO);
+        c.w.parts.set_anim_speed(unit.id, Speed::ZERO);
     }
 }

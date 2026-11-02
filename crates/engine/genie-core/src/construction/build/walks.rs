@@ -45,6 +45,7 @@ impl BuildAction {
         builder: &Unit,
     ) -> Result<(Option<WalkTo>, Option<MoveToAction>), GenieError> {
         let move_reads = builder.move_to_reads(
+            c.w.parts.motion.mover(builder.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (

@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::map::Position;
+use crate::movement::Speed;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -166,7 +167,15 @@ impl UnitView<'_, '_> {
             Some(m),
             (owner, computer),
             self.attacker.scenario,
-            (capture, self.c.w.parts.combat_of(u.id).firepower),
+            (
+                capture,
+                self.c.w.parts.combat_of(u.id).firepower,
+                self.c
+                    .w
+                    .parts
+                    .mover_of(u.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
+            ),
         );
         let target_kind = match ai.current_target.and_then(find) {
             Some((q, o)) => Some(o.master(self.c.w.master_tables(), q)?.kind),
@@ -198,8 +207,12 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
-        self.unit
-            .tear_down_actions(&mut releases, &mut leaves, by)?;
+        self.unit.tear_down_actions(
+            self.c.w.parts.motion.layer_mut(self.unit.id),
+            &mut releases,
+            &mut leaves,
+            by,
+        )?;
         self.torn_down((leaves, releases))?;
         self.c
             .lend_at(self.unit, |w, p, i| w.change_master(p, i, next))

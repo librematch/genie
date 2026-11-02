@@ -185,7 +185,7 @@ impl World {
         else {
             return;
         };
-        if let Some(level) = u.body.mover_mut().and_then(|m| m.paths.first_mut()) {
+        if let Some(level) = self.parts.mover_mut(u.id).and_then(|m| m.paths.first_mut()) {
             level.pause_time = pause;
         }
     }

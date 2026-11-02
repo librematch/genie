@@ -233,9 +233,9 @@ impl World {
             .ok_or_else(|| member_gone(target))?;
         let master = self.master(t.player(), t.master_id())?;
         let moves = match t {
-            WorldObject::Unit(_, u) => u
-                .body
-                .mover()
+            WorldObject::Unit(_, u, _) => self
+                .parts
+                .mover_of(u.id)
                 .is_some_and(crate::movement::Mover::is_moving),
             WorldObject::Ghost(..) => false,
         };

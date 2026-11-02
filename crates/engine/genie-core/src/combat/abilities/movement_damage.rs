@@ -186,9 +186,9 @@ impl World {
         ) {
             return Ok(());
         }
-        let moving = unit
-            .body
-            .mover()
+        let moving = self
+            .parts
+            .mover_of(unit.id)
             .and_then(|m| m.velocity.as_ref())
             .is_some_and(|v| 0.0 < fmath::length(v.velocity));
         if master.kind != COMBAT || !moving {

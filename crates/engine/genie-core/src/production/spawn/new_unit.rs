@@ -407,16 +407,7 @@ impl World {
                 master_id: master,
                 master: made.life,
             },
-            // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
-            // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            body: crate::objects::layers::Body::Moving(Mover::new_object(
-                moving,
-                Some(&standing),
-                position,
-                self.world_time,
-                angle,
-                Some(facets),
-            )),
+            place: crate::objects::layers::Static::at(position),
             attackable: true,
             pasture: None,
             my_pasture: None,
@@ -433,6 +424,18 @@ impl World {
         let parts = ObjectParts {
             unit_ai: ai,
             combat,
+            // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
+            // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
+            motion: Some(crate::objects::layers::MotionLayer::Moving(
+                Mover::new_object(
+                    moving,
+                    Some(&standing),
+                    position,
+                    self.world_time,
+                    angle,
+                    Some(facets),
+                ),
+            )),
             ..ObjectParts::default()
         };
         let idx = self.push_live(p, Object { unit, parts })?;

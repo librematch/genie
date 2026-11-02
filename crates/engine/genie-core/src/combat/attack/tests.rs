@@ -27,6 +27,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Animated;
+use crate::objects::layers::{MotionLayer, MotionMut, Static};
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
@@ -177,26 +178,26 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
     let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
     a.move_to = Some(walking(MoveTo::Moving));
     a.arms.idle_sprite = Some(stand);
-    let mut body = Body::Moving(crate::gathering::hunt::tests::walker());
-    body.set_anim_speed(Speed::new(0.5));
+    let mut motion = MotionLayer::Moving(crate::gathering::hunt::tests::walker());
+    motion.lent().set_anim_speed(Speed::new(0.5));
     let (mut sprite, mut rng) = (None, Well512::default());
-    a.halt(&mut body, &mut sprite, &mut rng).unwrap();
+    a.halt(motion.lent(), &mut sprite, &mut rng).unwrap();
     // the MoveTo's teardown stops the unit (its speed 0 at once), then set_state(1) sets 1
     assert_eq!(
         (
             a.state,
             a.move_to,
             ObjectId::field(a.target),
-            body.anim_speed()
+            motion.animated().speed
         ),
-        (AttackState::Done, None, 77, Some(Speed::new(1.0)))
+        (AttackState::Done, None, 77, Speed::new(1.0))
     );
     assert_eq!(sprite.map(|s| s.graphic.id), Some(SpriteId::named(1)));
-    assert_eq!(body.mover().unwrap().velocity.unwrap().velocity.y(), 0.0);
+    assert_eq!(motion.mover().unwrap().velocity.unwrap().velocity.y(), 0.0);
     // a unit without a standing sprite is not modelled
     let mut bare = own_attack(77, AttackState::Ready, Distance::new(1.0));
     assert!(
-        bare.halt(&mut Body::default(), &mut sprite, &mut rng)
+        bare.halt(MotionMut::new(None), &mut sprite, &mut rng)
             .is_err()
     );
 }
@@ -611,15 +612,14 @@ impl Rig {
         let _ = t
             .push_live(
                 PlayerId::new(1),
-                Unit {
-                    id: object_id(1),
-                    body: Body::new(
-                        Position::new(10.0, 10.0, 0.0),
-                        None,
-                        Some(soldier_mover(speed)),
-                    ),
-                    ..Unit::default()
-                },
+                crate::world::parts::Object::moving(
+                    Unit {
+                        id: object_id(1),
+                        place: Static::at(Position::new(10.0, 10.0, 0.0)),
+                        ..Unit::default()
+                    },
+                    soldier_mover(speed),
+                ),
             )
             .unwrap();
         Self::with_unit(t, victim, soldier())
@@ -721,18 +721,20 @@ impl Rig {
             ..
         } = &mut self.t;
         let (object, sprite) = streams.object_and_sprite();
+        let (motion, motions) = parts.motion.lend(unit.id);
         let mut g = Ground {
             by_id: crate::world::index::ObjectsRef::of_tables(
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat),
+                (&parts.building, &parts.combat, motions),
             ),
             map: spatial,
             sprite_rng: sprite,
             object_rng: Some(object),
             posts: Posts::Ais(&mut parts.unit_ai),
             graphics: &NO_GRAPHICS,
+            motion: MotionMut::new(motion),
         };
         let r = f(&mut unit, &mut g, &self.f, &self.r);
         let _ = self.t.put_back(PlayerId::new(1), unit).unwrap();
@@ -774,14 +776,18 @@ impl Rig {
 
     /// Its movement state.
     pub(crate) fn mover(&self) -> &Mover {
-        self.unit().body.mover().expect("the rig's attacker moves")
+        self.t
+            .parts
+            .mover_of(self.unit().id)
+            .expect("the rig's attacker moves")
     }
 
     /// Its movement state to change.
     pub(crate) fn mover_mut(&mut self) -> &mut Mover {
-        self.unit_mut()
-            .body
-            .mover_mut()
+        let id = self.unit().id;
+        self.t
+            .parts
+            .mover_mut(id)
             .expect("the rig's attacker moves")
     }
 
@@ -1799,29 +1805,32 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         on_target_moved: TargetMoved::Follows,
         same_owner: false,
     };
-    let mut body = Body::Animated(Animated::new(Speed::new(0.5)));
+    let mut motion = MotionLayer::Animated(Animated::new(Speed::new(0.5)));
     assert_eq!(
         a.clone()
-            .update_targetless(Seconds::new(0.028), true, &mut body),
+            .update_targetless(Seconds::new(0.028), true, motion.lent()),
         Err(GenieError::unsupported(
             "an Attack without a target in a state but 1"
         ))
     );
     assert_eq!(
-        a.update_targetless(Seconds::new(0.028), false, &mut body),
+        a.update_targetless(Seconds::new(0.028), false, motion.lent()),
         Ok((UpdateCode::DONE, true))
     );
     assert_eq!(a.state, AttackState::Done);
     let (mut sprite, mut rng) = (None, Well512::default());
-    let posted = a.disarmed(&mut sprite, &mut body, &mut rng).unwrap();
+    let posted = a.disarmed(&mut sprite, motion.lent(), &mut rng).unwrap();
     assert_eq!(posted, Some((NotifyKind::ACTION_INVALIDATED, [600, -1, 0])));
     assert_eq!(
-        (body.anim_speed(), sprite.map(|s| s.graphic.id)),
-        (Some(Speed::new(1.0)), Some(SpriteId::named(418)))
+        (motion.animated().speed, sprite.map(|s| s.graphic.id)),
+        (Speed::new(1.0), Some(SpriteId::named(418)))
     );
     // the Hunt's Attack, a sub-action, posts nothing
     a.sub_action = true;
-    assert_eq!(a.disarmed(&mut sprite, &mut body, &mut rng).unwrap(), None);
+    assert_eq!(
+        a.disarmed(&mut sprite, motion.lent(), &mut rng).unwrap(),
+        None
+    );
 }
 
 /// `FUN_140a7c210`: without a `MoveTo` sprite of its own the Attack walks with the unit's
@@ -2178,18 +2187,14 @@ fn a_gate_s_reach_is_to_its_nearest_part() {
         target_class: class::GATE,
         ..engaged(Distance::new(3.0), 0.0, false, UnitStance::STAND_GROUND)
     };
-    let mut mover_body = Body::new(
-        Position::new(10.0, 10.0, 0.0),
-        None,
-        Some(soldier_mover(0.0)),
-    );
+    let mut walker = soldier_mover(0.0);
     let c = own_start_among(
         (&world, objects.view()),
         &e,
         standing_arms(),
         true,
         PlayerId::new(2),
-        mover_body.mover_mut().unwrap(),
+        &mut walker,
     )
     .unwrap();
     // the part 8 is 0.5 off (its footprint 0.1); the part 10, the third, is not read
@@ -2446,7 +2451,7 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     assert_eq!(
         (
             centre.sprite.map(|s| s.graphic.id),
-            centre.body.anim_speed()
+            t.parts.anim_speed_of(centre.id)
         ),
         (Some(SpriteId::named(9)), Some(Speed::new(1.0)))
     );

@@ -301,7 +301,7 @@ mod tests {
                 PlayerId::new(1),
                 crate::objects::unit::Unit {
                     id: object_id(50),
-                    body: crate::objects::layers::Body::at(Position::new(7.0, 8.0, 0.0)),
+                    place: crate::objects::layers::Static::at(Position::new(7.0, 8.0, 0.0)),
                     life: crate::objects::lifecycle::Lifecycle {
                         master_id: TOWN_CENTRE,
                         state: ObjectState::Alive,

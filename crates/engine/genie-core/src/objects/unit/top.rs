@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::math::fmath::BVector;
+use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -16,12 +17,11 @@ use crate::world::checkpoint::TopAction;
 
 impl Unit {
     /// Slot 0x520: where it last moved to, as the game's vector: a moving object's `+0x824`
-    /// (`FUN_14106d530`, [`crate::movement::Mover::moved_at`]), any other's place
+    /// (`FUN_14106d530`, [`crate::movement::Mover::moved_at`] of its `mover`), any other's place
     /// (`FUN_141196c10`).
     #[must_use]
-    pub(crate) fn moved_vector(&self) -> BVector {
-        self.body
-            .mover()
+    pub(crate) fn moved_vector(&self, mover: Option<&Mover>) -> BVector {
+        mover
             .map_or_else(|| self.position(), |m| m.moved_at)
             .vector()
     }
@@ -121,10 +121,11 @@ impl Unit {
         }
     }
 
-    /// What the walk reads of it when it meets it ([`crate::map::spatial::Gait`]).
+    /// What the walk reads of it when it meets it ([`crate::map::spatial::Gait`]), with its
+    /// `mover` (none for an object that does not move).
     #[must_use]
-    pub fn gait(&self) -> Option<crate::map::spatial::Gait> {
-        let m = self.body.mover()?;
+    pub fn gait(&self, mover: Option<&Mover>) -> Option<crate::map::spatial::Gait> {
+        let m = mover?;
         Some(crate::map::spatial::Gait {
             moving: m
                 .velocity

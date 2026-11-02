@@ -13,6 +13,7 @@ use crate::map::DistanceSquared;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::rng::{Stream, Well512};
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::{Me, footprint_gap};
@@ -20,7 +21,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
-use crate::objects::layers::Body;
+use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::class;
@@ -42,7 +43,7 @@ impl Attack {
         &mut self,
         dt: Seconds,
         armed: bool,
-        body: &mut Body,
+        mut motion: MotionMut<'_>,
     ) -> Result<(UpdateCode, bool), GenieError> {
         self.timer += dt;
         if !armed {
@@ -54,7 +55,7 @@ impl Attack {
                 "an Attack without a target in a state but 1",
             ));
         }
-        body.set_anim_speed(Speed::ZERO);
+        motion.set_anim_speed(Speed::ZERO);
         Ok((UpdateCode::DONE, false))
     }
 
@@ -84,7 +85,7 @@ impl Attack {
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {
             1 | 2 => {
-                self.delete_move_to(unit)?;
+                self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
                 if !self.sub_action {
                     unit.post_own(
                         &mut c.w.parts.unit_ai,
@@ -92,7 +93,11 @@ impl Attack {
                         [600, 0, 0x202],
                     )?;
                 }
-                self.finish(unit, c.w.streams.get(Stream::Sprite))?;
+                self.finish(
+                    unit,
+                    c.w.parts.motion_mut(unit.id),
+                    c.w.streams.get(Stream::Sprite),
+                )?;
                 Ok(UpdateCode::DONE)
             }
             3 => self.walk_failed(c, unit),
@@ -107,17 +112,17 @@ impl Attack {
     pub(crate) fn disarmed(
         &self,
         sprite: &mut Option<ActiveSprite>,
-        body: &mut Body,
+        mut motion: MotionMut<'_>,
         rng: &mut Well512,
     ) -> Result<Option<(NotifyKind, [i32; 3])>, GenieError> {
         if self.move_to.is_some() {
             return Err(GenieError::unsupported("a building's Attack with a MoveTo"));
         }
-        body.set_anim_speed(Speed::new(1.0));
+        motion.set_anim_speed(Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(sprite, body.move_stats_mut(), idle, rng);
+        new_sprite(sprite, motion.move_stats_mut(), idle, rng);
         Ok((!self.sub_action).then_some((
             NotifyKind::ACTION_INVALIDATED,
             [600, ObjectId::field(self.target), 0],
@@ -164,7 +169,7 @@ impl Attack {
         match self.state {
             // case 0: the unit's animation stops; the list deletes the Attack
             AttackState::Done => {
-                set_walker_anim(&mut unit.body, Speed::new(0.0));
+                set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 Ok(UpdateCode::DONE)
             }
             // case 3 (state 4) walks the MoveTo to the target, cases 4 and 10 (states 5 and
@@ -183,7 +188,7 @@ impl Attack {
                     NotifyKind::ACTION_FAILED,
                     [600, 0, 0],
                 )?;
-                set_walker_anim(&mut unit.body, Speed::new(0.0));
+                set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 Ok(UpdateCode::FAILED)
             }
             // the states without a case (0; 3, 8 to 10, 12, 14 and above, which no step sets)
@@ -222,7 +227,11 @@ impl Attack {
         }
         self.target = None;
         self.point = Position::from([NONE; 3]);
-        self.finish(unit, c.w.streams.get(Stream::Sprite))?;
+        self.finish(
+            unit,
+            c.w.parts.motion_mut(unit.id),
+            c.w.streams.get(Stream::Sprite),
+        )?;
         Ok(UpdateCode::CODE_5)
     }
 
@@ -247,13 +256,13 @@ impl Attack {
         self.seen = t.position;
         let seen = sees(&c.w.spatial, f, t.position)?;
         if seen && matches!(self.state, AttackState::GotoSeen | AttackState::GotoPoint) {
-            let ground = unit
-                .body
-                .mover()
-                .map(|m| m.stats.radius.ground())
-                .ok_or(crate::world::ATTACKER_UNMOVING)?;
-            let gap = footprint_gap(unit.body.position(), ground, t.position, t.radius);
-            self.follow(unit, &mut c.w.attack_ground(), r, f, gap)?;
+            let ground =
+                c.w.parts
+                    .mover_of(unit.id)
+                    .map(|m| m.stats.radius.ground())
+                    .ok_or(crate::world::ATTACKER_UNMOVING)?;
+            let gap = footprint_gap(unit.place.position(), ground, t.position, t.radius);
+            self.follow(unit, &mut c.w.attack_ground(unit.id), r, f, gap)?;
             return Ok(Some(UpdateCode::UNDER_WAY));
         }
         if !seen && matches!(self.state, AttackState::Move | AttackState::GotoSeen) {
@@ -266,7 +275,7 @@ impl Attack {
                 return self.out_of_sight(c, unit, f, r).map(Some);
             }
             if self.state != AttackState::GotoSeen {
-                self.wait_at_seen(unit, f, r, &c.w.graphics)?;
+                self.wait_at_seen(unit, c.w.parts.motion_mut(unit.id), f, r, &c.w.graphics)?;
                 return Ok(Some(UpdateCode::UNDER_WAY));
             }
         }
@@ -291,7 +300,7 @@ impl Attack {
         let spared = matches!(f.victim.class, class::LIVESTOCK | class::FARM) && self.same_owner;
         let rng = c.w.streams.get(Stream::Sprite);
         if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied.by_attacker {
-            self.finish(unit, rng)?;
+            self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
             if !self.sub_action {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
@@ -305,7 +314,7 @@ impl Attack {
         // keeps it in the list; a unit's own Attack (not quiet, +0x60) of a unit whose unit AI's
         // order queue is empty posts 0x1fb with 600 and the target
         if f.victim.inside {
-            self.finish(unit, rng)?;
+            self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
             if !self.sub_action && r.queue_empty {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
@@ -318,7 +327,7 @@ impl Attack {
         // a building that cannot attack (FUN_14120ea30) ends it (set_state 1), its own Attack
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
         if !r.armed {
-            self.finish(unit, rng)?;
+            self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
             if !self.sub_action {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
@@ -342,11 +351,11 @@ impl Attack {
         r: &AttackReads,
         alive: bool,
     ) -> Result<UpdateCode, GenieError> {
-        let mut g = c.w.attack_ground();
+        let mut g = c.w.attack_ground(unit.id);
         match self.ready_to_attack(unit, &mut g, f, r, false)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
-                self.finish(unit, g.sprite_rng)?;
+                self.finish(unit, g.motion.reborrow(), g.sprite_rng)?;
                 return Ok(UpdateCode::CODE_5);
             }
             Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
@@ -376,7 +385,11 @@ impl Attack {
         // Attack, a sub-action, then posts 0x1fb with 600 and 0x202 too and returns 5
         if self.sub_action {
             self.target = None;
-            self.finish(unit, c.w.streams.get(Stream::Sprite))?;
+            self.finish(
+                unit,
+                c.w.parts.motion_mut(unit.id),
+                c.w.streams.get(Stream::Sprite),
+            )?;
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_INVALIDATED,
@@ -394,7 +407,11 @@ impl Attack {
             NotifyKind::ACTION_INVALIDATED,
             [600, 0, 0x202],
         )?;
-        self.finish(unit, c.w.streams.get(Stream::Sprite))?;
+        self.finish(
+            unit,
+            c.w.parts.motion_mut(unit.id),
+            c.w.streams.get(Stream::Sprite),
+        )?;
         Ok(UpdateCode::CODE_2)
     }
 
@@ -403,17 +420,19 @@ impl Attack {
     /// ([`Attack::goto_point`]).
     pub(super) fn wait_at_seen(
         &mut self,
-        unit: &mut Unit,
+        unit: &Unit,
+        mut motion: MotionMut<'_>,
         f: &Fight,
         r: &AttackReads,
         graphics: &crate::objects::Graphics,
     ) -> Result<(), GenieError> {
-        self.enter(AttackState::GotoSeen, unit)?;
+        self.enter(AttackState::GotoSeen, motion.reborrow())?;
         self.range = f.own.source.weapon_range;
-        self.goto_point(unit, r, graphics)
+        self.goto_point((unit, motion.mover()), r, graphics)
     }
 
-    /// The `MoveTo` to a point of states 5 and 11 ([`Attack::walk_to_seen`]) of `unit`: its start
+    /// The `MoveTo` to a point of states 5 and 11 ([`Attack::walk_to_seen`]) of `unit` with its
+    /// mover: its start
     /// finds no target object to be near (`FUN_14118f680` answers `FLT_MAX`), so a unit with a
     /// top speed (`UCOMISS`: not 0) asks for a path (state 3), any other fails (state 13).
     ///
@@ -422,7 +441,7 @@ impl Attack {
     /// A unit that does not move.
     pub(super) fn goto_point(
         &mut self,
-        unit: &Unit,
+        unit: (&Unit, Option<&Mover>),
         r: &AttackReads,
         graphics: &crate::objects::Graphics,
     ) -> Result<(), GenieError> {
@@ -445,7 +464,7 @@ impl Attack {
         target: Position,
     ) -> Result<UpdateCode, GenieError> {
         if sees(&c.w.spatial, f, target)? {
-            self.ready(unit, &mut c.w.attack_ground(), f, r)?;
+            self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
             return Ok(UpdateCode::UNDER_WAY);
         }
         if self.state == AttackState::GotoSeen
@@ -453,16 +472,21 @@ impl Attack {
             && SEEN_RANGE <= self.range.get()
             && !r.computer
         {
-            self.enter(AttackState::GotoPoint, unit)?;
+            self.enter(AttackState::GotoPoint, c.w.parts.motion_mut(unit.id))?;
             self.range = f.own.source.weapon_range;
-            self.goto_point(unit, r, &c.w.graphics)?;
+            self.goto_point((unit, c.w.parts.mover_of(unit.id)), r, &c.w.graphics)?;
             return Ok(UpdateCode::UNDER_WAY);
         }
         let target = self.target.take();
         if !self.sub_action {
             let_go(c, unit, target)?;
         }
-        self.finish_in(AttackState::Failed, unit, c.w.streams.get(Stream::Sprite))?;
+        self.finish_in(
+            AttackState::Failed,
+            unit,
+            c.w.parts.motion_mut(unit.id),
+            c.w.streams.get(Stream::Sprite),
+        )?;
         if !self.sub_action {
             unit.post_own(
                 &mut c.w.parts.unit_ai,

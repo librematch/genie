@@ -229,11 +229,15 @@ impl World {
     ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
         let owner = self.players.player(p)?;
         let unit = owner.live(i)?;
-        let mover = unit.body.mover().ok_or(GenieError::unsupported(
+        let mover = self.parts.mover_of(unit.id).ok_or(GenieError::unsupported(
             "a resource search without movement state",
         ))?;
         let (seeker, me_walk) = self.search_seeker(p, unit)?;
-        let (mask, master_id) = (mover.stats.restriction_mask, unit.life.master_id);
+        let (mask, master_id, at) = (
+            mover.stats.restriction_mask,
+            unit.life.master_id,
+            unit.position(),
+        );
         let (players, masters, index) = (
             &self.players,
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
@@ -243,7 +247,11 @@ impl World {
             players,
             index,
             masters,
-            (&self.parts.building, &self.parts.combat),
+            (
+                &self.parts.building,
+                &self.parts.combat,
+                self.parts.motion.unlent(),
+            ),
         );
         let candidate = |spatial: &crate::map::spatial::Spatial,
                          id: ObjectId|
@@ -300,7 +308,7 @@ impl World {
                 objects: &objects,
                 reach: &mut |spatial, id| {
                     mover.reaches_object(
-                        &me_walk,
+                        (at, &me_walk),
                         (spatial, by_id),
                         &mut plan,
                         id,

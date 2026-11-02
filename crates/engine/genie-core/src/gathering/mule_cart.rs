@@ -105,7 +105,7 @@ impl World {
             .unit_ai
             .get(self.players.live(p, idx)?.id)
             .and_then(|ai| ai.current_target);
-        if self.players.live(p, idx)?.body.mover().is_none() {
+        if self.parts.mover_of(self.players.live(p, idx)?.id).is_none() {
             return Err(GenieError::unsupported(
                 "a mule cart's search without its movement state (a moving building's setup)",
             ));
@@ -161,7 +161,7 @@ impl World {
             let mut found = Vec::new();
             for kind in kinds {
                 let (f, _) = closest_resource_of(
-                    &cart,
+                    (&cart, self.parts.mover_of(cart.id)),
                     &mut w,
                     others,
                     (

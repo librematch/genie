@@ -202,6 +202,7 @@ impl BuildAction {
             return self.restart(c, builder);
         };
         let move_reads = builder.move_to_reads(
+            c.w.parts.motion.mover(builder.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -268,7 +269,7 @@ impl BuildAction {
         }
         if DROP_REACH < drop.gap_squared.get() {
             self.timer = DROP_WAIT;
-            builder.body.set_anim_speed(Speed::ZERO);
+            c.w.parts.set_anim_speed(builder.id, Speed::ZERO);
             return Ok(HeadCode::Keeps);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();

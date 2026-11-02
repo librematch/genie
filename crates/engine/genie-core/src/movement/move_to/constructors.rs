@@ -6,6 +6,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::footprint_gap;
 use crate::movement::move_to::{
@@ -86,12 +87,13 @@ impl WalkTo {
 }
 
 impl<'g> MoveToReads<'g> {
-    /// What a new `MoveTo` reads of `unit` of `master` (its own, or the one its task switches it
-    /// to), with the sprites' table `graphics` and the unit's terrain look `look` (its combat
-    /// layer's): an object without movement has no speed (a static object's slot 0x208).
+    /// What a new `MoveTo` reads of `unit` with its mover `mover` (its motion layer's) of
+    /// `master` (its own, or the one its task switches it to), with the sprites' table
+    /// `graphics` and the unit's terrain look `look` (its combat layer's): an object without
+    /// movement has no speed (a static object's slot 0x208).
     #[must_use]
     pub fn of(
-        unit: &Unit,
+        (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
         (graphics, look): (
             &'g crate::objects::Graphics,
@@ -101,17 +103,17 @@ impl<'g> MoveToReads<'g> {
         Self {
             sprites: SpriteReads::of(master, look, graphics),
             state: unit.life.state,
-            speed: unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
+            speed: mover.map_or(Speed::ZERO, |m| m.stats.speed),
             at: unit.position(),
             ground: master.radius,
         }
     }
 
-    /// What a new `MoveTo` reads of `unit` with the sprites `sprites`: its state and speed, its place
-    /// and the radii of its movement state (none for a unit that does not move).
+    /// What a new `MoveTo` reads of `unit` with its mover `mover` and the sprites `sprites`:
+    /// its state and speed, its place and the radii of its movement state (none for a unit that
+    /// does not move).
     #[must_use]
-    pub fn with_sprites(sprites: SpriteReads<'g>, unit: &Unit) -> Self {
-        let mover = unit.body.mover();
+    pub fn with_sprites(sprites: SpriteReads<'g>, (unit, mover): (&Unit, Option<&Mover>)) -> Self {
         Self {
             sprites,
             state: unit.life.state,
@@ -240,15 +242,16 @@ impl<'g> MoveToReads<'g> {
 }
 
 impl Unit {
-    /// What a new `MoveTo` reads of this unit ([`MoveToReads::of`] with its master), `player`'s, whose
-    /// masters are `every`, with the sprites' table `graphics` and its terrain look `look` (its
-    /// combat layer's).
+    /// What a new `MoveTo` reads of this unit with its mover `mover` ([`MoveToReads::of`] with
+    /// its master), `player`'s, whose masters are `every`, with the sprites' table `graphics`
+    /// and its terrain look `look` (its combat layer's).
     ///
     /// # Errors
     ///
     /// A unit whose master the table lacks.
     pub(crate) fn move_to_reads<'g>(
         &self,
+        mover: Option<&Mover>,
         every: crate::objects::masters::MasterTables<'_>,
         player: PlayerId,
         graphics: (
@@ -256,7 +259,11 @@ impl Unit {
             Option<&crate::combat::abilities::Look>,
         ),
     ) -> Result<MoveToReads<'g>, GenieError> {
-        Ok(MoveToReads::of(self, self.master(every, player)?, graphics))
+        Ok(MoveToReads::of(
+            (self, mover),
+            self.master(every, player)?,
+            graphics,
+        ))
     }
 }
 

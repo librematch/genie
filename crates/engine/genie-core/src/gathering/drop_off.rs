@@ -10,12 +10,11 @@ use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::movement::move_to::SpriteReads;
-use crate::movement::{Me, Planning, footprint_gap};
+use crate::movement::{Me, Mover, Planning, footprint_gap};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionType;
-use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::action_type;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
@@ -122,6 +121,7 @@ impl Unit {
             self.actions.list.gather().and_then(|g| g.target_class),
         );
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -141,10 +141,10 @@ impl Unit {
                 ));
             }
             // set_state(11) without a target: to the point within the task's range
-            let mover = self
-                .body
-                .mover_mut()
-                .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+            let mover =
+                c.w.parts
+                    .mover_mut(self.id)
+                    .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
             return gather
                 .walk_back(Distance::ZERO, mover, &walks)
                 .map(|()| HeadCode::Keeps);
@@ -159,7 +159,7 @@ impl Unit {
             .list
             .gather_mut()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
-        gather.tear_down(self.body.mover_mut())?;
+        gather.tear_down(c.w.parts.mover_mut(self.id))?;
         gather.state = GatherState::Idle;
         gather.timer = Seconds::ZERO;
         gather.target = None;
@@ -168,7 +168,7 @@ impl Unit {
         if let Some(g) = shows {
             crate::objects::sprite::new_sprite(
                 &mut self.sprite,
-                self.body.move_stats_mut(),
+                c.w.parts.move_stats_mut(self.id),
                 g,
                 c.w.streams.get(Stream::Sprite),
             );
@@ -228,6 +228,7 @@ impl Unit {
             c.w.settings.walkable_farms,
         );
         let walks = self.move_walks(
+            c.w.parts.mover_of(self.id),
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
             (
@@ -243,7 +244,8 @@ impl Unit {
                 &c.w.players.player(c.player)?.attributes,
             ),
         };
-        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), self.body.mover_mut())
+        let (Some(gather), Some(mover)) =
+            (self.actions.list.gather_mut(), c.w.parts.mover_mut(self.id))
         else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
@@ -333,17 +335,11 @@ impl Unit {
     /// `MoveTo` walks there ([`crate::gathering::gather::GatherAction::set_drop`]). Without one the unit AI's
     /// part (notify 0x203) is not modelled.
     pub(crate) fn gather_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
+        let (mover, by_id) =
+            c.w.parts
+                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.masters));
         let w = DropWorld {
-            masters: crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
+            masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             pathing: &mut c.w.pathing,
@@ -353,18 +349,19 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.gather_drop_off_in(w, others, &c.w.graphics, by_id)? {
+        if let Some(site) = self.gather_drop_off_in(mover, w, others, &c.w.graphics, by_id)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;
         }
         Ok(())
     }
 
-    /// [`Unit::gather_drop_off`] in `w`, from the update or a command, with the sprites' table
-    /// `graphics`: the drop site it took when it is a new second target (the caller's to take,
+    /// [`Unit::gather_drop_off`] in `w` with the unit's `mover`, from the update or a command,
+    /// with the sprites' table `graphics`: the drop site it took when it is a new second target (the caller's to take,
     /// slot 0x178).
     pub(crate) fn gather_drop_off_in(
         &mut self,
+        mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
         graphics: &crate::objects::Graphics,
@@ -382,6 +379,7 @@ impl Unit {
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
         let (site, gap) = self.drop_site(
+            mover.as_deref(),
             &mut c,
             others,
             carry_to,
@@ -397,9 +395,8 @@ impl Unit {
             by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
         );
-        let walks = Walks::of(sprites, self);
-        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), self.body.mover_mut())
-        else {
+        let walks = Walks::of(sprites, (self, mover.as_deref()));
+        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -409,10 +406,12 @@ impl Unit {
         Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 
-    /// [`Unit::hunt_drop_off`] in `w`, from the update or a command, with the sprites' table
-    /// `graphics`: the drop site it took when it is a new second target (`FUN_140a7a190`, the caller's to take, slot 0x178).
+    /// [`Unit::hunt_drop_off`] in `w` with the unit's `mover`, from the update or a command,
+    /// with the sprites' table `graphics`: the drop site it took when it is a new second target
+    /// (`FUN_140a7a190`, the caller's to take, slot 0x178).
     pub(crate) fn drop_off_in(
         &mut self,
+        mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
         graphics: &crate::objects::Graphics,
@@ -430,6 +429,7 @@ impl Unit {
             .ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) = self.drop_site(
+            mover.as_deref(),
             &mut c,
             others,
             carry_to,
@@ -450,9 +450,8 @@ impl Unit {
             by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
         );
-        let walks = Walks::of(sprites, self);
-        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
-        else {
+        let walks = Walks::of(sprites, (self, mover.as_deref()));
+        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -462,12 +461,14 @@ impl Unit {
         Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 
-    /// The drop site a gatherer's `set_state(8)` walks to, its second target `carry_to` or, with
+    /// The drop site a gatherer's (with its mover `mover`) `set_state(8)` walks to, its second
+    /// target `carry_to` or, with
     /// none and a master with drop sites (`+0x7a0`), the closest of them (`FUN_1411671e0`: first
     /// one it reaches, [`Unit::drop_site_from`] outside other objects, then any); −1 for none.
     /// With the footprint gap to it (`FUN_14118f680`).
     pub(crate) fn drop_site(
         &self,
+        mover: Option<&Mover>,
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         carry_to: Option<DropSiteId>,
@@ -475,17 +476,14 @@ impl Unit {
         by_id: crate::world::index::ObjectsRef<'_>,
     ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
         let master = self.master_in(c.masters)?;
-        let mover = self
-            .body
-            .mover()
-            .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+        let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut site = carry_to;
         if site.is_none() && !master.drop_sites.is_empty() {
             let masters = c.masters.table.ok_or(GenieError::unsupported(
                 "a drop-off of a player without masters",
             ))?;
             let sites = &master.drop_sites;
-            site = match self.drop_site_from(c, others, state, true, by_id)? {
+            site = match self.drop_site_from(Some(mover), c, others, state, true, by_id)? {
                 Some(s) => Some(s),
                 None => drop_site_search(
                     others.own_iter(),
@@ -512,12 +510,13 @@ impl Unit {
         ))
     }
 
-    /// `FUN_1411671e0` from the unit (`state` its action's, which the planner reads) over its
+    /// `FUN_1411671e0` from the unit with its `mover` (`state` its action's, which the planner reads) over its
     /// master's drop sites (`+0x7a0`): [`drop_site_search`] with the unit as the seeker, by path
     /// for a human player (its argument 9, `FUN_141659cf0` false), skipping objects inside others
     /// when `outside` (its argument 10) and those at work on `0x7d` or `0x7c` (its argument 8).
     pub(crate) fn drop_site_from(
         &self,
+        mover: Option<&Mover>,
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
@@ -526,6 +525,7 @@ impl Unit {
     ) -> Result<Option<DropSiteId>, GenieError> {
         let by_path = !c.computer;
         self.drop_site_with(
+            mover,
             c,
             others,
             state,
@@ -538,6 +538,7 @@ impl Unit {
     /// and the action type `at_work` it passes over (−1 none).
     pub(crate) fn drop_site_with(
         &self,
+        mover: Option<&Mover>,
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
@@ -548,10 +549,7 @@ impl Unit {
             "a drop-off of a player without masters",
         ))?;
         let master = self.master_in(c.masters)?;
-        let mover = self
-            .body
-            .mover()
-            .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+        let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let terrain = c.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
             "the map's zones without its terrain",
         ))?;

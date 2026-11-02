@@ -143,7 +143,7 @@ impl World {
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = crate::movement::move_to::MoveToReads::of(
-            unit,
+            (unit, self.parts.mover_of(unit.id)),
             builder,
             (
                 &self.graphics,
@@ -199,7 +199,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let move_reads = crate::movement::move_to::MoveToReads::of(
-            unit,
+            (unit, self.parts.mover_of(unit.id)),
             master,
             (
                 &self.graphics,
@@ -374,7 +374,7 @@ impl World {
             }
             let unit = &self.players.live(player, idx)?;
             let move_reads = crate::movement::move_to::MoveToReads::of(
-                unit,
+                (unit, self.parts.mover_of(unit.id)),
                 unit.master(self.master_tables(), player)?,
                 (
                     &self.graphics,
@@ -391,7 +391,7 @@ impl World {
             let counted = same && r.counted;
             r.counted = false;
             r.target = taken;
-            r.walk_again(to, unit.body.mover_mut(), &move_reads)?;
+            r.walk_again(to, self.parts.mover_mut(unit.id), &move_reads)?;
             if counted {
                 self.leave_builders(Some(target))?;
             }
@@ -473,7 +473,7 @@ impl World {
         };
         // set_state(4)'s MoveTo to the foundation (FUN_140aa0df0), made before the borrows below
         let move_reads = crate::movement::move_to::MoveToReads::of(
-            unit,
+            (unit, self.parts.mover_of(unit.id)),
             builder,
             (
                 &self.graphics,
@@ -485,7 +485,8 @@ impl World {
             // the task finder took the new target below state 3, which slot 0x68 keeps
             let _ = self.build_set_target(player, idx, (old.target, old.added), target)?;
             let unit = self.players.live_mut(player, idx)?;
-            let (Some(build), mover) = (unit.actions.list.build_mut(), unit.body.mover_mut())
+            let (Some(build), mover) =
+                (unit.actions.list.build_mut(), self.parts.mover_mut(unit.id))
             else {
                 return Err(GenieError::unsupported(
                     "a Build's retarget without its Build",
@@ -500,7 +501,10 @@ impl World {
         };
         let (mut build, mut mover) = {
             let unit = self.players.live_mut(player, idx)?;
-            (unit.actions.list.take_build(), unit.body.take_mover())
+            (
+                unit.actions.list.take_build(),
+                self.parts.take_mover(unit.id),
+            )
         };
         // FUN_140aaddb0's building: an annex's main building
         let counted = match self.counted_building(Some(target))? {
@@ -518,7 +522,7 @@ impl World {
                 .retake(t_at, walk, mover.as_mut(), builders, computer);
         let unit = self.players.live_mut(player, idx)?;
         unit.actions.list.set_build(build);
-        unit.body.put_mover(mover);
+        self.parts.put_mover(unit.id, mover);
         r?;
         Ok(class)
     }

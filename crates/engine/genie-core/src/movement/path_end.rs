@@ -66,6 +66,7 @@ impl Mover {
     /// pather without a speed).
     pub(super) fn reach_test(
         &self,
+        at: Position,
         me: &Me,
         world: &mut Spatial,
         plan: &mut Planning<'_>,
@@ -137,11 +138,11 @@ impl Mover {
             }
         }
         let long_target = if let Some(t) = target_placed(world, target)? {
-            let gap2 = footprint_gap_squared(self.position(), ground, t.position, t.radius);
+            let gap2 = footprint_gap_squared(at, ground, t.position, t.radius);
             if gap2 < REACH_NEAR {
                 return Ok(false);
             }
-            let gap = footprint_gap(self.position(), ground, t.position, t.radius);
+            let gap = footprint_gap(at, ground, t.position, t.radius);
             Some(crate::pathing::long_path::LongTarget::new(
                 t.position, t.radius, gap, gap2,
             ))
@@ -151,7 +152,7 @@ impl Mover {
                 if 0.0 <= g { g } else { 0.0 }
             };
             // the gap from the unit's place (its decoded x and y), not +0x824
-            let (px, py) = (self.position().x(), self.position().y());
+            let (px, py) = (at.x(), at.y());
             let (gx, gy) = (gap(to.x() - px, radius.x()), gap(to.y() - py, radius.y()));
             if gx * gx + gy * gy < REACH_NEAR.get() {
                 return Ok(false);
@@ -162,7 +163,7 @@ impl Mover {
         // ignore units that wait or move, or its group's differentiator units, then the target
         let walker = LongWalker {
             id: me.id,
-            position: self.position(),
+            position: at,
             radius: ground,
             mask: self.stats.restriction_mask,
             moves: self.stats.speed != Speed::ZERO || master == LONG_PATH_MOVER,
@@ -451,7 +452,7 @@ impl Mover {
     /// the same and a higher id).
     pub(super) fn keeps_hit(
         &self,
-        me: &Me,
+        (at, me): (Position, &Me),
         player: PlayerId,
         (id, other): (ObjectId, &Placed),
         projected: BVector,
@@ -462,7 +463,7 @@ impl Mover {
         let top = self.paths.last().filter(|l| !l.points.is_empty());
         let ground = self.stats.radius.ground();
         let o = other.position.vector();
-        let now_overlap = overlap(self.position().vector(), ground, o, other.radius);
+        let now_overlap = overlap(at.vector(), ground, o, other.radius);
         let next_overlap = overlap(projected, ground, o, other.radius);
         let last_move = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
         let mut pushed = false;
@@ -506,7 +507,7 @@ impl Mover {
     /// [`include_kept`]: crate::movement::long_walk::include_kept
     pub(super) fn avoid(
         &self,
-        me: &Me,
+        (at, me): (Position, &Me),
         (world, groups, by_id): (
             &Spatial,
             Option<&crate::groups::UnitGroups>,
@@ -550,7 +551,7 @@ impl Mover {
             if own_move && !KEPT_BY_MEMBERS.contains(&other.class) {
                 continue;
             }
-            if self.keeps_hit(me, player, (id, other), projected, now, by_id)? {
+            if self.keeps_hit((at, me), player, (id, other), projected, now, by_id)? {
                 kept.push(id);
             }
         }

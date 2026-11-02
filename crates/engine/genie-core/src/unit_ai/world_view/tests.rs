@@ -158,7 +158,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
     };
     let unit = |id, x, master_id| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(x, 10.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, 10.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             master_id,
             state: ObjectState::Alive,
@@ -334,7 +334,7 @@ fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     };
     let unit = |id, x, master_id| Unit {
         id,
-        body: crate::objects::layers::Body::at(Position::new(x, 10.0, 0.0)),
+        place: crate::objects::layers::Static::at(Position::new(x, 10.0, 0.0)),
         life: crate::objects::lifecycle::Lifecycle {
             master_id,
             state: ObjectState::Alive,

@@ -299,8 +299,12 @@ impl World {
                 .members
                 .iter()
                 .map(|m| {
-                    self.object(m.id)
-                        .map(|(_, u)| (self.top_target_object(u), u.moved_vector()))
+                    self.object(m.id).map(|(_, u)| {
+                        (
+                            self.top_target_object(u),
+                            u.moved_vector(self.parts.mover_of(u.id)),
+                        )
+                    })
                 })
                 .collect(),
         };

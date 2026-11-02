@@ -4,11 +4,12 @@ An object is the game's class chain (FD-045-D06): the static object, the animate
 moving one, then the action, combat and building layers, each as the save reads it. This folder
 holds the layers as structs.
 
-`mod.rs` holds the layers below the action layer, the object's `Body`: the static layer with its
-place (every object), the animated layer (types 20 and up) and the moving one (types 30 and up).
-`combat.rs` holds the combat layer (`RGE_Combat_Object` and `TRIBE_Combat_Object`): every object
-holds it for now, with the game's defaults below type 50. `building.rs` holds the building layer
-(`TRIBE_Building_Object`), likewise on every object, with the game's defaults below type 80.
+`mod.rs` holds the layers below the action layer. The static layer with its place is on every
+object's row. The animated layer (types 20 to 29) or the moving one with its animated layer inside
+(types 30 and up) is the object's motion part (`MotionLayer`, in the world's tables, FD-045-D58).
+`combat.rs` holds the combat layer (`RGE_Combat_Object` and `TRIBE_Combat_Object`) and
+`building.rs` the building layer (`TRIBE_Building_Object`). Both are parts too: an object without
+an entry reads the game's defaults (below type 50, below type 80).
 
 ## In the game
 

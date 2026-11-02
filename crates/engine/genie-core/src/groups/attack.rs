@@ -196,7 +196,7 @@ impl World {
     /// Slot 0x520 (`FUN_14106d530`) of object `id`: where it last moved to ([`moved_place`]).
     pub(super) fn moved_place_of(&self, id: ObjectId) -> Result<BVector, GenieError> {
         let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        Ok(moved_place(u))
+        Ok(moved_place(u, self.parts.mover_of(id)))
     }
 
     /// The target master's two radii as one length (`+0xb57`, `+0xb5b`: `sqrt(x² + y²)`).
@@ -278,7 +278,8 @@ impl World {
         if reach < 0.0 && RANGED_MEMBER_KIND <= master.kind && !self.charge_hits(u, master, &t)? {
             reach = weapon_range(master).get();
         }
-        let against = self.range_against(WorldObject::Unit(p, u), Some(t))?;
+        let against =
+            self.range_against(WorldObject::Unit(p, u, self.parts.mover_of(u.id)), Some(t))?;
         let reach_squared = if reach < 0.0 {
             against.squared()
         } else {
@@ -455,11 +456,8 @@ fn take_into(list: &mut Vec<ObjectId>, ids: &[ObjectId], limit: usize) {
     list.extend(ids.iter().take(room));
 }
 
-/// Slot 0x520 (`FUN_14106d530`): the place the unit last moved to as the game holds it (x,
-/// height, y); an object that does not move holds its own.
-pub(crate) fn moved_place(u: &Unit) -> BVector {
-    u.body
-        .mover()
-        .map_or_else(|| u.position(), |m| m.moved_at)
-        .vector()
+/// Slot 0x520 (`FUN_14106d530`): the place the unit with its `mover` last moved to as the
+/// game holds it (x, height, y); an object that does not move holds its own.
+pub(crate) fn moved_place(u: &Unit, mover: Option<&crate::movement::Mover>) -> BVector {
+    mover.map_or_else(|| u.position(), |m| m.moved_at).vector()
 }

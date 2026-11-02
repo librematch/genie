@@ -200,10 +200,8 @@ impl World {
             ));
         };
         let mover =
-            self.players
-                .live_mut(p, idx)?
-                .body
-                .mover_mut()
+            self.parts
+                .mover_mut(self.players.live(p, idx)?.id)
                 .ok_or(GenieError::unsupported(
                     "a followed unit without movement state",
                 ))?;
@@ -411,9 +409,12 @@ impl World {
             .and_then(|id| self.graphics.get(id).copied());
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
-        let mover = unit.body.mover_mut().ok_or(GenieError::unsupported(
-            "a moved unit without movement state",
-        ))?;
+        let mover = self
+            .parts
+            .mover_mut(unit.id)
+            .ok_or(GenieError::unsupported(
+                "a moved unit without movement state",
+            ))?;
         let move_to = crate::movement::move_to::MoveToAction::to_object(
             &self.spatial,
             here,
@@ -424,6 +425,7 @@ impl World {
         )?;
         if move_to.shows_standing() {
             unit.shows_standing_sprite(
+                self.parts.motion.layer_mut(unit.id),
                 crate::objects::masters::OwnerMasters::new(
                     &self.parts.own_master,
                     self.masters.of(player),
@@ -505,6 +507,7 @@ impl World {
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
+            self.parts.motion.layer_mut(id),
             point,
             player,
             crate::objects::masters::OwnerMasters::new(
@@ -513,7 +516,7 @@ impl World {
             ),
             (
                 &self.graphics,
-                self.parts.combat_of(id).abilities.look.as_ref(),
+                self.parts.combat.of(id).abilities.look.as_ref(),
             ),
         )? {
             crate::movement::ai_moves::PointMove::Declined => return Ok(false),

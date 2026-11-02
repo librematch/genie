@@ -136,11 +136,15 @@ impl World {
         if !marching {
             return Ok(());
         }
-        if let Some(m) = self.live_object_mut(p, id).and_then(|u| u.body.mover_mut()) {
+        if self.live_object(p, id).is_some()
+            && let Some(m) = self.parts.mover_mut(id)
+        {
             m.ignore_units.clear();
         }
         self.object_stop(p, idx)?;
-        if let Some(m) = self.live_object_mut(p, id).and_then(|u| u.body.mover_mut()) {
+        if self.live_object(p, id).is_some()
+            && let Some(m) = self.parts.mover_mut(id)
+        {
             m.stand()?;
         }
         Ok(())

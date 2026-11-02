@@ -381,7 +381,7 @@ impl BuildAction {
                 ))?
                 .position;
         let now = c.w.world_time;
-        let mover = builder.body.mover_mut().ok_or(BUILDER_UNMOVING)?;
+        let mover = c.w.parts.mover_mut(builder.id).ok_or(BUILDER_UNMOVING)?;
         if !crate::combat::attack::face_target(mover, at, to, now)? {
             return Err(GenieError::unsupported(
                 "a builder that turns over time to face its foundation",

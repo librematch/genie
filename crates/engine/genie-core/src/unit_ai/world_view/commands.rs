@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
@@ -280,9 +281,14 @@ impl UnitView<'_, '_> {
             ),
             self.player,
         )?;
-        let mover = unit.body.mover().ok_or(GenieError::unsupported(
-            "an auto scout without movement state",
-        ))?;
+        let mover = self
+            .c
+            .w
+            .parts
+            .mover_of(unit.id)
+            .ok_or(GenieError::unsupported(
+                "an auto scout without movement state",
+            ))?;
         let map = self.c.w.spatial.map;
         let terrain = self
             .c
@@ -315,6 +321,7 @@ impl UnitView<'_, '_> {
                 groups: &self.c.w.groups,
             },
             mover,
+            at: unit.position(),
             me,
             player: self.player,
             master: master.id,
@@ -373,6 +380,8 @@ pub(crate) struct ScoutArea<'a> {
     pub(crate) zones: &'a crate::pathing::zones::ZoneMap,
     pub(crate) plan: Planning<'a>,
     pub(crate) mover: &'a Mover,
+    /// The scout's place (its row's static layer), which the search does not move.
+    pub(crate) at: Position,
     pub(crate) me: Me,
     pub(crate) player: PlayerId,
     pub(crate) master: MasterId,
@@ -401,7 +410,7 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
     }
 
     fn own_zone(&mut self) -> crate::pathing::zones::ZoneId {
-        let (x, y) = (self.mover.position().x(), self.mover.position().y());
+        let (x, y) = (self.at.x(), self.at.y());
         self.zones.zone(Tile::new(x as i32, y as i32))
     }
 
@@ -419,7 +428,7 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
     fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
         let to = tile.corner();
         self.mover.reaches(
-            &self.me,
+            (self.at, &self.me),
             (self.spatial, self.by_id),
             &mut self.plan,
             to,
@@ -434,8 +443,8 @@ impl crate::movement::explore::Area for ScoutArea<'_> {
             let g = d.abs() - r;
             if g <= 0.0 { 0.0 } else { g }
         };
-        let gx = gap(tile.x() as f32 - self.mover.position().x(), self.radius.x());
-        let gy = gap(tile.y() as f32 - self.mover.position().y(), self.radius.y());
+        let gx = gap(tile.x() as f32 - self.at.x(), self.radius.x());
+        let gy = gap(tile.y() as f32 - self.at.y(), self.radius.y());
         crate::math::fmath::sqrt(gy * gy + gx * gx)
     }
 }
