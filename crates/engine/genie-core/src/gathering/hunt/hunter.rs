@@ -89,9 +89,9 @@ impl Unit {
     /// both times).
     pub(crate) fn tree_lost(&self, actions: &crate::objects::layers::Action, c: &Step<'_>) -> bool {
         actions.list.hunt().is_some_and(|h| {
-            h.state == HuntState::Walk
+            matches!(h.state, HuntState::Walk { .. })
                 && Seconds::ZERO <= h.timer
-                && h.move_to.is_some_and(|m| {
+                && h.state.move_to().is_some_and(|m| {
                     m.state == MoveTo::Failed
                         || m.target.is_some_and(|t| {
                             c.w.object_state(t).is_some_and(|s| ObjectState::Undead < s)
@@ -127,18 +127,20 @@ impl Unit {
                 (Some(h.state), h.timer, h.target)
             });
         match state {
-            Some(HuntState::Drop) if timer < Seconds::ZERO => self.hunt_drop_wait(actions, c)?,
-            Some(HuntState::Drop) => return self.hunt_drop_walk(actions, c, me),
+            Some(HuntState::Drop { .. }) if timer < Seconds::ZERO => {
+                self.hunt_drop_wait(actions, c)?;
+            }
+            Some(HuntState::Drop { .. }) => return self.hunt_drop_walk(actions, c, me),
             // State 13: the hunt failed; its next update tells its unit AI (notify 0x1f9) and ends it.
-            Some(HuntState::Failed) => return self.hunt_failed(actions, c),
-            Some(HuntState::WalkPoint | HuntState::WalkSearch) => {
+            Some(HuntState::Failed) => return self.hunt_failed(c),
+            Some(HuntState::WalkPoint { .. } | HuntState::WalkSearch { .. }) => {
                 self.hunt_point_walk(actions, c, me)?;
             }
             Some(HuntState::Search) => self.hunt_search_wait(actions, c)?,
             Some(HuntState::Idle) => {
                 actions.hunt_idle()?;
             }
-            Some(HuntState::Walk) if target.is_none() && timer < Seconds::ZERO => {
+            Some(HuntState::Walk { .. }) if target.is_none() && timer < Seconds::ZERO => {
                 self.hunt_wait_walk(actions, c)?;
             }
             Some(HuntState::Lead) if target.is_none() => {
@@ -267,17 +269,9 @@ impl Unit {
     }
 
     /// State 13 (`0x140ac7a00` case 0xc): notify 0x1f9 with the hunt's action value, and the
-    /// update returns 3, whose deletion lets its target, then its second target go. One with a
-    /// sub-action is not modelled.
-    pub(crate) fn hunt_failed(
-        &self,
-        actions: &crate::objects::layers::Action,
-        c: &mut Step<'_>,
-    ) -> Result<HeadCode, GenieError> {
-        let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
-        if hunt.attack.is_some() || hunt.move_to.is_some() {
-            return Err(GenieError::unsupported("a failed hunt with a sub-action"));
-        }
+    /// update returns 3, whose deletion lets its target, then its second target go. The failed
+    /// state holds no sub-action (its `set_state` dropped them).
+    pub(crate) fn hunt_failed(&self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
         self.post_own(
             &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_FAILED,

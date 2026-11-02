@@ -822,7 +822,9 @@ fn hunt_takes_its_task_lead_and_move_to() {
             TaskId::of_task(0)
         )
     );
-    assert!(h.lead.moved && h.attack.is_none() && h.move_to.is_none());
+    assert!(
+        h.lead.moved && h.state.attack().copied().is_none() && h.state.move_to().copied().is_none()
+    );
     assert_eq!(
         h.lead.start.get().map(f32::to_bits),
         [6.0_f32, 7.0].map(f32::to_bits)
@@ -830,7 +832,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
     let h = imported(
         HUNT,
         hunt(with_sub(
-            base(HuntState::Walk.get()),
+            base(HuntState::Walk { move_to: None }.get()),
             MOVE_TO,
             move_to(4, 0.75),
         )),
@@ -841,7 +843,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
     .copied()
     .unwrap();
     // every MoveTo of the Hunt is quiet
-    let walk = h.move_to.unwrap();
+    let walk = h.state.move_to().copied().unwrap();
     assert_eq!(
         (
             walk.state,
@@ -866,7 +868,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
         imported(
             HUNT,
             hunt(with_sub(
-                base(HuntState::Walk.get()),
+                base(HuntState::Attack { attack: None }.get()),
                 genie_core::combat::attack::ATTACK,
                 attack
             ))
@@ -878,7 +880,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
         imported(
             HUNT,
             hunt(with_sub(
-                base(HuntState::Walk.get()),
+                base(HuntState::Walk { move_to: None }.get()),
                 genie_core::movement::explore::EXPLORE,
                 explore(base(3))
             ))
@@ -889,6 +891,16 @@ fn hunt_takes_its_task_lead_and_move_to() {
     assert_eq!(
         imported(HUNT, hunt(base(99))).unwrap_err(),
         GenieError::unsupported("a saved Hunt in a state the slice does not model")
+    );
+    // a MoveTo belongs to a walk: in any other state it is no state of the game
+    let idle = with_sub(base(HuntState::Idle.get()), MOVE_TO, move_to(4, 0.5));
+    let stray = imported(HUNT, hunt(idle)).unwrap_err();
+    assert_eq!(
+        (stray.kind(), stray.reason()),
+        (
+            genie_core::ErrorKind::InvalidInput,
+            "a MoveTo of a Hunt that does not walk"
+        )
     );
     assert_eq!(
         imported(HUNT, explore(base(HuntState::Idle.get()))).unwrap_err(),
@@ -1248,7 +1260,8 @@ fn attack(state: u8, walk: u16, pending: bool) -> Action {
 
 /// A Hunt's Attack in its swing past the hit (state 7, no hit to come) rests the unit's
 /// reload (its master's 2.5 s) less the attack sprite's length (1 s); one with its hit to
-/// come, or in another state, keeps no rest. A swing longer than the reload rests 0.
+/// come, or in another state, keeps no rest. A swing longer than the reload rests 0. An Attack
+/// in a state that does not attack is the import's error.
 #[test]
 fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
     use genie_core::combat::attack::{ATTACK, AttackState};
@@ -1268,7 +1281,7 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
             &acting(
                 HUNT,
                 hunt(with_sub(
-                    base(HuntState::Walk.get()),
+                    base(HuntState::Attack { attack: None }.get()),
                     ATTACK,
                     attack(state.get(), 4, pending),
                 )),
@@ -1281,7 +1294,9 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
         .hunt()
         .copied()
         .unwrap()
-        .attack
+        .state
+        .attack()
+        .copied()
         .unwrap();
         (a.swing.get().to_bits(), a.rest.get().to_bits())
     };
@@ -1296,5 +1311,26 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
     assert_eq!(
         swing(AttackState::Swing, false, &master(0.5)),
         (short.to_bits(), 0)
+    );
+    // an Attack belongs to the attack: in a walk it is no state of the game
+    let stray = import_drawn(
+        &acting(
+            HUNT,
+            hunt(with_sub(
+                base(HuntState::Walk { move_to: None }.get()),
+                ATTACK,
+                attack(AttackState::Move.get(), 4, false),
+            )),
+        ),
+        &master(2.5),
+        Some(&sprites),
+    )
+    .unwrap_err();
+    assert_eq!(
+        (stray.kind(), stray.reason()),
+        (
+            genie_core::ErrorKind::InvalidInput,
+            "an Attack of a Hunt that does not attack"
+        )
     );
 }

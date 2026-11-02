@@ -475,14 +475,16 @@ fn the_top_action_sub_action_is_its_move_to_or_its_attack() {
         state,
     };
     let mut hunt = crate::gathering::hunt::tests::hunting(7);
-    hunt.move_to = Some(MoveToAction::sub_in(MoveTo::Arrived));
+    hunt.state = crate::gathering::hunt::HuntState::Walk {
+        move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
+    };
     let hunter = crate::objects::layers::Action {
         list: ActionList::default().with_hunt(Some(hunt)),
         ..Default::default()
     };
     assert_eq!(hunter.top_sub_action(), Some(walking(ActionState::new(1))));
     let mut idle = hunt;
-    idle.move_to = None;
+    idle.state = idle.state.bare();
     let resting = crate::objects::layers::Action {
         list: ActionList::default().with_hunt(Some(idle)),
         ..Default::default()

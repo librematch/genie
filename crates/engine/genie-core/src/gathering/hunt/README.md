@@ -34,7 +34,7 @@ hunts its own livestock can lead the animal toward the drop site first (state 10
 | [`drop_off.rs`](drop_off.rs) | State 8: the drop-off at the drop site; the target let go, the teardown and a case 6 without a target. |
 | [`gathering.rs`](gathering.rs) | The walk to a dead target (state 4), the face (6) and the gathering (7). |
 | [`herding.rs`](herding.rs) | Leading own livestock to its drop site (state 10), facing an animal and the decay check. |
-| [`hunt_state.rs`](hunt_state.rs) | A Hunt's state: the steps of its update from the attack to the drop. |
+| [`hunt_state.rs`](hunt_state.rs) | A Hunt's state: the steps of its update from the attack to the drop, each walk with its `MoveTo` and the attack with its Attack. |
 | [`hunter.rs`](hunter.rs) | The hunter's part of its update: the hunt's targets checked, a lost tree, and the state the hunt is in (the drop-off's wait and walk, the failure, the walks to a point, the search, the idle, the lead). |
 | [`hunter_strike.rs`](hunter_strike.rs) | The hunt's strike as the hunter's update runs it: the hunter as a gatherer and an attacker, the herd it leads, the hunt's update and what follows. |
 | [`mod.rs`](mod.rs) | The Hunt action (`TRIBE_Action_Hunt`, type 110, vtable `0x142ed70f8`): a villager sent to a tree (or an animal) with a gather task attacks it first (state 12, an `Attack` sub-action); once it is dead the villager walks to it (state 4, a `MoveTo` sub-action), faces it (6) and gathers (7), then carries the load to a drop site (8). |

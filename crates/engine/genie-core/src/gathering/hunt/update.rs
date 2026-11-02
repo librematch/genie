@@ -45,9 +45,9 @@ impl HuntAction {
             ));
         }
         match self.state {
-            HuntState::Attack => self.update_attack(c, unit, actions, me, f, r),
+            HuntState::Attack { .. } => self.update_attack(c, unit, actions, me, f, r),
             // case 3: a hunt that gave up on its MoveTo waits (its timer below 0), then set_state 11
-            HuntState::Walk if self.timer < Seconds::ZERO => {
+            HuntState::Walk { .. } if self.timer < Seconds::ZERO => {
                 let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover =
                     c.w.parts
@@ -56,7 +56,7 @@ impl HuntAction {
                 self.wait_then_walk(c.dt.seconds(), mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
-            HuntState::Walk => self.update_walk(c, unit, actions, me, f, r),
+            HuntState::Walk { .. } => self.update_walk(c, unit, actions, me, f, r),
             HuntState::Lead => self.update_lead(c, unit, f, r),
             HuntState::Face => self.update_face(c, unit, f, r),
             // case 6 without a target (or a task): set_state(8) to carry the load off, set_state(3)
@@ -96,9 +96,13 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
-        let attack = self.attack.as_mut().ok_or(GenieError::unsupported(
-            "a Hunt in state 12 without its Attack",
-        ))?;
+        let attack =
+            self.state
+                .attack_mut()
+                .and_then(Option::as_mut)
+                .ok_or(GenieError::unsupported(
+                    "a Hunt in state 12 without its Attack",
+                ))?;
         match attack.update(c, unit, actions, me, f, &r.attack)?.get() {
             0 | 6.. => Ok(HuntNext::Stay),
             1 | 2 | 5 if self.target.is_none() => {
@@ -137,7 +141,7 @@ impl HuntAction {
                     c.w.parts
                         .mover_mut(unit.id)
                         .ok_or(crate::world::HUNTER_UNMOVING)?;
-                self.set_point_walk(HuntState::WalkSearch, mover, &walks)?;
+                self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
         }
@@ -253,7 +257,7 @@ impl HuntAction {
             c.w.parts
                 .mover_mut(unit.id)
                 .ok_or(crate::world::HUNTER_UNMOVING)?;
-        self.set_point_walk(HuntState::WalkSearch, mover, &walks)
+        self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)
     }
 
     /// `FUN_140ac4670` with 8 and −1 for a class the unit AI's slot 0x1b0 gives 0 (trees, the
@@ -293,8 +297,7 @@ impl HuntAction {
             c.w.parts
                 .mover_mut(unit.id)
                 .ok_or(crate::world::HUNTER_UNMOVING)?;
-        self.move_to = None;
-        self.state = HuntState::Attack;
+        self.state = HuntState::Attack { attack: None };
         // the herd is read only on a live target
         let target = self.target.ok_or(GenieError::unreachable(
             "a hunt's Attack on its livestock without a target",
@@ -307,7 +310,7 @@ impl HuntAction {
                 c.w.streams.get(Stream::Sprite),
             )?;
         }
-        self.attack = Some(a);
+        self.state = HuntState::Attack { attack: Some(a) };
         Ok(())
     }
 }

@@ -68,35 +68,45 @@ pub(super) fn import_hunt(
         .tribe_action_hunt
         .as_deref()
         .ok_or(GenieError::unsupported("a saved Hunt without its own part"))?;
-    let state = HuntState::of_byte(base.state)
-        .ok()
-        .filter(|s| {
-            matches!(
-                s,
-                HuntState::Idle
-                    | HuntState::Search
-                    | HuntState::Walk
-                    | HuntState::Face
-                    | HuntState::Gather
-                    | HuntState::Drop
-                    | HuntState::Lead
-                    | HuntState::Attack
-                    | HuntState::WalkSearch
-                    | HuntState::WalkPoint
-            )
-        })
-        .ok_or(GenieError::unsupported(
+    // the states the slice models
+    if !HuntState::of_byte(base.state, None, None).is_ok_and(|s| {
+        matches!(
+            s,
+            HuntState::Idle
+                | HuntState::Search
+                | HuntState::Walk { .. }
+                | HuntState::Face
+                | HuntState::Gather
+                | HuntState::Drop { .. }
+                | HuntState::Lead
+                | HuntState::Attack { .. }
+                | HuntState::WalkSearch { .. }
+                | HuntState::WalkPoint { .. }
+        )
+    }) {
+        return Err(GenieError::unsupported(
             "a saved Hunt in a state the slice does not model",
-        ))?;
+        ));
+    }
     let task = hunt_task(&saved.task(task_at)?);
-    let mut hunt = HuntAction {
+    let target_class = ClassId::of_param(part.target_type)?;
+    let (walk, attack) = match first_action(&base.sub_actions)? {
+        None => (None, None),
+        Some((genie_core::combat::attack::ATTACK, sub)) => (None, Some(hunt_attack(saved, sub)?)),
+        // every MoveTo of the Hunt is quiet (`FUN_140a7a170` with 1)
+        Some((MOVE_TO, sub)) => (Some(saved_move_to(sub, saved.graphics, true)?), None),
+        Some(_) => {
+            return Err(GenieError::unsupported(
+                "a saved Hunt with another sub-action",
+            ));
+        }
+    };
+    let hunt = HuntAction {
         target: ObjectId::of_field(base.target_id),
-        state,
+        state: HuntState::of_byte(base.state, walk, attack)?,
         point: saved.point(),
-        target_class: ClassId::of_param(part.target_type)?,
+        target_class,
         task,
-        attack: None,
-        move_to: None,
         drop_site: DropSiteId::of_field(part.sheep_drop_site_id as i32),
         carry_to: DropSiteId::of_field(base.target2_id),
         timer: Seconds::new(base.timer),
@@ -109,21 +119,6 @@ pub(super) fn import_hunt(
             ),
         },
     };
-    match first_action(&base.sub_actions)? {
-        None => {}
-        Some((genie_core::combat::attack::ATTACK, sub)) => {
-            hunt.attack = Some(hunt_attack(saved, sub)?);
-        }
-        Some((MOVE_TO, sub)) => {
-            // every MoveTo of the Hunt is quiet (`FUN_140a7a170` with 1)
-            hunt.move_to = Some(saved_move_to(sub, saved.graphics, true)?);
-        }
-        Some(_) => {
-            return Err(GenieError::unsupported(
-                "a saved Hunt with another sub-action",
-            ));
-        }
-    }
     actions.list.set_hunt(Some(hunt));
     Ok(())
 }

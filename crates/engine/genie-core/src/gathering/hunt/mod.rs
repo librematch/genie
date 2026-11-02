@@ -1,5 +1,5 @@
 //! The Hunt action (`TRIBE_Action_Hunt`, type 110, vtable `0x142ed70f8`): a villager sent to a
-//! tree (or an animal) with a gather task attacks it first (state 12, an [`Attack`] sub-action);
+//! tree (or an animal) with a gather task attacks it first (state 12, an [`Attack`](crate::combat::attack::Attack) sub-action);
 //! once it is dead the villager walks to it (state 4, a `MoveTo` sub-action), faces it (6) and
 //! gathers (7), then carries the load to a drop site (8). A hunter of its own livestock leads the
 //! animal toward the drop site first (state 10).
@@ -7,12 +7,12 @@
 //! 158041: constructor `FUN_140ac2dd0`, start (slot 5) `0x140ac49b0`, update (slot 6)
 //! `0x140ac7a00`, `set_state` (slot 16) `0x140ac60e0`.
 
-use crate::combat::attack::{Arms, Attack, AttackReads, Engagement};
+use crate::combat::attack::{Arms, AttackReads, Engagement};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
-use crate::movement::move_to::{MoveDefaults, MoveToAction};
+use crate::movement::move_to::MoveDefaults;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkRate;
@@ -90,7 +90,8 @@ const OWN_LIVESTOCK_RANGE: f32 = crate::math::image::hunt::OWN_LIVESTOCK_RANGE;
 pub struct HuntAction {
     /// The target object (`+0x20`, its id at `+0x30`).
     pub target: Option<ObjectId>,
-    /// The action state (`+0x18`), which word 9 adds.
+    /// The action state (`+0x18`), which word 9 adds, with its sub-action: the walks' quiet
+    /// `MoveTo` and the attack's Attack ([`HuntState`]).
     pub state: HuntState,
     /// `+0x38`..`+0x40`: where the target stood when the hunt took it.
     pub point: Position,
@@ -98,12 +99,6 @@ pub struct HuntAction {
     pub target_class: Option<ClassId>,
     /// `+0x48`: its task.
     pub task: HuntTask,
-    /// The sub-action of state 12.
-    pub attack: Option<Attack>,
-    /// The sub-action of states 4, 8, 11 and 15: the quiet `MoveTo` (the one component,
-    /// [`MoveToAction`]) to the target within the task's range (`OWN_LIVESTOCK_RANGE` to its own
-    /// player's livestock), to the drop site, or to the point, which `set_state` makes.
-    pub move_to: Option<MoveToAction>,
     /// `+0x70`: the drop site its own livestock is led to, none yet.
     pub drop_site: Option<crate::gathering::DropSiteId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,

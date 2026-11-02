@@ -108,12 +108,13 @@ impl Action {
                 })
             }),
             actions::Action::Hunt(h) => h
-                .attack
+                .state
+                .attack()
                 .map(|a| TopAction {
                     kind: crate::combat::attack::ATTACK,
                     state: ActionState::new(a.state.get()),
                 })
-                .or_else(|| walking(h.move_to.map(|m| m.state))),
+                .or_else(|| walking(h.state.move_to().map(|m| m.state))),
             actions::Action::Build(b) => walking(b.state.move_to().map(|m| m.state)),
             actions::Action::Repair(r) => walking(r.state.move_to().map(|m| m.state)),
             actions::Action::Fly(f) => walking(f.state.move_to().map(|m| m.state)),

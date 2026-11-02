@@ -60,7 +60,7 @@ impl HuntAction {
         walks: &Walks<'_>,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
-        self.state = HuntState::Drop;
+        self.state = HuntState::Drop { move_to: None };
         if self.carry_to.is_none() {
             return Err(GenieError::unsupported(
                 "a drop-off without its drop site (its search)",
@@ -73,7 +73,8 @@ impl HuntAction {
             gap,
             state: None,
         };
-        self.move_to = self.move_to_object(to, range, mover, walks)?;
+        let move_to = self.move_to_object(to, range, mover, walks)?;
+        self.state = HuntState::Drop { move_to };
         Ok(())
     }
 
@@ -175,10 +176,10 @@ impl HuntAction {
     /// The teardown (`FUN_140a73fc0`): the sub-actions go; the caller releases the target (slot
     /// 0x180).
     pub fn tear_down(&mut self, mut mover: Option<&mut Mover>) -> Result<(), GenieError> {
-        if let Some(mut a) = self.attack.take() {
+        if let Some(mut a) = self.state.take_attack() {
             a.tear_down(mover.as_deref_mut())?;
         }
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;

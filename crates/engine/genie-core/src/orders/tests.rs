@@ -5113,8 +5113,11 @@ fn drop_off_order_takes_hunt_to_its_site() {
         .copied()
         .expect("the Hunt");
     assert_eq!(
-        (h.carry_to, h.state),
-        (Some(DropSiteId::new(object_id(700))), HuntState::Drop)
+        (h.carry_to, h.state.bare()),
+        (
+            Some(DropSiteId::new(object_id(700))),
+            HuntState::Drop { move_to: None }
+        )
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,

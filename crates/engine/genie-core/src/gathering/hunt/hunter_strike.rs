@@ -180,8 +180,11 @@ impl Unit {
         master: &Master,
         victim: &Victim,
     ) -> Result<Option<Herd>, GenieError> {
-        let faces = action.state == HuntState::Walk
-            && action.move_to.is_some_and(|m| m.state == MoveTo::Arrived);
+        let faces = matches!(action.state, HuntState::Walk { .. })
+            && action
+                .state
+                .move_to()
+                .is_some_and(|m| m.state == MoveTo::Arrived);
         if !((faces && victim.class == class::LIVESTOCK && victim.state <= ObjectState::Alive)
             || action.state == HuntState::Lead)
         {
@@ -279,7 +282,7 @@ impl Unit {
 /// ([`ObjectId::NOBODY`]).
 fn hunt_victim(c: &Step<'_>, action: &HuntAction) -> Result<Victim, GenieError> {
     let target = match action.target {
-        None => action.attack.and_then(|a| a.target),
+        None => action.state.attack().and_then(|a| a.target),
         t => t,
     };
     match target {

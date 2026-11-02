@@ -214,7 +214,7 @@ impl World {
         }
         if let Some(hunt) = actions.list.hunt_mut() {
             let task = hunt.task.sprites;
-            if let Some(attack) = hunt.attack.as_mut() {
+            if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
                 follow_master(&mut attack.arms, Some(task), &sprites);
             }
         }

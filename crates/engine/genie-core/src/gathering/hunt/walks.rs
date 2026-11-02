@@ -98,12 +98,16 @@ impl HuntAction {
         gives_up: GiveUp,
     ) -> Result<UpdateCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
-        let state = self.move_to.as_ref().map(|m| m.state);
+        let state = self.state.move_to().map(|m| m.state);
         let how = ListUpdate {
             gives_up,
             ..ListUpdate::default()
         };
-        let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
+        let code = match self.state.walk_mut() {
+            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            // a state that does not walk has no sub-action: its list's update is the empty one's
+            None => update_sub_actions(&mut None, c, unit, me, how)?,
+        };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
             unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }

@@ -635,7 +635,7 @@ impl World {
         {
             hunt.task = crate::gathering::hunt::HuntTask::of(&t);
             let task = hunt.task.sprites;
-            if let Some(attack) = hunt.attack.as_mut() {
+            if let Some(attack) = hunt.state.attack_mut().and_then(Option::as_mut) {
                 crate::technology::effect::follow_master(&mut attack.arms, Some(task), &sprites);
             }
         }

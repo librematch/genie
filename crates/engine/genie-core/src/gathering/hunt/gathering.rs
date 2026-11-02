@@ -42,7 +42,7 @@ impl HuntAction {
         walks: &Walks<'_>,
     ) -> Result<(), GenieError> {
         self.tear_down(motion.mover_mut())?;
-        self.state = HuntState::Walk;
+        self.state = HuntState::Walk { move_to: None };
         self.timer = Seconds::ZERO;
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
         // Classes the hunt treats apart: livestock (58, `-0xe72`) and 49 (`-0xe7b`).
@@ -71,7 +71,8 @@ impl HuntAction {
             gap,
             state: Some(victim.state),
         };
-        self.move_to = self.move_to_object(to, Distance::new(range), mover, walks)?;
+        let move_to = self.move_to_object(to, Distance::new(range), mover, walks)?;
+        self.state = HuntState::Walk { move_to };
         Ok(())
     }
 
@@ -162,7 +163,6 @@ impl HuntAction {
     /// for a load of the task's resource of 1 or more, else the moving one; slot 0x68 takes the
     /// standing sprite for none).
     pub(super) fn begin_face(&mut self, c: &mut Step<'_>, unit: &mut Unit, r: &HuntReads) {
-        self.move_to = None;
         self.state = HuntState::Face;
         self.timer = Seconds::ZERO;
         let carrying = self.task.resource.is_some()

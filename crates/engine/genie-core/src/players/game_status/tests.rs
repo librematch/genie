@@ -439,7 +439,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
         crate::objects::layers::Action {
             list: ActionList::default().with_hunt(Some(HuntAction {
                 target: None,
-                state: HuntState::Walk,
+                state: HuntState::Walk { move_to: None },
                 point: Position::from([-1.0; 3]),
                 target_class: None,
                 task: HuntTask {
@@ -451,8 +451,6 @@ fn stopped_hunter_keeps_its_halted_hunt() {
                     productivity: None,
                     kind4: None,
                 },
-                attack: None,
-                move_to: None,
                 drop_site: None,
                 carry_to: None,
                 timer: Seconds::ZERO,
