@@ -149,8 +149,8 @@ impl World {
                     after,
                     left: None,
                 },
-                every: MasterTables::new(&self.masters, &self.parts.own_master),
-                masters: OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
+                every: MasterTables::new(&self.model.masters, &self.parts.own_master),
+                masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
                 plan: Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,
@@ -172,7 +172,7 @@ impl World {
                     others,
                     (kind, WorkerCount::NO_CAP, Some(DropSiteId::new(id))),
                     (current, ObjectState::Foundation, NO_POINT),
-                    ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                    ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
                 )?;
                 if let Some(f) = f {
                     found.push(f);

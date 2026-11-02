@@ -38,6 +38,7 @@ use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
+use std::sync::Arc;
 
 fn task(action_type: ActionKind) -> Task {
     Task {
@@ -684,7 +685,11 @@ fn world() -> World {
     t.dt_seconds = Seconds::new(0.5);
     t.spatial = Spatial::new(GridSize::new(20, 20));
     t.spatial.relations = t.players.iter().map(|p| p.relations.clone()).collect();
-    t.masters = vec![Masters::default(), Masters::default(), Masters::default()];
+    t.model.masters = vec![
+        Arc::new(Masters::default()),
+        Arc::new(Masters::default()),
+        Arc::new(Masters::default()),
+    ];
     t
 }
 
@@ -699,10 +704,10 @@ fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, ta
         hit_points: MasterHitPoints::of_data(100),
         ..Master::default()
     };
-    for ms in &mut t.masters {
+    for ms in &mut t.model.masters {
         let mut all: Vec<Master> = ms.iter().cloned().collect();
         all.push(m.clone());
-        *ms = Masters::new(all);
+        *ms = Arc::new(Masters::new(all));
     }
 }
 
@@ -718,7 +723,7 @@ fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Poin
     u.life.hp = hp;
     u.life.state = ObjectState::Alive;
     let _ = t.push_live(p, u).unwrap();
-    let radius = t.masters[p.index()]
+    let radius = t.model.masters[p.index()]
         .get(m)
         .map_or(Footprint::new(0.5, 0.5), |m| m.radius);
     t.spatial.insert(
@@ -1097,7 +1102,7 @@ fn waters(t: &mut World) {
     };
     for id in [19598, 19599, 19600, 19601] {
         let id = SpriteId::named(id);
-        let _ = t.graphics.insert(id, g(id));
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(id, g(id));
     }
 }
 

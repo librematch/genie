@@ -430,7 +430,7 @@ impl World {
         let me = unit.me(self.parts.actions_of(unit.id));
         let (mover, by_id) = self
             .parts
-            .lend_mover(unit.id, (&self.players, &self.index, &self.masters));
+            .lend_mover(unit.id, (&self.players, &self.index, &self.model.masters));
         let stepped = match mover {
             Some(mover) => {
                 let mut plan = Planning {

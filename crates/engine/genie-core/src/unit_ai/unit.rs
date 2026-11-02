@@ -73,6 +73,7 @@ impl Unit {
                 &c.w.allow_gaia_capture,
             )
             && c.w
+                .model
                 .masters
                 .get(q.index())
                 .is_some_and(|m| m.get(self.life.master_id).is_some())
@@ -420,7 +421,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )
         .ok();
         let class = master.map(|ms| ms.class);

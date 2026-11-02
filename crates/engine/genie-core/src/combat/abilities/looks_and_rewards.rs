@@ -138,7 +138,7 @@ impl World {
                     .and_then(|k| t.terrains.get(k.index()))
                     .map_or(TerrainFlags::NONE, |k| k.flags)
             });
-        let graphics = &self.graphics;
+        let graphics = &self.model.graphics;
         let exists = |id: i32| {
             i16::try_from(id)
                 .ok()

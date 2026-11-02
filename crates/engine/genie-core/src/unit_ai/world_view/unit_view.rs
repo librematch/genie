@@ -44,12 +44,12 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            every: MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             parts: &self.c.w.parts,
             by_id: ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                &self.c.w.masters,
+                &self.c.w.model.masters,
                 &self.c.w.parts,
             ),
             restriction: None,

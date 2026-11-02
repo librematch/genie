@@ -63,7 +63,7 @@ impl World {
     ///
     /// [`Spatial::grow_unknown`]: crate::map::spatial::Spatial::grow_unknown
     pub(crate) fn grow_unknown(&mut self, dt: Seconds) {
-        let masters = &self.masters;
+        let masters = &self.model.masters;
         self.spatial.grow_unknown(dt, |player, master| {
             player_master(masters, player, master)
                 .and_then(|m| m.moving)
@@ -79,6 +79,7 @@ impl World {
         self.reindex();
         self.spatial.relations = self.players.iter().map(|p| p.relations.clone()).collect();
         self.spatial.task_0x99 = self
+            .model
             .masters
             .iter()
             .map(|m| {
@@ -181,7 +182,11 @@ impl World {
                 // for the next tick; the player's remove and add (slots 0x2d8, 0x2d0) file it last
                 // in the tracker
                 let asleep = self.swap_remove_live(p, i)?;
-                let k = key(self.masters.of(p), &self.lines, asleep.unit.life.master_id);
+                let k = key(
+                    self.model.masters.of(p),
+                    &self.model.lines,
+                    asleep.unit.life.master_id,
+                );
                 let tracker = &mut self.players.player_mut(p)?.tracker;
                 tracker.remove(asleep.unit.id, k);
                 tracker.add(asleep.unit.id, k);
@@ -258,9 +263,9 @@ impl World {
         // 0x2d0), each tracker by its own masters
         for u in &moved {
             let m = u.unit.life.master_id;
-            let old = key(self.masters.of(p), &self.lines, m);
+            let old = key(self.model.masters.of(p), &self.model.lines, m);
             self.players.player_mut(p)?.tracker.remove(u.unit.id, old);
-            let k = key(self.masters.of(new), &self.lines, m);
+            let k = key(self.model.masters.of(new), &self.model.lines, m);
             self.players.player_mut(new)?.tracker.add(u.unit.id, k);
         }
         self.extend_live(new, moved)

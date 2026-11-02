@@ -454,6 +454,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Seconds;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     #[cfg(test)]
     use crate::gathering::hunt::tests::walker;
@@ -529,7 +530,7 @@ mod tests {
             ..Master::default()
         };
         let masters = Masters::new([master(master_id(4), 1), master(ids::ID_6, 3)]);
-        t.masters = vec![masters.clone(), masters];
+        t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];
         let mut g = UnitGroup::new(group_id(1));
         g.members = [(10, 1.0), (11, 2.0), (12, 3.0)]
             .iter()
@@ -632,7 +633,7 @@ mod tests {
         let _ = t
             .push_live(PlayerId::new(1), unit(15, master_id(8)))
             .unwrap();
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let extra = [
                 Master {
                     id: ids::ID_7,
@@ -647,7 +648,7 @@ mod tests {
                     ..Master::default()
                 },
             ];
-            *masters = Masters::new(masters.iter().cloned().chain(extra));
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain(extra)));
         }
         t.groups.groups[0].unit_types[0].units.push(object_id(14));
         assert!(!t.leave_statistic(group_id(1), object_id(14)).unwrap());
@@ -823,9 +824,9 @@ mod tests {
     #[test]
     fn lock_formation_takes_the_first_member_spacing() {
         let mut t = three();
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             for (id, r) in [(4, 0.2f32), (6, 0.5)] {
-                let m = masters.get_mut(master_id(id)).unwrap();
+                let m = Arc::make_mut(masters).get_mut(master_id(id)).unwrap();
                 m.radius = Footprint::new(r, r);
                 m.height = Distance::new(1.0);
                 m.spacing_modifier = SpacingModifier::new(1.0);

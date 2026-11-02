@@ -198,7 +198,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         let me_at =
             c.w.spatial
@@ -223,7 +223,7 @@ impl Unit {
                     civ: c.w.players.player(c.player)?.civ,
                 };
                 Some(DropOff {
-                    takes: drops_at(&c.w.drop_sites, s.master, &actor),
+                    takes: drops_at(&c.w.model.drop_sites, s.master, &actor),
                     gap_squared: footprint_gap_squared(
                         me_position,
                         me_radius,
@@ -302,7 +302,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         let who = PointWalker {
             player_type: c.w.players.player(c.player)?.kind,
@@ -358,10 +358,10 @@ impl Unit {
     ) -> Result<(), GenieError> {
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;

@@ -229,14 +229,14 @@ impl Unit {
             if let Ok(master) = object_master(
                 c.w.parts.own_master.get(self.id),
                 (self.id, self.life.master_id),
-                c.w.masters.of(c.player),
+                c.w.model.masters.of(c.player),
             ) {
                 let (standing, second) = (master.standing_sprite, master.standing_sprite_2);
                 self.idle_swap(
                     c.w.parts.motion_mut(self.id),
                     standing,
                     second,
-                    &c.w.graphics,
+                    &c.w.model.graphics,
                     c.w.streams.get(Stream::Sprite),
                 );
             }

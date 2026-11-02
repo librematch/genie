@@ -119,7 +119,7 @@ impl World {
     /// of class 39 whose master transforms ([`crate::objects::masters::BuildingMaster::transform_unit`]),
     /// newest first.
     pub(crate) fn gate_list(&self, q: PlayerId) -> Result<Vec<ListIndex>, GenieError> {
-        let masters = self.masters.of(q);
+        let masters = self.model.masters.of(q);
         let owner = self.players.player(q)?;
         let mut gates = Vec::new();
         for i in owner.objects.places().rev() {
@@ -217,7 +217,7 @@ impl World {
                 }
                 let gate = &self.players.live(q, i)?;
                 let (id, master) = (gate.id, gate.life.master_id);
-                let Some(m) = player_master(&self.masters, q, master) else {
+                let Some(m) = player_master(&self.model.masters, q, master) else {
                     continue;
                 };
                 let record = Obstruction {

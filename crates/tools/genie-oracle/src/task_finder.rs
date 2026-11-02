@@ -23,6 +23,7 @@ use genie_core::unit_ai::task_finder::{
 use genie_rec::de;
 use genie_save::generated::world::{RgeStaticObject, TribeCombatObject};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// What the task finder (`genie_core::unit_ai::task_finder`) reads of a save: every player's masters as the work
 /// command reads them, every object's state, holding and flags, the players' relations and their
@@ -30,7 +31,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct FinderWorld {
     /// Every player's masters.
-    pub masters: Vec<Masters>,
+    pub masters: Vec<Arc<Masters>>,
     /// The objects by id.
     pub objects: HashMap<ObjectId, FinderObject>,
     /// `relation[i]` of each player (`player+0x260`).
@@ -150,7 +151,9 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
     let sections = header.players();
     let masters = sections
         .iter()
-        .map(|p| work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table))
+        .map(|p| {
+            work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table).map(Arc::new)
+        })
         .collect::<Result<_, _>>()?;
     let objects = finder_objects(&sections)?;
     Ok(FinderWorld {

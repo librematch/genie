@@ -323,13 +323,13 @@ impl World {
         sub: bool,
     ) -> Result<Notify, GenieError> {
         action.state = EnterState::Failed;
-        let masters = OwnerMasters::new(&self.parts.own_master, self.masters.of(player));
+        let masters = OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player));
         let unit = self.players.live_mut(player, idx)?;
         self.parts.actions.of_mut(unit.id)?.place_enter(action, sub);
         unit.shows_standing_sprite(
             self.parts.motion.layer_mut(unit.id),
             masters,
-            &self.graphics,
+            &self.model.graphics,
             self.streams.get(Stream::Sprite),
         )?;
         Ok(Notify::own(
@@ -352,7 +352,7 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let tm = t.master(self.master_tables(), tp)?.clone();
@@ -361,7 +361,7 @@ impl World {
         let unit = self.players.live(player, idx)?;
         enter_view(
             &mut self.spatial,
-            &self.masters,
+            &self.model.masters,
             (unit, self.parts.mover_of(unit.id)),
             ((t, self.parts.mover_of(t.id)), &tm, room),
             range,
@@ -385,7 +385,7 @@ impl World {
         t: &EnterTarget,
         start: WalkStart,
     ) -> Result<Walking, GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(self.master_tables(), tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
@@ -394,7 +394,7 @@ impl World {
             (unit, self.parts.mover_of(unit.id)),
             unit.master(self.master_tables(), player)?,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );
@@ -427,7 +427,7 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let master = t.master(self.master_tables(), tp)?.clone();
@@ -459,7 +459,7 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let Some(Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };

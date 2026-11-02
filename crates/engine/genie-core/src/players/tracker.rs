@@ -403,7 +403,7 @@ impl World {
     /// [`key`] of player `p`'s master `master`.
     #[must_use]
     pub fn tracker_key(&self, p: PlayerId, master: MasterId) -> Key {
-        key(self.masters.of(p), &self.lines, master)
+        key(self.model.masters.of(p), &self.model.lines, master)
     }
 
     /// The load's filing: each player's objects as its lists hold them, the live ones then the
@@ -575,6 +575,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::WholeSeconds;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     fn building(id: i16, class: ClassId, stack: i16, head: i16, annex: i16) -> Master {
         Master {
@@ -951,8 +952,8 @@ mod tests {
             vec![Player::default(), player],
         )
         .with_buildings([site(10, 150.0), site(12, 149.9), site(14, f32::NAN)]);
-        t.masters = vec![masters(), masters()];
-        t.lines = lines();
+        t.model.masters = vec![Arc::new(masters()), Arc::new(masters())];
+        t.model.lines = Arc::new(lines());
         t
     }
 

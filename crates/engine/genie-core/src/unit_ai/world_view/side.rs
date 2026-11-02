@@ -69,7 +69,7 @@ impl UnitSide for UnitView<'_, '_> {
         let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
         Ok(nearest_table_site(
             (
-                &self.c.w.drop_sites,
+                &self.c.w.model.drop_sites,
                 self.civ,
                 &self.c.w.players.player(self.c.player)?.tracker,
             ),
@@ -99,7 +99,7 @@ impl UnitSide for UnitView<'_, '_> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            &self.c.w.model.masters,
             &self.c.w.parts,
         );
         self.c.w.spatial.point_clear(
@@ -254,6 +254,7 @@ impl UnitSide for UnitView<'_, '_> {
         let class = self
             .c
             .w
+            .model
             .masters
             .get(player.index())
             .and_then(|ms| ms.get(master))
@@ -282,7 +283,7 @@ impl UnitSide for UnitView<'_, '_> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            &self.c.w.model.masters,
             &self.c.w.parts,
         );
         mover.reaches_object(
@@ -318,12 +319,12 @@ impl UnitSide for UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            every: MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             parts: &self.c.w.parts,
             by_id: ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                &self.c.w.masters,
+                &self.c.w.model.masters,
                 &self.c.w.parts,
             ),
             restriction: self
@@ -345,7 +346,7 @@ impl UnitSide for UnitView<'_, '_> {
                 self.c.player,
                 self.new_owner,
             )?,
-            &self.c.w.masters,
+            &self.c.w.model.masters,
         );
         // ClosestObject's reachability check (slot 0x3d0) walks the unit's paths
         let mut plan = Planning {
@@ -365,7 +366,7 @@ impl UnitSide for UnitView<'_, '_> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            &self.c.w.model.masters,
             &self.c.w.parts,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {

@@ -167,7 +167,7 @@ impl World {
         let master = actor.master;
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         let t = self.task_target(target, 1)?;
         let general = self.task_target(target, 2)?;
@@ -298,6 +298,7 @@ impl World {
     ) -> Result<Option<(MasterId, Task)>, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let masters = self
+            .model
             .masters
             .get(player.index())
             .ok_or(GenieError::unsupported("a work command: no master table"))?;
@@ -312,7 +313,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         let (t, general) = match target {
             None => (None, None),
@@ -625,7 +626,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         let t = self.task_target(target, 1)?;
         let general = self.task_target(target, 2)?;
@@ -654,7 +655,7 @@ impl World {
         }
         let mut found = None;
         // the master table exists: master_of found the unit's own in it
-        for candidate in self.masters.checked(player.index())?.iter() {
+        for candidate in self.model.masters.checked(player.index())?.iter() {
             if candidate.class != own.class
                 || candidate.kind != own.kind
                 || candidate.task_by_group != own.task_by_group

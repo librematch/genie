@@ -40,8 +40,8 @@ impl Unit {
             ),
             (&mut releases, &mut leaves),
             by,
-            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-            &c.w.graphics,
+            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+            &c.w.model.graphics,
             sprite,
         )?;
         torn_down(c, self, (leaves, releases))

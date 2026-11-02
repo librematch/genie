@@ -122,7 +122,7 @@ impl HuntAction {
             self.timer = LEAD_WAIT;
             return Ok(HuntNext::Stay);
         }
-        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let player = f.own.player;
         self.set_walk(
             (&c.w.spatial, unit.position()),

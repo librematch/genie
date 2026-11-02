@@ -610,6 +610,7 @@ mod tests {
     use crate::world::WorldTime;
     #[cfg(test)]
     use crate::world::{FrameSeed, TreatyLength};
+    use std::sync::Arc;
 
     /// Gaia and two players: player 1's villager 10, house foundation 11 (build time 25, cost 25
     /// wood paid) and sheep 12, and player 2's villager 20.
@@ -703,7 +704,11 @@ mod tests {
                 ..Master::default()
             },
         ]);
-        t.masters = vec![masters.clone(), masters.clone(), masters];
+        t.model.masters = vec![
+            Arc::new(masters.clone()),
+            Arc::new(masters.clone()),
+            Arc::new(masters),
+        ];
         t
     }
 
@@ -766,10 +771,10 @@ mod tests {
     #[test]
     fn deleted_town_centre_foundation_clears_no_zones_without_treaty() {
         let town_centre = |t: &mut World| {
-            for m in &mut t.masters {
+            for m in &mut t.model.masters {
                 let mut tc = m.get(ids::HOUSE).unwrap().clone();
                 tc.id = TOWN_CENTRE_621;
-                *m = Masters::new(m.iter().cloned().chain([tc]));
+                *m = Arc::new(Masters::new(m.iter().cloned().chain([tc])));
             }
             t.players[1].objects[ListIndex::new(1)].life.master_id = TOWN_CENTRE_621;
         };
@@ -829,6 +834,7 @@ mod clearing_tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     /// A live object `id` of `master` at `x`, `y`, outside any pasture.
     fn object(id: i32, master: MasterId, x: f32, y: f32) -> Unit {
@@ -970,7 +976,7 @@ mod clearing_tests {
                 t.spatial.insert(u.id, at);
             }
         }
-        t.masters = vec![ms.clone(), ms];
+        t.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
         t
     }
 
@@ -1080,7 +1086,10 @@ mod clearing_tests {
             vec![],
         );
         for m in [1351, 1358] {
-            t.masters[0].get_mut(master_id(m)).unwrap().storage = vec![
+            Arc::make_mut(&mut t.model.masters[0])
+                .get_mut(master_id(m))
+                .unwrap()
+                .storage = vec![
                 (Some(attribute::HEADROOM), Amount::new(2.0), 2),
                 (Some(AttributeId::numbered(5)), Amount::new(3.0), 16),
                 (Some(attribute::RELICS_HELD), Amount::new(1.0), 32),

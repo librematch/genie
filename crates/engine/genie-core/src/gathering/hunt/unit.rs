@@ -104,7 +104,7 @@ impl Unit {
             task,
             master.standing_sprite,
             self.life.held(),
-            &c.w.graphics,
+            &c.w.model.graphics,
         );
         if let Some(s) = stand {
             new_sprite(
@@ -145,7 +145,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
         let (carry_to, class) = (hunt.carry_to, i32::from(ClassId::field(hunt.target_class)));
@@ -156,7 +156,7 @@ impl Unit {
             -1
         } else {
             let mut w = DropWorld {
-                masters: OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+                masters: OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 spatial: &mut c.w.spatial,
                 zones: &mut c.w.zones,
                 pathing: &mut c.w.pathing,
@@ -279,7 +279,7 @@ impl Unit {
             c.w.world_time,
         )?;
         let moving = hunt.task.walk_sprite_id(self.life.held());
-        let arms = arms(master, &c.w.graphics, hunt.task.sprites, moving);
+        let arms = arms(master, &c.w.model.graphics, hunt.task.sprites, moving);
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let site = hunt.carry_to.take();
         let by = self.releaser(c)?;
@@ -288,10 +288,10 @@ impl Unit {
         }
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
@@ -444,7 +444,7 @@ impl Unit {
             groups: &c.w.groups,
         };
         let (master_id, at) = (self.life.master_id, self.position());
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
         };
@@ -496,10 +496,10 @@ impl Unit {
         }
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
@@ -574,14 +574,14 @@ impl Unit {
             let moving = h.task.walk_sprite_id(self.life.held());
             (h.task.sprites, moving)
         });
-        let arms = arms(master, &c.w.graphics, sprites, moving);
+        let arms = arms(master, &c.w.model.graphics, sprites, moving);
         let drops_here = master.drop_sites.contains(&t.life.master_id);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
@@ -629,7 +629,7 @@ impl Unit {
         let standing = self
             .master(c.w.master_tables(), c.player)?
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(s))
+            .and_then(|s| c.w.model.graphics.get(s))
             .copied();
         if let Some(m) = c.w.parts.mover_mut(self.id) {
             m.shows(standing.as_ref());

@@ -57,6 +57,7 @@ use crate::world::WorldTime;
 use crate::world::parts::Part;
 use crate::world::tests::forage_world;
 use crate::world::{FrameSeed, Player};
+use std::sync::Arc;
 
 /// records/425906646's update 1883: a TC's gather point on a tree that is gone; its new
 /// villager takes the closest tree of Gaia's (by centre) within its sight of the point,
@@ -104,7 +105,10 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
         line_of_sight: Distance::new(4.0),
         ..Master::default()
     };
-    t.masters = vec![Masters::new([tree.clone()]), Masters::new([villager, tree])];
+    t.model.masters = vec![
+        Arc::new(Masters::new([tree.clone()])),
+        Arc::new(Masters::new([villager, tree])),
+    ];
     let g = GatherPoint {
         state: GatherPointState::POINT,
         point: Position::new(21.0, 21.0, 0.0),
@@ -481,11 +485,13 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     let world = || {
         let mut t = forage_world();
         // the villager's standing sprite (a graphic of ten frames, eight facets)
-        for masters in &mut t.masters {
-            masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite =
-                Some(SpriteId::named(300));
+        for masters in &mut t.model.masters {
+            Arc::make_mut(masters)
+                .get_mut(ids::VILLAGER_MALE)
+                .unwrap()
+                .standing_sprite = Some(SpriteId::named(300));
         }
-        let _ = t.graphics.insert(
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(
             SpriteId::named(300),
             Graphic {
                 id: SpriteId::named(300),
@@ -624,14 +630,14 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
 #[test]
 fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
     let mut t = forage_world();
-    for masters in &mut t.masters {
-        let villager = masters.get_mut(ids::VILLAGER_MALE).unwrap();
+    for masters in &mut t.model.masters {
+        let villager = Arc::make_mut(masters).get_mut(ids::VILLAGER_MALE).unwrap();
         villager.standing_sprite = Some(SpriteId::named(300));
         let moving = villager.moving.as_mut().unwrap();
         moving.base = Speed::new(0.8);
         moving.speed = Speed::new(1.6);
     }
-    let _ = t.graphics.insert(
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(
         SpriteId::named(300),
         Graphic {
             id: SpriteId::named(300),
@@ -666,11 +672,13 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
 fn only_gather_point_of_state_1_sends_the_new_unit() {
     let waits = |state| {
         let mut t = forage_world();
-        for masters in &mut t.masters {
-            masters.get_mut(ids::VILLAGER_MALE).unwrap().standing_sprite =
-                Some(SpriteId::named(300));
+        for masters in &mut t.model.masters {
+            Arc::make_mut(masters)
+                .get_mut(ids::VILLAGER_MALE)
+                .unwrap()
+                .standing_sprite = Some(SpriteId::named(300));
         }
-        let _ = t.graphics.insert(
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(
             SpriteId::named(300),
             Graphic {
                 id: SpriteId::named(300),
@@ -977,7 +985,7 @@ fn remains_world() -> World {
         (21, SpriteFlags::ANIMATED),
     ] {
         let id = SpriteId::named(id);
-        let _ = t.graphics.insert(id, graphic(id, flags));
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(id, graphic(id, flags));
     }
     let static_remains = Master {
         id: master_id(800),
@@ -997,13 +1005,13 @@ fn remains_world() -> World {
         moving: Some(walker().stats),
         ..Master::default()
     };
-    for masters in &mut t.masters {
-        *masters = Masters::new(
+    for masters in &mut t.model.masters {
+        *masters = Arc::new(Masters::new(
             masters
                 .iter()
                 .cloned()
                 .chain([static_remains.clone(), moving_remains.clone()]),
-        );
+        ));
     }
     t
 }
@@ -1016,7 +1024,7 @@ fn remains_world() -> World {
 #[test]
 fn remains_take_their_storage_and_face_their_dead_object_facet() {
     use crate::objects::lifecycle::Class;
-    let made = |t: &World, id| t.masters[1].get(id).unwrap().clone();
+    let made = |t: &World, id| t.model.masters[1].get(id).unwrap().clone();
     let mut t = remains_world();
     let food = t.players[1].attributes[4];
     let i = t

@@ -36,6 +36,7 @@ use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
 use crate::world::parts::{Parts, no_own_masters, no_parts};
+use std::sync::Arc;
 
 /// Slot 0x228 (`FUN_141084070`): the attacks above 0 add up in their order from +0; none
 /// (or none above 0) is +0.
@@ -91,7 +92,8 @@ fn harmless(master: Master) -> bool {
         Masters::default(),
         Masters::default(),
         Masters::new([master]),
-    ];
+    ]
+    .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
     let attacker = Attacker {
         ai_type: UnitAiType::CIVILIAN,
@@ -201,7 +203,8 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
             master(master_id(5), Footprint::new(0.3, 0.3)),
             master(ids::ID_6, Footprint::new(1.3, 0.3)),
         ]),
-    ];
+    ]
+    .map(Arc::new);
     let attacker = Attacker {
         ai_type: UnitAiType::SOLDIER,
         player: PlayerId::new(1),
@@ -355,7 +358,8 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
             class::CLASS_6,
             vec![ClassAmount::new(4, 3)],
         )]),
-    ];
+    ]
+    .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
     let attacker = Attacker {
         ai_type: UnitAiType::SOLDIER,

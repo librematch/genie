@@ -76,8 +76,8 @@ fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), Gen
 fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> Result<(), GenieError> {
     repairer.show_standing(
         c.w.parts.motion.layer_mut(repairer.id),
-        OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-        &c.w.graphics,
+        OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+        &c.w.model.graphics,
         c.w.streams.get(Stream::Sprite),
     )
 }
@@ -93,7 +93,7 @@ fn show(
     let mut sprites = Sprites {
         sprite: &mut repairer.sprite,
         rng: c.w.streams.get(Stream::Sprite),
-        graphics: &c.w.graphics,
+        graphics: &c.w.model.graphics,
     };
     sprites
         .shown(id.or(standing))?
@@ -329,7 +329,7 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
     ) -> Result<bool, GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let spatial = &mut c.w.spatial;
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let r = reads.restriction.ok_or(NO_RESTRICTION)?;
@@ -566,7 +566,7 @@ impl RepairAction {
             c.w.master_tables(),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
             ),
         )?;
@@ -597,7 +597,7 @@ impl RepairAction {
             c.w.master_tables(),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
             ),
         )?;

@@ -191,6 +191,7 @@ impl World {
         let short = MasterId::of_data(cvttss2si(v) as i16);
         if let Some(short) = short
             && self
+                .model
                 .masters
                 .get(p.index())
                 .is_some_and(|m| m.get(short).is_some())
@@ -234,7 +235,7 @@ impl World {
         {
             return self.complete_research(p, tech, None);
         }
-        let def = self.techs.checked(t)?.clone();
+        let def = self.model.techs.checked(t)?.clone();
         self.research_effect_known(p, tech)?;
         self.do_effect(p, &def.effect, None)?;
         let owner = self.players.player(p)?;
@@ -283,6 +284,7 @@ impl World {
         };
         for building in buildings {
             let time = self
+                .model
                 .techs
                 .get(t)
                 .and_then(|d| d.locations.iter().find(|&&(b, _)| b == building))

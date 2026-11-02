@@ -112,6 +112,7 @@ use crate::objects::layers::{
 };
 use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
+use crate::objects::lines::UnitLines;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
@@ -188,6 +189,7 @@ use crate::production::QueuedUnits;
 use crate::production::UnitIndex;
 use crate::production::{HotkeyId, MakeObjState, MakeTechState, Making, Production, Queue};
 use crate::technology::CostPaid;
+use crate::technology::Linked;
 use crate::technology::ResearchState;
 use crate::technology::{CostOverride, OverrideUse, ResearchCap, TechKind};
 use crate::test_ids::attack_category;
@@ -218,6 +220,7 @@ use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::task_finder::DropSite;
 use crate::unit_ai::task_finder::DropTarget;
 use crate::unit_ai::task_finder::world::{
     SideWorld, TaskWorld, task_search, task_target_with, wait_progress,
@@ -245,16 +248,17 @@ use crate::world::parts::{Object, Part, PartTable, no_own_masters};
 use crate::world::player::Player;
 use ids::FISH_TRAP;
 use std::iter::{once, repeat_n};
+use std::sync::Arc;
 
 /// Gives every player a default master for each master id its units name (the table the game
 /// always has), the ones the test set already has kept.
 pub(crate) fn stock_masters(t: &mut World) {
-    let tables: Vec<Masters> = t
+    let tables: Vec<Arc<Masters>> = t
         .players
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            let held = t.masters.get(i);
+            let held = t.model.masters.get(i);
             let mut all: Vec<Master> = held
                 .map(|m| m.iter().cloned().collect())
                 .unwrap_or_default();
@@ -266,10 +270,10 @@ pub(crate) fn stock_masters(t: &mut World) {
                     });
                 }
             }
-            Masters::new(all)
+            Arc::new(Masters::new(all))
         })
         .collect();
-    t.masters = tables;
+    t.model.masters = tables;
 }
 
 /// A player of objects `ids` (their unit AIs the world's, [`World::with_ais`]).
@@ -817,7 +821,11 @@ fn an_order_on_target_joins_the_unit_ai_history() {
         master(master_id(74), class::CLASS_6),
         master(master_id(4), class::CLASS_0),
     ]);
-    t.masters = vec![table.clone(), table.clone(), table];
+    t.model.masters = vec![
+        Arc::new(table.clone()),
+        Arc::new(table.clone()),
+        Arc::new(table),
+    ];
     t.world_time = WorldTime::from_millis(4321);
     t.remember_order(
         PlayerId::new(1),
@@ -880,7 +888,10 @@ fn flare_at_point_stands_on_the_ground() {
         standing_sprite: None,
         ..Master::default()
     };
-    t.masters = (0..3).map(|_| Masters::new([flare.clone()])).collect();
+    t.model.masters = (0..3)
+        .map(|_| Masters::new([flare.clone()]))
+        .map(Arc::new)
+        .collect();
     t.next_object_id = object_id(100);
     t.flare(None, Point::new(19.114_586, 29.197_92), 3).unwrap();
     for p in 1..3 {
@@ -912,7 +923,10 @@ fn hit_flare_lasts_twice_as_long_from_trebuchet() {
         storage: vec![(Some(AttributeId::numbered(12)), Amount::new(1.0), 0)],
         ..Master::default()
     };
-    t.masters = (0..3).map(|_| Masters::new([flare.clone()])).collect();
+    t.model.masters = (0..3)
+        .map(|_| Masters::new([flare.clone()]))
+        .map(Arc::new)
+        .collect();
     t.next_object_id = object_id(100);
     t.make_flare(PlayerId::new(2), Position::new(10.5, 12.5, 0.0), false)
         .unwrap();
@@ -957,10 +971,10 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
     };
-    t.graphics = Graphics::from([
+    t.model.graphics = Arc::new(Graphics::from([
         (SpriteId::named(13124), idle(SpriteId::named(13124))),
         (SpriteId::named(13170), idle(SpriteId::named(13170))),
-    ]);
+    ]));
     let pasture = Master {
         id: ids::PASTURE,
         kind: MasterKind::BUILDING,
@@ -990,7 +1004,10 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
             },
         ));
     }
-    t.masters = (0..2).map(|_| Masters::new(masters.clone())).collect();
+    t.model.masters = (0..2)
+        .map(|_| Masters::new(masters.clone()))
+        .map(Arc::new)
+        .collect();
     let _ = t
         .push_live(
             PlayerId::new(1),
@@ -1215,15 +1232,15 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Object {
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
     };
-    let _ = t.graphics.insert(SpriteId::named(13171), dying);
-    for m in &mut t.masters {
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(13171), dying);
+    for m in &mut t.model.masters {
         let mut all: Vec<Master> = m.iter().cloned().collect();
         for a in all.iter_mut().filter(|a| a.kind == MasterKind::MOVING) {
             a.kind = kind;
             a.death_sprite = Some(SpriteId::named(13171));
             a.max_speed = Speed::new(0.737);
         }
-        *m = Masters::new(all);
+        *m = Arc::new(Masters::new(all));
     }
     t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50)))
         .unwrap();
@@ -1260,10 +1277,10 @@ fn tended_pasture(at: Position, room: f32) -> World {
         radius: Footprint::new(0.2, 0.2),
         ..Master::default()
     };
-    for m in &mut t.masters {
+    for m in &mut t.model.masters {
         let mut all: Vec<Master> = m.iter().cloned().collect();
         all.push(villager.clone());
-        *m = Masters::new(all);
+        *m = Arc::new(Masters::new(all));
     }
     let villager = Unit {
         id: object_id(60),
@@ -1356,7 +1373,7 @@ fn villager_tends_the_nearest_livestock_with_room() {
         ..Player::default()
     });
     other.reindex();
-    other.masters.push(other.masters[1].clone());
+    other.model.masters.push(other.model.masters[1].clone());
     assert_eq!(
         other.pasture_pick(
             PastureId::new(object_id(50)),
@@ -1566,13 +1583,13 @@ fn player_new_tiles_give_their_resources_to_its_lists() {
         gather_group,
         ..Master::default()
     };
-    t.masters = vec![
-        Masters::new([
+    t.model.masters = vec![
+        Arc::new(Masters::new([
             master(master_id(411), true, GatherGroup::WOOD),
             master(master_id(412), false, GatherGroup::WOOD),
             master(master_id(413), true, GatherGroup::GOLD),
-        ]),
-        Masters::default(),
+        ])),
+        Arc::new(Masters::default()),
     ];
     t.spatial = Spatial::with_tiles(
         GridSize::new(120, 120),
@@ -1673,12 +1690,12 @@ fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
         gather_group,
         ..Master::default()
     };
-    t.masters = vec![
-        Masters::new([
+    t.model.masters = vec![
+        Arc::new(Masters::new([
             master(master_id(411), GatherGroup::WOOD),
             master(master_id(412), GatherGroup::FORAGE),
-        ]),
-        Masters::default(),
+        ])),
+        Arc::new(Masters::default()),
     ];
     placeable(&mut t);
     let v = t.spatial.sight.as_mut().unwrap();
@@ -1739,7 +1756,11 @@ fn new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
         gather_group: GatherGroup::FISH,
         ..Master::default()
     };
-    t.masters = vec![Masters::new([master(master_id(53), true), master(master_id(54), false)]); 3];
+    t.model.masters =
+        vec![Masters::new([master(master_id(53), true), master(master_id(54), false)]); 3]
+            .into_iter()
+            .map(Arc::new)
+            .collect();
     placeable(&mut t);
     let v = t.spatial.sight.as_mut().unwrap();
     // players 0 and 2 explored the tile, player 1 did not
@@ -1987,7 +2008,7 @@ fn build_world() -> World {
         (object_id(9181), villager_ai()),
     ]);
     t.next_object_id = object_id(10028);
-    t.masters = vec![Masters::default(), builder_masters()];
+    t.model.masters = vec![Arc::new(Masters::default()), Arc::new(builder_masters())];
     placeable(&mut t);
     t
 }
@@ -2195,7 +2216,11 @@ fn queued_build_queues_its_order_for_another_player_villager() {
         (object_id(9618), villager_ai()),
     ]);
     t.next_object_id = object_id(10028);
-    t.masters = vec![Masters::default(), builder_masters(), builder_masters()];
+    t.model.masters = vec![
+        Arc::new(Masters::default()),
+        Arc::new(builder_masters()),
+        Arc::new(builder_masters()),
+    ];
     placeable(&mut t);
     t.settings.cheats_enabled = true;
     // the command phase alone (the units' updates would run the orders)
@@ -2315,7 +2340,7 @@ pub(crate) fn sent_off_world(orders: Vec<QueuedOrder>) -> World {
     )
     .with_buildings([(object_id(10028), foundation.parts.building)])
     .with_ais([(object_id(9175), ai)]);
-    t.masters = vec![builder_masters(), builder_masters()];
+    t.model.masters = vec![Arc::new(builder_masters()), Arc::new(builder_masters())];
     t
 }
 
@@ -2333,7 +2358,7 @@ fn task(action_type: ActionKind) -> Task {
 #[test]
 fn slot_0x820_search_takes_the_own_task_else_the_first_master_of_the_swap_group() {
     let t = sent_off_world(vec![]);
-    let masters = &t.masters[1];
+    let masters = &t.model.masters[1];
     let find = |id: ObjectId| t.object(id);
     let site = task_target_with(object_id(10028), 1, &find, &t.parts, t.master_tables())
         .unwrap()
@@ -2616,8 +2641,8 @@ fn repair_world() -> World {
         .as_mut()
         .unwrap();
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
-    for masters in &mut t.masters {
-        let builder = masters.get_mut(ids::BUILDER).unwrap();
+    for masters in &mut t.model.masters {
+        let builder = Arc::make_mut(masters).get_mut(ids::BUILDER).unwrap();
         builder.weapon_range = Distance::new(0.5);
         builder.tasks.push(Task {
             id: task_id(4),
@@ -2893,8 +2918,11 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     mover.moved_at = at;
     t.parts.put_mover(v.id, Some(mover));
     // a walker of sixteen facets (its yaw reads them)
-    for table in &mut t.masters {
-        if let Some(m) = table.get_mut(ids::BUILDER).and_then(|m| m.moving.as_mut()) {
+    for table in &mut t.model.masters {
+        if let Some(m) = Arc::make_mut(table)
+            .get_mut(ids::BUILDER)
+            .and_then(|m| m.moving.as_mut())
+        {
             m.facets = Some(SpriteFacets {
                 count: FacetCount::of_data(16),
                 turns: true,
@@ -2918,7 +2946,7 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let _ = t.graphics.insert(SpriteId::named(7), walking);
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(7), walking);
     let shown_after_update = |t: &mut World| {
         in_update(
             t,
@@ -2948,7 +2976,7 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     // the MoveTo's constructor (FUN_140aa0df0) reads the builder's own master for its sprite
     let own = Master {
         move_sprite: Some(SpriteId::named(7)),
-        ..t.masters[1].get(ids::BUILDER).unwrap().clone()
+        ..t.model.masters[1].get(ids::BUILDER).unwrap().clone()
     };
     let id = t.players[1].objects[ListIndex::new(0)].id;
     t.set_part(id, Part::OwnMaster(Box::new(own))).unwrap();
@@ -3254,7 +3282,7 @@ pub(crate) fn open_map(t: &mut World) {
 /// villager can move.
 pub(crate) fn forage_world() -> World {
     let mut t = sent_off_world(vec![]);
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let forager = Master {
             id: master_id(120),
             capacity: CarryCapacity::of_data(10),
@@ -3284,7 +3312,9 @@ pub(crate) fn forage_world() -> World {
             radius: Footprint::new(2.0, 2.0),
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([forager, bush, centre]));
+        *masters = Arc::new(Masters::new(
+            masters.iter().cloned().chain([forager, bush, centre]),
+        ));
     }
     let resource = |id, x| Unit {
         id,
@@ -3383,7 +3413,7 @@ pub(crate) fn forage_world() -> World {
         ),
     );
     // the drop-site table: villagers drop berries at the town centre
-    t.drop_sites = vec![DropSite {
+    t.model.drop_sites = Arc::new(vec![DropSite {
         building: ids::TOWN_CENTRE,
         worker_class: Some(class::VILLAGER),
         targets: vec![DropTarget {
@@ -3393,7 +3423,7 @@ pub(crate) fn forage_world() -> World {
             attribute: Some(AttributeId::numbered(17)),
         }],
         ..DropSite::default()
-    }];
+    }]);
     t
 }
 
@@ -3693,7 +3723,10 @@ fn work_command_without_task_moves_the_unit_there() {
         Some(None)
     );
     let mut t = forage_world();
-    t.masters[1].get_mut(master_id(120)).unwrap().moving = None;
+    Arc::make_mut(&mut t.model.masters[1])
+        .get_mut(master_id(120))
+        .unwrap()
+        .moving = None;
     let before = t
         .parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -3874,8 +3907,11 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
     );
     // dropping at the dock too: the search without a seeker finds the same centre
     let mut t = world.clone();
-    for masters in &mut t.masters {
-        masters.get_mut(master_id(120)).unwrap().drop_sites = vec![ids::ID_45, ids::TOWN_CENTRE];
+    for masters in &mut t.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .drop_sites = vec![ids::ID_45, ids::TOWN_CENTRE];
     }
     t.unit_order(
         player_id(1),
@@ -3924,15 +3960,19 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
 fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
     let mut t = forage_world();
     t.settings.walkable_farms = true;
-    for masters in &mut t.masters {
-        masters.get_mut(master_id(120)).unwrap().tasks.push(Task {
-            id: task_id(3),
-            action_kind: GATHER,
-            object_group: Some(class_id(49)),
-            attribute_type: Some(attribute::FOOD),
-            work_range: Distance::new(0.25),
-            ..Task::default()
-        });
+    for masters in &mut t.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .tasks
+            .push(Task {
+                id: task_id(3),
+                action_kind: GATHER,
+                object_group: Some(class_id(49)),
+                attribute_type: Some(attribute::FOOD),
+                work_range: Distance::new(0.25),
+                ..Task::default()
+            });
         let farm = Master {
             id: ids::FARM,
             kind: MasterKind::BUILDING,
@@ -3945,7 +3985,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
             class: class::FISHING_SHIP,
             ..masters.get(master_id(120)).unwrap().clone()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([farm, fishing]));
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([farm, fishing])));
     }
     let _ = t
         .push_live(
@@ -4311,9 +4351,9 @@ fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
             .unwrap()
             .orders = orders;
         // the villager, the forager and the builder it becomes regenerate 20 a minute
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             for id in [83, 118, 120] {
-                if let Some(m) = masters.get_mut(master_id(id)) {
+                if let Some(m) = Arc::make_mut(masters).get_mut(master_id(id)) {
                     (m.kind, m.hit_points, m.regeneration) = (
                         MasterKind::COMBAT,
                         MasterHitPoints::of_data(25),
@@ -4450,11 +4490,14 @@ fn an_explored_map_leaves_the_auto_scout_nothing_to_seek() {
 fn the_unit_ai_resource_search_finds_the_nearest_bush_it_reaches() {
     use crate::unit_ai::{NO_POINT, ResourceSearch};
     let mut t = forage_world();
-    for masters in &mut t.masters {
-        let bush = masters.get_mut(master_id(59)).unwrap();
+    for masters in &mut t.model.masters {
+        let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
         (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FISH);
         // the walk reaches the forager's line of sight plus 5 tiles: 601 lies 7 away
-        masters.get_mut(master_id(120)).unwrap().line_of_sight = Distance::new(4.0);
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .line_of_sight = Distance::new(4.0);
     }
     let search = |t: &mut World, s: ResourceSearch| {
         let mut found = None;
@@ -4521,8 +4564,8 @@ fn the_unit_ai_resource_search_finds_the_nearest_bush_it_reaches() {
 /// by themselves as group 1.
 fn cart_world() -> World {
     let mut t = forage_world();
-    for masters in &mut t.masters {
-        let bush = masters.get_mut(master_id(59)).unwrap();
+    for masters in &mut t.model.masters {
+        let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
         (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FORAGE);
         let cart = Master {
             id: ids::MASTER_1808,
@@ -4538,7 +4581,7 @@ fn cart_world() -> World {
             }],
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([cart]));
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([cart])));
     }
     let _ = t
         .push_live(
@@ -4598,7 +4641,11 @@ fn mule_cart_finds_the_nearest_resource_of_its_task_class() {
         Ok((Some(object_id(600)), Position::new(32.5, 89.5, 0.0)))
     );
     let mut t = cart_world();
-    t.masters[1].get_mut(ids::MASTER_1808).unwrap().tasks[0].object_group = Some(class_id(99));
+    Arc::make_mut(&mut t.model.masters[1])
+        .get_mut(ids::MASTER_1808)
+        .unwrap()
+        .tasks[0]
+        .object_group = Some(class_id(99));
     assert_eq!(
         t.cart_find(PlayerId::new(1), ListIndex::new(3)),
         Ok((None, Position::new(24.5, 89.5, 0.0)))
@@ -4704,8 +4751,11 @@ fn the_units_on_new_foundation_are_sent_off_it() {
 #[test]
 fn formation_units_on_new_foundation_move_off_together() {
     let mut t = footprint_world();
-    for masters in &mut t.masters {
-        masters.get_mut(master_id(120)).unwrap().formation_category = FormationClass::of_data(1);
+    for masters in &mut t.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .formation_category = FormationClass::of_data(1);
     }
     t.evacuate(FoundationId::new(object_id(10028)), &[object_id(9175)])
         .unwrap();
@@ -4775,7 +4825,10 @@ fn built_castle_death_takes_its_headroom_and_its_count() {
                 },
             ],
         );
-        t.masters = vec![Masters::default(), Masters::new([castle.clone()])];
+        t.model.masters = vec![
+            Arc::new(Masters::default()),
+            Arc::new(Masters::new([castle.clone()])),
+        ];
         t
     };
     let mut t = world(1.0);
@@ -4883,10 +4936,10 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
         obstruction_class,
         ..Master::default()
     };
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         master(ids::HOUSE, ObstructionClass::UNIT),
         master(master_id(71), ObstructionClass::NONE),
-    ])];
+    ]))];
     t.spatial = Spatial::new(GridSize::new(40, 40));
     for id in [1, 2, 3, 4, 6] {
         t.spatial.insert(
@@ -4918,7 +4971,7 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
 /// town centre 700, all placed on [`open_map`]; the villager can move.
 pub(crate) fn hunt_world() -> World {
     let mut t = sent_off_world(vec![]);
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let hunter = Master {
             id: master_id(122),
             drop_sites: vec![ids::TOWN_CENTRE],
@@ -4944,7 +4997,9 @@ pub(crate) fn hunt_world() -> World {
             radius: Footprint::new(2.0, 2.0),
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([hunter, deer, centre]));
+        *masters = Arc::new(Masters::new(
+            masters.iter().cloned().chain([hunter, deer, centre]),
+        ));
     }
     let deer = |id, x| Unit {
         id,
@@ -5325,7 +5380,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
         t.spatial
             .set_position(object_id(9175), Position::new(22.3, 89.5, 0.0))
             .unwrap();
-        t.drop_sites = vec![DropSite {
+        t.model.drop_sites = Arc::new(vec![DropSite {
             building: ids::TOWN_CENTRE,
             worker_class: Some(class::VILLAGER),
             targets: vec![DropTarget {
@@ -5335,7 +5390,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
                 attribute: Some(attribute::MEAT),
             }],
             ..DropSite::default()
-        }];
+        }]);
         t
     };
     let mut t = dropping(MoveTo::Arrived);
@@ -5364,7 +5419,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
             .is_some_and(|h| h.timer < Seconds::ZERO)
     );
     let mut t = dropping(MoveTo::Arrived);
-    t.drop_sites.clear();
+    Arc::make_mut(&mut t.model.drop_sites).clear();
     assert!(hunt_part_of(&mut t, 50).is_err());
 }
 
@@ -5589,8 +5644,8 @@ fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
             h.state = HuntState::Gather;
             (h.task.work_value, h.task.resource) = (WorkValue::new(1.0), Some(attribute::MEAT));
         });
-        for masters in &mut t.masters {
-            let hunter = masters.get_mut(master_id(122)).unwrap();
+        for masters in &mut t.model.masters {
+            let hunter = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
             (hunter.capacity, hunter.work_rate) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
         }
         let deer = &mut t.players[0].objects[ListIndex::new(0)];
@@ -5656,8 +5711,8 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
         h.state = HuntState::Gather;
         (h.task.work_value, h.task.resource) = (WorkValue::new(1.0), Some(attribute::MEAT));
     });
-    for masters in &mut t.masters {
-        let hunter = masters.get_mut(master_id(122)).unwrap();
+    for masters in &mut t.model.masters {
+        let hunter = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
         (hunter.capacity, hunter.work_rate) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
     }
     let deer = &mut t.players[0].objects[ListIndex::new(0)];
@@ -5744,7 +5799,7 @@ fn gathering_hunt_whose_target_left_searches_without_reading_one() {
 fn shepherd_world(x: f32) -> World {
     use crate::movement::move_to::{MoveTo, MoveToAction};
     let mut t = hunt_world();
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let sheep = Master {
             id: master_id(594),
             kind: MasterKind::COMBAT,
@@ -5753,13 +5808,17 @@ fn shepherd_world(x: f32) -> World {
             moving: Some(walker().stats),
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([sheep]));
-        masters.get_mut(master_id(122)).unwrap().tasks.push(Task {
-            action_kind: HUNT,
-            object_group: Some(class_id(58)),
-            work_range: Distance::new(0.5),
-            ..Task::default()
-        });
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([sheep])));
+        Arc::make_mut(masters)
+            .get_mut(master_id(122))
+            .unwrap()
+            .tasks
+            .push(Task {
+                action_kind: HUNT,
+                object_group: Some(class_id(58)),
+                work_range: Distance::new(0.5),
+                ..Task::default()
+            });
     }
     let _ = t
         .push_live(
@@ -5798,12 +5857,12 @@ fn shepherd_world(x: f32) -> World {
             obstruction: None,
         },
     );
-    t.drop_sites = vec![DropSite {
+    t.model.drop_sites = Arc::new(vec![DropSite {
         building: ids::TOWN_CENTRE,
         worker_class: Some(class::VILLAGER),
         livestock: true,
         ..DropSite::default()
-    }];
+    }]);
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(510))
         .unwrap();
     let h = t
@@ -5919,7 +5978,7 @@ fn hunter_sheep_walks_before_the_hunter_update_ends() {
 /// class 15 and its hunt without a target at its own place.
 fn lumber_world(near: f32) -> World {
     let mut t = hunt_world();
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let tree = Master {
             id: master_id(349),
             kind: MasterKind::STATIC,
@@ -5929,8 +5988,8 @@ fn lumber_world(near: f32) -> World {
             gather_group: GatherGroup::WOOD,
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([tree]));
-        let hunter = masters.get_mut(master_id(122)).unwrap();
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([tree])));
+        let hunter = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
         hunter.line_of_sight = Distance::new(4.0);
         hunter.tasks.push(Task {
             action_kind: HUNT,
@@ -6008,7 +6067,7 @@ fn lets_world() -> World {
         .swap_remove_live(PlayerId::new(0), ListIndex::new(3))
         .unwrap();
     let _ = t.push_asleep(PlayerId::new(0), asleep).unwrap();
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let annex = Master {
             id: master_id(99),
             kind: MasterKind::BUILDING,
@@ -6018,7 +6077,7 @@ fn lets_world() -> World {
             }),
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([annex]));
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([annex])));
     }
     let _ = t
         .push_live(
@@ -6083,7 +6142,11 @@ fn an_update_take_counts_its_worker_and_wakes_sleeping_object() {
         Some(521)
     );
     assert!(t.players[0].sleeping.by_id(object_id(521)).is_none());
-    let k = key(t.masters.first(), &t.lines, master_id(349));
+    let k = key(
+        t.model.masters.first().map(|m| &**m),
+        &t.model.lines,
+        master_id(349),
+    );
     assert_eq!(
         t.players[0]
             .tracker
@@ -6169,7 +6232,11 @@ fn outside_an_update_the_lets_run_on_the_whole_world() {
         t.players[0].objects.iter().last().map(|u| u.id.get()),
         Some(521)
     );
-    let k = key(t.masters.first(), &t.lines, master_id(349));
+    let k = key(
+        t.model.masters.first().map(|m| &**m),
+        &t.model.lines,
+        master_id(349),
+    );
     assert_eq!(
         t.players[0]
             .tracker
@@ -6555,7 +6622,7 @@ fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
     let c = site_mut(&mut t, object_id(10028));
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
     if repairer {
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let mut m = masters.get(VILLAGER_MALE).unwrap().clone();
             m.id = master_id(156);
             m.weapon_range = Distance::new(0.5);
@@ -6564,7 +6631,7 @@ fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
                 work_val1: WorkValue::new(0.5),
                 ..task(REPAIR)
             });
-            *masters = Masters::new(masters.iter().cloned().chain([m]));
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([m])));
         }
     }
     t
@@ -6755,8 +6822,8 @@ fn enter_world(orders: Vec<QueuedOrder>, room: u8) -> World {
     house.life.hp = HitPoints::new(550.0);
     let c = site_mut(&mut t, object_id(10028));
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
-    for masters in &mut t.masters {
-        let house = masters.get_mut(ids::HOUSE).unwrap();
+    for masters in &mut t.model.masters {
+        let house = Arc::make_mut(masters).get_mut(ids::HOUSE).unwrap();
         house.garrison = GarrisonCapacity::of_data(room);
         // it takes villagers in (bit 0)
         house.building.as_mut().unwrap().garrison_type = GarrisonKinds::VILLAGERS;
@@ -6951,10 +7018,10 @@ fn livestock_enter_world() -> World {
         standing_sprite: None,
         ..Master::default()
     };
-    for masters in &mut t.masters {
-        *masters = Masters::new(masters.iter().cloned().chain([sheep.clone()]));
+    for masters in &mut t.model.masters {
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([sheep.clone()])));
         // the house takes herdables in (bit 4)
-        masters
+        Arc::make_mut(masters)
             .get_mut(ids::HOUSE)
             .unwrap()
             .building
@@ -7032,9 +7099,12 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
             };
-            let _ = t.graphics.insert(SpriteId::named(id), g);
+            let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(id), g);
         }
-        t.masters[1].get_mut(VILLAGER_MALE).unwrap().move_sprite = Some(SpriteId::named(31));
+        Arc::make_mut(&mut t.model.masters[1])
+            .get_mut(VILLAGER_MALE)
+            .unwrap()
+            .move_sprite = Some(SpriteId::named(31));
         let v = &mut t.players[1].objects[ListIndex::new(0)];
         let here = v.position();
         t.parts.mover_mut(v.id).unwrap().moved_at = here;
@@ -7183,7 +7253,7 @@ fn an_enter_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
             ally.objects.push(house.unit);
             t.players.push(ally);
             t.reindex();
-            t.masters.push(t.masters[1].clone());
+            t.model.masters.push(t.model.masters[1].clone());
             let mut placed = *t.spatial.get(object_id(10028)).unwrap();
             placed.player = PlayerId::new(2);
             t.spatial.insert(object_id(10028), placed);
@@ -7522,7 +7592,9 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
 fn build_command_without_its_foundation_or_task_does_nothing() {
     let without_build_tasks = |t: &mut World| {
         for id in [118, 212] {
-            let m = t.masters[1].get_mut(master_id(id)).unwrap();
+            let m = Arc::make_mut(&mut t.model.masters[1])
+                .get_mut(master_id(id))
+                .unwrap();
             m.tasks.retain(|k| k.action_kind != ActionKind::BUILD);
         }
     };
@@ -7659,13 +7731,17 @@ fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
         Ok(true)
     );
     for id in [83, 118, 212] {
-        let m = t.masters[1].get_mut(master_id(id)).unwrap();
+        let m = Arc::make_mut(&mut t.model.masters[1])
+            .get_mut(master_id(id))
+            .unwrap();
         m.tasks.retain(|k| k.action_kind != ActionKind::BUILD);
     }
     assert!(answers(&mut t, FoundationId::new(object_id(10028))));
     let mut t = sent_off_world(vec![]);
     for id in [118, 212] {
-        let m = t.masters[1].get_mut(master_id(id)).unwrap();
+        let m = Arc::make_mut(&mut t.model.masters[1])
+            .get_mut(master_id(id))
+            .unwrap();
         m.tasks.retain(|k| k.action_kind != ActionKind::BUILD);
     }
     assert!(!answers(&mut t, FoundationId::new(object_id(10028))));
@@ -7881,7 +7957,7 @@ fn the_ai_move_at_once_matches_the_one_after_the_update() {
 #[test]
 fn the_hunt_command_at_once_matches_the_one_after_the_update() {
     let mut later = sent_off_world(vec![]);
-    for masters in &mut later.masters {
+    for masters in &mut later.model.masters {
         let hunter = Master {
             id: master_id(122),
             tasks: vec![Task {
@@ -7899,7 +7975,7 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
             radius: Footprint::new(0.4, 0.4),
             ..Master::default()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([hunter, deer]));
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([hunter, deer])));
     }
     let _ = later
         .push_live(
@@ -8013,7 +8089,7 @@ fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() 
         )
         .with_ais(live_ais(&[2]));
         t.next_object_id = object_id(100);
-        t.masters = vec![builder_masters(), builder_masters()];
+        t.model.masters = vec![Arc::new(builder_masters()), Arc::new(builder_masters())];
         placeable(&mut t);
         t
     };
@@ -8244,14 +8320,14 @@ fn livestock_without_actions_starts_its_artifact_again() {
         ],
     )
     .with_actions([(object_id(40), sheep.parts.actions)]);
-    t.masters = vec![
-        Masters::default(),
-        Masters::new([Master {
+    t.model.masters = vec![
+        Arc::new(Masters::default()),
+        Arc::new(Masters::new([Master {
             id: master_id(594),
             kind: MasterKind::COMBAT,
             class: class::LIVESTOCK,
             ..Master::default()
-        }]),
+        }])),
     ];
     t.tick(Millis::new(50));
     let a = t
@@ -8282,7 +8358,7 @@ fn life_part(
     part: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> Result<(), GenieError>,
 ) -> Result<LifeLeft, GenieError> {
     let mut t = forage_world();
-    let mut master = t.masters[1].get(master_id(120)).unwrap().clone();
+    let mut master = t.model.masters[1].get(master_id(120)).unwrap().clone();
     set(&mut master, &mut t.players[1].objects[ListIndex::new(0)]);
     // the remains and death spawn the tests name (99, a master the game does not have)
     let left = Master {
@@ -8290,13 +8366,13 @@ fn life_part(
         kind: MasterKind::ANIMATED,
         ..Master::default()
     };
-    let ms = &mut t.masters[1];
-    *ms = Masters::new(
+    let ms = &mut t.model.masters[1];
+    *ms = Arc::new(Masters::new(
         ms.iter()
             .filter(|m| m.id != master_id(120))
             .cloned()
             .chain([master, left]),
-    );
+    ));
     in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -8453,7 +8529,10 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
         vec![player(vec![].into()), player(vec![sheep.unit].into())],
     )
     .with_actions([(object_id(40), sheep.parts.actions)]);
-    t.masters = vec![Masters::new([master.clone()]), Masters::new([master])];
+    t.model.masters = vec![
+        Arc::new(Masters::new([master.clone()])),
+        Arc::new(Masters::new([master])),
+    ];
     placeable(&mut t);
     let placed = Placed {
         position: Position::new(10.5, 10.5, 0.0),
@@ -8524,7 +8603,7 @@ fn farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
         }],
     )
     .with_actions([(object_id(40), farm.parts.actions)]);
-    t.masters = vec![Masters::new([farm_master()])];
+    t.model.masters = vec![Arc::new(Masters::new([farm_master()]))];
     t.tick(Millis::new(104));
     let f = &t.players[0].objects[ListIndex::new(0)];
     let make = t.parts.actions_of(f.id).list.make().copied().unwrap();
@@ -8604,14 +8683,14 @@ fn building_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
             ..Player::default()
         }],
     );
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: master_id(12),
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
         hit_points: MasterHitPoints::of_data(550),
         building: Some(BuildingMaster::default()),
         ..Master::default()
-    }])];
+    }]))];
     let timer = |t: &World| t.players[0].objects[ListIndex::new(0)].damaged_lately;
     t.tick(Millis::new(500));
     assert_eq!(timer(&t), DamagedTimer::of_data(2));
@@ -8865,7 +8944,7 @@ fn only_standing_unlocked_transforming_gate_lets_an_ally_pass() {
         master(66, class::VILLAGER, 63),
         not_building,
     ]);
-    t.masters = vec![masters.clone(), masters];
+    t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];
     let mut passes: Vec<bool> = (0..5)
         .map(|i| {
             t.gate_passes(PlayerId::new(1), ListIndex::new(i), PlayerId::new(1))
@@ -8931,7 +9010,10 @@ fn gate_opens_for_its_allies_while_they_update() {
         }),
         ..Master::default()
     };
-    t.masters = (0..4).map(|_| Masters::new([master.clone()])).collect();
+    t.model.masters = (0..4)
+        .map(|_| Masters::new([master.clone()]))
+        .map(Arc::new)
+        .collect();
     t.spatial = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![1; 400]),
@@ -9217,14 +9299,14 @@ fn gate_world() -> World {
     )
     .with_parts(split.1);
     t.world_time = WorldTime::from_millis(400);
-    t.masters = vec![
-        Masters::default(),
-        Masters::new([
+    t.model.masters = vec![
+        Arc::new(Masters::default()),
+        Arc::new(Masters::new([
             gate_master(88, 91, Distance::new(0.0)),
             gate_master(91, 88, Distance::new(2.0)),
             gate_master(92, -1, Distance::new(0.0)),
             soldier,
-        ]),
+        ])),
     ];
     t.spatial = Spatial::with_tiles(
         GridSize::new(40, 40),
@@ -9556,12 +9638,12 @@ fn the_forced_replay_removal_leaves_as_an_update_leave_does() {
         })),
     )
     .unwrap();
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: master_id(54),
         kind: MasterKind::MISSILE,
         recyclable: true,
         ..Master::default()
-    }])];
+    }]))];
     t.players[0].watched.push(Watched {
         id: object_id(9),
         cell: Cell::Tile(0),
@@ -9631,13 +9713,13 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
         ],
         ..trained(master_id(97), WholeSeconds::of_data(2))
     };
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         villager(VILLAGER_MALE),
         villager(VILLAGER_FEMALE),
         trained(master_id(99), WholeSeconds::of_data(25)),
         quick,
         centre,
-    ])];
+    ]))];
     stock_masters(&mut t);
     t
 }
@@ -9810,7 +9892,9 @@ fn queue_at_building_that_does_not_train_the_unit_queues_nothing_there() {
             class: class::BUILDING,
             ..Master::default()
         };
-        t.masters = vec![Masters::new(t.masters[0].iter().cloned().chain([master]))];
+        t.model.masters = vec![Arc::new(Masters::new(
+            t.model.masters[0].iter().cloned().chain([master]),
+        ))];
         t
     };
     let total = |t: &World, k: ListIndex| {
@@ -9866,7 +9950,7 @@ fn queue_at_another_player_building_queues_and_pays_for_its_owner() {
         t.players.push(other);
         t.reindex();
         t.player_time.push(Millis::ZERO);
-        t.masters.push(t.masters[0].clone());
+        t.model.masters.push(t.model.masters[0].clone());
         t.settings.cheats_enabled = cheats;
         t
     };
@@ -10050,7 +10134,7 @@ fn research_of_castle_age_queues_it_but_in_game_mode_16() {
     let castle = |mode| {
         let mut t = one_player(vec![centre(9)], [1000.0; 4]);
         t.settings.game_mode = mode;
-        t.techs = vec![TechDef::default(); 0x67];
+        t.model.techs = Arc::new(vec![TechDef::default(); 0x67]);
         let mut techs = vec![TechState::default(); 0x67];
         techs[0x66] = TechState {
             state: ResearchState::Available,
@@ -10096,8 +10180,8 @@ fn research_world() -> World {
         t.players[0].objects[ListIndex::new(0)].id,
         Some(UnitAi::default()),
     );
-    t.techs = vec![TechDef::default(); 6];
-    t.techs[5].costs[0] = Cost {
+    t.model.techs = Arc::new(vec![TechDef::default(); 6]);
+    Arc::make_mut(&mut t.model.techs)[5].costs[0] = Cost {
         attribute: Some(attribute::FOOD),
         amount: CostAmount::of_data(50),
         paid: CostPaid::PLAYER,
@@ -10234,16 +10318,16 @@ fn research_unmodelled_parts_fail() {
             .reason()
     };
     assert_eq!(
-        fails(&|t| t.techs.truncate(5)),
+        fails(&|t| Arc::make_mut(&mut t.model.techs).truncate(5)),
         "a technology the data file has not got"
     );
     assert_eq!(
-        fails(&|t| t.techs[5].kind = TechKind::SHARED),
+        fails(&|t| Arc::make_mut(&mut t.model.techs)[5].kind = TechKind::SHARED),
         "RESEARCH of the shared kind (FUN_1411c3fd0 over the packet's buildings)"
     );
     assert_eq!(
         fails(&|t| {
-            let _ = t.linked_techs.insert(tech_id(5), Linked::Cycle);
+            let _ = Arc::make_mut(&mut t.model.linked_techs).insert(tech_id(5), Linked::Cycle);
         }),
         "RESEARCH of a linked technology (FUN_140f3a0f0, FUN_140f39e80)"
     );
@@ -10255,7 +10339,7 @@ fn research_unmodelled_parts_fail() {
                 ..Player::default()
             });
             t.reindex();
-            t.masters.push(t.masters[0].clone());
+            t.model.masters.push(t.model.masters[0].clone());
         }),
         "RESEARCH at another player's object"
     );
@@ -10486,7 +10570,7 @@ fn an_unmodelled_command_stops_its_player() {
 /// visibility 0, 1, 2; hit points 30, 35, 40) and sheep 705 (class 58; line of sight 2, 3,
 /// 4; fog visibility 0, 1, 2; food 100); player 2 lacks the dead archer, and the dead
 /// archer of player 1 is of type 25 (a doppelganger's, which the copy leaves).
-fn hands_masters() -> Vec<Masters> {
+fn hands_masters() -> Vec<Arc<Masters>> {
     let table = |p: u8| {
         let archer = Master {
             id: master_id(4),
@@ -10529,7 +10613,7 @@ fn hands_masters() -> Vec<Masters> {
             Masters::new([archer, dead, sheep])
         }
     };
-    vec![table(0), table(1), table(2)]
+    vec![Arc::new(table(0)), Arc::new(table(1)), Arc::new(table(2))]
 }
 
 /// A 40 × 40 world of three players' sight with the registry, holding object `id` of
@@ -10642,7 +10726,7 @@ fn hands_ai(id: i32) -> UnitAi {
 fn hands(
     (u, ai): (&mut Unit, Option<&mut UnitAi>),
     owners: (usize, PlayerId),
-    (masters, own): (&[Masters], &mut PartTable<Master>),
+    (masters, own): (&[Arc<Masters>], &mut PartTable<Master>),
     s: &mut Spatial,
     now: WorldTime,
 ) -> Result<bool, GenieError> {
@@ -11223,7 +11307,7 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
 fn an_ownership_change_without_the_master_writes_the_records_alone() {
     let mut masters = hands_masters();
     let mut own = PartTable::default();
-    masters[2] = Masters::new([]);
+    masters[2] = Arc::new(Masters::new([]));
     let mut s = hands_world(
         21712,
         PlayerId::new(0),
@@ -11290,7 +11374,7 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
 /// standard modes a computer player that does not allow it is passed over.
 #[test]
 fn gaia_archer_player_sees_goes_to_that_player() {
-    let world = |masters: Vec<Masters>, computer: bool, mode: i32| {
+    let world = |masters: Vec<Arc<Masters>>, computer: bool, mode: i32| {
         let mut t = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
@@ -11329,7 +11413,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
         .with_ais(live_ais(&[500]));
         t.settings.game_mode = GameMode::of_data(mode);
         t.players[0].attributes[40] = Amount::new(1.0);
-        t.masters = masters;
+        t.model.masters = masters;
         t.spatial = hands_world(
             21712,
             PlayerId::new(0),
@@ -11363,7 +11447,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
     );
     // player 1 lacks the master: the loop ends with it, and Gaia keeps the archer
     let mut masters = hands_masters();
-    masters[1] = Masters::new([]);
+    masters[1] = Arc::new(Masters::new([]));
     let mut t = world(masters, false, 0);
     t.tick(Millis::new(100));
     assert_eq!(
@@ -11500,7 +11584,11 @@ fn teardown_world() -> World {
         master(ids::TOWN_CENTRE, MasterKind::BUILDING, class::TOWER),
         master(ids::HOUSE, MasterKind::BUILDING, class::BUILDING),
     ]);
-    t.masters = vec![table.clone(), table.clone(), table];
+    t.model.masters = vec![
+        Arc::new(table.clone()),
+        Arc::new(table.clone()),
+        Arc::new(table),
+    ];
     t
 }
 
@@ -11896,7 +11984,7 @@ fn deaths_world() -> World {
         master(VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER),
         master(ids::HOUSE, MasterKind::BUILDING, class::BUILDING),
     ]);
-    t.masters = vec![table.clone(), table];
+    t.model.masters = vec![Arc::new(table.clone()), Arc::new(table)];
     t
 }
 
@@ -12021,13 +12109,13 @@ fn move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() {
         ..Unit::default()
     };
     let _ = t.push_asleep(PlayerId::new(0), tree).unwrap();
-    for m in &mut t.masters {
-        *m = Masters::new(m.iter().cloned().chain([Master {
+    for m in &mut t.model.masters {
+        *m = Arc::new(Masters::new(m.iter().cloned().chain([Master {
             id: master_id(349),
             kind: MasterKind::TREE,
             class: class::TREE,
             ..Master::default()
-        }]));
+        }])));
     }
     let placed = |x: f32, class, master| Placed {
         position: Position::new(x, 10.5, 0.0),
@@ -12349,7 +12437,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             Some(walker),
             world,
             OthersRef::alone(PlayerId::new(1), &others),
-            &t.graphics,
+            &t.model.graphics,
             index::ObjectsRef::empty(),
         )
     };
@@ -12642,7 +12730,12 @@ fn foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
             ..Master::default()
         },
     ]);
-    t.masters = vec![table.clone(), table.clone(), table.clone(), table];
+    t.model.masters = vec![
+        Arc::new(table.clone()),
+        Arc::new(table.clone()),
+        Arc::new(table.clone()),
+        Arc::new(table),
+    ];
     let by = |t: &World, p, i| t.releaser(p, i).unwrap();
     let (enemy, other, ally) = (
         by(&t, PlayerId::new(2), ListIndex::new(0)),
@@ -12939,7 +13032,11 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
             ..UnitAi::default()
         },
     )]);
-    t.masters = vec![table.clone(), table.clone(), table];
+    t.model.masters = vec![
+        Arc::new(table.clone()),
+        Arc::new(table.clone()),
+        Arc::new(table),
+    ];
     t.set_part(
         object_id(7),
         Part::GatherPoint(Some(GatherPoint {
@@ -13108,7 +13205,11 @@ fn gaia_torch_goes_to_the_one_player_near_it() {
             ..UnitAi::default()
         },
     )]);
-    t.masters = vec![table.clone(), table.clone(), table];
+    t.model.masters = vec![
+        Arc::new(table.clone()),
+        Arc::new(table.clone()),
+        Arc::new(table),
+    ];
     t.spatial = hands_world(
         7,
         PlayerId::new(0),
@@ -13243,15 +13344,15 @@ fn gaia_sheep_player_stands_by_goes_to_it() {
     )]);
     let mut masters = hands_masters();
     for m in &mut masters {
-        *m = Masters::new(m.iter().cloned().chain([Master {
+        *m = Arc::new(Masters::new(m.iter().cloned().chain([Master {
             id: VILLAGER_MALE,
             kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             radius: Footprint::new(0.2, 0.2),
             ..Master::default()
-        }]));
+        }])));
     }
-    t.masters = masters;
+    t.model.masters = masters;
     t.spatial = hands_world(
         9520,
         PlayerId::new(0),
@@ -13434,7 +13535,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
                 ..Master::default()
             },
         ]);
-        t.masters = vec![masters; 3];
+        t.model.masters = vec![masters; 3].into_iter().map(Arc::new).collect();
         t
     };
     let by = |attacker, attacker_player, attacker_class| Kill {
@@ -13529,7 +13630,10 @@ fn killed_sheep(killer_last: bool) -> (World, Victim) {
         storage: vec![(Some(attribute::FARM_FOOD), Amount::new(100.0), 1)],
         ..Master::default()
     };
-    t.masters = vec![Masters::new([master.clone()]), Masters::new([master])];
+    t.model.masters = vec![
+        Arc::new(Masters::new([master.clone()])),
+        Arc::new(Masters::new([master])),
+    ];
     stock_masters(&mut t);
     t.spatial.insert(
         object_id(9520),
@@ -13860,7 +13964,11 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
         ..Master::default()
     };
     let masters = Masters::new([castle, annex]);
-    t.masters = vec![masters.clone(), masters.clone(), masters];
+    t.model.masters = vec![
+        Arc::new(masters.clone()),
+        Arc::new(masters.clone()),
+        Arc::new(masters),
+    ];
     t.link_test_annex(object_id(31), object_id(30));
     t.link_test_annex(object_id(32), object_id(30));
     // a history adds events once it has an entry
@@ -13978,7 +14086,10 @@ fn hit_wakes_sleeping_object_only_below_1_hit_point() {
             class: class::TREE,
             ..Master::default()
         };
-        t.masters = vec![Masters::new([master.clone()]), Masters::new([master])];
+        t.model.masters = vec![
+            Arc::new(Masters::new([master.clone()])),
+            Arc::new(Masters::new([master])),
+        ];
         let mut v = t.victim(object_id(50), PlayerId::new(1)).unwrap().unwrap();
         (v.hp, v.amount, v.goto_sleep) = (hp, Amount::new(90.0), false);
         write_hit(&mut t, (PlayerId::new(1), ListIndex::new(0)), v);
@@ -14062,11 +14173,11 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
     let mut tc = town_centre(9149);
     tc.life.master_id = ids::TOWN_CENTRE;
     let mut t = one_player(vec![tc], [200.0; 4]);
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: ids::TOWN_CENTRE,
         garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
-    }])];
+    }]))];
     let set = |target, point, own| {
         Command::GatherPoint(GatherPointCommand {
             player: player_id(0),
@@ -14125,11 +14236,11 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
         vec![gathering_centre(9149, Position::new(104.0, 47.0, 0.5))],
         [200.0; 4],
     );
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: ids::TOWN_CENTRE,
         garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
-    }])];
+    }]))];
     let set = |state| {
         Command::SetGatherState(SetGatherStateCommand {
             player: player_id(0),
@@ -14171,11 +14282,11 @@ fn set_gather_state_leaves_building_that_takes_no_gather_point_and_gone_object()
     let at = house.id;
     let mut t = one_player(vec![house], [200.0; 4]);
     t.set_part(at, Part::GatherPoint(gather)).unwrap();
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: ids::HOUSE,
         kind: MasterKind::BUILDING,
         ..Master::default()
-    }])];
+    }]))];
     let set = |state| {
         Command::SetGatherState(SetGatherStateCommand {
             player: player_id(0),
@@ -14206,11 +14317,11 @@ fn set_gather_point_keeps_the_target_of_kept_gather_point() {
     let at = tc.id;
     let mut t = one_player(vec![tc], [200.0; 4]);
     t.set_part(at, Part::GatherPoint(gather)).unwrap();
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: ids::TOWN_CENTRE,
         garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
-    }])];
+    }]))];
     let set = |target: Option<i32>, own| {
         Command::GatherPoint(GatherPointCommand {
             player: player_id(0),
@@ -14255,7 +14366,7 @@ fn set_gather_point_takes_building_that_trains_without_garrisoning() {
     let mut house = town_centre(10909);
     house.life.master_id = ids::HOUSE;
     let mut t = one_player(vec![barracks, house], [200.0; 4]);
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         Master {
             id: master_id(12),
             kind: MasterKind::BUILDING,
@@ -14273,7 +14384,7 @@ fn set_gather_point_takes_building_that_trains_without_garrisoning() {
             trained_at: vec![master_id(12)],
             ..Master::default()
         },
-    ])];
+    ]))];
     let set = Command::GatherPoint(GatherPointCommand {
         player: player_id(0),
         units: unit_list(object_ids([10908, 10909])),
@@ -14320,12 +14431,12 @@ fn command_queue_takes_the_gather_point_first_then_the_steps() {
     let at = tc.id;
     let mut t = one_player(vec![tc], [200.0; 4]).with_ais([(at, ai)]);
     t.set_part(at, Part::GatherPoint(gather)).unwrap();
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: ids::TOWN_CENTRE,
         kind: MasterKind::BUILDING,
         garrison: GarrisonCapacity::of_data(15),
         ..Master::default()
-    }])];
+    }]))];
     let step = |point| {
         Command::CommandQueue(BuildingQueueCommand {
             player: player_id(0),
@@ -14563,7 +14674,10 @@ fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
         hit_points: MasterHitPoints::of_data(500),
         ..Master::default()
     };
-    t.masters = vec![Masters::new([petard, tree]), Masters::new([wall])];
+    t.model.masters = vec![
+        Arc::new(Masters::new([petard, tree])),
+        Arc::new(Masters::new([wall])),
+    ];
     // a sleeping tree beside it (426048706's 8858): the blast walks the sleeping too
     let _ = t
         .push_asleep(
@@ -14588,7 +14702,7 @@ fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
             },
         )
         .unwrap();
-    t.graphics = Graphics::from([(
+    t.model.graphics = Arc::new(Graphics::from([(
         SpriteId::named(1751),
         Graphic {
             id: SpriteId::named(1751),
@@ -14599,7 +14713,7 @@ fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::ANIMATED,
         },
-    )]);
+    )]));
     let placed = |x: f32, class, player, master| Placed {
         position: Position::new(x, 158.5, 0.0),
         radius: Footprint::new(0.5, 0.5),
@@ -14770,11 +14884,11 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
         ],
     )
     .with_parts(split.1);
-    t.masters = vec![
-        Masters::new([]),
-        Masters::new([gate(master_id(88)), gate(master_id(95))]),
+    t.model.masters = vec![
+        Arc::new(Masters::new([])),
+        Arc::new(Masters::new([gate(master_id(88)), gate(master_id(95))])),
     ];
-    t.graphics = Graphics::from([(SpriteId::named(1751), g)]);
+    t.model.graphics = Arc::new(Graphics::from([(SpriteId::named(1751), g)]));
     // the main building's slot of the annex, as a load fills it
     t.link_test_annex(object_id(7229), object_id(7228));
     t.sync_world();
@@ -14914,18 +15028,18 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
     .with_parts(split.1);
     t.link_test_annex(object_id(34602), object_id(34600));
     t.link_test_annex(object_id(34601), object_id(34600));
-    t.masters = vec![
-        Masters::new([]),
-        Masters::new([
+    t.model.masters = vec![
+        Arc::new(Masters::new([])),
+        Arc::new(Masters::new([
             master(master_id(800), Some(SpriteId::named(38)), None),
             master(
                 master_id(1192),
                 Some(SpriteId::named(37)),
                 Some(SpriteId::named(112)),
             ),
-        ]),
+        ])),
     ];
-    t.graphics = Graphics::from([
+    t.model.graphics = Arc::new(Graphics::from([
         (
             SpriteId::named(1751),
             g(SpriteId::named(1751), SpriteFlags::NONE),
@@ -14951,7 +15065,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
                 SpriteFlags::ANIMATED | SpriteFlags::ONCE,
             ),
         ),
-    ]);
+    ]));
     let looks = |t: &World| -> Vec<(ObjectId, ObjectState, f32, Option<MainBuildingId>)> {
         t.players[1]
             .objects
@@ -15315,14 +15429,16 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         }],
     )
     .with_parts(split.1);
-    t.masters = vec![Masters::new([barracks])];
-    t.graphics = [
-        (SpriteId::named(207), g(SpriteId::named(207))),
-        (SpriteId::named(389), g(SpriteId::named(389))),
-        (SpriteId::named(2573), g(SpriteId::named(2573))),
-    ]
-    .into_iter()
-    .collect();
+    t.model.masters = vec![Arc::new(Masters::new([barracks]))];
+    t.model.graphics = Arc::new(
+        [
+            (SpriteId::named(207), g(SpriteId::named(207))),
+            (SpriteId::named(389), g(SpriteId::named(389))),
+            (SpriteId::named(2573), g(SpriteId::named(2573))),
+        ]
+        .into_iter()
+        .collect(),
+    );
     t.tick(Millis::new(10));
     assert_eq!(t.players[0].unsupported, None);
     let u = &t.players[0].objects[ListIndex::new(0)];
@@ -15928,7 +16044,12 @@ fn on_side<R>(
     for (id, parts) in parts {
         t.load_parts(id, parts).unwrap();
     }
-    (t.spatial, t.masters, t.graphics, t.groups) = (spatial, every, graphics, groups);
+    (t.spatial, t.model.masters, t.model.graphics, t.groups) = (
+        spatial,
+        every.into_iter().map(Arc::new).collect(),
+        Arc::new(graphics),
+        groups,
+    );
     let answer = in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -16406,7 +16527,7 @@ fn helper_free(helper: UnitAi, own: Option<&Attack>) -> bool {
 /// [`helper_free`] of the unit `helper` of player `owner` with the world's unit groups `groups`.
 fn helper_free_of(owner: PlayerId, helper: Object, groups: &UnitGroups) -> bool {
     help_view(helper, None, groups, |side| {
-        let scout = player_master(&side.c.w.masters, side.player, ids::ID_448)
+        let scout = player_master(&side.c.w.model.masters, side.player, ids::ID_448)
             .unwrap()
             .clone();
         let helper = OthersRef::of(&side.c.w.players, &side.c.w.index, PlayerId::new(1))
@@ -16693,7 +16814,7 @@ fn build_command_foundation_holds_its_movement_state() {
     )]);
     t.next_object_id = object_id(10028);
     t.world_time = WorldTime::from_millis(72890);
-    t.masters = vec![Masters::default(), masters];
+    t.model.masters = vec![Arc::new(Masters::default()), Arc::new(masters)];
     placeable(&mut t);
     t.run(&Command::Build(BuildCommand {
         player: player_id(1),
@@ -16784,9 +16905,9 @@ fn build_command_foundation_draws_its_facing_before_its_powerup_offset() {
             },
         )]);
         t.next_object_id = object_id(10028);
-        t.masters = vec![Masters::default(), masters];
+        t.model.masters = vec![Arc::new(Masters::default()), Arc::new(masters)];
         t.streams.seed_all(0x5eed);
-        let _ = t.graphics.insert(
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(
             SpriteId::named(588),
             Graphic {
                 id: SpriteId::named(588),
@@ -16945,7 +17066,7 @@ fn reseed_world() -> World {
         },
     )]);
     t.next_object_id = object_id(10028);
-    t.masters = vec![Masters::default(), farm_masters()];
+    t.model.masters = vec![Arc::new(Masters::default()), Arc::new(farm_masters())];
     placeable(&mut t);
     t
 }
@@ -17077,8 +17198,18 @@ fn reseed_without_farm_to_make_makes_nothing() {
             (t.players[1].farm_queue, t.players[1].fish_trap_queue) =
                 (QueueCount::ZERO, QueueCount::ONE);
         },
-        |t| t.masters[1].get_mut(master_id(259)).unwrap().class = class::FISHING_SHIP,
-        |t| t.masters[1].get_mut(ids::FARM).unwrap().available = false,
+        |t| {
+            Arc::make_mut(&mut t.model.masters[1])
+                .get_mut(master_id(259))
+                .unwrap()
+                .class = class::FISHING_SHIP;
+        },
+        |t| {
+            Arc::make_mut(&mut t.model.masters[1])
+                .get_mut(ids::FARM)
+                .unwrap()
+                .available = false;
+        },
     ];
     for setup in none {
         assert_eq!(reseeded(setup), (Ok(false), 1));
@@ -17093,15 +17224,15 @@ fn fishing_ship_reseeds_fish_trap() {
         let trap = Master {
             id: FISH_TRAP,
             base_id: Some(FISH_TRAP),
-            ..t.masters[1].get(ids::FARM).unwrap().clone()
+            ..t.model.masters[1].get(ids::FARM).unwrap().clone()
         };
-        let ms = &mut t.masters[1];
+        let ms = &mut t.model.masters[1];
         // a ship builds as itself: its own Build task, no group
         let tasks = ms.get(ids::BUILDER).unwrap().tasks.clone();
-        let ship = ms.get_mut(master_id(259)).unwrap();
+        let ship = Arc::make_mut(ms).get_mut(master_id(259)).unwrap();
         (ship.class, ship.task_by_group, ship.tasks) =
             (class::FISHING_SHIP, TaskGroup::NONE, tasks);
-        *ms = Masters::new(ms.iter().cloned().chain([trap]));
+        *ms = Arc::new(Masters::new(ms.iter().cloned().chain([trap])));
         t.players[1].farm_queue = QueueCount::of_data(0);
     };
     let mut t = reseed_world();
@@ -17227,7 +17358,7 @@ fn committing_build_or_wall_to_busy_builder_readies_its_queue() {
         },
     )]);
     t.next_object_id = object_id(10028);
-    t.masters = vec![Masters::default(), builder_masters()];
+    t.model.masters = vec![Arc::new(Masters::default()), Arc::new(builder_masters())];
     placeable(&mut t);
     let mut wall = t.clone();
     t.run(&Command::Build(BuildCommand {
@@ -17602,7 +17733,7 @@ fn livestock_inside_gets_its_default_artifact_and_loses_it_by_turns() {
 #[test]
 fn build_of_another_player_builders_is_refused_and_theirs_are_left_out() {
     let mut t = build_world();
-    t.masters[0] = builder_masters();
+    t.model.masters[0] = Arc::new(builder_masters());
     let theirs = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
     let _ = t.push_live(PlayerId::new(0), theirs).unwrap();
     let build = |builders: Vec<i32>| {
@@ -17746,12 +17877,12 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    t.graphics = Graphics::from([
+    t.model.graphics = Arc::new(Graphics::from([
         (SpriteId::named(300), sprite(SpriteId::named(300))),
         (SpriteId::named(301), sprite(SpriteId::named(301))),
-    ]);
+    ]));
     let masters = archer_masters(hit_chance, max_volley, spread);
-    t.masters = vec![masters.clone(), masters];
+    t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];
     walker(
         &mut t,
         PlayerId::new(1),
@@ -17820,7 +17951,9 @@ fn hit_flare_is_made_where_the_volley_runs() {
         storage: vec![(Some(AttributeId::numbered(12)), Amount::new(1.0), 0)],
         ..Master::default()
     };
-    t.masters[1] = Masters::new(t.masters[1].iter().cloned().chain([flare]));
+    t.model.masters[1] = Arc::new(Masters::new(
+        t.model.masters[1].iter().cloned().chain([flare]),
+    ));
     t.players[1].attributes = vec![Amount::ZERO; 300];
     let aimed = Aimed {
         target: Some(object_id(50)),
@@ -17948,7 +18081,11 @@ fn fired_missile_joins_its_owner_list_at_its_making() {
         100,
         |unit, actions, c| {
             let _ = unit.update(actions, c)?;
-            let k = key(c.w.masters.of(c.player), &c.w.lines, master_id(363));
+            let k = key(
+                c.w.model.masters.of(c.player),
+                &c.w.model.lines,
+                master_id(363),
+            );
             let listed = OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
                 .own(object_id(-2))
@@ -17973,8 +18110,11 @@ fn fired_missile_joins_its_owner_list_at_its_making() {
 #[test]
 fn missed_missile_strays_and_lands_on_the_ground() {
     let mut t = archer_world(0, 0, 0.0);
-    for m in &mut t.masters {
-        m.get_mut(master_id(4)).unwrap().missed_spread = MissSpread::new(2.0);
+    for m in &mut t.model.masters {
+        Arc::make_mut(m)
+            .get_mut(master_id(4))
+            .unwrap()
+            .missed_spread = MissSpread::new(2.0);
     }
     for _ in 0..6 {
         t.tick(Millis::new(100));
@@ -18076,7 +18216,7 @@ fn volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
 #[test]
 fn volley_own_missiles_hit_without_the_shooter() {
     let mut t = archer_world(100, 3, 0.5);
-    for m in &mut t.masters {
+    for m in &mut t.model.masters {
         let mut all: Vec<Master> = m.iter().cloned().collect();
         let own = Master {
             id: master_id(364),
@@ -18085,10 +18225,13 @@ fn volley_own_missiles_hit_without_the_shooter() {
             ..m.get(master_id(363)).unwrap().clone()
         };
         all.push(own);
-        m.get_mut(master_id(4)).unwrap().volley_missile = Some(master_id(364));
+        Arc::make_mut(m)
+            .get_mut(master_id(4))
+            .unwrap()
+            .volley_missile = Some(master_id(364));
         all.retain(|x| x.id != master_id(4));
         all.push(m.get(master_id(4)).unwrap().clone());
-        *m = Masters::new(all);
+        *m = Arc::new(Masters::new(all));
     }
     for _ in 0..6 {
         t.tick(Millis::new(100));
@@ -18140,9 +18283,12 @@ fn new_missile_sprite_draws_as_new_object_s() {
         replay_delay: Seconds::ZERO,
         flags: (SpriteFlags::ANIMATED | SpriteFlags::TURNS | SpriteFlags::RANDOM_FIRST_FRAME),
     };
-    let _ = drawn.graphics.insert(SpriteId::named(302), sprite);
-    for m in &mut drawn.masters {
-        m.get_mut(master_id(363)).unwrap().standing_sprite = Some(SpriteId::named(302));
+    let _ = Arc::make_mut(&mut drawn.model.graphics).insert(SpriteId::named(302), sprite);
+    for m in &mut drawn.model.masters {
+        Arc::make_mut(m)
+            .get_mut(master_id(363))
+            .unwrap()
+            .standing_sprite = Some(SpriteId::named(302));
     }
     for _ in 0..6 {
         plain.tick(Millis::new(100));
@@ -18163,8 +18309,9 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
     let cases: [(Change, &str); 7] = [
         (
             |t| {
-                for m in &mut t.masters {
-                    m.get_mut(master_id(4)).unwrap().charge_kind = ChargeKind::of_data(6);
+                for m in &mut t.model.masters {
+                    Arc::make_mut(m).get_mut(master_id(4)).unwrap().charge_kind =
+                        ChargeKind::of_data(6);
                 }
             },
             "a charged hit",
@@ -18175,32 +18322,40 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
         ),
         (
             |t| {
-                for m in &mut t.masters {
-                    m.get_mut(master_id(363)).unwrap().recyclable = false;
+                for m in &mut t.model.masters {
+                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().recyclable = false;
                 }
             },
             "a missile of a master that is not recyclable",
         ),
         (
             |t| {
-                for m in &mut t.masters {
-                    m.get_mut(master_id(363)).unwrap().moving = None;
+                for m in &mut t.model.masters {
+                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().moving = None;
                 }
             },
             "a missile master that does not move",
         ),
         (
             |t| {
-                for m in &mut t.masters {
-                    m.get_mut(master_id(363)).unwrap().missile_stats = None;
+                for m in &mut t.model.masters {
+                    Arc::make_mut(m)
+                        .get_mut(master_id(363))
+                        .unwrap()
+                        .missile_stats = None;
                 }
             },
             "a missile master without its flight",
         ),
         (
             |t| {
-                for m in &mut t.masters {
-                    if let Some(s) = m.get_mut(master_id(363)).unwrap().missile_stats.as_mut() {
+                for m in &mut t.model.masters {
+                    if let Some(s) = Arc::make_mut(m)
+                        .get_mut(master_id(363))
+                        .unwrap()
+                        .missile_stats
+                        .as_mut()
+                    {
                         s.smart_mode = SmartMode::LEADS_TARGET;
                     }
                 }
@@ -18209,8 +18364,13 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
         ),
         (
             |t| {
-                for m in &mut t.masters {
-                    if let Some(s) = m.get_mut(master_id(363)).unwrap().missile_stats.as_mut() {
+                for m in &mut t.model.masters {
+                    if let Some(s) = Arc::make_mut(m)
+                        .get_mut(master_id(363))
+                        .unwrap()
+                        .missile_stats
+                        .as_mut()
+                    {
                         s.projectile_kind = ProjectileKind::of_data(1);
                     }
                 }
@@ -18450,10 +18610,13 @@ fn forager_whose_bush_dies_lets_it_go_and_asks_for_search() {
 fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
     let carrying = |near: bool| {
         let mut t = foraging();
-        for masters in &mut t.masters {
-            let bush = masters.get_mut(master_id(59)).unwrap();
+        for masters in &mut t.model.masters {
+            let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
             (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FORAGE);
-            masters.get_mut(master_id(120)).unwrap().line_of_sight = Distance::new(4.0);
+            Arc::make_mut(masters)
+                .get_mut(master_id(120))
+                .unwrap()
+                .line_of_sight = Distance::new(4.0);
         }
         t.parts
             .unit_ai
@@ -18851,10 +19014,14 @@ fn house_builder() -> World {
             FoundationId::new(object_id(10028)),
         )
         .unwrap();
-    let k = key(t.masters.get(1), &t.lines, ids::TOWN_CENTRE);
+    let k = key(
+        t.model.masters.get(1).map(|m| &**m),
+        &t.model.lines,
+        ids::TOWN_CENTRE,
+    );
     t.players[1].tracker.add(object_id(700), k);
     t.players[1].tracker.complete(object_id(700), k);
-    t.drop_sites[0].resource_types = attribute::RESOURCES.to_vec();
+    Arc::make_mut(&mut t.model.drop_sites)[0].resource_types = attribute::RESOURCES.to_vec();
     t
 }
 
@@ -18971,7 +19138,7 @@ fn drop_site_sought(
     t.build_mesh().unwrap();
     setup(&mut t);
     let mut world = DropWorld {
-        masters: OwnerMasters::new(&t.parts.own_master, t.masters.get(1)),
+        masters: OwnerMasters::new(&t.parts.own_master, t.model.masters.get(1).map(|m| &**m)),
         spatial: &mut t.spatial,
         zones: &mut t.zones,
         pathing: &mut t.pathing,
@@ -18988,7 +19155,7 @@ fn drop_site_sought(
         objects,
         ActionState::NO_ACTION,
         args,
-        index::ObjectsRef::new(&t.players, &t.index, &t.masters, &t.parts),
+        index::ObjectsRef::new(&t.players, &t.index, &t.model.masters, &t.parts),
     )
 }
 
@@ -19043,9 +19210,11 @@ fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
         Ok(Some(DropSiteId::new(object_id(700))))
     );
     let unknown = |t: &mut World| {
-        for masters in &mut t.masters {
-            masters.get_mut(master_id(120)).unwrap().drop_sites =
-                vec![ids::TOWN_CENTRE, master_id(999)];
+        for masters in &mut t.model.masters {
+            Arc::make_mut(masters)
+                .get_mut(master_id(120))
+                .unwrap()
+                .drop_sites = vec![ids::TOWN_CENTRE, master_id(999)];
         }
         t.players[1].objects[ListIndex::new(2)].life.master_id = master_id(999);
     };
@@ -19326,9 +19495,12 @@ fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let _ = t.graphics.insert(SpriteId::named(31), walking);
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(31), walking);
     let master = t.players[1].objects[ListIndex::new(0)].life.master_id;
-    t.masters[1].get_mut(master).unwrap().move_sprite = Some(SpriteId::named(31));
+    Arc::make_mut(&mut t.model.masters[1])
+        .get_mut(master)
+        .unwrap()
+        .move_sprite = Some(SpriteId::named(31));
     let r = in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -19424,8 +19596,8 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
     let mut t = hunt_world();
     t.spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([3, 0])]);
     t.spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([4, 1])]);
-    for masters in &mut t.masters {
-        let m = masters.get_mut(master_id(122)).unwrap();
+    for masters in &mut t.model.masters {
+        let m = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
         (m.line_of_sight, m.search_radius) = (Distance::new(4.0), Distance::new(4.0));
     }
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
@@ -19617,14 +19789,22 @@ fn annexed_house() -> World {
     let placed = *t.spatial.get(object_id(10028)).unwrap();
     t.spatial.insert(object_id(10030), placed);
     t.link_test_annex(object_id(10030), object_id(10028));
-    let k = key(t.masters.get(1), &t.lines, ids::HOUSE);
+    let k = key(
+        t.model.masters.get(1).map(|m| &**m),
+        &t.model.lines,
+        ids::HOUSE,
+    );
     t.players[1].tracker.add(object_id(10030), k);
     t
 }
 
 /// Where houses `a` and `b` stand in their owner's done tracker list of master 70.
 fn done_at(t: &World, a: i32, b: i32) -> (Option<usize>, Option<usize>) {
-    let k = key(t.masters.get(1), &t.lines, ids::HOUSE);
+    let k = key(
+        t.model.masters.get(1).map(|m| &**m),
+        &t.model.lines,
+        ids::HOUSE,
+    );
     let done = t.players[1].tracker.list(ListKey::of_master(k.master));
     let at = |id| done.iter().position(|&d| d == id);
     (at(ObjectId::of_field(a)), at(ObjectId::of_field(b)))
@@ -19734,13 +19914,19 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
         0,
     );
     t.build_mesh().unwrap();
-    for masters in &mut t.masters {
-        let bush = masters.get_mut(master_id(59)).unwrap();
+    for masters in &mut t.model.masters {
+        let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
         (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FORAGE);
-        masters.get_mut(master_id(120)).unwrap().line_of_sight = Distance::new(4.0);
-        masters.get_mut(ids::TOWN_CENTRE).unwrap().line_of_sight = Distance::new(16.0);
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .line_of_sight = Distance::new(4.0);
+        Arc::make_mut(masters)
+            .get_mut(ids::TOWN_CENTRE)
+            .unwrap()
+            .line_of_sight = Distance::new(16.0);
     }
-    t.drop_sites[0].auto_work = true;
+    Arc::make_mut(&mut t.model.drop_sites)[0].auto_work = true;
     let b = t
         .parts
         .actions
@@ -19817,10 +20003,13 @@ fn builder_finds_more_work_around_the_building_it_finished() {
             .build()
             .is_none()
     );
-    let off: fn(&mut World) = |t| t.drop_sites[0].auto_work = false;
+    let off: fn(&mut World) = |t| Arc::make_mut(&mut t.model.drop_sites)[0].auto_work = false;
     let short: fn(&mut World) = |t| {
-        for masters in &mut t.masters {
-            masters.get_mut(ids::TOWN_CENTRE).unwrap().line_of_sight = Distance::ZERO;
+        for masters in &mut t.model.masters {
+            Arc::make_mut(masters)
+                .get_mut(ids::TOWN_CENTRE)
+                .unwrap()
+                .line_of_sight = Distance::ZERO;
         }
     };
     for setup in [off, short] {
@@ -19946,7 +20135,11 @@ fn builder_completion_reaches_the_world_within_its_update() {
         (house.life.state, repairers_of(&t, house)),
         (ObjectState::Alive, 0)
     );
-    let k = key(t.masters.get(1), &t.lines, ids::HOUSE);
+    let k = key(
+        t.model.masters.get(1).map(|m| &**m),
+        &t.model.lines,
+        ids::HOUSE,
+    );
     assert!(
         t.players[1]
             .tracker
@@ -20041,7 +20234,11 @@ fn foundation_whose_build_points_reached_its_build_time_completes() {
     let h = &t.players[1].objects[ListIndex::new(1)];
     let k = t.parts.building_of(h.id).construction.unwrap();
     assert_eq!((h.life.state, k.desolid), (ObjectState::Alive, false));
-    let key = key(t.masters.get(1), &t.lines, ids::HOUSE);
+    let key = key(
+        t.model.masters.get(1).map(|m| &**m),
+        &t.model.lines,
+        ids::HOUSE,
+    );
     assert_eq!(
         t.players[1].tracker.list(ListKey::of_master(key.master)),
         [Some(object_id(10028))]
@@ -20089,8 +20286,8 @@ fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves()
         .map_err(|e| e.reason().to_owned())
     };
     let mut t = house_builder();
-    for masters in &mut t.masters {
-        let b = masters
+    for masters in &mut t.model.masters {
+        let b = Arc::make_mut(masters)
             .get_mut(ids::HOUSE)
             .unwrap()
             .building
@@ -20102,12 +20299,12 @@ fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves()
     let mut t = house_builder();
     t.players[1].history.entries.push(HistoryEntry::default());
     t.players[1].attributes.resize(250, Amount::ZERO);
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let castle = Master {
             id: ids::CASTLE,
             ..masters.get(ids::HOUSE).unwrap().clone()
         };
-        *masters = Masters::new(masters.iter().cloned().chain([castle]));
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([castle])));
     }
     t.players[1].objects[ListIndex::new(1)].life.master_id = ids::CASTLE;
     let castle_built = EventKind::CASTLE_BUILT;
@@ -20123,8 +20320,8 @@ fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves()
 #[test]
 fn dying_desolid_foundation_owner_watches_it_within_its_update() {
     let mut t = house_builder();
-    for masters in &mut t.masters {
-        let house = masters.get_mut(ids::HOUSE).unwrap();
+    for masters in &mut t.model.masters {
+        let house = Arc::make_mut(masters).get_mut(ids::HOUSE).unwrap();
         house.death_sprite = None;
         if let Some(b) = house.building.as_mut() {
             b.destruction_sprite = None;
@@ -20158,14 +20355,17 @@ fn dying_desolid_foundation_owner_watches_it_within_its_update() {
 fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieError> {
     use crate::objects::masters::BuildingMaster;
     let mut t = house_builder();
-    for masters in &mut t.masters {
-        let centre = masters.get_mut(ids::TOWN_CENTRE).unwrap();
+    for masters in &mut t.model.masters {
+        let centre = Arc::make_mut(masters).get_mut(ids::TOWN_CENTRE).unwrap();
         centre.hit_points = MasterHitPoints::of_data(2400);
         centre.building = Some(BuildingMaster {
             garrison_heal_rate: HitPoints::new(2.0),
             ..BuildingMaster::default()
         });
-        masters.get_mut(master_id(120)).unwrap().hit_points = MasterHitPoints::of_data(25);
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .hit_points = MasterHitPoints::of_data(25);
     }
     t.world_time = WorldTime::from_millis(3000);
     t.players[1].objects[ListIndex::new(2)].garrison = vec![object_id(9175)];
@@ -20235,8 +20435,8 @@ fn building_heals_its_garrison_each_whole_second() {
         "a unit inside whose raider_build_countdown runs (FUN_1411e7220)"
     );
     let repairs = |t: &mut World| {
-        for masters in &mut t.masters {
-            let b = masters
+        for masters in &mut t.model.masters {
+            let b = Arc::make_mut(masters)
                 .get_mut(ids::TOWN_CENTRE)
                 .unwrap()
                 .building
@@ -20260,8 +20460,11 @@ fn building_heals_its_garrison_each_whole_second() {
 fn wall_or_house_counts_no_whole_seconds() {
     use crate::construction::building_update::walls_branch;
     let wall = |t: &mut World| {
-        for masters in &mut t.masters {
-            masters.get_mut(ids::TOWN_CENTRE).unwrap().class = class::WALL;
+        for masters in &mut t.model.masters {
+            Arc::make_mut(masters)
+                .get_mut(ids::TOWN_CENTRE)
+                .unwrap()
+                .class = class::WALL;
         }
     };
     assert_eq!(centre_seconds(wall), Ok((10.0, 0)));
@@ -20506,7 +20709,7 @@ fn repair_pays_ends_at_full_hit_points_and_reaches_an_ally_house() {
     );
     // a castle (650 stone, 4800 hit points) pays its share in stone
     let mut t = repairing(near);
-    for masters in &mut t.masters {
+    for masters in &mut t.model.masters {
         let house = masters.get(ids::HOUSE).unwrap().clone();
         let castle = Master {
             id: ids::CASTLE,
@@ -20514,7 +20717,7 @@ fn repair_pays_ends_at_full_hit_points_and_reaches_an_ally_house() {
             cost: costs(&[(attribute::STONE, 650, true)]),
             ..house
         };
-        *masters = Masters::new(masters.iter().cloned().chain([castle]));
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([castle])));
     }
     let castle = &mut t.players[1].objects[ListIndex::new(1)];
     (castle.life.master_id, castle.life.hp) = (master_id(82), HitPoints::new(3000.0));
@@ -21056,7 +21259,7 @@ fn dying_building_lets_its_annexes_go_in_its_own_update() {
         .unwrap()
         .annex_of = Some(MainBuildingId::new(object_id(10028)));
     let house = &t.players[1].objects[ListIndex::new(1)];
-    let master = t.masters[1].get(house.life.master_id).unwrap();
+    let master = t.model.masters[1].get(house.life.master_id).unwrap();
     let progress = t.parts.building_of(house.id).construction.unwrap().progress;
     let id = building_death(master, None, progress).unwrap();
     let shown = Graphic {
@@ -21068,7 +21271,7 @@ fn dying_building_lets_its_annexes_go_in_its_own_update() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
     };
-    let _ = t.graphics.insert(id, shown);
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(id, shown);
     let seen = in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(1)),
@@ -21406,15 +21609,15 @@ fn completion_parts_reach_their_owner() {
     // the house's completion with its master's technology, or disappearing when built
     let completed = |setup: fn(&mut BuildingMaster)| {
         let mut t = house_builder();
-        for masters in &mut t.masters {
-            if let Some(b) = masters
+        for masters in &mut t.model.masters {
+            if let Some(b) = Arc::make_mut(masters)
                 .get_mut(ids::HOUSE)
                 .and_then(|m| m.building.as_mut())
             {
                 setup(b);
             }
         }
-        t.techs = vec![TechDef::default()];
+        t.model.techs = Arc::new(vec![TechDef::default()]);
         t.players[1].techs = vec![TechState {
             state: ResearchState::Available,
             research_cap: ResearchCap::of_data(-1),
@@ -21462,7 +21665,7 @@ fn built_building_death_reaches_its_owner_within_its_update() {
     use crate::technology::{TechDef, TechState};
     let died = |another: bool| {
         let mut t = enter_world(vec![], 5);
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let mut castle = Master {
                 id: ids::CASTLE,
                 death_sprite: None,
@@ -21471,7 +21674,7 @@ fn built_building_death_reaches_its_owner_within_its_update() {
             };
             let b = castle.building.as_mut().unwrap();
             (b.tech, b.destruction_sprite) = (Some(tech_id(0)), None);
-            *masters = Masters::new(masters.iter().cloned().chain([castle]));
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([castle])));
         }
         t.players[1].objects[ListIndex::new(1)].life.master_id = ids::CASTLE;
         if another {
@@ -21479,7 +21682,7 @@ fn built_building_death_reaches_its_owner_within_its_update() {
             other.unit.id = object_id(10031);
             let _ = t.push_live(PlayerId::new(1), other).unwrap();
         }
-        t.techs = vec![TechDef::default()];
+        t.model.techs = Arc::new(vec![TechDef::default()]);
         t.players[1].techs = vec![TechState {
             state: ResearchState::Researched,
             ..TechState::default()
@@ -22297,9 +22500,15 @@ fn explorer_hears(t: &mut World) -> String {
 #[test]
 fn computer_players_ai_tasks_its_explorer_to_the_unexplored_tile() {
     let mut t = explorer_world(&[[28, 80]], vec![]);
-    for masters in &mut t.masters {
-        masters.get_mut(master_id(120)).unwrap().line_of_sight = Distance::new(4.0);
-        masters.get_mut(ids::TOWN_CENTRE).unwrap().line_of_sight = Distance::new(5.0);
+    for masters in &mut t.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(master_id(120))
+            .unwrap()
+            .line_of_sight = Distance::new(4.0);
+        Arc::make_mut(masters)
+            .get_mut(ids::TOWN_CENTRE)
+            .unwrap()
+            .line_of_sight = Distance::new(5.0);
     }
     // no sight: the player sees no tile now
     t.spatial.sight = None;
@@ -22367,7 +22576,7 @@ fn frozen_unit_may_have_moved_its_master_speed() {
     let mut t = forage_world();
     let id = t.players[1].objects[ListIndex::new(0)].id;
     let master = t.players[1].objects[ListIndex::new(0)].life.master_id;
-    t.masters[1]
+    Arc::make_mut(&mut t.model.masters[1])
         .get_mut(master)
         .unwrap()
         .moving
@@ -22380,7 +22589,7 @@ fn frozen_unit_may_have_moved_its_master_speed() {
     t.spatial.freeze(id);
     t.grow_unknown(Seconds::new(2.0));
     assert_eq!(t.spatial.get(id).unwrap().unknown, Some(1.6));
-    t.masters[1] = Masters::new([]);
+    t.model.masters[1] = Arc::new(Masters::new([]));
     t.grow_unknown(Seconds::new(0.05));
     assert_eq!(t.spatial.get(id).unwrap().unknown, Some(f32::INFINITY));
 }

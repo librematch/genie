@@ -156,7 +156,7 @@ impl World {
             (unit, self.parts.mover_of(unit.id)),
             builder,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );
@@ -207,7 +207,7 @@ impl World {
             (unit, self.parts.mover_of(unit.id)),
             master,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );
@@ -380,7 +380,7 @@ impl World {
                 (unit, self.parts.mover_of(unit.id)),
                 unit.master(self.master_tables(), player)?,
                 (
-                    &self.graphics,
+                    &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
             );
@@ -482,7 +482,7 @@ impl World {
             (unit, self.parts.mover_of(unit.id)),
             builder,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );

@@ -421,7 +421,7 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?;
         let range = object_range(Distance::ZERO, Some(master));
-        let sprite = object_sprite(master).and_then(|id| self.graphics.get(id).copied());
+        let sprite = object_sprite(master).and_then(|id| self.model.graphics.get(id).copied());
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
         let mover = self
@@ -441,8 +441,8 @@ impl World {
         if move_to.shows_standing() {
             unit.shows_standing_sprite(
                 self.parts.motion.layer_mut(unit.id),
-                OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
-                &self.graphics,
+                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
+                &self.model.graphics,
                 self.streams.get(Stream::Sprite),
             )?;
         }
@@ -522,9 +522,9 @@ impl World {
             self.parts.motion.layer_mut(id),
             point,
             player,
-            OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
+            OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat.of(id).abilities.look.as_ref(),
             ),
         )? {

@@ -187,7 +187,7 @@ impl GatherAction {
             if self.target_class == Some(class::FARM)
                 && target.is_some_and(|t| WorkerCount::ONE < t.workers)
             {
-                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(Distance::new(radius), mover, &walks)?;
                 self.target = None;
@@ -197,7 +197,7 @@ impl GatherAction {
             self.set_idle(c, unit, r);
             return Ok(Next::Stay);
         }
-        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         self.begin_reseed_walk(Distance::new(radius), mover, &walks)?;
         Ok(Next::Stay)

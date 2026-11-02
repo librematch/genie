@@ -66,7 +66,7 @@ impl Unit {
             return Ok(());
         }
         let m = self.master(
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
         )?;
         for &(attribute, amount, kind) in &m.storage {
@@ -173,7 +173,7 @@ impl Unit {
         }
         if before < ObjectState::DyingSprite && ObjectState::Undead < after {
             let master = self.master(
-                MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
                 c.player,
             )?;
             forget_resource(&mut c.w.spatial, Some(master), self.id, self.position())?;

@@ -112,6 +112,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
 use crate::world::tests::in_update;
+use std::sync::Arc;
 
 /// An Enter task of work range `range` and class `class` without sprites.
 pub(crate) fn enter_task(range: Distance, class: ClassId) -> Task {
@@ -223,7 +224,7 @@ fn garrison_world() -> World {
         vec![Millis::ZERO; 4],
         players,
     );
-    t.masters = (0..4).map(|_| garrison_masters()).collect();
+    t.model.masters = (0..4).map(|_| garrison_masters()).map(Arc::new).collect();
     let _ = t
         .push_live(PlayerId::new(1), unit(100, TC, HitPoints::new(2400.0)))
         .unwrap();
@@ -275,7 +276,11 @@ fn walk_again_world() -> (World, ListIndex) {
 }
 
 /// What the reach tile test reads, for unit 1 between (10.5, 10.5) and (11.5, 11.5).
-fn walls<'a>(spatial: &'a mut Spatial, masters: &'a [Masters], stats: &'a MoveStats) -> Walls<'a> {
+fn walls<'a>(
+    spatial: &'a mut Spatial,
+    masters: &'a [Arc<Masters>],
+    stats: &'a MoveStats,
+) -> Walls<'a> {
     Walls {
         me: Point::new(10.5, 10.5),
         them: Point::new(11.5, 11.5),
@@ -362,7 +367,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
     // the reach is the footprints' squared gap against the range squared (COMISS/JBE: a NaN
     // gap is in); a target with speed within a range of 1 (COMISS/JC: a NaN range is not
     // tested) asks the tiles about the two: on a walled map a reach that skips them is in
-    let masters = [Masters::default(), garrison_masters()];
+    let masters = [Masters::default(), garrison_masters()].map(Arc::new);
     let blocked = [(10, 11), (11, 10)];
     let (mut walled, stats) = walled_map(GridSize::new(100, 100), &blocked, &blocked, &[(10, 11)]);
     let (mut open, _) = walled_map(GridSize::new(100, 100), &[(10, 11)], &blocked, &[]);
@@ -539,8 +544,8 @@ fn villager(t: &World) -> ListIndex {
 /// villager's master has no sprites (the world's sprites' table is empty), its walk 16 facets.
 fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
     let mut t = shore_world(at, ship);
-    for m in &mut t.masters {
-        if let Some(v) = m.get_mut(VILLAGER) {
+    for m in &mut t.model.masters {
+        if let Some(v) = Arc::make_mut(m).get_mut(VILLAGER) {
             (v.standing_sprite, v.move_sprite, v.run_sprite) = (None, None, None);
         }
     }
@@ -1046,7 +1051,7 @@ fn walled_map(
 fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
     // FUN_140a85c30 for range <= 1 and a target with speed: the box of the two tiles (one
     // tile and the next when it spans more than one), the two tiles left out
-    let masters = [Masters::default(), garrison_masters()];
+    let masters = [Masters::default(), garrison_masters()].map(Arc::new);
     let walled = |spatial: &mut Spatial, stats, me, them| {
         walled_off(
             me,
@@ -1118,7 +1123,7 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
         Ok(false)
     );
     // a master the slice lacks on a counted tile fails
-    let masters = [Masters::default(), Masters::default()];
+    let masters = [Masters::default(), Masters::default()].map(Arc::new);
     let (mut spatial, stats) = walled_map(GridSize::new(100, 100), &blocked, &blocked, &[]);
     assert!(
         walled_off(
@@ -1641,7 +1646,7 @@ fn transport_takes_combat_unit_with_task_on_its_class_and_room() {
         tasks: vec![task(GARRISON, 20)],
         ..Master::default()
     }]));
-    t.masters = (0..4).map(|_| masters.clone()).collect();
+    t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
     assert_eq!(takes(&t, master_id(1500), true), Ok(true));
     // full: no room for one more
     assert_eq!(takes(&t, master_id(1500), false), Ok(false));
@@ -1710,7 +1715,7 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
         class: WHOLE_SHARE_CLASS,
         ..Master::default()
     }]));
-    t.masters = (0..4).map(|_| relic.clone()).collect();
+    t.model.masters = (0..4).map(|_| relic.clone()).map(Arc::new).collect();
     for (p, id, m) in [
         (1, 1000, VILLAGER),
         (1, 1001, ARCHER),
@@ -1799,7 +1804,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
         v.tall = true;
         v.moving = Some(standing());
     }
-    t.masters = (0..4).map(|_| masters.clone()).collect();
+    t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
     let n = (w * h) as usize;
     t.spatial = Spatial::new(GridSize::new(w, h));
     let mut terrain = Terrain::new(
@@ -2028,7 +2033,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
             (Some(AttributeId::numbered(17)), Amount::new(6.0));
     };
     let drop_site = |t: &mut World| {
-        t.drop_sites = vec![DropSite {
+        t.model.drop_sites = Arc::new(vec![DropSite {
             building: TC,
             worker_class: Some(class::VILLAGER),
             targets: vec![DropTarget {
@@ -2038,7 +2043,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
                 attribute: Some(AttributeId::numbered(17)),
             }],
             ..DropSite::default()
-        }];
+        }]);
     };
     let (r, t) = enters_the_centre(|t| {
         with_food(t);
@@ -2068,8 +2073,8 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
         "an enter into a building at a fifth of its hit points (state 13)"
     );
     let transforms: fn(&mut World) = |t| {
-        for m in &mut t.masters {
-            let v = m.get_mut(VILLAGER).unwrap();
+        for m in &mut t.model.masters {
+            let v = Arc::make_mut(m).get_mut(VILLAGER).unwrap();
             v.tasks.push(Task {
                 object_id: Some(TC),
                 ..task(ActionKind::DEPOSIT, -1)
@@ -2081,8 +2086,8 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
         "an enter of a master that transforms (task 0x88)"
     );
     let full: fn(&mut World) = |t| {
-        for m in &mut t.masters {
-            m.get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(0);
+        for m in &mut t.model.masters {
+            Arc::make_mut(m).get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(0);
         }
     };
     assert_eq!(
@@ -2267,7 +2272,7 @@ fn unit_ais_test_takes_building_or_transport_that_takes_its_unit_in() {
         garrison: GarrisonCapacity::of_data(5),
         ..Master::default()
     }]));
-    t.masters = (0..4).map(|_| masters.clone()).collect();
+    t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
     let _ = t
         .push_live(
             PlayerId::new(1),
@@ -2436,8 +2441,8 @@ fn garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
     // the annex's count 1, which is full, so it goes to 100 (index 1, count 0)
     let world = |with_annex: bool| {
         let mut t = sized_world(40, 40);
-        for m in &mut t.masters {
-            if let Some(tc) = m.get_mut(TC) {
+        for m in &mut t.model.masters {
+            if let Some(tc) = Arc::make_mut(m).get_mut(TC) {
                 tc.garrison = GarrisonCapacity::of_data(1);
             }
         }
@@ -2640,8 +2645,8 @@ fn garrison_into_transport_pairs_the_units_whose_class_has_the_flags() {
 /// `ship` and villager 1000 at `at`, each where it last moved to its place.
 fn shore_world(at: Point, ship: Point) -> World {
     let mut t = sized_world(40, 40);
-    for m in &mut t.masters {
-        if let Some(v) = m.get_mut(VILLAGER) {
+    for m in &mut t.model.masters {
+        if let Some(v) = Arc::make_mut(m).get_mut(VILLAGER) {
             v.tasks = vec![
                 task(GARRISON, 3),
                 Task {
@@ -2707,9 +2712,9 @@ fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let _ = t.graphics.insert(SpriteId::named(2001), running);
-    for m in &mut t.masters {
-        if let Some(s) = m.get_mut(SHIP) {
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(2001), running);
+    for m in &mut t.model.masters {
+        if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
             s.run_sprite = Some(SpriteId::named(2001));
         }
     }
@@ -2902,15 +2907,15 @@ fn coast_world(ship: Point) -> World {
         restriction: RestrictionId::named(1),
         ..standing()
     };
-    for m in &mut t.masters {
-        if let Some(s) = m.get_mut(SHIP) {
+    for m in &mut t.model.masters {
+        if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
             s.terrain_restriction = Some(RestrictionId::named(1));
             s.radius = Footprint::new(0.5, 0.5);
             s.tall = true;
             s.garrison = GarrisonCapacity::of_data(5);
             s.moving = Some(sails);
         }
-        if let Some(v) = m.get_mut(VILLAGER) {
+        if let Some(v) = Arc::make_mut(m).get_mut(VILLAGER) {
             v.terrain_restriction = Some(RestrictionId::named(0));
         }
     }
@@ -3094,15 +3099,15 @@ fn an_unload_command_sends_transport_toward_the_shore() {
 /// ship's place in its player's list.
 fn transport_task_world() -> (World, ListIndex) {
     let mut t = coast_world(Point::new(10.5, 10.5));
-    for m in &mut t.masters {
+    for m in &mut t.model.masters {
         let market = Master {
             id: ids::MARKET,
             ..m.get(TC).expect("the town centre").clone()
         };
         let mut all: Vec<Master> = m.iter().cloned().collect();
         all.push(market);
-        *m = Masters::new(all);
-        if let Some(s) = m.get_mut(SHIP) {
+        *m = Arc::new(Masters::new(all));
+        if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
             s.tasks.push(Task {
                 id: task_id(7),
                 action_kind: transport::TRANSPORT,
@@ -3215,8 +3220,8 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
 #[test]
 fn trade_boat_work_at_its_own_market_makes_new_transport() {
     let (mut t, idx) = transport_task_world();
-    for m in &mut t.masters {
-        if let Some(s) = m.get_mut(SHIP) {
+    for m in &mut t.model.masters {
+        if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
             s.class = class::TRADE_BOAT;
         }
     }
@@ -3653,8 +3658,11 @@ fn seek_shelter_sends_the_players_villagers_and_checked_units_to_its_buildings()
     assert_eq!(enter(&t, object_id(2000)), Some(Some(container_id(100))));
     // a building that takes no villagers (garrison type bit 0) is not asked
     let mut t = let_out_world();
-    for m in &mut t.masters {
-        if let Some(b) = m.get_mut(TC).and_then(|tc| tc.building.as_mut()) {
+    for m in &mut t.model.masters {
+        if let Some(b) = Arc::make_mut(m)
+            .get_mut(TC)
+            .and_then(|tc| tc.building.as_mut())
+        {
             b.garrison_type = GarrisonKinds::INFANTRY;
         }
     }
@@ -3848,7 +3856,7 @@ fn buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
         class: class::ARTIFACT,
         ..Master::default()
     }]));
-    t.masters = (0..4).map(|_| masters.clone()).collect();
+    t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
     for (p, id, m) in [
         (0, 900, master_id(285)),
         (1, 1000, VILLAGER),
@@ -4261,8 +4269,8 @@ fn building_lets_out_the_units_of_player_no_longer_its_ally() {
 #[test]
 fn siege_tower_unload_on_new_relation_is_not_modelled() {
     let mut t = let_out_world();
-    for m in &mut t.masters {
-        if let Some(ship) = m.get_mut(SHIP) {
+    for m in &mut t.model.masters {
+        if let Some(ship) = Arc::make_mut(m).get_mut(SHIP) {
             ship.class = class::SIEGE;
         }
     }
@@ -4308,10 +4316,10 @@ fn siege_tower_unload_on_new_relation_is_not_modelled() {
 fn market_tells_computer_ally_of_its_tile() {
     let market = |ally: PlayerType, own: PlayerType| {
         let mut t = let_out_world();
-        for m in &mut t.masters {
+        for m in &mut t.model.masters {
             let mut market = m.get(TC).unwrap().clone();
             market.id = ids::MARKET;
-            *m = Masters::new(m.iter().cloned().chain([market]));
+            *m = Arc::new(Masters::new(m.iter().cloned().chain([market])));
         }
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::MARKET;
         t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(10.5, 12.5, 0.0));

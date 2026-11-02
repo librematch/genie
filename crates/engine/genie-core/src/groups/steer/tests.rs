@@ -50,6 +50,7 @@ use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::parts::Object;
+use std::sync::Arc;
 
 /// The walking and the running sprite's top speeds of the hunt tests' walker (speed 0.8): its
 /// factors 1.125 and 1.875.
@@ -146,9 +147,13 @@ fn world() -> World {
         formation_category: FormationClass::of_data(1),
         ..Master::default()
     };
-    t.masters = vec![Masters::new([master]); 2];
+    t.model.masters = vec![Masters::new([master]); 2]
+        .into_iter()
+        .map(Arc::new)
+        .collect();
     for (id, factor) in [(6, 0.0), (7, 1.125), (8, 1.875)] {
-        let _ = t.graphics.insert(SpriteId::named(id), graphic(id, factor));
+        let _ =
+            Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(id), graphic(id, factor));
     }
     t.spatial = Spatial::with_tiles(
         GridSize::new(32, 32),
@@ -177,12 +182,12 @@ fn world() -> World {
 
 /// The members' master and movement with radius `r` on the ground.
 fn widen(t: &mut World, r: f32) {
-    for m in &mut t.masters {
+    for m in &mut t.model.masters {
         let mut all: Vec<Master> = m.iter().cloned().collect();
         for a in &mut all {
             a.radius = Footprint::new(r, r);
         }
-        *m = Masters::new(all);
+        *m = Arc::new(Masters::new(all));
     }
     for u in &mut t.players[1].objects {
         if let Some(m) = t.parts.mover_mut(u.id) {

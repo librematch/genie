@@ -113,7 +113,7 @@ impl World {
     /// mode; without the map's elevations the height stays.
     pub(crate) fn on_ground(&self, p: PlayerId, master: MasterId, at: Position) -> Position {
         let fly_mode =
-            player_master(&self.masters, p, master).map_or(FlyMode::GROUND, |m| m.fly_mode);
+            player_master(&self.model.masters, p, master).map_or(FlyMode::GROUND, |m| m.fly_mode);
         self.spatial
             .terrain
             .as_ref()

@@ -152,7 +152,7 @@ impl Unit {
     /// A gatherer whose master the slice lacks.
     fn gather_reads(&self, c: &Step<'_>, gather: &GatherAction) -> Result<GatherReads, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
+        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.model.graphics.get(s).copied());
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
         Ok(GatherReads {
@@ -260,7 +260,7 @@ impl Unit {
             civ: c.w.players.player(c.player)?.civ,
         };
         Ok(Some(DropOff {
-            takes: drops_at(&c.w.drop_sites, s.master, &actor),
+            takes: drops_at(&c.w.model.drop_sites, s.master, &actor),
             gap_squared: footprint_gap_squared(position, radius, s.position, s.radius),
         }))
     }
@@ -287,10 +287,10 @@ impl Unit {
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
@@ -414,7 +414,7 @@ impl Unit {
         actions: &Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
@@ -423,7 +423,7 @@ impl Unit {
             carry.id().get()
         } else if !master.drop_sites.is_empty() {
             let mut w = DropWorld {
-                masters: OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+                masters: OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 spatial: &mut c.w.spatial,
                 zones: &mut c.w.zones,
                 pathing: &mut c.w.pathing,

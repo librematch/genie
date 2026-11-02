@@ -307,7 +307,7 @@ impl World {
         let Some(filter) = filter else {
             return Ok(NO_RANGE);
         };
-        let Some(master) = self.masters.of(player).and_then(|m| m.get(master)) else {
+        let Some(master) = self.model.masters.of(player).and_then(|m| m.get(master)) else {
             return Ok(0.0);
         };
         for task in &master.tasks {

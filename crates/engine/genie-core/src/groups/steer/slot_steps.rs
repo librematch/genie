@@ -122,7 +122,7 @@ impl World {
                 at.ground(),
                 (
                     &mut self.spatial,
-                    ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                    ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
                 ),
                 &mut plan,
                 (to, Distance::ZERO, None),
@@ -147,7 +147,7 @@ impl World {
                 player_type,
                 (to, 0.0),
                 None,
-                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
             )?
             .0
         };

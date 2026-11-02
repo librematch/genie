@@ -248,7 +248,7 @@ impl World {
                 &mut self.spatial,
                 id,
                 &annexes,
-                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
             )?;
             for u in units {
                 self.shut_in_gate(u)?;
@@ -326,7 +326,7 @@ impl World {
         let world = SwitchWorld {
             spatial: &mut self.spatial,
             pathing: &mut self.pathing,
-            graphics: &self.graphics,
+            graphics: &self.model.graphics,
             sprite: self.streams.get(Stream::Sprite),
         };
         let unit = self.players.live_mut(player, idx)?;

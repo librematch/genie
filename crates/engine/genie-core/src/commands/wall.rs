@@ -239,7 +239,7 @@ impl World {
         if w.queue_id.is_queued() {
             return Ok(());
         }
-        let Some(site) = player_master(&self.masters, player, master) else {
+        let Some(site) = player_master(&self.model.masters, player, master) else {
             return Ok(());
         };
         // The buildings' master type: a wall of another type does nothing.

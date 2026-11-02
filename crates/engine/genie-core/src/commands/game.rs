@@ -320,6 +320,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     /// Gaia and three players with 300 attributes each.
     fn world() -> World {
@@ -387,7 +388,7 @@ mod tests {
             class: class::TOWER,
             ..Master::default()
         };
-        t.masters = vec![Masters::new([]), Masters::new([castle])];
+        t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(Masters::new([castle]))];
         t.track_add(PlayerId::new(1), object_id(500), CASTLE)
             .unwrap();
         t.track_complete(PlayerId::new(1), object_id(500), CASTLE)
@@ -425,7 +426,7 @@ mod tests {
             costing(PASTURE, 100),
             costing(FISH_TRAP, 100),
         ]);
-        t.masters = vec![Masters::new([]), masters];
+        t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(masters)];
         let wood = |t: &World| t.players[1].attributes[1];
         t.game(&game(1, GameSub::FARM_QUEUE, 1, 2, 0)).unwrap();
         assert_eq!(

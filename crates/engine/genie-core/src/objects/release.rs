@@ -99,7 +99,10 @@ impl World {
     pub(crate) fn leave_world(&mut self, p: PlayerId, gone: &Object) -> Result<(), GenieError> {
         let (missile, gone) = (gone.parts.missile, &gone.unit);
         self.track_remove(p, gone.id, gone.life.master_id)?;
-        let master = gone.master(MasterTables::new(&self.masters, &self.parts.own_master), p)?;
+        let master = gone.master(
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
+            p,
+        )?;
         forget_resource(&mut self.spatial, Some(master), gone.id, gone.position())?;
         if MasterKind::COMBAT <= master.kind {
             count_class(&mut self.players.player_mut(p)?.attributes, master, -1.0);

@@ -82,7 +82,7 @@ impl World {
         let class = e.master.map_or(Key::NONE, |m| self.tracker_key(p, m)).class;
         let master = e
             .master
-            .and_then(|m| player_master(&self.masters, p, m))
+            .and_then(|m| player_master(&self.model.masters, p, m))
             .cloned();
         let owner = self.players.player_mut(p)?;
         for _ in 0..count.get().max(0) {
@@ -123,7 +123,7 @@ impl World {
         state.state = ResearchState::Available;
         state.research_done = Seconds::ZERO;
         let building = owner.objects.checked_mut(idx)?;
-        if let Some(def) = self.techs.get(t) {
+        if let Some(def) = self.model.techs.get(t) {
             for c in def.costs.iter().filter(|c| c.paid == CostPaid::BUILDING) {
                 // a cost entry of the building's own store names an attribute
                 let attribute = c.attribute.ok_or(NO_ATTRIBUTE)?;
@@ -234,7 +234,7 @@ impl World {
             .class;
         let master = entry
             .master
-            .and_then(|m| player_master(&self.masters, p, m))
+            .and_then(|m| player_master(&self.model.masters, p, m))
             .cloned();
         let owner = self.players.player_mut(p)?;
         if let Some(m) = &master {

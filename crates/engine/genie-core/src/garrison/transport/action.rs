@@ -39,6 +39,7 @@ use crate::world::World;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
+use genie_model::model::Model;
 
 impl TransportAction {
     /// The unload command's constructor (`FUN_140aa3ab0` with no task, `+0x48`): its point the
@@ -226,8 +227,8 @@ impl TransportAction {
             zones,
             pathing,
             streams,
-            graphics,
             parts,
+            model: Model { graphics, .. },
             ..
         } = &mut *c.w;
         let sprites = SpriteReads {

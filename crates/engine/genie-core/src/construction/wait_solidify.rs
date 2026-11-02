@@ -113,14 +113,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Ok(false);
@@ -128,6 +128,7 @@ impl UnitView<'_, '_> {
         let masters = self
             .c
             .w
+            .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
@@ -152,7 +153,7 @@ impl UnitView<'_, '_> {
             player,
             relations: &self.c.w.players.player(self.player)?.relations,
             foreign,
-            drop_sites: &self.c.w.drop_sites,
+            drop_sites: &self.c.w.model.drop_sites,
         };
         // slot 0x820's point: the target's place
         let at = find(target).map_or(Position::ORIGIN, |(_, u)| u.position());

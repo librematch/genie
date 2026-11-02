@@ -95,7 +95,7 @@ impl World {
         if MasterKind::BUILDING <= master.kind {
             let stack = master.building.as_ref().and_then(|b| b.stack_unit);
             let key = stack
-                .and_then(|stack| player_master(&self.masters, p, stack))
+                .and_then(|stack| player_master(&self.model.masters, p, stack))
                 .filter(|s| {
                     s.kind == MasterKind::BUILDING
                         && s.building

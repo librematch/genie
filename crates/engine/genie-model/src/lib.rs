@@ -27,6 +27,7 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
 pub mod combat;
 pub mod map;
 pub mod math;
+pub mod model;
 pub mod movement;
 pub mod objects;
 pub mod players;

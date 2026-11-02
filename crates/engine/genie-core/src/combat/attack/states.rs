@@ -161,7 +161,13 @@ impl Attack {
                         [600, 0, 0x202],
                     )?;
                 }
-                self.wait_at_seen(unit, c.w.parts.motion_mut(unit.id), f, r, &c.w.graphics)?;
+                self.wait_at_seen(
+                    unit,
+                    c.w.parts.motion_mut(unit.id),
+                    f,
+                    r,
+                    &c.w.model.graphics,
+                )?;
                 return Ok(UpdateCode::CODE_5);
             }
             unit.post_own(

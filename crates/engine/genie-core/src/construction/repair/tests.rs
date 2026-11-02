@@ -37,6 +37,7 @@ use crate::test_ids::task_id;
 use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::tests::{in_update, repairing};
 use crate::world::{Player, World, WorldTime};
+use std::sync::Arc;
 
 const TASK: RepairTask = RepairTask {
     id: task_id(7),
@@ -334,9 +335,9 @@ const fn moving(state: MoveTo) -> RepairState {
 /// the repairer showing its standing sprite.
 fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> World {
     let mut t = repairing(at);
-    t.graphics = graphics();
-    for masters in &mut t.masters {
-        let m = masters.get_mut(ids::BUILDER).unwrap();
+    t.model.graphics = Arc::new(graphics());
+    for masters in &mut t.model.masters {
+        let m = Arc::make_mut(masters).get_mut(ids::BUILDER).unwrap();
         (m.standing_sprite, m.move_sprite) = (Some(SpriteId::named(5)), Some(SpriteId::named(20)));
     }
     let work = Work {
@@ -607,7 +608,7 @@ fn repair_ends_with_its_target_gone_foreign_or_dead() {
                 });
                 t.reindex();
                 t.players[1].relations = relation_row([1, 0, 3]);
-                t.masters.push(t.masters[1].clone());
+                t.model.masters.push(t.model.masters[1].clone());
             },
             true,
         ),

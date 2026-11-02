@@ -78,7 +78,7 @@ impl World {
                 master,
                 self.spatial.map,
                 (
-                    &self.graphics,
+                    &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
                 task,
@@ -143,9 +143,9 @@ impl World {
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
             (
-                OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
+                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
                 (
-                    &self.graphics,
+                    &self.model.graphics,
                     self.parts.combat.of(id).abilities.look.as_ref(),
                 ),
                 rng,
@@ -172,8 +172,8 @@ impl World {
             let rng = self.streams.get(Stream::Sprite);
             unit.show_standing(
                 self.parts.motion.layer_mut(unit.id),
-                OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
-                &self.graphics,
+                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
+                &self.model.graphics,
                 rng,
             )?;
         }
@@ -229,7 +229,7 @@ impl World {
                 master,
                 self.spatial.map,
                 (
-                    &self.graphics,
+                    &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
                 t.task,
@@ -420,7 +420,7 @@ impl World {
                     spot,
                     Distance::new(grow),
                     mask,
-                    ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                    ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
                 )?
             {
                 found = Some(spot);

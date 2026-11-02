@@ -685,6 +685,7 @@ mod tests {
     use crate::world::FrameSeed;
     use crate::world::Millis;
     use crate::world::Player;
+    use std::sync::Arc;
 
     /// Player 1's unit 7 (master 4: type 70, category 1, no action, no unit AI) in group 1 at
     /// the origin, its top speed 1, its [`MotionFlags::NEW`] set (no formation follows), at world
@@ -715,7 +716,10 @@ mod tests {
             formation_category: FormationClass::of_data(1),
             ..Master::default()
         };
-        t.masters = vec![Masters::new([master]); 2];
+        t.model.masters = vec![Masters::new([master]); 2]
+            .into_iter()
+            .map(Arc::new)
+            .collect();
         let mut g = UnitGroup::new(group_id(1));
         g.owner = Some(PlayerId::new(1));
         g.members = vec![Member {

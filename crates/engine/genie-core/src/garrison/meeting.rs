@@ -30,6 +30,7 @@ use crate::objects::unit::Unit;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, Zones};
 use crate::world::Unread;
 use crate::world::index::ObjectsRef;
+use std::sync::Arc;
 
 /// How near the point a transport must reach for an Enter (slot 0x3d8's range), and the range up
 /// to which an Enter's reach of a target with speed tests the tiles about the two
@@ -165,7 +166,7 @@ pub fn walled_off(
     me: Point,
     them: Point,
     spatial: &mut Spatial,
-    masters: &[Masters],
+    masters: &[Arc<Masters>],
     (id, stats): (ObjectId, &MoveStats),
     by_id: ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
@@ -206,7 +207,11 @@ pub fn walled_off(
 /// # Errors
 ///
 /// An object whose master the slice lacks.
-fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<usize, GenieError> {
+fn buildings_on(
+    spatial: &Spatial,
+    masters: &[Arc<Masters>],
+    tile: Tile,
+) -> Result<usize, GenieError> {
     let mut n = 0;
     for (_, o) in spatial.objects_on(tile) {
         let m = player_master(masters, o.player, o.master).ok_or(GenieError::unsupported(
@@ -378,7 +383,7 @@ pub struct Walls<'a> {
     /// The map's places and tiles.
     pub spatial: &'a mut Spatial,
     /// Each player's masters, which tell the buildings.
-    pub masters: &'a [Masters],
+    pub masters: &'a [Arc<Masters>],
     /// The unit's id.
     pub id: ObjectId,
     /// The unit's movement state.
@@ -410,7 +415,7 @@ impl Walls<'_> {
 /// type 80.
 pub(crate) fn enter_reach(
     spatial: &mut Spatial,
-    masters: &[Masters],
+    masters: &[Arc<Masters>],
     (id, stats, moved_at): (ObjectId, &MoveStats, Position),
     (target, target_mover): (ObjectId, Option<&Mover>),
     range: Distance,
@@ -447,7 +452,7 @@ pub(crate) fn enter_reach(
 /// A unit without movement state ([`NO_SPEED`]), and what the reach does not model.
 pub(crate) fn enter_view(
     spatial: &mut Spatial,
-    masters: &[Masters],
+    masters: &[Arc<Masters>],
     (unit, mover): (&Unit, Option<&Mover>),
     ((t, target_mover), tm, room): ((&Unit, Option<&Mover>), &Master, bool),
     range: Distance,

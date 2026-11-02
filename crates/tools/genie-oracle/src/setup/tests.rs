@@ -124,7 +124,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         [1]
     );
     // no table: no masters, so no unit lines and no planners
-    assert_eq!(turns.masters.len(), 0);
+    assert_eq!(turns.model.masters.len(), 0);
 }
 
 /// A resign is the flag without the drop's bit.
@@ -173,7 +173,7 @@ fn the_slice_takes_the_master_tables() {
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let turns = slice(&save, Some(&table));
     assert_eq!(turns.history_period, HistoryUpdates::of_data(9));
-    assert_eq!(turns.masters.len(), 2);
+    assert_eq!(turns.model.masters.len(), 2);
     assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
 }
 

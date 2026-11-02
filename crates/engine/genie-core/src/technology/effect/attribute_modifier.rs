@@ -47,7 +47,8 @@ impl World {
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
         if let Some(why) = self.reached_masters(p, unit, class).iter().find_map(|&id| {
-            self.masters
+            self.model
+                .masters
                 .get(p.index())?
                 .get(id)?
                 .unloaded_for(attribute)
@@ -113,7 +114,7 @@ impl World {
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
-        let masters = self.masters.checked(p.index())?;
+        let masters = self.model.masters.checked(p.index())?;
         let master = u.master(self.master_tables(), p)?;
         if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
             return Ok(());
@@ -131,7 +132,7 @@ impl World {
             if m.kind == MasterKind::COMBAT {
                 shares.push(share(
                     m,
-                    self.masters.checked(q.index())?,
+                    self.model.masters.checked(q.index())?,
                     self.parts.combat_of(unit.id).reload_powerup,
                     rate,
                 )?);
@@ -169,7 +170,7 @@ impl World {
             return Ok(());
         };
         let master = u.master(self.master_tables(), p)?.clone();
-        let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(id)).copied();
+        let g = |id: Option<SpriteId>| id.and_then(|id| self.model.graphics.get(id)).copied();
         if master.kind < MasterKind::ACTION
             || !has_actions(
                 self.parts.actions_of(u.id),
@@ -185,7 +186,7 @@ impl World {
             // slot 0x68 with no sprite (a second standing sprite the table lacks) shows none,
             // which the slice's sprites cannot hold; without the graphics the Sprite stream is not
             // modelled
-            let (Some(graphic), false) = (g(sprite), self.graphics.is_empty()) else {
+            let (Some(graphic), false) = (g(sprite), self.model.graphics.is_empty()) else {
                 return Ok(());
             };
             let place = self.place(id).ok_or(OBJECT_GONE)?;
@@ -239,7 +240,7 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        let Some(masters) = self.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(p) else {
             return Ok(());
         };
         if let Some(unit) = unit.filter(|&u| within_table(masters, u)) {
@@ -291,7 +292,7 @@ impl World {
         unit: Option<MasterId>,
         class: Option<ClassId>,
     ) -> Vec<MasterId> {
-        let Some(masters) = self.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(p) else {
             return Vec::new();
         };
         if let Some(unit) = unit.filter(|&u| within_table(masters, u)) {
@@ -440,12 +441,12 @@ impl World {
     ) -> Result<(), GenieError> {
         {
             let world = AttributeWorld {
-                sprites: &self.graphics,
+                sprites: &self.model.graphics,
                 handicap: None,
                 capped: CAPPED,
             };
             let terrain = self.spatial.terrain.as_ref();
-            let Some(m) = self.masters.of_mut(p).and_then(|m| m.get_mut(id)) else {
+            let Some(m) = self.model.masters.of_mut(p).and_then(|m| m.get_mut(id)) else {
                 return Ok(());
             };
             match change {
@@ -453,7 +454,7 @@ impl World {
                 Change::Add => m.add_attribute(attribute, v, &world),
                 Change::Multiply => m.multiply_attribute(attribute, v, &world),
             }
-            follow(m, attribute, &self.graphics, terrain);
+            follow(m, attribute, &self.model.graphics, terrain);
         }
         self.master_followers(p, id, attribute)?;
         Ok(())
@@ -470,7 +471,7 @@ impl World {
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
         use crate::objects::masters::MasterAttribute;
-        let Some(master) = player_master(&self.masters, p, id).cloned() else {
+        let Some(master) = player_master(&self.model.masters, p, id).cloned() else {
             return Ok(());
         };
         let terrain = self.spatial.terrain.as_ref();
@@ -484,7 +485,13 @@ impl World {
         {
             ids.push(u.id);
             if let Some(m) = self.parts.mover_mut(u.id) {
-                follow_moving(&master, &mut m.stats, attribute, &self.graphics, terrain);
+                follow_moving(
+                    &master,
+                    &mut m.stats,
+                    attribute,
+                    &self.model.graphics,
+                    terrain,
+                );
                 // the top speed the unit reads with the sprite it shows, from the new base
                 if let Some(shown) = u.sprite.as_ref().map(|s| &s.graphic) {
                     m.stats.show(Some(shown));

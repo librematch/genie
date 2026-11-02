@@ -419,7 +419,7 @@ impl World {
     /// A player without a table or a table without the master ([`crate::world::OBJECT_MASTER`],
     /// with the player and the master).
     pub(crate) fn master(&self, player: PlayerId, master: MasterId) -> Result<&Master, GenieError> {
-        player_master(&self.masters, player, master)
+        player_master(&self.model.masters, player, master)
             .ok_or_else(|| OBJECT_MASTER.with("player", player).with("master", master))
     }
 

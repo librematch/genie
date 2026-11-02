@@ -138,7 +138,7 @@ impl World {
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let site_at = self
             .spatial
             .get(foundation)
@@ -255,7 +255,7 @@ impl World {
         at: Point,
         trees: bool,
     ) -> Result<(), GenieError> {
-        let Some(m) = player_master(&self.masters, player, master) else {
+        let Some(m) = player_master(&self.model.masters, player, master) else {
             return Ok(());
         };
         let site = ClearingSite {
@@ -307,7 +307,7 @@ impl World {
         Ok(Some(clear_look_of(
             u,
             self.parts.building_of(id),
-            OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
+            OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
         )?))
     }
 

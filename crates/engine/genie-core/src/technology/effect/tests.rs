@@ -80,6 +80,7 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
 use crate::world::{FrameSeed, GameMode};
+use std::sync::Arc;
 
 /// A combat unit's charge after its master's maximum charge changes (`FUN_1412163c0`'s
 /// `;`): a set and an add keep the charge's share of the maximum, without a maximum a set
@@ -355,15 +356,15 @@ fn an_effect_spawns_its_villagers_at_each_built_town_centre() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let _ = t.graphics.insert(SpriteId::named(300), standing);
-    for ms in &mut t.masters {
-        ms.get_mut(VILLAGER).unwrap().standing_sprite = Some(SpriteId::named(300));
+    let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(300), standing);
+    for ms in &mut t.model.masters {
+        Arc::make_mut(ms).get_mut(VILLAGER).unwrap().standing_sprite = Some(SpriteId::named(300));
         let female = Master {
             id: master_id(0x125),
             ..ms.get(VILLAGER).unwrap().clone()
         };
-        *ms = Masters::new(ms.iter().cloned().chain([female]));
-        ms.get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(15);
+        *ms = Arc::new(Masters::new(ms.iter().cloned().chain([female])));
+        Arc::make_mut(ms).get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(15);
     }
     t.players[1].attributes = vec![Amount::ZERO; 600];
     let before = t.players[1].objects.len();
@@ -420,14 +421,14 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
         vec![Millis::ZERO],
         vec![player],
     );
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: ids::VILLAGER_MALE,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         hit_points: MasterHitPoints::of_data(25),
         armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
         ..Master::default()
-    }])];
+    }]))];
     let loom = [
         EffectCommand::of_data(4, -1, 4, 0, 15.0).unwrap(),
         EffectCommand::of_data(4, -1, 4, 8, 1025.0).unwrap(),
@@ -443,7 +444,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
         .collect();
     // (25 + 15) × 10 / 25 = 16
     assert_eq!(hp, [40.0, 16.0]);
-    let m = t.masters[0].get(ids::VILLAGER_MALE).unwrap();
+    let m = t.model.masters[0].get(ids::VILLAGER_MALE).unwrap();
     assert_eq!(
         (m.hit_points, m.armors.clone()),
         (
@@ -522,7 +523,11 @@ fn total_missiles_change_sets_adds_or_scales_the_volleys() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.masters = vec![Masters::new([combat(master_id(4), class::CLASS_6, 60)])];
+    t.model.masters = vec![Arc::new(Masters::new([combat(
+        master_id(4),
+        class::CLASS_6,
+        60,
+    )]))];
     let fire = |t: &World| t.parts.combat_of(object_id(1)).firepower.get();
     for (change, v, after) in [
         (Change::Set, 2.0, 2.0),
@@ -566,11 +571,11 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         combat(master_id(4), class::CLASS_6, 60),
         combat(master_id(5), class::CLASS_6, 60),
         combat(ids::ID_7, class::CLASS_6, 60),
-    ])];
+    ]))];
     // set master 4's hit points to 90: its unit keeps its share, 30 × 90 / 60 = 45
     // the load files the objects in the players' trackers
     t.load_trackers().unwrap();
@@ -582,17 +587,26 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
         .map(|u| u.life.hp.get())
         .collect();
     assert_eq!(hp, [45.0, 30.0]);
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
+    let hps: Vec<i16> = t.model.masters[0]
+        .iter()
+        .map(|m| m.hit_points.get())
+        .collect();
     assert_eq!(hps, [90, 60, 60]);
     // master 6 lies within the table (up to 7) but has no master: nothing, not the class
     t.do_effect(PlayerId::new(0), &[attribute(4, 6, 6, 0, 10.0)], None)
         .unwrap();
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
+    let hps: Vec<i16> = t.model.masters[0]
+        .iter()
+        .map(|m| m.hit_points.get())
+        .collect();
     assert_eq!(hps, [90, 60, 60]);
     // past the table the class changes: (60 + 10) × 30 / 60 = 35
     t.do_effect(PlayerId::new(0), &[attribute(4, 100, 6, 0, 10.0)], None)
         .unwrap();
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
+    let hps: Vec<i16> = t.model.masters[0]
+        .iter()
+        .map(|m| m.hit_points.get())
+        .collect();
     assert_eq!(hps, [100, 70, 70]);
     assert_eq!(
         t.players[0].objects[ListIndex::new(1)].life.hp,
@@ -636,7 +650,7 @@ fn change_moves_the_shares_of_the_units_inside_building() {
     archer_master.reload = Seconds::new(2.0);
     archer_master.weapons = vec![ClassAmount::new(3, 4)];
     archer_master.garrison_firepower = Firepower::new(1.0);
-    t.masters = vec![Masters::new([archer_master, tower_master])];
+    t.model.masters = vec![Arc::new(Masters::new([archer_master, tower_master]))];
     // the tower's rate: 5 / 2 = 2.5; the archer's share 4 / 2 / 2.5 = 0.8, then 6 / 2 / 2.5
     t.do_effect(
         PlayerId::new(0),
@@ -645,7 +659,7 @@ fn change_moves_the_shares_of_the_units_inside_building() {
     )
     .unwrap();
     assert_eq!(
-        t.masters[0].get(master_id(4)).unwrap().weapons,
+        t.model.masters[0].get(master_id(4)).unwrap().weapons,
         [ClassAmount::new(3, 6)]
     );
     assert_eq!(
@@ -701,7 +715,7 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
         }),
         ..Master::default()
     };
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         building(
             30,
             MasterHitPoints::of_data(200),
@@ -709,7 +723,7 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
             [Some(master_id(31)), None, None, None],
         ),
         building(31, MasterHitPoints::of_data(100), 30, [None; 4]),
-    ])];
+    ]))];
     // multiply the class's hit points by 1.5: every object's hit points × 1.5 + 0.5
     // the load files the objects in the players' trackers
     t.load_trackers().unwrap();
@@ -721,7 +735,10 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
         .map(|u| u.life.hp.get())
         .collect();
     assert_eq!(hp, [150.0, 75.0, 15.0]);
-    let hps: Vec<i16> = t.masters[0].iter().map(|m| m.hit_points.get()).collect();
+    let hps: Vec<i16> = t.model.masters[0]
+        .iter()
+        .map(|m| m.hit_points.get())
+        .collect();
     assert_eq!(hps, [300, 150]);
 }
 
@@ -745,10 +762,14 @@ fn team_effect_reaches_the_mutual_allies() {
             player(vec![3, 3, 3, 0]),
         ],
     );
-    t.masters = vec![Masters::new([combat(master_id(4), class::CLASS_6, 60)]); 4];
+    t.model.masters = vec![Masters::new([combat(master_id(4), class::CLASS_6, 60)]); 4]
+        .into_iter()
+        .map(Arc::new)
+        .collect();
     t.do_effect(PlayerId::new(1), &[attribute(14, -1, 6, 0, 5.0)], None)
         .unwrap();
     let hps: Vec<i16> = t
+        .model
         .masters
         .iter()
         .map(|m| m.get(master_id(4)).unwrap().hit_points.get())
@@ -757,6 +778,7 @@ fn team_effect_reaches_the_mutual_allies() {
     t.do_effect(PlayerId::new(1), &[attribute(44, -1, 6, 0, 5.0)], None)
         .unwrap();
     let hps: Vec<i16> = t
+        .model
         .masters
         .iter()
         .map(|m| m.get(master_id(4)).unwrap().hit_points.get())
@@ -766,6 +788,7 @@ fn team_effect_reaches_the_mutual_allies() {
     t.do_effect(PlayerId::new(1), &[attribute(24, -1, 6, 0, 5.0)], None)
         .unwrap();
     let hps: Vec<i16> = t
+        .model
         .masters
         .iter()
         .map(|m| m.get(master_id(4)).unwrap().hit_points.get())
@@ -799,7 +822,7 @@ fn storage_set_moves_the_player_attribute_by_each_object() {
         (None, Amount::ZERO, 0),
         (None, Amount::ZERO, 0),
     ];
-    t.masters = vec![Masters::new([house])];
+    t.model.masters = vec![Arc::new(Masters::new([house]))];
     t.players[0].attributes[4] = Amount::new(10.0);
     // the load files the objects in the players' trackers
     t.load_trackers().unwrap();
@@ -807,7 +830,7 @@ fn storage_set_moves_the_player_attribute_by_each_object() {
         .unwrap();
     assert_eq!(t.players[0].attributes[4], Amount::new(30.0));
     assert_eq!(
-        t.masters[0].get(ids::HOUSE).unwrap().storage[0].1,
+        t.model.masters[0].get(ids::HOUSE).unwrap().storage[0].1,
         Amount::new(15.0)
     );
 }
@@ -850,7 +873,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             ],
             ..Master::default()
         };
-        t.masters = vec![Masters::new([stone])];
+        t.model.masters = vec![Arc::new(Masters::new([stone]))];
         t.load_trackers().unwrap();
         let mut v = Visibility::new(
             GridSize::new(w, h),
@@ -996,7 +1019,7 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     let mut m = combat(master_id(4), class::CLASS_6, 60);
     (m.max_speed, m.move_sprite, m.run_sprite, m.standing_sprite) =
         (Speed::new(1.5), None, None, None);
-    t.masters = vec![Masters::new([m])];
+    t.model.masters = vec![Arc::new(Masters::new([m]))];
     t.master_followers(
         PlayerId::new(0),
         master_id(4),
@@ -1050,7 +1073,10 @@ fn an_object_copies_of_its_master_follow_its_change() {
         ObstructionClass::UNIT,
     );
     (m.line_of_sight, m.tall) = (Distance::new(6.0), true);
-    t.masters = vec![Masters::new([m, combat(master_id(5), class::CLASS_6, 60)])];
+    t.model.masters = vec![Arc::new(Masters::new([
+        m,
+        combat(master_id(5), class::CLASS_6, 60),
+    ]))];
     for id in [1, 3] {
         t.spatial.insert(
             object_id(id),
@@ -1138,7 +1164,10 @@ fn an_object_copies_of_its_master_follow_its_change() {
         (Distance::new(6.0), Distance::new(2.0))
     );
     // a dying sprite below 0 is none
-    t.masters[0].get_mut(master_id(4)).unwrap().death_sprite = None;
+    Arc::make_mut(&mut t.model.masters[0])
+        .get_mut(master_id(4))
+        .unwrap()
+        .death_sprite = None;
     t.master_followers(
         PlayerId::new(0),
         master_id(4),
@@ -1173,7 +1202,7 @@ fn speed_change_reaches_the_units_movement() {
     let mut villager = combat(master_id(4), class::VILLAGER, 25);
     villager.max_speed = Speed::new(0.8);
     villager.moving = Some(stats);
-    t.masters = vec![Masters::new([villager])];
+    t.model.masters = vec![Arc::new(Masters::new([villager]))];
     t.do_effect(PlayerId::new(0), &[attribute(5, -1, 4, 5, 1.1)], None)
         .unwrap();
     let s = t
@@ -1185,7 +1214,10 @@ fn speed_change_reaches_the_units_movement() {
     let speed = 0.8_f32 * 1.1;
     assert_eq!(s.speed, Speed::new(speed));
     // a speed the loader left at 0 under the moving values stops the change first
-    t.masters[0].get_mut(master_id(4)).unwrap().max_speed = Speed::ZERO;
+    Arc::make_mut(&mut t.model.masters[0])
+        .get_mut(master_id(4))
+        .unwrap()
+        .max_speed = Speed::ZERO;
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(5, -1, 4, 5, 1.1)], None)
             .is_err()
@@ -1262,7 +1294,7 @@ fn farm_food_change_grows_the_farms_food() {
     .with_actions([(object_id(5), layer)]);
     let mut master = combat(ids::FARM, class::FARM, 480);
     master.kind = MasterKind::BUILDING;
-    t.masters = vec![Masters::new([master])];
+    t.model.masters = vec![Arc::new(Masters::new([master]))];
     t.players[0].attributes[31] = Amount::new(1.0);
     t.players[0].attributes[36] = Amount::new(175.0);
     // the load files the objects in the players' trackers
@@ -1365,11 +1397,11 @@ fn barracks_tech() -> World {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.techs = vec![TechDef {
+    t.model.techs = Arc::new(vec![TechDef {
         required: [TechId::of_data(-1); 6],
         locations: vec![(MasterId::of_data(12), WholeSeconds::of_data(30))],
         ..TechDef::default()
-    }];
+    }]);
     t
 }
 
@@ -1410,12 +1442,16 @@ fn the_research_time_modifier_changes_the_adjustment_and_may_complete() {
 fn technology_change_reaches_its_costs_locations_and_state() {
     use crate::technology::Cost;
     let mut t = barracks_tech();
-    t.techs[0].costs[0] = Cost {
+    Arc::make_mut(&mut t.model.techs)[0].costs[0] = Cost {
         attribute: Some(attribute::STONE),
         amount: CostAmount::of_data(100),
         paid: CostPaid::PLAYER,
     };
-    t.masters = vec![Masters::new([combat(master_id(87), class::BUILDING, 1000)])];
+    t.model.masters = vec![Arc::new(Masters::new([combat(
+        master_id(87),
+        class::BUILDING,
+        1000,
+    )]))];
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 0x4002, -1, 25.0)], None)
         .unwrap();
     assert_eq!(
@@ -1531,10 +1567,10 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     let mut man_at_arms = combat(master_id(75), class::CLASS_6, 45);
     man_at_arms.weapons = vec![ClassAmount::new(4, 6)];
     man_at_arms.available = false;
-    t.masters = vec![Masters::new([militia, man_at_arms])];
+    t.model.masters = vec![Arc::new(Masters::new([militia, man_at_arms]))];
     t.do_effect(PlayerId::new(0), &[attribute(3, 74, 75, -1, 0.0)], None)
         .unwrap();
-    let m = t.masters[0].get(master_id(74)).unwrap();
+    let m = t.model.masters[0].get(master_id(74)).unwrap();
     assert_eq!(
         (m.id, m.hit_points, m.weapons.clone()),
         (
@@ -1545,11 +1581,14 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     );
     assert!(m.available);
     // mode 1 leaves the master
-    t.masters[0].get_mut(master_id(75)).unwrap().hit_points = MasterHitPoints::of_data(50);
+    Arc::make_mut(&mut t.model.masters[0])
+        .get_mut(master_id(75))
+        .unwrap()
+        .hit_points = MasterHitPoints::of_data(50);
     t.do_effect(PlayerId::new(0), &[attribute(3, 74, 75, 1, 0.0)], None)
         .unwrap();
     assert_eq!(
-        t.masters[0].get(master_id(74)).unwrap().hit_points,
+        t.model.masters[0].get(master_id(74)).unwrap().hit_points,
         MasterHitPoints::of_data(45)
     );
     // with an object: its slot 0x98 keeps its share of the hit points (45 of 45: 50 of 50)
@@ -1567,7 +1606,7 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
         (master_id(74), HitPoints::new(50.0))
     );
     assert_eq!(
-        t.masters[0].get(master_id(74)).unwrap().hit_points,
+        t.model.masters[0].get(master_id(74)).unwrap().hit_points,
         MasterHitPoints::of_data(50)
     );
 }
@@ -1595,7 +1634,7 @@ fn spawns_and_cost_entries() {
     tc.kind = MasterKind::BUILDING;
     let mut serjeant = combat(master_id(1658), class::CLASS_6, 60);
     serjeant.cost = costs(&[(attribute::FOOD, 60, true), (attribute::STONE, 35, true)]);
-    t.masters = vec![Masters::new([tc, serjeant])];
+    t.model.masters = vec![Arc::new(Masters::new([tc, serjeant]))];
     t.do_effect(PlayerId::new(0), &[attribute(7, 1658, 109, 5, 0.0)], None)
         .unwrap();
     t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
@@ -1607,7 +1646,7 @@ fn spawns_and_cost_entries() {
     t.do_effect(PlayerId::new(0), &[attribute(5, 1658, -1, 103, -2.0)], None)
         .unwrap();
     assert_eq!(
-        t.masters[0].get(master_id(1658)).unwrap().cost,
+        t.model.masters[0].get(master_id(1658)).unwrap().cost,
         [
             CostSlot::default(),
             CostSlot::new(attribute::STONE, CostAmount::of_data(35), true),
@@ -1618,7 +1657,7 @@ fn spawns_and_cost_entries() {
     t.do_effect(PlayerId::new(0), &[attribute(5, 1658, -1, 105, -1.0)], None)
         .unwrap();
     assert_eq!(
-        t.masters[0].get(master_id(1658)).unwrap().cost,
+        t.model.masters[0].get(master_id(1658)).unwrap().cost,
         costs(&[(attribute::GOLD, -1, true), (attribute::STONE, 35, true)])
     );
 }
@@ -1634,7 +1673,11 @@ fn the_object_kinds_without_an_object_do_nothing() {
         vec![Millis::ZERO],
         vec![Player::default()],
     );
-    t.masters = vec![Masters::new([combat(ids::CASTLE, class::TOWER, 4800)])];
+    t.model.masters = vec![Arc::new(Masters::new([combat(
+        ids::CASTLE,
+        class::TOWER,
+        4800,
+    )]))];
     for kind in 200..=206 {
         t.do_effect(PlayerId::new(0), &[attribute(kind, 82, -1, 8, 770.0)], None)
             .unwrap();
@@ -1648,7 +1691,7 @@ fn the_object_kinds_without_an_object_do_nothing() {
         .is_err()
     );
     assert_eq!(
-        t.masters[0].get(ids::CASTLE).unwrap().hit_points,
+        t.model.masters[0].get(ids::CASTLE).unwrap().hit_points,
         MasterHitPoints::of_data(4800)
     );
 }
@@ -1666,23 +1709,23 @@ fn the_enable_command_sets_available_unless_disabled() {
     );
     let mut locked = combat(master_id(5), class::CLASS_6, 10);
     locked.disabled = true;
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         combat(master_id(4), class::CLASS_6, 10),
         locked,
         combat(master_id(0x26d), class::BUILDING, 10),
-    ])];
+    ]))];
     t.do_effect(
         PlayerId::new(0),
         &[attribute(2, 4, 1, -1, 0.0), attribute(2, 5, 1, -1, 0.0)],
         None,
     )
     .unwrap();
-    let available: Vec<bool> = t.masters[0].iter().map(|m| m.available).collect();
+    let available: Vec<bool> = t.model.masters[0].iter().map(|m| m.available).collect();
     assert_eq!(available, [true, false, false]);
     t.settings.game_mode = GameMode::of_data(11);
     t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
         .unwrap();
-    assert!(!t.masters[0].get(master_id(0x26d)).unwrap().available);
+    assert!(!t.model.masters[0].get(master_id(0x26d)).unwrap().available);
     t.settings.game_mode = GameMode::of_data(0);
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
@@ -1690,7 +1733,7 @@ fn the_enable_command_sets_available_unless_disabled() {
     );
     t.do_effect(PlayerId::new(0), &[attribute(2, 4, 0, -1, 0.0)], None)
         .unwrap();
-    assert!(!t.masters[0].get(master_id(4)).unwrap().available);
+    assert!(!t.model.masters[0].get(master_id(4)).unwrap().available);
 }
 
 /// A research whose effect reaches its building (the object `FUN_1413cdcd0` passes, which its
@@ -1721,10 +1764,10 @@ fn research_whose_effect_needs_its_building_stops() {
         effect,
         ..TechDef::default()
     };
-    t.techs = vec![
+    t.model.techs = Arc::new(vec![
         def(vec![attribute(204, 82, -1, 0, 1500.0)]),
         def(vec![attribute(4, -1, 4, 0, 15.0)]),
-    ];
+    ]);
     assert!(
         t.complete_research(PlayerId::new(0), tech_id(0), None)
             .is_err()
@@ -1764,13 +1807,13 @@ fn an_age_adds_its_event_to_the_history() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.techs = vec![
+    t.model.techs = Arc::new(vec![
         TechDef {
             required: [TechId::of_data(-1); 6],
             ..TechDef::default()
         };
         104
-    ];
+    ]);
     t.world_time = WorldTime::from_millis(612_345);
     t.players[0].history.entries = vec![
         HistoryEntry {
@@ -1830,7 +1873,7 @@ fn dependent_technology_done_already_completes_with_its_requirement() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.techs = vec![def(-1, 0), def(0, 1), def(1, 1), def(0, 2)];
+    t.model.techs = Arc::new(vec![def(-1, 0), def(0, 1), def(1, 1), def(0, 2)]);
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(0), None),
         Ok(true)
@@ -1866,13 +1909,13 @@ fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
             vec![player],
         );
         t.settings.full_tech_tree = full_tech_tree;
-        t.techs = vec![
+        t.model.techs = Arc::new(vec![
             def(-1, 0, 0),
             def(0, 5, 0),
             def(0, 5, 1),
             def(0, 7, 0),
             def(0, 0, 0),
-        ];
+        ]);
         assert_eq!(
             t.complete_research(PlayerId::new(0), tech_id(0), None),
             Ok(true)
@@ -1931,12 +1974,12 @@ fn the_technology_commands_disable_and_adjust_costs() {
         ],
         ..TechDef::default()
     };
-    t.techs = vec![
+    t.model.techs = Arc::new(vec![
         kind(TechKind::default()),
         kind(TechKind::default()),
         kind(TechKind::REENABLED),
         kind(TechKind::SHARED),
-    ];
+    ]);
     let command = |kind: u8, a: i16, b: i16, c: i16, d: f32| {
         EffectCommand::of_data(kind, a, b, c, d).unwrap()
     };
@@ -1999,7 +2042,7 @@ fn the_disable_command_reads_its_id_low_16_bits() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.techs = vec![TechDef::default(); 3];
+    t.model.techs = Arc::new(vec![TechDef::default(); 3]);
     let disable = |d: f32| EffectCommand::of_data(b'f', -1, -1, -1, d).unwrap();
     t.do_effect(PlayerId::new(0), &[disable(65538.0)], None)
         .unwrap();
@@ -2027,7 +2070,7 @@ fn cost_change_past_the_i32_range_adds_nothing() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.techs = vec![TechDef {
+    t.model.techs = Arc::new(vec![TechDef {
         costs: [
             Cost {
                 attribute: Some(attribute::FOOD),
@@ -2038,7 +2081,7 @@ fn cost_change_past_the_i32_range_adds_nothing() {
             Cost::default(),
         ],
         ..TechDef::default()
-    }];
+    }]);
     let change = EffectCommand::of_data(b'e', 0, 0, 1, 3.0e9).unwrap();
     t.do_effect(PlayerId::new(0), &[change], None).unwrap();
     assert_eq!(
@@ -2087,10 +2130,10 @@ fn the_last_building_of_master_withdraws_its_technology() {
         vec![Millis::ZERO],
         vec![player],
     );
-    t.techs = vec![TechDef {
+    t.model.techs = Arc::new(vec![TechDef {
         required: [TechId::of_data(-1); 6],
         ..TechDef::default()
-    }];
+    }]);
     t.withdraw_tech(PlayerId::new(0), master_id(1640), tech_id(0))
         .unwrap();
     assert_eq!(t.players[0].techs[0].state, ResearchState::Researched);
@@ -2143,16 +2186,18 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
         vec![player],
     )
     .with_actions([(object_id(3), layer)]);
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         standing_sprite: Some(SpriteId::named(300)),
         ..combat(master_id(4), class::CLASS_6, 60)
-    }])];
-    t.graphics = [
-        (SpriteId::named(300), graphic(SpriteId::named(300))),
-        (SpriteId::named(301), graphic(SpriteId::named(301))),
-    ]
-    .into_iter()
-    .collect();
+    }]))];
+    t.model.graphics = Arc::new(
+        [
+            (SpriteId::named(300), graphic(SpriteId::named(300))),
+            (SpriteId::named(301), graphic(SpriteId::named(301))),
+        ]
+        .into_iter()
+        .collect(),
+    );
     t.load_trackers().unwrap();
     t.do_effect(PlayerId::new(0), &[attribute(0, 4, -1, 71, 301.0)], None)
         .unwrap();
@@ -2163,7 +2208,9 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
             .map(|s| s.graphic.id)
     };
     assert_eq!(
-        t.masters[0].get(master_id(4)).map(|m| m.standing_sprite),
+        t.model.masters[0]
+            .get(master_id(4))
+            .map(|m| m.standing_sprite),
         Some(Some(SpriteId::named(301)))
     );
     // the unit with an action leaves its sprite to the action (an Explore holds none)
@@ -2205,7 +2252,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
         vec![player],
     )
     .with_buildings([(object_id(1), built_layer())]);
-    t.masters = vec![Masters::new([
+    t.model.masters = vec![Arc::new(Masters::new([
         combat(master_id(4), class::CLASS_6, 60),
         Master {
             id: ids::HOUSE,
@@ -2217,7 +2264,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             obstruction_class: ObstructionClass::UNIT,
             ..Master::default()
         },
-    ])];
+    ]))];
     t.spatial = Spatial::new(GridSize::new(10, 10));
     t.spatial.insert(
         object_id(1),

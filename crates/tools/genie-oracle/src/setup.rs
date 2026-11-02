@@ -25,11 +25,13 @@ use genie_core::technology::ResearchCap;
 use genie_core::technology::ResearchCount;
 use genie_core::world::FrameSeed;
 use genie_core::world::Millis;
+use genie_core::world::Model;
 use genie_core::world::PlayState;
 use genie_core::world::Seconds;
 use genie_core::world::Tick;
 use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
+use std::sync::Arc;
 
 mod player_parts;
 
@@ -48,7 +50,6 @@ use genie_core::objects::ObjectState;
 use genie_core::objects::lines::UnitLines;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::MasterKind;
-use genie_core::objects::masters::Masters;
 use genie_core::objects::unit::Unit;
 use genie_core::pathing::zones::{ZoneMap, Zones};
 use genie_core::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
@@ -407,11 +408,6 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
         Err(e) => stop_all(&mut turns, &e),
     }
     if let Some(table) = masters {
-        turns.drop_sites.clone_from(&table.drop_sites);
-        turns.linked_techs.clone_from(&table.linked_techs);
-        turns.graphics = table.graphics.clone();
-        turns.techs.clone_from(&table.techs);
-        turns.effects.clone_from(&table.effects);
         turns.history_period = table.time_slice;
         // the unit lines' tables, which the game builds at its first load with Gaia's master
         // count (`FUN_141533cb0` -> `FUN_140fde680`)
@@ -419,23 +415,37 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             .players()
             .first()
             .map_or(0, |p| p.objects().master_object_num);
-        turns.lines = UnitLines::build(gaia_masters, &table.unit_lines);
         let masters = header
             .players()
             .iter()
-            .map(|p| work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table))
-            .collect::<Result<_, _>>();
-        match masters {
-            Ok(m) => turns.masters = m,
-            Err(e) => stop_all(&mut turns, &e),
-        }
+            .map(|p| {
+                work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table)
+                    .map(Arc::new)
+            })
+            .collect::<Result<_, _>>()
+            .unwrap_or_else(|e| {
+                stop_all(&mut turns, &e);
+                Vec::new()
+            });
+        // the tech tree is not loaded (MISSING.md): the default table
+        turns.model = Model {
+            masters,
+            graphics: Arc::new(table.graphics.clone()),
+            drop_sites: Arc::new(table.drop_sites.clone()),
+            lines: Arc::new(UnitLines::build(gaia_masters, &table.unit_lines)),
+            linked_techs: Arc::new(table.linked_techs.clone()),
+            techs: Arc::new(table.techs.clone()),
+            effects: Arc::new(table.effects.clone()),
+            ..Model::default()
+        };
         // the players' unit masters (type 70), Gaia's left out
         let all = || {
             turns
+                .model
                 .masters
                 .iter()
                 .skip(1)
-                .flat_map(Masters::iter)
+                .flat_map(|m| m.iter())
                 .filter(|m| m.kind == MasterKind::COMBAT)
         };
         turns.spatial.fastest = all()
@@ -603,7 +613,7 @@ type Entered = (
 /// Player `p`'s units inside a building of its own, in list order, each with its building and
 /// its share ([`garrison_firepower`]).
 fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
-    let (Some(masters), Some(player)) = (turns.masters.get(p), turns.players.get(p)) else {
+    let (Some(masters), Some(player)) = (turns.model.masters.get(p), turns.players.get(p)) else {
         return Vec::new();
     };
     let lists = || player.objects.iter().chain(&player.sleeping);

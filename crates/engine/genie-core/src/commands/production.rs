@@ -78,7 +78,7 @@ impl World {
         let owner = self.players.player(player)?;
         let limit = if owner.kind.is_computer() { 500 } else { 60 };
         let empty = Masters::default();
-        let masters = self.masters.of(player).unwrap_or(&empty);
+        let masters = self.model.masters.of(player).unwrap_or(&empty);
         let Some(unit) = masters.get(unit_id) else {
             return Ok(());
         };
@@ -295,7 +295,7 @@ impl World {
         let mut queued = Seconds::ZERO;
         for e in queue.slots.head(entries)? {
             if let Some(master) = e.master {
-                let time = player_master(&self.masters, p, master)
+                let time = player_master(&self.model.masters, p, master)
                     .and_then(|m| m.train_locations.first())
                     .map_or(WholeSeconds::ZERO, |l| l.time);
                 queued += Seconds::new((i32::from(e.count.get()) * i32::from(time.get())) as f32);
@@ -396,7 +396,7 @@ impl World {
         let empty = Masters::default();
         let mut n = count.get();
         loop {
-            let masters = self.masters.of(player).unwrap_or(&empty);
+            let masters = self.model.masters.of(player).unwrap_or(&empty);
             if pay(
                 masters,
                 master,
@@ -411,7 +411,7 @@ impl World {
             n -= 1;
         }
         let class = self.tracker_key(player, master).class;
-        let masters = self.masters.of(player).unwrap_or(&empty);
+        let masters = self.model.masters.of(player).unwrap_or(&empty);
         let made = masters.get(master);
         let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
         let owner = self.players.player_mut(player)?;
@@ -512,7 +512,7 @@ impl World {
         let owner = self.players.player(player)?;
         if let Some(master) = master {
             let empty = Masters::default();
-            let masters = self.masters.of(player).unwrap_or(&empty);
+            let masters = self.model.masters.of(player).unwrap_or(&empty);
             return Ok(as_entry_costs(master_costs(masters, master, owner)?));
         }
         let Some((tech, t)) = tech
@@ -521,7 +521,7 @@ impl World {
         else {
             return Ok(NO_COSTS);
         };
-        let Some(def) = self.techs.get(t) else {
+        let Some(def) = self.model.techs.get(t) else {
             return Ok(NO_COSTS);
         };
         let get = |k: AttributeId| Attributes::get(owner, k);

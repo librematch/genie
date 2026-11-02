@@ -107,16 +107,18 @@ impl Unit {
     ///
     /// The target's master's and [`crate::garrison::enter_view`]'s.
     fn enter_reads(&self, c: &mut Step<'_>, enter: &EnterAction) -> Result<EnterReads, GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {
-                let master =
-                    t.master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), tp)?;
+                let master = t.master(
+                    MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+                    tp,
+                )?;
                 let room = units_inside(others, t.id) < master.garrison.units();
                 let (mut view, start) = enter_view(
                     &mut c.w.spatial,
-                    &c.w.masters,
+                    &c.w.model.masters,
                     (self, c.w.parts.mover_of(self.id)),
                     ((t, c.w.parts.mover_of(t.id)), master, room),
                     enter.range,
@@ -214,7 +216,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         let given = TransportAction::given_sprite(t.task, master)?;
         let reads = TransportReads {
@@ -227,7 +229,7 @@ impl Unit {
             given,
             standing: master
                 .standing_sprite
-                .and_then(|s| c.w.graphics.get(s))
+                .and_then(|s| c.w.model.graphics.get(s))
                 .copied(),
         };
         // written back before an error too: the stop's context reads the list
@@ -309,8 +311,8 @@ impl Unit {
         enter.state = EnterState::Done;
         self.shows_standing_sprite(
             c.w.parts.motion.layer_mut(self.id),
-            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-            &c.w.graphics,
+            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+            &c.w.model.graphics,
             c.w.streams.get(Stream::Sprite),
         )?;
         self.post_own(
@@ -348,13 +350,13 @@ impl Unit {
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
-        let own = c.w.masters.of(c.player);
+        let own = c.w.model.masters.of(c.player);
         let masters = own.ok_or(NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
         let bm = building
             .master_in(OwnerMasters::new(
                 &c.w.parts.own_master,
-                c.w.masters.of(tp).or(own),
+                c.w.model.masters.of(tp).or(own),
             ))?
             .clone();
         let hp = building.life.hp;
@@ -377,7 +379,7 @@ impl Unit {
             ),
             civ: owner.civ,
         };
-        if drops_at(&c.w.drop_sites, bm.id, &actor)
+        if drops_at(&c.w.model.drop_sites, bm.id, &actor)
             && Amount::ZERO < self.life.amount
             && bm.kind == MasterKind::BUILDING
         {
@@ -522,9 +524,9 @@ impl Unit {
         me: &Master,
         bm: &Master,
     ) -> Result<(), GenieError> {
-        let masters = c.w.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
+        let masters = c.w.model.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
-            let own = c.w.masters.of(bp).unwrap_or(masters);
+            let own = c.w.model.masters.of(bp).unwrap_or(masters);
             let rate = attack_rate(bm, own, reload);
             share(
                 me,

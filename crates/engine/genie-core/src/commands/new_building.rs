@@ -97,11 +97,11 @@ impl World {
         player: PlayerId,
         master: MasterId,
     ) -> Result<(), GenieError> {
-        if let Some(m) = player_master(&self.masters, player, master) {
+        if let Some(m) = player_master(&self.model.masters, player, master) {
             count_class(&mut self.players.player_mut(player)?.attributes, m, 1.0);
         }
         let _ = self.streams.get(Stream::Object).rand15();
-        if let Some(m) = player_master(&self.masters, player, master)
+        if let Some(m) = player_master(&self.model.masters, player, master)
             .filter(|m| m.kind == MasterKind::BUILDING && !m.trained_at.is_empty())
         {
             let paid: i32 = cost_entries(&m.cost)
@@ -123,7 +123,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
     ) -> Result<Held, GenieError> {
-        let storage = player_master(&self.masters, player, master)
+        let storage = player_master(&self.model.masters, player, master)
             .map(|m| m.storage.clone())
             .unwrap_or_default();
         static_storage(self.players.player_mut(player)?, &storage)
@@ -174,7 +174,7 @@ impl World {
         let position = self.on_ground(player, master, position);
         let id = self.take_object_id(player, master);
         // what its first update as a built building starts (slot 0x7f0)
-        let default_task = player_master(&self.masters, player, master)
+        let default_task = player_master(&self.model.masters, player, master)
             .map_or(DefaultTask::Nothing, default_start);
         let ai = unit_ai
             .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
@@ -198,7 +198,7 @@ impl World {
         // (slot 0x798, FUN_1412029f0): their draws, the sprite and the angle it faces
         let standing = made
             .standing_sprite
-            .and_then(|s| self.graphics.get(s).copied());
+            .and_then(|s| self.model.graphics.get(s).copied());
         let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |g| {
             let (s, _, angle) = self.setup_draws(g);
             (Some(s), angle)
@@ -206,12 +206,13 @@ impl World {
         self.building_combat_setup(player, master)?;
         let held = self.building_storage(player, master)?;
         // what its death reads of the master: its dying sprite, death spawn and decay
-        let death = player_master(&self.masters, player, master).map_or((None, false, None), |m| {
-            (m.death_sprite, m.death_spawns[0].is_some(), m.life)
-        });
+        let death = player_master(&self.model.masters, player, master)
+            .map_or((None, false, None), |m| {
+                (m.death_sprite, m.death_spawns[0].is_some(), m.life)
+            });
         // the moving setup (FUN_1411580a0) of every building, a moving object though it never
         // moves (a mule cart does): the walk reads its last move time
-        let mut mover = player_master(&self.masters, player, master)
+        let mut mover = player_master(&self.model.masters, player, master)
             .and_then(|m| m.moving)
             .map(|stats| {
                 Mover::new_object(
@@ -243,7 +244,7 @@ impl World {
         if foundation && WholeSeconds::ZERO < made.build_time {
             let shown = building
                 .construction_sprite
-                .and_then(|s| self.graphics.get(s).copied())
+                .and_then(|s| self.model.graphics.get(s).copied())
                 .or(standing);
             if let Some(g) = shown {
                 new_sprite(
@@ -273,7 +274,7 @@ impl World {
             regen_stinger: Regeneration::ZERO,
             attack_count: AttackCount::ZERO,
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-            firepower: player_master(&self.masters, player, master)
+            firepower: player_master(&self.model.masters, player, master)
                 .map_or(Firepower::ZERO, |m| m.volley_fire),
             next_volley: MissileCount::ZERO,
             reload_worldtime: WorldTime::ZERO,
@@ -377,7 +378,7 @@ impl World {
                 continue;
             };
             // a master the player has not got makes nothing (its slot 0x40 is not called)
-            let Some(am) = player_master(&self.masters, player, annex).cloned() else {
+            let Some(am) = player_master(&self.model.masters, player, annex).cloned() else {
                 continue;
             };
             // the .dat's annexes are buildings (type 80): another type's master has no building

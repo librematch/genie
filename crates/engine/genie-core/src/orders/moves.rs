@@ -222,8 +222,8 @@ impl World {
             if move_to.shows_standing() {
                 unit.shows_standing_sprite(
                     self.parts.motion.layer_mut(unit.id),
-                    OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
-                    &self.graphics,
+                    OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
+                    &self.model.graphics,
                     self.streams.get(Stream::Sprite),
                 )?;
             }
@@ -248,7 +248,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let look = self.parts.combat_of(unit.id).abilities.look.as_ref();
-        Ok(point_sprite(master, look, false).and_then(|id| self.graphics.get(id).copied()))
+        Ok(point_sprite(master, look, false).and_then(|id| self.model.graphics.get(id).copied()))
     }
 
     /// The unit's slot 0x340 from its unit AI's move off a footprint (slot 0x148,
@@ -272,9 +272,9 @@ impl World {
             (class, player),
             (&mut releases, &mut builder_leaves, by),
             (
-                OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
+                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                 (
-                    &self.graphics,
+                    &self.model.graphics,
                     self.parts.combat.of(id).abilities.look.as_ref(),
                 ),
                 self.streams.get(Stream::Sprite),
@@ -408,7 +408,7 @@ impl World {
     ) -> Result<Option<(bool, bool)>, GenieError> {
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         Ok(match target {
             Some(tp) if !world.allied(player, tp, true) => {

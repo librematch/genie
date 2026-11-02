@@ -78,7 +78,7 @@ impl Unit {
         target: Option<RepairTargetId>,
     ) -> Result<RepairReads, GenieError> {
         let own = repair_master(
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             self,
         )?;
@@ -194,7 +194,11 @@ fn repairee_of(
     let Some((target, (q, t))) = target.and_then(|id| Some((id, held(id)?))) else {
         return Ok((None, None));
     };
-    let tm = repair_master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), q, t)?;
+    let tm = repair_master(
+        MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+        q,
+        t,
+    )?;
     let repairee = Repairee {
         state: t.life.state,
         hp: t.life.hp,
@@ -242,7 +246,11 @@ pub(crate) fn repair_target(
     if let Some(target) = target.map(RoleId::id)
         && let Some((q, t)) = others.find(target)
     {
-        let tm = repair_master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), q, t)?;
+        let tm = repair_master(
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+            q,
+            t,
+        )?;
         for id in reached_ids(c.w.objects(), target, tm.kind == MasterKind::BUILDING) {
             let Some(o) = others.find(id) else {
                 continue;
@@ -258,7 +266,8 @@ pub(crate) fn repair_target(
         ));
     }
     let masters =
-        c.w.masters
+        c.w.model
+            .masters
             .get(player.index())
             .ok_or(GenieError::missing_data("a repairer's player's masters"))?;
     // what the owner holds now: the update may have paid or gained before the repair
@@ -315,7 +324,7 @@ fn repaired(
     id: ObjectId,
 ) -> Result<Repaired, GenieError> {
     let om = repair_master(
-        MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+        MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
         oq,
         o,
     )?;

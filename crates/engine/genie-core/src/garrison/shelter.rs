@@ -211,7 +211,7 @@ impl World {
         master: MasterId,
     ) -> Result<Shelters, GenieError> {
         let mut shelters = Shelters::default();
-        let key = ListKey::of_master(self.lines.base(master));
+        let key = ListKey::of_master(self.model.lines.base(master));
         let (at, radius) = self.ground(target)?;
         for &id in self.players.player(tp)?.tracker.list(key) {
             // the tracker's keepers follow every object its player gains and loses, so the

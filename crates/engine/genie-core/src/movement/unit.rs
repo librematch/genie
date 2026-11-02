@@ -60,7 +60,7 @@ impl Unit {
             Some(_) => self.group_speed(
                 (actions, c.w.parts.unread.get(self.id)),
                 &c.w.groups,
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 c.w.parts.unit_ai.get(self.id),
             )?,
             None => None,
@@ -178,8 +178,8 @@ impl Unit {
             villager && !c.w.players.player(c.player)?.kind.is_computer(),
             stance,
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                &c.w.graphics,
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
             ),
         )
@@ -240,11 +240,11 @@ impl Unit {
                 let master = object_master(
                     c.w.parts.own_master.get(self.id),
                     (self.id, self.life.master_id),
-                    c.w.masters.of(c.player),
+                    c.w.model.masters.of(c.player),
                 )
                 .ok();
                 let graphic =
-                    |id: Option<SpriteId>| id.and_then(|id| c.w.graphics.get(id).copied());
+                    |id: Option<SpriteId>| id.and_then(|id| c.w.model.graphics.get(id).copied());
                 let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));

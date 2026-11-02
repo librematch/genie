@@ -518,7 +518,7 @@ impl World {
             let tm = t.master(self.master_tables(), tp)?;
             let world = TaskWorld {
                 players: &self.players,
-                drop_sites: &self.drop_sites,
+                drop_sites: &self.model.drop_sites,
             };
             (tm.kind == MasterKind::BUILDING
                 && t.life.state == ObjectState::Alive

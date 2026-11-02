@@ -66,10 +66,10 @@ impl World {
         // what its MoveTo's constructor (FUN_140aa0df0) reads of the unit and the target
         let reads = unit.move_to_reads(
             self.parts.motion.mover(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
@@ -389,7 +389,7 @@ impl World {
         let player = &self.players.player(p)?;
         let (mover, by_id) = self
             .parts
-            .lend_mover(unit.id, (&self.players, &self.index, &self.masters));
+            .lend_mover(unit.id, (&self.players, &self.index, &self.model.masters));
         let world = DropWorld {
             masters: by_id.masters().of(p),
             spatial: &mut self.spatial,
@@ -402,9 +402,23 @@ impl World {
         };
         let others = OthersRef::of(&self.players, &self.index, p)?;
         let result = if by == DropOffBy::Hunt {
-            unit.drop_off_in(&mut actions, mover, world, others, &self.graphics, by_id)
+            unit.drop_off_in(
+                &mut actions,
+                mover,
+                world,
+                others,
+                &self.model.graphics,
+                by_id,
+            )
         } else {
-            unit.gather_drop_off_in(&mut actions, mover, world, others, &self.graphics, by_id)
+            unit.gather_drop_off_in(
+                &mut actions,
+                mover,
+                world,
+                others,
+                &self.model.graphics,
+                by_id,
+            )
         };
         self.parts.put_actions(unit.id, actions);
         let idx = self.put_back_own(p, unit)?;

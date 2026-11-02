@@ -140,6 +140,7 @@ impl World {
         g: GatherPoint,
     ) -> Result<Option<ObjectId>, GenieError> {
         let class = self
+            .model
             .masters
             .first()
             .and_then(|m| g.target_master.and_then(|t| m.get(t)))

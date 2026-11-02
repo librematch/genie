@@ -107,8 +107,8 @@ impl Unit {
             c.w.parts.combat_of(self.id),
             master,
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                &c.w.graphics,
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                &c.w.model.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
             (player_type, c.w.world_time),
@@ -135,7 +135,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         let player_type =
             c.w.players
@@ -145,8 +145,8 @@ impl Unit {
             c.w.parts.combat_of(self.id),
             master,
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                &c.w.graphics,
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                &c.w.model.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
             (player_type, c.w.world_time),

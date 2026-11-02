@@ -133,7 +133,7 @@ impl Unit {
         }
         let locked = gate.locked;
         let annexes = c.w.parts.building_of(self.id).annexes;
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let (total, allied) = self.gate_count(annexes, &mut c.w.spatial, by_id)?;
         let gate =
             c.w.parts
@@ -302,7 +302,7 @@ impl Unit {
         let Ok(master) = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         ) else {
             return Ok(());
         };
@@ -377,7 +377,7 @@ impl Unit {
             let m = object_master(
                 c.w.parts.own_master.get(u.id),
                 (u.id, u.life.master_id),
-                c.w.masters.of(c.player),
+                c.w.model.masters.of(c.player),
             )?;
             // The villager's class (4), which a building's repair by its garrison counts.
             if m.class == class::VILLAGER {

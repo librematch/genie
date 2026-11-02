@@ -47,7 +47,6 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::Masters;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::pathing::Pathing;
@@ -55,10 +54,10 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 pub use crate::players::history::HISTORY_PERIOD;
 use crate::technology::TechId;
-use crate::unit_ai::task_finder::DropSite;
 pub(crate) use crate::world::player::NO_ATTRIBUTE;
 pub use crate::world::player::{AiSettings, Formations, Player};
 use genie_diff::Diff;
+pub use genie_model::model::Model;
 
 mod after_step;
 mod ai_values;
@@ -95,16 +94,12 @@ use crate::math::image::turn::{
     GATE_SHUT_HEIGHT as TURN_GATE_SHUT_HEIGHT, SPEED_EPSILON as TURN_SPEED_EPSILON,
     TREE_SEARCH_WITHIN as TURN_TREE_SEARCH_WITHIN,
 };
-use crate::objects::lines::UnitLines;
-use crate::objects::{Graphics, RelicCount};
+use crate::objects::RelicCount;
 use crate::pathing::zones::Zones;
 use crate::players::Team;
 use crate::players::ai_module::AiModules;
 use crate::players::history::HistoryUpdates;
 use crate::players::market::Market;
-use crate::players::world_player::TechTree;
-use crate::technology::{EffectCommand, Linked, TechDef};
-use std::collections::BTreeMap;
 
 /// What every building holds of a gate: `mGateLocked` (`+0xc7c`; a lock also sets the
 /// building's last move time, [`Mover::last_move`], slot 0x670, `FUN_1411dba30`), `mFirstUpdate`
@@ -280,21 +275,14 @@ pub struct World {
     pub ticks: Tick,
     /// `mNextObjectId`, the id the next new object gets.
     pub next_object_id: ObjectId,
-    /// Each player's masters, which BUILD reads; a player without them stops at its own BUILD.
-    pub masters: Vec<Masters>,
+    /// The game data the world plays on (FD-046-D04): the masters per player, the
+    /// technologies and effects, the tech tree, the unit lines, the drop sites and the graphics,
+    /// each table shared with the stock model until its first write.
+    pub model: Model,
     /// Every object's place on the map.
     pub spatial: Spatial,
     /// The planners and the mesh.
     pub pathing: Pathing,
-    /// What the sprite clock reads of each graphic (the `.dat`'s).
-    pub graphics: Graphics,
-    /// The game's drop-site table (`dropsites.json`).
-    pub drop_sites: Vec<DropSite>,
-    /// The game's unit lines (`unitlines.json`, [`crate::objects::lines`]); empty when not loaded.
-    pub lines: UnitLines,
-    /// The game's linked technologies (`linkedTechs.json`, the table at the game settings'
-    /// `+0x18` that `FUN_140f39f40` looks up), by technology; empty when not loaded.
-    pub linked_techs: BTreeMap<TechId, Linked>,
     /// The game options the simulation reads ([`crate::world::settings::Settings`]), from the header.
     pub settings: settings::Settings,
     /// The game object's tagged value at `+0x680` (`DAT_143f07a58`, read through
@@ -323,11 +311,6 @@ pub struct World {
     /// The computer players' AI modules (`player+0x7a8`), by player.
     pub ai: AiModules,
     pub(crate) streams: Streams,
-    /// The `.dat`'s technologies, by id.
-    pub techs: Vec<TechDef>,
-    /// The world's effect table (`+0x128`, `TRIBE_Effects`): every effect's commands by id, the
-    /// `.dat`'s.
-    pub effects: Vec<Vec<EffectCommand>>,
     /// The market's prices (`+0x868`.., saved).
     pub market: Market,
     /// The world's unit groups ([`crate::groups`]).
@@ -352,9 +335,6 @@ pub struct World {
     /// recording's point of view. Its masters stand for a building's in a train location's test
     /// (`FUN_141263610` through `FUN_140c88440`, [`crate::players::world_player`]).
     pub local_player: PlayerId,
-    /// The game's tech tree table and its civilisations' unique units, which the defeat check's
-    /// count of the units a building will train reads ([`crate::players::world_player::TechTree`]).
-    pub tech_tree: TechTree,
     /// `allianceLocked` (`world+0xc`, saved): GAME's diplomacy and allied victory change nothing
     /// while it is not 0.
     pub alliance_locked: i32,

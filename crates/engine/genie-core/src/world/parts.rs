@@ -597,7 +597,7 @@ impl World {
     #[must_use]
     pub fn master_tables(&self) -> MasterTables<'_> {
         MasterTables {
-            players: &self.masters,
+            players: &self.model.masters,
             own: &self.parts.own_master,
         }
     }
@@ -701,6 +701,7 @@ mod tests {
     use crate::world::player::Player;
     #[cfg(test)]
     use crate::world::{FrameSeed, Millis, WorldTime};
+    use std::sync::Arc;
 
     /// The table finds each object's part by id; a removal moves the last part into the gap and
     /// its slot follows; a second insert replaces; two tables of the same parts in another
@@ -996,7 +997,7 @@ mod tests {
         .unwrap();
         assert_eq!(t.parts.unread.get(id), Some(&why));
         assert_eq!(t.parts.of(id).unread, Some(why.clone()));
-        let by_id = ObjectsRef::new(&t.players, &t.index, &t.masters, &t.parts);
+        let by_id = ObjectsRef::new(&t.players, &t.index, &t.model.masters, &t.parts);
         assert_eq!(by_id.unread(id), Some(&why));
         t.check_parts().unwrap();
         let gone = t
@@ -1044,7 +1045,7 @@ mod tests {
             hit_points: MasterHitPoints::of_data(hp),
             ..Master::default()
         };
-        t.masters = vec![Masters::new([master(25)])];
+        t.model.masters = vec![Arc::new(Masters::new([master(25)]))];
         t.set_part(id, Part::OwnMaster(Box::new(master(40))))
             .unwrap();
         let hp = |t: &World, i: usize| {

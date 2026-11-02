@@ -140,7 +140,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         let target = query.target;
         let t = self.task_target(target, 1)?;
@@ -160,7 +160,7 @@ impl World {
         };
         let mut found = find(own)?;
         if found.is_none() && own.task_by_group != TaskGroup::NONE {
-            let masters = self.masters.of(player);
+            let masters = self.model.masters.of(player);
             for candidate in masters.into_iter().flat_map(Masters::iter) {
                 if candidate.class != own.class
                     || candidate.kind != own.kind

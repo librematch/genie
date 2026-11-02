@@ -114,11 +114,11 @@ impl World {
         let mut lets = Lets {
             player,
             relations,
-            masters: MasterTables::new(&self.masters, &self.parts.own_master),
+            masters: MasterTables::new(&self.model.masters, &self.parts.own_master),
             ais: &mut self.parts.unit_ai,
             buildings: &mut self.parts.building,
             combats: &mut self.parts.combat,
-            lines: &self.lines,
+            lines: &self.model.lines,
             tracker,
             own_notifies,
         };

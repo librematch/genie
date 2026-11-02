@@ -14,6 +14,7 @@ use genie_core::players::PlayerId;
 use genie_core::players::attribute;
 use genie_core::players::{ByPlayer, Relations};
 use genie_core::unit_ai::task_finder::Diplomacy;
+use std::sync::Arc;
 
 /// An object of player 1, master 83, at the main building `annex_of` if it is an annex.
 fn object(annex_of: Option<ObjectId>) -> FinderObject {
@@ -42,7 +43,10 @@ fn world(relation: u8) -> FinderWorld {
         ..Master::default()
     };
     FinderWorld {
-        masters: vec![Masters::default(), Masters::new([master])],
+        masters: vec![
+            Arc::new(Masters::default()),
+            Arc::new(Masters::new([master])),
+        ],
         objects: [
             (object_id(10), object(None)),
             (object_id(11), object(Some(object_id(10)))),

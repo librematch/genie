@@ -42,6 +42,7 @@ use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::parts::PartTable;
 use genie_diff::Diff;
+use genie_model::model::Model;
 
 mod attack_state;
 mod constructor;
@@ -454,11 +455,12 @@ impl World {
         let Self {
             spatial,
             streams,
-            graphics,
             players,
             index,
-            masters,
             parts,
+            model: Model {
+                graphics, masters, ..
+            },
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();

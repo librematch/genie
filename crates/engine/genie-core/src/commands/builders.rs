@@ -179,12 +179,12 @@ impl World {
         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
         position: Position,
     ) -> Result<(MasterId, BuildAction), GenieError> {
-        let masters = self.masters.of(q).ok_or(GenieError::unsupported(
+        let masters = self.model.masters.of(q).ok_or(GenieError::unsupported(
             "BUILD tasks the builders: no master table",
         ))?;
-        let site = player_master(&self.masters, fp, master).ok_or(GenieError::unsupported(
-            "BUILD of a master the player does not have",
-        ))?;
+        let site = player_master(&self.model.masters, fp, master).ok_or(
+            GenieError::unsupported("BUILD of a master the player does not have"),
+        )?;
         let target = TaskTarget {
             id: foundation.id(),
             master: site,
@@ -199,7 +199,7 @@ impl World {
         };
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         let owner = world.players.player(q)?;
         let unit = self
@@ -256,7 +256,7 @@ impl World {
             (unit, self.parts.mover_of(unit.id)),
             builder,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );
@@ -413,7 +413,7 @@ impl World {
             1,
             &find,
             &self.parts,
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
         let general = task_target_with(
@@ -421,16 +421,17 @@ impl World {
             2,
             &find,
             &self.parts,
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
         let masters = self
+            .model
             .masters
             .get(player.index())
             .ok_or(GenieError::unsupported("a build order: no master table"))?;
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         let owner = world.players.player(player)?;
         let unit = owner.objects.checked(idx)?;
@@ -462,7 +463,7 @@ impl World {
             (unit, self.parts.mover_of(unit.id)),
             builder,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         );

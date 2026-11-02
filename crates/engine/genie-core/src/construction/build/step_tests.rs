@@ -29,6 +29,7 @@ use crate::unit_ai::NotifyKind;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
+use std::sync::Arc;
 
 use super::tests::{MOVING_TASK, TASK, started};
 use super::*;
@@ -233,13 +234,13 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             ..UnitAi::default()
         },
     )]);
-    t.masters = vec![masters.clone(), masters];
-    t.graphics = Graphics::from([
+    t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];
+    t.model.graphics = Arc::new(Graphics::from([
         (WALKING, graphic(WALKING)),
         (STANDING, graphic(STANDING)),
         (TASK_SPRITE, graphic(TASK_SPRITE)),
         (SpriteId::named(7), graphic(SpriteId::named(7))),
-    ]);
+    ]));
     t.spatial = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![0; 400]),
@@ -957,8 +958,8 @@ fn stump(t: &mut World) {
         height: Distance::new(1.0),
         ..Master::default()
     };
-    for masters in &mut t.masters {
-        *masters = Masters::new(masters.iter().cloned().chain([m.clone()]));
+    for masters in &mut t.model.masters {
+        *masters = Arc::new(Masters::new(masters.iter().cloned().chain([m.clone()])));
     }
     let _ = t
         .push_live(
@@ -1345,10 +1346,14 @@ fn with_mill(t: &mut World) {
         ),
     );
     // a done building of its owner's tracker, which the table's search reads
-    let k = key(t.masters.get(1), &t.lines, master_id(68));
+    let k = key(
+        t.model.masters.get(1).map(|m| &**m),
+        &t.model.lines,
+        master_id(68),
+    );
     t.players[1].tracker.add(object_id(300), k);
     t.players[1].tracker.complete(object_id(300), k);
-    t.drop_sites = vec![DropSite {
+    t.model.drop_sites = Arc::new(vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
         targets: vec![DropTarget {
@@ -1359,7 +1364,7 @@ fn with_mill(t: &mut World) {
         }],
         resource_types: vec![attribute::WOOD],
         ..DropSite::default()
-    }];
+    }]);
 }
 
 /// `set_state(8)` (`0x140aae200` case 8): the prelude takes a counted builder out of the
@@ -1577,7 +1582,7 @@ fn builder_at_its_drop_site_gives_its_load_and_walks_back() {
     );
     let mut refused = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(MoveTo::Arrived));
     own(&mut refused, object_id(300)).workers = WorkerCount::of_data(1);
-    refused.drop_sites[0].targets[0].attribute = Some(attribute::STONE);
+    Arc::make_mut(&mut refused.model.drop_sites)[0].targets[0].attribute = Some(attribute::STONE);
     let _ = code(&mut refused, 250);
     let b = build(&refused);
     assert_eq!(

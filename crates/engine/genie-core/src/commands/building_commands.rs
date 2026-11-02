@@ -297,7 +297,7 @@ impl World {
     /// a building of master type 80 alive (state 2) whose master is among the technology's
     /// locations, with the technology in state 1 or repeatable, and without a top action of
     /// 0x7b to 0x7d (`FUN_141227a00`), queues it ([`World::queue_research`]); queued, its unit AI
-    /// takes the action value 0x26c. A technology of `linkedTechs.json` ([`World::linked_techs`],
+    /// takes the action value 0x26c. A technology of `linkedTechs.json` ([`Model::linked_techs`](genie_model::model::Model::linked_techs),
     /// the game settings' table `FUN_140f39f40` looks up) is not modelled (`FUN_140f3a0f0`,
     /// `FUN_140f39e80`). Not held: the interface's view and selection (`FUN_140e6de20`), the
     /// local player's statistics flag. Not modelled: the computer players' parts (`player+0x7a8`, `FUN_1411d5520`), the player's
@@ -317,7 +317,7 @@ impl World {
             return Ok(());
         }
         let tech = tech_id.index();
-        let def = self.techs.get(tech).ok_or(GenieError::unsupported(
+        let def = self.model.techs.get(tech).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
         ))?;
         let get = |i: AttributeId| Attributes::get(owner, i);
@@ -333,7 +333,7 @@ impl World {
             ));
         }
         let building_id = self.least_loaded(r, buildings)?;
-        if self.linked_techs.contains_key(&tech_id) {
+        if self.model.linked_techs.contains_key(&tech_id) {
             return Err(GenieError::unsupported(
                 "RESEARCH of a linked technology (FUN_140f3a0f0, FUN_140f39e80)",
             ));
@@ -426,7 +426,7 @@ impl World {
         shift: bool,
     ) -> Result<bool, GenieError> {
         let t = tech.index();
-        let def = self.techs.checked(t)?;
+        let def = self.model.techs.checked(t)?;
         let state = self.players.player(player)?.techs.checked(t)?;
         let one = !state.allow_multiple || def.upgrades();
         let count: u16 = if !shift || one { 1 } else { 5 };

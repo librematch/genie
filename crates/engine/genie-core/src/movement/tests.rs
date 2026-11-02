@@ -49,6 +49,7 @@ use crate::world::index::TestObjects;
 use crate::world::parts::Object;
 use crate::world::{FrameSeed, Player, World};
 use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, SQRT_2};
+use std::sync::Arc;
 
 const DT: f32 = 0.02;
 
@@ -2270,7 +2271,7 @@ pub(crate) fn path_world(owner: Player) -> World {
         ..Master::default()
     };
     let table = Masters::new([master(ids::VILLAGER_MALE), master(MasterId::default())]);
-    t.masters = vec![Masters::new([]), table];
+    t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(table)];
     t
 }
 

@@ -46,7 +46,8 @@ impl Unit {
         const REACH_LOW: f32 = 4.0;
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let masters =
-            c.w.masters
+            c.w.model
+                .masters
                 .get(c.player.index())
                 .ok_or(GenieError::unsupported(
                     "a builder without its player's masters",
@@ -59,7 +60,7 @@ impl Unit {
             "a builder's building without a place",
         ))?;
         let entry = drop_site(
-            &c.w.drop_sites,
+            &c.w.model.drop_sites,
             built,
             master.class,
             c.w.players.player(c.player)?.civ,
@@ -81,7 +82,7 @@ impl Unit {
         let (player, me_id, every) = (
             c.player,
             self.id,
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
         );
         let candidate = |id: ObjectId, owner: PlayerId, u: &Self, position: Position| {
             let m = u.master(every, owner)?;

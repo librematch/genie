@@ -53,7 +53,7 @@ impl World {
         let master = u.master(self.master_tables(), p)?;
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         Ok(Some(victim_in(
             (
@@ -228,7 +228,7 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
         player: c.player,
         relations: &c.w.players.player(c.player)?.relations,
         foreign: view.players(),
-        drop_sites: &c.w.drop_sites,
+        drop_sites: &c.w.model.drop_sites,
     };
     Ok(Some(victim_in(
         (

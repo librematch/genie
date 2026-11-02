@@ -24,6 +24,7 @@ use crate::world::index::{ObjectIndex, Place};
 use crate::world::player::Player;
 use std::cmp::Ordering;
 use std::ptr::eq;
+use std::sync::Arc;
 
 /// The objects besides the one that updates, to read: its owner's other live objects in their
 /// list's order and the other players' live and sleeping ones.
@@ -382,7 +383,7 @@ impl<'a> Others<'a> {
         &mut self,
         id: ObjectId,
         own_tracker: &mut Tracker,
-        (masters, lines): (&[Masters], &UnitLines),
+        (masters, lines): (&[Arc<Masters>], &UnitLines),
     ) -> bool {
         let Self {
             player,

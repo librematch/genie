@@ -72,9 +72,9 @@ impl Unit {
             (class, c.player),
             (&mut releases, &mut leaves, by),
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 (
-                    &c.w.graphics,
+                    &c.w.model.graphics,
                     c.w.parts.combat.of(self.id).abilities.look.as_ref(),
                 ),
                 sprite_rng,
@@ -89,9 +89,9 @@ impl Unit {
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
                 (
-                    OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+                    OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                     (
-                        &c.w.graphics,
+                        &c.w.model.graphics,
                         c.w.parts.combat.of(self.id).abilities.look.as_ref(),
                     ),
                     sprite_rng,
@@ -391,7 +391,7 @@ impl Unit {
         let range = object_range(range, Some(own));
         let sprite = ai_sprite(own, false)
             .or_else(|| object_sprite(own))
-            .and_then(|id| c.w.graphics.get(id).copied());
+            .and_then(|id| c.w.model.graphics.get(id).copied());
         let here = self.position();
         let mover = c.w.parts.mover_mut(self.id).ok_or(GenieError::unreachable(
             "a walker tested above without its mover",
@@ -407,8 +407,8 @@ impl Unit {
         if move_to.shows_standing() {
             self.shows_standing_sprite(
                 c.w.parts.motion.layer_mut(self.id),
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                &c.w.graphics,
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
         }

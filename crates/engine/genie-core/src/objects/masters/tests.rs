@@ -54,6 +54,7 @@ use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::unit_ai_type;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 /// A sprite field as the attribute tests read it: its id, −1 for none.
@@ -1708,7 +1709,7 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
 /// master.
 #[test]
 fn master_is_found_by_its_player_and_id() {
-    let every = vec![Masters::default(), villagers()];
+    let every = vec![Arc::new(Masters::default()), Arc::new(villagers())];
     let found = player_master(&every, PlayerId::new(1), ids::VILLAGER_MALE).map(|m| m.id);
     assert_eq!(found, Some(ids::VILLAGER_MALE));
     assert!(player_master(&every, PlayerId::new(0), ids::VILLAGER_MALE).is_none());
@@ -1719,7 +1720,7 @@ fn master_is_found_by_its_player_and_id() {
 #[test]
 fn the_world_masters_are_looked_up_by_player() {
     use crate::objects::masters::PlayersMasters;
-    let mut every = [Masters::new([house()]), Masters::new([])];
+    let mut every = [Masters::new([house()]), Masters::new([])].map(Arc::new);
     assert!(
         every
             .of(PlayerId::new(0))

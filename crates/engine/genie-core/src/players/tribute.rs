@@ -59,7 +59,8 @@ impl World {
     #[must_use]
     pub fn pays_tribute(&self, p: PlayerId) -> bool {
         let has = |m: MasterId| {
-            self.masters
+            self.model
+                .masters
                 .get(p.index())
                 .is_some_and(|ms| ms.get(m).is_some())
         };
@@ -144,6 +145,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     fn gift(attribute: u16, amount: f32, fee: f32) -> Gift {
         Gift {
@@ -209,7 +211,11 @@ mod tests {
             class: class::BUILDING,
             ..Master::default()
         }]);
-        t.masters = vec![masters.clone(), masters.clone(), masters];
+        t.model.masters = vec![
+            Arc::new(masters.clone()),
+            Arc::new(masters.clone()),
+            Arc::new(masters),
+        ];
         if market {
             t.players[1].tracker.add(
                 object_id(7),

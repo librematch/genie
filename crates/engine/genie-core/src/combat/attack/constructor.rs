@@ -191,16 +191,16 @@ impl Attack {
     ) -> Result<(Self, Vec<Posted>), GenieError> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
         let (mover, by_id) =
             c.w.parts
-                .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.masters));
+                .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.model.masters));
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
             Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
@@ -220,13 +220,13 @@ impl Attack {
             ))?;
             let (motion, by_id) =
                 c.w.parts
-                    .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.masters));
+                    .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.model.masters));
             let mut g = Ground {
                 map: &c.w.spatial,
                 sprite_rng: c.w.streams.get(Stream::Sprite),
                 object_rng: None,
                 posts: Posts::Held(&mut posted),
-                graphics: &c.w.graphics,
+                graphics: &c.w.model.graphics,
                 by_id,
                 motion,
             };
@@ -235,8 +235,8 @@ impl Attack {
         if begun.arrived {
             unit.shows_standing_sprite(
                 c.w.parts.motion.layer_mut(unit.id),
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                &c.w.graphics,
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
         }

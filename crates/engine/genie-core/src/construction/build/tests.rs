@@ -38,6 +38,7 @@ use crate::world::WorldTime;
 use crate::world::parts::Object;
 use crate::world::{Player, World};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// The two tiles beside a builder on a footprint's diagonal (`LAB_140aafc09`'s arguments), by
 /// the quarter its step points into: up-left, down-left, and the rest.
@@ -721,7 +722,7 @@ fn site_world(spatial: Spatial, masters: Vec<Master>, objects: Vec<Object>) -> W
     )
     .with_parts(parts);
     t.spatial = spatial;
-    t.masters = vec![ms.clone(), ms];
+    t.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
     t
 }
 

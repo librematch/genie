@@ -79,7 +79,7 @@ impl World {
         let completion = Completion {
             master: Some(master),
             farm_bonus: farm_bonus(&self.players.player(owner)?.attributes),
-            masters: self.masters.of(owner),
+            masters: self.model.masters.of(owner),
             player_type: self.players.player(owner)?.kind,
             ai: self.parts.unit_ai.contains(u.id),
         };
@@ -116,7 +116,10 @@ impl World {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let (Place::Live(p, _) | Place::Sleeping(p, _)) = place;
         let volley = held(&mut self.players, place)?
-            .master(MasterTables::new(&self.masters, &self.parts.own_master), p)?
+            .master(
+                MasterTables::new(&self.model.masters, &self.parts.own_master),
+                p,
+            )?
             .volley_fire;
         let now = self.world_time;
         let u = held(&mut self.players, place)?;
@@ -388,7 +391,7 @@ impl World {
         at: Position,
         flagged: bool,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let Some(made) = player_master(&self.masters, p, master).cloned() else {
+        let Some(made) = player_master(&self.model.masters, p, master).cloned() else {
             return Ok(None);
         };
         // a combat unit (type 70, an effect's spawn): the master's slot 0x40 there, its footprint

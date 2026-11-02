@@ -31,6 +31,7 @@ use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use std::sync::Arc;
 
 /// An enable command finds the master it tested gone.
 const NO_MASTER: GenieError =
@@ -57,7 +58,7 @@ impl World {
     ) -> Result<bool, GenieError> {
         use crate::technology::Attributes;
         let (tech, t) = (t, t.index());
-        let def = self.techs.checked(t)?.clone();
+        let def = self.model.techs.checked(t)?.clone();
         let state = &self.players.player(p)?.techs.checked(t)?;
         if !(ResearchState::Unavailable..=ResearchState::Researching).contains(&state.state) {
             return Ok(false);
@@ -107,12 +108,12 @@ impl World {
     /// disable of a building's own technology) would differ without it.
     pub(super) fn research_effect_known(&self, p: PlayerId, t: TechId) -> Result<(), GenieError> {
         let t = t.index();
-        let def = self.techs.checked(t)?;
+        let def = self.model.techs.checked(t)?;
         let state = &self.players.player(p)?.techs.checked(t)?;
         let shared = |tech: DisabledTech| {
             // FUN_1413d1020 tests the whole id
             tech.whole()
-                .and_then(|d| self.techs.get(d.index()))
+                .and_then(|d| self.model.techs.get(d.index()))
                 .is_some_and(|d| d.kind == TechKind::SHARED)
         };
         // the player's own enable for one building and upgrade of the object (kinds 2 and 3),
@@ -151,7 +152,7 @@ impl World {
     /// is not researched.
     pub(crate) fn research_built(&mut self, p: PlayerId, t: TechId) -> Result<(), GenieError> {
         let tree = self.players.player(p)?.techs.len();
-        if tree == 0 || self.techs.len() != tree {
+        if tree == 0 || self.model.techs.len() != tree {
             return Err(GenieError::unsupported(
                 "a completion's technology without the player's tech tree",
             ));
@@ -208,7 +209,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let mut counted = 0;
         let civ = self.players.player(p)?.civ;
-        for d in 0..self.techs.len() {
+        for d in 0..self.model.techs.len() {
             counted += self.update_dependent(p, civ, (d, tech))?;
         }
         if counted == 0 {
@@ -233,7 +234,7 @@ impl World {
         (d, t): (usize, TechId),
     ) -> Result<i32, GenieError> {
         let mut counted = 0;
-        let def = self.techs.checked(d)?;
+        let def = self.model.techs.checked(d)?;
         if !def.required.contains(&Some(t)) || def.kind == TechKind::SHARED {
             return Ok(counted);
         }
@@ -346,11 +347,16 @@ impl World {
         amount: f32,
         mode: ChangeMode,
     ) -> Result<(), GenieError> {
-        let tree = self.players.player(p)?.techs.len().min(self.techs.len());
+        let tree = self
+            .players
+            .player(p)?
+            .techs
+            .len()
+            .min(self.model.techs.len());
         let Some(t) = Some(tech.index()).filter(|&t| t < tree) else {
             return Ok(());
         };
-        let costs = self.techs.checked(t)?.costs;
+        let costs = self.model.techs.checked(t)?.costs;
         let adjustments = &mut self.players.player_mut(p)?.techs.checked_mut(t)?.cost_adj;
         for (cost, adj) in costs.iter().zip(adjustments.iter_mut()) {
             if !cost.paid.is_paid() || resource.is_some_and(|r| cost.attribute != Some(r)) {
@@ -387,10 +393,16 @@ impl World {
         tech: DisabledTech,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
-        let count = self.players.player(p)?.techs.len().min(self.techs.len());
+        let count = self
+            .players
+            .player(p)?
+            .techs
+            .len()
+            .min(self.model.techs.len());
         let held = tech.whole().map(TechId::index).filter(|&t| t < count);
         if held.is_some_and(|t| {
-            self.techs
+            self.model
+                .techs
                 .get(t)
                 .is_some_and(|d| d.kind == TechKind::SHARED)
         }) {
@@ -420,10 +432,10 @@ impl World {
         let short = tech.short();
         let states = &mut self.players.player_mut(p)?.techs;
         match usize::try_from(short).ok().filter(|&t| t < count) {
-            Some(t) => disable(&self.techs, states, t),
+            Some(t) => disable(&self.model.techs, states, t),
             None if short < 0 => {
                 for t in 0..count {
-                    disable(&self.techs, states, t);
+                    disable(&self.model.techs, states, t);
                 }
             }
             None => {}
@@ -447,7 +459,7 @@ impl World {
         one: bool,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
-        if player_master(&self.masters, p, master).is_none() {
+        if player_master(&self.model.masters, p, master).is_none() {
             return Ok(());
         }
         if enable == 1 && master == MODE_TESTED_MASTER {
@@ -472,9 +484,7 @@ impl World {
             }
             return Ok(());
         }
-        let m = self
-            .masters
-            .checked_mut(p.index())?
+        let m = Arc::make_mut(self.model.masters.checked_mut(p.index())?)
             .get_mut(master)
             .ok_or(NO_MASTER)?;
         if !m.disabled {

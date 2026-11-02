@@ -127,7 +127,7 @@ impl World {
             if let Some(facet) = facet {
                 let standing = made
                     .standing_sprite
-                    .and_then(|s| self.graphics.get(s))
+                    .and_then(|s| self.model.graphics.get(s))
                     .copied();
                 let own = standing.map_or(
                     SpriteFacets {
@@ -212,7 +212,7 @@ impl World {
         let id = self.take_object_id(p, master);
         let standing = made
             .standing_sprite
-            .and_then(|s| self.graphics.get(s).copied());
+            .and_then(|s| self.model.graphics.get(s).copied());
         let mut sprite = None;
         if let Some(g) = standing {
             sprite = Some(ActiveSprite::start(g, self.streams.get(Stream::Sprite)));
@@ -288,7 +288,7 @@ impl World {
         let death_facets = if made.kind == MasterKind::STATIC {
             let after = made.death_sprite.or(made.standing_sprite);
             after
-                .and_then(|after| self.graphics.get(after))
+                .and_then(|after| self.model.graphics.get(after))
                 .filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several())
                 .map(|g| g.facets)
         } else {

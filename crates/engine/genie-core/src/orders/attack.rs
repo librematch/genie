@@ -63,8 +63,8 @@ impl World {
             self.parts.combat_of(u.id),
             master,
             (
-                OwnerMasters::new(&self.parts.own_master, self.masters.of(player)),
-                &self.graphics,
+                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
+                &self.model.graphics,
             ),
             self.parts.unit_ai.get(u.id),
             (held.kind, world_time),
@@ -126,7 +126,12 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?;
         // the task factory (`FUN_140a97e00` case 7) gives the Attack the task's moving sprite
-        let arms = arms(master, &self.graphics, task.sprites, task.sprites.moving);
+        let arms = arms(
+            master,
+            &self.model.graphics,
+            task.sprites,
+            task.sprites.moving,
+        );
         let standing = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         let me_at = *self
             .spatial
@@ -317,10 +322,10 @@ impl World {
             .filter(|&t| t.is_some());
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;

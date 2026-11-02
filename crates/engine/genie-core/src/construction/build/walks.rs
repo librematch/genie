@@ -48,10 +48,10 @@ impl BuildAction {
     ) -> Result<(Option<WalkTo>, Option<MoveToAction>), GenieError> {
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
         )?;

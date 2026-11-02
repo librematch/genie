@@ -367,7 +367,7 @@ impl World {
         master: MasterId,
         action: ActionKind,
     ) -> Result<bool, GenieError> {
-        let Some(masters) = self.masters.of(player) else {
+        let Some(masters) = self.model.masters.of(player) else {
             return self.master(player, master).map(|_| false);
         };
         Ok(masters.get(master).is_some_and(|m| {
@@ -520,7 +520,7 @@ impl World {
         let Some(sprite) = self.sprite_to_show(id, shown)? else {
             return Ok(false);
         };
-        let graphic = self.graphics.get(sprite).copied();
+        let graphic = self.model.graphics.get(sprite).copied();
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
         let u = match place {
             Place::Live(p, i) => self.players.live_mut(p, i).ok(),

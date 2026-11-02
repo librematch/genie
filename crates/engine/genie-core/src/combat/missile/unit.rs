@@ -24,6 +24,7 @@ use crate::objects::masters::player_master;
 use crate::objects::unit::{Unit, missed_passes};
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
+use genie_model::model::Model;
 
 use crate::combat::attack::{Hit, strike};
 use crate::combat::missile::{
@@ -301,7 +302,7 @@ impl Unit {
             ally_factor: 1.0,
             player: Some(c.player),
             ignore: &[RecordId::from(self.id)],
-            objects: ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts),
+            objects: ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts),
         })?;
         let mut met = Vec::new();
         for record in crossed {
@@ -312,10 +313,11 @@ impl Unit {
             let Some(p) = c.w.spatial.get(id) else {
                 continue;
             };
-            let m =
-                player_master(&c.w.masters, p.player, p.master).ok_or(GenieError::unsupported(
+            let m = player_master(&c.w.model.masters, p.player, p.master).ok_or(
+                GenieError::unsupported(
                     "an object a missile meets of a master the slice does not have",
-                ))?;
+                ),
+            )?;
             if meets_height(p.position.z(), m.height.get(), at.z(), stats.radius.z()) {
                 met.push((id, p.player, m.kind, m.blast_defense));
             }
@@ -356,10 +358,10 @@ impl Unit {
         let shooter_slot = c.w.live_index(p, action.fired_from);
         let World {
             players,
-            masters,
             spatial,
             streams,
             parts,
+            model: Model { masters, .. },
             ..
         } = &mut *c.w;
         let Player {
@@ -530,7 +532,7 @@ impl Unit {
                 Some(self.life.master_id)
             };
             let area = blaster
-                .and_then(|id| player_master(&c.w.masters, c.player, id))
+                .and_then(|id| player_master(&c.w.model.masters, c.player, id))
                 .map(|m| m.area_effect)
                 .ok_or(GenieError::unsupported(
                     "a landed missile's blast of a master the slice does not have",
@@ -612,7 +614,7 @@ impl Unit {
             c.w.spatial.sight_state(self.id, ObjectState::Removed)?;
             if before < ObjectState::DyingSprite {
                 let master = self.master(
-                    MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+                    MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
                     c.player,
                 )?;
                 forget_resource(&mut c.w.spatial, Some(master), self.id, self.position())?;

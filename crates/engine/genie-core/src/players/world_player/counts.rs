@@ -84,7 +84,7 @@ impl World {
     /// the limited units' tests not reached.
     #[must_use]
     pub fn trainable_count(&self, p: PlayerId, building: MasterId) -> i16 {
-        let Some(masters) = self.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(p) else {
             return 0;
         };
         let mut count = 0i16;
@@ -134,7 +134,7 @@ impl World {
     /// [`TechTree`]: crate::players::world_player::tech_tree::TechTree
     #[must_use]
     pub fn upgradable_count(&self, p: PlayerId, building: MasterId) -> i16 {
-        let Some(masters) = self.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(p) else {
             return 0;
         };
         let Some(player) = self.players.get(p.index()) else {
@@ -146,6 +146,7 @@ impl World {
         let state = |t: TreeTech| t.index().and_then(|t| player.techs.get(t)).map(|t| t.state);
         let ages_out = AGES.map(|t| state(TreeTech::of_tech(t)) == Some(ResearchState::Disabled));
         let unique = self
+            .model
             .tech_tree
             .unique_units
             .get(player.civ.index())
@@ -175,16 +176,16 @@ impl World {
                 settings: &self.settings,
                 fallback,
             };
-            if (!full || TreeMaster::of_master(m.id) != unique) && !self.tech_tree.has(&q) {
+            if (!full || TreeMaster::of_master(m.id) != unique) && !self.model.tech_tree.has(&q) {
                 continue;
             }
-            let link = self.tech_tree.link(&q);
+            let link = self.model.tech_tree.link(&q);
             let had = link
                 .master()
                 .and_then(|l| masters.get(l))
                 .map(|l| l.available);
             if had.is_none_or(|a| a) {
-                let tech = self.tech_tree.tech(&q);
+                let tech = self.model.tech_tree.tech(&q);
                 if state(tech).is_none_or(|s| s == ResearchState::Researched) {
                     count = count.wrapping_add(1);
                 }
@@ -213,7 +214,7 @@ impl World {
             return false;
         }
         let mut at = building;
-        let local = player_master(&self.masters, self.local_player, building);
+        let local = player_master(&self.model.masters, self.local_player, building);
         if let Some(b) = local.filter(|b| b.class == BUILDING)
             && let Some(site) = b.building.as_ref()
             && site.disappears_when_built

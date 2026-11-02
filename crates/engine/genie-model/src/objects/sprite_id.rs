@@ -4,7 +4,7 @@ use genie_diff::Diff;
 use std::fmt::{Display, Error, Formatter};
 
 /// A sprite (a `.dat` graphic) by its id, 0 and up: what a master's and a task's sprite
-/// fields name and the world's sprite table holds (`genie_core::world::World::graphics`). The
+/// fields name and the world's sprite table holds ([`Model::graphics`](crate::model::Model::graphics)). The
 /// game's −1 (or any id below 0) is none, which an `Option` holds ([`SpriteId::of_data`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Diff)]
 pub struct SpriteId(i16);

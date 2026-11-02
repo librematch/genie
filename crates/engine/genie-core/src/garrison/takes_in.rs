@@ -158,7 +158,8 @@ impl World {
         others: bool,
         unchecked: bool,
     ) -> Result<bool, GenieError> {
-        let Some(unit) = master.and_then(|master| player_master(&self.masters, player, master))
+        let Some(unit) =
+            master.and_then(|master| player_master(&self.model.masters, player, master))
         else {
             return Ok(false);
         };
@@ -168,7 +169,7 @@ impl World {
         if bp != player {
             let world = TaskWorld {
                 players: &self.players,
-                drop_sites: &self.drop_sites,
+                drop_sites: &self.model.drop_sites,
             };
             if !others || !world.allied(bp, player, true) || !world.allied(player, bp, true) {
                 return Ok(false);

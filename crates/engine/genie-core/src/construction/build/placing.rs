@@ -378,7 +378,7 @@ impl BuildAction {
         builder: &Unit,
         footprint: ObjectId,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
@@ -398,10 +398,10 @@ impl BuildAction {
         self.state = BuildState::Clear { move_to: None };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
         )?;

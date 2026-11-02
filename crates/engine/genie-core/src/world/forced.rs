@@ -329,8 +329,10 @@ impl World {
         }
         sight_follows(&mut self.spatial, id, (before, state))?;
         if before < ObjectState::DyingSprite && ObjectState::Undead < state {
-            let master =
-                forced.master(MasterTables::new(&self.masters, &self.parts.own_master), p)?;
+            let master = forced.master(
+                MasterTables::new(&self.model.masters, &self.parts.own_master),
+                p,
+            )?;
             forget_resource(&mut self.spatial, Some(master), id, forced.position())?;
         }
         Ok(())

@@ -239,7 +239,8 @@ impl World {
         if made.kind != MasterKind::COMBAT {
             return Ok(None);
         }
-        let (Some(own), Some(theirs)) = (self.masters.of(player), self.masters.of(up)) else {
+        let (Some(own), Some(theirs)) = (self.model.masters.of(player), self.model.masters.of(up))
+        else {
             return Err(GenieError::unsupported("an unload without the masters"));
         };
         let b = self.players.live(player, container)?;

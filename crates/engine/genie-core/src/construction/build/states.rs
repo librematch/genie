@@ -301,8 +301,8 @@ impl BuildAction {
     pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
         builder.show_standing(
             c.w.parts.motion.layer_mut(builder.id),
-            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-            &c.w.graphics,
+            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+            &c.w.model.graphics,
             c.w.streams.get(Stream::Sprite),
         )
     }

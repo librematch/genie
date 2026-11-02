@@ -713,6 +713,7 @@ mod tests {
     use crate::world::Seconds;
     use crate::world::WholeSeconds;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     /// A gold mine's master (it leaves ghosts), a house's and the ghosts' own.
     const MINE: MasterId = MasterId::named(66);
@@ -770,7 +771,7 @@ mod tests {
             vec![Millis::ZERO; 3],
             players,
         );
-        t.masters = (0..3).map(|_| masters(recyclable)).collect();
+        t.model.masters = (0..3).map(|_| masters(recyclable)).map(Arc::new).collect();
         let _ = t
             .push_live(
                 PlayerId::new(0),
@@ -1158,7 +1159,7 @@ mod tests {
         for _ in 0..2 {
             t.players.push(Player::default());
             t.reindex();
-            t.masters.push(masters(true));
+            t.model.masters.push(Arc::new(masters(true)));
         }
         let own = |p| own_masks(p, false);
         let with = |p, bits: u64| {
@@ -1307,7 +1308,7 @@ mod tests {
             class: class::BUILDING,
             ..Master::default()
         };
-        t.masters = (0..3)
+        t.model.masters = (0..3)
             .map(|_| {
                 Masters::new(masters(true).iter().cloned().chain([
                     gate.clone(),
@@ -1316,6 +1317,7 @@ mod tests {
                     skipped.clone(),
                 ]))
             })
+            .map(Arc::new)
             .collect();
         // Gaia's mine 5 dead (state 3), house 9's annexes 10 (a gate) and 11, a class-51
         // building 12, master 1808's 13, a desolid foundation 14 in the sleeping list

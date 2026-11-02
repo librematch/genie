@@ -13,6 +13,7 @@ use crate::world::Player;
 use crate::world::index::{ObjectIndex, ObjectsRef};
 use crate::world::parts::{PartTable, Parts};
 use std::mem::replace;
+use std::sync::Arc;
 
 /// A part table read with at most one entry lent out to change ([`PartTable::lend`]): the
 /// others read as the table's, the lent one as none (its object is out for its update, as its
@@ -180,7 +181,7 @@ impl Parts {
     pub(crate) fn lend_motion<'a>(
         &'a mut self,
         id: ObjectId,
-        (players, index, masters): (&'a [Player], &'a ObjectIndex, &'a [Masters]),
+        (players, index, masters): (&'a [Player], &'a ObjectIndex, &'a [Arc<Masters>]),
     ) -> (MotionMut<'a>, ObjectsRef<'a>) {
         let (motion, motions) = self.motion.lend(id);
         (
@@ -206,7 +207,7 @@ impl Parts {
     pub(crate) fn lend_mover<'a>(
         &'a mut self,
         id: ObjectId,
-        tables: (&'a [Player], &'a ObjectIndex, &'a [Masters]),
+        tables: (&'a [Player], &'a ObjectIndex, &'a [Arc<Masters>]),
     ) -> (Option<&'a mut Mover>, ObjectsRef<'a>) {
         let (motion, by_id) = self.lend_motion(id, tables);
         (motion.into_mover(), by_id)

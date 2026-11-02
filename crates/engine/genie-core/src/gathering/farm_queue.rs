@@ -116,7 +116,7 @@ impl World {
         if !count.any() || QUEUE_LIMIT <= self.queued(p, queue)? {
             return Ok(false);
         }
-        let Some(masters) = self.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(p) else {
             return Ok(false);
         };
         let player = self.players.player_mut(p)?;
@@ -161,7 +161,7 @@ impl World {
         }
         // the game reads the master without a test: a queue of a master the player lacks
         // cannot have been paid for
-        if let Some(m) = player_master(&self.masters, p, master) {
+        if let Some(m) = player_master(&self.model.masters, p, master) {
             refund_master(m, n, player)?;
         }
         Ok(true)
@@ -174,7 +174,7 @@ impl World {
     /// (`CVTSI2SS`, `COMISS`). A base id the player lacks makes none (the game reads its table's
     /// slot unchecked; the `.dat`'s masters name their own).
     pub fn can_make(&self, p: PlayerId, master: MasterId) -> Result<bool, GenieError> {
-        let Some(ms) = self.masters.of(p) else {
+        let Some(ms) = self.model.masters.of(p) else {
             return Ok(false);
         };
         let Some(m) = ms.get(master) else {
@@ -223,7 +223,7 @@ impl World {
     pub fn reseed_master(&self, p: PlayerId) -> Result<Option<MasterId>, GenieError> {
         for m in [FARM, PASTURE] {
             if self.can_make(p, m)?
-                && player_master(&self.masters, p, m).is_some_and(|m| m.class == class::FARM)
+                && player_master(&self.model.masters, p, m).is_some_and(|m| m.class == class::FARM)
             {
                 return Ok(Some(m));
             }
@@ -349,7 +349,7 @@ impl World {
     ) -> Result<Option<bool>, GenieError> {
         let mut from_queue = !auto;
         if auto {
-            let Some(masters) = self.masters.of(p) else {
+            let Some(masters) = self.model.masters.of(p) else {
                 // unreachable: the gatherer's master was found in this table above
                 return Ok(None);
             };
@@ -389,7 +389,12 @@ impl World {
         let Some(gather) = self.parts.actions.of_mut(unit.id)?.list.gather_mut() else {
             return Ok(());
         };
-        let stand = stand_sprite(&gather.task, standing, unit.life.held(), &self.graphics);
+        let stand = stand_sprite(
+            &gather.task,
+            standing,
+            unit.life.held(),
+            &self.model.graphics,
+        );
         let released = gather.after_reseed(
             arrived,
             player_type,
@@ -436,6 +441,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     /// A master of type 70 costing `cost` (attribute, amount, paid).
     fn master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
@@ -469,7 +475,7 @@ mod tests {
             ),
             master(FISH_TRAP, &[(attribute::WOOD, 100, true)]),
         ]);
-        t.masters = vec![Masters::new([]), masters];
+        t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(masters)];
         t
     }
 
@@ -580,20 +586,20 @@ mod tests {
     #[test]
     fn master_can_be_made_by_its_base_availability() {
         let mut t = world(0.0);
-        t.masters[1] = Masters::new([
+        t.model.masters[1] = Arc::new(Masters::new([
             building(FARM, class::FARM, FARM, true, -1),
             building(PASTURE, class::FARM, master_id(300), false, -1),
             building(master_id(300), class::BUILDING, master_id(300), true, 301),
             building(master_id(301), class::BUILDING, master_id(302), false, -1),
             building(master_id(302), class::BUILDING, master_id(302), true, -1),
             building(master_id(303), class::BUILDING, master_id(999), true, -1),
-        ]);
+        ]));
         assert!(t.can_make(PlayerId::new(1), FARM).unwrap());
         // the pasture's base 300 heads 301, whose base 302 is available
         assert!(t.can_make(PlayerId::new(1), PASTURE).unwrap());
         assert!(!t.can_make(PlayerId::new(1), ids::ID_1187).unwrap());
         assert!(!t.can_make(PlayerId::new(1), master_id(303)).unwrap());
-        t.masters[1] = Masters::new([building(FARM, class::FARM, FARM, false, -1)]);
+        t.model.masters[1] = Arc::new(Masters::new([building(FARM, class::FARM, FARM, false, -1)]));
         assert!(!t.can_make(PlayerId::new(1), FARM).unwrap());
     }
 
@@ -602,13 +608,13 @@ mod tests {
     #[test]
     fn town_centre_can_be_made_below_the_town_centre_limit() {
         let mut t = world(0.0);
-        t.masters[1] = Masters::new([building(
+        t.model.masters[1] = Arc::new(Masters::new([building(
             TOWN_CENTRE_621,
             class::BUILDING,
             TOWN_CENTRE_621,
             false,
             -1,
-        )]);
+        )]));
         assert!(!t.can_make(PlayerId::new(1), TOWN_CENTRE_621).unwrap());
         t.players[1].attributes[attribute::TOWN_CENTRE_LIMIT.index()] = Amount::new(1.0);
         assert!(t.can_make(PlayerId::new(1), TOWN_CENTRE_621).unwrap());
@@ -625,13 +631,13 @@ mod tests {
                 building(PASTURE, class::FARM, PASTURE, pasture, -1),
             ])
         };
-        t.masters[1] = masters(true, true, class::FARM);
+        t.model.masters[1] = Arc::new(masters(true, true, class::FARM));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(FARM));
-        t.masters[1] = masters(false, true, class::FARM);
+        t.model.masters[1] = Arc::new(masters(false, true, class::FARM));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(PASTURE));
-        t.masters[1] = masters(true, true, class::BUILDING);
+        t.model.masters[1] = Arc::new(masters(true, true, class::BUILDING));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(PASTURE));
-        t.masters[1] = masters(false, false, class::FARM);
+        t.model.masters[1] = Arc::new(masters(false, false, class::FARM));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), None);
     }
 

@@ -103,7 +103,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         let drops_here = master.drop_sites.contains(&t.life.master_id);
         let at = |id: ObjectId| {
@@ -126,17 +126,17 @@ impl Unit {
         )?;
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let old = hunt.target;
         let moving = hunt.task.walk_sprite_id(self.life.held());
-        let arms = arms(master, &c.w.graphics, hunt.task.sprites, moving);
+        let arms = arms(master, &c.w.model.graphics, hunt.task.sprites, moving);
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         if let Some(arrived) = hunt.retarget(
             HuntRetarget {

@@ -20,6 +20,7 @@ use crate::players::diplomacy::REVEAL_UNITS;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
+use genie_model::model::Model;
 
 impl World {
     /// The building `id`'s `set_state(2)` from state 0 (`FUN_1411dbb70`), after its annexes'
@@ -139,9 +140,9 @@ impl World {
         let place = self.place(id).ok_or(NOT_HELD)?;
         let Self {
             players,
-            graphics,
             streams,
             parts,
+            model: Model { graphics, .. },
             ..
         } = self;
         let u = held(players, place)?;

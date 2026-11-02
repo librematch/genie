@@ -54,6 +54,7 @@ use crate::world::parts::Part;
 use crate::world::tests::{forage_world, in_update};
 use crate::world::{OBJECT_MASTER, Unread, WorldTime};
 use std::iter::once;
+use std::sync::Arc;
 
 /// A graphic of sixteen facets, its sequence flag bit 1 set (`turns`).
 const WALKING: Graphic = Graphic {
@@ -228,7 +229,7 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
             let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
             Ok((
                 level,
-                ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts)
+                ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts)
                     .gait(object_id(600))
                     .and_then(|g| g.pause),
             ))
@@ -606,7 +607,10 @@ fn unit_reads_its_own_master_before_its_player_s() {
         hit_points: MasterHitPoints::of_data(25),
         ..Master::default()
     };
-    let every = vec![Masters::default(), Masters::new([shared])];
+    let every = vec![
+        Arc::new(Masters::default()),
+        Arc::new(Masters::new([shared])),
+    ];
     let u = Unit {
         id: object_id(7),
         life: Lifecycle {

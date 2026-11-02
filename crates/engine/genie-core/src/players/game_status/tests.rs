@@ -78,6 +78,7 @@ use crate::world::WholeSeconds;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
 use crate::world::{FrameSeed, GameMode, PlayState};
+use std::sync::Arc;
 
 /// An entry of `count` villagers of master `master` that paid `food` each.
 fn villager(master: Option<MasterId>, count: i16, food: f32) -> Entry {
@@ -175,7 +176,11 @@ fn game() -> World {
     t.players[1].objects[ListIndex::new(0)].life.master_id = ids::TOWN_CENTRE;
     t.set_part(object_id(9), Part::Production(Some(Box::new(production))))
         .unwrap();
-    t.masters = vec![masters.clone(), masters.clone(), masters];
+    t.model.masters = vec![
+        Arc::new(masters.clone()),
+        Arc::new(masters.clone()),
+        Arc::new(masters),
+    ];
     t.victory_conquest = true;
     t
 }
@@ -691,7 +696,7 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
         villager(Some(ids::VILLAGER_FEMALE), 4, 46.0),
     ]);
     t.players[1].attributes[80] = Amount::new(7.0);
-    t.masters[1] = Masters::new([
+    t.model.masters[1] = Arc::new(Masters::new([
         t.master(PlayerId::new(1), ids::TOWN_CENTRE)
             .unwrap()
             .clone(),
@@ -704,7 +709,7 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
                 .unwrap()
                 .clone()
         },
-    ]);
+    ]));
     t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), Batch::Five)
         .unwrap();
     let p = &t.players[1];
@@ -732,7 +737,7 @@ fn cancel_of_all_takes_five_villagers_of_both_sexes() {
     assert_eq!(p.tracker.queued, -10);
     // from the second unit the make action goes on for the other sex
     let mut t2 = game();
-    t2.masters = t.masters.clone();
+    t2.model.masters = t.model.masters.clone();
     let tc = t2
         .parts
         .production
@@ -774,8 +779,8 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         ..villager(Some(master_id(4)), count, 0.0)
     };
     let mut t = game();
-    let ms = &mut t.masters[1];
-    *ms = Masters::new(ms.iter().cloned().chain([Master {
+    let ms = &mut t.model.masters[1];
+    *ms = Arc::new(Masters::new(ms.iter().cloned().chain([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         cost: costs(&[
@@ -785,7 +790,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
         ]),
         storage: vec![(Some(attribute::HEADROOM), Amount::new(-1.0), 2)],
         ..Master::default()
-    }]));
+    }])));
     t.players[1].attributes[80] = Amount::new(4.0);
     let tc = t
         .parts
@@ -920,7 +925,7 @@ fn researching(progress: f32) -> World {
         locations: vec![(MasterId::of_data(109), WholeSeconds::of_data(25))],
         ..TechDef::default()
     };
-    t.techs = defs;
+    t.model.techs = Arc::new(defs);
     t
 }
 
@@ -1031,8 +1036,9 @@ fn research_gives_the_effect_attribute_269_names() {
         let mut t = researching(25.0);
         t.players[1].attributes.resize(300, Amount::ZERO);
         t.players[1].attributes[269] = Amount::new(reward);
-        t.effects = vec![Vec::new(); 301];
-        t.effects[300] = vec![EffectCommand::of_data(1, 3, 1, -1, 20.0).unwrap()];
+        t.model.effects = Arc::new(vec![Vec::new(); 301]);
+        Arc::make_mut(&mut t.model.effects)[300] =
+            vec![EffectCommand::of_data(1, 3, 1, -1, 20.0).unwrap()];
         let gold = t.players[1].attributes[3];
         t.produce(PlayerId::new(1), ListIndex::new(0), Seconds::new(1.0))
             .unwrap();
@@ -1055,13 +1061,13 @@ fn cancel_in_game_mode_16_clears_the_military_flag() {
         t.settings.game_mode = GameMode::of_data(16);
         t.players[1].attributes[6] = Amount::new(age);
         t.players[1].one_military_queued = true;
-        let ms = &mut t.masters[1];
-        *ms = Masters::new(ms.iter().cloned().chain([Master {
+        let ms = &mut t.model.masters[1];
+        *ms = Arc::new(Masters::new(ms.iter().cloned().chain([Master {
             id: master_id(4),
             class: class::CLASS_6,
             kind: MasterKind::COMBAT,
             ..Master::default()
-        }]));
+        }])));
         let tc = t
             .parts
             .production

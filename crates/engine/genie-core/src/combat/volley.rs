@@ -117,7 +117,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         if (matches!(
             master.id,
@@ -311,7 +311,8 @@ impl Unit {
         scatter: GroundOffset,
     ) -> Result<(), GenieError> {
         let masters =
-            c.w.masters
+            c.w.model
+                .masters
                 .get(c.player.index())
                 .ok_or(GenieError::unsupported("a volley without the masters"))?;
         let master = self.master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?;
@@ -396,7 +397,7 @@ impl Unit {
         aimed: &Aimed,
         shot: &Shot,
     ) -> Result<(), GenieError> {
-        let made = player_master(&c.w.masters, c.player, shot.made).ok_or(
+        let made = player_master(&c.w.model.masters, c.player, shot.made).ok_or(
             GenieError::unsupported("a missile its player's masters do not have"),
         )?;
         let stats = made.missile_stats.ok_or(GenieError::unsupported(
@@ -420,7 +421,7 @@ impl Unit {
         // the setups' draws: static (its sprite, its facet), then moving (its angle)
         let standing = made
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(s).copied());
+            .and_then(|s| c.w.model.graphics.get(s).copied());
         if let Some(g) = standing {
             let _ = ActiveSprite::start(g, c.w.streams.get(Stream::Sprite));
             if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
@@ -584,10 +585,10 @@ impl Unit {
         };
         // it joins the end of its owner's list (slot 0x2d0, which files it in the tracker);
         // then its action takes the target and the shooter
-        c.w.players
-            .player_mut(c.player)?
-            .tracker
-            .add(id, key(c.w.masters.of(c.player), &c.w.lines, made.id));
+        c.w.players.player_mut(c.player)?.tracker.add(
+            id,
+            key(c.w.model.masters.of(c.player), &c.w.model.lines, made.id),
+        );
         let class = made.class;
         let own = Missile {
             max_range: shot.reach,

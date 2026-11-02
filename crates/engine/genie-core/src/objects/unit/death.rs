@@ -157,7 +157,7 @@ impl Unit {
     /// 1.4003 when the spears kill it in update 3147, moves at its master's 0.737 with its
     /// dying sprite).
     fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> Result<(), GenieError> {
-        let g = c.w.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
+        let g = c.w.model.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
         new_sprite(
             &mut self.sprite,
             c.w.parts.move_stats_mut(self.id),
@@ -191,13 +191,17 @@ impl Unit {
         let completion = Completion {
             master: Some(master),
             farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
-            masters: c.w.masters.of(c.player),
+            masters: c.w.model.masters.of(c.player),
             player_type: c.w.players.player(c.player)?.kind,
             ai,
         };
         let part = completion.first_part(construction)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
-        let k = key(c.w.masters.of(c.player), &c.w.lines, self.life.master_id);
+        let k = key(
+            c.w.model.masters.of(c.player),
+            &c.w.model.lines,
+            self.life.master_id,
+        );
         c.w.players
             .player_mut(c.player)?
             .tracker

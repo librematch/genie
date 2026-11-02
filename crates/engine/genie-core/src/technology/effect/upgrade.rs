@@ -29,6 +29,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::parts::Part;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+use std::sync::Arc;
 
 /// The masters [`World::upgrade_walk`] reads: the table's old and new ones, and the dead unit
 /// master whose objects take masters of their own.
@@ -80,7 +81,7 @@ impl World {
         mode: UpgradeMode,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
-        let Some(masters) = self.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(p) else {
             return Ok(());
         };
         let (Some(old), Some(new)) = (masters.get(from), masters.get(to)) else {
@@ -114,7 +115,7 @@ impl World {
         self.track_move_upgraded(p, from, to)?;
         if keep
             && old.kind == new.kind
-            && let Some(m) = self.masters.checked_mut(p.index())?.get_mut(from)
+            && let Some(m) = Arc::make_mut(self.model.masters.checked_mut(p.index())?).get_mut(from)
         {
             m.copy_from(&new);
         }
@@ -215,7 +216,7 @@ impl World {
         old: &Master,
     ) -> Result<(), GenieError> {
         let dead = old.death_spawns[0]
-            .and_then(|id| player_master(&self.masters, p, id))
+            .and_then(|id| player_master(&self.model.masters, p, id))
             .cloned();
         let id = self.players.live(p, i)?.id;
         if !self.parts.own_master.contains(id) {
@@ -247,9 +248,14 @@ impl World {
         (master, at): (Option<MasterId>, Option<MasterId>),
         count: i16,
     ) -> Result<(), GenieError> {
-        let has = |q: usize, id: MasterId| self.masters.get(q).is_some_and(|m| m.get(id).is_some());
+        let has = |q: usize, id: MasterId| {
+            self.model
+                .masters
+                .get(q)
+                .is_some_and(|m| m.get(id).is_some())
+        };
         let building = at
-            .and_then(|at| player_master(&self.masters, p, at))
+            .and_then(|at| player_master(&self.model.masters, p, at))
             .is_some_and(|m| m.kind == MasterKind::BUILDING);
         let (Some(master), Some(at)) = (master, at) else {
             return Ok(());
@@ -359,7 +365,7 @@ impl World {
         let (Some(units), Some(edit)) = (units, edit) else {
             return;
         };
-        let Some(masters) = self.masters.of_mut(p) else {
+        let Some(masters) = self.model.masters.of_mut(p) else {
             return;
         };
         for m in masters.iter_mut() {

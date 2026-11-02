@@ -100,7 +100,7 @@ impl Unit {
                 let l = clear_look_of(
                     u,
                     c.w.parts.building_of(id),
-                    OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(owner)),
+                    OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(owner)),
                 )?;
                 let _ = looks.insert(id, l);
             }
@@ -192,7 +192,7 @@ impl Unit {
         };
         Ok(state_of(site.map(DropSiteId::id), others).map(|state| {
             let drop = DropOff {
-                takes: drops_at(&c.w.drop_sites, s.master, &actor),
+                takes: drops_at(&c.w.model.drop_sites, s.master, &actor),
                 gap_squared: footprint_gap_squared(
                     me_at.position,
                     me_at.radius,
@@ -284,6 +284,7 @@ fn drop_site_master(c: &Step<'_>, built: Option<MasterId>) -> Result<bool, Genie
     }
     let civ = c.w.players.player(c.player)?.civ;
     Ok(c.w
+        .model
         .drop_sites
         .iter()
         .any(|d| d.building == m && (d.civs.is_empty() || d.civs.contains(&civ))))

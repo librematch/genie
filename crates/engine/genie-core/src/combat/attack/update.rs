@@ -293,7 +293,13 @@ impl Attack {
                 return self.out_of_sight(c, unit, f, r).map(Some);
             }
             if !matches!(self.state, AttackState::GotoSeen { .. }) {
-                self.wait_at_seen(unit, c.w.parts.motion_mut(unit.id), f, r, &c.w.graphics)?;
+                self.wait_at_seen(
+                    unit,
+                    c.w.parts.motion_mut(unit.id),
+                    f,
+                    r,
+                    &c.w.model.graphics,
+                )?;
                 return Ok(Some(UpdateCode::UNDER_WAY));
             }
         }
@@ -505,7 +511,7 @@ impl Attack {
                 |move_to| AttackState::GotoPoint { move_to },
                 (unit, c.w.parts.mover_of(unit.id)),
                 r,
-                &c.w.graphics,
+                &c.w.model.graphics,
             )?;
             return Ok(UpdateCode::UNDER_WAY);
         }

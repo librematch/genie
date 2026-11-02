@@ -324,7 +324,12 @@ impl World {
                 spatial: &mut self.spatial,
                 plan: &mut plan,
                 dt: self.dt_seconds,
-                by_id: ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                by_id: ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    &self.model.masters,
+                    &self.parts,
+                ),
             };
             path_step(&mut motion, &view, &lead, &mut world, budget)
         };

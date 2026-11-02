@@ -8,18 +8,16 @@ use crate::math::rng::Streams;
 use crate::movement::Mover;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::lines::UnitLines;
+use crate::objects::RelicCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::{Graphics, RelicCount};
 use crate::pathing::Pathing;
 use crate::pathing::zones::Zones;
 use crate::players::PlayerId;
 use crate::players::Team;
 use crate::players::ai_module::AiModules;
 use crate::players::market::Market;
-use crate::players::world_player::TechTree;
 use crate::trace::new_object;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -30,7 +28,7 @@ use crate::world::player::Player;
 use crate::world::settings::Settings;
 use crate::world::{FrameSeed, Mode680, PlayState, Tick};
 use crate::world::{HISTORY_PERIOD, PLANNED_MASTERS, Recycling, World};
-use std::collections::BTreeMap;
+use genie_model::model::Model;
 
 impl World {
     /// The world's next object id (`FUN_14152fd70`) for a new object of `master` for `player`: it
@@ -62,13 +60,9 @@ impl World {
             players,
             ticks: Tick::ZERO,
             next_object_id: ObjectId::default(),
-            masters: Vec::new(),
+            model: Model::default(),
             spatial: Spatial::default(),
             pathing: Pathing::default(),
-            graphics: Graphics::default(),
-            drop_sites: Vec::new(),
-            lines: UnitLines::default(),
-            linked_techs: BTreeMap::new(),
             settings: Settings::default(),
             start_work_due: false,
             mode_680: Mode680::ZERO,
@@ -78,8 +72,6 @@ impl World {
             zones: Zones::default(),
             recycling: Recycling::default(),
             streams: Streams::default(),
-            techs: Vec::new(),
-            effects: Vec::new(),
             market: Market::default(),
             ai: AiModules::default(),
             groups: UnitGroups::default(),
@@ -89,7 +81,6 @@ impl World {
             history_period: HISTORY_PERIOD,
             allow_gaia_capture: Vec::new(),
             local_player: PlayerId::new(0),
-            tech_tree: TechTree::default(),
             alliance_locked: 0,
             teams: [Team::ALONE; 8],
             instant_work: 0,
@@ -104,6 +95,7 @@ impl World {
     pub fn register_planners(&mut self) {
         for master in PLANNED_MASTERS {
             if let Some(r) = self
+                .model
                 .masters
                 .first()
                 .and_then(|m| m.get(master))
@@ -136,7 +128,10 @@ impl World {
                 if u.life.inside.is_some() || ObjectState::Removed <= u.life.state {
                     continue;
                 }
-                let m = u.master(MasterTables::new(&self.masters, &self.parts.own_master), q)?;
+                let m = u.master(
+                    MasterTables::new(&self.model.masters, &self.parts.own_master),
+                    q,
+                )?;
                 let Some(placed) = self.spatial.get(u.id) else {
                     continue;
                 };

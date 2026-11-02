@@ -140,7 +140,7 @@ impl Fly {
                 let mover = c.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
                 let sprites = FlightSprites {
                     walking: bird.master(c.w.master_tables(), c.player)?.move_sprite,
-                    graphics: &c.w.graphics,
+                    graphics: &c.w.model.graphics,
                 };
                 let action = c.w.streams.get(Stream::Action);
                 let dropped =
@@ -424,6 +424,7 @@ mod tests {
     #[cfg(test)]
     use crate::world::tests::in_update;
     use crate::world::{Player, World};
+    use std::sync::Arc;
 
     /// The hawk's place.
     const AT: Position = Position::new(57.845_688, 104.499_275, 9.0);
@@ -494,12 +495,12 @@ mod tests {
         .with_motions([(object_id(9925), Motion::Moving(wings(speed)))]);
         t.spatial = Spatial::new(GridSize::new(120, 120));
         t.streams.get(Stream::Action).set_seed(seed);
-        t.graphics = hawk_graphics();
-        t.masters = vec![Masters::new([Master {
+        t.model.graphics = Arc::new(hawk_graphics());
+        t.model.masters = vec![Arc::new(Masters::new([Master {
             id: master_id(96),
             move_sprite: Some(SpriteId::named(846)),
             ..Master::default()
-        }])];
+        }]))];
         t
     }
 
@@ -817,7 +818,9 @@ mod tests {
             let bird = &mut t.players[0].objects[ListIndex::new(0)];
             t.parts.actions.of_mut(bird.id).unwrap().list.set_fly(None);
             t.parts.actions.of_mut(bird.id).unwrap().default_task = DefaultTask::Fly;
-            let master = t.masters[0].get_mut(master_id(96)).unwrap();
+            let master = Arc::make_mut(&mut t.model.masters[0])
+                .get_mut(master_id(96))
+                .unwrap();
             master.tasks = vec![task];
             master.default_task = default;
             let r = in_update(

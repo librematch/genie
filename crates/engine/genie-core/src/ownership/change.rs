@@ -46,7 +46,7 @@ impl World {
     pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> Result<(), GenieError> {
         let mut unit = self.take_out(q, j)?;
         let had = self.parts.dead_master.contains(unit.id);
-        let tables = MasterTables::new(&self.masters, &self.parts.own_master);
+        let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
         let dead = dead_master_of(&unit, q.index(), tables, had);
         let id = unit.id;
         let changed = change_hands(
@@ -75,6 +75,7 @@ impl World {
         // (`FUN_1411cd860`, `COMISS`/`JC`: a NaN does not)
         let (id, master_id) = (unit.unit.id, unit.unit.life.master_id);
         let built = self
+            .model
             .masters
             .first()
             .and_then(|m| m.get(master_id))
@@ -324,7 +325,7 @@ impl World {
     ) -> Result<PlayerId, GenieError> {
         let mut unit = self.take_out(old, idx)?;
         let had = self.parts.dead_master.contains(unit.id);
-        let tables = MasterTables::new(&self.masters, &self.parts.own_master);
+        let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
         let dead = dead_master_of(&unit, old.index(), tables, had);
         let changed = change_hands(
             (

@@ -49,6 +49,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::{Formations, FrameSeed, Player};
 use std::slice::from_ref;
+use std::sync::Arc;
 
 /// `FUN_14102d580` copies a slot in use without its transform mark (`+0x44`).
 #[test]
@@ -108,7 +109,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
         master(master_id(5), 1),
         master(ids::ID_6, 3),
     ]);
-    t.masters = vec![masters.clone(), masters];
+    t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];
     let mut classes = vec![1u8; 400];
     for &(x, y) in blocked {
         classes[y * 20 + x] = 2;
@@ -241,8 +242,8 @@ fn the_point_from_the_front_runs_along_the_stored_positions() {
 #[test]
 fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
     let mut t = slot_world(&[(10, 4, 1.0, 0.0), (35, 35, 2.0, 0.0)], &[]);
-    for masters in &mut t.masters {
-        *masters = Masters::new([
+    for masters in &mut t.model.masters {
+        *masters = Arc::new(Masters::new([
             Master {
                 id: master_id(4),
                 kind: MasterKind::COMBAT,
@@ -263,7 +264,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
                 formation_category: FormationClass::of_data(1),
                 ..Master::default()
             },
-        ]);
+        ]));
     }
     t.players[1].kind = PlayerType::HUMAN;
     t.players[1].ghosts = vec![Ghost {
@@ -671,14 +672,14 @@ fn the_passability_tests_with_the_world_object_of_the_lead_id() {
                 Restriction::new(vec![0.0, 1.0]),
             ],
         ));
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let ghost = Master {
                 id: GHOST_MASTER,
                 kind: MasterKind::DOPPELGANGER,
                 terrain_restriction: Some(RestrictionId::named(1)),
                 ..Master::default()
             };
-            *masters = Masters::new(masters.iter().cloned().chain([ghost]));
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([ghost])));
         }
         if ghost {
             t.players[1].ghosts = vec![ghost_at(-2, 1.0, 1.0)];
@@ -960,7 +961,7 @@ fn type_world(paths: Vec<PathData>) -> World {
         formation_category: FormationClass::of_data(1),
         ..Master::default()
     }]);
-    t.masters = vec![masters.clone(), masters];
+    t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];
     let mut g = UnitGroup::new(group_id(1));
     g.owner = Some(PlayerId::new(1));
     g.members = vec![Member {
@@ -1053,11 +1054,11 @@ fn lock_or_given_type_overrides_the_groups_own_choice() {
     let mut t = type_world(far);
     t.groups.groups[0].flags |= GroupFlags::LINE;
     assert_eq!(own(&t), FormationKind::LINE);
-    t.masters[1] = Masters::new([Master {
+    t.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         ..Master::default()
-    }]);
+    }]));
     assert_eq!(own(&t), FormationKind::HORDE);
     let g = t.groups.get(group_id(1)).unwrap().clone();
     assert_eq!(

@@ -16,7 +16,7 @@ use crate::world::slots::PlayerSlots;
 /// BUILD (0x66, `FUN_140e7a400`): the player places a foundation of `master` at `position` (state
 /// 0, hit points 1), with the unit AI the factory gives its master. The player pays the master's
 /// cost, and each builder, in packet order, takes the master it builds with and starts a Build
-/// action (`World::masters`). The slice takes the
+/// action (`Model::masters`). The slice takes the
 /// placement as given: the recording's game accepted it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BuildCommand {

@@ -52,7 +52,7 @@ impl HuntAction {
             HuntState::Attack { .. } => self.update_attack(c, unit, actions, me, f, r),
             // case 3: a hunt that gave up on its MoveTo waits (its timer below 0), then set_state 11
             HuntState::Walk { .. } if self.timer < Seconds::ZERO => {
-                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.wait_then_walk(c.dt.seconds(), mover, &walks)?;
                 Ok(HuntNext::Stay)
@@ -122,7 +122,7 @@ impl HuntAction {
             }
             1 | 2 | 5 => {
                 self.decay_check(c, unit, actions, r.stops_decay, f)?;
-                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let player = f.own.player;
                 self.set_walk(
                     (&c.w.spatial, unit.position()),
@@ -137,7 +137,7 @@ impl HuntAction {
             _ => {
                 let target = self.let_go();
                 unit.hunt_release(c, [target])?;
-                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
                 self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)?;
                 Ok(HuntNext::Stay)
@@ -250,7 +250,7 @@ impl HuntAction {
     ) -> Result<(), GenieError> {
         self.no_tree_search(r)?;
         self.set_target(None);
-        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)
     }
@@ -281,10 +281,10 @@ impl HuntAction {
     ) -> Result<(), GenieError> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;

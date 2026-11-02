@@ -37,6 +37,7 @@ use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::settings::Settings;
 use crate::world::{Age, FrameSeed, GameMode, SubModeFlags, Visibility as WorldVisibility};
+use std::sync::Arc;
 
 /// Attributes 0 to 299, all 0.
 fn attributes() -> Vec<Amount> {
@@ -229,7 +230,12 @@ fn mill_livestock_makes_food() {
         master(master_id(68), MasterKind::BUILDING, class::BUILDING),
         master(master_id(5), MasterKind::COMBAT, class::LIVESTOCK),
     ]);
-    t.masters = vec![masters.clone(), masters.clone(), masters.clone(), masters];
+    t.model.masters = vec![
+        Arc::new(masters.clone()),
+        Arc::new(masters.clone()),
+        Arc::new(masters.clone()),
+        Arc::new(masters),
+    ];
     let mill = object(10, master_id(68), ObjectState::Alive);
     let other = object(11, master_id(68), ObjectState::Alive);
     let sheep = object(12, master_id(5), ObjectState::Alive);
@@ -347,7 +353,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     ]);
     let keeps = |objects: Vec<Unit>, game_mode: i32| {
         let mut t = world();
-        t.masters = vec![masters.clone(); 4];
+        t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
         t.settings.game_mode = GameMode::of_data(game_mode);
         t.players[1].objects = objects.into();
         t.reindex();
@@ -390,7 +396,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     );
     // a player with only a wall loses, attribute 45 cleared
     let mut t = world();
-    t.masters = vec![masters.clone(); 4];
+    t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![object(3, master_id(117), ObjectState::Alive)].into();
     t.reindex();
@@ -400,7 +406,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     assert_eq!(t.players[1].attributes[45], Amount::ZERO);
     // one that a villager keeps plays on
     let mut t = world();
-    t.masters = vec![masters; 4];
+    t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![
         object(3, master_id(117), ObjectState::Alive),
@@ -495,7 +501,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
         military: false,
     };
     let mut t = world();
-    t.masters = vec![masters.clone(); 4];
+    t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
     t.settings.game_mode = GameMode::of_data(11);
     t.players[1].victory_times = VictoryTimes::default();
     t.players[1].objects = vec![
@@ -516,7 +522,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
     assert_eq!(t.players[1].game_status, GameStatus::LOST);
     // regicide (sub-mode bit 2): no king, a villager notwithstanding
     let mut t = world();
-    t.masters = vec![masters; 4];
+    t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
     t.settings.sub_game_mode_flag = SubModeFlags::from_bits_retain(4);
     t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
     t.reindex();
@@ -577,7 +583,7 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
             ..master(ids::TOWN_CENTRE_621, MasterKind::BUILDING, class::BUILDING)
         },
     ]);
-    t.masters = vec![masters.clone(); 4];
+    t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
     assert_eq!(t.trainable_count(PlayerId::new(1), ids::TOWN_CENTRE), 1);
     assert_eq!(t.trainable_count(PlayerId::new(1), master_id(12)), 1);
     assert_eq!(t.trainable_count(PlayerId::new(1), master_id(101)), 0);
@@ -587,7 +593,7 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
     // town centre limit (218)
     let mut builder = masters;
     builder.get_mut(ids::TOWN_CENTRE_621).unwrap().available = false;
-    t.masters[1] = builder;
+    t.model.masters[1] = Arc::new(builder);
     t.players[1].attributes[218] = Amount::new(1.0);
     assert_eq!(t.trainable_count(PlayerId::new(1), BUILDER), 1);
     t.players[1].attributes[48] = Amount::new(1.0);
@@ -694,10 +700,10 @@ fn the_upgradable_count_follows_the_tech_tree() {
         },
         master(master_id(12), MasterKind::BUILDING, class::BUILDING),
     ]);
-    t.masters = vec![masters; 4];
+    t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
     t.players[1].civ = CivId::new(0);
     t.players[1].techs = vec![TechState::default(); 200];
-    t.tech_tree = TechTree {
+    t.model.tech_tree = Arc::new(TechTree {
         civs: vec![vec![TreeBuilding {
             id: TreeMaster::of_data(12),
             units: vec![
@@ -716,10 +722,13 @@ fn the_upgradable_count_follows_the_tech_tree() {
             ],
         }]],
         unique_units: Vec::new(),
-    };
+    });
     // 74 counts (no link, no technology); 75's link 74 is not had
     assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 1);
-    t.masters[1].get_mut(master_id(74)).unwrap().available = true;
+    Arc::make_mut(&mut t.model.masters[1])
+        .get_mut(master_id(74))
+        .unwrap()
+        .available = true;
     // 75: its link had, its technology not researched
     assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 1);
     t.players[1].techs[150].state = ResearchState::Researched;

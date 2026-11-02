@@ -26,6 +26,7 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
+use genie_model::model::Model;
 use std::mem::{replace, take};
 
 pub(crate) struct Step<'a> {
@@ -94,8 +95,8 @@ impl World {
             streams,
             players,
             index,
-            masters,
             parts,
+            model: Model { masters, .. },
             ..
         } = self;
         let (object, sprite_rng) = streams.object_and_sprite();
@@ -292,7 +293,7 @@ impl Step<'_> {
                 by_id: ObjectsRef::of_tables(
                     &self.w.players,
                     &self.w.index,
-                    MasterTables::new(&self.w.masters, &parts.own_master),
+                    MasterTables::new(&self.w.model.masters, &parts.own_master),
                     (
                         &parts.building,
                         &parts.combat,

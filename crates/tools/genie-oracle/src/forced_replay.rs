@@ -101,7 +101,12 @@ pub fn old_pather_paths(
         let mut pather = HullPather::new(
             (
                 &mut turns.spatial,
-                ObjectsRef::new(&turns.players, &turns.index, &turns.masters, &turns.parts),
+                ObjectsRef::new(
+                    &turns.players,
+                    &turns.index,
+                    &turns.model.masters,
+                    &turns.parts,
+                ),
             ),
             id,
             Some(target),

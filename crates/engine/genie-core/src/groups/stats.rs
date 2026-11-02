@@ -612,6 +612,7 @@ mod tests {
     use crate::vision::VisionBits;
     use crate::world::Millis;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     #[cfg(test)]
     use crate::gathering::hunt::tests::walker;
@@ -651,7 +652,9 @@ mod tests {
     fn ready_charge_of_type_6_adds_its_charge_event_to_the_range() {
         let mut t = searched_world();
         let charging = |t: &mut World, charge_type: i16, charge_target: i16| {
-            let m = t.masters[1].get_mut(master_id(4)).unwrap();
+            let m = Arc::make_mut(&mut t.model.masters[1])
+                .get_mut(master_id(4))
+                .unwrap();
             (m.charge_kind, m.charge_target, m.charge_event) = (
                 ChargeKind::of_data(charge_type),
                 ChargeTarget::of_data(charge_target),
@@ -741,13 +744,16 @@ mod tests {
             radius: Footprint::new(0.2, 0.2),
             ..Master::default()
         };
-        t.masters = vec![
+        t.model.masters = vec![
             Masters::new([
                 master(master_id(4), class::CLASS_6),
                 master(ids::ID_6, class::VILLAGER)
             ]);
             4
-        ];
+        ]
+        .into_iter()
+        .map(Arc::new)
+        .collect();
         let mut s = Spatial::new(GridSize::new(20, 20));
         s.relations = ByPlayer::new(vec![
             relation_row([0, 3, 3, 3]),
@@ -907,7 +913,7 @@ mod tests {
         };
         far.life.master_id = ids::ID_7;
         let _ = t.push_live(PlayerId::new(1), far).unwrap();
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let archer = Master {
                 id: ids::ID_7,
                 kind: MasterKind::COMBAT,
@@ -916,7 +922,7 @@ mod tests {
                 radius: Footprint::new(0.3, 0.3),
                 ..Master::default()
             };
-            *masters = Masters::new(masters.iter().cloned().chain([archer]));
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([archer])));
         }
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.unit_types[0].units.push(object_id(50));
@@ -949,12 +955,12 @@ mod tests {
     fn member_far_from_its_slot_leaves_the_group() {
         let world = |spacing: f32, order: [i32; 2]| {
             let mut t = searched_world();
-            for masters in &mut t.masters {
-                *masters = Masters::new(masters.iter().cloned().map(|mut m| {
+            for masters in &mut t.model.masters {
+                *masters = Arc::new(Masters::new(masters.iter().cloned().map(|mut m| {
                     m.height = Distance::new(1.0);
                     m.spacing_modifier = SpacingModifier::new(spacing);
                     m
-                }));
+                })));
             }
             let mut stray = t.object_of(&t.players[1].objects[ListIndex::new(0)]);
             stray.unit.id = object_id(11);

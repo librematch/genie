@@ -179,7 +179,7 @@ impl World {
             .ok_or(NO_TOP_ACTION)?;
         hunt.tear_down(self.parts.motion.mover_mut(unit.id))?;
         hunt.state = HuntState::Idle;
-        let sprite = stand_sprite(&hunt.task, standing, unit.life.held(), &self.graphics);
+        let sprite = stand_sprite(&hunt.task, standing, unit.life.held(), &self.model.graphics);
         // the target, then the second target
         let released = [
             hunt.target.map(HuntTargetId::id),
@@ -274,7 +274,12 @@ impl World {
             .list
             .gather_mut()
             .ok_or(NO_TOP_ACTION)?;
-        let stand = stand_sprite(&gather.task, standing, unit.life.held(), &self.graphics);
+        let stand = stand_sprite(
+            &gather.task,
+            standing,
+            unit.life.held(),
+            &self.model.graphics,
+        );
         let released = gather.halt(
             self.parts.motion.mover_mut(unit.id),
             stand,

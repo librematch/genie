@@ -137,7 +137,7 @@ impl World {
         if first.tech.is_none() {
             let pop = first
                 .master
-                .and_then(|m| player_master(&self.masters, p, m))
+                .and_then(|m| player_master(&self.model.masters, p, m))
                 .map_or(Amount::ZERO, |m| population(&m.storage));
             self.players.player_mut(p)?.add_attribute(QUEUED, -pop)?;
         }
@@ -161,7 +161,7 @@ impl World {
             let making = if first.tech.is_none() {
                 let pop = first
                     .master
-                    .and_then(|m| player_master(&self.masters, p, m))
+                    .and_then(|m| player_master(&self.model.masters, p, m))
                     .map_or(Amount::ZERO, |m| population(&m.storage));
                 if housed(&self.players.player(p)?.attributes, pop)? {
                     if self.players.player(p)?.kind.is_computer() {
@@ -192,6 +192,7 @@ impl World {
             .and_then(|q| q.queue.first())
             .and_then(|e| e.tech)
             && self
+                .model
                 .techs
                 .get(tech.index())
                 .is_some_and(|d| d.kind == TechKind::SHARED)
@@ -225,7 +226,10 @@ impl World {
         let mut making = making;
         match &mut making {
             Making::Unit(make) => {
-                if let Some(m) = make.master.and_then(|m| player_master(&self.masters, p, m)) {
+                if let Some(m) = make
+                    .master
+                    .and_then(|m| player_master(&self.model.masters, p, m))
+                {
                     let pop = population(&m.storage);
                     self.players
                         .player_mut(p)?
@@ -325,7 +329,9 @@ impl World {
         }
         let site = building.master(self.master_tables(), p)?;
         let rate = self.parts.combat_of(building.id).work_rate_powerup + site.work_rate;
-        let made = make.master.and_then(|m| player_master(&self.masters, p, m));
+        let made = make
+            .master
+            .and_then(|m| player_master(&self.model.masters, p, m));
         let time = Seconds::of_master(make.time(made, building.life.master_id)).get();
         let progress = Seconds::new(rate * dt_seconds) + make.progress;
         if let Some(Some(Making::Unit(m))) = self
@@ -397,7 +403,9 @@ impl World {
         if matches!(make.state, MakeObjState::Making | MakeObjState::NoSpot)
             && self.game_state == PlayState::PLAYING
         {
-            let made = make.master.and_then(|m| player_master(&self.masters, p, m));
+            let made = make
+                .master
+                .and_then(|m| player_master(&self.model.masters, p, m));
             let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
             let refund = (!make.paid).then(|| made.cloned()).flatten();
             let owner = self.players.player_mut(p)?;

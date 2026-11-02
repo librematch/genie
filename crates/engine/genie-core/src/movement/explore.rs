@@ -244,7 +244,7 @@ impl ExploreAction {
         let master = object_master(
             c.w.parts.own_master.get(explorer.id),
             (explorer.id, explorer.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )
         .ok();
         let villager = master.is_some_and(|m| m.class == class::VILLAGER);
@@ -594,14 +594,14 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         );
         master.map_or_else(
             |_| ExploreMove {
                 reads: MoveToReads::with_sprites(
                     SpriteReads {
                         defaults: MoveDefaults::default(),
-                        graphics: &c.w.graphics,
+                        graphics: &c.w.model.graphics,
                     },
                     (self, c.w.parts.mover_of(self.id)),
                 ),
@@ -612,7 +612,7 @@ impl Unit {
                     (self, c.w.parts.mover_of(self.id)),
                     master,
                     (
-                        &c.w.graphics,
+                        &c.w.model.graphics,
                         c.w.parts.combat_of(self.id).abilities.look.as_ref(),
                     ),
                 )
@@ -647,7 +647,7 @@ impl Unit {
         let standing = self
             .master(c.w.master_tables(), c.player)?
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(s))
+            .and_then(|s| c.w.model.graphics.get(s))
             .copied();
         if let Some(m) = c.w.parts.mover_mut(self.id) {
             m.shows(standing.as_ref());

@@ -247,7 +247,7 @@ impl World {
         );
         let (players, masters, index) = (
             &self.players,
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             &self.index,
         );
         let by_id = ObjectsRef::of_tables(

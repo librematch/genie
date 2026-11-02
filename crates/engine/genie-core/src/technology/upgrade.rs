@@ -128,8 +128,8 @@ impl World {
         }
         let class_changed = MasterKind::COMBAT <= kind
             && class_changes(
-                player_master(&self.masters, p, new.id),
-                player_master(&self.masters, p, old.id),
+                player_master(&self.model.masters, p, new.id),
+                player_master(&self.model.masters, p, old.id),
             );
         if MasterKind::COMBAT <= kind {
             let id = self.object_at_mut(place)?.id;
@@ -363,7 +363,7 @@ impl World {
         master: &Master,
         before: HpPercent,
     ) -> Result<HpPercent, GenieError> {
-        let graphics = take(&mut self.graphics);
+        let graphics = take(&mut self.model.graphics);
         let mut object = take(self.streams.get(Stream::Object));
         let mut sprite = take(self.streams.get(Stream::Sprite));
         let u = self.players.at_mut(place)?;
@@ -374,7 +374,7 @@ impl World {
             before,
             (&graphics, &mut object, &mut sprite),
         );
-        self.graphics = graphics;
+        self.model.graphics = graphics;
         *self.streams.get(Stream::Object) = object;
         *self.streams.get(Stream::Sprite) = sprite;
         r
@@ -401,10 +401,10 @@ impl World {
     /// already ([`crate::objects::sprite::new_sprite`] on the Sprite stream). Without the graphics (no
     /// data file) the Sprite stream is not modelled.
     fn show(&mut self, place: Place, id: SpriteId) -> Result<(), GenieError> {
-        if self.graphics.is_empty() {
+        if self.model.graphics.is_empty() {
             return Ok(());
         }
-        let g = self.graphics.get(id).copied().ok_or(NO_SPRITE)?;
+        let g = self.model.graphics.get(id).copied().ok_or(NO_SPRITE)?;
         let rng = self.streams.get(Stream::Sprite);
         let u = match place {
             Place::Live(q, i) => self.players.live_mut(q, i)?,
@@ -450,7 +450,7 @@ impl World {
                 .copied()
         };
         let old_task = |id: TaskId| old.tasks.iter().find(|t| t.id == id).copied();
-        let graphics = &self.graphics;
+        let graphics = &self.model.graphics;
         let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
         let sprites = MasterSprites {
             moving: g(new.move_sprite),
@@ -609,6 +609,7 @@ mod tests {
     use crate::world::tests::forage_world;
     #[cfg(test)]
     use crate::world::{FrameSeed, Player};
+    use std::sync::Arc;
 
     /// An animated graphic of `frames` frames with a random first frame (flags 5).
     const fn graphic(id: i16) -> Graphic {
@@ -873,16 +874,18 @@ mod tests {
             vec![Millis::ZERO],
             vec![player],
         );
-        t.masters = vec![Masters::new([
+        t.model.masters = vec![Arc::new(Masters::new([
             old,
             new,
             rubble(1403, 1403),
             rubble(1435, 1435),
-        ])];
-        t.graphics = [1070, 1464, 3070, 3464]
-            .map(|id| (SpriteId::named(id), graphic(id)))
-            .into_iter()
-            .collect();
+        ]))];
+        t.model.graphics = Arc::new(
+            [1070, 1464, 3070, 3464]
+                .map(|id| (SpriteId::named(id), graphic(id)))
+                .into_iter()
+                .collect(),
+        );
         t.upgrade_objects(
             PlayerId::new(0),
             master_id(70),
@@ -915,7 +918,7 @@ mod tests {
             t.parts.own_master.get(rubble.id).map(|m| m.id),
             Some(master_id(1403))
         );
-        let master = t.masters[0].get(ids::HOUSE).unwrap();
+        let master = t.model.masters[0].get(ids::HOUSE).unwrap();
         assert_eq!(
             (master.id, master.hit_points, master.death_spawns[0]),
             (
@@ -974,7 +977,7 @@ mod tests {
                 ..Default::default()
             },
         )]);
-        t.masters = vec![Masters::new([old, new])];
+        t.model.masters = vec![Arc::new(Masters::new([old, new]))];
         t.players[0].attributes[37] = Amount::new(1.0);
         t.upgrade_objects(
             PlayerId::new(0),
@@ -998,7 +1001,7 @@ mod tests {
         assert_eq!((a[37], a[40]), (Amount::ZERO, Amount::new(1.0)));
         assert_eq!(t.players[0].attributes[0], Amount::new(10.0));
         assert_eq!(
-            t.masters[0].get(ids::VILLAGER_MALE).map(|m| m.class),
+            t.model.masters[0].get(ids::VILLAGER_MALE).map(|m| m.class),
             Some(class::VILLAGER)
         );
     }
@@ -1024,7 +1027,7 @@ mod tests {
         let mut t = forage_world();
         t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
             .unwrap();
-        let mut old = t.masters[1].get(master_id(120)).unwrap().clone();
+        let mut old = t.model.masters[1].get(master_id(120)).unwrap().clone();
         old.tasks.push(task(
             task_id(3),
             ActionKind::BUILD,
@@ -1194,11 +1197,11 @@ mod tests {
             vec![Millis::ZERO],
             vec![player],
         );
-        t.masters = vec![Masters::new([
+        t.model.masters = vec![Arc::new(Masters::new([
             soldier(master_id(4), MasterHitPoints::of_data(40)),
             soldier(master_id(5), MasterHitPoints::of_data(60)),
             soldier(master_id(0x67f), MasterHitPoints::of_data(60)),
-        ])];
+        ]))];
         t.set_part(
             object_id(11),
             Part::OwnMaster(Box::new(soldier(
@@ -1246,7 +1249,7 @@ mod tests {
         );
         assert_eq!(hp(&t), [30.0, 20.0, 20.0]);
         assert_eq!(
-            t.masters[0].get(master_id(4)).map(|m| m.hit_points),
+            t.model.masters[0].get(master_id(4)).map(|m| m.hit_points),
             Some(MasterHitPoints::of_data(40))
         );
         let mut t = upgrade_world();
@@ -1269,7 +1272,7 @@ mod tests {
             (master_id(4), MasterHitPoints::of_data(60))
         );
         assert_eq!(
-            t.masters[0].get(master_id(4)).map(|m| m.hit_points),
+            t.model.masters[0].get(master_id(4)).map(|m| m.hit_points),
             Some(MasterHitPoints::of_data(60))
         );
         for (p, to) in [(0, 99), (3, 5)] {
@@ -1336,11 +1339,13 @@ mod tests {
             vec![Millis::ZERO],
             vec![player],
         );
-        t.masters = vec![Masters::new(masters)];
-        t.graphics = graphics
-            .iter()
-            .map(|&id| (SpriteId::named(id), graphic(id)))
-            .collect();
+        t.model.masters = vec![Arc::new(Masters::new(masters))];
+        t.model.graphics = Arc::new(
+            graphics
+                .iter()
+                .map(|&id| (SpriteId::named(id), graphic(id)))
+                .collect(),
+        );
         t
     }
 
@@ -1351,7 +1356,7 @@ mod tests {
         let mut t = forage_world();
         t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
             .unwrap();
-        let old = t.masters[1].get(master_id(120)).unwrap().clone();
+        let old = t.model.masters[1].get(master_id(120)).unwrap().clone();
         let bare = Master {
             id: master_id(121),
             tasks: Vec::new(),

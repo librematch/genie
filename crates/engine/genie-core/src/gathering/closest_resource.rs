@@ -217,7 +217,7 @@ impl UnitView<'_, '_> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            &self.c.w.model.masters,
             &self.c.w.parts,
         );
         let mut w = ResourceWorld {
@@ -231,10 +231,10 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            every: MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            every: MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             masters: OwnerMasters::new(
                 &self.c.w.parts.own_master,
-                self.c.w.masters.of(self.player),
+                self.c.w.model.masters.of(self.player),
             ),
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
@@ -311,7 +311,7 @@ impl Unit {
         cap: WorkerCount,
         site: Option<DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current =
             c.w.parts
@@ -326,8 +326,8 @@ impl Unit {
             spatial: &mut c.w.spatial,
             zones: &mut c.w.zones,
             foreign: others.players(),
-            every: MasterTables::new(&c.w.masters, &c.w.parts.own_master),
-            masters: OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+            every: MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+            masters: OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
             plan: Planning {
                 pathing: &mut c.w.pathing,
                 now: c.w.world_time,

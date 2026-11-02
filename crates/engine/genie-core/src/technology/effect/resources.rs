@@ -93,7 +93,7 @@ impl World {
             let kind = self
                 .object(id)
                 .map(|(_, u)| u.life.master_id)
-                .and_then(|m| player_master(&self.masters, p, m))
+                .and_then(|m| player_master(&self.model.masters, p, m))
                 .map(|m| m.kind);
             if matches!(kind, Some(MasterKind::COMBAT | MasterKind::BUILDING)) {
                 self.garrison_volleys(p, id, after)?;

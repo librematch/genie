@@ -31,6 +31,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::parts::PartTable;
 use std::iter::once;
+use std::sync::Arc;
 
 /// A map of zones by column (the tile's x over 10) and terrain flags by a closure; the shore
 /// point the planner gives, recorded.
@@ -622,7 +623,10 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     };
     let rig = || {
         let mut rig = Rig::on_the_path(Victim::default());
-        assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic), None);
+        assert_eq!(
+            Arc::make_mut(&mut rig.t.model.graphics).insert(SpriteId::named(3), graphic),
+            None
+        );
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig
     };

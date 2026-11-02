@@ -99,6 +99,7 @@ use crate::world::parts::Object;
 use crate::world::parts::ObjectParts;
 use crate::world::tests::{forage_world, hunt_world};
 use crate::world::{FrameSeed, Gate, Player};
+use std::sync::Arc;
 
 /// The object's own update knows its slot: it is taken while it still holds the object, and
 /// the object is found by its id once the list moved or the slot is out of the lists; an
@@ -219,22 +220,22 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
             ..Player::default()
         }],
     );
-    t.masters = vec![Masters::new([Master {
+    t.model.masters = vec![Arc::new(Masters::new([Master {
         id: master_id(1243),
         class: class::LIVESTOCK,
         ..Master::default()
-    }])];
+    }]))];
     let tc = DropSite {
         building: ids::TOWN_CENTRE,
         worker_class: Some(class::VILLAGER),
         ..DropSite::default()
     };
-    t.drop_sites = vec![tc.clone()];
+    t.model.drop_sites = Arc::new(vec![tc.clone()]);
     assert!(
         t.drop_off_unasked(PlayerId::new(0), ListIndex::new(0), true)
             .is_ok()
     );
-    t.drop_sites = vec![
+    t.model.drop_sites = Arc::new(vec![
         tc,
         DropSite {
             building: ids::PASTURE,
@@ -242,7 +243,7 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
             resource_types: vec![attribute::FOOD],
             ..DropSite::default()
         },
-    ];
+    ]);
     let pen = |id, x: f32, state| Unit {
         id,
         place: Static::at(Position::new(x, 10.0, 0.0)),
@@ -253,15 +254,15 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
         },
         ..Unit::default()
     };
-    t.masters[0] = Masters::new([
-        t.masters[0].get(master_id(1243)).unwrap().clone(),
+    t.model.masters[0] = Arc::new(Masters::new([
+        t.model.masters[0].get(master_id(1243)).unwrap().clone(),
         Master {
             id: ids::PASTURE,
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         },
-    ]);
+    ]));
     t.players[0].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::FOOD);
     t.players[0].objects[ListIndex::new(0)].place_for_test(Position::new(10.0, 10.0, 0.0));
     for (id, x, state) in [
@@ -415,7 +416,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         .with_buildings([(foundation.unit.id, foundation.parts.building.clone())])
         .with_actions([(villager.unit.id, villager.parts.actions.clone())])
         .with_motions([(villager.unit.id, Motion::Moving(walker()))]);
-        t.masters = vec![Masters::new([
+        t.model.masters = vec![Arc::new(Masters::new([
             Master {
                 id: ids::VILLAGER_MALE,
                 kind: MasterKind::COMBAT,
@@ -441,7 +442,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                 radius: Footprint::new(1.0, 1.0),
                 ..Master::default()
             },
-        ])];
+        ]))];
         t.spatial.insert(
             object_id(10),
             placed(
@@ -473,12 +474,12 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         t
     };
     let mut t = world();
-    t.drop_sites = vec![DropSite {
+    t.model.drop_sites = Arc::new(vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
         resource_types: vec![attribute::WOOD],
         ..DropSite::default()
-    }];
+    }]);
     t.unit_order(
         player_id(0),
         &object_ids([10]),
@@ -569,12 +570,12 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     // 7 asks the Build as 8 does; 6 does not ask it: the search alone (no drop site in the
     // table here, nothing to work on)
     let mut t = world();
-    t.drop_sites = vec![DropSite {
+    t.model.drop_sites = Arc::new(vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
         resource_types: vec![attribute::WOOD],
         ..DropSite::default()
-    }];
+    }]);
     t.unit_order(player_id(0), &object_ids([10]), UnitOrderAction::DropOff)
         .unwrap();
     assert_eq!(
@@ -888,11 +889,11 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
 /// Gaia's main building 60 (master 200, class 3) at (20.5, 20.5) and its annex 61 (master 201,
 /// class 52) at (22, 20.5), both fog visible, after the wolf of [`work_attack`]'s world.
 fn annexed(t: &mut World) {
-    let wolf = t.masters[0]
+    let wolf = t.model.masters[0]
         .get(master_id(126))
         .cloned()
         .expect("the wolf's master");
-    t.masters[0] = Masters::new([
+    t.model.masters[0] = Arc::new(Masters::new([
         wolf,
         Master {
             id: master_id(200),
@@ -908,7 +909,7 @@ fn annexed(t: &mut World) {
             fog_visibility: FogVisibility::VISIBLE,
             ..Master::default()
         },
-    ]);
+    ]));
     let building = |id, master_id, position, annex_of| {
         Object::with_building(
             Unit {
@@ -968,7 +969,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         flags: SpriteFlags::ANIMATED,
     };
     let mut t = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
-    t.graphics = Graphics::from([
+    t.model.graphics = Arc::new(Graphics::from([
         (SpriteId::named(300), standing),
         (
             SpriteId::named(301),
@@ -985,23 +986,25 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
                 ..standing
             },
         ),
-    ]);
+    ]));
     let mut walker = walker();
     // the soldier's speed 0.8: its standing sprite's factor 1, its walking one's 1.5
     walker.stats.speed = Speed::new(1.2);
-    let soldier = t.masters[1].get_mut(master_id(4)).unwrap();
+    let soldier = Arc::make_mut(&mut t.model.masters[1])
+        .get_mut(master_id(4))
+        .unwrap();
     soldier.standing_sprite = Some(SpriteId::named(300));
     soldier.attack_sprite = Some(SpriteId::named(301));
     soldier.move_sprite = Some(SpriteId::named(302));
     soldier.weapon_range = Distance::ZERO;
     soldier.reload = Seconds::new(2.0);
     soldier.moving = Some(walker.stats);
-    t.masters[0] = Masters::new([Master {
+    t.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(126),
         kind: MasterKind::COMBAT,
         class: class::PREDATOR,
         ..Master::default()
-    }]);
+    }]));
     let _ = t
         .push_live(
             PlayerId::new(0),
@@ -1124,12 +1127,12 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         standing_sprite: None,
         ..Master::default()
     };
-    t.masters = vec![
-        Masters::new([]),
-        Masters::new([
+    t.model.masters = vec![
+        Arc::new(Masters::new([])),
+        Arc::new(Masters::new([
             master(master_id(4), FormationClass::of_data(3)),
             master(ids::VILLAGER_MALE, FormationClass::UNGROUPED),
-        ]),
+        ])),
     ];
     if !members.is_empty() {
         t.groups.groups.push(UnitGroup {
@@ -1449,9 +1452,9 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     t.players.push(Player::default());
     t.reindex();
     t.player_time.push(Millis::ZERO);
-    t.masters.push(Masters::new([]));
+    t.model.masters.push(Arc::new(Masters::new([])));
     let walker = walker();
-    if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
+    if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
         m.moving = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
@@ -1622,8 +1625,8 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
     t.world_time = WorldTime::from_millis(400);
     t.players.push(Player::default());
     t.reindex();
-    t.masters.push(Masters::new([]));
-    t.masters[1] = Masters::new([
+    t.model.masters.push(Arc::new(Masters::new([])));
+    t.model.masters[1] = Arc::new(Masters::new([
         Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
@@ -1634,7 +1637,7 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
             kind: MasterKind::BUILDING,
             ..Master::default()
         },
-    ]);
+    ]));
     let _ = t
         .push_live(
             PlayerId::new(1),
@@ -1696,10 +1699,10 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         volley_fire: Firepower::new(f32::from(build_time.get() / 15)),
         ..Master::default()
     };
-    t.masters[1] = Masters::new([
+    t.model.masters[1] = Arc::new(Masters::new([
         master(TROPHY, WholeSeconds::of_data(10)),
         master(master_id(1650), WholeSeconds::of_data(30)),
-    ]);
+    ]));
     let trophy = |state| Object {
         unit: Unit {
             id: object_id(60),
@@ -1782,7 +1785,7 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
     };
     let run = |queued| {
         let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
-        if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
+        if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
             m.kind = MasterKind::BUILDING;
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
@@ -1810,7 +1813,7 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
 fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     let walker = walker();
-    if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
+    if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
         m.moving = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
@@ -1874,7 +1877,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     let mover = || {
         let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
         let walker = walker();
-        if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
+        if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
             m.moving = Some(walker.stats);
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
@@ -2008,7 +2011,7 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
     let run = |master: MasterId, held: Held, task: Task| {
         let mut t = soldiers(&[(11, master.get(), Point::new(20.0, 20.0))], &[]);
         for (id, class) in [(83, class::VILLAGER), (4, class::CLASS_6)] {
-            if let Some(m) = t.masters[1].get_mut(master_id(id)) {
+            if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(master_id(id)) {
                 m.class = class;
             }
         }
@@ -2146,15 +2149,17 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
         standing_sprite: None,
         ..Master::default()
     };
-    t.masters.push(Masters::new([scout.clone()]));
-    t.masters[1] = Masters::new([
+    t.model
+        .masters
+        .push(Arc::new(Masters::new([scout.clone()])));
+    t.model.masters[1] = Arc::new(Masters::new([
         scout,
         Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
             ..Master::default()
         },
-    ]);
+    ]));
     let ai = UnitAi {
         current_order: None,
         current_action: None,
@@ -2255,12 +2260,12 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
     let mut t = soldiers(&units, &[]);
     t.players.push(Player::default());
     t.reindex();
-    t.masters.push(Masters::new([Master {
+    t.model.masters.push(Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         class: class::CLASS_54,
         ..Master::default()
-    }]));
+    }])));
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
         Some(UnitAi::default()),
@@ -2802,12 +2807,12 @@ fn followers() -> World {
     t.players[1].formations.auto = false;
     t.spatial.map = GridSize::new(120, 120);
     let walker = walker();
-    t.masters[1] = Masters::new([Master {
+    t.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         moving: Some(walker.stats),
         ..Master::default()
-    }]);
+    }]));
     for u in &mut t.players[1].objects {
         t.parts.put_mover(u.id, Some(walker.clone()));
         t.parts.set_unit_ai(
@@ -2822,13 +2827,13 @@ fn followers() -> World {
     }
     t.players.push(Player::default());
     t.reindex();
-    t.masters.push(Masters::new([Master {
+    t.model.masters.push(Arc::new(Masters::new([Master {
         id: master_id(5),
         kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         radius: Footprint::new(0.5, 0.5),
         ..Master::default()
-    }]));
+    }])));
     let _ = t
         .push_live(
             PlayerId::new(2),
@@ -3000,11 +3005,11 @@ fn follow_of_another_player_unit_does_nothing() {
 fn builder_leaves_the_main_building_of_an_annex() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.masters[1] = Masters::new([Master {
+    t.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(79),
         kind: MasterKind::BUILDING,
         ..Master::default()
-    }]);
+    }]));
     let construction = Construction {
         progress: Seconds::ZERO,
         desolid: true,
@@ -3100,11 +3105,11 @@ fn unit_own_queued_order_names_its_target() {
 fn an_action_new_target_is_taken_and_its_old_one_let_go() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.masters[0] = Masters::new([Master {
+    t.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(66),
         kind: MasterKind::COMBAT,
         ..Master::default()
-    }]);
+    }]));
     let deer = |id, state, workers| Unit {
         id,
         workers,
@@ -3192,7 +3197,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
 fn build_new_target_leaves_the_old_foundation_builders() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    t.masters[1] = Masters::new([
+    t.model.masters[1] = Arc::new(Masters::new([
         Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
@@ -3203,7 +3208,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
             kind: MasterKind::BUILDING,
             ..Master::default()
         },
-    ]);
+    ]));
     let foundation = |id, builders| {
         Object::with_building(
             Unit {
@@ -3335,12 +3340,12 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
         class,
         ..Master::default()
     };
-    t.masters[1] = Masters::new([
+    t.model.masters[1] = Arc::new(Masters::new([
         master(master_id(4), MasterKind::COMBAT, class::CLASS_6),
         master(ids::ID_42, MasterKind::COMBAT, class::RELIC),
         master(master_id(58), MasterKind::COMBAT, class::LIVESTOCK),
         master(master_id(10), MasterKind::STATIC, class::CLASS_5),
-    ]);
+    ]));
     let unit = |id, master, amount| Unit {
         id,
         life: Lifecycle {
@@ -3399,7 +3404,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
         tasks,
         ..Master::default()
     };
-    t.masters[1] = Masters::new([
+    t.model.masters[1] = Arc::new(Masters::new([
         villager(ids::VILLAGER_MALE, vec![task(GATHER, Some(master_id(53)))]),
         villager(ids::BUILDER, vec![task(ActionKind::BUILD, None)]),
         Master {
@@ -3409,7 +3414,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             hit_points: MasterHitPoints::of_data(550),
             ..Master::default()
         },
-    ]);
+    ]));
     t.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(25.0);
     let _ = t
         .push_live(
@@ -3498,7 +3503,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         moving: Some(walker.stats),
         ..Master::default()
     };
-    t.masters[1] = Masters::new([
+    t.model.masters[1] = Arc::new(Masters::new([
         sheep_master.clone(),
         Master {
             id: master_id(4),
@@ -3506,10 +3511,10 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
             radius: Footprint::new(1.5, 1.5),
             ..Master::default()
         },
-    ]);
+    ]));
     t.players.push(Player::default());
     t.reindex();
-    t.masters.push(Masters::new([sheep_master]));
+    t.model.masters.push(Arc::new(Masters::new([sheep_master])));
     let sheep = |id, x: f32, y: f32| {
         Object::moving(
             Unit {
@@ -3691,10 +3696,10 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
         radius: Footprint::new(0.2, 0.2),
         ..Master::default()
     };
-    t.masters = vec![
-        Masters::new([]),
-        Masters::new([master(master_id(4), class)]),
-        Masters::new([master(master_id(5), class::CLASS_6)]),
+    t.model.masters = vec![
+        Arc::new(Masters::new([])),
+        Arc::new(Masters::new([master(master_id(4), class)])),
+        Arc::new(Masters::new([master(master_id(5), class::CLASS_6)])),
     ];
     for (id, player, x) in [(10, 1, 10.0), (20, 2, x)] {
         t.spatial.insert(
@@ -4475,13 +4480,16 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
     ];
     let world = |target_x: f32| {
         let mut t = soldiers(&units, &[11, 12]);
-        t.masters[1].get_mut(master_id(4)).unwrap().line_of_sight = Distance::new(5.0);
-        t.masters[0] = Masters::new([Master {
+        Arc::make_mut(&mut t.model.masters[1])
+            .get_mut(master_id(4))
+            .unwrap()
+            .line_of_sight = Distance::new(5.0);
+        t.model.masters[0] = Arc::new(Masters::new([Master {
             id: ids::HOUSE,
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
-        }]);
+        }]));
         let _ = t
             .push_live(
                 PlayerId::new(0),
@@ -4755,13 +4763,15 @@ fn gather_takes_farm_but_no_other_building() {
     let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    t.masters[1] = Masters::new(t.masters[1].iter().cloned().chain([Master {
-        id: ids::FARM,
-        kind: MasterKind::BUILDING,
-        class: class::FARM,
-        radius: Footprint::new(1.5, 1.5),
-        ..Master::default()
-    }]));
+    t.model.masters[1] = Arc::new(Masters::new(t.model.masters[1].iter().cloned().chain([
+        Master {
+            id: ids::FARM,
+            kind: MasterKind::BUILDING,
+            class: class::FARM,
+            radius: Footprint::new(1.5, 1.5),
+            ..Master::default()
+        },
+    ])));
     let farm = |id, state, annex_of| {
         Object::with_building(
             Unit {
@@ -5276,14 +5286,14 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
 #[test]
 fn work_command_retarget_to_its_player_master_84_fails() {
     let with_84 = |mut t: World| {
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let m84 = Master {
                 id: ids::MARKET,
                 kind: MasterKind::COMBAT,
                 class: class::PREY,
                 ..Master::default()
             };
-            *masters = Masters::new(masters.iter().cloned().chain([m84]));
+            *masters = Arc::new(Masters::new(masters.iter().cloned().chain([m84])));
         }
         let _ = t
             .push_live(
@@ -5337,7 +5347,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
 fn work_command_task_is_retaken_by_the_action_on_top() {
     use crate::objects::masters::Task;
     let mut t = forage_world();
-    let task = *t.masters[1]
+    let task = *t.model.masters[1]
         .get(master_id(120))
         .unwrap()
         .tasks
@@ -5426,7 +5436,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
 fn work_command_factory_starts_the_task_action() {
     use crate::objects::masters::Task;
     let mut t = forage_world();
-    let task = *t.masters[1]
+    let task = *t.model.masters[1]
         .get(master_id(120))
         .unwrap()
         .tasks
@@ -5512,10 +5522,10 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
             object_group: Some(class::BUILDING),
             ..Task::default()
         }],
-        ..t.masters[1].get(master_id(4)).unwrap().clone()
+        ..t.model.masters[1].get(master_id(4)).unwrap().clone()
     };
-    t.masters[1] = Masters::new([soldier, building.clone()]);
-    t.masters.push(Masters::new([building]));
+    t.model.masters[1] = Arc::new(Masters::new([soldier, building.clone()]));
+    t.model.masters.push(Arc::new(Masters::new([building])));
     for u in &mut t.players[1].objects {
         u.life.hp = HitPoints::new(25.0);
     }

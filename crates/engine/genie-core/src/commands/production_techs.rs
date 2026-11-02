@@ -36,7 +36,7 @@ impl World {
         button: QueueButton,
     ) -> Result<bool, GenieError> {
         let t = tech.index();
-        let def = self.techs.get(t).ok_or(GenieError::unsupported(
+        let def = self.model.techs.get(t).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
         ))?;
         let owner = self.players.player_mut(player)?;

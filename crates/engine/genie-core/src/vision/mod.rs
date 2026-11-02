@@ -170,6 +170,7 @@ mod tests {
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     /// The masks of the visible and explored bits `visible` and `explored`.
     fn masks(visible: u64, explored: u64) -> VisionMasks {
@@ -294,8 +295,9 @@ mod tests {
             standing_sprite: None,
             ..Master::default()
         };
-        t.masters = (0..t.players.len())
+        t.model.masters = (0..t.players.len())
             .map(|_| Masters::new([flare.clone()]))
+            .map(Arc::new)
             .collect();
         t.next_object_id = object_id(100);
         let flares = |t: &World| -> Vec<(i32, Position)> {

@@ -34,6 +34,7 @@ use crate::world::parts::no_parts;
 use crate::world::parts::{PartTable, Parts};
 use crate::world::player::Player;
 use crate::world::slots::PlayerSlots;
+use std::sync::Arc;
 #[cfg(test)]
 use std::sync::LazyLock;
 
@@ -299,7 +300,7 @@ impl<'a> ObjectsRef<'a> {
     pub fn new(
         players: &'a [Player],
         index: &'a ObjectIndex,
-        masters: &'a [Masters],
+        masters: &'a [Arc<Masters>],
         parts: &'a Parts,
     ) -> Self {
         Self::of_tables(
@@ -464,7 +465,7 @@ impl<'a> ObjectsRef<'a> {
 pub(crate) struct TestObjects {
     players: Vec<Player>,
     index: ObjectIndex,
-    masters: Vec<Masters>,
+    masters: Vec<Arc<Masters>>,
     parts: Parts,
 }
 
@@ -579,7 +580,7 @@ impl World {
     /// The objects by id, to read ([`ObjectsRef`]).
     #[must_use]
     pub fn objects(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts)
+        ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts)
     }
 
     /// The table by id again from the players' lists (after a list changed in place).

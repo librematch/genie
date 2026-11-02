@@ -172,7 +172,7 @@ impl World {
                 master,
                 self.spatial.map,
                 (
-                    &self.graphics,
+                    &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
                 task,

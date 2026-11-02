@@ -9,6 +9,7 @@ use crate::objects::masters::{Master, MasterId, Masters, Task};
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
 use crate::world::parts::PartTable;
+use std::sync::Arc;
 
 /// Player `player`'s master `id` in `every`, the world's masters: one table per player, as the
 /// game's player holds its masters' pointers (`player+0x28`); none where the player has no
@@ -16,7 +17,7 @@ use crate::world::parts::PartTable;
 /// player and id: an object's master goes through [`crate::objects::unit::Unit::master`], an
 /// invariant one through [`crate::world::World::master`].
 #[must_use]
-pub fn player_master(every: &[Masters], player: PlayerId, id: MasterId) -> Option<&Master> {
+pub fn player_master(every: &[Arc<Masters>], player: PlayerId, id: MasterId) -> Option<&Master> {
     every.of(player)?.get(id)
 }
 
@@ -26,7 +27,7 @@ pub fn player_master(every: &[Masters], player: PlayerId, id: MasterId) -> Optio
 #[derive(Clone, Copy, Debug)]
 pub struct MasterTables<'a> {
     /// The world's masters, one table per player.
-    pub players: &'a [Masters],
+    pub players: &'a [Arc<Masters>],
     /// The objects' own masters by id.
     pub own: &'a PartTable<Master>,
 }
@@ -34,7 +35,7 @@ pub struct MasterTables<'a> {
 impl<'a> MasterTables<'a> {
     /// The world's players' tables `players` and the objects' own masters `own`.
     #[must_use]
-    pub const fn new(players: &'a [Masters], own: &'a PartTable<Master>) -> Self {
+    pub const fn new(players: &'a [Arc<Masters>], own: &'a PartTable<Master>) -> Self {
         Self { players, own }
     }
 
@@ -77,13 +78,13 @@ pub trait PlayersMasters {
     fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters>;
 }
 
-impl PlayersMasters for [Masters] {
+impl PlayersMasters for [Arc<Masters>] {
     fn of(&self, player: PlayerId) -> Option<&Masters> {
-        self.get(player.index())
+        self.get(player.index()).map(|m| &**m)
     }
 
     fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters> {
-        self.get_mut(player.index())
+        self.get_mut(player.index()).map(Arc::make_mut)
     }
 }
 

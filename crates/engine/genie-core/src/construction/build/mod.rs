@@ -495,6 +495,7 @@ mod stack_tests {
     #[cfg(test)]
     use crate::world::{FrameSeed, Gate};
     use crate::world::{Player, World};
+    use std::sync::Arc;
 
     /// A building master of `id`: class 3, radius `r`, height `z`, obstruction `kind`, train
     /// time `bt`, hit points `hp`, an annex of `head`, with `annexes` at their offsets.
@@ -698,7 +699,7 @@ mod stack_tests {
             },
         );
         t.next_object_id = object_id(8768);
-        t.masters = vec![ms.clone(), ms];
+        t.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
         t
     }
 
@@ -714,7 +715,7 @@ mod stack_tests {
             Population::of_data(3),
             Population::ZERO,
         );
-        for ms in &mut t.masters {
+        for ms in &mut t.model.masters {
             let castle = building(
                 82,
                 (2.0, 4.0, ObstructionKind::TYPE_2),
@@ -722,7 +723,7 @@ mod stack_tests {
                 -1,
                 &[],
             );
-            *ms = Masters::new(ms.iter().cloned().chain([castle]));
+            *ms = Arc::new(Masters::new(ms.iter().cloned().chain([castle])));
         }
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
         assert_eq!(
@@ -848,8 +849,8 @@ mod stack_tests {
             (1.0, Some((ObstructionKind::CIRCLE, ObstructionClass::UNIT))),
         ] {
             let mut t = world();
-            for ms in &mut t.masters {
-                let m = ms.get_mut(ids::TOWN_CENTRE).unwrap();
+            for ms in &mut t.model.masters {
+                let m = Arc::make_mut(ms).get_mut(ids::TOWN_CENTRE).unwrap();
                 m.build_time = WholeSeconds::ZERO;
                 m.obstruction_kind = ObstructionKind::CIRCLE;
                 m.obstruction_class = ObstructionClass::UNIT;
@@ -877,9 +878,9 @@ mod stack_tests {
         for locked in [true, false] {
             let mut t = world();
             t.world_time = WorldTime::from_millis(5000);
-            for ms in &mut t.masters {
+            for ms in &mut t.model.masters {
                 for id in [621, 109] {
-                    let m = ms.get_mut(master_id(id)).unwrap();
+                    let m = Arc::make_mut(ms).get_mut(master_id(id)).unwrap();
                     m.class = class::GATE;
                     m.storage.clear();
                     m.volley_missile = None;

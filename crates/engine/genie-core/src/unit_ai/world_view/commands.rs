@@ -83,6 +83,7 @@ impl UnitView<'_, '_> {
         let masters = self
             .c
             .w
+            .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
@@ -97,14 +98,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Err(GenieError::unreachable(
@@ -131,7 +132,7 @@ impl UnitView<'_, '_> {
             player,
             relations: &self.c.w.players.player(self.player)?.relations,
             foreign,
-            drop_sites: &self.c.w.drop_sites,
+            drop_sites: &self.c.w.model.drop_sites,
         };
         let found = task_search(masters, &actor, &t, &general, terrain, Some(REPAIR), &dip)?;
         if switch.is_none() && found.is_none() {
@@ -191,6 +192,7 @@ impl UnitView<'_, '_> {
         let masters = self
             .c
             .w
+            .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
@@ -201,14 +203,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 target,
                 2,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Err(GenieError::unreachable(
@@ -235,7 +237,7 @@ impl UnitView<'_, '_> {
             player,
             relations: &self.c.w.players.player(self.player)?.relations,
             foreign,
-            drop_sites: &self.c.w.drop_sites,
+            drop_sites: &self.c.w.model.drop_sites,
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
@@ -265,7 +267,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, Distance), GenieError> {
         let unit = &*self.unit;
         let master = unit.master(
-            MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             self.player,
         )?;
         let mover = self
@@ -296,7 +298,7 @@ impl UnitView<'_, '_> {
             by_id: ObjectsRef::new(
                 &self.c.w.players,
                 &self.c.w.index,
-                &self.c.w.masters,
+                &self.c.w.model.masters,
                 &self.c.w.parts,
             ),
             zones,

@@ -195,7 +195,7 @@ impl GatherAction {
             return Ok(Next::Stay);
         }
         self.timer = Seconds::ZERO;
-        let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         if self.stops.several() {
             let rng = c.w.streams.get(Stream::Action);
@@ -271,7 +271,7 @@ impl GatherAction {
                 if r.food_sold <= Amount::ZERO {
                     self.current_stop = self.current_stop.next();
                 }
-                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 let rng = c.w.streams.get(Stream::Action);
                 let to = self.walk_to(target, Distance::ZERO);
@@ -319,7 +319,7 @@ impl GatherAction {
             // go), then `set_state(11)` with no target's radius
             4 | 5 => {
                 self.target = None;
-                let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
+                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(Distance::ZERO, mover, &walks)?;
                 Ok(Next::Stay)

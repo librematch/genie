@@ -36,6 +36,7 @@ use crate::test_ids::object_ids;
 use crate::unit_ai::UnitAi;
 use crate::world::World;
 use crate::world::{FrameSeed, Player};
+use std::sync::Arc;
 
 /// `BMotion`'s constructor (`FUN_141041850`): the 0x7f7fffff turn limits at `+0x9c`,
 /// `+0xa0`, `+0xa8`, zero speeds and accelerations, the lead (`+0xc4`) -1, flags 3, the
@@ -406,7 +407,7 @@ fn tasked_world(masters: Vec<Master>, owner_range: f32) -> World {
             },
         ],
     );
-    t.masters = vec![Masters::new([]), Masters::new(masters)];
+    t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(Masters::new(masters))];
     t
 }
 
@@ -655,7 +656,11 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         soldier(ids::ID_329, class::CLASS_6),
         building,
     ]);
-    t.masters = vec![Masters::new([]), masters.clone(), masters];
+    t.model.masters = vec![
+        Arc::new(Masters::new([])),
+        Arc::new(masters.clone()),
+        Arc::new(masters),
+    ];
     let mut g = UnitGroup::new(group_id(1));
     g.owner = Some(PlayerId::new(1));
     g.members = members
@@ -682,7 +687,7 @@ fn register(t: &mut World) {
         .zip(&t.players)
         .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
         .filter_map(|(p, u)| {
-            let m = t.masters.of(p)?.get(u.life.master_id)?;
+            let m = t.model.masters.of(p)?.get(u.life.master_id)?;
             Some((
                 u.id.get(),
                 Placed {
@@ -850,7 +855,12 @@ fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
 #[test]
 fn filter_takes_the_range_of_the_members_task_of_that_type() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
-    for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
+    for master in t
+        .model
+        .masters
+        .iter_mut()
+        .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
+    {
         master.tasks = vec![
             plain_task(GATHER, Distance::new(6.0)),
             plain_task(ActionKind::CONVERT, Distance::new(1.5)),
@@ -1032,7 +1042,12 @@ fn the_special_units_follow_the_target_class() {
     ];
     let special = |target_class: ClassId, target_master: MasterId, take: usize| {
         let mut t = attack_world(&units[..take]);
-        for b in t.masters.iter_mut().filter_map(|m| m.get_mut(ids::HOUSE)) {
+        for b in t
+            .model
+            .masters
+            .iter_mut()
+            .filter_map(|m| Arc::make_mut(m).get_mut(ids::HOUSE))
+        {
             b.class = target_class;
         }
         let _ = target_master;
@@ -1097,7 +1112,12 @@ fn attack_task() -> Task {
 /// [`attack_world`] whose soldiers (master 4) have the attack task.
 fn attack_world_with_task(members: &[(i32, i16, f32, f32)]) -> World {
     let mut t = attack_world(members);
-    for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
+    for master in t
+        .model
+        .masters
+        .iter_mut()
+        .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
+    {
         master.tasks = vec![attack_task()];
     }
     t
@@ -1139,7 +1159,12 @@ fn group_ordered_on_an_enemy_building_runs_the_attack_path() {
 #[test]
 fn group_ordered_with_general_task_runs_the_general_command() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
-    for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
+    for master in t
+        .model
+        .masters
+        .iter_mut()
+        .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
+    {
         master.tasks = vec![Task {
             action_kind: GATHER,
             work_range: Distance::new(6.0),
@@ -1301,17 +1326,17 @@ fn the_special_units_of_masters_6_and_7_and_of_the_category_classes() {
     let world = |target_class: ClassId, target_master: MasterId| {
         let mut t = attack_world(&units);
         t.players[2].objects[ListIndex::new(0)].life.master_id = target_master;
-        for masters in &mut t.masters {
+        for masters in &mut t.model.masters {
             let mut b = building_master();
             b.id = target_master;
             b.class = target_class;
-            *masters = Masters::new(
+            *masters = Arc::new(Masters::new(
                 masters
                     .iter()
                     .filter(|m| m.id != ids::HOUSE)
                     .cloned()
                     .chain([b]),
-            );
+            ));
         }
         t
     };

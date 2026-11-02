@@ -62,7 +62,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a research of a technology the tree has not got",
             ))?;
-        let def = self.techs.get(t).ok_or(GenieError::unsupported(
+        let def = self.model.techs.get(t).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
         ))?;
         Ok((t, def))
@@ -148,7 +148,7 @@ impl World {
     /// without `repeat`, it is left. Then the action takes state 1 (the event 100 and the
     /// computer players' slot 0x3a8 are not held) and the building's unit AI is told 0x1fa with
     /// the action value 0x26c. Last, attribute 269 (the Spanish's 300) names an effect of the
-    /// world's table ([`World::effects`], slot 0x10) the player gets with the building as its
+    /// world's table ([`Model::effects`](genie_model::model::Model::effects), slot 0x10) the player gets with the building as its
     /// object ([`World::do_effect`]).
     ///
     /// [`TechState::repeatable`]: crate::technology::TechState::repeatable
@@ -164,7 +164,7 @@ impl World {
         let (tech, t) = (t, t.index());
         let owner = self.players.player(p)?;
         let state = owner.techs.checked(t)?;
-        let def = self.techs.checked(t)?;
+        let def = self.model.techs.checked(t)?;
         if state.state == ResearchState::Researching || repeat {
             let mut time = def
                 .locations
@@ -206,7 +206,7 @@ impl World {
         if 0 < reward
             && let Some(effect) = usize::try_from(reward)
                 .ok()
-                .and_then(|e| self.effects.get(e))
+                .and_then(|e| self.model.effects.get(e))
                 .cloned()
         {
             self.do_effect(p, &effect, Some(id))?;
@@ -226,7 +226,7 @@ impl World {
         t: usize,
     ) -> Result<(), GenieError> {
         if !r.paid {
-            let def = self.techs.checked(t)?;
+            let def = self.model.techs.checked(t)?;
             let owner = self.players.player_mut(p)?;
             let mut state = take(owner.techs.checked_mut(t)?);
             let done = refund_tech(&mut state, def, r.tech, owner);
@@ -271,7 +271,7 @@ impl World {
         if r.state != MakeTechState::Done && self.game_state == PlayState::PLAYING {
             self.research_failed(p, i, r, t)?;
         }
-        let def = self.techs.checked(t)?;
+        let def = self.model.techs.checked(t)?;
         let owner = self.players.player(p)?;
         let state = owner.techs.checked(t)?;
         if def.kind == TechKind::SHARED {

@@ -9,6 +9,10 @@ It holds plain data and the functions over it. The systems that run a game are g
 genie-import fills the model from the game's files (FD-046). The modules mirror genie-core's
 paths until the components regroup them.
 
+`model::Model` holds the tables as one value. Each table sits in an `Arc`: a cloned model shares
+them, and a write copies only the table it changes (`Arc::make_mut`), so every game and every
+mod's variant starts from the stock tables without copying them (FD-046-D04).
+
 ## Licence
 
 [AGPL-3.0-only](https://github.com/librematch/genie/blob/main/LICENSE-AGPL-3.0)

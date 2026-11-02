@@ -96,14 +96,20 @@ impl UnitView<'_, '_> {
             .spatial
             .get(self.unit.id)
             .ok_or(ATTACKER_UNPLACED)?;
-        let target_master = player_master(&self.c.w.masters, t.player, t.master).ok_or(
+        let target_master = player_master(&self.c.w.model.masters, t.player, t.master).ok_or(
             GenieError::unsupported("an attack's target of a master the slice does not have"),
         )?;
         let visible = self.target_visible(&t, target_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
         let look = self.c.w.parts.combat_of(unit.id).abilities.look.as_ref();
-        let arms = arms_looking(master, look, &self.c.w.graphics, TaskSprites::NONE, None);
+        let arms = arms_looking(
+            master,
+            look,
+            &self.c.w.model.graphics,
+            TaskSprites::NONE,
+            None,
+        );
         let standing = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         if unit.sprite.is_none() {
             return Err(GenieError::unsupported(
@@ -223,7 +229,7 @@ impl UnitView<'_, '_> {
             )?
             .get(id)
             .ok_or(NOT_HELD)?;
-            let m = player_master(&self.c.w.masters, p.player, p.master).ok_or(NOT_HELD)?;
+            let m = player_master(&self.c.w.model.masters, p.player, p.master).ok_or(NOT_HELD)?;
             Ok(Mark {
                 id,
                 kind: m.kind,
@@ -308,7 +314,7 @@ impl UnitView<'_, '_> {
             player: self.player,
             relations: &self.c.w.players.player(self.player)?.relations,
             foreign: view.players(),
-            drop_sites: &self.c.w.drop_sites,
+            drop_sites: &self.c.w.model.drop_sites,
         };
         Ok(Some(victim_in(
             (
@@ -360,8 +366,11 @@ impl UnitView<'_, '_> {
             self.c.w.parts.combat_of(unit.id),
             master,
             (
-                OwnerMasters::new(&self.c.w.parts.own_master, self.c.w.masters.of(self.player)),
-                &self.c.w.graphics,
+                OwnerMasters::new(
+                    &self.c.w.parts.own_master,
+                    self.c.w.model.masters.of(self.player),
+                ),
+                &self.c.w.model.graphics,
             ),
             Some(ai),
             (self.player_type, self.c.w.world_time),
@@ -399,6 +408,6 @@ impl UnitView<'_, '_> {
         } else {
             VILLAGER_FEMALE
         };
-        player_master(&self.c.w.masters, self.player, swap)
+        player_master(&self.c.w.model.masters, self.player, swap)
     }
 }

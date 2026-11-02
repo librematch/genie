@@ -99,7 +99,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<DropSiteId>, GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let seeks = master.kind < MasterKind::COMBAT
@@ -108,7 +108,7 @@ impl World {
                 .iter()
                 .any(|&d| d == ids::ID_45 || d == ids::ID_2172)
                 && !matches!(master.class, class::FISHING_SHIP | class::TRADE_BOAT));
-        let masters = self.masters.of(p).ok_or(GenieError::unsupported(
+        let masters = self.model.masters.of(p).ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;
         if !seeks {
@@ -129,7 +129,7 @@ impl World {
             .map_or(ActionState::NO_ACTION, |a| a.state);
         let player = &self.players.player(p)?;
         let mut world = DropWorld {
-            masters: OwnerMasters::new(&self.parts.own_master, self.masters.of(p)),
+            masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
@@ -167,7 +167,7 @@ impl World {
         let player = self.players.player(p)?;
         let look = |id: ObjectId| self.object(id).map(|(_, o)| (o.life.state, o.position()));
         Ok(nearest_table_site(
-            (&self.drop_sites, player.civ, &player.tracker),
+            (&self.model.drop_sites, player.civ, &player.tracker),
             (at, held, class),
             look,
         ))

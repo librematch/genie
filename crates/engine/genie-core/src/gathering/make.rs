@@ -126,7 +126,7 @@ impl MakeAction {
         let master = object_master(
             c.w.parts.own_master.get(farm.id),
             (farm.id, farm.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         match self.state {
             // `+0x18`: the state whose update reports the action done (`FUN_140a99e30` returns 1).
@@ -208,6 +208,7 @@ mod tests {
     #[cfg(test)]
     use crate::world::tests::in_update;
     use crate::world::{Player, World};
+    use std::sync::Arc;
 
     /// The farm's default task in build 158041's `.dat` (master 50, task 0).
     fn farm_task() -> Task {
@@ -276,7 +277,7 @@ mod tests {
             ..farm_master(ids::ID_7)
         };
         let masters = Masters::new([farm_master(ids::FARM), farm_master(ids::PASTURE), wall]);
-        t.masters = vec![Masters::default(), masters];
+        t.model.masters = vec![Arc::new(Masters::default()), Arc::new(masters)];
         t
     }
 

@@ -389,7 +389,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let master = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master)?.standing_sprite;
-        let shown = standing.and_then(|s| self.graphics.get(s)).copied();
+        let shown = standing.and_then(|s| self.model.graphics.get(s)).copied();
         let unit = self.players.live_mut(p, idx)?;
         if let Some(m) = self.parts.mover_mut(unit.id) {
             m.shows(shown.as_ref());

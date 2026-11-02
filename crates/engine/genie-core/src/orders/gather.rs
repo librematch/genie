@@ -110,10 +110,10 @@ impl World {
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
@@ -199,10 +199,10 @@ impl World {
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
@@ -274,10 +274,10 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
@@ -330,7 +330,7 @@ impl World {
         let target_master = t.master(self.master_tables(), tp)?;
         let world = TaskWorld {
             players: &self.players,
-            drop_sites: &self.drop_sites,
+            drop_sites: &self.model.drop_sites,
         };
         Ok(Quarry {
             id: target,
@@ -409,10 +409,10 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
@@ -495,7 +495,12 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let moving = task.walk_sprite_id(unit.life.held());
-        Ok(attack_arms(master, &self.graphics, task.sprites, moving))
+        Ok(attack_arms(
+            master,
+            &self.model.graphics,
+            task.sprites,
+            moving,
+        ))
     }
 
     /// [`crate::combat::attack::engagement`] of the unit at `idx` with `target`.
@@ -623,10 +628,10 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
-            MasterTables::new(&self.masters, &self.parts.own_master),
+            MasterTables::new(&self.model.masters, &self.parts.own_master),
             player,
             (
-                &self.graphics,
+                &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;

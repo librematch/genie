@@ -103,8 +103,8 @@ impl Unit {
             }
             self.show_standing(
                 c.w.parts.motion.layer_mut(self.id),
-                OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                &c.w.graphics,
+                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
             )?;
         } else {
@@ -203,12 +203,13 @@ impl Unit {
             c.building_handover = true;
             return Ok(c
                 .w
+                .model
                 .masters
                 .get(new.index())
                 .is_some_and(|m| m.get(self.life.master_id).is_some()));
         }
         let had = c.w.parts.dead_master.contains(self.id);
-        let tables = MasterTables::new(&c.w.masters, &c.w.parts.own_master);
+        let tables = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
         let dead = dead_master_of(self, c.player.index(), tables, had);
         let id = self.id;
         let changed = change_hands(

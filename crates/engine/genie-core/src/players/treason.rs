@@ -41,7 +41,8 @@ impl World {
         } else {
             CASTLE
         };
-        self.masters
+        self.model
+            .masters
             .get(p.index())
             .is_some_and(|ms| ms.get(castle).is_some())
             && self
@@ -136,6 +137,7 @@ mod tests {
     use crate::world::WorldTime;
     #[cfg(test)]
     use crate::world::{FrameSeed, GameMode};
+    use std::sync::Arc;
 
     /// Gaia and three players; player 1 holds 500 gold and is allied with 3.
     fn world() -> World {
@@ -203,8 +205,9 @@ mod tests {
             standing_sprite: None,
             ..Master::default()
         };
-        t.masters = (0..t.players.len())
+        t.model.masters = (0..t.players.len())
             .map(|_| Masters::new([flare.clone()]))
+            .map(Arc::new)
             .collect();
     }
 

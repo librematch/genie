@@ -47,9 +47,9 @@ impl World {
         player: PlayerId,
         master: MasterId,
     ) -> Result<(), GenieError> {
-        let site = player_master(&self.masters, player, master).ok_or(GenieError::unsupported(
-            "BUILD of a master the player does not have",
-        ))?;
+        let site = player_master(&self.model.masters, player, master).ok_or(
+            GenieError::unsupported("BUILD of a master the player does not have"),
+        )?;
         let mut listed = [0i16; 4];
         for (resource, amount, _) in cost_entries(&site.cost) {
             if let Some(r) = resource.is_resource().then(|| resource.index()) {

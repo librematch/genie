@@ -55,7 +55,7 @@ impl Unit {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.masters.of(c.player),
+            c.w.model.masters.of(c.player),
         )?;
         let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
         let victim = hunt_victim(c, &hunt)?;
@@ -107,7 +107,7 @@ impl Unit {
             .copied()
             .filter(|&v| Amount::ZERO < v)
             .unwrap_or(Amount::new(1.0));
-        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
+        let g = |id: Option<SpriteId>| id.and_then(|s| c.w.model.graphics.get(s).copied());
         Ok(HuntReads {
             defaults: MoveDefaults::of(
                 master,
@@ -117,8 +117,8 @@ impl Unit {
                 c.w.parts.combat_of(self.id),
                 master,
                 (
-                    OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-                    &c.w.graphics,
+                    OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+                    &c.w.model.graphics,
                 ),
                 c.w.parts.unit_ai.get(self.id),
                 (owner.kind, c.w.world_time),
@@ -212,7 +212,7 @@ impl Unit {
             c.w.world_time,
         )?;
         let moving = action.task.walk_sprite_id(self.life.held());
-        let arms = arms(master, &c.w.graphics, action.task.sprites, moving);
+        let arms = arms(master, &c.w.model.graphics, action.task.sprites, moving);
         let own = them.player == c.player;
         let drop_site = if !own {
             None
@@ -229,7 +229,8 @@ impl Unit {
                 ));
             }
             let sites: Vec<MasterId> =
-                c.w.drop_sites
+                c.w.model
+                    .drop_sites
                     .iter()
                     .filter(|d| d.livestock)
                     .map(|d| d.building)
@@ -266,7 +267,7 @@ impl Unit {
                 Some(
                     master
                         .special_sprite
-                        .and_then(|s| c.w.graphics.get(s))
+                        .and_then(|s| c.w.model.graphics.get(s))
                         .copied()
                         .ok_or(GenieError::unsupported(
                             "a special graphic the data file does not have",

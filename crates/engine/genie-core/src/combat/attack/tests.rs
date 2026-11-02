@@ -74,6 +74,8 @@ use crate::world::index::TestObjects;
 use crate::world::parts::Object;
 use crate::world::step::Step;
 use crate::world::tests::{archer_world, in_update, missiles};
+use genie_model::model::Model;
+use std::sync::Arc;
 
 /// `FUN_140a82ae0` case 6 after the hit: a ranged unit whose attack timer ran out is done
 /// without a target and ready again past its interrupt frame (its firing frame without one);
@@ -667,7 +669,10 @@ impl Rig {
             standing_sprite: None,
             ..Master::default()
         };
-        t.masters = vec![Masters::new([master]); t.players.len()];
+        t.model.masters = vec![Masters::new([master]); t.players.len()]
+            .into_iter()
+            .map(Arc::new)
+            .collect();
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         unit.life.state = ObjectState::Alive;
         unit.life.master_id = master_id(4);
@@ -744,8 +749,8 @@ impl Rig {
             streams,
             players,
             index,
-            masters,
             parts,
+            model: Model { masters, .. },
             ..
         } = &mut self.t;
         let (object, sprite) = streams.object_and_sprite();
@@ -2501,8 +2506,11 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
     };
     let mut t = forage_world();
     // the town centre's master without a missile cannot attack
-    for masters in &mut t.masters {
-        masters.get_mut(ids::TOWN_CENTRE).unwrap().missile = MasterField::NONE;
+    for masters in &mut t.model.masters {
+        Arc::make_mut(masters)
+            .get_mut(ids::TOWN_CENTRE)
+            .unwrap()
+            .missile = MasterField::NONE;
     }
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     let mut attack = own_attack(-1, AttackState::Done, Distance::ZERO);
@@ -2634,7 +2642,7 @@ fn ranged_swing_fires_at_its_firing_frame_and_melee_one_counts_down() {
             changed: true,
             looped: false,
             ..ActiveSprite::start(
-                *t.graphics.get(SpriteId::named(301)).unwrap(),
+                *t.model.graphics.get(SpriteId::named(301)).unwrap(),
                 &mut Well512::default(),
             )
         };
@@ -2735,7 +2743,7 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
         last_frame: Frame::of_data(4),
         changed: true,
         ..ActiveSprite::start(
-            *t.graphics.get(SpriteId::named(301)).unwrap(),
+            *t.model.graphics.get(SpriteId::named(301)).unwrap(),
             &mut Well512::default(),
         )
     };

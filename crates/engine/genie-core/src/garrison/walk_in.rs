@@ -267,8 +267,8 @@ impl EnterAction {
         self.timer = WAIT_SECONDS;
         unit.shows_standing_sprite(
             c.w.parts.motion.layer_mut(unit.id),
-            OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
-            &c.w.graphics,
+            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+            &c.w.model.graphics,
             c.w.streams.get(Stream::Sprite),
         )
     }
@@ -474,7 +474,8 @@ impl EnterAction {
                 .ok_or(GenieError::unreachable(
                     "an Enter's held target gone in its update",
                 ))?;
-            let master = target.master(MasterTables::new(&w.masters, &w.parts.own_master), tp)?;
+            let master =
+                target.master(MasterTables::new(&w.model.masters, &w.parts.own_master), tp)?;
             let meeting = Meeting {
                 spatial: &mut w.spatial,
                 zones: &mut w.zones,
@@ -489,7 +490,7 @@ impl EnterAction {
             };
             let sprites = SpriteReads {
                 defaults: reads.defaults,
-                graphics: &w.graphics,
+                graphics: &w.model.graphics,
             };
             let moves = MoveToReads::with_sprites(sprites, (meeting.unit, meeting.mover));
             self.walk_again(
@@ -497,7 +498,7 @@ impl EnterAction {
                 reads.start,
                 meeting,
                 &moves,
-                ObjectsRef::new(&w.players, &w.index, &w.masters, &w.parts),
+                ObjectsRef::new(&w.players, &w.index, &w.model.masters, &w.parts),
             )?
         };
         match walking {

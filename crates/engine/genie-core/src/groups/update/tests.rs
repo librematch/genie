@@ -86,6 +86,7 @@ use crate::world::WorldTime;
 use crate::world::parts::Object;
 use crate::world::{FrameSeed, OBJECT_MASTER};
 use crate::world::{Player, World};
+use std::sync::Arc;
 
 /// A unit of master 4 at (`x`, `y`) in state 2 with 50 hit points (its unit AI [`soldier_ai`]).
 fn soldier(id: i32, x: f32, y: f32) -> Unit {
@@ -155,7 +156,10 @@ fn world() -> World {
         formation_category: FormationClass::of_data(1),
         ..Master::default()
     };
-    t.masters = vec![Masters::new([master]); 4];
+    t.model.masters = vec![Masters::new([master]); 4]
+        .into_iter()
+        .map(Arc::new)
+        .collect();
     let mut s = Spatial::new(GridSize::new(8, 8));
     s.relations = ByPlayer::new(vec![
         relation_row([0, 3, 3, 3]),
@@ -335,10 +339,10 @@ fn target_is_pending_while_seen_and_no_ally_s() {
     assert!(!t.target_pending(group_id(1)).unwrap());
     light(&mut t, 1, 3, 3, false);
     assert!(!t.target_pending(group_id(1)).unwrap());
-    for m in &mut t.masters {
+    for m in &mut t.model.masters {
         let mut master = m.get(master_id(4)).unwrap().clone();
         master.fog_visibility = FogVisibility::VISIBLE;
-        *m = Masters::new([master]);
+        *m = Arc::new(Masters::new([master]));
     }
     assert!(t.target_pending(group_id(1)).unwrap());
     t.players[2].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
@@ -393,7 +397,10 @@ fn relic_carriers_keep_their_command_pending() {
         ..Master::default()
     };
     let set_masters = |t: &mut World, tasks: Vec<Task>| {
-        t.masters = vec![Masters::new([monk(tasks), relic.clone(), monastery.clone()]); 4];
+        t.model.masters = vec![Masters::new([monk(tasks), relic.clone(), monastery.clone()]); 4]
+            .into_iter()
+            .map(Arc::new)
+            .collect();
     };
     let mut r = soldier(40, 6.0, 6.0);
     r.life.master_id = ids::RELIC;
@@ -515,10 +522,10 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
         .unwrap()
         .list
         .set_attack(Some(attack(AttackState::Killed)));
-    for m in &mut t.masters {
+    for m in &mut t.model.masters {
         let mut master = m.get(master_id(4)).unwrap().clone();
         master.class = class::TRADE_CART;
-        *m = Masters::new([master]);
+        *m = Arc::new(Masters::new([master]));
     }
     assert!(t.member_idle(object_id(10)).unwrap());
 }
@@ -658,7 +665,10 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
             formation_category: FormationClass::of_data(1),
             ..Master::default()
         };
-        t.masters = vec![Masters::new([m]); 4];
+        t.model.masters = vec![Masters::new([m]); 4]
+            .into_iter()
+            .map(Arc::new)
+            .collect();
     };
     master(&mut t, class::CLASS_6, [-1; 3]);
     assert_eq!(t.show_walking(object_id(10)), Ok(false));
@@ -677,7 +687,7 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::NONE,
         };
-        let _ = t.graphics.insert(graphic.id, graphic);
+        let _ = Arc::make_mut(&mut t.model.graphics).insert(graphic.id, graphic);
     }
     assert_eq!(t.show_walking(object_id(10)), Ok(true));
     assert_eq!(speed(&t), Speed::new(0.8 * 1.125));
@@ -686,7 +696,7 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
     t.show_standing(object_id(10)).unwrap();
     assert_eq!(speed(&t), Speed::new(0.8 * 0.125));
     // a held sprite needs the graphic
-    t.graphics.clear();
+    Arc::make_mut(&mut t.model.graphics).clear();
     let graphic = Graphic {
         id: SpriteId::named(1),
         frames: Frame::of_data(1),
@@ -791,14 +801,17 @@ fn each_line_takes_its_units_least_range() {
         weapon_range: range,
         ..Master::default()
     };
-    t.masters = vec![
+    t.model.masters = vec![
         Masters::new([
             combat(master_id(4), MasterKind::COMBAT, Distance::new(3.0)),
             combat(master_id(5), MasterKind::COMBAT, Distance::new(1.5)),
             combat(ids::ID_6, MasterKind::MOVING, Distance::new(2.0))
         ]);
         4
-    ];
+    ]
+    .into_iter()
+    .map(Arc::new)
+    .collect();
     t.players[1].objects[ListIndex::new(1)].life.master_id = master_id(5);
     t.players[1].objects[ListIndex::new(2)].life.master_id = ids::ID_6;
     let slot = |unit| Slot {
@@ -1478,7 +1491,7 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
         groups: vec![g],
         ..UnitGroups::default()
     };
-    let masters = OwnerMasters::new(&t.parts.own_master, Some(&t.masters[1]));
+    let masters = OwnerMasters::new(&t.parts.own_master, Some(&t.model.masters[1]));
     let of = |groups: &UnitGroups, id| {
         let u = t.object(object_id(id)).unwrap().1;
         u.group_speed(
@@ -1922,7 +1935,7 @@ fn register(t: &mut World) {
         .zip(&t.players)
         .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
         .filter_map(|(p, u)| {
-            let m = t.masters.of(p)?.get(u.life.master_id)?;
+            let m = t.model.masters.of(p)?.get(u.life.master_id)?;
             Some((
                 u.id.get(),
                 Placed {
@@ -2114,7 +2127,7 @@ fn an_attack_follows_target_that_moved() {
 /// is the gate, with 21 its annex at (2.5, 2.5).
 fn gate_world() -> World {
     let mut t = world();
-    let m4 = t.masters[2].get(master_id(4)).unwrap().clone();
+    let m4 = t.model.masters[2].get(master_id(4)).unwrap().clone();
     let gate = Master {
         id: master_id(5),
         kind: MasterKind::BUILDING,
@@ -2123,7 +2136,7 @@ fn gate_world() -> World {
         standing_sprite: None,
         ..Master::default()
     };
-    t.masters[2] = Masters::new([m4, gate]);
+    t.model.masters[2] = Arc::new(Masters::new([m4, gate]));
     t.players[2].objects[ListIndex::new(0)].life.master_id = master_id(5);
     let mut annex = soldier(21, 2.5, 2.5);
     annex.life.master_id = master_id(5);
@@ -2154,16 +2167,16 @@ fn gate_out_of_reach_is_struck_at_its_nearest_part() {
     );
     // within its weapon range and above the least one: the gate itself
     t.link_test_annex(object_id(21), object_id(20));
-    let mut m4 = t.masters[1].get(master_id(4)).unwrap().clone();
+    let mut m4 = t.model.masters[1].get(master_id(4)).unwrap().clone();
     m4.weapon_range = Distance::new(10.0);
-    t.masters[1] = Masters::new([m4.clone()]);
+    t.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
     assert_eq!(
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(20)
     );
     // below the least range (a squared 3.9 against 5 squared) it is out of reach again
     m4.min_range = Distance::new(5.0);
-    t.masters[1] = Masters::new([m4]);
+    t.model.masters[1] = Arc::new(Masters::new([m4]));
     assert_eq!(
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(21)
@@ -2189,15 +2202,15 @@ fn unit_speed_is_its_movers_unless_charge_runs() {
     };
     assert_eq!(speed(&t, 11).unwrap(), 0.0);
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
-    let mut m4 = t.masters[1].get(master_id(4)).unwrap().clone();
+    let mut m4 = t.model.masters[1].get(master_id(4)).unwrap().clone();
     m4.max_charge = Charge::new(1.0);
-    t.masters[1] = Masters::new([m4.clone()]);
+    t.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
     m4.special_attack = SpecialAttack::CHARGE;
-    t.masters[1] = Masters::new([m4.clone()]);
+    t.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
     assert!(speed(&t, 10).is_err());
     m4.max_charge = Charge::ZERO;
-    t.masters[1] = Masters::new([m4]);
+    t.model.masters[1] = Arc::new(Masters::new([m4]));
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
 }
 

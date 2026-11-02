@@ -374,7 +374,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
         })
         .collect();
     for (p, player) in turns.players.iter().enumerate() {
-        let masters = turns.masters.get(p);
+        let masters = turns.model.masters.get(p);
         for unit in player.objects.iter().chain(player.sleeping.iter()) {
             let Some(ai) = turns
                 .parts

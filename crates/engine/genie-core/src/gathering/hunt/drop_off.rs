@@ -222,7 +222,7 @@ impl Unit {
     ) -> Result<(), GenieError> {
         let (mover, by_id) =
             c.w.parts
-                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.masters));
+                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model.masters));
         let w = DropWorld {
             masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,
@@ -234,7 +234,9 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.drop_off_in(actions, mover, w, others, &c.w.graphics, by_id)? {
+        if let Some(site) =
+            self.drop_off_in(actions, mover, w, others, &c.w.model.graphics, by_id)?
+        {
             let by = self.releaser(c)?;
             take(c, self, site, by)?;
         }

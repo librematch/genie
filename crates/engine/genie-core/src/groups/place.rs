@@ -184,7 +184,7 @@ impl World {
                 grow,
                 &members,
                 true,
-                ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts),
+                ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
             )? {
                 return Ok(at);
             }
@@ -264,7 +264,7 @@ impl World {
         group: GroupId,
         ahead: Distance,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
+        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
@@ -452,6 +452,7 @@ mod tests {
     use crate::world::parts::Object;
     #[cfg(test)]
     use crate::world::{FrameSeed, Player};
+    use std::sync::Arc;
 
     /// `FUN_141049e10` facing x with up y: right is `y × x`, (0, 0, -1), the constructor's.
     #[test]
@@ -503,12 +504,12 @@ mod tests {
             }],
         )
         .with_parts(parts);
-        t.masters = vec![Masters::new([Master {
+        t.model.masters = vec![Arc::new(Masters::new([Master {
             id: master_id(4),
             radius: Footprint::new(0.4, 0.4),
             terrain_restriction: Some(RestrictionId::named(0)),
             ..Master::default()
-        }])];
+        }]))];
         t.spatial = Spatial::with_tiles(
             GridSize::new(20, 20),
             Tiles::new(GridSize::new(20, 20), vec![1; 400]),

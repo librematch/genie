@@ -78,14 +78,14 @@ impl UnitView<'_, '_> {
                 1,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
             task_target_with(
                 foundation.id(),
                 2,
                 &find,
                 &self.c.w.parts,
-                MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+                MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
             return Err(FOUNDATION_GONE);
@@ -93,6 +93,7 @@ impl UnitView<'_, '_> {
         let masters = self
             .c
             .w
+            .model
             .masters
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
@@ -124,7 +125,7 @@ impl UnitView<'_, '_> {
                 self.new_owner,
             )?
             .players(),
-            drop_sites: &self.c.w.drop_sites,
+            drop_sites: &self.c.w.model.drop_sites,
         };
         // slot 0x820's point: the foundation's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), f.position());
@@ -153,7 +154,7 @@ impl UnitView<'_, '_> {
                 self.c.player,
                 self.new_owner,
             )?,
-            MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             &self.c.w.spatial,
         );
         let foundation_on = |tile: Tile| -> Result<Option<ObjectId>, GenieError> {
@@ -187,12 +188,12 @@ impl UnitView<'_, '_> {
         let by_id = ObjectsRef::new(
             &self.c.w.players,
             &self.c.w.index,
-            &self.c.w.masters,
+            &self.c.w.model.masters,
             &self.c.w.parts,
         );
         let unit = &*self.unit;
         let master = unit.master(
-            MasterTables::new(&self.c.w.masters, &self.c.w.parts.own_master),
+            MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             self.player,
         )?;
         let (player, others) = (

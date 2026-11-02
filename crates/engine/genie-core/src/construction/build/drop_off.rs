@@ -86,13 +86,17 @@ impl BuildAction {
         task_range: Distance,
     ) -> Result<DropSearch, GenieError> {
         let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let masters = c.w.masters.get(c.player.index()).ok_or(OBJECT_MASTER)?;
+        let masters =
+            c.w.model
+                .masters
+                .get(c.player.index())
+                .ok_or(OBJECT_MASTER)?;
         let own = builder.master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?;
         let at = builder.position().ground();
         let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
         let found = nearest_table_site(
             (
-                &c.w.drop_sites,
+                &c.w.model.drop_sites,
                 c.w.players.player(c.player)?.civ,
                 &c.w.players.player(c.player)?.tracker,
             ),
@@ -109,7 +113,7 @@ impl BuildAction {
             }
             view.find(t)
         };
-        let every = MasterTables::new(&c.w.masters, &c.w.parts.own_master);
+        let every = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
         let task = match (
             task_target_with(id.id(), 1, &find, &c.w.parts, every)?,
             task_target_with(id.id(), 2, &find, &c.w.parts, every)?,
@@ -136,7 +140,7 @@ impl BuildAction {
                     player,
                     relations: &c.w.players.player(c.player)?.relations,
                     foreign,
-                    drop_sites: &c.w.drop_sites,
+                    drop_sites: &c.w.model.drop_sites,
                 };
                 // slot 0x820's point: x, y and z −1, no terrain
                 task_search(masters, &actor, &t, &general, None, None, &dip)?
@@ -196,10 +200,10 @@ impl BuildAction {
         };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
         )?;

@@ -662,6 +662,7 @@ mod tests {
     use crate::test_ids::object_id;
     #[cfg(test)]
     use crate::world::WorldTime;
+    use std::sync::Arc;
 
     #[test]
     fn check_finds_no_owner_and_waits_one_second() {
@@ -1356,7 +1357,10 @@ mod tests {
         let mut rig = Rig::on_the_path(Victim::default());
         // the top speed derives from the base and the sprite shown
         (rig.mover_mut().stats.speed, rig.mover_mut().stats.base) = (Speed::ZERO, Speed::ZERO);
-        assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic(3)), None);
+        assert_eq!(
+            Arc::make_mut(&mut rig.t.model.graphics).insert(SpriteId::named(3), graphic(3)),
+            None
+        );
         rig.mover_mut().in_the_way = vec![object_id(77)];
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();

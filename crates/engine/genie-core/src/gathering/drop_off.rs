@@ -137,10 +137,10 @@ impl Unit {
         );
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
@@ -193,12 +193,12 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player)?;
         let standing = master
             .standing_sprite
-            .and_then(|s| c.w.graphics.get(s).copied());
+            .and_then(|s| c.w.model.graphics.get(s).copied());
         let carrying = gather
             .task
             .sprites
             .carrying
-            .and_then(|s| c.w.graphics.get(s).copied());
+            .and_then(|s| c.w.model.graphics.get(s).copied());
         Ok(match carrying {
             Some(g)
                 if gather.task.resource.is_some()
@@ -230,10 +230,10 @@ impl Unit {
         );
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.masters, &c.w.parts.own_master),
+            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
             c.player,
             (
-                &c.w.graphics,
+                &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
@@ -341,7 +341,7 @@ impl Unit {
     ) -> Result<(), GenieError> {
         let (mover, by_id) =
             c.w.parts
-                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.masters));
+                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model.masters));
         let w = DropWorld {
             masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,
@@ -354,7 +354,7 @@ impl Unit {
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         if let Some(site) =
-            self.gather_drop_off_in(actions, mover, w, others, &c.w.graphics, by_id)?
+            self.gather_drop_off_in(actions, mover, w, others, &c.w.model.graphics, by_id)?
         {
             let by = self.releaser(c)?;
             take(c, self, site, by)?;
