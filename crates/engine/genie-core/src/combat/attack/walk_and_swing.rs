@@ -222,7 +222,13 @@ impl Attack {
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
         if ranged || r.volleys {
-            unit.volley(c, Aimed::at(self.target, &f.victim))?;
+            unit.volley(
+                c,
+                Aimed::at(
+                    self.target.map(crate::combat::AttackTargetId::id),
+                    &f.victim,
+                ),
+            )?;
         } else {
             if matches!(
                 f.own.master_id,

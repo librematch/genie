@@ -3,7 +3,6 @@
 
 use crate::GenieError;
 use crate::combat::damage::Victim;
-use crate::gathering::DropSiteId;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::update::{QUIET_CODE, UNMOVING};
 use crate::gathering::gather::{
@@ -260,7 +259,7 @@ impl GatherAction {
             return Ok([None; 2]);
         }
         self.state = GatherState::Idle;
-        let released = [self.target, self.carry_to.map(DropSiteId::id)];
+        let released = self.targets();
         self.target = None;
         self.carry_to = None;
         self.point = Position::from([-1.0; 3]);

@@ -66,7 +66,7 @@ impl Unit {
     pub(crate) fn repair_reads(
         &self,
         c: &Step<'_>,
-        target: Option<ObjectId>,
+        target: Option<crate::construction::RepairTargetId>,
     ) -> Result<RepairReads, GenieError> {
         let own = repair_master(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
@@ -76,7 +76,7 @@ impl Unit {
         let (repairee, counted_in) = repairee_of(
             c,
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-            target,
+            target.map(crate::construction::RepairTargetId::id),
         )?;
         Ok(RepairReads {
             target: repairee,
@@ -238,13 +238,13 @@ fn repairee_of(
 /// lacks, and an attribute the player has not got.
 pub(crate) fn repair_target(
     c: &mut Step<'_>,
-    target: Option<ObjectId>,
+    target: Option<crate::construction::RepairTargetId>,
     amount: HitPoints,
 ) -> Result<(RepairOutcome, MasterKind), GenieError> {
     let player = c.player;
     let mut set = Vec::new();
     let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
-    if let Some(target) = target
+    if let Some(target) = target.map(crate::objects::RoleId::id)
         && let Some((q, t)) = others.find(target)
     {
         let tm = repair_master(

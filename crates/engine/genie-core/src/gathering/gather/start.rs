@@ -181,7 +181,7 @@ impl GatherAction {
                 (FarmStops::ONE, Seconds::ZERO)
             };
         Ok(Self {
-            target: Some(target.id),
+            target: Some(crate::gathering::GatherTargetId::new(target.id)),
             carry_to: None,
             state: GatherState::New,
             point: target.position,
@@ -301,7 +301,7 @@ impl GatherAction {
         } = retarget;
         let held = walks.held.amount;
         self.worked = false;
-        if Some(target.id) == self.target {
+        if self.target.map(crate::gathering::GatherTargetId::id) == Some(target.id) {
             match self.state {
                 GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
                     return Ok(true);
@@ -321,10 +321,9 @@ impl GatherAction {
             return Ok(true);
         }
         // slot 0x68 takes the target: its workers count it once it is new
-        let workers = target
-            .workers
-            .plus(i32::from(Some(target.id) != self.target));
-        self.target = Some(target.id);
+        let taken = crate::gathering::GatherTargetId::new(target.id);
+        let workers = target.workers.plus(i32::from(Some(taken) != self.target));
+        self.target = Some(taken);
         self.point = target.position;
         self.target_class = target.class.or_none();
         if farm_stops {
@@ -531,7 +530,7 @@ impl GatherAction {
         if let Some(s) = stand {
             new_sprite(sprite, mover.map(|m| &mut m.stats), s, rng);
         }
-        let released = [self.target, self.carry_to.map(DropSiteId::id)];
+        let released = self.targets();
         self.target = None;
         self.carry_to = None;
         self.point = Position::from([-1.0; 3]);

@@ -327,7 +327,7 @@ fn stop_idles_the_gather_and_lets_its_targets_go() {
         state: GatherState::Walk {
             move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
         },
-        target: Some(object_id(31)),
+        target: Some(crate::gathering::GatherTargetId::new(object_id(31))),
         carry_to: Some(DropSiteId::new(object_id(9))),
         point: Position::new(5.0, 6.0, 0.0),
         timer: Seconds::new(2.0),
@@ -414,7 +414,7 @@ fn past_its_time_per_stop_farmer_walks_to_the_next_stop() {
     );
     let walks = walks(Held::default());
     let to = WalkTo {
-        id: g.target,
+        id: g.target.map(crate::gathering::GatherTargetId::id),
         at: Position::new(112.5, 173.5, 3.0),
         gap: Distance::ZERO,
         state: Some(ObjectState::Alive),
@@ -666,7 +666,7 @@ fn farm_update(
 fn gatherer_turning_over_time_faces_its_target_later() {
     let mut g = GatherAction {
         state: GatherState::Face,
-        target: Some(object_id(28222)),
+        target: Some(crate::gathering::GatherTargetId::new(object_id(28222))),
         ..GatherAction::new(task(), &farm(), false, rate()).unwrap()
     };
     let mut mover = crate::gathering::hunt::tests::walker();
@@ -852,7 +852,7 @@ fn gatherer_walks_to_its_target_and_faces_it_on_arrival() {
         state: GatherState::Walk {
             move_to: move_to.map(to_house),
         },
-        target: Some(object_id(10028)),
+        target: Some(crate::gathering::GatherTargetId::new(object_id(10028))),
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
     let state = |g: &GatherAction| g.state.move_to().copied().map(|m| m.state);
@@ -961,7 +961,7 @@ fn gatherer_whose_move_to_lost_its_target_walks_back_to_its_point() {
         state: GatherState::Walk {
             move_to: Some(to_house(MoveTo::Moving)),
         },
-        target: Some(object_id(10028)),
+        target: Some(crate::gathering::GatherTargetId::new(object_id(10028))),
         point: Position::new(30.0, 88.0, 0.0),
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
@@ -1069,7 +1069,7 @@ fn gatherer_facing_its_target_works_it() {
     rig.set_load(Some(attribute::STONE), 4.0);
     let mut g = GatherAction {
         state: GatherState::Face,
-        target: Some(object_id(10028)),
+        target: Some(crate::gathering::GatherTargetId::new(object_id(10028))),
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
     let mut house = Victim {
@@ -1159,7 +1159,7 @@ fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
 #[test]
 fn farmer_at_farm_another_works_walks_back_to_search() {
     let mut g = waiting(false);
-    g.target = Some(object_id(12557));
+    g.target = Some(crate::gathering::GatherTargetId::new(object_id(12557)));
     let mut farm = Victim {
         id: object_id(12557),
         amount: Amount::new(175.0),
@@ -1208,7 +1208,7 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
     );
     // the farm still standing: the farmer faces it (set_state 6)
     let mut g = walking(MoveTo::Arrived);
-    g.target = Some(object_id(28222));
+    g.target = Some(crate::gathering::GatherTargetId::new(object_id(28222)));
     let mut bush = target(10.0);
     assert_eq!(
         farm_update(&mut g, Some(&mut bush), 100, false),
@@ -1217,7 +1217,7 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
     assert_eq!(g.state, GatherState::Face);
     // a dying one (state 3) does not hold it: the reseed
     let mut g = walking(MoveTo::Arrived);
-    g.target = Some(object_id(28222));
+    g.target = Some(crate::gathering::GatherTargetId::new(object_id(28222)));
     let mut dying = Victim {
         state: ObjectState::Dying,
         ..target(10.0)
@@ -1237,7 +1237,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
             state: GatherState::ReseedWalk {
                 move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
             },
-            target: Some(object_id(5)),
+            target: Some(crate::gathering::GatherTargetId::new(object_id(5))),
             carry_to: Some(DropSiteId::new(object_id(6))),
             ..GatherAction::new(task(), &farm(), false, rate()).unwrap()
         };
@@ -1257,7 +1257,12 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
     };
     assert_eq!(
         after(true, true),
-        (GatherState::Done, [None, None], Some(object_id(5)), None)
+        (
+            GatherState::Done,
+            [None, None],
+            Some(crate::gathering::GatherTargetId::new(object_id(5))),
+            None
+        )
     );
     assert_eq!(
         after(true, false),
@@ -1392,7 +1397,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
         (
             GatherState::Walk { move_to: None },
             Some(to_bush),
-            Some(object_id(28222)),
+            Some(crate::gathering::GatherTargetId::new(object_id(28222))),
             None,
             Position::new(23.5, 93.5, 0.0),
             class_of(7)

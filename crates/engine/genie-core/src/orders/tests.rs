@@ -619,7 +619,7 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
         (
             crate::combat::attack::AttackState::Move { move_to: None },
             Some(crate::movement::move_to::MoveTo::Arrived),
-            Some(object_id(50))
+            Some(crate::combat::AttackTargetId::new(object_id(50)))
         )
     );
     assert_eq!(
@@ -852,7 +852,11 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
             .expect("the soldier's Attack");
         assert_eq!(
             (attack.state, attack.pending, attack.target2),
-            (state, pending, Some(object_id(50))),
+            (
+                state,
+                pending,
+                Some(crate::combat::AttackTargetId::new(object_id(50)))
+            ),
             "reload timer {timer}"
         );
         assert_eq!(
@@ -3278,7 +3282,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         .unwrap()
         .list
         .set_build(Some(crate::construction::build::BuildAction {
-            target: Some(object_id(60)),
+            target: Some(crate::construction::FoundationId::new(object_id(60))),
             state: BuildState::Work,
             point: Position::new(-1.0, -1.0, -1.0),
             task: crate::construction::build::BuildTask {
@@ -3297,10 +3301,13 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         t.build_set_target(
             PlayerId::new(1),
             ListIndex::new(0),
-            (Some(object_id(60)), true),
-            object_id(60)
+            (
+                Some(crate::construction::FoundationId::new(object_id(60))),
+                true
+            ),
+            crate::construction::FoundationId::new(object_id(60))
         ),
-        Ok(Some(object_id(60)))
+        Ok(Some(crate::construction::FoundationId::new(object_id(60))))
     );
     assert!(
         t.parts
@@ -3315,10 +3322,13 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         t.build_set_target(
             PlayerId::new(1),
             ListIndex::new(0),
-            (Some(object_id(60)), true),
-            object_id(61)
+            (
+                Some(crate::construction::FoundationId::new(object_id(60))),
+                true
+            ),
+            crate::construction::FoundationId::new(object_id(61))
         ),
-        Ok(Some(object_id(61)))
+        Ok(Some(crate::construction::FoundationId::new(object_id(61))))
     );
     let build = t
         .parts
@@ -3327,7 +3337,13 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         .build()
         .copied()
         .unwrap();
-    assert_eq!((build.target, build.added), (Some(object_id(61)), false));
+    assert_eq!(
+        (
+            build.target.map(crate::construction::FoundationId::id),
+            build.added
+        ),
+        (Some(object_id(61)), false)
+    );
     let site = |t: &World, i: ListIndex| {
         let u = &t.players[1].objects[i];
         (
@@ -4856,7 +4872,7 @@ fn gather_takes_farm_but_no_other_building() {
     assert_eq!(
         (g.target, g.state.bare(), g.point),
         (
-            Some(object_id(800)),
+            Some(crate::gathering::GatherTargetId::new(object_id(800))),
             GatherState::Walk { move_to: None },
             Position::new(26.5, 89.5, 0.0)
         )
@@ -5278,7 +5294,10 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
             took,
             t.parts.actions_of(v.id).list.gather().map(|g| g.target)
         ),
-        (true, Some(Some(object_id(601))))
+        (
+            true,
+            Some(Some(crate::gathering::GatherTargetId::new(object_id(601))))
+        )
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
     assert_eq!(
@@ -5301,7 +5320,7 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
         t.parts.actions_of(v.id).list.hunt().map(|h| h.target),
-        Some(Some(object_id(501)))
+        Some(Some(crate::gathering::HuntTargetId::new(object_id(501))))
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
     assert_eq!(
@@ -5488,7 +5507,10 @@ fn work_command_factory_starts_the_task_action() {
             .list
             .gather()
             .map(|g| (g.target, g.state.bare())),
-        Some((Some(object_id(600)), GatherState::Walk { move_to: None }))
+        Some((
+            Some(crate::gathering::GatherTargetId::new(object_id(600))),
+            GatherState::Walk { move_to: None }
+        ))
     );
     let unknown = Task {
         action_type: ActionType::named(0x55),

@@ -126,7 +126,11 @@ impl Attack {
         new_sprite(sprite, motion.move_stats_mut(), idle, rng);
         Ok((!self.sub_action).then_some((
             NotifyKind::ACTION_INVALIDATED,
-            [600, ObjectId::field(self.target), 0],
+            [
+                600,
+                ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
+                0,
+            ],
         )))
     }
 
@@ -317,7 +321,11 @@ impl Attack {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
-                    [600, ObjectId::field(self.target), 0],
+                    [
+                        600,
+                        ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
+                        0,
+                    ],
                 )?;
             }
             return Ok(Some(UpdateCode::DONE));
@@ -331,7 +339,11 @@ impl Attack {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
-                    [600, ObjectId::field(self.target), 0],
+                    [
+                        600,
+                        ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
+                        0,
+                    ],
                 )?;
             }
             return Ok(Some(UpdateCode::CODE_4));
@@ -344,7 +356,11 @@ impl Attack {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
-                    [600, ObjectId::field(self.target), 0],
+                    [
+                        600,
+                        ObjectId::field(self.target.map(crate::combat::AttackTargetId::id)),
+                        0,
+                    ],
                 )?;
             }
             return Ok(Some(UpdateCode::DONE));
@@ -550,7 +566,7 @@ pub(super) fn sees(
 pub(super) fn let_go(
     c: &mut Step<'_>,
     unit: &mut Unit,
-    target: Option<ObjectId>,
+    target: Option<crate::combat::AttackTargetId>,
 ) -> Result<(), GenieError> {
     let Some(target) = target else {
         return Ok(());

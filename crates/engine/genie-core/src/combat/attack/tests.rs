@@ -136,7 +136,7 @@ fn walking(state: MoveTo) -> MoveToAction {
 /// A unit's own Attack on `target` in `state` with range `range`.
 pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> Attack {
     Attack {
-        target: ObjectId::of_field(target),
+        target: crate::combat::AttackTargetId::of_field(target),
         target2: None,
         state,
         timer: Seconds::ZERO,
@@ -188,7 +188,7 @@ fn stop_ends_the_attack_and_the_unit_stands() {
         (
             a.state,
             a.state.move_to().copied(),
-            ObjectId::field(a.target),
+            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id)),
             motion.animated().speed
         ),
         (AttackState::Done, None, 77, Speed::new(1.0))
@@ -264,7 +264,10 @@ fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
         );
         assert_eq!(
             (a.target, a.seen),
-            (Some(object_id(7)), deer.position),
+            (
+                Some(crate::combat::AttackTargetId::new(object_id(7))),
+                deer.position
+            ),
             "{state}"
         );
     }
@@ -389,7 +392,13 @@ fn an_area_effect_attack_takes_building_main_building() {
             takes: Some(object_id(31)),
         }
     );
-    assert_eq!((a.target, a.seen), (Some(object_id(31)), main.position));
+    assert_eq!(
+        (a.target, a.seen),
+        (
+            Some(crate::combat::AttackTargetId::new(object_id(31))),
+            main.position
+        )
+    );
     // without an area effect the annex itself is the target, its own in state 6
     let mut a = own_attack(30, AttackState::Ready, Distance::ZERO);
     assert_eq!(
@@ -408,7 +417,7 @@ fn an_area_effect_attack_takes_building_main_building() {
             w.lets_go,
             w.takes,
             w.clears_count,
-            ObjectId::field(a.target)
+            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id))
         ),
         (None, None, true, 31)
     );
@@ -420,7 +429,11 @@ fn an_area_effect_attack_takes_building_main_building() {
     };
     let w = a.work(Some(annex), Some(dying), &mangonel, |_| true);
     assert_eq!(
-        (w.lets_go, w.takes, ObjectId::field(a.target)),
+        (
+            w.lets_go,
+            w.takes,
+            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id))
+        ),
         (Some(object_id(30)), None, -1)
     );
     // class 60: slot 0x68 returns at once; the seen point still follows
@@ -437,7 +450,7 @@ fn an_area_effect_attack_takes_building_main_building() {
                 kept: true,
                 ..Worked::default()
             },
-            Some(object_id(7)),
+            Some(crate::combat::AttackTargetId::new(object_id(7))),
             odd.position
         )
     );
@@ -2753,7 +2766,7 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
     );
     assert_eq!(
         after(
-            Some(object_id(10028)),
+            Some(crate::combat::AttackTargetId::new(object_id(10028))),
             crate::objects::Frame::of_data(5),
             at_frame(6, 5),
             Seconds::ZERO
@@ -2763,7 +2776,7 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
     );
     assert_eq!(
         after(
-            Some(object_id(10028)),
+            Some(crate::combat::AttackTargetId::new(object_id(10028))),
             crate::objects::Frame::of_data(-1),
             at_frame(3, 2),
             Seconds::ZERO
@@ -2777,7 +2790,7 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
     };
     assert_eq!(
         after(
-            Some(object_id(10028)),
+            Some(crate::combat::AttackTargetId::new(object_id(10028))),
             crate::objects::Frame::of_data(-1),
             looped,
             Seconds::new(0.5)
@@ -3243,7 +3256,12 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
     rig.f.own.class = class::VILLAGER;
     let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
     assert_eq!(
-        (code, ObjectId::field(a.target), a.point, a.state),
+        (
+            code,
+            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id)),
+            a.point,
+            a.state
+        ),
         (
             Ok(UpdateCode::CODE_5),
             -1,
@@ -3463,7 +3481,7 @@ fn killing_attack_ends_once_its_swing_looped() {
             code,
             rig.workers(7, PlayerId::new(0)),
             rig.posted(),
-            ObjectId::field(a.target),
+            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id)),
             a.state
         ),
         (
@@ -3478,7 +3496,11 @@ fn killing_attack_ends_once_its_swing_looped() {
     rig.unit_mut().sprite = Some(ActiveSprite::start(STANDING, &mut Well512::default()));
     let code = rig.run(20, |c, u, _, _, _| a.killed_step(c, u));
     assert_eq!(
-        (code, a.state, ObjectId::field(a.target)),
+        (
+            code,
+            a.state,
+            ObjectId::field(a.target.map(crate::combat::AttackTargetId::id))
+        ),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Killed, 7)
     );
 }

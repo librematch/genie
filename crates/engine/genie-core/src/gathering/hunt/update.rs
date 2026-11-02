@@ -302,7 +302,7 @@ impl HuntAction {
         let target = self.target.ok_or(GenieError::unreachable(
             "a hunt's Attack on its livestock without a target",
         ))?;
-        let (a, arrived) = Attack::start(target, &herd.engagement, herd.arms, mover, &reads)?;
+        let (a, arrived) = Attack::start(target.id(), &herd.engagement, herd.arms, mover, &reads)?;
         if arrived {
             a.arrived_sprite(
                 unit,

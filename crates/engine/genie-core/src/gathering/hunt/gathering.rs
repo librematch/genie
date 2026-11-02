@@ -66,7 +66,7 @@ impl HuntAction {
         let ground = mover.stats.radius.ground();
         let gap = footprint_gap(at, ground, t.position, t.radius);
         let to = WalkTo {
-            id: self.target,
+            id: self.target.map(crate::gathering::HuntTargetId::id),
             at: t.position,
             gap,
             state: Some(victim.state),
@@ -118,7 +118,7 @@ impl HuntAction {
                             // the hunt faces its livestock target here
                             if let Some(sheep) = sheep {
                                 c.lend((&mut *unit, &mut *actions), |w| {
-                                    w.lead_herd(player, sheep, site)
+                                    w.lead_herd(player, sheep.id(), site)
                                 })?;
                             }
                         }

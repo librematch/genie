@@ -12,7 +12,6 @@ use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{MoveDefaults, SpriteReads};
 use crate::movement::{Me, Mover, footprint_gap, footprint_gap_squared};
 use crate::objects::ActionState;
-use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::masters::ClassId;
@@ -209,7 +208,7 @@ impl Unit {
                 .map(|p| (p.position, p.radius))
                 .ok_or(GenieError::unsupported("a gatherer without a place"))?;
         let site = self.gather_site(c, gather.carry_to, (position, radius))?;
-        let before = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let before = gather.targets();
         let dropped = gather.update_drop(c, self, me, reads, site);
         actions.put_gather(gather);
         match dropped? {
@@ -306,7 +305,7 @@ impl Unit {
                 .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let rng = c.w.streams.get(Stream::Action);
         let to = WalkTo {
-            id: gather.target,
+            id: gather.target.map(crate::gathering::GatherTargetId::id),
             at: t.position,
             gap,
             state,
@@ -356,7 +355,7 @@ impl Unit {
         actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         next: crate::gathering::gather::Next,
-        (old_target, old_second): (Option<ObjectId>, Option<DropSiteId>),
+        (old_target, old_second): (Option<crate::gathering::GatherTargetId>, Option<DropSiteId>),
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
         use crate::gathering::gather::Next;
@@ -365,7 +364,10 @@ impl Unit {
         }
         if let Some(g) = actions.list.gather() {
             for (old, new) in [
-                (old_target, g.target),
+                (
+                    old_target.map(crate::gathering::GatherTargetId::id),
+                    g.target.map(crate::gathering::GatherTargetId::id),
+                ),
                 (
                     old_second.map(DropSiteId::id),
                     g.carry_to.map(DropSiteId::id),
@@ -383,7 +385,8 @@ impl Unit {
                 // a build command on no foundation does nothing
                 if let Some(target) = actions.list.gather().and_then(|g| g.target) {
                     c.lend_at((&mut *self, &mut *actions), |w, p, i| {
-                        w.build_command(p, i, crate::construction::FoundationId::new(target))
+                        // the farm the gatherer works is the foundation it rebuilds
+                        w.build_command(p, i, crate::construction::FoundationId::new(target.id()))
                             .map(drop)
                     })?;
                 }

@@ -107,7 +107,7 @@ impl RepairAction {
         move_reads: &MoveToReads<'_>,
     ) -> Result<Self, GenieError> {
         let mut repair = Self {
-            target: to.id,
+            target: to.id.map(crate::construction::RepairTargetId::new),
             state: RepairState::Move { move_to: None },
             point: to.at,
             timer: Seconds::ZERO,
@@ -336,7 +336,7 @@ impl RepairAction {
         crate::pathing::hull_path::quick_reach(
             (spatial, by_id),
             repairer.id,
-            self.target,
+            self.target.map(crate::construction::RepairTargetId::id),
             mask,
             Distance::new(reads.radius.x()),
             Distance::new(REACH),
@@ -600,7 +600,10 @@ impl RepairAction {
                 c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
             ),
         )?;
-        let to = move_reads.walk_to(c.w, self.target)?;
+        let to = move_reads.walk_to(
+            c.w,
+            self.target.map(crate::construction::RepairTargetId::id),
+        )?;
         self.state = RepairState::Move {
             move_to: self.walk(&move_reads, to)?,
         };
@@ -656,7 +659,7 @@ impl RepairAction {
             m.stop()?;
         }
         self.state = RepairState::WalkPoint { move_to: walk };
-        Ok((old, counted))
+        Ok((old.map(crate::construction::RepairTargetId::id), counted))
     }
 
     /// Slot 7 (`FUN_140adaa00`) as the unit's stop calls it: `set_state(2)`. Returns whether it

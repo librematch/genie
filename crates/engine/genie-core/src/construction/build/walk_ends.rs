@@ -92,7 +92,7 @@ impl BuildAction {
             if desolid && c.w.spatial.foreign_marks(&placed) {
                 let seen =
                     c.w.spatial
-                        .building_sight(target, placed.position, placed.player)
+                        .building_sight(target.id(), placed.position, placed.player)
                         .ok_or(UNSEEN_SITE)?
                         .seen();
                 if seen {
@@ -148,7 +148,7 @@ impl BuildAction {
             && let Some((q, _)) = c.w.object(target)
             && !c.w.players.player(q)?.computer
         {
-            c.w.remove_building(q, target)?;
+            c.w.remove_building(q, target.id())?;
         }
         Ok(())
     }

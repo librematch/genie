@@ -12,6 +12,7 @@
 //! (`+0x20`, `+0x30`) unset and keeps the foundation's id at `+0x68` instead.
 
 use crate::GenieError;
+use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionType;
@@ -43,7 +44,7 @@ pub struct WaitSolidify {
     /// `+0x48`: the task slot 0x820 found on the foundation, whatever its action type.
     pub task: Task,
     /// `+0x68`: the foundation's id.
-    pub target: ObjectId,
+    pub target: FoundationId,
 }
 
 impl WaitSolidify {
@@ -51,7 +52,7 @@ impl WaitSolidify {
     /// leaves the target unset), the task, the type 0x9a, the foundation's id and state
     /// [`WaitSolidifyState::Waiting`].
     #[must_use]
-    pub const fn new(task: Task, target: ObjectId) -> Self {
+    pub const fn new(task: Task, target: FoundationId) -> Self {
         Self {
             state: WaitSolidifyState::Waiting,
             task,
@@ -164,7 +165,7 @@ impl UnitView<'_, '_> {
             return Ok(false);
         };
         let wait = Wait {
-            target,
+            target: FoundationId::new(target),
             task,
             switch: switch.map(|m| m.id),
         };
@@ -182,6 +183,10 @@ mod tests {
     use crate::objects::masters::TaskId;
     use crate::test_ids::object_id;
 
+    fn foundation(id: i32) -> FoundationId {
+        FoundationId::new(object_id(id))
+    }
+
     fn task() -> Task {
         Task {
             id: TaskId::test(3),
@@ -192,10 +197,10 @@ mod tests {
 
     #[test]
     fn new_wait_holds_its_task_and_foundation_in_state_10() {
-        let w = WaitSolidify::new(task(), object_id(8123));
+        let w = WaitSolidify::new(task(), foundation(8123));
         assert_eq!(
             (w.state, w.task, w.target),
-            (WaitSolidifyState::Waiting, task(), object_id(8123))
+            (WaitSolidifyState::Waiting, task(), foundation(8123))
         );
         assert_eq!(WaitSolidifyState::Waiting.get(), 10);
         assert_eq!(WAIT_SOLIDIFY, WAIT_SOLIDIFY);
@@ -203,7 +208,7 @@ mod tests {
 
     #[test]
     fn the_wait_ends_once_the_foundation_is_past_hundredth_or_gone() {
-        let w = WaitSolidify::new(task(), object_id(8123));
+        let w = WaitSolidify::new(task(), foundation(8123));
         assert!(w.update(None), "a foundation the world does not hold");
         assert!(!w.update(Some(Seconds::ZERO)));
         // 0.01f32 widens to 0.009999999776…, at most the double 0.01
@@ -216,13 +221,13 @@ mod tests {
 
     #[test]
     fn its_set_state_sets_the_state_alone() {
-        let mut w = WaitSolidify::new(task(), object_id(8123));
+        let mut w = WaitSolidify::new(task(), foundation(8123));
         w.set_state(WaitSolidifyState::Stopped);
         assert_eq!(
             w,
             WaitSolidify {
                 state: WaitSolidifyState::Stopped,
-                ..WaitSolidify::new(task(), object_id(8123))
+                ..WaitSolidify::new(task(), foundation(8123))
             }
         );
     }

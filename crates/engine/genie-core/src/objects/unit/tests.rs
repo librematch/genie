@@ -323,7 +323,10 @@ fn the_actions_update_runs_the_action_held() {
         .list
         .gather()
         .copied();
-    assert_eq!(after.map(|g| g.target), Some(Some(object_id(600))));
+    assert_eq!(
+        after.map(|g| g.target),
+        Some(Some(crate::gathering::GatherTargetId::new(object_id(600))))
+    );
     assert_ne!(before, after);
 }
 
@@ -332,7 +335,7 @@ fn gone_foundation() -> crate::construction::wait_solidify::WaitSolidify {
     crate::construction::wait_solidify::WaitSolidify {
         state: WaitSolidifyState::Waiting,
         task: crate::objects::masters::Task::default(),
-        target: object_id(99_999),
+        target: crate::construction::FoundationId::new(object_id(99_999)),
     }
 }
 
@@ -449,7 +452,7 @@ fn the_top_action_object_is_its_target_unless_it_has_none() {
         list: ActionList::default().with_wait_solidify(Some(
             crate::construction::wait_solidify::WaitSolidify::new(
                 crate::objects::masters::Task::default(),
-                object_id(900),
+                crate::construction::FoundationId::new(object_id(900)),
             ),
         )),
         ..Default::default()
@@ -592,7 +595,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
     let wait = crate::construction::wait_solidify::WaitSolidify {
         state: WaitSolidifyState::Waiting,
         task: crate::objects::masters::Task::default(),
-        target: object_id(7),
+        target: crate::construction::FoundationId::new(object_id(7)),
     };
     assert_eq!(of(Action::WaitSolidify(wait)), None);
 }

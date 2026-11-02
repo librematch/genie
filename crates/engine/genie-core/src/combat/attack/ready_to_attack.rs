@@ -176,7 +176,7 @@ impl Attack {
     pub(super) fn held_target(&self, map: &Spatial) -> Result<(ObjectId, Placed), GenieError> {
         let target = self.target.ok_or(TARGET_GONE)?;
         let t = map.get_known(target)?.ok_or(TARGET_GONE)?;
-        Ok((target, *t))
+        Ok((target.id(), *t))
     }
 
     /// readyToAttack's ready-at-once test: the target stands on the attack's point

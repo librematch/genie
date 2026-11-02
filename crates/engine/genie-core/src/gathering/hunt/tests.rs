@@ -166,7 +166,7 @@ fn load_of_another_resource_asks_no_drop_off() {
 /// A Hunt gathering `target` with the chopping task.
 pub(crate) fn hunting(target: i32) -> HuntAction {
     HuntAction {
-        target: ObjectId::of_field(target),
+        target: crate::gathering::HuntTargetId::of_field(target),
         state: HuntState::Gather,
         point: Position::ORIGIN,
         target_class: None,
@@ -440,7 +440,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             attack.state.move_to().copied().map(|m| m.state)
         ),
         (
-            Some(object_id(9366)),
+            Some(crate::gathering::HuntTargetId::new(object_id(9366))),
             HuntState::Attack { attack: None },
             AttackState::Move { move_to: None },
             Some(MoveTo::Arrived)
@@ -510,7 +510,13 @@ fn hunt_new_target_clears_its_lead() {
             &mut mover,
         )
         .unwrap();
-    assert_eq!((hunt.target, hunt.lead), (Some(object_id(9366)), Lead::NEW));
+    assert_eq!(
+        (hunt.target, hunt.lead),
+        (
+            Some(crate::gathering::HuntTargetId::new(object_id(9366))),
+            Lead::NEW
+        )
+    );
 }
 
 #[test]
@@ -563,7 +569,7 @@ fn victim(amount: f32) -> Victim {
 #[test]
 fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full() {
     let hunt = HuntAction {
-        target: Some(object_id(9357)),
+        target: Some(crate::gathering::HuntTargetId::new(object_id(9357))),
         state: HuntState::Gather,
         point: Position::new(24.5, 94.5, 0.0),
         target_class: Some(class::TREE),
@@ -662,7 +668,11 @@ fn hunt_on_live_ally_fails() {
     .expect("a hunt");
     assert_eq!(
         (hunt.state, hunt.timer, hunt.target),
-        (HuntState::Failed, Seconds::ZERO, Some(ally.id))
+        (
+            HuntState::Failed,
+            Seconds::ZERO,
+            Some(crate::gathering::HuntTargetId::new(ally.id))
+        )
     );
 }
 
@@ -724,7 +734,7 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
 #[test]
 fn hunt_whose_target_went_walks_to_its_point() {
     let mut hunt = HuntAction {
-        target: Some(object_id(28813)),
+        target: Some(crate::gathering::HuntTargetId::new(object_id(28813))),
         state: HuntState::Walk {
             move_to: Some(to_house(MoveTo::Moving, CHOP.range)),
         },
@@ -913,7 +923,7 @@ fn walk_to_the_point_ends_in_search_or_done() {
     // set_state(2) lets the target and the second target go, in that order
     let mut h = hunt(HuntState::Search, MoveTo::Arrived);
     (h.target, h.carry_to, h.timer) = (
-        Some(object_id(28813)),
+        Some(crate::gathering::HuntTargetId::new(object_id(28813))),
         Some(DropSiteId::new(object_id(9156))),
         Seconds::new(-10.0),
     );

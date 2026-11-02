@@ -3,7 +3,6 @@
 use crate::GenieError;
 use crate::combat::attack::{Arms, Engagement};
 use crate::construction::MainBuildingId;
-use crate::gathering::DropSiteId;
 use crate::gathering::gather::{GatherRetarget, GatherStart};
 use crate::gathering::hunt::{HuntAction, HuntMove, HuntStart, HuntTask, Quarry};
 use crate::map::Position;
@@ -122,7 +121,7 @@ impl World {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let old = gather.targets();
         let rng = self.streams.get(Stream::Action);
         let took = gather.retarget(
             GatherRetarget {
@@ -136,7 +135,7 @@ impl World {
             mover,
             rng,
         )?;
-        let new = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let new = gather.targets();
         // a farm another farmer works: taken (slot 0x68) and let go again (set_state 11)
         let waits = matches!(
             gather.state,
@@ -214,9 +213,9 @@ impl World {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let old = gather.targets();
         gather.take_move(moved_to, point, player, mover, &walks)?;
-        let new = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let new = gather.targets();
         self.exchange_gather_targets(old, new, by)?;
         Ok(true)
     }
@@ -308,7 +307,7 @@ impl World {
         if let Some(old) = old_target
             && hunt.target.is_none()
         {
-            self.release(old, by)?;
+            self.release(old.id(), by)?;
         }
         if new_second != old_second
             && let Some(new) = new_second

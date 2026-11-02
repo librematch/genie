@@ -308,7 +308,7 @@ impl Unit {
                 "a hunter without its hunt or movement state",
             ));
         };
-        let old = hunt.target;
+        let old = hunt.target.map(crate::gathering::HuntTargetId::id);
         if !hunt.take_move(
             HuntMove {
                 target: None,
@@ -342,7 +342,7 @@ impl Unit {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = gather.target;
+        let old = gather.target.map(crate::gathering::GatherTargetId::id);
         gather.take_move(None, point, player, mover, &walks)?;
         Ok(PointMove::Taken(old))
     }

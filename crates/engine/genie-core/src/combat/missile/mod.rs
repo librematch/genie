@@ -33,6 +33,7 @@ mod hit_mode;
 mod miss_spread;
 mod missile_modes;
 mod missile_state;
+mod missile_target;
 mod projectile_type;
 mod shooter_id;
 mod strike_result;
@@ -43,6 +44,7 @@ pub use self::hit_mode::HitMode;
 pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
+pub use self::missile_target::{MissileTarget, MissileTargetId};
 pub use self::projectile_type::ProjectileType;
 pub use self::shooter_id::{Shooter, ShooterId};
 pub use self::strike_result::StrikeResult;
@@ -149,9 +151,8 @@ impl Origin {
 pub struct MissileAction {
     /// `+0x18`.
     pub state: MissileState,
-    /// The target (`+0x20`, its id `+0x30`) and the object it was fired from (`+0x28`, `+0x34`),
-    /// −1 for none.
-    pub target: Option<ObjectId>,
+    /// The target (`+0x20`, its id `+0x30`), −1 for none.
+    pub target: Option<MissileTargetId>,
     /// The object it was fired from (`+0x28`, its id `+0x34`).
     pub fired_from: Option<ShooterId>,
     /// `+0x38`..`+0x40`: the target's place when fired.
@@ -546,7 +547,7 @@ mod tests {
         };
         let mut a = MissileAction {
             state: MissileState::Launch,
-            target: Some(object_id(9655)),
+            target: Some(MissileTargetId::new(object_id(9655))),
             fired_from: Some(ShooterId::new(object_id(9171))),
             point: Position::ORIGIN,
             timer: Distance::ZERO,

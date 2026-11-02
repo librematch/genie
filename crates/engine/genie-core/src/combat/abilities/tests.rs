@@ -811,7 +811,7 @@ fn keshik(t: &mut World) {
         Point::new(5.5, 5.5),
     );
     let attack = crate::combat::attack::Attack {
-        target: Some(object_id(77)),
+        target: Some(crate::combat::AttackTargetId::new(object_id(77))),
         target2: None,
         state: AttackState::Swing,
         timer: Seconds::ZERO,

@@ -37,7 +37,7 @@ impl BuildAction {
         move_reads: &MoveToReads<'_>,
     ) -> Result<Self, GenieError> {
         Ok(Self {
-            target: to.id,
+            target: to.id.map(crate::construction::FoundationId::new),
             state: BuildState::Move {
                 move_to: task.walk(move_reads, Some(to))?,
             },
@@ -54,7 +54,7 @@ impl BuildAction {
     #[must_use]
     pub(super) const fn restarted(
         &self,
-        target: Option<ObjectId>,
+        target: Option<crate::construction::FoundationId>,
         at: Position,
         move_to: Option<MoveToAction>,
     ) -> Self {

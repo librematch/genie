@@ -180,10 +180,24 @@ impl crate::objects::layers::Action {
     pub(crate) fn attack_target(&self) -> Option<ObjectId> {
         self.list
             .hunt()
-            .map(|h| h.target)
-            .or_else(|| self.list.gather().and_then(|g| g.target).map(Some))
-            .or_else(|| self.list.attack().map(|a| a.target))
-            .or_else(|| self.list.missile().and_then(|a| a.target).map(Some))
+            .map(|h| h.target.map(crate::gathering::HuntTargetId::id))
+            .or_else(|| {
+                self.list
+                    .gather()
+                    .and_then(|g| g.target)
+                    .map(|t| Some(t.id()))
+            })
+            .or_else(|| {
+                self.list
+                    .attack()
+                    .map(|a| a.target.map(crate::combat::AttackTargetId::id))
+            })
+            .or_else(|| {
+                self.list
+                    .missile()
+                    .and_then(|a| a.target)
+                    .map(|t| Some(t.id()))
+            })
             .flatten()
     }
 }

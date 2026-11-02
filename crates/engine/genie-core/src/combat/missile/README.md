@@ -24,6 +24,7 @@ The volleys that fire missiles are in `combat/volley.rs`.
 | [`miss_spread.rs`](miss_spread.rs) | How far a missed missile strays. |
 | [`missile_modes.rs`](missile_modes.rs) | A missile master's modes (`SmartMode`, `VanishMode`). |
 | [`missile_state.rs`](missile_state.rs) | A missile's state: launched, flying, ended. |
+| [`missile_target.rs`](missile_target.rs) | A missile's target as its own type: the object it was fired at. |
 | [`mod.rs`](mod.rs) | The missile (`RGE_Missile_Object`, type 60) and its action (`RGE_Action_Missile`, type 8): a ranged attacker's swing makes one at its weapon offset (`FUN_141081020`, `spawn_point`), its action aims at the target (`FUN_140a9c600`, `aim`; `set_state` 3, `FUN_140a9de70`, `MissileAction::launch`) and flies it each update (`FUN_140a9e6e0`, `MissileAction::fly`) until it hits the target (the shooter's hit, slot 0x860) or the ground. |
 | [`projectile_type.rs`](projectile_type.rs) | A missile master's projectile type. |
 | [`shooter_id.rs`](shooter_id.rs) | A shooter's id as its own type: the object a missile was fired from. |

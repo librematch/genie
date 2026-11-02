@@ -150,7 +150,8 @@ impl Attack {
     /// effect's building target, the range test, the new target) is [`Attack::work`]'s, which
     /// needs the unit's and the target's values.
     pub fn keeps(&self, target: Option<ObjectId>) -> Result<bool, GenieError> {
-        if target == self.target && self.state.keeps_target() {
+        if target == self.target.map(crate::combat::AttackTargetId::id) && self.state.keeps_target()
+        {
             return Ok(true);
         }
         Err(GenieError::unsupported(
@@ -184,7 +185,9 @@ impl Attack {
         {
             target = m;
         }
-        if Some(target.id) == self.target && self.state.keeps_target() {
+        if self.target.map(crate::combat::AttackTargetId::id) == Some(target.id)
+            && self.state.keeps_target()
+        {
             return Worked {
                 kept: true,
                 ..Worked::default()
@@ -214,12 +217,13 @@ impl Attack {
         if target.is_some_and(|t| t.class == CLASS_60) {
             return worked;
         }
-        let new = target.map(|t| t.id);
+        // slot 0x68 gives the Attack its target
+        let new = target.map(|t| crate::combat::AttackTargetId::new(t.id));
         if new != self.target {
             worked.clears_count = true;
         }
         if self.target.is_some() && self.target != new && !self.sub_action {
-            worked.lets_go = self.target;
+            worked.lets_go = self.target.map(crate::combat::AttackTargetId::id);
         }
         if self.target != new {
             self.target = match target {
@@ -227,7 +231,7 @@ impl Attack {
                     if !self.sub_action {
                         worked.takes = Some(t.id);
                     }
-                    Some(t.id)
+                    new
                 }
                 _ => None,
             };

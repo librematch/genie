@@ -25,6 +25,7 @@ use crate::movement::fly::Fly;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
+use crate::objects::RoleId;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::action_type;
 use crate::ownership::artifact::Artifact;
@@ -171,20 +172,17 @@ impl Action {
     /// Artifact not moving to an object, a Fly, an Explore, a Transport, a Make, a wait for a
     /// foundation, which keeps the foundation at `+0x68`).
     #[must_use]
-    pub const fn target(&self) -> Option<ObjectId> {
+    pub fn target(&self) -> Option<ObjectId> {
         match self {
             Self::Artifact(a) => a.target,
-            Self::Build(a) => a.target,
-            Self::Repair(a) => a.target,
+            Self::Build(a) => a.target.map(RoleId::id),
+            Self::Repair(a) => a.target.map(RoleId::id),
             Self::MoveTo(a) => a.target,
-            Self::Hunt(a) => a.target,
-            Self::Gather(a) => a.target,
-            Self::Attack(a) => a.target,
-            Self::Enter(a) => match a.target {
-                Some(t) => Some(t.id()),
-                None => None,
-            },
-            Self::Missile(a) => a.target,
+            Self::Hunt(a) => a.target.map(RoleId::id),
+            Self::Gather(a) => a.target.map(RoleId::id),
+            Self::Attack(a) => a.target.map(RoleId::id),
+            Self::Enter(a) => a.target.map(RoleId::id),
+            Self::Missile(a) => a.target.map(RoleId::id),
             Self::Fly(_)
             | Self::Explore(_)
             | Self::Transport(_)
@@ -197,25 +195,13 @@ impl Action {
     /// or a Build's drop site, a missile's shooter, an Attack's second target; the slice's other
     /// actions hold none (an import checks the save's).
     #[must_use]
-    pub const fn second_target(&self) -> Option<ObjectId> {
+    pub fn second_target(&self) -> Option<ObjectId> {
         match self {
-            Self::Hunt(h) => match h.carry_to {
-                Some(s) => Some(s.id()),
-                None => None,
-            },
-            Self::Gather(g) => match g.carry_to {
-                Some(s) => Some(s.id()),
-                None => None,
-            },
-            Self::Build(b) => match b.site {
-                Some(s) => Some(s.id()),
-                None => None,
-            },
-            Self::Missile(m) => match m.fired_from {
-                Some(s) => Some(s.id()),
-                None => None,
-            },
-            Self::Attack(a) => a.target2,
+            Self::Hunt(h) => h.carry_to.map(RoleId::id),
+            Self::Gather(g) => g.carry_to.map(RoleId::id),
+            Self::Build(b) => b.site.map(RoleId::id),
+            Self::Missile(m) => m.fired_from.map(RoleId::id),
+            Self::Attack(a) => a.target2.map(RoleId::id),
             _ => None,
         }
     }

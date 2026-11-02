@@ -315,8 +315,8 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
         .list
         .set_missile(Some(genie_core::combat::missile::MissileAction {
             state: genie_core::combat::missile::MissileState::of_byte(base.state)?,
-            target: ObjectId::of_field(base.target_id),
-            fired_from: ObjectId::of_field(base.target2_id).map(ShooterId::new),
+            target: genie_core::combat::missile::MissileTargetId::of_field(base.target_id),
+            fired_from: ShooterId::of_field(base.target2_id),
             point: saved.point(),
             timer: Distance::new(base.timer),
             direction: Offset::new(ma.velocity_x, ma.velocity_y, ma.velocity_z),
@@ -370,7 +370,7 @@ fn import_build(
         .transpose()?;
     let task = work(saved.s.master_obj)?;
     actions.list.set_build(Some(BuildAction {
-        target: ObjectId::of_field(base.target_id),
+        target: genie_core::construction::FoundationId::of_field(base.target_id),
         state: genie_core::construction::build::BuildState::of_byte(base.state, move_to)?,
         point: saved.point(),
         task,
@@ -406,7 +406,7 @@ fn import_repair(
     actions
         .list
         .set_repair(Some(genie_core::construction::repair::RepairAction {
-            target: ObjectId::of_field(base.target_id),
+            target: genie_core::construction::RepairTargetId::of_field(base.target_id),
             state: genie_core::construction::repair::RepairState::of_byte(base.state, move_to)?,
             point: saved.point(),
             timer: Seconds::new(base.timer),
@@ -549,7 +549,7 @@ fn import_wait_solidify(
             "a saved Wait_Solidify without its own part",
         ))?
         .target_building_id;
-    let target = ObjectId::try_from(target)?;
+    let target = genie_core::construction::FoundationId::new(ObjectId::try_from(target)?);
     let mut wait =
         genie_core::construction::wait_solidify::WaitSolidify::new(saved.task(task_at)?, target);
     wait.set_state(

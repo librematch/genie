@@ -658,7 +658,7 @@ fn build_takes_its_task_move_to_and_site() {
     assert_eq!(
         (a.target, a.site, walk.target, walk.state, walk.quiet),
         (
-            Some(object_id(30)),
+            Some(genie_core::construction::FoundationId::new(object_id(30))),
             Some(DropSiteId::new(object_id(31))),
             None,
             MoveTo::Moving,
@@ -1209,7 +1209,7 @@ fn wait_solidify_waits_for_its_foundation() {
         .copied()
         .unwrap();
     assert_eq!(
-        (w.state, w.target, w.task.id),
+        (w.state, w.target.id(), w.task.id),
         (
             WaitSolidifyState::Stopped,
             object_id(40),

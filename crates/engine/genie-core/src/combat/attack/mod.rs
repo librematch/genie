@@ -132,10 +132,10 @@ pub struct Arms {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Attack {
     /// The target object (`+0x20`, its id at `+0x30`).
-    pub target: Option<ObjectId>,
+    pub target: Option<crate::combat::AttackTargetId>,
     /// The second target (`+0x28`, its id at `+0x34`): the work command's Attack takes its
     /// target as this too (`FUN_140a7a190`, slot 0x178), −1 for none.
-    pub target2: Option<ObjectId>,
+    pub target2: Option<crate::combat::AttackTargetId>,
     /// The action state (`+0x18`), with its walk's quiet `MoveTo` ([`AttackState`]).
     pub state: AttackState,
     /// `+0x44`: seconds in the state, the update adds dt.

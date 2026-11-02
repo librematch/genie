@@ -220,7 +220,11 @@ impl Unit {
             }
             match action.hit_mode {
                 crate::combat::missile::HitMode::TARGET_ALONE => {
-                    if Some(id) != action.target {
+                    if Some(id)
+                        != action
+                            .target
+                            .map(crate::combat::missile::MissileTargetId::id)
+                    {
                         continue;
                     }
                     let result = self.missile_strike(actions, action, fired, c)?;
@@ -232,10 +236,17 @@ impl Unit {
                     }
                 }
                 crate::combat::missile::HitMode::MISSED => {
-                    if missed_passes(c, (id, player, kind, level), action.target, blast_level) {
+                    let target = action
+                        .target
+                        .map(crate::combat::missile::MissileTargetId::id);
+                    if missed_passes(c, (id, player, kind, level), target, blast_level) {
                         continue;
                     }
-                    if Some(id) != action.target {
+                    if Some(id)
+                        != action
+                            .target
+                            .map(crate::combat::missile::MissileTargetId::id)
+                    {
                         return Err(GenieError::unsupported(
                             "a missed missile meeting another object than its target",
                         ));
@@ -572,7 +583,7 @@ impl Unit {
         let Some(target) = action.target else {
             return Ok(());
         };
-        if action.state == MissileState::Done || action.met.contains(&target) {
+        if action.state == MissileState::Done || action.met.contains(&target.id()) {
             return Ok(());
         }
         let v = victim(c, action.target)?.ok_or(GenieError::unsupported(
@@ -606,9 +617,12 @@ impl Unit {
     ) -> Result<(), GenieError> {
         if let Some(a) = slot.take() {
             let by = self.releaser(c)?;
-            for t in [a.target, a.fired_from.map(ShooterId::id)]
-                .into_iter()
-                .flatten()
+            for t in [
+                a.target.map(crate::combat::missile::MissileTargetId::id),
+                a.fired_from.map(ShooterId::id),
+            ]
+            .into_iter()
+            .flatten()
             {
                 crate::world::lets::release(c, self, t, by)?;
             }

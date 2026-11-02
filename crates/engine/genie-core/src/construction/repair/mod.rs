@@ -112,7 +112,7 @@ impl RepairTask {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct RepairAction {
     /// The target's id (`+0x30`).
-    pub target: Option<ObjectId>,
+    pub target: Option<crate::construction::RepairTargetId>,
     /// The action state (`+0x18`), which word 9 adds, with its quiet `MoveTo` sub-action: to
     /// the target (state 4) or to the point (state 11).
     pub state: RepairState,

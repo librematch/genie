@@ -65,7 +65,7 @@ impl BuildAction {
         if !desolid {
             return self.join(c, builder);
         }
-        let site = FoundationId::new(self.target.ok_or(SITE_GONE)?);
+        let site = self.target.ok_or(SITE_GONE)?;
         let placed = *c.w.spatial.get_known(site)?.ok_or(SITE_GONE)?;
         let clearing = ClearingSite {
             player: placed.player,
@@ -127,15 +127,12 @@ impl BuildAction {
         let (sx, sy) = (placed.position.x(), placed.position.y());
         let inside = (bx - sx).abs() <= placed.radius.x() && (by - sy).abs() <= placed.radius.y();
         if inside {
-            return self.clear(c, builder);
+            return self.clear(c, builder, site.id());
         }
         if let Some(annex) = self.annex_beneath(c, builder, placed.radius)? {
-            // set_state(223) with the annex as the target: the walk off the annex's footprint;
-            // the foundation is the target again
-            let site = self.target.replace(annex);
-            let walk = self.clear(c, builder);
-            self.target = site;
-            return walk;
+            // set_state(223) with the annex as the target, which the foundation replaces again
+            // after it: the walk off the annex's footprint
+            return self.clear(c, builder, annex);
         }
         self.wait_or_halt(c, builder, reads)
     }
@@ -357,7 +354,9 @@ impl BuildAction {
         Ok(())
     }
 
-    /// `set_state(223)`: a quiet `MoveTo` to the free tile beside the footprint (`FUN_1411566b0`,
+    /// `set_state(223)`: a quiet `MoveTo` to the free tile beside the footprint of `footprint`
+    /// (`FUN_1411566b0`; the foundation, or the annex beneath the builder that `+0x20` holds for
+    /// the `set_state` only),
     /// `FUN_140aa0d30` with the task's moving sprite, [`MoveToReads::to_point`]); it starts in
     /// state 3, as a `MoveTo` to a point is far from it (`FUN_140aa2100`), in 13 for a unit
     /// without speed.
@@ -368,7 +367,12 @@ impl BuildAction {
     /// tile beside it, and a sprite the table lacks.
     ///
     /// [`MoveToReads::to_point`]: crate::movement::move_to::MoveToReads::to_point
-    pub(super) fn clear(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
+    pub(super) fn clear(
+        &mut self,
+        c: &mut Step<'_>,
+        builder: &Unit,
+        footprint: ObjectId,
+    ) -> Result<(), GenieError> {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -376,7 +380,7 @@ impl BuildAction {
             &c.w.parts,
         );
         let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
-        let site = c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
+        let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
         let at = builder.position();
         let spot =

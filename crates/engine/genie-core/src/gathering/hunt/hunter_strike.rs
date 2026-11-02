@@ -195,7 +195,10 @@ impl Unit {
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
-        let (me_at, them) = (at(Some(self.id))?, at(action.target)?);
+        let (me_at, them) = (
+            at(Some(self.id))?,
+            at(action.target.map(crate::gathering::HuntTargetId::id))?,
+        );
         let speed =
             c.w.parts
                 .mover_of(self.id)
@@ -281,10 +284,15 @@ impl Unit {
 /// Attack reads none (state 7's end without a target): a stand-in no object holds
 /// ([`ObjectId::NOBODY`]).
 fn hunt_victim(c: &Step<'_>, action: &HuntAction) -> Result<Victim, GenieError> {
-    let target = match action.target {
-        None => action.state.attack().and_then(|a| a.target),
-        t => t,
-    };
+    let target = action.target.map_or_else(
+        || {
+            action
+                .state
+                .attack()
+                .and_then(|a| a.target.map(crate::combat::AttackTargetId::id))
+        },
+        |t| Some(t.id()),
+    );
     match target {
         None => Ok(Victim {
             id: ObjectId::NOBODY,

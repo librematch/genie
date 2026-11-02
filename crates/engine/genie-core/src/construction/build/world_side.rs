@@ -168,10 +168,10 @@ impl crate::world::World {
     /// What the starts and the completion do not model.
     pub(crate) fn work_building(
         &mut self,
-        id: ObjectId,
+        id: crate::construction::FoundationId,
         amount: Seconds,
     ) -> Result<bool, GenieError> {
-        let mut at = id;
+        let mut at = id.id();
         loop {
             for annex in self.objects().annexes(at).ids() {
                 let Some((q, a)) = self.object(annex) else {
@@ -424,7 +424,8 @@ impl crate::world::World {
         let (id, _) = self.make_building(p, master, ai, at)?;
         if flagged {
             self.clear_footprint(p, master, at.ground(), true)?;
-            let _ = self.work_building(id, STACK_WORK)?;
+            // the building made on a flagged stack is the foundation its work builds
+            let _ = self.work_building(crate::construction::FoundationId::new(id), STACK_WORK)?;
         }
         if made.auto_gather {
             if self.players.player(p)?.objects.last().map(|u| u.id) != Some(id) {

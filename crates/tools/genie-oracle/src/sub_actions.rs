@@ -130,8 +130,8 @@ pub(super) fn saved_attack(
         }
     };
     Ok(genie_core::combat::attack::Attack {
-        target: ObjectId::of_field(b.target_id),
-        target2: ObjectId::of_field(b.target2_id),
+        target: genie_core::combat::AttackTargetId::of_field(b.target_id),
+        target2: genie_core::combat::AttackTargetId::of_field(b.target2_id),
         state: genie_core::combat::attack::AttackState::of_byte(b.state, move_to)?,
         timer: Seconds::new(b.timer),
         range: Distance::new(a.range),

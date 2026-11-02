@@ -10,6 +10,7 @@ mod foundation_id;
 pub(crate) mod gates;
 mod main_building_id;
 pub mod repair;
+mod repair_target;
 pub mod wait_solidify;
 mod wait_solidify_state;
 
@@ -18,3 +19,4 @@ pub use self::builder_count::BuilderCount;
 pub use self::footprint_waits::FootprintWaits;
 pub use self::foundation_id::{Foundation, FoundationId};
 pub use self::main_building_id::{MainBuilding, MainBuildingId};
+pub use self::repair_target::{RepairTarget, RepairTargetId};

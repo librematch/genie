@@ -1272,7 +1272,7 @@ mod tests {
             .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify {
                 state: WaitSolidifyState::Waiting,
                 task: waiting,
-                target: object_id(10028),
+                target: crate::construction::FoundationId::new(object_id(10028)),
             }));
         t.actions_take_master(Place::Live(PlayerId::new(1), ListIndex::new(0)), &old, &new)
             .unwrap();

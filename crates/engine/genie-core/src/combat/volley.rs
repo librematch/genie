@@ -516,7 +516,10 @@ impl Unit {
         // its action: the target and the shooter taken (slot 0x178), then the start
         let mut action = crate::combat::missile::MissileAction {
             state: crate::combat::missile::MissileState::New,
-            target: aimed.target,
+            // the volley gives the missile its aim as its target
+            target: aimed
+                .target
+                .map(crate::combat::missile::MissileTargetId::new),
             fired_from: shot.shooter.then_some(ShooterId::new(self.id)),
             point: shot.point,
             timer: Distance::ZERO,

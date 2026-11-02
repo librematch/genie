@@ -7,7 +7,6 @@ use genie_core::GenieError;
 use genie_core::gathering::DropSiteId;
 use genie_core::map::Point;
 use genie_core::movement::move_to::MOVE_TO;
-use genie_core::objects::ObjectId;
 use genie_core::objects::layers;
 use genie_core::objects::masters::{ClassId, Task};
 use genie_core::players::Amount;
@@ -102,7 +101,7 @@ pub(super) fn import_hunt(
         }
     };
     let hunt = HuntAction {
-        target: ObjectId::of_field(base.target_id),
+        target: genie_core::gathering::HuntTargetId::of_field(base.target_id),
         state: HuntState::of_byte(base.state, walk, attack)?,
         point: saved.point(),
         target_class,
@@ -190,7 +189,7 @@ pub(super) fn import_gather(
     let state = GatherState::of_byte(base.state, walk)?;
     let task = hunt_task(&saved.task(task_at)?);
     let gather = GatherAction {
-        target: ObjectId::of_field(base.target_id),
+        target: genie_core::gathering::GatherTargetId::of_field(base.target_id),
         carry_to: DropSiteId::of_field(base.target2_id),
         state,
         point: saved.point(),

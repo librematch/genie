@@ -39,7 +39,7 @@ impl Attack {
     /// (slot 0x7d0's sprite).
     pub(crate) fn own(target: ObjectId, e: &Engagement, arms: Arms) -> Self {
         Self {
-            target: Some(target),
+            target: Some(crate::combat::AttackTargetId::new(target)),
             target2: None,
             state: AttackState::New,
             timer: Seconds::ZERO,

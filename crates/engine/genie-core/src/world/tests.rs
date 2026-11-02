@@ -2367,7 +2367,7 @@ fn task_target_reads_an_annex_as_its_main_building() {
 fn wait_for_foundation_switches_the_villager_and_holds_the_task() {
     let mut t = sent_off_world(vec![]);
     let wait = Wait {
-        target: object_id(10028),
+        target: FoundationId::new(object_id(10028)),
         task: task(action_type::BUILD),
         switch: Some(ids::BUILDER),
     };
@@ -2379,7 +2379,7 @@ fn wait_for_foundation_switches_the_villager_and_holds_the_task() {
         t.parts.actions_of(v.id).list.wait_solidify().copied(),
         Some(crate::construction::wait_solidify::WaitSolidify::new(
             task(action_type::BUILD),
-            object_id(10028)
+            FoundationId::new(object_id(10028))
         ))
     );
     assert_eq!(
@@ -2469,10 +2469,13 @@ fn wait_reads_its_foundation_build_points_wherever_it_is() {
     );
     let sites = &t.parts.building;
     assert_eq!(
-        wait_progress(object_id(10028), own, sites),
+        wait_progress(FoundationId::new(object_id(10028)), own, sites),
         Some(Seconds::ZERO)
     );
-    assert_eq!(wait_progress(object_id(77), own, sites), None);
+    assert_eq!(
+        wait_progress(FoundationId::new(object_id(77)), own, sites),
+        None
+    );
     // another player's (player 0 updating, player 1 after it)
     let other = Foreign {
         before: none,
@@ -2481,7 +2484,7 @@ fn wait_reads_its_foundation_build_points_wherever_it_is() {
     };
     assert_eq!(
         wait_progress(
-            object_id(10028),
+            FoundationId::new(object_id(10028)),
             OthersRef::new(
                 PlayerId::new(0),
                 &ObjectList::default(),
@@ -2537,7 +2540,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
     }
     t.link_test_annex(object_id(10031), object_id(10028));
     assert_eq!(
-        t.work_building(object_id(10031), Seconds::new(0.021)),
+        t.work_building(FoundationId::new(object_id(10031)), Seconds::new(0.021)),
         Ok(true)
     );
     let c = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
@@ -2615,7 +2618,7 @@ fn work_command_on_damaged_building_starts_repair() {
             r.task.work_value
         ),
         (
-            Some(object_id(10028)),
+            Some(crate::construction::RepairTargetId::new(object_id(10028))),
             RepairState::Move { move_to: None },
             Distance::new(0.5),
             TaskId::test(4),
@@ -2718,7 +2721,7 @@ fn work_command_on_another_building_moves_the_repair_there() {
     assert_eq!(
         (r.target, r.state.bare(), r.counted, r.point),
         (
-            Some(object_id(10031)),
+            Some(crate::construction::RepairTargetId::new(object_id(10031))),
             RepairState::Move { move_to: None },
             false,
             Position::new(34.0, 88.0, 0.0)
@@ -2776,7 +2779,7 @@ fn work_command_on_foundation_starts_build_as_its_builder() {
             b.added
         ),
         (
-            Some(object_id(10028)),
+            Some(FoundationId::new(object_id(10028))),
             BuildState::Move { move_to: None },
             Some(10028),
             Position::new(30.0, 88.0, 0.0),
@@ -2989,7 +2992,7 @@ fn work_command_on_the_build_own_foundation_keeps_the_work_or_walks_again() {
             BuildState::Move { move_to: None },
             false,
             Some(MoveTo::Arrived),
-            Some(object_id(10028))
+            Some(FoundationId::new(object_id(10028)))
         )
     );
     assert_eq!(
@@ -3087,7 +3090,7 @@ fn work_command_on_another_foundation_moves_the_build_there() {
                 .map(|m| ObjectId::field(m.target))
         ),
         (
-            Some(object_id(10031)),
+            Some(FoundationId::new(object_id(10031))),
             BuildState::Move { move_to: None },
             false,
             Position::new(34.0, 88.0, 0.0),
@@ -3151,7 +3154,7 @@ fn queued_order_on_target_works_on_it_with_the_order_priority() {
             .actions_of(v.id)
             .list
             .build()
-            .map(|b| (b.target, b.state.bare())),
+            .map(|b| (b.target.map(FoundationId::id), b.state.bare())),
         Some((Some(object_id(10028)), BuildState::Move { move_to: None }))
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
@@ -3402,7 +3405,7 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
             g.task.id
         ),
         (
-            Some(object_id(600)),
+            Some(crate::gathering::GatherTargetId::new(object_id(600))),
             None,
             GatherState::Walk { move_to: None },
             Position::new(32.5, 89.5, 0.0),
@@ -3448,7 +3451,7 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
     assert_eq!(
         (g.target, g.state.bare(), g.point),
         (
-            Some(object_id(601)),
+            Some(crate::gathering::GatherTargetId::new(object_id(601))),
             GatherState::Walk { move_to: None },
             Position::new(36.5, 89.5, 0.0)
         )
@@ -3519,7 +3522,7 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
     assert_eq!(
         (g.target, g.state.bare(), g.task.id),
         (
-            Some(object_id(600)),
+            Some(crate::gathering::GatherTargetId::new(object_id(600))),
             GatherState::Walk { move_to: None },
             TaskId::test(2)
         )
@@ -3536,7 +3539,7 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
             .list
             .gather()
             .map(|g| g.target),
-        Some(Some(object_id(601)))
+        Some(Some(crate::gathering::GatherTargetId::new(object_id(601))))
     );
     assert_eq!(
         (
@@ -3984,7 +3987,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
     assert_eq!(
         (g.target, g.task.id, g.point),
         (
-            Some(object_id(800)),
+            Some(crate::gathering::GatherTargetId::new(object_id(800))),
             TaskId::test(3),
             Position::new(29.5, 89.5, 0.0)
         )
@@ -4139,7 +4142,10 @@ fn the_unit_ai_moves_and_works_apply_in_order() {
             .list
             .gather()
             .map(|g| (g.target, g.state.bare())),
-        Some((Some(object_id(601)), GatherState::Walk { move_to: None }))
+        Some((
+            Some(crate::gathering::GatherTargetId::new(object_id(601))),
+            GatherState::Walk { move_to: None }
+        ))
     );
     assert_eq!(t.parts.actions_of(v.id).list.move_to().copied(), None);
     // a unit that does not move cannot be moved to an object
@@ -4179,7 +4185,7 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
             .list
             .hunt()
             .map(|h| h.target),
-        Some(Some(object_id(500)))
+        Some(Some(crate::gathering::HuntTargetId::new(object_id(500))))
     );
     with_effects(&mut t, vec![Effect::Stop]).unwrap();
     assert_eq!(
@@ -4199,7 +4205,11 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(v.life.master_id, ids::BUILDER);
     assert_eq!(
-        t.parts.actions_of(v.id).list.build().map(|b| b.target),
+        t.parts
+            .actions_of(v.id)
+            .list
+            .build()
+            .map(|b| b.target.map(FoundationId::id)),
         Some(Some(object_id(10028)))
     );
     let mut t = sent_off_world(vec![]);
@@ -4218,7 +4228,11 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
     with_effects(&mut t, vec![Effect::OrderOnTarget(order)]).unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts.actions_of(v.id).list.build().map(|b| b.target),
+        t.parts
+            .actions_of(v.id)
+            .list
+            .build()
+            .map(|b| b.target.map(FoundationId::id)),
         Some(Some(object_id(10028)))
     );
     assert_eq!(
@@ -4230,7 +4244,11 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
     assert_eq!(with_effects(&mut t, twice), Ok(()));
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts.actions_of(v.id).list.build().map(|b| b.target),
+        t.parts
+            .actions_of(v.id)
+            .list
+            .build()
+            .map(|b| b.target.map(FoundationId::id)),
         Some(Some(object_id(10028)))
     );
     let mut t = sent_off_world(vec![]);
@@ -4319,7 +4337,7 @@ fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
     let (regen, build, (priority, queued, look)) = run(vec![order]);
     assert_eq!(
         (build, priority, queued),
-        (Some(Some(object_id(10028))), 3, 0)
+        (Some(Some(FoundationId::new(object_id(10028)))), 3, 0)
     );
     assert_eq!(regen, idle_regen);
     assert!(
@@ -5035,13 +5053,17 @@ fn work_command_on_another_deer_moves_the_hunt_there() {
     let h = t.parts.actions_of(v.id).list.hunt().copied().unwrap();
     assert_eq!(
         (h.target, h.carry_to, h.target_class),
-        (Some(object_id(501)), None, Some(class::PREY))
+        (
+            Some(crate::gathering::HuntTargetId::new(object_id(501))),
+            None,
+            Some(class::PREY)
+        )
     );
     assert_eq!(
         (h.state.bare(), h.state.attack().copied().map(|a| a.target)),
         (
             HuntState::Attack { attack: None },
-            Some(Some(object_id(501)))
+            Some(Some(crate::combat::AttackTargetId::new(object_id(501))))
         )
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
@@ -5329,7 +5351,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
         (h.state.bare(), h.target, h.carry_to),
         (
             HuntState::Attack { attack: None },
-            Some(object_id(500)),
+            Some(crate::gathering::HuntTargetId::new(object_id(500))),
             None
         )
     );
@@ -5835,7 +5857,7 @@ fn hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_near_one() {
         (h.state.bare(), h.target, h.drop_site),
         (
             HuntState::Lead,
-            Some(object_id(510)),
+            Some(crate::gathering::HuntTargetId::new(object_id(510))),
             Some(DropSiteId::new(object_id(700)))
         )
     );
@@ -5872,7 +5894,7 @@ fn hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_near_one() {
         (h.state.bare(), h.state.attack().copied().map(|a| a.target)),
         (
             HuntState::Attack { attack: None },
-            Some(Some(object_id(510)))
+            Some(Some(crate::combat::AttackTargetId::new(object_id(510))))
         )
     );
 }
@@ -6467,7 +6489,10 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
         .unwrap();
     assert_eq!(
         (h.target, h.state.attack().copied().map(|a| a.target)),
-        (Some(object_id(520)), Some(Some(object_id(520))))
+        (
+            Some(crate::gathering::HuntTargetId::new(object_id(520))),
+            Some(Some(crate::combat::AttackTargetId::new(object_id(520))))
+        )
     );
     assert_eq!(
         t.players[0].objects[ListIndex::new(2)].workers,
@@ -6516,7 +6541,10 @@ fn hunt_whose_attack_failed_takes_near_tree_or_searches() {
         .unwrap();
     assert_eq!(
         (h.target, h.state.attack().copied().map(|a| a.target)),
-        (Some(object_id(520)), Some(Some(object_id(520))))
+        (
+            Some(crate::gathering::HuntTargetId::new(object_id(520))),
+            Some(Some(crate::combat::AttackTargetId::new(object_id(520))))
+        )
     );
     for (near, target_class) in [(39.0, class::TREE), (31.5, class_id(99))] {
         let mut t = lumber_world(near);
@@ -6600,7 +6628,7 @@ fn the_unit_ai_repair_order_switches_villager_to_the_repairer() {
     assert_eq!(
         (r.target, r.state.bare(), r.range, r.task.id),
         (
-            Some(object_id(10028)),
+            Some(crate::construction::RepairTargetId::new(object_id(10028))),
             RepairState::Move { move_to: None },
             Distance::new(0.5),
             TaskId::test(4)
@@ -6699,7 +6727,9 @@ fn the_unit_ai_repair_command_is_the_unit_within_its_run() {
         Ok((
             true,
             156,
-            Some(Some(object_id(10028))),
+            Some(Some(crate::construction::RepairTargetId::new(object_id(
+                10028
+            )))),
             Some(object_id(10028))
         ))
     );
@@ -7710,7 +7740,7 @@ fn the_build_command_at_once_matches_the_one_after_the_update() {
             .actions_of(b.id)
             .list
             .build()
-            .is_some_and(|build| build.target == Some(object_id(10028)))
+            .is_some_and(|build| build.target == Some(FoundationId::new(object_id(10028))))
     );
     assert_eq!(
         (
@@ -7971,7 +8001,7 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
             .actions_of(b.id)
             .list
             .hunt()
-            .is_some_and(|h| h.target == Some(object_id(500)))
+            .is_some_and(|h| h.target == Some(crate::gathering::HuntTargetId::new(object_id(500))))
     );
     assert_eq!(
         (
@@ -11657,7 +11687,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .list
         .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify::new(
             crate::objects::masters::Task::default(),
-            object_id(10028),
+            FoundationId::new(object_id(10028)),
         )));
     t.clear_actions(PlayerId::new(1), ListIndex::new(2))
         .unwrap();
@@ -11680,7 +11710,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .unwrap()
         .list
         .set_build(Some(BuildAction {
-            target: Some(object_id(10028)),
+            target: Some(FoundationId::new(object_id(10028))),
             state: BuildState::Idle,
             point: Position::new(-1.0, -1.0, -1.0),
             task: BuildTask {
@@ -11820,7 +11850,7 @@ fn deaths_world() -> World {
         .list
         .set_hunt(Some(crate::gathering::hunt::tests::hunting(60)));
     layers[2].list.set_build(Some(BuildAction {
-        target: Some(object_id(10028)),
+        target: Some(FoundationId::new(object_id(10028))),
         state: BuildState::Place,
         point: Position::new(-1.0, -1.0, -1.0),
         task: BuildTask {
@@ -15443,8 +15473,8 @@ fn mover_unit(
 /// A unit's own Attack on `target` (second target `target2`) in `state`, without a `MoveTo`.
 fn own_attack(target: i32, target2: i32, state: AttackState) -> crate::combat::attack::Attack {
     crate::combat::attack::Attack {
-        target: ObjectId::of_field(target),
-        target2: ObjectId::of_field(target2),
+        target: crate::combat::AttackTargetId::of_field(target),
+        target2: crate::combat::AttackTargetId::of_field(target2),
         state,
         timer: Seconds::ZERO,
         range: Distance::ZERO,
@@ -15817,7 +15847,7 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
         .list
         .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify::new(
             crate::objects::masters::Task::default(),
-            object_id(10028),
+            FoundationId::new(object_id(10028)),
         )));
     let none = Graphics::new();
     assert_eq!(
@@ -16366,7 +16396,7 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
             .actions
             .list
             .attack()
-            .is_some_and(|a| a.target == Some(object_id(50)))
+            .is_some_and(|a| a.target == Some(crate::combat::AttackTargetId::new(object_id(50))))
     );
     // the owner's attribute 4 (10 before) as the attack command returns
     assert_eq!(housed, 10.0 - 1.0 + 3.0);
@@ -16649,7 +16679,7 @@ fn an_attack_command_on_its_own_attack_target_asks_that_attack_again() {
         (a.state, a.target, a.seen),
         (
             AttackState::Done,
-            Some(object_id(50)),
+            Some(crate::combat::AttackTargetId::new(object_id(50))),
             Position::new(10.5, 10.0, 0.0)
         )
     );
@@ -17072,7 +17102,11 @@ fn farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
     let farmer = &p.objects[ListIndex::new(0)];
     assert_eq!(farmer.life.master_id, ids::BUILDER);
     assert_eq!(
-        t.parts.actions_of(farmer.id).list.build().map(|b| b.target),
+        t.parts
+            .actions_of(farmer.id)
+            .list
+            .build()
+            .map(|b| b.target.map(FoundationId::id)),
         Some(Some(object_id(10028)))
     );
     assert!(t.parts.actions_of(farmer.id).list.gather().is_none());
@@ -17266,7 +17300,7 @@ fn reseed_placement_passes_over_the_old_farm() {
                 .list
                 .gather_mut()
                 .unwrap()
-                .target = ObjectId::of_field(target);
+                .target = crate::gathering::GatherTargetId::of_field(target);
         }
     };
     assert_eq!(reseeded(old_farm(12557)), (Ok(true), 3));
@@ -17734,7 +17768,7 @@ fn build_of_another_player_builders_is_refused_and_theirs_are_left_out() {
             .actions_of(p.objects[ListIndex::new(0)].id)
             .list
             .build()
-            .map(|b| b.target),
+            .map(|b| b.target.map(FoundationId::id)),
         Some(Some(object_id(10028)))
     );
     assert_eq!(
@@ -18467,7 +18501,10 @@ fn forager_fills_up_carries_its_berries_home_and_comes_back() {
                 );
                 assert_eq!(
                     (g.target, g.carry_to),
-                    (Some(object_id(600)), Some(DropSiteId::new(object_id(700))))
+                    (
+                        Some(crate::gathering::GatherTargetId::new(object_id(600))),
+                        Some(DropSiteId::new(object_id(700)))
+                    )
                 );
             }
         }
@@ -18492,7 +18529,13 @@ fn forager_fills_up_carries_its_berries_home_and_comes_back() {
         .gather()
         .copied()
         .unwrap();
-    assert_eq!((g.target, g.carry_to), (Some(object_id(600)), None));
+    assert_eq!(
+        (g.target, g.carry_to),
+        (
+            Some(crate::gathering::GatherTargetId::new(object_id(600))),
+            None
+        )
+    );
 }
 
 /// A bush that dies under its forager (past state 6) is let go (its worker leaves) and the
@@ -18602,7 +18645,10 @@ fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
     };
     assert_eq!(
         carrying(true),
-        Some((GatherState::Walk { move_to: None }, Some(object_id(601))))
+        Some((
+            GatherState::Walk { move_to: None },
+            Some(crate::gathering::GatherTargetId::new(object_id(601)))
+        ))
     );
     assert_eq!(
         carrying(false),
@@ -18785,7 +18831,13 @@ fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
             |unit, actions, c| {
                 let by = unit.releaser(c)?;
                 let r = unit
-                    .gather_next(actions, c, next, old, by)
+                    .gather_next(
+                        actions,
+                        c,
+                        next,
+                        (old.0.map(crate::gathering::GatherTargetId::new), old.1),
+                        by,
+                    )
                     .and_then(|code| unit.end_head_update(actions, c, code));
                 // the objects let go, as the update leaves them
                 let released = [600, 700]
@@ -18799,7 +18851,10 @@ fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
                             })
                     })
                     .collect();
-                let gather = actions.list.gather().map(|g| (g.target, g.state));
+                let gather = actions
+                    .list
+                    .gather()
+                    .map(|g| (g.target.map(crate::gathering::GatherTargetId::id), g.state));
                 Ok((r, released, gather))
             },
         )
@@ -19605,7 +19660,7 @@ fn hunt_after(t: &World) -> (Option<(HuntState, i32, i32)>, [i32; 2]) {
         h.map(|h| {
             (
                 h.state.bare(),
-                ObjectId::field(h.target),
+                ObjectId::field(h.target.map(crate::gathering::HuntTargetId::id)),
                 ObjectId::field(h.carry_to.map(DropSiteId::id)),
             )
         }),
@@ -19854,7 +19909,10 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
         .list
         .build_mut()
         .unwrap();
-    (b.target, b.state) = (Some(object_id(700)), BuildState::Finished);
+    (b.target, b.state) = (
+        Some(FoundationId::new(object_id(700))),
+        BuildState::Finished,
+    );
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     centre.workers = crate::objects::WorkerCount::of_data(1);
     let centre = centre.id;
@@ -19961,7 +20019,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
         .list
         .build_mut()
         .unwrap();
-    (b.target, b.state, b.added) = (ObjectId::of_field(site), BuildState::Place, true);
+    (b.target, b.state, b.added) = (FoundationId::of_field(site), BuildState::Place, true);
     b.task = BuildTask {
         range: Distance::new(0.1),
         work_value: crate::objects::masters::WorkValue::new(1.0),
@@ -21284,7 +21342,10 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         ),
         (
             Some(crate::gathering::gather::GATHER),
-            Some((Some(object_id(600)), GatherState::Walk { move_to: None }))
+            Some((
+                Some(crate::gathering::GatherTargetId::new(object_id(600))),
+                GatherState::Walk { move_to: None }
+            ))
         )
     );
     assert_eq!(
@@ -21318,10 +21379,14 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         .list
         .gather_mut()
         .unwrap()
-        .target = Some(object_id(10028));
+        .target = Some(crate::gathering::GatherTargetId::new(object_id(10028)));
     assert_eq!(
         followed(&mut t, Next::Build),
-        Ok((Some(1), None, Some(Some(object_id(10028)))))
+        Ok((
+            Some(1),
+            None,
+            Some(Some(FoundationId::new(object_id(10028))))
+        ))
     );
     let builder = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(

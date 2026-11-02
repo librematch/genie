@@ -337,7 +337,7 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     assert_eq!(
         (a.target, a.state.bare()),
         (
-            Some(object_id(700)),
+            Some(genie_core::combat::AttackTargetId::new(object_id(700))),
             AttackState::GotoSeen { move_to: None }
         )
     );

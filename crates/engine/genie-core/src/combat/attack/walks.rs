@@ -82,7 +82,7 @@ impl Attack {
             return Err(ATTACK_WITHOUT_TARGET.with("state", self.state));
         }
         let to = WalkTo {
-            id: self.target,
+            id: self.target.map(crate::combat::AttackTargetId::id),
             at,
             gap,
             state: None,

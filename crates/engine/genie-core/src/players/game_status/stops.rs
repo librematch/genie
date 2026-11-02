@@ -177,7 +177,10 @@ impl World {
             &self.graphics,
         );
         // the target, then the second target
-        let released = [hunt.target, hunt.carry_to.map(DropSiteId::id)];
+        let released = [
+            hunt.target.map(crate::gathering::HuntTargetId::id),
+            hunt.carry_to.map(DropSiteId::id),
+        ];
         hunt.set_target(None);
         hunt.carry_to = None;
         hunt.point = Position::from([-1.0; 3]);
@@ -302,11 +305,15 @@ impl World {
             .build_mut()
             .ok_or(NO_TOP_ACTION)?;
         let foundation = build.target;
-        let (counted, targets) = build.halt(self.parts.motion.mover_mut(unit.id))?;
+        let (counted, target, site) = build.halt(self.parts.motion.mover_mut(unit.id))?;
         if counted {
             self.leave_builders(foundation)?;
         }
         self.standing_sprite(p, idx)?;
+        let targets = [
+            target.map(crate::construction::FoundationId::id),
+            site.map(DropSiteId::id),
+        ];
         for t in targets.into_iter().flatten() {
             self.release(t, by)?;
         }

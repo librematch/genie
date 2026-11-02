@@ -86,7 +86,7 @@ const UNSEEN_SITE: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct BuildAction {
     /// The foundation's id; none once it is gone.
-    pub target: Option<ObjectId>,
+    pub target: Option<crate::construction::FoundationId>,
     /// The action state (`+0x18`), which word 9 adds, with its sub-action list's `MoveTo`
     /// (`+0x50`): to the foundation (`set_state(4)`), to the drop site (8), to its point (11) or
     /// off the footprint (223).
@@ -699,7 +699,10 @@ mod stack_tests {
         }
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
         assert_eq!(
-            t.work_building(object_id(8759), Seconds::new(1.0)),
+            t.work_building(
+                crate::construction::FoundationId::new(object_id(8759)),
+                Seconds::new(1.0)
+            ),
             Ok(false)
         );
         assert_eq!(
@@ -729,7 +732,10 @@ mod stack_tests {
     fn town_centre_foundation_completes_into_the_town_centre_and_its_annexes() {
         let mut t = world();
         assert_eq!(
-            t.work_building(object_id(8759), Seconds::new(1.0)),
+            t.work_building(
+                crate::construction::FoundationId::new(object_id(8759)),
+                Seconds::new(1.0)
+            ),
             Ok(false)
         );
         let ids: Vec<(i32, i16, ObjectState)> = t.players[1]
@@ -921,7 +927,10 @@ mod stack_tests {
             .unwrap()
             .attacking_units = vec![object_id(99_999)];
         assert_eq!(
-            gone.work_building(object_id(8759), Seconds::new(1.0)),
+            gone.work_building(
+                crate::construction::FoundationId::new(object_id(8759)),
+                Seconds::new(1.0)
+            ),
             Ok(false)
         );
         let mut held = world();
@@ -931,7 +940,10 @@ mod stack_tests {
             .unwrap()
             .attacking_units = vec![first];
         assert_eq!(
-            held.work_building(object_id(8759), Seconds::new(1.0)),
+            held.work_building(
+                crate::construction::FoundationId::new(object_id(8759)),
+                Seconds::new(1.0)
+            ),
             Err(GenieError::unsupported(
                 "a stack unit's completion with other players' units on it (+0xce0)"
             ))

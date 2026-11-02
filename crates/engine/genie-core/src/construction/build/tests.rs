@@ -558,7 +558,11 @@ fn stop_halts_the_build_and_lets_its_foundation_go() {
     };
     assert_eq!(
         b.halt(Some(&mut mover)),
-        Ok((true, [Some(object_id(31148)), None]))
+        Ok((
+            true,
+            Some(crate::construction::FoundationId::new(object_id(31148))),
+            None
+        ))
     );
     assert_eq!(
         (b.state, b.added, b.state.move_to().copied(), b.target),
@@ -571,7 +575,14 @@ fn stop_halts_the_build_and_lets_its_foundation_go() {
         state: BuildState::Work,
         ..started(object_id(31150), Position::ORIGIN, Distance::ZERO, TASK)
     };
-    assert_eq!(idle.halt(None), Ok((false, [Some(object_id(31150)), None])));
+    assert_eq!(
+        idle.halt(None),
+        Ok((
+            false,
+            Some(crate::construction::FoundationId::new(object_id(31150))),
+            None
+        ))
+    );
 }
 
 /// The Build's constructor (`FUN_140aad4e0`) and `set_state(4)` take the foundation's place
@@ -613,8 +624,13 @@ fn builder_sent_to_another_foundation_starts_over() {
         .state
         .move_to()
         .copied();
-    b.retarget(object_id(31150), Position::ORIGIN, walk, None)
-        .unwrap();
+    b.retarget(
+        crate::construction::FoundationId::new(object_id(31150)),
+        Position::ORIGIN,
+        walk,
+        None,
+    )
+    .unwrap();
     // set_state(4) keeps the timer
     assert_eq!(
         b,
@@ -852,7 +868,10 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let house = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
     let mut t = site_world(world, vec![master], vec![house]);
     assert_eq!(
-        t.work_building(object_id(10026), Seconds::new(0.02)),
+        t.work_building(
+            crate::construction::FoundationId::new(object_id(10026)),
+            Seconds::new(0.02)
+        ),
         Ok(false)
     );
     let h = t.players[1].objects.by_id(object_id(10026)).unwrap();
@@ -1020,7 +1039,10 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
     );
     let rate = 1.0f32 * 1.0 * 0.021;
     assert_eq!(
-        t.work_building(object_id(10028), Seconds::new(rate)),
+        t.work_building(
+            crate::construction::FoundationId::new(object_id(10028)),
+            Seconds::new(rate)
+        ),
         Ok(true)
     );
     let h = t.players[1].objects.by_id(object_id(10028)).unwrap();
@@ -1101,7 +1123,10 @@ fn the_work_starts_the_desolid_annexes_first() {
         t.link_test_annex(object_id(post), object_id(10028));
     }
     assert_eq!(
-        t.work_building(object_id(10028), Seconds::new(0.021)),
+        t.work_building(
+            crate::construction::FoundationId::new(object_id(10028)),
+            Seconds::new(0.021)
+        ),
         Ok(true)
     );
     let site = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
@@ -1224,7 +1249,10 @@ fn an_annex_work_goes_to_its_main_building() {
             built_master(master_id(1192), &Vec::new()),
         ];
         let mut t = site_world(world, masters, vec![gate, post]);
-        let going = t.work_building(object_id(10029), Seconds::new(amount));
+        let going = t.work_building(
+            crate::construction::FoundationId::new(object_id(10029)),
+            Seconds::new(amount),
+        );
         let post = t.players[1].objects.by_id(object_id(10029)).unwrap();
         assert_eq!(
             (t.parts.building_of(post.id).construction, post.life.hp),

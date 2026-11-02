@@ -61,6 +61,8 @@ use crate::world::{Player, World};
 const BUILDER: ObjectId = object_id(5);
 /// Its foundation, a house.
 const HOUSE: ObjectId = object_id(10028);
+/// The house as the Build's foundation.
+const HOUSE_SITE: crate::construction::FoundationId = crate::construction::FoundationId::new(HOUSE);
 /// The house's place.
 const AT_HOUSE: Position = Position::new(10.5, 10.5, 0.0);
 /// The builder's walking sprite, which its `MoveTo`s show by default, and its standing sprite,
@@ -640,7 +642,7 @@ fn waiting_builder_whose_foundation_dies_walks_to_its_place() {
 #[test]
 fn builder_on_its_footprint_faces_it_then_walks_to_free_tile_beside_it() {
     let b = BuildAction {
-        target: Some(HOUSE),
+        target: Some(HOUSE_SITE),
         state: BuildState::Work,
         point: Position::new(-1.0, -1.0, -1.0),
         task: MOVING_TASK,
@@ -1417,7 +1419,7 @@ fn builder_drop_off_walks_to_the_drop_site_its_search_found() {
     );
     assert_eq!(
         (b.added, house(&t).0, b.target, mill(&t)),
-        (false, 2, Some(HOUSE), 1)
+        (false, 2, Some(HOUSE_SITE), 1)
     );
     let b = drop(&mut t, DropSearch::Nothing);
     let walk = b.state.move_to().copied().unwrap();
@@ -1530,7 +1532,7 @@ fn builder_at_its_drop_site_gives_its_load_and_walks_back() {
     assert_eq!(wood(&t), (0.0, 10.0, 0));
     assert_eq!(
         (b.state.bare(), b.site, b.target),
-        (BuildState::Move { move_to: None }, None, Some(HOUSE))
+        (BuildState::Move { move_to: None }, None, Some(HOUSE_SITE))
     );
     assert_eq!(walk_state(&t), Some(MoveTo::Start));
     // the MoveTo at its end stays in the list until the next set_state
@@ -1814,7 +1816,7 @@ fn an_annex_test_sends_its_units_off_or_halts_the_build() {
         } else {
             assert_eq!(
                 (b.state, b.target, sent_off(&t)),
-                (BuildState::Wait, Some(HOUSE), 1)
+                (BuildState::Wait, Some(HOUSE_SITE), 1)
             );
             assert_eq!(
                 builder(&t).footprint_waits,
@@ -1855,7 +1857,7 @@ fn builder_on_an_annex_walks_off_it() {
     let walk = b.state.move_to().copied().unwrap();
     assert_eq!(
         (b.state.bare(), b.target, sent_off(&t)),
-        (BuildState::Clear { move_to: None }, Some(HOUSE), 1)
+        (BuildState::Clear { move_to: None }, Some(HOUSE_SITE), 1)
     );
     let (x, y) = (walk.point.x(), walk.point.y());
     let off = |c: f32, p: f32| 1.0 < (p - c).abs();

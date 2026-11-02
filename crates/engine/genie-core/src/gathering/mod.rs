@@ -12,7 +12,9 @@ pub mod farm_queue;
 mod farm_stops;
 pub mod gather;
 pub mod gather_search;
+mod gather_target;
 pub mod hunt;
+mod hunt_target;
 pub mod make;
 mod make_state;
 pub(crate) mod mule_cart;
@@ -22,6 +24,8 @@ mod queue_count;
 
 pub use self::drop_site_id::DropSiteId;
 pub use self::farm_stops::{FarmStops, StopIndex};
+pub use self::gather_target::{GatherTarget, GatherTargetId};
+pub use self::hunt_target::{HuntTarget, HuntTargetId};
 pub use self::pasture_id::{Pasture, PastureId};
 pub use self::queue_count::QueueCount;
 

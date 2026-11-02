@@ -76,19 +76,19 @@ impl Diplomacy for SideWorld<'_> {
     }
 }
 
-/// The build points (`+0xc50`) a wait for a foundation reads of object `id`
+/// The build points (`+0xc50`) a wait for a foundation reads of its foundation
 /// ([`crate::construction::wait_solidify::WaitSolidify::update`]) among its owner's other objects and the
 /// other players' lists: None when the world does not hold it. Its target is the building that
 /// sent the unit off (the unit AI's notify 0x216), whose build points are its construction's;
 /// the world never gives its id to another object, so an object without a construction is not
 /// met. `buildings` holds the objects' building layers.
 pub(crate) fn wait_progress(
-    id: ObjectId,
+    foundation: crate::construction::FoundationId,
     others: OthersRef<'_>,
     buildings: &PartTable<Building>,
 ) -> Option<Seconds> {
     others
-        .get(id)
+        .get(foundation.id())
         .and_then(|u| buildings.get(u.id)?.construction.map(|k| k.progress))
 }
 

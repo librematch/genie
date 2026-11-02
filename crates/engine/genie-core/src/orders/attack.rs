@@ -196,7 +196,8 @@ impl World {
                 ai.post(crate::unit_ai::Notify::own(id, kind, p), state)?;
             }
         }
-        attack.target2 = Some(target);
+        // the attack command gives the Attack its second target
+        attack.target2 = Some(crate::combat::AttackTargetId::new(target));
         self.parts
             .actions
             .of_mut(unit.id)?
@@ -353,7 +354,8 @@ impl World {
             }
             // the hunt's slot 0x68 (FUN_140ac7980): FUN_140a7a230 on the new target, which the
             // work command's task finder took below state 3
-            let _ = self.retarget_action(player, idx, old.unwrap_or(None), target, false)?;
+            let old = old.flatten().map(crate::gathering::HuntTargetId::id);
+            let _ = self.retarget_action(player, idx, old, target, false)?;
         }
         Ok(())
     }

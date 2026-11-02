@@ -1,7 +1,7 @@
 //! An object's id in a role: the id of the object a field or a routine needs in one part (the
-//! container a unit is inside, a construction site, a pasture, a drop site, a building's main
-//! part, a missile's shooter), so that an id of another role or of any object does not compile
-//! there.
+//! container a unit is inside, a foundation, a pasture, a drop site, a building's main part, a
+//! missile's shooter, an action's target: the Gather's, the Hunt's, the Repair's, the Attack's,
+//! the missile's), so that an id of another role or of any object does not compile there.
 
 use std::cmp::Ordering;
 use std::fmt;

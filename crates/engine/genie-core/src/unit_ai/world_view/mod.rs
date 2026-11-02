@@ -51,7 +51,7 @@ pub(crate) struct DropWorld<'a> {
 /// [`UnitView::lend`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Wait {
-    pub(crate) target: ObjectId,
+    pub(crate) target: crate::construction::FoundationId,
     pub(crate) task: crate::objects::masters::Task,
     pub(crate) switch: Option<MasterId>,
 }

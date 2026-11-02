@@ -89,7 +89,7 @@ const OWN_LIVESTOCK_RANGE: f32 = crate::math::image::hunt::OWN_LIVESTOCK_RANGE;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct HuntAction {
     /// The target object (`+0x20`, its id at `+0x30`).
-    pub target: Option<ObjectId>,
+    pub target: Option<crate::gathering::HuntTargetId>,
     /// The action state (`+0x18`), which word 9 adds, with its sub-action: the walks' quiet
     /// `MoveTo` and the attack's Attack ([`HuntState`]).
     pub state: HuntState,

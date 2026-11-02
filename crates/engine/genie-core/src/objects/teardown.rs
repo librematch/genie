@@ -26,8 +26,8 @@ pub(crate) struct TornDown {
 
 impl TornDown {
     /// `target` let go, unless it is none (−1).
-    fn release(&mut self, target: Option<ObjectId>) {
-        if let Some(target) = target {
+    fn release(&mut self, target: impl crate::objects::ObjectKey) {
+        if let Some(target) = target.key() {
             self.releases.push(target);
         }
     }
@@ -97,9 +97,9 @@ impl Action {
                 if b.added
                     && let Some(target) = b.target
                 {
-                    torn.builder_leaves.push(target);
+                    torn.builder_leaves.push(target.id());
                 }
-                torn.release(b.target);
+                torn.release(b.target.map(crate::construction::FoundationId::id));
                 torn.release(b.site.map(DropSiteId::id));
                 stop_if_moving(motion, b.state.move_to().is_some())?;
             }
@@ -107,7 +107,7 @@ impl Action {
                 if r.counted
                     && let Some(target) = r.target
                 {
-                    torn.builder_leaves.push(target);
+                    torn.builder_leaves.push(target.id());
                 }
                 torn.release(r.target);
                 stop_if_moving(motion, r.state.move_to().is_some())?;

@@ -38,6 +38,8 @@ part of the update, which binds the action to the world.
 | [`farm_queue.rs`](farm_queue.rs) | The mill's and the dock's queues: the farms and pastures (`farm_queue_count`, `+0x141c`) and the fish traps (`fishTrapQueueCount`, `+0x1420`) a player paid for ahead, which GAME's sub-commands 0xd, 0x15 and 0x11 buy and 0xe, 0x16 and 0x12 give back. |
 | [`farm_stops.rs`](farm_stops.rs) | A gatherer's stops on a farm. |
 | [`gather_search.rs`](gather_search.rs) | The searches for a resource to gather: a builder's search for more work around the building it completed (`FUN_1415cc4e0`, over the tiles `FUN_1415cc1a0` reaches) and the unit AI's `ClosestResourceObject` (`FUN_140c49760`, slot 0x80), which the builder's Build asks next (`0x140ab0370` case 0xdf). |
+| [`gather_target.rs`](gather_target.rs) | A Gather's target as its own type: the resource it works. |
+| [`hunt_target.rs`](hunt_target.rs) | A Hunt's target as its own type: the animal it hunts or leads. |
 | [`make.rs`](make.rs) | A farm's food: `RGE_Action_Make` (action type 21, vtable `RGE_Action_Make::vftable`), the default task of the farms (50, 1187), the fish trap (199) and the pastures (1893, 1897). |
 | [`make_state.rs`](make_state.rs) | A Make's state: making food. |
 | [`mod.rs`](mod.rs) | Gathering resources: the Gather and Hunt actions with each gatherer's part of its update, a farm's food, the searches for a resource, the drop sites and drop-offs, the mill's and the dock's queues and the pastures. |

@@ -17,7 +17,6 @@ use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
-use crate::objects::ObjectId;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -159,7 +158,7 @@ impl HuntAction {
 
     /// Slot 0x68 with none (`FUN_140ac7980`, [`HuntAction::set_target`]): the target goes; the
     /// old target, which the caller releases (slot 0x180).
-    pub const fn let_go(&mut self) -> Option<ObjectId> {
+    pub const fn let_go(&mut self) -> Option<crate::gathering::HuntTargetId> {
         let target = self.target;
         self.set_target(None);
         target
@@ -168,7 +167,7 @@ impl HuntAction {
     /// Slot 0x68 (`FUN_140ac7980`): the base's change of target (`FUN_140a7a230`, whose release
     /// and take are the caller's), then the lead clears ([`Lead::NEW`]: `moved_sheep` and
     /// `sheep_still_time` 0, the start −1).
-    pub const fn set_target(&mut self, target: Option<ObjectId>) {
+    pub const fn set_target(&mut self, target: Option<crate::gathering::HuntTargetId>) {
         self.target = target;
         self.lead = Lead::NEW;
     }

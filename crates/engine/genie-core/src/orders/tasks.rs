@@ -363,7 +363,8 @@ impl World {
             .repair()
             .copied()
             .ok_or(NO_REPAIR)?;
-        let same = repair.target == Some(target);
+        // the work command gives the Repair its target
+        let same = repair.target == Some(crate::construction::RepairTargetId::new(target));
         let stays = same
             && (repair.state == RepairState::Face
                 || (matches!(repair.state, RepairState::Move { .. }) && computer));
@@ -371,7 +372,15 @@ impl World {
             if !same && repair.counted {
                 self.leave_builders(repair.target)?;
             }
-            let taken = self.retarget_action(player, idx, repair.target, target, false)?;
+            let taken = self
+                .retarget_action(
+                    player,
+                    idx,
+                    repair.target.map(crate::construction::RepairTargetId::id),
+                    target,
+                    false,
+                )?
+                .map(crate::construction::RepairTargetId::new);
             if ship {
                 return Err(crate::construction::repair::SHIP_REPAIR);
             }
@@ -496,9 +505,11 @@ impl World {
             ),
         );
         let walk = old.task.walk(&move_reads, Some(to))?;
-        if old.target != Some(target) {
+        // the work command gives the Build its new foundation
+        let foundation = crate::construction::FoundationId::new(target);
+        if old.target != Some(foundation) {
             // the task finder took the new target below state 3, which slot 0x68 keeps
-            let _ = self.build_set_target(player, idx, (old.target, old.added), target)?;
+            let _ = self.build_set_target(player, idx, (old.target, old.added), foundation)?;
             let unit = self.players.live_mut(player, idx)?;
             let (Some(build), mover) = (
                 self.parts.actions.of_mut(unit.id)?.list.build_mut(),
@@ -508,7 +519,7 @@ impl World {
                     "a Build's retarget without its Build",
                 ));
             };
-            build.retarget(target, target_at, walk, mover)?;
+            build.retarget(foundation, target_at, walk, mover)?;
             return Ok(class);
         }
         let computer = self.players.player(player)?.computer;
@@ -554,14 +565,22 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (old, added): (Option<ObjectId>, bool),
-        new: ObjectId,
-    ) -> Result<Option<ObjectId>, GenieError> {
+        (old, added): (Option<crate::construction::FoundationId>, bool),
+        new: crate::construction::FoundationId,
+    ) -> Result<Option<crate::construction::FoundationId>, GenieError> {
         let leaves = old != Some(new) && added;
         if leaves {
             self.leave_builders(old)?;
         }
-        let target = self.retarget_action(player, idx, old, new, false)?;
+        let target = self
+            .retarget_action(
+                player,
+                idx,
+                old.map(crate::construction::FoundationId::id),
+                new.id(),
+                false,
+            )?
+            .map(crate::construction::FoundationId::new);
         if let Some(build) = self
             .parts
             .actions_mut(self.players.live(player, idx)?.id)?

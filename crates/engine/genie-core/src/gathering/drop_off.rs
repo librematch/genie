@@ -257,7 +257,7 @@ impl Unit {
                 "a gatherer without its gather or movement state",
             ));
         };
-        let old = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let old = gather.targets();
         let rng = c.w.streams.get(Stream::Action);
         let _ = gather.retarget(
             GatherRetarget {
@@ -271,7 +271,7 @@ impl Unit {
             mover,
             rng,
         )?;
-        let new = [gather.target, gather.carry_to.map(DropSiteId::id)];
+        let new = gather.targets();
         for (old, new) in old.into_iter().zip(new) {
             if old == new {
                 continue;

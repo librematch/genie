@@ -120,7 +120,7 @@ pub(crate) const FARM_FOOD_SOLD: usize = 96;
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct GatherAction {
     /// The target object (`+0x20`, its id at `+0x30`), −1 for none.
-    pub target: Option<ObjectId>,
+    pub target: Option<crate::gathering::GatherTargetId>,
     /// `+0x28` (its id at `+0x34`), the second target: the drop site the load goes to in state 8,
     /// −1 for none.
     pub carry_to: Option<crate::gathering::DropSiteId>,
@@ -152,6 +152,24 @@ pub struct GatherAction {
     /// `+0x8c`, `+0x90`: `mGatherX`, `mGatherY`, where the gathering started (−1 while the
     /// game's farm setting holds them, [`GatherReads::farm_stops`]).
     pub gather_at: Point,
+}
+
+impl GatherAction {
+    /// Its target and its second target as any objects' ids, −1 for none: what the releases
+    /// compare and let go (slot 0x180).
+    #[must_use]
+    pub const fn targets(&self) -> [Option<ObjectId>; 2] {
+        [
+            match self.target {
+                Some(t) => Some(t.id()),
+                None => None,
+            },
+            match self.carry_to {
+                Some(t) => Some(t.id()),
+                None => None,
+            },
+        ]
+    }
 }
 
 /// What the gather reads of its target when it takes it.

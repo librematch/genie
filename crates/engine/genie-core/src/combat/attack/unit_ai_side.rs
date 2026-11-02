@@ -70,7 +70,7 @@ impl UnitView<'_, '_> {
             .actions
             .list
             .attack()
-            .is_some_and(|a| a.target == Some(target))
+            .is_some_and(|a| a.target.map(crate::combat::AttackTargetId::id) == Some(target))
         {
             if force {
                 self.attack_again(target, &t, master, ai)?;
@@ -179,7 +179,7 @@ impl UnitView<'_, '_> {
         let target = attack.target;
         self.actions.list.set_attack(Some(attack));
         if let Some(target) = target {
-            self.take(target, by)?;
+            self.take(target.id(), by)?;
         }
         Ok(crate::unit_ai::Attacked {
             attacks: true,

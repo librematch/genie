@@ -894,7 +894,12 @@ fn halt_stops_the_repair_and_answers_whether_it_counted() {
     assert_eq!(r.halt(Some(&mut mover)), Ok(true));
     assert_eq!(
         (r.state, r.counted, r.state.move_to().copied(), r.target),
-        (RepairState::Halted, false, None, Some(object_id(20)))
+        (
+            RepairState::Halted,
+            false,
+            None,
+            Some(crate::construction::RepairTargetId::new(object_id(20)))
+        )
     );
     assert_eq!(r.halt(None), Ok(false));
 }

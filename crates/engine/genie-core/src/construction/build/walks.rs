@@ -56,7 +56,11 @@ impl BuildAction {
         let to = if self.target.is_none() {
             None
         } else {
-            Some(move_reads.walk_to(c.w, self.target)?.ok_or(SITE_GONE)?)
+            Some(
+                move_reads
+                    .walk_to(c.w, self.target.map(crate::construction::FoundationId::id))?
+                    .ok_or(SITE_GONE)?,
+            )
         };
         Ok((to, self.task.walk(&move_reads, to)?))
     }

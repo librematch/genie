@@ -9,7 +9,6 @@ use crate::gathering::DropSiteId;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
-use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
@@ -45,7 +44,7 @@ impl BuildAction {
     /// An object of a master its owner lacks.
     pub(super) fn count(
         c: &mut Step<'_>,
-        site: Option<ObjectId>,
+        site: Option<crate::construction::FoundationId>,
         by: i8,
     ) -> Result<(), GenieError> {
         if let Some(id) = c.w.counted_building(site)?
@@ -65,7 +64,7 @@ impl BuildAction {
     /// An object of a master its owner lacks.
     pub(super) fn builders(
         c: &Step<'_>,
-        site: Option<ObjectId>,
+        site: Option<crate::construction::FoundationId>,
     ) -> Result<crate::construction::BuilderCount, GenieError> {
         Ok(c.w
             .counted_building(site)?
@@ -241,7 +240,7 @@ impl BuildAction {
                 ))?
                 .position;
         let work = crate::orders::Work {
-            target: self.target,
+            target: self.target.map(crate::construction::FoundationId::id),
             point,
             carry_test: false,
             filter: None,
@@ -274,7 +273,7 @@ impl BuildAction {
                 "a builder's search for more work without its building",
             ));
         };
-        if let Some(work) = builder.more_work(actions, c, target, built)? {
+        if let Some(work) = builder.more_work(actions, c, target.id(), built)? {
             return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
         }
         self.no_more_work()?;
@@ -419,7 +418,7 @@ impl BuildAction {
     /// The unit's stop that the motion step does not model.
     pub fn retarget(
         &mut self,
-        target: ObjectId,
+        target: crate::construction::FoundationId,
         at: Position,
         walk: Option<MoveToAction>,
         mover: Option<&mut crate::movement::Mover>,
@@ -440,7 +439,7 @@ impl BuildAction {
     /// master's `+0x470`, the caller's), the foundation and the second target go (slot 0x68 and
     /// `FUN_140a7a190` with none: the caller releases both) and the point is −1. The answer is
     /// true, so the stop keeps the list; returns whether it counted, the foundation and the
-    /// second target (−1 for none).
+    /// second target (its drop site).
     ///
     /// # Errors
     ///
@@ -448,7 +447,14 @@ impl BuildAction {
     pub(crate) fn halt(
         &mut self,
         mover: Option<&mut crate::movement::Mover>,
-    ) -> Result<(bool, [Option<ObjectId>; 2]), GenieError> {
+    ) -> Result<
+        (
+            bool,
+            Option<crate::construction::FoundationId>,
+            Option<DropSiteId>,
+        ),
+        GenieError,
+    > {
         let counted = std::mem::replace(&mut self.added, false);
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
@@ -457,9 +463,7 @@ impl BuildAction {
         }
         self.point = Position::from([-1.0; 3]);
         self.state = BuildState::Halted;
-        let target = self.target.take();
-        let site = self.site.take();
-        Ok((counted, [target, site.map(DropSiteId::id)]))
+        Ok((counted, self.target.take(), self.site.take()))
     }
 
     /// `set_state(2)` from the update ([`BuildAction::halt`]): a counted builder leaves its
@@ -475,7 +479,7 @@ impl BuildAction {
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
-        let (counted, [target, second]) = self.halt(c.w.parts.mover_mut(builder.id))?;
+        let (counted, target, second) = self.halt(c.w.parts.mover_mut(builder.id))?;
         if counted {
             Self::count(c, target, -1)?;
         }

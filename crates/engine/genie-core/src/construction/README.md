@@ -37,6 +37,7 @@ building's own steps first, then the builder's or repairer's action.
 | [`gates.rs`](gates.rs) | The gates: the units in a gate, a player's gate list and passes, and the gates opened before and closed after a player's update. |
 | [`main_building_id.rs`](main_building_id.rs) | A main building's id as its own type: the building whose annexes are its parts. |
 | [`mod.rs`](mod.rs) | Building and repairing: the Build and Repair actions with each worker's part of its update, the wait for a foundation, a building's own update and the gates. |
+| [`repair_target.rs`](repair_target.rs) | A Repair's target as its own type: the object it repairs. |
 | [`wait_solidify.rs`](wait_solidify.rs) | A villager's wait for a foundation: `TRIBE_Action_Wait_Solidify` (action type 0x9a, vtable `0x142ed82f8`). |
 | [`wait_solidify_state.rs`](wait_solidify_state.rs) | A Wait Solidify's state: waiting for its foundation to turn solid. |
 | [`build/`](build/) | A builder's Build action (`TRIBE_Action_Build`, type 101, vtable `0x142ed6628`) up to the builder's walk: the action starts in state 4 with a `MoveTo` sub-action (`RGE_Action_Move_To`, type 1) toward the foundation; a builder already at the foundation works in its first update (state 6). |

@@ -114,13 +114,13 @@ impl Unit {
     /// # Errors
     ///
     /// The release's.
-    pub(crate) fn hunt_release<const N: usize>(
+    pub(crate) fn hunt_release<K: crate::objects::ObjectKey, const N: usize>(
         &mut self,
         c: &mut Step<'_>,
-        ids: [Option<ObjectId>; N],
+        ids: [K; N],
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
-        for id in ids.into_iter().flatten() {
+        for id in ids.into_iter().filter_map(crate::objects::ObjectKey::key) {
             crate::world::lets::release(c, self, id, by)?;
         }
         Ok(())

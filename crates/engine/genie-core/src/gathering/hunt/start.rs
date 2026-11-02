@@ -133,7 +133,7 @@ impl HuntAction {
             walks,
         } = start;
         let mut hunt = Self {
-            target: Some(target.id),
+            target: Some(crate::gathering::HuntTargetId::new(target.id)),
             state: HuntState::New,
             point: target.position,
             target_class: Some(target.class),
@@ -270,10 +270,10 @@ impl HuntAction {
             self.set_drop(target.position, attack.gap, mover, &walks)?;
             return Ok(Some(false));
         }
-        if Some(target.id) == self.target {
+        if self.target.map(crate::gathering::HuntTargetId::id) == Some(target.id) {
             return Ok(None);
         }
-        self.set_target(Some(target.id));
+        self.set_target(Some(crate::gathering::HuntTargetId::new(target.id)));
         self.target_class = Some(target.class);
         self.carry_to = None;
         self.chase(target, player, attack, arms, mover, &walks)
@@ -438,6 +438,9 @@ impl HuntAction {
         let second = self.carry_to.take();
         self.point = Position::from([-1.0; 3]);
         self.timer = Seconds::ZERO;
-        [target, second.map(DropSiteId::id)]
+        [
+            target.map(crate::gathering::HuntTargetId::id),
+            second.map(DropSiteId::id),
+        ]
     }
 }

@@ -298,24 +298,32 @@ impl World {
             None
         };
         let found = match top {
-            Some(crate::gathering::gather::GATHER) => self
-                .parts
-                .actions_of(unit.id)
-                .list
-                .gather()
-                .map(|g| (DropOffBy::Gather, g.target, g.point, g.task.resource)),
-            Some(action_type::BUILD) => self
-                .parts
-                .actions_of(unit.id)
-                .list
-                .build()
-                .map(|b| (DropOffBy::Build, b.target, b.point, b.task.resource)),
-            Some(HUNT) => self
-                .parts
-                .actions_of(unit.id)
-                .list
-                .hunt()
-                .map(|h| (DropOffBy::Hunt, h.target, h.point, h.task.resource)),
+            Some(crate::gathering::gather::GATHER) => {
+                self.parts.actions_of(unit.id).list.gather().map(|g| {
+                    (
+                        DropOffBy::Gather,
+                        g.target.map(crate::gathering::GatherTargetId::id),
+                        g.point,
+                        g.task.resource,
+                    )
+                })
+            }
+            Some(action_type::BUILD) => self.parts.actions_of(unit.id).list.build().map(|b| {
+                (
+                    DropOffBy::Build,
+                    b.target.map(crate::construction::FoundationId::id),
+                    b.point,
+                    b.task.resource,
+                )
+            }),
+            Some(HUNT) => self.parts.actions_of(unit.id).list.hunt().map(|h| {
+                (
+                    DropOffBy::Hunt,
+                    h.target.map(crate::gathering::HuntTargetId::id),
+                    h.point,
+                    h.task.resource,
+                )
+            }),
             _ => None,
         };
         let Some((by, target, point, resource)) = found else {

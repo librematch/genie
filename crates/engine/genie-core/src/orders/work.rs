@@ -48,7 +48,8 @@ fn attack_on(
     a: &crate::combat::attack::Attack,
     target: Option<ObjectId>,
 ) -> bool {
-    top == Some(crate::combat::attack::ATTACK) && a.target == target
+    top == Some(crate::combat::attack::ATTACK)
+        && a.target.map(crate::combat::AttackTargetId::id) == target
 }
 
 impl World {

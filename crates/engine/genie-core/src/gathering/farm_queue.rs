@@ -261,7 +261,7 @@ impl World {
         if queue == Queue::Farms
             && let Some(target) = gather.target
         {
-            own.push(target);
+            own.push(target.id());
             let is_building = match self.object(target) {
                 Some((q, t)) => {
                     t.master(self.master_tables(), q)?.kind
