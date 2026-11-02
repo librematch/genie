@@ -6,6 +6,7 @@
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-core/tests/crt_math.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
   "crates/formats/genie-dat/src/dat_write.rs": 4,
   "crates/formats/genie-dat/src/tech.rs": 4,
@@ -36,6 +37,7 @@
  "clippy::cast_possible_wrap": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-scx/src/format/scx.rs": 3,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
   "crates/formats/genie-scx/src/player.rs": 1,
@@ -48,12 +50,14 @@
  "clippy::cast_precision_loss": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1,
   "crates/tools/genie-oracle/tests/tick_trace.rs": 1
  },
  "clippy::cast_sign_loss": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
   "crates/formats/genie-scx/src/format/rge.rs": 1,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
@@ -129,10 +133,12 @@
  },
  "clippy::similar_names": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::struct_excessive_bools": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-dat/src/unit_type/statics.rs": 1,
   "crates/formats/genie-rec/src/lib.rs": 1,
   "crates/formats/genie-rec/src/unit/building.rs": 1,
@@ -148,6 +154,7 @@
  "clippy::suboptimal_flops": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::suspicious_operation_groupings": {
@@ -157,6 +164,7 @@
  "clippy::too_long_first_doc_paragraph": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::too_many_arguments": {
@@ -169,6 +177,7 @@
   "crates/engine/genie-core/src/unit_ai/unit.rs": 1,
   "crates/engine/genie-core/src/world/object_step.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
+  "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-rec/tests/de_oracle.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1,
   "crates/tools/genie-oracle/tests/tick_trace.rs": 1

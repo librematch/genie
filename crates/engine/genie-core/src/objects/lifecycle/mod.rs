@@ -19,8 +19,8 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 pub(crate) mod death_parts;
-mod master_data;
-mod object_state;
+use genie_model::objects::lifecycle::master_data;
+use genie_model::objects::lifecycle::object_state;
 
 pub use self::master_data::MasterData;
 pub use self::object_state::ObjectState;

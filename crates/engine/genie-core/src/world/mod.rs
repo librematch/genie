@@ -62,15 +62,15 @@ use genie_diff::Diff;
 
 mod after_step;
 mod ai_values;
-mod clock;
+use genie_model::world::clock;
 mod forced;
 mod frame_seed;
 mod mode_680;
 mod object_step;
-mod options;
+use genie_model::world::options;
 mod play_state;
 pub mod schedule;
-pub mod settings;
+pub use genie_model::world::settings;
 mod setup;
 mod tick;
 mod world_update;

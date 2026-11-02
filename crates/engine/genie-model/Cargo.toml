@@ -1,0 +1,24 @@
+[package]
+name = "genie-model"
+version = "0.1.0"
+description = "The game data of Age of Empires II: Definitive Edition as the genie engine holds it: masters, technologies, effects, the tech tree, unit lines, drop sites, graphics, roles, slots and tuning"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository.workspace = true
+
+[dependencies]
+# the error every crate returns: its kind, reason, place and context
+genie-error = { path = "../../base/genie-error" }
+# the field by field comparison the divergence tools run on the state (FD-045-D14)
+genie-diff = { path = "../../base/genie-diff" }
+# the f32 operations as the game's code does them, the image's constants and the map's geometry
+# (FD-046-D28)
+genie-math = { path = "../genie-math" }
+# the getters of the newtypes: their values are private, so only the constructors that check
+# them set them (FD-001-D23)
+getset.workspace = true
+# the bit sets the game tests bit by bit (a master's flags)
+bitflags.workspace = true
+
+[lints]
+workspace = true

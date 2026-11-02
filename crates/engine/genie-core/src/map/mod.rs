@@ -1,18 +1,18 @@
 //! The map: the terrain of each tile and where the world's objects stand (their places,
 //! radii, footprints and the grid that finds them).
 
-mod distance;
+use genie_model::map::distance;
 mod grid_size;
-mod radii;
+use genie_model::map::radii;
 mod rect;
 mod restriction;
-mod restriction_id;
+use genie_model::map::restriction_id;
 mod snow;
 pub mod spatial;
 pub mod terrain;
 mod terrain_flags;
-mod terrain_id;
-mod terrain_mask;
+use genie_model::map::terrain_id;
+use genie_model::map::terrain_mask;
 
 pub use self::distance::{Distance, DistanceSquared, WholeDistance};
 pub use self::grid_size::GridSize;

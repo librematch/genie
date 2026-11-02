@@ -1,5 +1,5 @@
 //! A unit AI's factory type as one type: which `Tribe…UnitAIModule` a master's unit AI is
-//! (`Master::unit_ai_type`), the value the module's constructor takes.
+//! ([`crate::unit_ai::unit_ai_type`]), the value the module's constructor takes.
 
 use genie_diff::{Diff, Differ};
 use std::fmt::{Display, Error, Formatter};

@@ -10,7 +10,7 @@
 //! need are the objects' routines, which this file leaves to them.
 
 mod attribute_modifier;
-mod change;
+use genie_model::technology::effect::change;
 mod commands;
 mod completion;
 mod object_slots;

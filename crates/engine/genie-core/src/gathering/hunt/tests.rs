@@ -47,6 +47,7 @@ use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::{Animated, Motion, Static};
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
+use crate::test_ids::task_id;
 use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::World;
 
@@ -339,7 +340,7 @@ const ARMS: Arms = Arms {
 };
 
 const CHOP: HuntTask = HuntTask {
-    id: TaskId::test(0),
+    id: task_id(0),
     range: Distance::ZERO,
     resource: Some(attribute::MEAT),
     sprites: TaskSprites::of_data([-1, 1239, 1961, 1960]),

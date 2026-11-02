@@ -28,6 +28,7 @@ use crate::orders::lock_gate;
 use crate::players::PlayerId;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
+use crate::unit_ai::unit_ai_type;
 use crate::world::Seconds;
 use crate::world::index::Place;
 use crate::world::parts::Part;
@@ -417,7 +418,7 @@ impl World {
             }
             return Ok(Some(id));
         }
-        let ai = Ok(made.unit_ai_type(master));
+        let ai = Ok(unit_ai_type(&made, master));
         let (id, _) = self.make_building(p, master, ai, at)?;
         if flagged {
             self.clear_footprint(p, master, at.ground(), true)?;

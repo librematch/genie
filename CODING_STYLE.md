@@ -45,7 +45,7 @@ data-oriented architect makes it.
 | --- | --- | --- |
 | `crates/base/` | `genie-error`, `genie-diff`: below every other crate | GPL-3.0 |
 | `crates/formats/` | the readers and writers of the game's files | GPL-3.0 |
-| `crates/engine/` | the engine: `genie-core`, `genie-command-codec`; its foundation `genie-math` (FD-046) | AGPL-3.0 |
+| `crates/engine/` | the engine: `genie-core`, `genie-command-codec`; its foundations `genie-math` (the arithmetic) and `genie-model` (the game data) (FD-046) | AGPL-3.0 |
 | `crates/tools/` | command-line tools and the oracle library | AGPL-3.0 |
 
 - Dependencies point inward. Engine and tool crates can depend on format crates. A format crate

@@ -2,7 +2,7 @@
 //! `FUN_1411a8ba0` and its test of a task on a target, slot 4 `FUN_1411a8620`): which task of a
 //! master's task list a unit does on a target object. The work command (object slot 37,
 //! `FUN_14106ff70`) asks it of the unit's own master and, through the task swap group, of the
-//! player's other masters ([`crate::objects::masters::Masters::work_master`]).
+//! player's other masters ([`crate::objects::masters::work_master`]).
 //!
 //! The finder tries the special tasks first, each for the targets it is about (dropping off what
 //! the unit carries, building its player's foundation, garrisoning, repairing, converting, healing
@@ -42,7 +42,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::{CivId, Relations};
 use crate::unit_ai::task_finder::target_steps::on_target;
 
-mod drop_site;
+use genie_model::unit_ai::task_finder::drop_site;
 mod target_steps;
 pub(crate) mod world;
 

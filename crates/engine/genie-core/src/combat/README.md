@@ -34,8 +34,6 @@ it. After the combat update, every combat unit and building runs its passive abi
 | --- | --- |
 | [`attack_powerup.rs`](attack_powerup.rs) | An object's attack powerup. |
 | [`attack_target.rs`](attack_target.rs) | An Attack's target as its own type: the object it attacks. |
-| [`charge.rs`](charge.rs) | An object's charge (`Charge`) and how fast it fills (`ChargeRate`), with the game's `f32` operations. |
-| [`firepower.rs`](firepower.rs) | A volley's size: the firepower (missiles a volley), the missiles counted and the swings that fired. |
 | [`mod.rs`](mod.rs) | Combat: attacks, hits and missiles. |
 | [`victim_reads.rs`](victim_reads.rs) | What a hit reads of its victim: the object's values and its relations to the attacker. |
 | [`victims.rs`](victims.rs) | A hit's victim: what the hit reads of it, the objects it may reach, the hit written back, the kill and its counts. |

@@ -26,6 +26,7 @@ members = [
   "crates/engine/genie-command-codec",
   "crates/engine/genie-core",
   "crates/engine/genie-math",
+  "crates/engine/genie-model",
   "crates/tools/genie-oracle",
   "crates/tools/genie-swiss-knife",
 ]

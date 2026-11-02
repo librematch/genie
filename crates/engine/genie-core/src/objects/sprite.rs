@@ -13,7 +13,7 @@
 //! `FUN_1413b2d90` (always), frame reset `FUN_1413b5030`, looped (slot 12) `FUN_1413b38e0`
 //! (never).
 
-mod graphic;
+use genie_model::objects::sprite::graphic;
 
 pub use self::graphic::Graphic;
 pub(crate) use self::graphic::top_speed;

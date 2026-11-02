@@ -8,7 +8,7 @@
 //! ([`SpriteFacets`]); the slice takes them from the unit's master when every sprite of the
 //! master has the same ([`crate::movement::MoveStats::facets`]).
 
-mod sprite_facets;
+use genie_model::objects::facing::sprite_facets;
 
 pub use self::sprite_facets::SpriteFacets;
 use crate::map::Point;

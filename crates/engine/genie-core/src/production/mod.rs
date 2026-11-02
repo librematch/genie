@@ -31,10 +31,10 @@ use crate::world::slots::CheckedIndex;
 use genie_diff::Diff;
 
 mod batch;
-mod button;
+use genie_model::production::button;
 mod cost_count;
 mod costs;
-mod hotkey;
+use genie_model::production::hotkey;
 mod make_obj_state;
 mod make_tech_state;
 mod queue_counts;

@@ -31,6 +31,7 @@ use crate::players::attribute::IN_PRODUCTION;
 use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::QueueEnd;
+use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
@@ -315,7 +316,7 @@ impl World {
                 )
             })
         });
-        let ai_type = made.unit_ai_type(master).ok_or(GenieError::unsupported(
+        let ai_type = unit_ai_type(made, master).ok_or(GenieError::unsupported(
             "a new combat unit without a unit AI",
         ))?;
         let new_object = self.new_object(p, master, made, position)?;

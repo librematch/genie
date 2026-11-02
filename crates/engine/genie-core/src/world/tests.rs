@@ -203,6 +203,7 @@ use crate::test_ids::opt_master;
 use crate::test_ids::order_type;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
+use crate::test_ids::task_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::unit_list;
 use crate::test_ids::{adds as test_ids_adds, amounts, attributes};
@@ -2619,7 +2620,7 @@ fn repair_world() -> World {
         let builder = masters.get_mut(ids::BUILDER).unwrap();
         builder.weapon_range = Distance::new(0.5);
         builder.tasks.push(Task {
-            id: TaskId::test(4),
+            id: task_id(4),
             work_val1: WorkValue::new(0.5),
             ..task(REPAIR)
         });
@@ -2659,7 +2660,7 @@ fn work_command_on_damaged_building_starts_repair() {
             Some(RepairTargetId::new(object_id(10028))),
             RepairState::Move { move_to: None },
             Distance::new(0.5),
-            TaskId::test(4),
+            task_id(4),
             WorkValue::new(0.5)
         )
     );
@@ -2830,7 +2831,7 @@ fn work_command_on_foundation_starts_build_as_its_builder() {
             work_value: WorkValue::new(0.0),
             work_rate: WorkRate::new(1.0),
             resource: None,
-            id: TaskId::test(0),
+            id: task_id(0),
             moving: None,
         }
     );
@@ -3259,7 +3260,7 @@ pub(crate) fn forage_world() -> World {
             capacity: CarryCapacity::of_data(10),
             drop_sites: vec![ids::TOWN_CENTRE],
             tasks: vec![Task {
-                id: TaskId::test(2),
+                id: task_id(2),
                 action_type: GATHER,
                 object_group: Some(class_id(7)),
                 attribute_type: Some(AttributeId::numbered(17)),
@@ -3436,7 +3437,7 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
             GatherState::Walk { move_to: None },
             Position::new(32.5, 89.5, 0.0),
             Some(Distance::new(0.25)),
-            TaskId::test(2)
+            task_id(2)
         )
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
@@ -3541,7 +3542,7 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
         (
             Some(GatherTargetId::new(object_id(600))),
             GatherState::Walk { move_to: None },
-            TaskId::test(2)
+            task_id(2)
         )
     );
     assert_eq!(
@@ -3925,7 +3926,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
     t.settings.walkable_farms = true;
     for masters in &mut t.masters {
         masters.get_mut(master_id(120)).unwrap().tasks.push(Task {
-            id: TaskId::test(3),
+            id: task_id(3),
             action_type: GATHER,
             object_group: Some(class_id(49)),
             attribute_type: Some(attribute::FOOD),
@@ -3995,7 +3996,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
         (g.target, g.task.id, g.point),
         (
             Some(GatherTargetId::new(object_id(800))),
-            TaskId::test(3),
+            task_id(3),
             Position::new(29.5, 89.5, 0.0)
         )
     );
@@ -6559,7 +6560,7 @@ fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
             m.id = master_id(156);
             m.weapon_range = Distance::new(0.5);
             m.tasks.push(Task {
-                id: TaskId::test(4),
+                id: task_id(4),
                 work_val1: WorkValue::new(0.5),
                 ..task(REPAIR)
             });
@@ -6607,7 +6608,7 @@ fn the_unit_ai_repair_order_switches_villager_to_the_repairer() {
             Some(RepairTargetId::new(object_id(10028))),
             RepairState::Move { move_to: None },
             Distance::new(0.5),
-            TaskId::test(4)
+            task_id(4)
         )
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
@@ -6938,7 +6939,7 @@ fn livestock_enter_world() -> World {
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
         tasks: vec![Task {
-            id: TaskId::test(1),
+            id: task_id(1),
             action_type: ENTER,
             object_group: Some(class_id(3)),
             ..Task::default()
@@ -8558,18 +8559,19 @@ fn farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
 #[test]
 fn built_farm_master_starts_make_and_another_default_task_is_reported() {
     use crate::objects::layers::DefaultTask;
-    assert_eq!(farm_master().default_start(), DefaultTask::Make);
+    use crate::objects::layers::default_start;
+    assert_eq!(default_start(&farm_master()), DefaultTask::Make);
     let mut other = farm_master();
     other.tasks[0].action_type = FLY;
     assert_eq!(
-        other.default_start(),
+        default_start(&other),
         DefaultTask::Fails(Unstartable::Unported(FLY))
     );
     // a type the factories make nothing of starts nothing (a wild animal's Explore, 6)
     other.tasks[0].action_type = ActionType::named(6);
-    assert_eq!(other.default_start(), DefaultTask::Nothing);
+    assert_eq!(default_start(&other), DefaultTask::Nothing);
     other.default_task = None;
-    assert_eq!(other.default_start(), DefaultTask::Nothing);
+    assert_eq!(default_start(&other), DefaultTask::Nothing);
 }
 
 /// `TRIBE_Building_Object::update`'s whole seconds (`0x1411c95a2`): a built building outside
@@ -15518,7 +15520,7 @@ fn an_ai_move_replaces_done_attack_with_move_to_the_point() {
 #[test]
 fn an_ai_move_hands_the_point_to_the_gather() {
     let task = HuntTask {
-        id: TaskId::test(2),
+        id: task_id(2),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,
@@ -16861,7 +16863,7 @@ fn farm_masters() -> Masters {
 /// ended; the player holds 100 wood.
 fn reseed_world() -> World {
     let task = HuntTask {
-        id: TaskId::test(2),
+        id: task_id(2),
         range: Distance::new(0.25),
         resource: Some(attribute::MEAT),
         sprites: TaskSprites::NONE,

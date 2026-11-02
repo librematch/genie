@@ -36,7 +36,6 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`after_step.rs`](after_step.rs) | An object's step and what follows it (`World::step_object`): what its `Step` gathered, applied to the world in the order the game's update makes them. |
 | [`ai_values.rs`](ai_values.rs) | The values of a player's AI settings (`crate::world::AiSettings`). |
 | [`checkpoint.rs`](checkpoint.rs) | The per-player 11-word state block that recorded games checkpoint every N syncs. |
-| [`clock.rs`](clock.rs) | The world's clock in the game's milliseconds: a moment of it (`WorldTime`) and a span (`Millis`). |
 | [`forced.rs`](forced.rs) | The forced replay (dev only): the game's state after a tick (`GameState`) and the step that forces it on the world. |
 | [`frame_seed.rs`](frame_seed.rs) | The world's frame seed. |
 | [`index.rs`](index.rs) | The world's table by id (`FUN_1415417a0`: `world+0x168` for ids 0 and up, `+0x178` for the recycled ones, FD-045-D49): where each object is, a player's live or sleeping slot. |
@@ -45,14 +44,12 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`mode_680.rs`](mode_680.rs) | The game object's tagged value at `+0x680`. |
 | [`motions.rs`](motions.rs) | The motion part's reads and writes (FD-045-D58): an object's animated layer and its mover, by id in the world's table (`Parts::motion`), beside the row's place. |
 | [`object_step.rs`](object_step.rs) | One object's step with its `Step` (`World::run_object`) and a unit AI run outside its update. |
-| [`options.rs`](options.rs) | The game options' values: the game mode, the ages, the visibility, the resource level, the sub-mode's rules, the content mode and the treaty. |
 | [`others.rs`](others.rs) | The world's objects by id as an update reaches them (FD-045-D19, D28): `OthersRef` to read them (the owner's live list and the other players' lists), `Others` to change them while the unit AI runs, and the world's own lookups for the update itself, which holds the world (`World::locate`, `World::wake_sleeper`, `World::take_out_own`). |
 | [`parts.rs`](parts.rs) | The parts only some objects hold, each in a table by id on the world (FD-045-D51), so that an object's row holds only what every object has. |
 | [`parts_fixtures.rs`](parts_fixtures.rs) | A test's world with its parts: fixtures that file a test object's parts beside its row (`World::with_parts`, `World::split_layers`) and the whole objects tests push. |
 | [`play_state.rs`](play_state.rs) | The world's game state. |
 | [`player.rs`](player.rs) | A player (`Player`): its objects, attributes and formations, and the stop of its update. |
 | [`schedule.rs`](schedule.rs) | The world update as a declared schedule (FD-045-D13): its steps in the game's order, each with the game routine it ports, and the update that runs them with an observer. |
-| [`settings.rs`](settings.rs) | The game options the simulation reads: the object `FUN_140c87b90` returns (`GameOptions`, 0x1088 bytes), which the header saves and its load `FUN_141305310` fills. |
 | [`setup.rs`](setup.rs) | The world as the header save holds it (`World::new`): the next object id, the planners and the shape mesh the game's load builds. |
 | [`slots.rs`](slots.rs) | The checked reach into the world's player table and the players' object lists. |
 | [`step.rs`](step.rs) | What a tick's update of one object reads and writes (`Step`) and its walks. |

@@ -213,6 +213,13 @@ pub(super) struct RetargetSearch {
     pub(super) work_state: bool,
 }
 
+/// The unit AI type the factory (`FUN_141215a90`) gives a new object of master `master`, by
+/// the master's id `id` ([`factory_type`]).
+#[must_use]
+pub const fn unit_ai_type(master: &Master, id: MasterId) -> Option<UnitAiType> {
+    factory_type(master.class, id, master.volley_missile, master.combat_level)
+}
+
 /// The unit-AI type the factory (`FUN_141215a90`) gives a new object of a master of `class`
 /// with the volley missile `missile` (`+0x8d4`, −1 for none) and the combat level
 /// `combat_level` (`+0x62c`). The types are those `FUN_141215560`'s switch names for its

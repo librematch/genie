@@ -23,12 +23,8 @@ A player has more than its objects. This folder holds the rest:
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`amount.rs`](amount.rs) | An amount of a player attribute (`Amount`), with the game's `f32` operations. |
-| [`amount_rate.rs`](amount_rate.rs) | How fast an amount changes (`AmountRate`, an attribute's amount per second), with the game's `f32` operations. |
-| [`attribute.rs`](attribute.rs) | The indices of the player's attributes (`player+0x8`'s array of `f32`): the one definition of the attributes the engine reads and writes by number. |
 | [`by_player.rs`](by_player.rs) | One value per player, looked up by the player (`ByPlayer`). |
 | [`chance.rs`](chance.rs) | A computer player's chance setting: the percent a unit AI's draw is held against. |
-| [`civ_id.rs`](civ_id.rs) | A civilisation's number. |
 | [`diplomacy.rs`](diplomacy.rs) | A player's diplomacy change (the world player's slot 0x30, `FUN_141639690`, which GAME's sub-command 0 runs): its stance toward another player (`diplomacy[i]`, `+0xe12`), the relation it makes (`relation[i]`, `+0x260`) and what its queries make of that player's objects (`unit_diplomacy[i]`, `+0x278`); its objects hear of it (slot 0x120: units inside a building or siege tower of a player no longer allied leave it); the players' sight masks and tile lists are made again; then the world's teams (`FUN_1415e23f0`) and the units the players reveal (`FUN_14152bcb0`). |
 | [`escrow_share.rs`](escrow_share.rs) | The share of a resource's income a computer player sets aside. |
 | [`market.rs`](market.rs) | The market: the world's commodity prices (`+0x868`..`+0x8a0`, saved) and the two commands that trade at them, `TRIBE_COMMAND_SELL_COMMODITY` (0x7a, `FUN_141639310`) and `TRIBE_COMMAND_BUY_COMMODITY` (0x7b, `FUN_141618390`). |

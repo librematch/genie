@@ -9,11 +9,10 @@ them, which the game-data model takes along (FD-046).
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`tech_tree_data.rs`](tech_tree_data.rs) | The tech tree's data: its units, buildings and unique units, and the queries over them (FD-046). |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`world`](../../../world/).
+- Uses: no other system.
 <!-- /uses -->

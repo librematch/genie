@@ -31,6 +31,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::production::CostCount;
 use crate::production::{cost_test, pay, refund_master};
+use crate::unit_ai::unit_ai_type;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
@@ -292,7 +293,7 @@ impl World {
             return Ok(false);
         };
         let made = self.master(p, master)?;
-        let ai = Ok(made.unit_ai_type(master));
+        let ai = Ok(unit_ai_type(made, master));
         let at = farm.with_height(0.0);
         let (foundation, _) = self.make_building(p, master, ai, at)?;
         if from_queue {

@@ -18,6 +18,8 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionType;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
+use crate::objects::masters::follow;
+use crate::objects::masters::follow_moving;
 use crate::objects::masters::{AttributeWorld, Master, master_type, player_master};
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::players::PlayerId;
@@ -426,7 +428,7 @@ impl World {
     }
 
     /// Player `p`'s master `id` takes the change (its slot 0x18, 0x20 or 0x28), then the values
-    /// the slice derives from it follow ([`Master::follow`], [`World::master_followers`]).
+    /// the slice derives from it follow ([`follow`], [`World::master_followers`]).
     pub(super) fn change_one_master(
         &mut self,
         p: PlayerId,
@@ -436,9 +438,8 @@ impl World {
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
         {
-            let sprite = Self::attribute_world(&self.graphics);
             let world = AttributeWorld {
-                sprite: &sprite,
+                sprites: &self.graphics,
                 handicap: None,
                 capped: CAPPED,
             };
@@ -451,14 +452,14 @@ impl World {
                 Change::Add => m.add_attribute(attribute, v, &world),
                 Change::Multiply => m.multiply_attribute(attribute, v, &world),
             }
-            m.follow(attribute, &self.graphics, terrain);
+            follow(m, attribute, &self.graphics, terrain);
         }
         self.master_followers(p, id, attribute)?;
         Ok(())
     }
 
     /// What player `p`'s objects of master `id` hold of it and the slice keeps beside the master
-    /// (the game reads the master): their movement's values ([`Master::follow_moving`]), their
+    /// (the game reads the master): their movement's values ([`follow_moving`]), their
     /// dying sprite and death spawns, their construction's hit points, build time and record,
     /// their sight's line of sight and their tile's height test.
     pub(super) fn master_followers(
@@ -482,7 +483,7 @@ impl World {
         {
             ids.push(u.id);
             if let Some(m) = self.parts.mover_mut(u.id) {
-                master.follow_moving(&mut m.stats, attribute, &self.graphics, terrain);
+                follow_moving(&master, &mut m.stats, attribute, &self.graphics, terrain);
                 // the top speed the unit reads with the sprite it shows, from the new base
                 if let Some(shown) = u.sprite.as_ref().map(|s| &s.graphic) {
                     m.stats.show(Some(shown));

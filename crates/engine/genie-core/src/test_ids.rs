@@ -8,6 +8,7 @@ use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::TaskId;
 use crate::objects::masters::{COST_SLOTS, CostSlot};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -55,6 +56,12 @@ pub(crate) fn master_id(value: i16) -> MasterId {
 /// The master `value`, or none for −1 (a field the game fills with −1).
 pub(crate) fn opt_master(value: i16) -> Option<MasterId> {
     MasterId::of_data(value)
+}
+
+/// The task `value` of a test's master (0 or more); const, so a test's constants name tasks too.
+pub(crate) const fn task_id(value: i16) -> TaskId {
+    assert!(0 <= value, "a negative task id");
+    TaskId::of_task(value)
 }
 
 /// The class `value` (0 or more).

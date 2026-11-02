@@ -23,6 +23,7 @@ use crate::objects::{FacetCount, Frame};
 use crate::pathing::zones::ZoneId;
 use crate::players::PlayerType;
 use crate::test_ids::object_id;
+use crate::test_ids::task_id;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
@@ -681,35 +682,32 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
 /// task the master lacks is an error.
 #[test]
 fn transport_move_to_shows_its_task_or_its_master_sprite() {
-    use crate::objects::masters::{Master, Task, TaskId};
+    use crate::objects::masters::{Master, Task};
     let master = Master {
         move_sprite: Some(SpriteId::named(7)),
         tasks: vec![
             Task {
-                id: TaskId::test(4),
+                id: task_id(4),
                 sprites: TaskSprites::of_data([3, -1, -1, -1]),
                 ..Task::default()
             },
             Task {
-                id: TaskId::test(5),
+                id: task_id(5),
                 ..Task::default()
             },
         ],
         ..Master::default()
     };
     let on = |task, master: &Master| TransportAction::given_sprite(task, master);
-    assert_eq!(
-        on(Some(TaskId::test(4)), &master),
-        Ok(Some(SpriteId::named(3)))
-    );
-    assert_eq!(on(Some(TaskId::test(5)), &master), Ok(None));
+    assert_eq!(on(Some(task_id(4)), &master), Ok(Some(SpriteId::named(3))));
+    assert_eq!(on(Some(task_id(5)), &master), Ok(None));
     assert_eq!(on(None, &master), Ok(Some(SpriteId::named(7))));
     let walkless = Master {
         move_sprite: None,
         ..master.clone()
     };
     assert_eq!(on(None, &walkless), Ok(None));
-    assert!(on(Some(TaskId::test(6)), &master).is_err());
+    assert!(on(Some(task_id(6)), &master).is_err());
 }
 
 fn rng() -> Well512 {

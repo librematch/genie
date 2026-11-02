@@ -23,7 +23,6 @@ disable a technology, spawn an object, change a cost.
 | File | What it holds |
 | --- | --- |
 | [`attribute_modifier.rs`](attribute_modifier.rs) | The player's attribute modifier (slot 0x148, `FUN_1416121b0`): the hooks around it, the masters' change and what their objects and an Attack follow of it. |
-| [`change.rs`](change.rs) | An effect's change to a value: set, add or multiply (FD-046). |
 | [`commands.rs`](commands.rs) | The effects' `do_effect` (`FUN_141462440`, then the base `FUN_140ec2ac0`): each command by its kind for every party (`Party`). |
 | [`completion.rs`](completion.rs) | A research's completion (`FUN_1413cdcd0`): its effect, the technologies that depend on it, a built building's technologies, the cost modifier and the disable and enable commands. |
 | [`mod.rs`](mod.rs) | A research's completion and the effects it gives: `FUN_1413cdcd0` (the technology done, its effect, the technologies that depend on it, the player's statistics), the effects' `TRIBE_Effects::do_effect` (`FUN_141462440`, then the base `FUN_140ec2ac0`) with every kind for every party, and what they reach: the player's attribute modifier (slots 0x150, 0x158, 0x160 -> slot 0x148, `FUN_1416121b0`: the hooks `FUN_141614f40` around `FUN_14165a000`, the objects' slots 0x78, 0x80, 0x88 and the masters' 0x18, 0x20, 0x28 of `crate::objects::masters`), the resource commands (slots 0x1b0, 0x1b8, the player's attribute set and add), the technology changes (`'e'`, `'f'`, `'g'`, kind 8), the enables, upgrades, spawns and cost entries. |

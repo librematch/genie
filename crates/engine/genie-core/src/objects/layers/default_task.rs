@@ -3,7 +3,10 @@
 //! `0x14106ac90`, slot 0x7f0), as the load or the object's constructor found it.
 
 use crate::GenieError;
+use crate::gathering::make::MAKE;
+use crate::objects::masters::ACTION_FACTORY_TYPES;
 use crate::objects::masters::ActionType;
+use crate::objects::masters::Master;
 use genie_diff::{Diff, Differ};
 
 /// What an object's default task starts once its action list is empty in state 2: one value
@@ -110,6 +113,21 @@ impl DefaultTask {
             Self::Fails(f) => Some(f),
             Self::Nothing | Self::Fly | Self::Make | Self::Artifact => None,
         }
+    }
+}
+
+/// What a new building of master `master` starts once its action list is empty in state 2
+/// (`RGE_Action_Object::update`, slot 0x7f0): a Make ([`crate::gathering::make`]), or a start
+/// the slice cannot make of another type the factory makes; nothing for a type the factory
+/// makes no action of.
+#[must_use]
+pub fn default_start(master: &Master) -> DefaultTask {
+    match master.default_task() {
+        Some(t) if t.action_type == MAKE => DefaultTask::Make,
+        Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_type) => {
+            DefaultTask::Fails(Unstartable::Unported(t.action_type))
+        }
+        _ => DefaultTask::Nothing,
     }
 }
 

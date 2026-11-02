@@ -177,10 +177,10 @@ impl UnitView<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objects::masters::TaskId;
     #[cfg(test)]
     use crate::objects::masters::action_type::BUILD;
     use crate::test_ids::object_id;
+    use crate::test_ids::task_id;
 
     fn foundation(id: i32) -> FoundationId {
         FoundationId::new(object_id(id))
@@ -188,7 +188,7 @@ mod tests {
 
     fn task() -> Task {
         Task {
-            id: TaskId::test(3),
+            id: task_id(3),
             action_type: BUILD,
             ..Task::default()
         }

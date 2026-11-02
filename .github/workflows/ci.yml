@@ -110,7 +110,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       # The engine core must stay compilable to WebAssembly. Add every new engine crate here.
-      - run: cargo build --locked -p genie-error -p genie-diff -p genie-math -p genie-core -p genie-command-codec -p genie-oracle --target wasm32-unknown-unknown
+      - run: cargo build --locked -p genie-error -p genie-diff -p genie-math -p genie-model -p genie-core -p genie-command-codec -p genie-oracle --target wasm32-unknown-unknown
 
   docs:
     name: Docs

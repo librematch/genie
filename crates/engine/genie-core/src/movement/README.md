@@ -56,8 +56,6 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`levels.rs`](levels.rs) | The levels of a unit's path data by their role: the walked level and its parent. |
 | [`long_walk.rs`](long_walk.rs) | A step's reach of its waypoint, the long pather's walker and the units whose tiles it lowers. |
 | [`mod.rs`](mod.rs) | A unit's movement (`RGE_Moving_Object`, MovingObject.cpp in 158041): the velocity step that moves it along its forward vector, and the motion step that steers it along its path. |
-| [`move_algorithm.rs`](move_algorithm.rs) | A moving master's move algorithm (`MoveAlgorithm`, `move_algorithm`). |
-| [`move_stats.rs`](move_stats.rs) | What a moving master's motion reads of its master and its sprites (FD-046: the model's part of the movement). |
 | [`new_path.rs`](new_path.rs) | A new level's path: no path, its link under the walked level, the short pather's ignore list and a blocked start. |
 | [`path_counts.rs`](path_counts.rs) | A path level's link to its parent and the plans it may still try; a mover's wait delays and substitute count. |
 | [`path_end.rs`](path_end.rs) | The reach test, a `MoveTo`'s path end that follows its target, the top path and the pauses. |
@@ -66,10 +64,8 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`path_state.rs`](path_state.rs) | A path level's state: whether it asks for a path, walks it or is done with it. |
 | [`request.rs`](request.rs) | The motion step's path request: the long pather's plan, the walled-off stretches and the goal's reach. |
 | [`request_plans.rs`](request_plans.rs) | The path request's planners for a unit with a footprint: the tile pathfinder's first plan, the short pather's tail, the long pather for a far waypoint and the tile pathfinder again. |
-| [`speed.rs`](speed.rs) | A speed on the map in tiles per second (`Speed`), with the game's `f32` operations. |
 | [`step.rs`](step.rs) | The velocity step, a new object's setup, the position setter and the motion step's loop. |
 | [`tests.rs`](tests.rs) | Tests. |
-| [`turn_rate.rs`](turn_rate.rs) | How fast a unit or a group turns (`TurnRate`, radians per second), with the game's `f32` operations. |
 | [`unit.rs`](unit.rs) | The movement actions in a unit's update: the velocity step, the unit's own `MoveTo`, its Explore and a bird's Fly. |
 | [`walk.rs`](walk.rs) | The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed control. |
 | [`waypoint.rs`](waypoint.rs) | A reached waypoint and what follows it: the next waypoint, a level's end and the moving state. |

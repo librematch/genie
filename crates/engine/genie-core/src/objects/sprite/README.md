@@ -9,11 +9,10 @@ the speed it gives a mover, which the game-data model takes along (FD-046).
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`graphic.rs`](graphic.rs) | A sprite's definition and the speed it gives a mover (FD-046: the model's part of the sprites). |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`movement`](../../movement/), [`world`](../../world/).
+- Uses: no other system.
 <!-- /uses -->

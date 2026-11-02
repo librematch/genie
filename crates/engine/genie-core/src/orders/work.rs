@@ -32,6 +32,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::work_master;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{ATTACK_TASK, Work};
 use crate::ownership::artifact::ARTIFACT_TYPE;
@@ -219,7 +220,7 @@ impl World {
     }
 
     /// The work command (slot 37, `FUN_14106ff70`) of a unit on a target object: the master and
-    /// task of [`crate::objects::masters::Masters::work_master`] (the master changes, slot 0x90), the task's
+    /// task of [`crate::objects::masters::work_master`] (the master changes, slot 0x90), the task's
     /// requirement, then the task's action from the action list's factory (slot 0x10), the unit
     /// AI's notify (slot 0x828) and the install (slot 0x808).
     pub(super) fn work_command(
@@ -286,7 +287,7 @@ impl World {
     }
 
     /// The work command's master and task for the unit at (`player`, `idx`) on `target` (none
-    /// for a point) at `point` ([`crate::objects::masters::Masters::work_master`] under the task
+    /// for a point) at `point` ([`crate::objects::masters::work_master`] under the task
     /// `filter`, the terrain under the point for a task for a terrain): the master with the task
     /// found.
     pub(super) fn work_task(
@@ -326,9 +327,7 @@ impl World {
             general: general.as_ref(),
             terrain: self.task_terrain(point),
         };
-        Ok(masters
-            .work_master(&actor, &on, filter, &world)?
-            .map(|(with, task)| (with, *task)))
+        Ok(work_master(masters, &actor, &on, filter, &world)?.map(|(with, task)| (with, *task)))
     }
 
     /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,

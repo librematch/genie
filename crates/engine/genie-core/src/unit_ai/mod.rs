@@ -106,7 +106,7 @@ use self::ids::{
     TREBUCHET_PACKED_CLASS, VILLAGER_NOTIFY, WALK_BACK, closest_undiscovered_tile, dodges,
     held_action_state, order_move, retarget_kind, siege_stance, soldier_stance,
 };
-pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_type};
+pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_type, unit_ai_type};
 pub(crate) use self::ids::{alert_owner, helper_answers, searches_on_class};
 pub use self::issuer::Issuer;
 pub use self::notifies::Inbox;

@@ -27,7 +27,6 @@ its mills' food. After the objects, the player's scout map takes the tiles that 
 | [`mod.rs`](mod.rs) | The world player's own update (`WorldPlayer::update`, `0x14163b100`, slot 0x100) and Gaia's (`WorldPlayerGaia::update`, `0x141681cd0`, its slot 0x100). |
 | [`tech_tree.rs`](tech_tree.rs) | The game's tech tree table (`TechTree`, `FUN_140c7e080`) and its lookups. |
 | [`tests.rs`](tests.rs) | Tests. |
-| [`tree_ids.rs`](tree_ids.rs) | The ids the tech tree table holds: its masters and its technologies, as the game's ints. |
 | [`update.rs`](update.rs) | The world player's update: the loop's seconds, the explored share, the defeat check and what keeps a player in the game. |
 | [`tech_tree/`](tech_tree/) |  |
 <!-- /files -->

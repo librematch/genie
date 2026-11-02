@@ -47,7 +47,7 @@ use crate::world::WorldTime;
 mod counts;
 mod income;
 mod tech_tree;
-mod tree_ids;
+use genie_model::players::world_player::tree_ids;
 mod update;
 
 pub use self::tech_tree::{TechTree, TreeBuilding, TreeQuery, TreeUnit, UniqueUnit};

@@ -65,6 +65,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
+use crate::test_ids::task_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::{adds, amounts};
 use crate::unit_ai::ActionKind;
@@ -242,7 +243,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         t.players[1].objects.last_place().unwrap()
     };
     let task = HuntTask {
-        id: TaskId::test(0),
+        id: task_id(0),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,
@@ -302,7 +303,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         },
     ));
     let repair_task = RepairTask {
-        id: TaskId::test(0),
+        id: task_id(0),
         work_value: WorkValue::new(1.0),
         moving: None,
         proceeding: None,
@@ -440,7 +441,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
                 point: Position::from([-1.0; 3]),
                 target_class: None,
                 task: HuntTask {
-                    id: TaskId::test(0),
+                    id: task_id(0),
                     range: Distance::ZERO,
                     resource: None,
                     sprites: TaskSprites::NONE,

@@ -51,8 +51,10 @@ use crate::test_ids::object_id;
 use crate::test_ids::{class_of, opt_master};
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::task_finder::TaskOn;
+use crate::unit_ai::unit_ai_type;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
+use std::sync::LazyLock;
 
 /// A sprite field as the attribute tests read it: its id, −1 for none.
 fn sprite_value(s: Option<SpriteId>) -> f32 {
@@ -152,10 +154,29 @@ impl Diplomacy for Alone {
     }
 }
 
+/// A sprite table holding the ids 1 to 99.
+static SPRITES: LazyLock<Graphics> = LazyLock::new(|| {
+    (1..100)
+        .map(|id| {
+            let sprite = SpriteId::named(id);
+            let graphic = Graphic {
+                id: sprite,
+                frames: Frame::of_data(1),
+                facets: FacetCount::of_data(1),
+                speed_multiplier: SpeedMultiplier::ONE,
+                frame_duration: Seconds::ZERO,
+                replay_delay: Seconds::ZERO,
+                flags: SpriteFlags::empty(),
+            };
+            (sprite, graphic)
+        })
+        .collect()
+});
+
 /// A world whose sprite table holds the ids 1 to 99, without a handicap.
 fn world(capped: bool) -> AttributeWorld<'static> {
     AttributeWorld {
-        sprite: &|id| (1..100).contains(&id),
+        sprites: &SPRITES,
         handicap: None,
         capped,
     }
@@ -983,7 +1004,7 @@ fn the_train_location_attributes_change_the_selected_entry() {
         (m.train_locations.len(), m.train_location_entry.get()),
         (2, 1)
     );
-    m.follow(attribute::TRAIN_TIME, &Graphics::new(), None);
+    follow(&mut m, attribute::TRAIN_TIME, &Graphics::new(), None);
     assert_eq!(
         (m.trained_at.clone(), m.build_time),
         (
@@ -1019,7 +1040,12 @@ fn the_damage_sprite_attributes_resize_and_select() {
     m.multiply_attribute(attribute::DAMAGE_GRAPHICS_ENTRY_MOD, -3.0, &world(false));
     assert_eq!(m.damage_graphics, []);
     assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(0xff));
-    m.follow(attribute::DAMAGE_GRAPHICS_ENTRY_MOD, &Graphics::new(), None);
+    follow(
+        &mut m,
+        attribute::DAMAGE_GRAPHICS_ENTRY_MOD,
+        &Graphics::new(),
+        None,
+    );
     assert!(!m.damage_sprites);
 }
 
@@ -1134,21 +1160,21 @@ fn moving_master_derived_values_follow_its_attributes() {
         weapon_range: Distance::ZERO,
     });
     m.multiply_attribute(attribute::MOVEMENT_SPEED, 1.1, &world(false));
-    m.follow(attribute::MOVEMENT_SPEED, &graphics, None);
+    follow(&mut m, attribute::MOVEMENT_SPEED, &graphics, None);
     let s = m.moving.unwrap();
     assert_eq!((s.base, s.speed), (Speed::new(1.1), Speed::new(1.1 * 1.5)));
     m.set_attribute(attribute::SIZE_Z, 1.0, &world(false));
-    m.follow(attribute::SIZE_Z, &graphics, None);
+    follow(&mut m, attribute::SIZE_Z, &graphics, None);
     assert!(m.tall);
     assert_eq!(m.moving.unwrap().radius, Radii::new(0.2, 0.2, 1.0));
     m.set_attribute(attribute::RUNNING_GRAPHIC, 3.0, &world(false));
-    m.follow(attribute::RUNNING_GRAPHIC, &graphics, None);
+    follow(&mut m, attribute::RUNNING_GRAPHIC, &graphics, None);
     let s = m.moving.unwrap();
     assert_eq!(s.speed, Speed::new(1.1 * 0.5));
     // 8 facets and 16: no common count
     assert_eq!(s.facets, None);
     m.set_attribute(attribute::RUNNING_GRAPHIC, 2.0, &world(false));
-    m.follow(attribute::RUNNING_GRAPHIC, &graphics, None);
+    follow(&mut m, attribute::RUNNING_GRAPHIC, &graphics, None);
     assert_eq!(
         m.moving.unwrap().facets,
         Some(SpriteFacets {
@@ -1423,7 +1449,7 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
             general: Some(&site),
             terrain: None,
         };
-        m.work_master(&actor, &on, None, &Alone).map(|w| {
+        work_master(m, &actor, &on, None, &Alone).map(|w| {
             w.map(|(id, t)| {
                 (
                     id.get(),
@@ -1489,7 +1515,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             general: Some(&site),
             terrain: None,
         };
-        m.work_master(&actor, &on, None, &Alone)
+        work_master(&m, &actor, &on, None, &Alone)
             .map(|w| w.map(|(id, t)| (id.get(), t.action_type)))
     };
     assert_eq!(
@@ -1513,24 +1539,39 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     };
     // a building without a volley missile, with one (the tower's), and a boar's combat level
     assert_eq!(
-        master(class::BUILDING, None, CombatLevel::NONE).unit_ai_type(ids::HOUSE),
+        unit_ai_type(
+            &master(class::BUILDING, None, CombatLevel::NONE),
+            ids::HOUSE
+        ),
         Some(UnitAiType::BUILDING)
     );
     assert_eq!(
-        master(class::BUILDING, Some(master_id(5)), CombatLevel::NONE).unit_ai_type(master_id(79)),
+        unit_ai_type(
+            &master(class::BUILDING, Some(master_id(5)), CombatLevel::NONE),
+            master_id(79),
+        ),
         Some(UnitAiType::TOWER)
     );
     assert_eq!(
-        master(class::PREDATOR, None, CombatLevel::ANIMAL).unit_ai_type(master_id(48)),
+        unit_ai_type(
+            &master(class::PREDATOR, None, CombatLevel::ANIMAL),
+            master_id(48)
+        ),
         Some(UnitAiType::BOAR)
     );
     assert_eq!(
-        master(class::PREDATOR, None, CombatLevel::NONE).unit_ai_type(master_id(126)),
+        unit_ai_type(
+            &master(class::PREDATOR, None, CombatLevel::NONE),
+            master_id(126)
+        ),
         Some(UnitAiType::LION)
     );
     // the factory's own ids first
     assert_eq!(
-        master(class::BUILDING, None, CombatLevel::NONE).unit_ai_type(ids::ID_1105),
+        unit_ai_type(
+            &master(class::BUILDING, None, CombatLevel::NONE),
+            ids::ID_1105
+        ),
         Some(UnitAiType::SIEGE_TOWER)
     );
 }

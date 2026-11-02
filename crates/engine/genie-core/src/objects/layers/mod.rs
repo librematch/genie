@@ -24,7 +24,7 @@ mod motion;
 pub use self::action::Action;
 pub use self::building::Building;
 pub use self::combat::Combat;
-pub use self::default_task::{DefaultTask, UnreadDefault, Unstartable};
+pub use self::default_task::{DefaultTask, UnreadDefault, Unstartable, default_start};
 pub use self::motion::{Animated, Motion, MotionMut};
 use crate::map::spatial::Placed;
 

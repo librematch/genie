@@ -33,12 +33,13 @@ use crate::players::relation_row;
 use crate::technology::Attributes;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
+use crate::test_ids::task_id;
 use crate::unit_ai::{ActionKind, NotifyKind};
 use crate::world::tests::{in_update, repairing};
 use crate::world::{Player, World, WorldTime};
 
 const TASK: RepairTask = RepairTask {
-    id: TaskId::test(7),
+    id: task_id(7),
     work_value: WorkValue::new(0.5),
     moving: None,
     proceeding: None,

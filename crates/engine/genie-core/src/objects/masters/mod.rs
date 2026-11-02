@@ -2,31 +2,28 @@
 //! changes into to do them, and how an effect changes a master: the attribute setters (slots
 //! 0x18, 0x20 and 0x28 of every master type, [`Master::set_attribute`]), the master copy of an
 //! upgrade (slot 8, [`Master::copy_from`]) and the values the slice derives from a master
-//! ([`Master::follow`]). The values are game data: the player's masters in the save, with the
+//! ([`follow`]). The values are game data: the player's masters in the save, with the
 //! `.dat`'s values for what the save does not carry.
 
-mod combat_level;
-mod combat_setters;
-mod conversion_adjust;
-mod cost_amount;
-mod cost_slot;
+use genie_model::objects::masters::combat_level;
+use genie_model::objects::masters::conversion_adjust;
+use genie_model::objects::masters::cost_amount;
+use genie_model::objects::masters::cost_slot;
 mod derived;
-mod dispatch;
 mod lookup;
-mod spacing_modifier;
-mod static_setters;
-mod target_owner;
-mod task_id;
-mod task_index;
-mod task_terrain;
-mod trail;
-mod tribe_setters;
-mod values;
+use genie_model::objects::masters::spacing_modifier;
+use genie_model::objects::masters::target_owner;
+use genie_model::objects::masters::task_id;
+use genie_model::objects::masters::task_index;
+use genie_model::objects::masters::task_terrain;
+use genie_model::objects::masters::trail;
+use genie_model::objects::masters::values;
 
 pub use self::combat_level::CombatLevel;
 pub use self::cost_amount::CostAmount;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
-pub use self::lookup::{MasterTables, OwnerMasters, PlayersMasters, player_master};
+pub use self::derived::{follow, follow_moving};
+pub use self::lookup::{MasterTables, OwnerMasters, PlayersMasters, player_master, work_master};
 pub use self::spacing_modifier::SpacingModifier;
 pub use self::target_owner::TargetOwner;
 pub use self::task_id::TaskId;
@@ -35,11 +32,6 @@ pub use self::task_terrain::TaskTerrain;
 pub use self::trail::{Trail, TrailDensity, TrailMode};
 pub use self::values::AttributeWorld;
 pub(crate) use self::values::cost_resource;
-use self::values::{
-    MISSILE_SPEED_CAP, PERCENT, ROUND, SPEED_CAP, add_short, add_sprite, class_amount, handicapped,
-    id_of, insert_damage_graphic, insert_train_location, low8, low16, multiply_short,
-    resize_damage_graphics, resize_train_locations, select_entry, set_sprite,
-};
 #[cfg(test)]
 use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskTarget};
 
@@ -51,60 +43,60 @@ pub const ACTION_FACTORY_TYPES: [ActionType; 28] = action_type::types([
     0x83, 0x84, 0x87, 0x88, 0x95, 0x9a, 4, 5, 7, 10, 0xd, 0x15,
 ]);
 
-pub mod action_type;
-mod adjacent_mode;
-mod attack_priority;
-pub mod attribute;
-mod blast_level;
-mod buildable_on;
-mod carry_capacity;
-mod charge_event;
-mod charge_target;
-mod charge_type;
-pub mod class;
-mod class_id;
+pub use genie_model::objects::masters::action_type;
+use genie_model::objects::masters::adjacent_mode;
+use genie_model::objects::masters::attack_priority;
+pub use genie_model::objects::masters::attribute;
+use genie_model::objects::masters::blast_level;
+use genie_model::objects::masters::buildable_on;
+use genie_model::objects::masters::carry_capacity;
+use genie_model::objects::masters::charge_event;
+use genie_model::objects::masters::charge_target;
+use genie_model::objects::masters::charge_type;
+pub use genie_model::objects::masters::class;
+use genie_model::objects::masters::class_id;
 mod class_mask;
-mod combat_ability;
-mod damage_amount;
-mod damage_class;
-mod damage_share;
-mod damage_sprite;
-mod entries;
-mod fly_mode;
-mod fog_visibility;
-mod formation_class;
-mod garrison_capacity;
-mod garrison_kinds;
-mod gather_group;
-mod ghost_mode;
-mod hero_flags;
-mod hill_mode;
-mod hit_chance;
-mod id_field;
-pub mod ids;
-mod interaction_mode;
-mod interface_kind;
-mod invulnerability;
-mod master;
-mod master_id;
-mod master_kind;
-pub mod master_type;
-mod minimap_mode;
-mod object_flags;
-mod obstruction_class;
-mod obstruction_type;
-mod occlusion;
-mod placement_terrains;
-mod run_pattern;
-mod selection_effect;
-mod sound_events;
-mod special_attack;
-mod task;
-mod task_flags;
-mod task_group;
-mod task_sprites;
-mod volley_spread;
-mod work_value;
+use genie_model::objects::masters::combat_ability;
+use genie_model::objects::masters::damage_amount;
+use genie_model::objects::masters::damage_class;
+use genie_model::objects::masters::damage_share;
+use genie_model::objects::masters::damage_sprite;
+use genie_model::objects::masters::entries;
+use genie_model::objects::masters::fly_mode;
+use genie_model::objects::masters::fog_visibility;
+use genie_model::objects::masters::formation_class;
+use genie_model::objects::masters::garrison_capacity;
+use genie_model::objects::masters::garrison_kinds;
+use genie_model::objects::masters::gather_group;
+use genie_model::objects::masters::ghost_mode;
+use genie_model::objects::masters::hero_flags;
+use genie_model::objects::masters::hill_mode;
+use genie_model::objects::masters::hit_chance;
+use genie_model::objects::masters::id_field;
+pub use genie_model::objects::masters::ids;
+use genie_model::objects::masters::interaction_mode;
+use genie_model::objects::masters::interface_kind;
+use genie_model::objects::masters::invulnerability;
+use genie_model::objects::masters::master;
+use genie_model::objects::masters::master_id;
+use genie_model::objects::masters::master_kind;
+pub use genie_model::objects::masters::master_type;
+use genie_model::objects::masters::minimap_mode;
+use genie_model::objects::masters::object_flags;
+use genie_model::objects::masters::obstruction_class;
+use genie_model::objects::masters::obstruction_type;
+use genie_model::objects::masters::occlusion;
+use genie_model::objects::masters::placement_terrains;
+use genie_model::objects::masters::run_pattern;
+use genie_model::objects::masters::selection_effect;
+use genie_model::objects::masters::sound_events;
+use genie_model::objects::masters::special_attack;
+use genie_model::objects::masters::task;
+use genie_model::objects::masters::task_flags;
+use genie_model::objects::masters::task_group;
+use genie_model::objects::masters::task_sprites;
+use genie_model::objects::masters::volley_spread;
+use genie_model::objects::masters::work_value;
 
 pub use self::action_type::ActionType;
 pub use self::adjacent_mode::AdjacentMode;

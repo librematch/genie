@@ -62,7 +62,6 @@ use crate::objects::masters::MasterField;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionType;
-use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskTerrain;
 use crate::objects::masters::action_type::{COMBAT, DEPOSIT};
 use crate::objects::masters::class;
@@ -92,6 +91,7 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
+use crate::test_ids::task_id;
 use crate::test_ids::unit_list;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Issuer;
@@ -3105,7 +3105,7 @@ fn transport_task_world() -> (World, ListIndex) {
         *m = Masters::new(all);
         if let Some(s) = m.get_mut(SHIP) {
             s.tasks.push(Task {
-                id: TaskId::test(7),
+                id: task_id(7),
                 action_type: transport::TRANSPORT,
                 object_group: None,
                 object_id: None,
@@ -3165,7 +3165,7 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
         (
             TransportState::Sail { move_to: None },
             TransportMode::NEW,
-            Some(TaskId::test(7)),
+            Some(task_id(7)),
             Position::new(14.5, 10.5, 0.0),
             Some(MoveTo::Start)
         )

@@ -23,7 +23,6 @@ use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::{Action, Motion, Static};
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::WorkValue;
 use crate::objects::masters::class;
@@ -36,6 +35,7 @@ use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::test_ids::task_id;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
 use crate::world::step::Step;
@@ -200,7 +200,7 @@ impl Rig {
 /// A forager's task: food (kind 17, berries), range 0.25, work value 1 (the 4v4's 31139).
 fn task() -> HuntTask {
     HuntTask {
-        id: TaskId::test(2),
+        id: task_id(2),
         range: Distance::new(0.25),
         resource: Some(AttributeId::numbered(17)),
         sprites: TaskSprites::NONE,

@@ -9,7 +9,6 @@ sprites have, which the game-data model takes along (FD-046).
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`sprite_facets.rs`](sprite_facets.rs) | The facets a master's sprites have (FD-046: the model's part of the facing). |
 <!-- /files -->
 
 ## How it connects

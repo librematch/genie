@@ -25,6 +25,7 @@ use crate::objects::masters::action_type;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::player_master;
+use crate::objects::masters::work_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::orders::Dispatch;
 use crate::orders::{Work, readiness};
@@ -169,12 +170,10 @@ impl World {
     }
 
     /// What slot 0x128 on `foundation` (of `master`, player `fp`'s, at `position`) takes for the
-    /// builder `id` of player `q`: the master it builds with ([`Masters::work_master`], with
+    /// builder `id` of player `q`: the master it builds with ([`work_master`], with
     /// `q`'s masters and attributes) and the Build action of that master's task. A builder
     /// whose action would be replaced, without a Build task for it or with one not enabled, is
     /// not modelled.
-    ///
-    /// [`Masters::work_master`]: crate::objects::masters::Masters::work_master
     pub(crate) fn build_task(
         &self,
         q: PlayerId,
@@ -230,12 +229,9 @@ impl World {
             general: Some(&target),
             terrain: self.task_terrain(Position::new(position.x(), position.y(), 0.0)),
         };
-        let (with, task) =
-            masters
-                .work_master(&actor, &on, None, &world)?
-                .ok_or(GenieError::unsupported(
-                    "a builder with no task for its foundation",
-                ))?;
+        let (with, task) = work_master(masters, &actor, &on, None, &world)?.ok_or(
+            GenieError::unsupported("a builder with no task for its foundation"),
+        )?;
         if task.action_type != action_type::BUILD {
             return Err(GenieError::unsupported(
                 "a builder whose task for its foundation is not Build",

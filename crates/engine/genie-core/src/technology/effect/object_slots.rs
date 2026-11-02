@@ -8,11 +8,9 @@ use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::image::effect::{ONE as EFFECT_ONE, ROUND as EFFECT_ROUND};
-use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::SpriteId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterAttribute;
@@ -43,20 +41,6 @@ pub(super) const OBJECT_HP_CAP: f32 = 32767.0;
 pub(super) const ROUND: f32 = EFFECT_ROUND;
 
 impl World {
-    /// What the masters' setters read of the world for player `p` ([`AttributeWorld`]): the
-    /// sprite table (the `.dat`'s graphics), no handicap (`player+0x668`, not held: none in the
-    /// games probed) and the player's `+0x648` unset (not held: 0 for every player probed).
-    ///
-    /// [`AttributeWorld`]: crate::objects::masters::AttributeWorld
-    pub(super) fn attribute_world(graphics: &Graphics) -> impl Fn(i32) -> bool + '_ {
-        move |id| {
-            i16::try_from(id)
-                .ok()
-                .and_then(SpriteId::of_data)
-                .is_some_and(|id| graphics.contains_key(id))
-        }
-    }
-
     /// The ids player `p`'s tracker files under class `class` (`FUN_14104f8f0`, key class + 900)
     /// and those pending under it (`FUN_14104f9e0`, key class + 90900), each in the tracker's
     /// order. A queued unit's place holds −1, which no object has: every reader's lookup passes

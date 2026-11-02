@@ -31,6 +31,7 @@ use crate::players::attribute;
 use crate::technology::effect::{MasterSprites, follow_master};
 use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
 use crate::unit_ai::UnitAi;
+use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
@@ -417,8 +418,7 @@ impl World {
     fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> Result<(), GenieError> {
         let position = self.object_at(place)?.position();
         let made = self.new_object(p, new.id, new, position)?;
-        let ai = new
-            .unit_ai_type(new.id)
+        let ai = unit_ai_type(new, new.id)
             .and_then(|t| UnitAi::constructed(t, &made, self.streams.get(Stream::Ai)));
         let id = self.object_at(place)?.id;
         self.set_part(id, Part::UnitAi(ai.map(Box::new)))?;
@@ -595,6 +595,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
+    use crate::test_ids::task_id;
     use crate::vision::TileCount;
     use crate::vision::VisionBits;
     #[cfg(test)]
@@ -1023,43 +1024,28 @@ mod tests {
             .unwrap();
         let mut old = t.masters[1].get(master_id(120)).unwrap().clone();
         old.tasks.push(task(
-            TaskId::test(3),
+            task_id(3),
             action_type::BUILD,
             Some(class_id(3)),
             Distance::new(0.25),
         ));
-        let make = task(TaskId::test(4), MAKE, None, Distance::ZERO);
-        let waiting = task(
-            TaskId::test(9),
-            WAIT_SOLIDIFY,
-            Some(class_id(3)),
-            Distance::ZERO,
-        );
+        let make = task(task_id(4), MAKE, None, Distance::ZERO);
+        let waiting = task(task_id(9), WAIT_SOLIDIFY, Some(class_id(3)), Distance::ZERO);
         let new = Master {
             id: master_id(121),
             tasks: vec![
-                task(
-                    TaskId::test(5),
-                    GATHER,
-                    Some(class_id(7)),
-                    Distance::new(0.5),
-                ),
-                task(
-                    TaskId::test(6),
-                    GATHER,
-                    Some(class_id(7)),
-                    Distance::new(0.75),
-                ),
+                task(task_id(5), GATHER, Some(class_id(7)), Distance::new(0.5)),
+                task(task_id(6), GATHER, Some(class_id(7)), Distance::new(0.75)),
                 Task {
                     sprites: TaskSprites::of_data([12, -1, -1, -1]),
                     ..task(
-                        TaskId::test(7),
+                        task_id(7),
                         action_type::BUILD,
                         Some(class_id(3)),
                         Distance::new(1.5),
                     )
                 },
-                task(TaskId::test(8), MAKE, None, Distance::new(2.0)),
+                task(task_id(8), MAKE, None, Distance::new(2.0)),
             ],
             ..old.clone()
         };
@@ -1069,7 +1055,7 @@ mod tests {
             work_value: WorkValue::new(0.5),
             work_rate: WorkRate::new(1.0),
             resource: Some(AttributeId::numbered(17)),
-            id: TaskId::test(3),
+            id: task_id(3),
             moving: None,
         };
         t.parts
@@ -1124,7 +1110,7 @@ mod tests {
                 work_value: WorkValue::new(3.0),
                 work_rate: WorkRate::new(1.0),
                 resource: Some(AttributeId::numbered(17)),
-                id: TaskId::test(7),
+                id: task_id(7),
                 moving: Some(SpriteId::named(12)),
             }
         );

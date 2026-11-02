@@ -35,6 +35,7 @@ use crate::players::PlayerId;
 use crate::production::spawn::{
     Facing, NOT_MOVING, Placing, Site, WorldMap, corner_tiles, placement, spawn_point,
 };
+use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
@@ -396,7 +397,7 @@ impl World {
     /// A death spawn or the remains of a building master: its slot 0x40 (`FUN_14123d1a0`) makes a
     /// building at `at` (`FUN_1411ac5c0` with 1, so its init `FUN_1411de5f0`): the building's
     /// factory and constructor as any new building's ([`World::make_building`], with the unit AI
-    /// its class gets, [`crate::objects::masters::Master::unit_ai_type`]). Not held: the dead
+    /// its class gets, [`unit_ai_type`]). Not held: the dead
     /// object's `+0x6a8` and its facet (`FUN_14119d490`).
     ///
     /// # Errors
@@ -413,7 +414,7 @@ impl World {
                 "a computer player's new building (its AI's slot 0x398)",
             ));
         }
-        let ai_type = made.unit_ai_type(made.id);
+        let ai_type = unit_ai_type(made, made.id);
         let _ = self.make_building(p, made.id, Ok(ai_type), at)?;
         Ok(())
     }

@@ -28,6 +28,7 @@ use crate::objects::ObjectState;
 use crate::objects::Relics;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::default_start;
 use crate::objects::layers::{Action, Animated, Building, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::death_parts::count_class;
@@ -51,6 +52,7 @@ use crate::players::attribute::BUILDING_COST;
 use crate::trace::player_unsupported;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
+use crate::unit_ai::unit_ai_type;
 use crate::world::NO_ATTRIBUTE;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -62,7 +64,7 @@ use crate::world::{Gate, World};
 impl World {
     /// The new foundation of BUILD and of `BUILD_WALL`'s tiles (the master's slot 0x108,
     /// [`World::make_building`], with the unit AI type the factory gives its master,
-    /// [`Master::unit_ai_type`]), then the player pays the master's cost (each entry flagged
+    /// [`unit_ai_type`]), then the player pays the master's cost (each entry flagged
     /// paid). Its id, which takes the foundation's role here, and position.
     pub(crate) fn found(
         &mut self,
@@ -70,7 +72,7 @@ impl World {
         master: MasterId,
         position: Position,
     ) -> Result<(FoundationId, Position), GenieError> {
-        let unit_ai = self.master(player, master)?.unit_ai_type(master);
+        let unit_ai = unit_ai_type(self.master(player, master)?, master);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
         let cost = self.master(player, master)?.cost;
         let owner = self.players.player_mut(player)?;
@@ -173,7 +175,7 @@ impl World {
         let id = self.take_object_id(player, master);
         // what its first update as a built building starts (slot 0x7f0)
         let default_task = player_master(&self.masters, player, master)
-            .map_or(DefaultTask::Nothing, Master::default_start);
+            .map_or(DefaultTask::Nothing, default_start);
         let ai = unit_ai
             .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
             .map(|(t, new)| {
@@ -380,7 +382,7 @@ impl World {
             };
             // the .dat's annexes are buildings (type 80): another type's master has no building
             // part, which the constructor below refuses
-            let ai = Ok(am.unit_ai_type(annex));
+            let ai = Ok(unit_ai_type(&am, annex));
             let at = Position::new(position.x() + off.x(), position.y() + off.y(), given_z);
             let (aid, at) = self.make_building(player, annex, ai, at)?;
             self.link_annex(player, (id, slot), aid, &made, &am)?;

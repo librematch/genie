@@ -3,12 +3,12 @@
 //! own update.
 
 pub mod ai_module;
-mod amount;
-mod amount_rate;
-pub mod attribute;
+use genie_model::players::amount;
+use genie_model::players::amount_rate;
+pub use genie_model::players::attribute;
 mod by_player;
 mod chance;
-mod civ_id;
+use genie_model::players::civ_id;
 pub mod diplomacy;
 mod escrow_share;
 pub mod game_status;

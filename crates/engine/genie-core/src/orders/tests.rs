@@ -83,6 +83,7 @@ use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
+use crate::test_ids::task_id;
 use crate::unit_ai::ActionKind;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -5202,7 +5203,7 @@ fn work_command_finds_its_master_and_task_on_target() {
         .expect("the Gather task");
     assert_eq!(
         (with, task.id, task.action_type),
-        (master_id(120), TaskId::test(2), GATHER)
+        (master_id(120), task_id(2), GATHER)
     );
     assert_eq!(
         t.work_task(
@@ -5355,7 +5356,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         Ok(true)
     );
     let other = Task {
-        id: TaskId::test(9),
+        id: task_id(9),
         ..task
     };
     assert_eq!(
@@ -5394,7 +5395,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         work_value: WorkValue::new(1.0),
         work_rate: WorkRate::new(1.0),
         resource: None,
-        id: TaskId::test(3),
+        id: task_id(3),
         moving: None,
     };
     t.parts

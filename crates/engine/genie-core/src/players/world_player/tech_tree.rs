@@ -1,6 +1,6 @@
 //! The game's tech tree table ([`TechTree`], `FUN_140c7e080`) and its lookups.
 
-mod tech_tree_data;
+use genie_model::players::world_player::tech_tree::tech_tree_data;
 
 pub use self::tech_tree_data::TechTree;
 pub use self::tech_tree_data::TreeBuilding;
