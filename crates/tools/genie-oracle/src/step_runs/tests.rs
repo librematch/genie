@@ -22,7 +22,7 @@ fn syncs(n: usize) -> Vec<u8> {
 /// Every step of the update is reported in the schedule's order, and a quiet world against the
 /// same quiet save parts at none of them.
 #[test]
-fn a_quiet_update_parts_at_no_step() {
+fn quiet_update_parts_at_no_step() {
     let (save, rec) = (quiet(), syncs(3));
     let game_at = |_| Some((quiet(), None));
     let steps = steps_from_save(&save, &rec, 0, None, Dumps::default(), &game_at).unwrap();
@@ -43,7 +43,7 @@ fn a_quiet_update_parts_at_no_step() {
 
 /// A step without the game's save is not compared; the others are.
 #[test]
-fn a_step_without_the_game_s_save_is_not_compared() {
+fn step_without_the_game_save_is_not_compared() {
     let (save, rec) = (quiet(), syncs(3));
     let game_at =
         |s| matches!(s, UpdateStep::Player(PlayerStep::Objects, _)).then(|| (quiet(), None));

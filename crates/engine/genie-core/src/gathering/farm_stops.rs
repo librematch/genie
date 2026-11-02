@@ -85,7 +85,7 @@ mod tests {
 
     /// A farm of four stops walks on from its first three stops, not from its last.
     #[test]
-    fn a_farm_of_four_stops_walks_on_from_the_first_three() {
+    fn farm_of_four_stops_walks_on_from_the_first_three() {
         let four = FarmStops::of_data(4);
         assert!(four.several() && !FarmStops::ONE.several());
         assert!(StopIndex::of_data(2).before_last(four));

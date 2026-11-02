@@ -8,7 +8,7 @@ use genie_core::vision::registry::SLOTS;
 const POOLS: &str = "pool 60 2\n101 1\n102 0\n\npool 25 2\n201 0\n202 0\n";
 
 #[test]
-fn the_missile_pool_comes_back_in_the_slice_s_order() {
+fn the_missile_pool_comes_back_in_the_slice_order() {
     assert_eq!(
         recycle_pools_from_dump(POOLS).unwrap(),
         [(object_id(102), false), (object_id(101), true)]
@@ -22,7 +22,7 @@ fn the_missile_pool_comes_back_in_the_slice_s_order() {
 /// An object line before a pool line, a word that is not a number or a line of another shape
 /// is out of shape.
 #[test]
-fn a_pool_dump_out_of_shape_is_an_error() {
+fn pool_dump_out_of_shape_is_an_error() {
     for text in [
         "101 1\n",
         "pool sixty 1\n",
@@ -58,7 +58,7 @@ fn mask_line(id: i32, slots: &[i64]) -> String {
 }
 
 #[test]
-fn a_registry_dump_reads_its_lists_and_masks() {
+fn registry_dump_reads_its_lists_and_masks() {
     let one = 1.0_f32.to_bits();
     let text = format!(
         "registry 2 3\nlist 1 2 1 4\nrec 77 {one:x} 1 {one:x} {:x} 0 0\n{}\n",
@@ -80,7 +80,7 @@ fn a_registry_dump_reads_its_lists_and_masks() {
 }
 
 #[test]
-fn a_registry_dump_out_of_shape_is_an_error() {
+fn registry_dump_out_of_shape_is_an_error() {
     let rec = "rec 77 0 1 0 0 0 0";
     for text in [
         String::new(),

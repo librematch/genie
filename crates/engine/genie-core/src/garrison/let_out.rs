@@ -164,11 +164,18 @@ impl World {
             self.parts.combat_mut(b.id)?.firepower = bm.volley_fire;
         }
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
-        let (b_at, b_radius) = (b.position(), bm.radius);
+        let (building_at, building_radius) = (b.position(), bm.radius);
         if bm.kind == BUILDING
             && let Some(v) = self.spatial.sight.as_mut()
         {
-            v.sight_off_los(bid, b_at, b_radius, false, INSIDE_SIGHT, false)?;
+            v.sight_off_los(
+                bid,
+                building_at,
+                building_radius,
+                false,
+                INSIDE_SIGHT,
+                false,
+            )?;
         }
         // slot 0x58: on the map at the spot (new_position: its tile's list, its sight)
         let mut placed = self.spatial.come_out(id).ok_or_else(|| {

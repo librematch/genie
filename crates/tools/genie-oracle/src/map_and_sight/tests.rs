@@ -39,7 +39,7 @@ fn the_same_sight_has_no_difference() {
 
 /// The explored count, a tile's count and its two unified bits, each with the tile's place.
 #[test]
-fn a_tile_differs_by_its_count_or_its_unified_bits() {
+fn tile_differs_by_its_count_or_its_unified_bits() {
     let mut slice = sight();
     slice.maps[1].explored = TileCount::new(3);
     slice.maps[1].counts[3] = 0;
@@ -62,7 +62,7 @@ fn a_tile_differs_by_its_count_or_its_unified_bits() {
 }
 
 #[test]
-fn a_player_without_a_map_or_lists_says_so() {
+fn player_without_map_or_lists_says_so() {
     assert_eq!(
         visibility_differences(&sight(), &sight(), 2),
         ["player 2 has no visible map"]
@@ -188,7 +188,7 @@ mod spatial {
     }
 
     #[test]
-    fn a_unit_takes_its_masters_footprint_and_obstruction() {
+    fn unit_takes_its_masters_footprint_and_obstruction() {
         let out = placed();
         let unit = out.get(object_id(10)).unwrap();
         assert_eq!(
@@ -235,7 +235,7 @@ mod spatial {
     /// A standing building links its tiles (their link bits). A desolid foundation links none,
     /// has no obstruction and has not explored.
     #[test]
-    fn a_building_links_its_tiles_unless_it_was_made_desolid() {
+    fn building_links_its_tiles_unless_it_was_made_desolid() {
         let out = placed();
         let sight = out.sight.as_ref().unwrap();
         let standing = sight.seer(object_id(11)).unwrap();

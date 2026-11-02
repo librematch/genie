@@ -568,7 +568,7 @@ mod tests {
     /// `FUN_1410083c0` adds a sleeping unit as a live one: its link names the group, it joins
     /// the members and its sub-formation's statistic.
     #[test]
-    fn a_sleeping_unit_joins_a_group_as_a_live_one() {
+    fn sleeping_unit_joins_group_as_live_one() {
         let mut t = three();
         let mut asleep = Unit {
             id: object_id(13),
@@ -594,7 +594,7 @@ mod tests {
     /// `FUN_14102c480`: a held unit of no sub-formation (type below 70) or of one no statistic
     /// has leaves nothing (false); a held unit leaves its sub-formation's first statistic.
     #[test]
-    fn a_unit_leaves_only_its_own_sub_formation_s_statistic() {
+    fn unit_leaves_only_its_own_sub_formation_statistic() {
         let mut t = three();
         let unit = |id: i32, master: MasterId| {
             let mut u = Unit {
@@ -643,7 +643,7 @@ mod tests {
     /// 12's, 12's 3 the first spare); its statistic counts 10 alone; it stands and its link
     /// clears; the lead becomes the member nearest the target (the origin: 10); flags `0x10002`.
     #[test]
-    fn a_removed_member_leaves_its_slot_statistic_and_lead() {
+    fn removed_member_leaves_its_slot_statistic_and_lead() {
         let mut t = three();
         assert!(
             t.remove_unit(group_id(1), object_id(11), None, false)
@@ -737,7 +737,7 @@ mod tests {
     /// `FUN_14100d140` writes the formation type of every member `FUN_1415417a0` finds with a
     /// unit AI, a sleeping one too.
     #[test]
-    fn the_stances_reach_a_sleeping_member() {
+    fn the_stances_reach_sleeping_member() {
         let mut t = three();
         for u in &mut t.players[1].objects {
             t.parts
@@ -807,7 +807,7 @@ mod tests {
     /// (`MOVSS`/`UCOMISS` at 0x14102500a): the first held member with a radius sets it, the later
     /// ones are skipped.
     #[test]
-    fn lock_formation_takes_the_first_member_s_spacing() {
+    fn lock_formation_takes_the_first_member_spacing() {
         let mut t = three();
         for masters in &mut t.masters {
             for (id, r) in [(4, 0.2f32), (6, 0.5)] {
@@ -829,7 +829,7 @@ mod tests {
     /// Kept moving, the unit's walk stays; a unit the world does not hold leaves the first
     /// statistic that holds it.
     #[test]
-    fn a_unit_kept_moving_walks_on_and_a_gone_one_leaves_its_statistic() {
+    fn unit_kept_moving_walks_on_and_gone_one_leaves_its_statistic() {
         let mut t = three();
         assert!(
             t.remove_unit(group_id(1), object_id(11), None, true)

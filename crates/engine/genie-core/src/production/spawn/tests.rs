@@ -48,7 +48,7 @@ use crate::world::WorldTime;
 /// villager takes the closest tree of Gaia's (by centre) within its sight of the point,
 /// measured from the tree's footprint, else none (it walks to the point).
 #[test]
-fn a_gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
+fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
     let unit = |id, master, x: f32, y: f32| Unit {
         id,
         place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
@@ -156,7 +156,7 @@ impl PlaceMap for Hill {
 }
 
 #[test]
-fn a_hill_mode_takes_flat_ground_side_slopes_or_an_edge_within_one_step() {
+fn hill_mode_takes_flat_ground_side_slopes_or_an_edge_within_one_step() {
     let fails = |mode, shape, elevation, at| {
         hill_fails(
             HillMode::of_data(mode),
@@ -209,7 +209,7 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
 }
 
 #[test]
-fn a_blocker_that_moves_lets_the_spot_try_its_next_candidate() {
+fn blocker_that_moves_lets_the_spot_try_its_next_candidate() {
     let spot = Spot {
         at: Point::new(1.0, 1.0),
         step: GroundOffset::new(0.5, 0.0),
@@ -255,7 +255,7 @@ fn sheep(state: ObjectState) -> Near {
 }
 
 #[test]
-fn livestock_stays_alive_a_tree_only_once_dead() {
+fn livestock_stays_alive_tree_only_once_dead() {
     assert!(sheep(ObjectState::Alive).stays());
     assert!(!sheep(ObjectState::Unfinished).stays());
     let tree = Near {
@@ -315,7 +315,7 @@ impl PlaceMap for Fogged {
 /// In the fog, of the objects without a fog visibility only the player's own block a BUILD,
 /// and another player's building whose visibility mask meets both the player's masks.
 #[test]
-fn a_fogged_building_blocks_a_build_by_its_visibility_mask() {
+fn fogged_building_blocks_build_by_its_visibility_mask() {
     let house = Near {
         id: object_id(500),
         position: Position::new(20.5, 20.5, 0.0),
@@ -429,7 +429,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
 /// Two objects on one tile that block the point differently: the first of the tile's list
 /// reports (the game's scan, `FUN_141264db0`), whichever stays.
 #[test]
-fn the_first_object_of_a_tile_s_list_reports_the_block() {
+fn the_first_object_of_tile_list_reports_the_block() {
     let villager = Placing {
         player: PlayerId::new(1),
         radius: Footprint::new(0.2, 0.2),
@@ -466,7 +466,7 @@ fn the_first_object_of_a_tile_s_list_reports_the_block() {
 /// centre's height). A computer player's spawn, one without the players' sight and a master
 /// that does not move are not modelled.
 #[test]
-fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
+fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     let world = || {
         let mut t = crate::world::tests::forage_world();
         // the villager's standing sprite (a graphic of ten frames, eight facets)
@@ -611,7 +611,7 @@ fn a_made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
 /// standing one: its master's speed times that sprite's factor, not the master's speed with its
 /// running sprite (the deer 9655 of MarvinBlue/426048731 ran at the running speed).
 #[test]
-fn a_made_unit_moves_at_the_speed_of_its_standing_sprite() {
+fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
     let mut t = crate::world::tests::forage_world();
     for masters in &mut t.masters {
         let villager = masters.get_mut(ids::VILLAGER_MALE).unwrap();
@@ -652,7 +652,7 @@ fn a_made_unit_moves_at_the_speed_of_its_standing_sprite() {
 /// (`+0xc30`); a state of 0xff (SET GATHER STATE's) leaves it standing, which the unit's wait
 /// to move (`+0x7f9`) shows.
 #[test]
-fn only_a_gather_point_of_state_1_sends_the_new_unit() {
+fn only_gather_point_of_state_1_sends_the_new_unit() {
     let waits = |state| {
         let mut t = crate::world::tests::forage_world();
         for masters in &mut t.masters {
@@ -726,7 +726,7 @@ fn all_blocked(site: &Site) -> (Vec<Point>, Result<Point, GenieError>) {
 /// lower part (4), the right side's top half (5) and lower half (6), the bottom side's left
 /// half (7) and right half (8). Then the later rings, not modelled.
 #[test]
-fn a_spawn_search_without_a_gather_point_walks_the_eight_segments_once() {
+fn spawn_search_without_gather_point_walks_the_eight_segments_once() {
     let site = Site {
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(1.0, 1.0),
@@ -793,7 +793,7 @@ fn a_spawn_search_without_a_gather_point_walks_the_eight_segments_once() {
 /// tries nothing; the second takes the open top left corner's two segments (1, 2), then the
 /// bottom side from the right (9) and the right side from the bottom (10) as one segment.
 #[test]
-fn a_second_pass_between_walled_corners_tries_the_bottom_right_corner() {
+fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
     let site = Site {
         position: Position::new(10.0, 10.0, 0.0),
         radius: Footprint::new(1.0, 1.0),
@@ -839,7 +839,7 @@ fn queued_move() -> crate::unit_ai::QueuedOrder {
 /// action with no target at the point, leaves the town bell and walks there (a `MoveTo` of
 /// range 0); a new unit's queue empties, an unloaded unit's stays.
 #[test]
-fn a_gather_point_without_a_target_walks_the_new_unit_there() {
+fn gather_point_without_target_walks_the_new_unit_there() {
     use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
     let walked = |notified| {
         let mut t = crate::world::tests::forage_world();
@@ -898,7 +898,7 @@ fn a_gather_point_without_a_target_walks_the_new_unit_there() {
 /// A unit without speed only waits to move; one that already acts, or one not in state 2,
 /// is not modelled.
 #[test]
-fn a_gather_point_s_walk_waits_without_speed_and_stops_at_the_unmodelled() {
+fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
     let mut t = crate::world::tests::forage_world();
     t.parts
         .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
@@ -1004,7 +1004,7 @@ fn remains_world() -> World {
 /// facets). Another type, a static object with hit points, a recyclable master, moving remains
 /// without a facet or without a moving master are not modelled.
 #[test]
-fn remains_take_their_storage_and_face_their_dead_object_s_facet() {
+fn remains_take_their_storage_and_face_their_dead_object_facet() {
     use crate::objects::lifecycle::Class;
     let made = |t: &World, id| t.masters[1].get(id).unwrap().clone();
     let mut t = remains_world();
@@ -1148,7 +1148,7 @@ const fn house_site(restriction: &Restriction, human: bool) -> BuildSite<'_> {
 /// the tiles 5 (a computer passes); a box that passes answers none; a zone mode is not
 /// modelled.
 #[test]
-fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
+fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
     use crate::production::spawn::placement_test::build_static_test;
     let open_values = Restriction::new(vec![1.0]);
     let open = house_site(&open_values, true);
@@ -1199,7 +1199,7 @@ fn build_s_static_test_answers_the_map_s_edge_terrain_and_exploration() {
 
 /// BUILD's scan reads 8 tiles either way of the point, from 0 to the map's last tile.
 #[test]
-fn build_s_scan_reads_eight_tiles_either_way_within_the_map() {
+fn build_scan_reads_eight_tiles_either_way_within_the_map() {
     use crate::production::spawn::placement_test::build_scan_range;
     assert_eq!(build_scan_range(50.5, 120), (42, 58));
     assert_eq!(build_scan_range(2.0, 120), (0, 10));
@@ -1210,7 +1210,7 @@ fn build_s_scan_reads_eight_tiles_either_way_within_the_map() {
 /// fog visibility, and of those without only the player's own; on a tile never explored any;
 /// a fogged object of fog visibility 3 is not modelled.
 #[test]
-fn build_s_scan_counts_what_the_player_sees_of_a_tile() {
+fn build_scan_counts_what_the_player_sees_of_tile() {
     use crate::production::spawn::placement_test::build_sees;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
@@ -1286,7 +1286,7 @@ fn build_s_scan_counts_what_the_player_sees_of_a_tile() {
 /// does not obstruct, a wall under the player's own gate and another player's desolid house
 /// (not one of class 51); it keeps a standing house.
 #[test]
-fn build_s_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
+fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
     use crate::production::spawn::placement_test::build_ignores;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
@@ -1365,7 +1365,7 @@ fn build_s_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() 
 /// BUILD's scan passes over a moving unit of the player or Gaia but not another's, one
 /// buildable on, and a felled tree off a forest but not on one or with more hit points.
 #[test]
-fn build_s_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
+fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     use crate::production::spawn::placement_test::build_passes;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
@@ -1426,7 +1426,7 @@ fn build_s_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
 /// wall under the player's own gate, another's desolid foundation or an object beyond the
 /// box; an object of obstruction type 11 is not modelled.
 #[test]
-fn build_s_blockers_are_the_standing_objects_whose_box_overlaps() {
+fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
     use crate::production::spawn::placement_test::blocks_build;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
@@ -1508,7 +1508,7 @@ fn build_s_blockers_are_the_standing_objects_whose_box_overlaps() {
 /// find a dying house (state 4) that BUILD's own scan passes over, but not one of the site's own,
 /// a desolid foundation, or anything for a site without a height.
 #[test]
-fn the_build_s_static_scans_find_a_dying_house_build_passes_over() {
+fn the_build_static_scans_find_dying_house_build_passes_over() {
     let house = Near {
         id: object_id(600),
         position: Position::new(21.5, 21.5, 0.0),
@@ -1618,7 +1618,7 @@ impl PlaceMap for Terrains {
 /// with them; a terrain of none beside a set one reads flags the map has not
 /// got, which is not modelled.
 #[test]
-fn a_placement_terrain_takes_its_own_tile_or_one_of_a_shared_flag() {
+fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
     use crate::production::spawn::terrains::point_terrain_allows;
     // terrains 0 (land), 1 and 2 (shallow water), 3 (shallows)
     let map = Terrains {
@@ -1643,7 +1643,7 @@ fn a_placement_terrain_takes_its_own_tile_or_one_of_a_shared_flag() {
 /// The side terrains: the master's own, then every other terrain with ice (then beach) that one
 /// of its own has, in the terrains' order.
 #[test]
-fn side_terrains_take_the_others_of_a_shared_flag() {
+fn side_terrains_take_the_others_of_shared_flag() {
     use crate::production::spawn::terrains::side_terrains;
     let map = Terrains {
         kinds: [0; 9],
@@ -1666,7 +1666,7 @@ fn side_terrains_take_the_others_of_a_shared_flag() {
 /// The placement terrains of a master: with terrains the point's tile must be of one and the box
 /// shrinks to it; with side terrains a tile beside the box must be of one.
 #[test]
-fn a_master_s_placement_terrains_test_the_point_and_the_tiles_beside() {
+fn master_placement_terrains_test_the_point_and_the_tiles_beside() {
     // the centre (1, 1) of terrain 5, the tile right of it (2, 1) of terrain 6
     let map = Terrains {
         kinds: [0, 0, 0, 0, 5, 6, 0, 0, 0],

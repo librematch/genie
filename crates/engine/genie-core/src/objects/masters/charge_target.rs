@@ -49,7 +49,7 @@ mod tests {
 
     /// −1 holds every bit, 0 none, and a group's bit is its place.
     #[test]
-    fn the_targets_hold_a_bit_per_group() {
+    fn the_targets_hold_bit_per_group() {
         assert_eq!(ChargeTarget::EVERY.bits(), 0xffff);
         assert!((0..16).all(|g| ChargeTarget::EVERY.holds(g)));
         assert!(!(0..16).any(|g| ChargeTarget::ALL_BUT_BUILDINGS.holds(g)));

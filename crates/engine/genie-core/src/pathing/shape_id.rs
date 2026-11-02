@@ -57,7 +57,7 @@ mod tests {
 
     /// A free slot's link is the next free slot's number, −1 for none, and reads back.
     #[test]
-    fn a_free_slot_s_link_is_the_next_slot_or_minus_one() {
+    fn free_slot_link_is_the_next_slot_or_minus_one() {
         let s = ShapeId::new(7);
         assert_eq!((s.get(), s.index(), s.to_string()), (7, 7, "7".to_owned()));
         assert_eq!([Some(s), None].map(ShapeId::link), [7, -1]);

@@ -246,7 +246,7 @@ mod tests {
 
     /// A population is the count's `CVTTSS2SI` cut to 16 bits; a NaN gives 0.
     #[test]
-    fn a_population_is_the_truncated_count_s_low_short() {
+    fn population_is_the_truncated_count_low_short() {
         assert_eq!(Population::of_count(7.9), Population::of_data(7));
         assert_eq!(Population::of_count(70_000.0).get(), 4464);
         assert_eq!(Population::of_count(f32::NAN), Population::ZERO);
@@ -270,7 +270,7 @@ mod tests {
 
     /// A tally truncates the attribute (32 or 64 bits), wraps and keeps a count's low short.
     #[test]
-    fn a_tally_truncates_wraps_and_keeps_the_low_short() {
+    fn tally_truncates_wraps_and_keeps_the_low_short() {
         assert_eq!(Tally::of_amount(Amount::new(12.9)), Tally::of_data(12));
         assert_eq!(Tally::of_amount(Amount::new(f32::NAN)).get(), i32::MIN);
         // 2^32 + 5 through 64 bits keeps the low 32: 0
@@ -293,7 +293,7 @@ mod tests {
 
     /// A share adds as floats and compares with the battle's thresholds as doubles.
     #[test]
-    fn a_share_adds_and_meets_the_battle_thresholds() {
+    fn share_adds_and_meets_the_battle_thresholds() {
         let share = Share::of(Tally::of_data(3), Tally::of_data(25));
         assert_eq!(share.get(), 3.0 / 25.0);
         // 0.12 as a float lies below the double's 0.12

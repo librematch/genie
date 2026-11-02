@@ -61,7 +61,7 @@ mod tests {
 
     /// The numbers 0 to 3 are the four relations; any other is none.
     #[test]
-    fn a_relation_number_is_one_of_four() {
+    fn relation_number_is_one_of_four() {
         assert_eq!(
             [0, 1, 2, 3, -1, 4].map(QueryRelation::of_number),
             [

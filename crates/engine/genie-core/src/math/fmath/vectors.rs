@@ -222,7 +222,7 @@ mod tests {
     /// its place on the map (x, y, z) and back, its ground, the `with_` copies and the save's
     /// three floats.
     #[test]
-    fn a_vector_keeps_the_game_s_order_and_its_bits() {
+    fn vector_keeps_the_game_order_and_its_bits() {
         let v = BVector::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
             (v.x().to_bits(), v.height(), v.y().to_bits()),
@@ -259,7 +259,7 @@ mod tests {
     /// Negation flips every component's sign bit, a zero's and a NaN's too (`-c`, not
     /// `-1 * c`, which would keep a NaN's sign).
     #[test]
-    fn a_negated_vector_flips_each_sign_bit() {
+    fn negated_vector_flips_each_sign_bit() {
         let v = -BVector::new(0.0, -2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
             v.get().map(f32::to_bits),

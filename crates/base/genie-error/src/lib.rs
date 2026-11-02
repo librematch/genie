@@ -338,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn a_source_is_the_cause() {
+    fn source_is_the_cause() {
         let io = std::io::Error::other("short read");
         let e = invalid_input("a header too short").with_source(io);
         assert_eq!(
@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn an_error_stays_small_and_is_built_without_a_box() {
+    fn an_error_stays_small_and_is_built_without_box() {
         // the kind, the reason, the place and the context's box
         assert!(size_of::<GenieError>() <= 40);
         assert!(size_of::<GenieResult<()>>() <= 40);

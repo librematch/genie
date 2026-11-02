@@ -80,8 +80,8 @@ const EPSILON: f32 = crate::math::image::hull_path::EPSILON;
 /// `DAT_14330eb8c`: one (a direction's length; the intersection's inverse).
 const ONE: f32 = crate::math::image::hull_path::ONE;
 /// `DAT_142ed55d4`, `DAT_142f4328c`: the parameters within which two segments meet.
-const T_LOW: f32 = crate::math::image::hull_path::T_LOW;
-const T_HIGH: f32 = crate::math::image::hull_path::T_HIGH;
+const LOW_T: f32 = crate::math::image::hull_path::LOW_T;
+const HIGH_T: f32 = crate::math::image::hull_path::HIGH_T;
 /// `DAT_142f43298`: the intersection search's first distance.
 const FAR: f32 = crate::math::image::hull_path::FAR;
 /// `DAT_14330ebf4`: the largest float, the first distance of the ray searches.

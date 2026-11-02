@@ -216,7 +216,7 @@ mod tests {
 
     /// A value no case names is an error; −1 is a field's none.
     #[test]
-    fn a_value_no_case_names_is_an_error() {
+    fn value_no_case_names_is_an_error() {
         for v in [0, 0x2c4, 0x262, 0x269, 0x2cf, 0x2d0, 0x323] {
             assert_eq!(
                 OrderKind::try_from(v).map_err(|e| e.kind()),

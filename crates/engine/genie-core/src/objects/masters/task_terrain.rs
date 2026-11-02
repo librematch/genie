@@ -59,7 +59,7 @@ mod tests {
 
     /// A task is for the terrain whose byte its 16 bits equal: −1 and 256 + 3 are for none.
     #[test]
-    fn a_task_is_for_the_terrain_its_short_names() {
+    fn task_is_for_the_terrain_its_short_names() {
         assert!(TaskTerrain::of_data(3).is(TerrainId::named(3)));
         assert!(!TaskTerrain::of_data(259).is(TerrainId::named(3)));
         assert!(!TaskTerrain::NONE.is(TerrainId::named(255)));

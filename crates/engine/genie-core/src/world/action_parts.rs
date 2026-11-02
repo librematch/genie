@@ -94,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn a_taken_layer_leaves_an_empty_one_and_comes_back() {
+    fn taken_layer_leaves_an_empty_one_and_comes_back() {
         let mut parts = Parts::default();
         let id = object_id(7);
         parts.put_actions(id, flying());

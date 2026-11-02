@@ -18,7 +18,7 @@ fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 #[test]
-fn a_built_command_decodes_its_fields() {
+fn built_command_decodes_its_fields() {
     // BUILD (0x66): player 2, 1 builder (id 1234), a house (master 70) at (10.5, 20.5)
     let mut packet = vec![0x66, 2, 0, 0, 1, 0, 0, 0];
     packet.extend(10.5f32.to_le_bytes());
@@ -45,7 +45,7 @@ fn a_built_command_decodes_its_fields() {
 }
 
 #[test]
-fn a_packet_that_fits_no_layout_stays_raw() {
+fn packet_that_fits_no_layout_stays_raw() {
     let short = [0x66, 2, 0, 0];
     assert_eq!(Command::decode(&short), Command::Unknown(short.to_vec()));
     assert_eq!(Command::decode(&short).encode().unwrap(), short);

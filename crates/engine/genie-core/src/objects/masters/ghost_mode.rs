@@ -42,7 +42,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_ghost_mode_is_the_data_s_byte() {
+    fn ghost_mode_is_the_data_byte() {
         assert_eq!(GhostMode::of_data(0), GhostMode::NONE);
         assert_eq!(GhostMode::of_data(1).get(), 1);
         assert_eq!(GhostMode::NONE.to_string(), "0");

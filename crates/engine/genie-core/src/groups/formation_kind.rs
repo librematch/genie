@@ -107,7 +107,7 @@ mod tests {
 
     /// −1 is no type; a unit AI's byte round-trips; only the types 0 to 8 vote.
     #[test]
-    fn a_type_reads_its_field_byte_and_vote() {
+    fn type_reads_its_field_byte_and_vote() {
         assert_eq!(FormationKind::of_field(-1), None);
         assert_eq!(FormationKind::of_field(4), Some(FormationKind::BOX));
         assert_eq!(FormationKind::field(None), -1);

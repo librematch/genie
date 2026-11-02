@@ -35,7 +35,7 @@ fn encode(ticks: &[(u32, Vec<[u32; 11]>)]) -> Vec<u8> {
 }
 
 #[test]
-fn a_trace_gives_each_ticks_world_time_and_lanes() {
+fn trace_gives_each_ticks_world_time_and_lanes() {
     let lane = |b: u32| std::array::from_fn(|i| b + i as u32);
     let ticks = vec![
         (104, vec![lane(0), lane(11)]),
@@ -48,7 +48,7 @@ fn a_trace_gives_each_ticks_world_time_and_lanes() {
 }
 
 #[test]
-fn a_file_of_another_kind_is_refused() {
+fn file_of_another_kind_is_refused() {
     assert!(matches!(
         TickTrace::decode(b"GRTRACE3\0\0\0\0"),
         Err(TraceError::NotTrace)

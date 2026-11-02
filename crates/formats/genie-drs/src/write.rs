@@ -410,7 +410,7 @@ mod test {
 
     /// More files than a reserved directory holds fail to add.
     #[test]
-    fn a_reserved_directory_refuses_one_file_too_many() -> anyhow::Result<()> {
+    fn reserved_directory_refuses_one_file_too_many() -> anyhow::Result<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), ReserveDirectoryStrategy::new(2, 1))?;
         drs.add("txt", 1, &b"a"[..])?;
         assert!(invalid(&drs.add("txt", 2, &b"b"[..]).unwrap_err()));
@@ -419,7 +419,7 @@ mod test {
 
     /// More tables than a reserved directory holds fail to close.
     #[test]
-    fn a_reserved_directory_refuses_one_table_too_many() -> anyhow::Result<()> {
+    fn reserved_directory_refuses_one_table_too_many() -> anyhow::Result<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), ReserveDirectoryStrategy::new(1, 2))?;
         drs.add("txt", 1, &b"a"[..])?;
         drs.add("bin", 2, &b"b"[..])?;
@@ -429,7 +429,7 @@ mod test {
 
     /// A resource type of more than 4 bytes or of bytes that are no UTF-8 fails to add.
     #[test]
-    fn a_bad_resource_type_fails_to_add() -> anyhow::Result<()> {
+    fn bad_resource_type_fails_to_add() -> anyhow::Result<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), InMemoryStrategy::default())?;
         assert!(invalid(&drs.add("toolong", 1, &b"a"[..]).unwrap_err()));
         assert!(invalid(&drs.add(&[0xff_u8][..], 1, &b"a"[..]).unwrap_err()));
@@ -440,7 +440,7 @@ mod test {
     /// A resource type reads back as the text it was given, and one stored as no UTF-8 does not
     /// read.
     #[test]
-    fn a_resource_type_reads_back_or_does_not_read() {
+    fn resource_type_reads_back_or_does_not_read() {
         let slp = ResourceType::try_from(*b" pls").unwrap();
         assert_eq!(slp.to_string(), "slp");
         assert!(ResourceType::try_from([0xff, 0, 0, 0]).is_err());

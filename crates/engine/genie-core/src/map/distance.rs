@@ -203,7 +203,7 @@ mod tests {
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
-    fn distances_do_the_game_s_f32_operations() {
+    fn distances_do_the_game_f32_operations() {
         let (a, b) = (Distance::new(0.1), Distance::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
@@ -228,7 +228,7 @@ mod tests {
     /// A NaN factor first keeps its payload in the product (`mulss` returns its first NaN
     /// operand), so the factor's side is part of the operation.
     #[test]
-    fn a_nan_factor_keeps_its_side() {
+    fn nan_factor_keeps_its_side() {
         let nan = f32::from_bits(0x7fc0_0001);
         assert_eq!(
             (nan * Distance::new(2.0)).get().to_bits(),
@@ -242,7 +242,7 @@ mod tests {
 
     /// A distance squared is its one `f32` product with itself.
     #[test]
-    fn a_distance_squared_is_its_product_with_itself() {
+    fn distance_squared_is_its_product_with_itself() {
         let d = Distance::new(1.1);
         assert_eq!(d.squared(), DistanceSquared::new(1.1 * 1.1));
         assert_eq!(d.squared().get().to_bits(), (1.1_f32 * 1.1).to_bits());
@@ -252,7 +252,7 @@ mod tests {
 
     /// A whole distance converts to its float, rounding beyond 2^24 as `CVTSI2SS`.
     #[test]
-    fn a_whole_distance_converts_to_its_float() {
+    fn whole_distance_converts_to_its_float() {
         use crate::map::WholeDistance;
         assert_eq!(WholeDistance::of_data(10).distance(), Distance::new(10.0));
         assert_eq!(WholeDistance::of_data(-16).distance().get(), -16.0);

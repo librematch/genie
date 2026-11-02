@@ -49,7 +49,7 @@ mod tests {
 
     /// A foundation clears 1 and 2, a placement passes over 1 only.
     #[test]
-    fn a_foundation_clears_more_than_a_placement_passes() {
+    fn foundation_clears_more_than_placement_passes() {
         let two = BuildableOn::of_data(2);
         assert_eq!(
             [BuildableOn::NO, BuildableOn::YES, two].map(BuildableOn::cleared),

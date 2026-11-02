@@ -470,7 +470,7 @@ mod tests {
 
     /// A purchase pays for the most of `count` the player can, then queues them.
     #[test]
-    fn the_mill_s_queue_buys_what_the_player_can_pay() {
+    fn the_mill_queue_buys_what_the_player_can_pay() {
         let mut t = world(250.0);
         assert!(
             t.queue_farms(PlayerId::new(1), QueueCount::of_data(5), FARM)
@@ -525,7 +525,7 @@ mod tests {
 
     /// A queue at 40 takes no purchase; one below may pass 40.
     #[test]
-    fn a_full_queue_takes_no_purchase() {
+    fn full_queue_takes_no_purchase() {
         let mut t = world(10_000.0);
         t.players[1].farm_queue = QueueCount::of_data(40);
         assert!(
@@ -542,7 +542,7 @@ mod tests {
 
     /// A master the player lacks buys nothing.
     #[test]
-    fn a_master_the_player_lacks_buys_nothing() {
+    fn master_the_player_lacks_buys_nothing() {
         let mut t = world(1000.0);
         assert!(
             !t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), ids::ID_1187)
@@ -579,7 +579,7 @@ mod tests {
     /// `FUN_141663f80`: the master its base id names is available; a stack's head names the
     /// head's base; a master the player lacks, or a base it lacks, makes none.
     #[test]
-    fn a_master_can_be_made_by_its_base_s_availability() {
+    fn master_can_be_made_by_its_base_availability() {
         let mut t = world(0.0);
         t.masters[1] = Masters::new([
             building(FARM, class::FARM, FARM, true, -1),
@@ -601,7 +601,7 @@ mod tests {
     /// The town centre 621 is also made while the town centres standing are fewer than
     /// attribute 218.
     #[test]
-    fn a_town_centre_can_be_made_below_the_town_centre_limit() {
+    fn town_centre_can_be_made_below_the_town_centre_limit() {
         let mut t = world(0.0);
         t.masters[1] = Masters::new([building(
             TOWN_CENTRE_621,
@@ -618,7 +618,7 @@ mod tests {
     /// `FUN_141658b40`: the farm when the player can make it, else the pasture, each of the
     /// farm class; else none.
     #[test]
-    fn a_reseed_makes_the_farm_else_the_pasture() {
+    fn reseed_makes_the_farm_else_the_pasture() {
         let mut t = world(0.0);
         let masters = |farm: bool, pasture: bool, class: ClassId| {
             Masters::new([
@@ -638,7 +638,7 @@ mod tests {
 
     /// A return gives back at most the queue's count, each its paid costs.
     #[test]
-    fn a_return_refunds_at_most_the_queue() {
+    fn return_refunds_at_most_the_queue() {
         let mut t = world(0.0);
         t.players[1].farm_queue = QueueCount::of_data(3);
         assert!(

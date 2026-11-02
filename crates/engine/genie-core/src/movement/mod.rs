@@ -371,8 +371,8 @@ const PUSHED: f32 = crate::math::image::movement::PUSHED;
 
 /// `FUN_1411615a0`: how deep two boxes (centre, radii on the ground) overlap, the lesser of the
 /// two axes; 0 when they do not.
-fn overlap(a: BVector, a_radius: Footprint, b: BVector, b_radius: Footprint) -> f32 {
-    let (ar, ad, br, bd) = (a_radius.x(), a_radius.y(), b_radius.x(), b_radius.y());
+fn overlap(a: BVector, radius_a: Footprint, b: BVector, radius_b: Footprint) -> f32 {
+    let (ar, ad, br, bd) = (radius_a.x(), radius_a.y(), radius_b.x(), radius_b.y());
     let (ax1, ax0, ay0, ay1) = (a.x() + ar, a.x() - ar, a.y() - ad, a.y() + ad);
     let (by0, by1, bx0, bx1) = (b.y() - bd, b.y() + bd, b.x() - br, b.x() + br);
     // COMISS/JNC at 0x1411615fd..0x141161610: only an ordered `>=` leaves, a NaN goes on

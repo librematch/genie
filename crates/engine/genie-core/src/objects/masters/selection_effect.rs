@@ -40,7 +40,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_selection_effect_is_the_data_s_byte() {
+    fn selection_effect_is_the_data_byte() {
         assert_eq!(SelectionEffect::of_data(0), SelectionEffect::NONE);
         assert_eq!(SelectionEffect::of_data(9).get(), 9);
         assert_eq!(SelectionEffect::NONE.to_string(), "0");

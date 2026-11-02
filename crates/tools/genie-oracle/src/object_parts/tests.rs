@@ -45,7 +45,7 @@ fn with_ai(ai: UnitAiModule) -> genie_save::Object {
 
 /// A combat object without a unit AI imports none.
 #[test]
-fn an_object_without_a_unit_ai_imports_none() {
+fn an_object_without_unit_ai_imports_none() {
     assert_eq!(
         unit_ai(&combat_object(5, 4), object_id(5), PLAYERS).map(|ai| ai.is_none()),
         Ok(true)
@@ -95,7 +95,7 @@ fn the_saved_orders_and_actions_import_as_their_kinds() {
 
 /// A tower's saved orders import as the building's queue.
 #[test]
-fn a_tower_s_saved_orders_import() {
+fn tower_saved_orders_import() {
     let mut object = combat_object(5, 4);
     combat_mut(&mut object).tribe_tower_unit_ai_module = Some(Box::new(TribeTowerUnitAiModule {
         unit_ai_module: idle(),
@@ -108,7 +108,7 @@ fn a_tower_s_saved_orders_import() {
 
 /// An order or action value none names fails the import, wherever the save holds it.
 #[test]
-fn a_value_none_names_fails_the_import() {
+fn value_none_names_fails_the_import() {
     let saves = [
         UnitAiModule {
             current_order_value: 0x262,
@@ -152,7 +152,7 @@ fn a_value_none_names_fails_the_import() {
 /// The saved unit AI is the imported object's part, not its row's; a value none names leaves the
 /// object without one, and the row holds the failure as its unmodelled part.
 #[test]
-fn the_saved_unit_ai_is_the_object_s_part() {
+fn the_saved_unit_ai_is_the_object_part() {
     use genie_core::players::CivId;
     use genie_save::generated::world::PlayerObjects;
     let whole = |object: &genie_save::Object| {

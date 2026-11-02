@@ -38,7 +38,7 @@ pub(super) const COS_C3: f64 = f64::from_bits(0x3ef9_9342_e0ee_5069);
 
 /// `0x14099db70` (msun's `__kernel_sindf`): the sine of a double up to about π/4 in size, rounded
 /// to f32 (`CVTSD2SS`).
-pub(super) fn k_sin(x: f64) -> f32 {
+pub(super) fn kernel_sin(x: f64) -> f32 {
     let z = x * x;
     let w = z * z;
     let r = z * SIN_S4 - SIN_S3;
@@ -51,7 +51,7 @@ pub(super) fn k_sin(x: f64) -> f32 {
 
 /// `0x14099cad0` (msun's `__kernel_cosdf`): the cosine of a double up to about π/4 in size,
 /// rounded to f32.
-pub(super) fn k_cos(x: f64) -> f32 {
+pub(super) fn kernel_cos(x: f64) -> f32 {
     let z = x * x;
     let w = z * z;
     let r = z * COS_C3 - COS_C2;
@@ -74,29 +74,29 @@ pub fn cos(x: f32) -> f32 {
             // x + 2^120 into a dead store (msun raises inexact): 1
             return ONE;
         }
-        return k_cos(f64::from(x));
+        return kernel_cos(f64::from(x));
     }
     if ix <= 0x407b_53d1 {
         let d = f64::from(x);
         if ix > 0x4016_cbe3 {
-            return -k_cos(if negative { d + PI_F64 } else { d - PI_F64 });
+            return -kernel_cos(if negative { d + PI_F64 } else { d - PI_F64 });
         }
         return if negative {
-            k_sin(d + FRAC_PI_2_F64)
+            kernel_sin(d + FRAC_PI_2_F64)
         } else {
-            k_sin(FRAC_PI_2_F64 - d)
+            kernel_sin(FRAC_PI_2_F64 - d)
         };
     }
     if ix <= 0x40e2_31d5 {
         if ix > 0x40af_eddf {
             let d = f64::from(x);
-            return k_cos(if negative {
+            return kernel_cos(if negative {
                 d + TWO_PI_F64
             } else {
                 d - TWO_PI_F64
             });
         }
-        return k_sin(f64::from(if negative { -x } else { x }) - THREE_FRAC_PI_2_F64);
+        return kernel_sin(f64::from(if negative { -x } else { x }) - THREE_FRAC_PI_2_F64);
     }
     if ix >= 0x7f80_0000 {
         #[allow(clippy::eq_op)]
@@ -104,10 +104,10 @@ pub fn cos(x: f32) -> f32 {
     }
     let (n, y) = rem_pio2(x);
     match n & 3 {
-        0 => k_cos(y),
-        1 => k_sin(-y),
-        2 => -k_cos(y),
-        _ => k_sin(y),
+        0 => kernel_cos(y),
+        1 => kernel_sin(-y),
+        2 => -kernel_cos(y),
+        _ => kernel_sin(y),
     }
 }
 
@@ -123,29 +123,29 @@ pub fn sin(x: f32) -> f32 {
             // x · 2^-120 or x + 2^120 into a dead store (msun raises underflow or inexact): x
             return x;
         }
-        return k_sin(f64::from(x));
+        return kernel_sin(f64::from(x));
     }
     if ix <= 0x407b_53d1 {
         let d = f64::from(x);
         if ix <= 0x4016_cbe3 {
             return if negative {
-                -k_cos(d + FRAC_PI_2_F64)
+                -kernel_cos(d + FRAC_PI_2_F64)
             } else {
-                k_cos(d - FRAC_PI_2_F64)
+                kernel_cos(d - FRAC_PI_2_F64)
             };
         }
-        return k_sin(-(if negative { d + PI_F64 } else { d - PI_F64 }));
+        return kernel_sin(-(if negative { d + PI_F64 } else { d - PI_F64 }));
     }
     if ix <= 0x40e2_31d5 {
         let d = f64::from(x);
         if ix <= 0x40af_eddf {
             return if negative {
-                k_cos(d + THREE_FRAC_PI_2_F64)
+                kernel_cos(d + THREE_FRAC_PI_2_F64)
             } else {
-                -k_cos(d - THREE_FRAC_PI_2_F64)
+                -kernel_cos(d - THREE_FRAC_PI_2_F64)
             };
         }
-        return k_sin(if negative {
+        return kernel_sin(if negative {
             d + TWO_PI_F64
         } else {
             d - TWO_PI_F64
@@ -157,9 +157,9 @@ pub fn sin(x: f32) -> f32 {
     }
     let (n, y) = rem_pio2(x);
     match n & 3 {
-        0 => k_sin(y),
-        1 => k_cos(y),
-        2 => k_sin(-y),
-        _ => -k_cos(y),
+        0 => kernel_sin(y),
+        1 => kernel_cos(y),
+        2 => kernel_sin(-y),
+        _ => -kernel_cos(y),
     }
 }

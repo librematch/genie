@@ -44,7 +44,7 @@ mod tests {
     /// 1 counts as gathered and in gold's counter, another non-zero byte in the counter alone, 0
     /// in neither.
     #[test]
-    fn a_stat_s_byte_names_its_counters() {
+    fn stat_byte_names_its_counters() {
         let counts = |s: ResourceStat| (s.gathered(), s.counts_gold());
         assert_eq!(counts(ResourceStat::GATHERED), (true, true));
         assert_eq!(counts(ResourceStat::of_data(2)), (false, true));

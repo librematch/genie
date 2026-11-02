@@ -38,7 +38,7 @@ mod tests {
 
     /// A class is in the set when its bit is set below the bound; a negative class never is.
     #[test]
-    fn a_class_is_in_the_mask_below_its_bound() {
+    fn class_is_in_the_mask_below_its_bound() {
         let set = ClassMask::new(0x0012_0000_0000_0008, 0x35);
         let has = |c: i16| set.contains(ClassId::of_master(c));
         assert!(has(3) && has(49) && has(52));

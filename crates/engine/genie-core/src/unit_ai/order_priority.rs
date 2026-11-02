@@ -42,7 +42,7 @@ mod tests {
 
     /// Below a command's 100 an order waits; none is −1.
     #[test]
-    fn below_a_command_s_priority_an_order_waits() {
+    fn below_command_priority_an_order_waits() {
         assert!(OrderPriority::of_data(99).waits() && OrderPriority::NONE.waits());
         assert!(!OrderPriority::COMMAND.waits() && !OrderPriority::of_data(101).waits());
         assert_eq!(OrderPriority::NONE.get(), -1);

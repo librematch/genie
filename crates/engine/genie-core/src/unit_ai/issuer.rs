@@ -87,7 +87,7 @@ mod tests {
     /// A saved issuer is the queue's own object at its id, a player at a player's number and
     /// another object at any other value; −1 names none.
     #[test]
-    fn a_saved_issuer_is_the_own_object_a_player_or_another_object() {
+    fn saved_issuer_is_the_own_object_player_or_another_object() {
         let own = object_id(5);
         assert!(matches!(
             Issuer::of_saved(5, own, 9),

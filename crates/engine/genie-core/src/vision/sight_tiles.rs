@@ -67,7 +67,7 @@ mod tests {
     /// A sight converts as `CVTTSS2SI` does (toward zero, a NaN to `i32::MIN`), sees above 0,
     /// and its table row is clamped to 0..=20.
     #[test]
-    fn a_sight_in_tiles_truncates_sees_above_zero_and_clamps_its_row() {
+    fn sight_in_tiles_truncates_sees_above_zero_and_clamps_its_row() {
         assert_eq!(SightTiles::of(Distance::new(4.9)), SightTiles::new(4));
         assert_eq!(SightTiles::of(Distance::new(-0.5)), SightTiles::new(0));
         assert_eq!(SightTiles::of(Distance::new(f32::NAN)).get(), i32::MIN);

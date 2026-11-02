@@ -127,7 +127,7 @@ mod tests {
 
     /// A word of 0 to 3 names a side; a larger one is an error.
     #[test]
-    fn a_word_past_3_names_no_side() {
+    fn word_past_3_names_no_side() {
         assert_eq!(ShapeSide::of_word(2).unwrap(), ShapeSide::HighY);
         assert!(ShapeSide::of_word(4).is_err());
     }

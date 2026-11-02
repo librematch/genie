@@ -158,7 +158,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
 /// The combat object's sight answers a changed mask only for an object others take over by
 /// seeing it (`+0x924` 1), once the registry took it.
 #[test]
-fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
+fn changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
     let mut v = world(PlayerId::new(3));
     v.registry = Some(Registry::new(3, 65));
     let mut gaia = unit(PlayerId::new(0), Distance::new(2.0));
@@ -212,7 +212,7 @@ fn a_changed_mask_is_the_answer_for_an_object_taken_over_by_sight() {
 /// `FUN_14120f800`: an object with an id writes the new owner into its records in every
 /// list (`+0x8b0`..); one without an id has none to write.
 #[test]
-fn an_ownership_change_writes_the_new_owner_into_the_object_s_records() {
+fn an_ownership_change_writes_the_new_owner_into_the_object_records() {
     let mut v = world(PlayerId::new(3));
     let mut r = Registry::new(3, 65);
     r.entries
@@ -285,7 +285,7 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
 /// place, its distance and byte 0; a full list doubles its capacity. A manager without lists
 /// adds nothing.
 #[test]
-fn a_resource_goes_last_in_its_group_s_list_and_a_full_list_doubles() {
+fn resource_goes_last_in_its_group_list_and_full_list_doubles() {
     let mut r = resources(5);
     r.add(object_id(10), GatherGroup::GOLD, Point::new(3.5, 7.5));
     r.add(object_id(11), GatherGroup::GOLD, Point::new(1.5, 2.5));
@@ -305,7 +305,7 @@ fn a_resource_goes_last_in_its_group_s_list_and_a_full_list_doubles() {
 /// `Remove_Resource` (`FUN_141289b80`): the first record of the object takes the last one's
 /// record and the list shortens; its index, 0 for an empty list, -1 when not found.
 #[test]
-fn a_removed_resource_s_place_takes_the_last_record() {
+fn removed_resource_place_takes_the_last_record() {
     let mut r = resources(5);
     for id in [1, 2, 3] {
         r.add(object_id(id), GatherGroup::WOOD, Point::new(id as f32, 0.0));
@@ -368,7 +368,7 @@ fn the_closest_resource_skips_the_ids_given_and_keeps_its_distance() {
 /// explored tiles, a revealed rectangle's never explored ones (`reveal_terrain_sq`); the
 /// player's update ends with the list cleared (`FUN_141661030`).
 #[test]
-fn newly_explored_tiles_join_the_player_s_tile_list_until_its_update_ends() {
+fn newly_explored_tiles_join_the_player_tile_list_until_its_update_ends() {
     let mut v = world(PlayerId::new(2));
     let _ = v
         .explore(
@@ -418,7 +418,7 @@ fn newly_explored_tiles_join_the_player_s_tile_list_until_its_update_ends() {
 /// `FUN_1411980b0`'s lists: each player whose map explored the object's tile (its bit 32 + p
 /// of the unified map, from 0 while the player exists) loses the object from its group's list.
 #[test]
-fn a_resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
+fn resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
     let mut v = world(PlayerId::new(3));
     v.resources = vec![resources(5), resources(5), resources(5)];
     for r in &mut v.resources {
@@ -444,7 +444,7 @@ fn a_resource_leaves_the_lists_of_the_players_that_explored_its_tile() {
 }
 
 #[test]
-fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
+fn sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
     let mut v = world(PlayerId::new(3));
     assert_eq!(
         v.explore(
@@ -513,7 +513,7 @@ fn a_sight_counts_its_circle_explored_then_visible_and_leaves_it_explored() {
 }
 
 #[test]
-fn a_unit_s_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
+fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
     let mut v = world(PlayerId::new(3));
     v.add_seer(object_id(7), unit(PlayerId::new(1), Distance::new(2.0)));
     let r = Footprint::new(0.5, 0.5);
@@ -568,7 +568,7 @@ fn a_unit_s_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies(
 }
 
 #[test]
-fn the_extent_list_matches_the_saved_entries_of_a_town_centre_and_a_house() {
+fn the_extent_list_matches_the_saved_entries_of_town_centre_and_house() {
     let mut v = world(PlayerId::new(1));
     assert_eq!(
         v.extent_entry(Tile::new(29, 94), TileRect::new(27, 92, 30, 95)),
@@ -666,7 +666,7 @@ fn the_extent_list_matches_the_saved_entries_of_a_town_centre_and_a_house() {
 }
 
 #[test]
-fn a_first_sight_of_a_building_s_tile_explores_the_building() {
+fn first_sight_of_building_tile_explores_the_building() {
     let mut v = world(PlayerId::new(3));
     assert_eq!(
         v.link_building(Position::new(29.0, 94.0, 0.0), Footprint::new(2.0, 2.0))
@@ -701,7 +701,7 @@ fn a_first_sight_of_a_building_s_tile_explores_the_building() {
 }
 
 #[test]
-fn a_building_sees_its_footprint_while_built_then_its_circle_from_a_tile_corner() {
+fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
     let mut v = world(PlayerId::new(3));
     let site = Seer {
         master: ids::HOUSE,
@@ -739,7 +739,7 @@ fn a_building_sees_its_footprint_while_built_then_its_circle_from_a_tile_corner(
 /// A computer player's first sight of a tile queues it for its AI module (slot 0x88), once per
 /// tile; a human player's sight queues nothing.
 #[test]
-fn a_computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
+fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
     let mut v = world(PlayerId::new(3));
     v.computer = vec![false, true, false];
     assert_eq!(

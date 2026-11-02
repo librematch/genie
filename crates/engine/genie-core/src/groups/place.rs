@@ -595,7 +595,7 @@ mod tests {
     /// With no member in front the group moves onto the member nearest the point ahead; with
     /// none the world holds nothing changes.
     #[test]
-    fn without_a_member_in_front_the_group_moves_onto_the_nearest() {
+    fn without_member_in_front_the_group_moves_onto_the_nearest() {
         let mut t = front_world(vec![unit(11, 13.0, 12.0), unit(12, 19.0, 15.0)]);
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
@@ -626,7 +626,7 @@ mod tests {
     /// A staggered lock (7) takes the whole spacing: 11 at 1.5 from the line is in front of it
     /// (and of no other lock), 12 nearer the point ahead only in the other.
     #[test]
-    fn a_staggered_lock_takes_the_whole_spacing() {
+    fn staggered_lock_takes_the_whole_spacing() {
         let units = vec![unit(11, 13.0, 11.5), unit(12, 19.0, 13.0)];
         let mut t = front_world(units.clone());
         t.groups.groups[0].formation_locked_type = Some(FormationKind::STAGGERED);
@@ -664,7 +664,7 @@ mod tests {
     /// lead's radius, 0.2) but the members are ignored. Object 50 of no member there sends it to
     /// the front: of 10 and 11, both in front, 10 is nearer the point ahead.
     #[test]
-    fn a_flanked_group_stays_where_its_lead_could_stand() {
+    fn flanked_group_stays_where_its_lead_could_stand() {
         // the lead moves (slot 0x270 is `FUN_141158940`), where it last moved to its place
         let lead = unit(10, 15.0, 10.5);
         let mut mover = crate::gathering::hunt::tests::walker();
@@ -710,7 +710,7 @@ mod tests {
     /// say) could stand on the group's place among the members, so a flanked group stays; a
     /// ghost's slot 0x270 (`FUN_141071e30`) is 0, so the group goes to the front.
     #[test]
-    fn a_flanked_group_tests_the_world_s_object_of_its_lead_id() {
+    fn flanked_group_tests_the_world_object_of_its_lead_id() {
         let units = vec![unit(10, 15.0, 10.5), unit(11, 10.2, 10.1)];
         let flanked = |t: &mut World| {
             t.groups.groups[0].formation_locked_type = Some(FormationKind::FLANKED);

@@ -124,7 +124,7 @@ impl Unit {
         c: &mut Step<'_>,
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
-        let farm_waits = crate::gathering::gather::waits_for_a_farm(
+        let farm_waits = crate::gathering::gather::waits_for_farm(
             self.life.master_id,
             actions.list.gather().and_then(|g| g.target_class),
         );
@@ -312,14 +312,14 @@ impl Unit {
             "a gather's new target the slice does not hold",
         ))?;
         let master = self.master(c.w.master_tables(), c.player)?;
-        let t_master = t.master(c.w.master_tables(), owner)?;
+        let target_master = t.master(c.w.master_tables(), owner)?;
         Ok((
             owner.index(),
             crate::gathering::gather::Resource {
                 id: found,
                 position: t.position(),
-                class: t_master.class,
-                master: t_master.id,
+                class: target_master.class,
+                master: target_master.id,
                 player: owner,
                 workers: t.workers,
                 drop_site: master.drop_sites.contains(&t.life.master_id),
@@ -327,10 +327,10 @@ impl Unit {
                     self.position(),
                     master.radius,
                     t.position(),
-                    t_master.radius,
+                    target_master.radius,
                 ),
                 state: t.life.state,
-                radius: t_master.radius,
+                radius: target_master.radius,
             },
         ))
     }

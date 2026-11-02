@@ -71,7 +71,7 @@ mod tests {
     /// A rate over seconds is an angle and an angle over seconds a rate, each one `f32`
     /// operation in the game's operand order.
     #[test]
-    fn a_turn_rate_over_seconds_is_an_angle() {
+    fn turn_rate_over_seconds_is_an_angle() {
         let (r, dt) = (TurnRate::new(0.7), Seconds::new(0.3));
         assert_eq!((r * dt).get().to_bits(), (0.7_f32 * 0.3).to_bits());
         assert_eq!(

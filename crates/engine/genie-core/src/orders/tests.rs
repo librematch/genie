@@ -74,7 +74,7 @@ use crate::world::parts::Object;
 /// the object is found by its id once the list moved or the slot is out of the lists; an
 /// object asleep or gone has no live slot.
 #[test]
-fn an_object_s_own_slot_is_taken_while_it_holds_the_object() {
+fn an_object_own_slot_is_taken_while_it_holds_the_object() {
     let unit = |id| Unit {
         id,
         ..Unit::default()
@@ -121,7 +121,7 @@ fn an_object_s_own_slot_is_taken_while_it_holds_the_object() {
 /// records/425906646's gate 27745 (masters 88 and 91, 1650 hit points each, three damage
 /// sprites): unhurt, its share is 0 under either master; a resource's share is not modelled.
 #[test]
-fn a_damage_share_is_the_whole_less_the_hit_points_share() {
+fn damage_share_is_the_whole_less_the_hit_points_share() {
     assert_eq!(
         damage_share(
             HitPoints::new(1650.0),
@@ -170,7 +170,7 @@ fn a_damage_share_is_the_whole_less_the_hit_points_share() {
 /// of the player's tracker in state 2 (`FUN_141658e20`), but a goose (below type 70) does no
 /// work on it.
 #[test]
-fn a_drop_off_order_leaves_a_livestock_without_a_drop_site_alone() {
+fn drop_off_order_leaves_livestock_without_drop_site_alone() {
     let goose = Unit {
         id: object_id(28766),
         life: crate::objects::lifecycle::Lifecycle {
@@ -285,7 +285,7 @@ fn a_drop_off_order_leaves_a_livestock_without_a_drop_site_alone() {
 /// within the Build task's range (its master has no task on the mill). Without a mill in the
 /// table it walks back to its foundation; carrying nothing it is not ordered at all.
 #[test]
-fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
+fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     use crate::map::spatial::Placed;
     let placed = |position, master, radius| Placed {
         position,
@@ -592,7 +592,7 @@ fn a_unit_order_drop_off_sends_a_carrying_builder_to_the_table_s_drop_site() {
 /// (`0x140aa29e0`, not quiet) shows the standing sprite (slot 0x798) at the standing speed and
 /// clears `+0x7b8`; the Attack waits in state 4 for the `MoveTo`'s end.
 #[test]
-fn a_work_attack_on_a_touching_target_starts_its_move_to_arrived() {
+fn work_attack_on_touching_target_starts_its_move_to_arrived() {
     let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
     t.start_attack(
         PlayerId::new(1),
@@ -638,7 +638,7 @@ fn a_work_attack_on_a_touching_target_starts_its_move_to_arrived() {
 /// of it as of a new one (the retarget time takes the world's time); another target or filter
 /// does not keep it.
 #[test]
-fn a_work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
+fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
     let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
     let at = Position::new(10.4, 10.0, 0.0);
     t.start_attack(
@@ -698,7 +698,7 @@ fn a_work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
 /// its main building, with the annex's owner, class and fog visibility but the main building's
 /// place and class; a target or a main building the slice does not hold fails.
 #[test]
-fn an_attack_task_aims_at_its_target_or_an_annex_s_main_building() {
+fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
     let (mut t, _) = work_attack(UnitStance::AGGRESSIVE);
     let aim = t.attack_aim(object_id(50)).unwrap();
     assert_eq!(
@@ -822,7 +822,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
 /// under way it waits ready on its standing sprite; with it done it swings at once on its
 /// attack sprite.
 #[test]
-fn an_attack_task_of_a_unit_that_cannot_move_goes_ready_in_reach() {
+fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
     use crate::combat::attack::AttackState;
     for (timer, state, pending, sprite) in [
         (0.5, AttackState::Ready, false, 300),
@@ -1160,7 +1160,7 @@ fn the_splitter_groups_soldiers_near_each_other_and_leaves_villagers_loose() {
 /// `FUN_140fd76d0`'s first pass: units in a group the world holds keep their group with the
 /// order's other members, auto formations or not; a member ordered alone moves loose.
 #[test]
-fn the_splitter_keeps_the_order_s_members_of_an_existing_group_together() {
+fn the_splitter_keeps_the_order_members_of_an_existing_group_together() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(60.0, 20.0)),
@@ -1241,7 +1241,7 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
 /// an object of the issuer's (flags 3 to 6); with the setting `+0x1074` any stays. A human's
 /// command left without a unit is refused.
 #[test]
-fn the_unload_check_keeps_an_ally_s_object_the_command_ties_to_the_issuer() {
+fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -1317,7 +1317,7 @@ fn the_unload_check_keeps_an_ally_s_object_the_command_ties_to_the_issuer() {
 
 /// `FUN_140e6b750`: each id's object, live or sleeping, None for a gone one, in the ids' order.
 #[test]
-fn the_lookup_keeps_a_gone_unit_s_entry() {
+fn the_lookup_keeps_gone_unit_entry() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let _ = t
@@ -1345,7 +1345,7 @@ fn the_lookup_keeps_a_gone_unit_s_entry() {
 /// its idle timer takes its adjusted timeout; another player's unit the check dropped and a
 /// sleeping object take nothing.
 #[test]
-fn a_stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
+fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -1420,7 +1420,7 @@ fn a_stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
 /// player's unit, and MOVE and INTERACT (no owner test past it) order it as its own player's:
 /// a queued order joins its unit AI's queue with the issuer as the order's.
 #[test]
-fn an_order_to_another_player_s_unit_goes_to_its_queue_with_the_setting() {
+fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     t.settings.cheats_enabled = true;
     t.players.push(crate::world::Player::default());
@@ -1478,7 +1478,7 @@ fn an_order_to_another_player_s_unit_goes_to_its_queue_with_the_setting() {
 /// world holds leave it (`FUN_14102c160`), one unit or several; a unit in no group, or in a
 /// group the world does not hold, stays as it is.
 #[test]
-fn the_loose_units_of_a_move_or_an_interact_leave_their_groups() {
+fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
     let units = [
         (11, 83, Point::new(20.0, 20.0)),
         (12, 83, Point::new(40.0, 20.0)),
@@ -1551,7 +1551,7 @@ fn the_loose_units_of_a_move_or_an_interact_leave_their_groups() {
 /// when the world holds it, at its place; a unit without a unit AI or a target the world
 /// does not hold names none.
 #[test]
-fn a_queued_move_s_new_group_takes_its_first_unit_s_target() {
+fn queued_move_new_group_takes_its_first_unit_target() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (13, 4, Point::new(21.0, 20.0)),
@@ -1594,7 +1594,7 @@ fn a_queued_move_s_new_group_takes_its_first_unit_s_target() {
 /// move time to the world time plus 1, an unlock leaving it; player 2's GATE of it does
 /// nothing unless players may order each other's units; a unit (type 70) takes nothing.
 #[test]
-fn a_gate_command_toggles_the_lock_of_a_building_of_its_player() {
+fn gate_command_toggles_the_lock_of_building_of_its_player() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.world_time = WorldTime::from_millis(400);
@@ -1668,7 +1668,7 @@ fn a_gate_command_toggles_the_lock_of_a_building_of_its_player() {
 /// 1650, keeping its share of hit points, and in state 2 its build points take the new
 /// master's build time; in state 1 they stay.
 #[test]
-fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
+fn transformed_building_takes_its_new_master_build_time_in_state_2() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let master = |id, build_time| Master {
@@ -1756,7 +1756,7 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
 /// (slot 0x128); a queued order then goes on as a mover's and its unit AI queues it (order
 /// 0x2db at the point), with no movement state to touch.
 #[test]
-fn a_queued_interact_to_an_object_that_does_not_move_also_queues_it() {
+fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
     let interact = |queued| Interact {
         target: None,
         point: Point::new(25.0, 30.0),
@@ -1794,7 +1794,7 @@ fn a_queued_interact_to_an_object_that_does_not_move_also_queues_it() {
 /// pass with 1 makes both ready, and its tail stops the unit (the object's slot 0x148,
 /// `FUN_14108c050`, 0x140c42cd4): the AI's order ends and it forgets its targets.
 #[test]
-fn an_order_to_a_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
+fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     let walker = crate::gathering::hunt::tests::walker();
     if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
@@ -1848,7 +1848,7 @@ fn an_order_to_a_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
 /// targets itself takes it without a work command. A sleeping unit and a mover without movement
 /// state are not modelled.
 #[test]
-fn an_interact_s_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
+fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     let interact = Interact {
         target: None,
         point: Point::new(25.0, 30.0),
@@ -1987,7 +1987,7 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
 /// the one held leaves the unit holding none of the task's (the food kinds 0 and 15 to 17
 /// are one); an attack task (7 or 9) turns a unit's retargeting off unless it is a villager.
 #[test]
-fn the_carried_resource_test_drops_another_resource_and_stops_a_soldier_s_retargeting() {
+fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargeting() {
     let task = |action_type, attribute_type| crate::objects::masters::Task {
         action_type,
         attribute_type,
@@ -2059,7 +2059,7 @@ fn the_carried_resource_test_drops_another_resource_and_stops_a_soldier_s_retarg
 /// `+0xa14`, which slot 0x128 with 0 clears while its work command runs; the move follows
 /// either way.
 #[test]
-fn a_move_inside_a_work_command_with_0_keeps_the_order_queue() {
+fn move_inside_work_command_with_0_keeps_the_order_queue() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let order = crate::unit_ai::QueuedOrder {
@@ -2120,7 +2120,7 @@ fn a_move_inside_a_work_command_with_0_keeps_the_order_queue() {
 /// `FUN_140e666f0`: another player's scout takes the order as its owner's, a unit without
 /// bit 4 nothing; of a human's ids only the first 60 count.
 #[test]
-fn an_auto_scout_reaches_any_player_s_scout_of_its_first_60_ids() {
+fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.players.push(crate::world::Player::default());
@@ -2240,7 +2240,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
 /// `FUN_140e6a7c0` after `FUN_140e55d30`: another player's unit takes the stance only while
 /// players may order each other's; a class-54 unit takes no stance 1.
 #[test]
-fn a_stance_reaches_another_player_s_unit_only_under_the_setting() {
+fn stance_reaches_another_player_unit_only_under_the_setting() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.players.push(crate::world::Player::default());
@@ -2303,7 +2303,7 @@ fn a_stance_reaches_another_player_s_unit_only_under_the_setting() {
 /// no tile, list or record change; its record (for its way out) takes the new master's values,
 /// its hit points their share, its storage leaves and comes as anyone's.
 #[test]
-fn a_master_change_inside_a_building_keeps_to_its_record() {
+fn master_change_inside_building_keeps_to_its_record() {
     let old = Master {
         id: master_id(4),
         kind: master_type::COMBAT,
@@ -2504,7 +2504,7 @@ fn switch_masters() -> (Master, Master) {
 /// master's values; it shows the new standing sprite; in state 2 its volleys are the new
 /// master's volley fire. In state 3 only the powerups go.
 #[test]
-fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite() {
+fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite() {
     let (old, next) = switch_masters();
     let unit = |hp, state| Unit {
         id: object_id(7),
@@ -2607,7 +2607,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
 /// [`switch_master`]'s unmodelled parts: a share that changes the damage sprites, a moving
 /// unit's new master that does not move and a new standing sprite the data file lacks.
 #[test]
-fn a_master_change_s_unmodelled_parts_fail() {
+fn master_change_unmodelled_parts_fail() {
     let (old, next) = switch_masters();
     let unit = Unit {
         id: object_id(7),
@@ -2651,7 +2651,7 @@ fn a_master_change_s_unmodelled_parts_fail() {
 /// `FUN_1412066b0`: the attack, reload, work rate, most hit points and armor powerups go, the
 /// hit points powerup and the reload stinger stay.
 #[test]
-fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
+fn master_change_clears_the_powerups_but_the_hit_points_one() {
     let mut combat = crate::objects::layers::Combat {
         attack_powerup: crate::combat::AttackPowerup::new(2.0),
         reload_powerup: Seconds::new(0.5),
@@ -2693,7 +2693,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
 /// `FUN_140a97730`: an empty list and a `MoveTo` head take no move; an Artifact head takes
 /// the point (its goal); an action the slice does not hold is refused.
 #[test]
-fn the_head_action_takes_a_move_only_where_its_slot_0x40_does() {
+fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let point = Position::new(25.0, 21.0, 0.0);
@@ -2769,7 +2769,7 @@ fn the_head_action_takes_a_move_only_where_its_slot_0x40_does() {
 /// fold into the running least and greatest; units side by side on a diagonal pass, two near
 /// each other far off it do not.
 #[test]
-fn follow_s_box_sets_each_unit_s_x_against_its_y() {
+fn follow_box_sets_each_unit_column_against_its_row() {
     assert_eq!(
         follow_spread(&[Point::new(20.0, 20.0), Point::new(21.0, 20.0)]),
         Some(Point::new(20.5, 20.0))
@@ -2798,7 +2798,7 @@ fn follow_s_box_sets_each_unit_s_x_against_its_y() {
 
 /// A FOLLOW offset stays on the map: below 0 it is 0, past the size less 0.01 that.
 #[test]
-fn a_follow_offset_stays_on_the_map() {
+fn follow_offset_stays_on_the_map() {
     assert_eq!(follow_axis(-0.5, 120), 0.0);
     assert_eq!(follow_axis(130.0, 120), 119.99);
     assert_eq!(follow_axis(60.25, 120), 60.25);
@@ -2884,7 +2884,7 @@ fn followers() -> World {
 /// (`FUN_140c563d0`) makes the order ready (its last argument, 1) and shows it at the
 /// target's x and y, whole ones too (430024841's scout guarding a villager at x 144).
 #[test]
-fn a_guard_gives_its_units_the_defend_order_at_once() {
+fn guard_gives_its_units_the_defend_order_at_once() {
     for x in [20.3, 40.0] {
         let mut t = followers();
         t.players[2].objects[ListIndex::new(0)].place_for_test(Position::new(x, 20.0, 0.0));
@@ -2918,7 +2918,7 @@ fn a_guard_gives_its_units_the_defend_order_at_once() {
 /// `FUN_14161c920` for one unit: it follows the target (a `MoveTo` to it), its unit AI takes
 /// the follow order and action and the target with its class at its place.
 #[test]
-fn a_follower_takes_the_follow_order_and_walks_to_its_target() {
+fn follower_takes_the_follow_order_and_walks_to_its_target() {
     let mut t = followers();
     t.follow(PlayerId::new(1), &object_ids([11]), object_id(30))
         .unwrap();
@@ -2995,7 +2995,7 @@ fn followers_side_by_side_take_their_offsets_from_the_target() {
 /// FOLLOW's check: another player's unit takes nothing while players may not order each
 /// other's units.
 #[test]
-fn a_follow_of_another_player_s_unit_does_nothing() {
+fn follow_of_another_player_unit_does_nothing() {
     let mut t = followers();
     t.follow(PlayerId::new(2), &object_ids([11]), object_id(30))
         .unwrap();
@@ -3012,7 +3012,7 @@ fn a_follow_of_another_player_s_unit_does_nothing() {
 /// `FUN_140aaddb0`: a Build on an annex counts its main building's builders one less; a
 /// foundation the world no longer holds counts nothing.
 #[test]
-fn a_builder_leaves_the_main_building_of_an_annex() {
+fn builder_leaves_the_main_building_of_an_annex() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.masters[1] = crate::objects::masters::Masters::new([Master {
@@ -3081,7 +3081,7 @@ fn a_builder_leaves_the_main_building_of_an_annex() {
 /// `FUN_140c4da50`: the first queued order with a target that the unit itself issued; an
 /// order of another issuer or without a target does not count.
 #[test]
-fn a_unit_s_own_queued_order_names_its_target() {
+fn unit_own_queued_order_names_its_target() {
     let order = |issuer, target| crate::unit_ai::QueuedOrder {
         issuer,
         order: OrderKind::Move,
@@ -3112,7 +3112,7 @@ fn a_unit_s_own_queued_order_names_its_target() {
 /// go; a quiet sub-action does neither; a target in state 7 or more is not taken; the same
 /// target changes nothing.
 #[test]
-fn an_action_s_new_target_is_taken_and_its_old_one_let_go() {
+fn an_action_new_target_is_taken_and_its_old_one_let_go() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.masters[0] = crate::objects::masters::Masters::new([Master {
@@ -3216,7 +3216,7 @@ fn an_action_s_new_target_is_taken_and_its_old_one_let_go() {
 /// `FUN_140ab0300`: a Build counted among its foundation's builders leaves them for a new
 /// target, which it takes; the same target keeps the count.
 #[test]
-fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
+fn build_new_target_leaves_the_old_foundation_builders() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     t.masters[1] = crate::objects::masters::Masters::new([
@@ -3350,7 +3350,7 @@ fn a_build_s_new_target_leaves_the_old_foundation_s_builders() {
 /// class 42 and livestock with food are spared, livestock with a NaN load is not, and a
 /// sleeping object (below type 70) wakes to the end of the live list and dies.
 #[test]
-fn a_shutting_gate_kills_the_units_in_it_but_the_spared() {
+fn shutting_gate_kills_the_units_in_it_but_the_spared() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let master = |id, kind, class| Master {
@@ -3404,7 +3404,7 @@ fn a_shutting_gate_kills_the_units_in_it_but_the_spared() {
 /// takes the first master of its class, type and swap group with one, searched with any
 /// filter, and becomes it only with the change; one with its own task keeps its master.
 #[test]
-fn slot_0x820_takes_the_first_master_of_the_swap_group_with_a_task() {
+fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     let units = [(11, 83, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let task = |action_type, object_id| crate::objects::masters::Task {
@@ -3503,7 +3503,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_a_task() {
 /// so does the player's idle livestock in state 2 on a tile within 3 that the player sees,
 /// then the livestock around that; another player's or one too far stays.
 #[test]
-fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
+fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     let units = [(11, 4, Point::new(30.0, 30.0))];
     let mut t = soldiers(&units, &[]);
     t.spatial = crate::map::spatial::Spatial::new(GridSize::new(40, 40));
@@ -3615,7 +3615,7 @@ fn a_led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
 
 /// `FUN_1410395a0`: the old list goes, the new one is copied whole, an empty one too.
 #[test]
-fn a_group_s_differentiator_groups_are_the_list_given() {
+fn group_differentiator_groups_are_the_list_given() {
     let mut g = crate::groups::UnitGroup {
         differentiator_groups: vec![group_id(1), group_id(2), group_id(3)],
         ..crate::groups::UnitGroup::default()
@@ -3639,7 +3639,7 @@ fn an_ignored_unit_joins_the_end_of_the_ignore_list() {
 /// `FUN_1410862c0`: too close below the least range (COMISS, SETA: NaN not), in reach at
 /// most the weapon range (COMISS, JC: NaN out) and not too close.
 #[test]
-fn a_target_is_in_reach_within_the_weapon_range_and_not_below_the_least() {
+fn target_is_in_reach_within_the_weapon_range_and_not_below_the_least() {
     assert_eq!(
         work_reach(Distance::new(3.0), Distance::new(5.0), Distance::new(2.0)),
         (true, false)
@@ -3809,7 +3809,7 @@ fn the_splitter_splits_an_order_to_more_than_60_units_in_runs_of_60() {
 /// grid of one cell a row, half a tile apart, from the order's point (their `MoveTos`' points in
 /// the save after 1568).
 #[test]
-fn units_of_a_move_take_the_cells_of_a_grid() {
+fn units_of_move_take_the_cells_of_grid() {
     let point = Point::new(29.78125, 92.489_586);
     assert_eq!(
         grid_point(0, 2, point, GridSize::new(120, 120)),
@@ -3862,7 +3862,7 @@ fn units_of_an_order_take_their_offsets_from_their_centroid() {
 /// the box passes however far apart the units stand; a unit 9 tiles right of the first does
 /// not.
 #[test]
-fn the_box_of_an_order_moves_only_its_least_value_for_a_lower_one() {
+fn the_box_of_an_order_moves_only_its_least_value_for_lower_one() {
     assert!(centroid(&[Point::new(50.0, 50.0), Point::new(30.0, 50.0)]).is_some());
     assert_eq!(
         centroid(&[Point::new(30.0, 50.0), Point::new(39.0, 50.0)]),
@@ -3940,7 +3940,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
 }
 
 #[test]
-fn a_point_off_the_map_stays_inside_its_edge() {
+fn point_off_the_map_stays_inside_its_edge() {
     let c = Point::new(10.0, 10.0);
     assert_eq!(
         offset_point(
@@ -3956,7 +3956,7 @@ fn a_point_off_the_map_stays_inside_its_edge() {
 /// `FUN_14161b970`'s timers: 750 ms for the first six entries of the list (the gone ones
 /// count), the world's dt more for each six after.
 #[test]
-fn a_patrol_staggers_its_units_timeouts_by_sixes() {
+fn patrol_staggers_its_units_timeouts_by_sixes() {
     assert_eq!(patrol_timeout(0, Millis::new(100)), Millis::new(750));
     assert_eq!(patrol_timeout(5, Millis::new(100)), Millis::new(750));
     assert_eq!(patrol_timeout(6, Millis::new(100)), Millis::new(850));
@@ -3967,7 +3967,7 @@ fn a_patrol_staggers_its_units_timeouts_by_sixes() {
 /// `FUN_14161b970`'s filter: a waypoint less than a tile from the last one kept on both x
 /// and y is passed over; a NaN difference does not count (`COMISS`/`JNC`).
 #[test]
-fn a_patrol_passes_over_a_waypoint_within_a_tile_of_the_last() {
+fn patrol_passes_over_waypoint_within_tile_of_the_last() {
     let w = [
         Point::new(10.5, 10.5),
         Point::new(11.0, 10.0),
@@ -4022,7 +4022,7 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
 /// differentiator the command count, its formation locked to the command's type (5), the group
 /// listed as its own differentiator group and the command count one higher.
 #[test]
-fn a_formation_of_soldiers_makes_one_group_locked_to_its_type() {
+fn formation_of_soldiers_makes_one_group_locked_to_its_type() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4069,7 +4069,7 @@ fn a_formation_of_soldiers_makes_one_group_locked_to_its_type() {
 /// order ends; any other unit's order stays. Units the world lacks make no group, and a human
 /// whose units are all gone is refused (no command is counted).
 #[test]
-fn a_formation_stops_the_units_that_march_and_ignores_gone_ones() {
+fn formation_stops_the_units_that_march_and_ignores_gone_ones() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4117,7 +4117,7 @@ fn a_formation_stops_the_units_that_march_and_ignores_gone_ones() {
 /// takes the patrol order, the move action and no target at the waypoint, its timers 0 and
 /// 750, its saved patrol gone.
 #[test]
-fn a_lone_unit_patrols_to_its_waypoint() {
+fn lone_unit_patrols_to_its_waypoint() {
     let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
     let at = t.players[1].objects[ListIndex::new(0)].position();
     t.players[1].objects[ListIndex::new(0)].place_for_test(at.with_z(1.5));
@@ -4167,7 +4167,7 @@ fn a_lone_unit_patrols_to_its_waypoint() {
 /// to the tile's middle); the move goes to the last one kept, the unit AI's point is the
 /// command's last even where the filter left it out. Without `+0x8` the saved patrol stays.
 #[test]
-fn a_lone_unit_s_waypoints_but_the_last_become_its_own() {
+fn lone_unit_waypoints_but_the_last_become_its_own() {
     let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
     let w = [
         Point::new(25.0, 20.0),
@@ -4201,7 +4201,7 @@ fn a_lone_unit_s_waypoints_but_the_last_become_its_own() {
 /// (no order) pending: the action stops (slot 0xb0 with 1: its value the last, none now) and
 /// the unit's stopAction runs at once, before the move.
 #[test]
-fn a_move_runs_the_stop_of_a_pending_completion_first() {
+fn move_runs_the_stop_of_pending_completion_first() {
     let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
     let ai = t
         .parts
@@ -4246,7 +4246,7 @@ fn a_move_runs_the_stop_of_a_pending_completion_first() {
 /// stands), its unit AI on the attack move order (`0x2dd`), the move action and no target at
 /// the waypoint.
 #[test]
-fn a_lone_unit_attack_moves_to_its_waypoint() {
+fn lone_unit_attack_moves_to_its_waypoint() {
     let sweep = Sweep {
         patrol: false,
         reset: false,
@@ -4342,7 +4342,7 @@ fn a_lone_unit_attack_moves_to_its_waypoint() {
 /// queue not ready) leaves the record's shown point and ready flag to the stack, which is
 /// not modelled; with `+0xa` an unready order does not send it there.
 #[test]
-fn an_attack_move_through_the_unit_ai_s_queue_is_not_modelled() {
+fn an_attack_move_through_the_unit_ai_queue_is_not_modelled() {
     let sweep = |queued, ignore_pending| Sweep {
         patrol: false,
         reset: true,
@@ -4454,7 +4454,7 @@ fn loose_patrollers_ignore_each_other_and_one_at_its_waypoint_stays() {
 /// group's place joins it (flags bit 17), the villager does not, and a unit among the far
 /// ones does not either.
 #[test]
-fn a_kept_group_takes_the_loose_soldiers_about_it() {
+fn kept_group_takes_the_loose_soldiers_about_it() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4496,7 +4496,7 @@ fn a_kept_group_takes_the_loose_soldiers_about_it() {
 /// the target is out of its line of sight (the squared gap on the ground above its master's line
 /// of sight squared); one that sees it stays loose.
 #[test]
-fn a_kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
+fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4649,7 +4649,7 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
 /// waypoints but the last as its own and a looping path to the last, back and forth from 5
 /// tiles; the command count goes on.
 #[test]
-fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
+fn patrolling_group_walks_loop_through_its_waypoints() {
     let mut t = two_patrollers();
     let w = [Point::new(25.0, 25.0), Point::new(30.0, 20.0)];
     t.patrol(player_id(1), &object_ids([11, 12]), &w, true)
@@ -4692,7 +4692,7 @@ fn a_patrolling_group_walks_a_loop_through_its_waypoints() {
 /// its own (its formation the line's lock) and the three list each other as their
 /// differentiator groups.
 #[test]
-fn a_move_of_soldiers_in_no_group_forms_new_groups() {
+fn move_of_soldiers_in_no_group_forms_new_groups() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4737,7 +4737,7 @@ fn a_move_of_soldiers_in_no_group_forms_new_groups() {
 /// splitter keeps the group (`FUN_140fd9f40`), which takes the soldier and the command
 /// (`BUnitGroup::command`); no new group is made.
 #[test]
-fn a_move_of_a_whole_group_keeps_it() {
+fn move_of_whole_group_keeps_it() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4787,7 +4787,7 @@ fn a_move_of_a_whole_group_keeps_it() {
 /// gone are not modelled; another building it does not take (false), so the work command makes
 /// a new action.
 #[test]
-fn a_gather_takes_a_farm_but_no_other_building() {
+fn gather_takes_farm_but_no_other_building() {
     let mut t = crate::world::tests::forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -4923,7 +4923,7 @@ fn foraging() -> World {
 /// (kind 1); the order 8 to an action without a target or a point is unaimed; the order 6
 /// and a unit without such an action ask nothing.
 #[test]
-fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
+fn drop_off_order_asks_the_top_gather_build_or_hunt() {
     use super::unit_order::{DropOffAsk, DropOffBy};
     let mut t = foraging();
     let ask = |by, asked, unaimed| Some(DropOffAsk { by, asked, unaimed });
@@ -5015,7 +5015,7 @@ fn a_drop_off_order_asks_the_top_gather_build_or_hunt() {
 /// (0x21c) and leaves the Gather; the order 8 to an unaimed Gather records its work for the
 /// town bell, drops off and queues the way back.
 #[test]
-fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
+fn drop_off_order_takes_gather_to_its_site_or_posts_the_other_load() {
     let mut t = foraging();
     t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
         .unwrap();
@@ -5083,7 +5083,7 @@ fn a_drop_off_order_takes_a_gather_to_its_site_or_posts_the_other_load() {
 /// The drop-off order 7 to a Hunt carrying its load: it goes to the town centre 700 (state 8),
 /// which counts it as a worker.
 #[test]
-fn a_drop_off_order_takes_a_hunt_to_its_site() {
+fn drop_off_order_takes_hunt_to_its_site() {
     let mut t = foraging();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.actions.of_mut(v.id).unwrap().list.set_gather(None);
@@ -5119,7 +5119,7 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
 /// The drop-off orders fail on a sleeping object and on a unit whose action the slice does not
 /// hold; they pass over a unit not in state 2, below type 40 or carrying nothing.
 #[test]
-fn a_drop_off_order_fails_on_what_it_does_not_hold() {
+fn drop_off_order_fails_on_what_it_does_not_hold() {
     let mut t = foraging();
     t.set_unread(
         t.players[1].objects[ListIndex::new(0)].id,
@@ -5149,7 +5149,7 @@ fn a_drop_off_order_fails_on_what_it_does_not_hold() {
 /// (`set_state(13)`: its animation at speed 1, its standing sprite); with the wolf in reach a
 /// soldier that may move starts its `MoveTo` arrived and shows its standing sprite.
 #[test]
-fn an_attack_task_s_start_ends_where_the_start_does() {
+fn an_attack_task_start_ends_where_the_start_does() {
     use crate::combat::attack::AttackState;
     let started = |ai: bool, at: f32| {
         let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
@@ -5200,7 +5200,7 @@ fn an_attack_task_s_start_ends_where_the_start_does() {
 /// The work command's task (`FUN_14106ff70`): none on a point; the forager's Gather task 2 on
 /// Gaia's bush (its master 120); none on its town centre, which no task of it names.
 #[test]
-fn a_work_command_finds_its_master_and_task_on_a_target() {
+fn work_command_finds_its_master_and_task_on_target() {
     let t = crate::world::tests::forage_world();
     assert_eq!(
         t.work_task(
@@ -5244,7 +5244,7 @@ fn a_work_command_finds_its_master_and_task_on_a_target() {
 /// A work command on the other bush retargets the forager's Gather on the same task, and on
 /// the other deer the hunter's Hunt: the unit AI hears the gather or hunt order on it.
 #[test]
-fn a_work_command_retargets_a_gather_or_a_hunt_on_its_task() {
+fn work_command_retargets_gather_or_hunt_on_its_task() {
     let mut t = crate::world::tests::forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -5299,7 +5299,7 @@ fn a_work_command_retargets_a_gather_or_a_hunt_on_its_task() {
 
 /// A Gather or a Hunt sent on to an object of its own player's master 84 is not modelled.
 #[test]
-fn a_work_command_s_retarget_to_its_player_s_master_84_fails() {
+fn work_command_retarget_to_its_player_master_84_fails() {
     let with_84 = |mut t: World| {
         for masters in &mut t.masters {
             let m84 = Master {
@@ -5359,7 +5359,7 @@ fn a_work_command_s_retarget_to_its_player_s_master_84_fails() {
 /// follows); another current task, or a Build of the unit's former master, is not modelled;
 /// no action on top answers 0.
 #[test]
-fn a_work_command_s_task_is_retaken_by_the_action_on_top() {
+fn work_command_task_is_retaken_by_the_action_on_top() {
     use crate::objects::masters::Task;
     let mut t = crate::world::tests::forage_world();
     let task = *t.masters[1]
@@ -5448,7 +5448,7 @@ fn a_work_command_s_task_is_retaken_by_the_action_on_top() {
 /// The action list's factory for the work's task: the Gather task starts a Gather on the
 /// bush; a task of an action type the slice does not make is not modelled.
 #[test]
-fn a_work_command_s_factory_starts_the_task_s_action() {
+fn work_command_factory_starts_the_task_action() {
     use crate::objects::masters::Task;
     let mut t = crate::world::tests::forage_world();
     let task = *t.masters[1]
@@ -5497,7 +5497,7 @@ fn a_work_command_s_factory_starts_the_task_s_action() {
 /// group's command 9 on it, and the command count goes on. The soldiers are in the group, none
 /// is loose.
 #[test]
-fn an_interact_of_soldiers_on_an_enemy_building_forms_a_group_that_attacks_it() {
+fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),

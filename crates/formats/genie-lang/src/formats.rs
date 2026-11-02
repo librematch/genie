@@ -255,7 +255,7 @@ mod tests {
 
     /// The game's DLL's string tables: block n's strings take the ids from (n - 1) × 16 on.
     #[test]
-    fn a_dll_s_string_tables_give_their_strings_by_id() {
+    fn dll_string_tables_give_their_strings_by_id() {
         let f = File::open("test/dlls/language_x1_p1.dll").unwrap();
         let lang = LangFileType::Dll.read_from(f).unwrap();
         assert_eq!(
@@ -271,7 +271,7 @@ mod tests {
     /// A string table block: an empty string only counts its id, a string that does not
     /// decode as UTF-16 is left out, a later one with the same id replaces the earlier.
     #[test]
-    fn a_string_block_counts_empty_strings_and_skips_bad_ones() {
+    fn string_block_counts_empty_strings_and_skips_bad_ones() {
         let mut lang = LangFile::new();
         let data = [
             0, 0, 2, 0, b'h', 0, b'i', 0, 1, 0, 0x00, 0xd8, 1, 0, b'x', 0,

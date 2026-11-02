@@ -465,7 +465,7 @@ mod tests {
     };
 
     #[test]
-    fn the_chop_reaches_its_frame_22_after_a_second_of_20_ms_updates() {
+    fn the_chop_reaches_its_frame_22_after_second_of_20_ms_updates() {
         // MarvinBlue/426048731's 9181 from update 1008 (the tick oracle's trace): frame 0 after
         // the first update (time 0.02), frame 1 after the third (time 0.0155...)
         let mut s = ActiveSprite::start(CHOP, &mut Well512::default());
@@ -488,7 +488,7 @@ mod tests {
     /// keeps its frame; a moving object's top speed is its base times the shown sprite's factor
     /// above 0 after every call, a static object has none.
     #[test]
-    fn a_new_sprite_starts_its_instance_and_the_top_speed_follows_it() {
+    fn new_sprite_starts_its_instance_and_the_top_speed_follows_it() {
         let walking = Graphic {
             id: SpriteId::named(1),
             speed_multiplier: SpeedMultiplier::of_data(1.25),
@@ -536,7 +536,7 @@ mod tests {
     /// 0x1413b5112 skips only for an ordered 1e-7 above it), and the NaN interval then returns
     /// before a step (JC at 0x1413b5149).
     #[test]
-    fn a_nan_speed_multiplier_holds_the_frame() {
+    fn nan_speed_multiplier_holds_the_frame() {
         let g = Graphic {
             speed_multiplier: SpeedMultiplier::of_data(f32::NAN),
             ..CHOP
@@ -549,7 +549,7 @@ mod tests {
     /// `CVTTSS2SI EDX` then `MOVSX EAX, DX` (0x1413b5177): a quotient past the i32 range steps
     /// 0 frames (0x80000000's low word), where a saturating cast would step back one.
     #[test]
-    fn a_step_count_past_the_i32_range_steps_no_frame() {
+    fn step_count_past_the_i32_range_steps_no_frame() {
         let mut s = ActiveSprite::start(CHOP, &mut Well512::default());
         s.update(Seconds::new(3.0e8), Speed::new(1.0));
         assert_eq!(
@@ -565,7 +565,7 @@ mod tests {
     /// sprite played once stops on its end; the frame it left is never shown again at once, so
     /// a one-frame loop ends looped.
     #[test]
-    fn a_sprite_past_its_end_waits_its_delay_loops_or_stops() {
+    fn sprite_past_its_end_waits_its_delay_loops_or_stops() {
         let four = |flags, replay_delay| Graphic {
             id: SpriteId::named(1),
             frames: Frame::of_data(4),
@@ -663,7 +663,7 @@ mod tests {
 
     /// The replay delay's test is COMISS/JBE (0x1413b521f): a NaN delay loops at once.
     #[test]
-    fn a_nan_replay_delay_loops_at_once() {
+    fn nan_replay_delay_loops_at_once() {
         let g = Graphic {
             frames: Frame::of_data(2),
             replay_delay: Seconds::new(f32::NAN),
@@ -675,7 +675,7 @@ mod tests {
     }
 
     #[test]
-    fn a_static_sprite_stays_on_its_frame_and_has_reached_every_frame() {
+    fn static_sprite_stays_on_its_frame_and_has_reached_every_frame() {
         // build 158041's town center sprite 3241 does not animate (sequence bit 0 clear)
         let still = Graphic {
             id: SpriteId::named(3241),
@@ -744,7 +744,7 @@ mod tests {
     }
 
     #[test]
-    fn a_combat_object_s_slots_show_its_look_else_its_master_s() {
+    fn combat_object_slots_show_its_look_else_its_master_s() {
         let m = barracks();
         assert_eq!(standing(&m, None, false), Some(SpriteId::named(2575)));
         assert_eq!(walking(&m, None, false), Some(SpriteId::named(10)));
@@ -763,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn a_loaded_trade_cart_shows_its_trade_task_s_carrying_sprite() {
+    fn loaded_trade_cart_shows_its_trade_task_carrying_sprite() {
         let trade = crate::objects::masters::Task {
             action_type: action_type::TRADE,
             object_id: Some(master_id(0x54)),
@@ -806,7 +806,7 @@ mod tests {
     /// records/425984813: a barracks that dies a foundation plays its destruction sprite (389),
     /// not its death sprite (2573).
     #[test]
-    fn a_building_that_dies_before_it_is_built_shows_its_destruction_sprite() {
+    fn building_that_dies_before_it_is_built_shows_its_destruction_sprite() {
         let m = barracks();
         assert_eq!(
             building_death(&m, None, Seconds::new(12.5)),

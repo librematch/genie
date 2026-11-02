@@ -114,7 +114,7 @@ mod tests {
 
     /// 0 to 4 are the relations, in their lists' order, each with its bit; other values none.
     #[test]
-    fn a_saved_value_is_a_relation_with_its_list_and_bit() {
+    fn saved_value_is_relation_with_its_list_and_bit() {
         assert_eq!(UnitRelation::of_field(4), Some(UnitRelation::ENEMY));
         assert_eq!(UnitRelation::of_field(5), None);
         assert_eq!(UnitRelation::of_field(-1), None);

@@ -47,7 +47,7 @@ mod tests {
 
     /// A time times an acceleration is the one `f32` product, the time first.
     #[test]
-    fn a_time_times_an_acceleration_is_a_speed() {
+    fn time_times_an_acceleration_is_speed() {
         let a = Acceleration::new(-23.52);
         assert_eq!(
             (Seconds::new(0.1) * a).get().to_bits(),

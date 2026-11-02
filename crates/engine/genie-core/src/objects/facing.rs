@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn a_forward_vector_takes_its_facet_and_the_facet_its_angle() {
+    fn forward_vector_takes_its_facet_and_the_facet_its_angle() {
         // facing the diagonal (1, 0, 1): facet 0, a quarter of π
         let f = facet_of_forward(BVector::new(1.0, 0.0, 1.0), VILLAGER);
         assert_eq!(f, Facet::of_data(0));
@@ -270,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_with_a_turn_time_steps_a_facet_a_turn_time_until_it_faces() {
+    fn unit_with_turn_time_steps_facet_turn_time_until_it_faces() {
         let (at, to) = (Point::new(10.0, 10.0), Point::new(10.0, 14.0));
         let off = facets_to(at, Angle::ZERO, to, Some(VILLAGER));
         assert!(1.5 < off.abs());
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_faces_within_half_a_facet_or_turns_at_once() {
+    fn unit_faces_within_half_facet_or_turns_at_once() {
         let at = Point::new(100.0, 40.0);
         let angle = 0.0;
         // straight along its angle: it faces already
@@ -346,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn the_modulo_of_a_negative_value_counts_back_from_the_divisor() {
+    fn the_modulo_of_negative_value_counts_back_from_the_divisor() {
         assert_eq!(modulo(-1.0, 16.0), 15.0);
         assert_eq!(modulo(-16.0, 16.0), 0.0);
         assert_eq!(modulo(17.0, 16.0), 1.0);

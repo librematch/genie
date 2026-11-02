@@ -104,7 +104,7 @@ mod tests {
     /// A cap of −1 never binds; a set one binds the plans from its value on and the waits past
     /// it.
     #[test]
-    fn a_set_cap_binds_and_none_never_does() {
+    fn set_cap_binds_and_none_never_does() {
         assert!(!PlanCount::of_data(99).reached(PlanCap::NONE));
         assert!(PlanCount::of_data(6).reached(PlanCap::of_data(6)));
         assert!(!PlanCount::of_data(5).reached(PlanCap::of_data(6)));

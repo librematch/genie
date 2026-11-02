@@ -407,7 +407,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
 }
 
 #[test]
-fn an_enter_of_a_unit_without_speed_starts_failed_beyond_arrived() {
+fn an_enter_of_unit_without_speed_starts_failed_beyond_arrived() {
     // `0x140aa2100`: beyond ARRIVED of its target a MoveTo without speed starts in state 13
     let (mut t, v) = walk_again_world();
     walks_at(&mut t, v, 0.0);
@@ -440,7 +440,7 @@ fn an_enter_of_a_unit_without_speed_starts_failed_beyond_arrived() {
 }
 
 #[test]
-fn a_transport_s_enter_walks_to_it_and_sends_it_where_they_meet() {
+fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
     // FUN_140a87320 case 4 on a transport: the point and code of FUN_140a85f30. An idle ship
     // meets the villager on the shore on the way (code 1): the transport is sent there at its
     // own height; one under a MoveTo (state 3) where it goes (code 0): not sent. The MoveTo
@@ -592,7 +592,7 @@ fn completed(t: &World) -> usize {
 }
 
 #[test]
-fn a_transport_that_moved_off_the_point_makes_the_enter_walk_again() {
+fn transport_that_moved_off_the_point_makes_the_enter_walk_again() {
     // FUN_140a87a80 state 4: FUN_140a7bbf0 (not on the point) and FUN_140a7bd10 (more than
     // half a tile off: COMISS/JA) set_state(4): the ship meets the villager on the shore (code
     // 1) and is sent there at once (slot 0x3d8, then slot 0x340); then the new MoveTo updates
@@ -641,7 +641,7 @@ fn a_transport_that_moved_off_the_point_makes_the_enter_walk_again() {
 /// The Enter's waiting `MoveTo` (state 2, after the motion step gave up): the world's dt
 /// onto its timer (code 0: nothing else happens); at its delay it asks again.
 #[test]
-fn an_enter_s_waiting_move_to_asks_again_at_its_delay() {
+fn an_enter_waiting_move_to_asks_again_at_its_delay() {
     let mut e = ship_enter(Position::new(5.5, 30.5, 0.0), MoveTo::Waiting);
     if let Some(m) = e.move_to.as_mut() {
         m.wait = crate::movement::move_to::MoveWait {
@@ -678,7 +678,7 @@ fn an_enter_s_waiting_move_to_asks_again_at_its_delay() {
 }
 
 #[test]
-fn a_walk_again_into_reach_enters_and_the_update_enters_again() {
+fn walk_again_into_reach_enters_and_the_update_enters_again() {
     // the set_state(4) of a moved transport finds the unit in reach: FUN_140a867b0 at once (the
     // unit inside, the ship's list holding it, notify 0x1fa), then the update's code 1 (no
     // MoveTo) in reach enters again (notify 0x1fa and set_state(1), then its own)
@@ -712,7 +712,7 @@ fn a_walk_again_into_reach_enters_and_the_update_enters_again() {
 }
 
 #[test]
-fn a_failed_move_walks_again_once_then_waits_and_a_wait_walks_again() {
+fn failed_move_walks_again_once_then_waits_and_wait_walks_again() {
     // code 3: +0x68 lets one set_state(4); the next waits a second (set_state(2)), whose end
     // walks again; the town centre is a building: no meeting
     let failed = EnterAction::new(
@@ -775,7 +775,7 @@ fn moved_ship(y: f32) -> EnterTarget {
 /// more), of an unallied player or without room is state 11, which is not modelled; a held
 /// one passes.
 #[test]
-fn an_enter_holds_only_a_live_allied_target_with_room() {
+fn an_enter_holds_only_live_allied_target_with_room() {
     let ship = moved_ship(89.5);
     let reason = |t| EnterAction::held_target(t).unwrap_err().reason();
     assert_eq!(reason(None), "an Enter whose building is gone (state 11)");
@@ -807,7 +807,7 @@ fn an_enter_holds_only_a_live_allied_target_with_room() {
 /// or off it by at most half a tile on every axis, stays; more than half a tile on one axis
 /// moved; a NaN offset compares as not moved (`COMISS`/`JA`).
 #[test]
-fn an_enter_s_target_moved_only_beyond_half_a_tile() {
+fn an_enter_target_moved_only_beyond_half_tile() {
     let enter = EnterAction::new(
         ContainerId::new(object_id(7420)),
         Position::new(82.5, 89.5, 0.0),
@@ -825,7 +825,7 @@ fn an_enter_s_target_moved_only_beyond_half_a_tile() {
 }
 
 #[test]
-fn a_meeting_point_is_the_shore_on_the_way_else_a_beach_under_the_unit() {
+fn meeting_point_is_the_shore_on_the_way_else_beach_under_the_unit() {
     // FUN_140a85f30's branch by the target: an idle transport (state 0 or 2) with room and
     // speed meets the unit at the shore; without room or speed (or with a negative one; a NaN
     // has some) at its place; moving (state 4) where its action goes, but a siege weapon at its
@@ -1083,7 +1083,7 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
 }
 
 #[test]
-fn a_town_center_takes_villagers_infantry_cavalry_and_monks() {
+fn town_center_takes_villagers_infantry_cavalry_and_monks() {
     // a town center's garrison_type 11: bits 0, 1 and 3
     assert!(garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
@@ -1144,7 +1144,7 @@ fn a_town_center_takes_villagers_infantry_cavalry_and_monks() {
 }
 
 #[test]
-fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
+fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
     // MarvinBlue/426048731's town center 9149 (the tick oracle, update 4439): pierce 5 by its
     // volley missile 54 every 2 s; its 7 villagers made its firepower 1 + 7
     let arrow = Master {
@@ -1207,7 +1207,7 @@ fn a_villager_inside_a_town_center_adds_one_missile_to_its_volleys() {
     );
 }
 
-/// A town centre's master as `a_villager_inside_a_town_center_adds_one_missile_to_its_volleys`
+/// A town centre's master as `villager_inside_town_center_adds_one_missile_to_its_volleys`
 /// has it.
 fn town_center() -> Master {
     Master {
@@ -1224,7 +1224,7 @@ fn town_center() -> Master {
 }
 
 #[test]
-fn an_attack_rate_needs_a_reload_and_a_range_that_compare_above_their_limits() {
+fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     // FUN_14120dc10: COMISS reload, 0 and COMISS range, 1.0, each with JBE: an unordered
     // value gives no rate, as one at the limit does
     let arrow = Master {
@@ -1272,7 +1272,7 @@ fn an_attack_rate_needs_a_reload_and_a_range_that_compare_above_their_limits() {
 }
 
 #[test]
-fn a_volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
+fn volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
     // FUN_14120e1a0: the volley missile when 0 <= id < the player's master count, else the
     // missile; a null slot or one without weapons adds nothing, with no fallback
     let missile = Master {
@@ -1377,7 +1377,7 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
 }
 
 #[test]
-fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_its_floor() {
+fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_floor() {
     // FUN_141213520: MAXSS(own / rate, floor), the floor 0.0 unless object flag 3 names (in
     // its upper half, +0x656) a master of type 70: that master's firepower over the rate
     let foot = Master {
@@ -1471,7 +1471,7 @@ fn a_share_is_at_least_zero_and_a_transforming_master_takes_its_other_form_as_it
 }
 
 #[test]
-fn a_garrison_task_compares_the_bytes_the_game_passes_widened() {
+fn garrison_task_compares_the_bytes_the_game_passes_widened() {
     // FUN_1415c9240: the task's ushorts +0xe and +0x10 against the byte arguments
     let tasks = [task(GARRISON, 20), task(GARRISON, -1)];
     // class 276 passes its low byte 20; a task of 276 never matches a byte
@@ -1501,7 +1501,7 @@ fn a_garrison_task_compares_the_bytes_the_game_passes_widened() {
 }
 
 #[test]
-fn a_building_takes_a_unit_in_by_its_player_state_hit_points_room_and_garrison_type() {
+fn building_takes_unit_in_by_its_player_state_hit_points_room_and_garrison_type() {
     // FUN_14120eb10
     let mut t = garrison_world();
     let takes = |t: &World, b, p, m, others, unchecked| {
@@ -1559,7 +1559,7 @@ fn a_building_takes_a_unit_in_by_its_player_state_hit_points_room_and_garrison_t
 }
 
 #[test]
-fn a_transport_takes_a_combat_unit_with_a_task_on_its_class_and_room() {
+fn transport_takes_combat_unit_with_task_on_its_class_and_room() {
     // FUN_14120eb10's object-flag-0 branch: FUN_1415c9240 with 3 and the transport's class
     let mut t = garrison_world();
     let takes = |t: &World, m, unchecked| {
@@ -1627,7 +1627,7 @@ fn the_class_flags_are_the_images_table_by_class() {
 }
 
 #[test]
-fn a_room_test_counts_the_unit_and_what_it_holds_or_one_for_none() {
+fn room_test_counts_the_unit_and_what_it_holds_or_one_for_none() {
     // FUN_1412169b0: slot 0x498 of the building plus that of the unit and 1
     let mut t = garrison_world();
     let _ = t
@@ -1815,7 +1815,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
 /// no state change, no move; the building's sight takes its circle of 5 and the villager's
 /// town-bell record its work.
 #[test]
-fn a_gather_point_on_its_own_building_takes_the_new_unit_in() {
+fn gather_point_on_its_own_building_takes_the_new_unit_in() {
     let mut t = let_out_world();
     walker(
         &mut t,
@@ -1852,7 +1852,7 @@ fn a_gather_point_on_its_own_building_takes_the_new_unit_in() {
 }
 
 #[test]
-fn a_grouped_unit_that_enters_a_building_leaves_its_group() {
+fn grouped_unit_that_enters_building_leaves_its_group() {
     let mut t = let_out_world();
     let mut v = unit(400, VILLAGER, HitPoints::new(25.0));
     v.place_for_test(Position::new(12.5, 10.0, 0.0));
@@ -1922,7 +1922,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.stats = standing();
     t.parts.put_mover(v.id, Some(walker));
-    let v_ai = crate::unit_ai::UnitAi {
+    let villager_ai = crate::unit_ai::UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
         current_action: None,
@@ -1930,7 +1930,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
         ..crate::unit_ai::UnitAi::default()
     };
     let _ = t
-        .push_live(PlayerId::new(1), Object::with_ai(v, v_ai))
+        .push_live(PlayerId::new(1), Object::with_ai(v, villager_ai))
         .unwrap();
     t.players[1].attributes = vec![Amount::ZERO; 250];
     let placed = crate::map::spatial::Placed {
@@ -1970,7 +1970,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
 /// a fifth of its hit points or less (480 of 2400) and a master that transforms into the
 /// centre (task 0x88) are not modelled, nor is the Enter's state 11 for a full centre.
 #[test]
-fn an_enter_gives_its_load_to_a_drop_site_and_needs_room() {
+fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
     let with_food = |t: &mut World| {
         let v = t.players[1].objects.last_mut().unwrap();
         (v.life.attribute_type, v.life.amount) =
@@ -2205,7 +2205,7 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
 }
 
 #[test]
-fn a_unit_ais_test_takes_a_building_or_transport_that_takes_its_unit_in() {
+fn unit_ais_test_takes_building_or_transport_that_takes_its_unit_in() {
     // FUN_140c40e00: type below 70 none, else FUN_14120eb10 with 1, 1
     let mut t = garrison_world();
     let mut masters = garrison_masters();
@@ -2240,7 +2240,7 @@ fn a_unit_ais_test_takes_a_building_or_transport_that_takes_its_unit_in() {
 pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point) {
     let mut v = unit(id, m, HitPoints::new(25.0));
     v.place_for_test(at.with_height(0.0));
-    let v_ai = crate::unit_ai::UnitAi {
+    let villager_ai = crate::unit_ai::UnitAi {
         ai_type: UnitAiType::CIVILIAN,
         current_order: None,
         current_action: None,
@@ -2276,7 +2276,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
             sprite_facets: None,
         }),
     );
-    let _ = t.push_live(p, Object::with_ai(v, v_ai)).unwrap();
+    let _ = t.push_live(p, Object::with_ai(v, villager_ai)).unwrap();
     t.spatial.insert(
         object_id(id),
         crate::map::spatial::Placed {
@@ -2338,7 +2338,7 @@ pub(crate) fn tracked(t: &mut World, m: MasterId, ids: &[i32]) {
 }
 
 #[test]
-fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_gates() {
+fn the_shelters_near_target_follow_its_owners_tracker_and_count_annexes_and_gates() {
     // FUN_14161e370 with +0x1e: the town centres' list (109) in the tracker's order; 102 is
     // beyond ten tiles, annex 104 is no building but pushes its count (one unit inside)
     let mut t = sized_world(40, 40);
@@ -2379,7 +2379,7 @@ fn the_shelters_near_a_target_follow_its_owners_tracker_and_count_annexes_and_ga
 }
 
 #[test]
-fn a_garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
+fn garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
     // the town centres take one unit; the list [104, 101, 100] gives the buildings
     // [101, 100] and the counts [1, 0, 0]: the villager's nearest pair (101, index 0) reads
     // the annex's count 1, which is full, so it goes to 100 (index 1, count 0)
@@ -2433,7 +2433,7 @@ fn a_garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
 }
 
 #[test]
-fn a_garrison_through_the_unit_ais_queues_their_enter_orders() {
+fn garrison_through_the_unit_ais_queues_their_enter_orders() {
     // FUN_141621220 with param_7: slot 0x30 into slot 0x28 with 0x2cd, issued by the unit
     let mut t = let_out_world();
     walker(
@@ -2496,7 +2496,7 @@ fn ship_at(t: &mut World, at: Point) {
 }
 
 #[test]
-fn a_garrison_into_a_transport_pairs_the_units_whose_class_has_the_flags() {
+fn garrison_into_transport_pairs_the_units_whose_class_has_the_flags() {
     // FUN_141621220: a villager (class 4, flags 0x10163) with a garrison task on the ship's
     // class 20 pairs with it and, through the unit AIs, queues its enter order on it; the
     // archer (class 0) has no such task, and the ship itself (class 20) no class flags
@@ -2634,7 +2634,7 @@ fn shore_world(at: Point, ship: Point) -> World {
 }
 
 #[test]
-fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
+fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
     // FUN_14161e370 (no +0x1e) -> FUN_141621220's transports -> slot 0x7e8 with filter 3 ->
     // the finder's LAB_1412796b4 -> the Enter: FUN_140a85f30 walks from the ship's tile
     // (5, 30) to the villager's (5, 12) and meets it on the beach tile (5, 17), code 1: the
@@ -2719,7 +2719,7 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
 }
 
 #[test]
-fn a_villager_meets_a_moving_ship_where_it_goes() {
+fn villager_meets_moving_ship_where_it_goes() {
     // FUN_140a85f30 on a ship under a MoveTo (state 3): its goal, code 0, no order
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
     t.parts
@@ -2795,7 +2795,7 @@ fn a_villager_meets_a_moving_ship_where_it_goes() {
 }
 
 #[test]
-fn a_villager_meets_a_sailing_transport_where_it_sails() {
+fn villager_meets_sailing_transport_where_it_sails() {
     // FUN_140a85f30 on a ship whose Transport sails (state 11): the Transport's point (its
     // +0x38, +0x3c, FUN_140a7be40 and FUN_140a7be50), code 0
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
@@ -2941,7 +2941,7 @@ fn ashore(t: &mut World, center: Point, radius: f32) -> Point {
 /// the planner's path to the point (`FUN_140f7c390`), its `MoveTo` starting; the unit AI holds
 /// the unload's action value with the ship itself as its target.
 #[test]
-fn an_unload_command_sends_a_transport_toward_the_shore() {
+fn an_unload_command_sends_transport_toward_the_shore() {
     let mut t = coast_world(Point::new(10.5, 10.5));
     UnloadCommand {
         player: player_id(1),
@@ -3076,7 +3076,7 @@ fn work_at(target: i32, point: Position) -> crate::orders::Work {
 /// 0x48: the work at the new point, `+0x34` 1, sailing there for another object's order);
 /// water under the point gives no task, so the ship just moves.
 #[test]
-fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
+fn work_command_on_land_point_makes_transport_that_sails_there() {
     let (mut t, idx) = transport_task_world();
     t.order_work(
         PlayerId::new(1),
@@ -3152,7 +3152,7 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
 /// 19, `FUN_141195490`, `FUN_141195400`) ordered to its own player's market: the factory makes
 /// a new Transport (`+0x34` −1, not the retake's 1), whose notify names the market.
 #[test]
-fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
+fn trade_boat_work_at_its_own_market_makes_new_transport() {
     let (mut t, idx) = transport_task_world();
     for m in &mut t.masters {
         if let Some(s) = m.get_mut(SHIP) {
@@ -3215,7 +3215,7 @@ fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
 /// stream's `find_drop_location`), out of the ship's list, its unit AI's state position the
 /// spot; with none left inside the owner hears nothing, and the Transport idles.
 #[test]
-fn a_transport_beside_the_shore_puts_its_units_ashore() {
+fn transport_beside_the_shore_puts_its_units_ashore() {
     let mut t = coast_world(Point::new(14.5, 10.5));
     UnloadCommand {
         player: player_id(1),
@@ -3293,7 +3293,7 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
 /// a draw leaves the water, and the Transport sails there to unload (`set_state(4)`, `+0x68`):
 /// its update's end leaves it so.
 #[test]
-fn a_transport_without_a_drop_location_sails_on_to_a_new_point() {
+fn transport_without_drop_location_sails_on_to_new_point() {
     let mut t = coast_world(Point::new(14.5, 10.5));
     // the villager's master stands nowhere (restriction 0 refuses both terrains)
     if let Some(terrain) = t.spatial.terrain.as_mut() {
@@ -3339,7 +3339,7 @@ fn a_transport_without_a_drop_location_sails_on_to_a_new_point() {
 /// `find_drop_location`, any zone), leaves it for the place and takes its stance again
 /// there; the ship's own Transport stays untouched.
 #[test]
-fn a_unit_inside_a_transport_unloaded_goes_ashore_about_it() {
+fn unit_inside_transport_unloaded_goes_ashore_about_it() {
     let mut t = coast_world(Point::new(14.5, 10.5));
     let spot = ashore(&mut t, Point::new(14.5, 10.5), 1.0);
     UnloadCommand {
@@ -3400,7 +3400,7 @@ fn a_unit_inside_a_transport_unloaded_goes_ashore_about_it() {
 /// `FUN_140e6f620`), the command's list holds any player's object (`FUN_140e6b750`), and the
 /// villager goes ashore about it. Without the alliance both ways the ship goes from the list.
 #[test]
-fn a_unit_inside_an_ally_s_transport_unloaded_goes_ashore() {
+fn unit_inside_an_ally_transport_unloaded_goes_ashore() {
     let ally = |both_ways: bool| {
         let mut t = coast_world(Point::new(14.5, 10.5));
         let i = t.players[1].objects.position_of(object_id(200)).unwrap();
@@ -3450,7 +3450,7 @@ fn a_unit_inside_an_ally_s_transport_unloaded_goes_ashore() {
 }
 
 #[test]
-fn a_villager_beside_a_ship_enters_it_at_once() {
+fn villager_beside_ship_enters_it_at_once() {
     // in reach (gap 0.8, range 1) of a ship with speed: the tiles (5, 19) and (5, 20) are
     // the two left out, no building between; FUN_140a867b0 -> FUN_1411921d0 -> the ship's
     // slot 0x1c0 (FUN_14120b790): inside at the ship's place; FUN_1412067f0 with 3 records
@@ -3496,7 +3496,7 @@ fn a_villager_beside_a_ship_enters_it_at_once() {
 }
 
 #[test]
-fn a_villager_enters_an_allys_ship_with_its_owners_masters() {
+fn villager_enters_an_allys_ship_with_its_owners_masters() {
     // player 2's ship beside player 1's villager: FUN_14120eb10 lets an ally's transport take
     // it (both ways allied), and the enter adds the villager to the ship's list
     let mut t = shore_world(Point::new(5.5, 19.0), Point::new(5.5, 20.5));
@@ -3607,7 +3607,7 @@ fn seek_shelter_sends_the_players_villagers_and_checked_units_to_its_buildings()
 /// world no longer holds is passed over. A building with orders of its own to hand on is not
 /// modelled.
 #[test]
-fn unload_of_a_building_lets_every_unit_inside_out() {
+fn unload_of_building_lets_every_unit_inside_out() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(1), 1001, VILLAGER);
@@ -3666,7 +3666,7 @@ fn unload_of_a_building_lets_every_unit_inside_out() {
 }
 
 #[test]
-fn unload_lets_a_unit_out_of_the_building_it_is_inside() {
+fn unload_lets_unit_out_of_the_building_it_is_inside() {
     // FUN_14161f410 on a unit inside a building: FUN_1411e7220 toward the point, +0x9dc
     // cleared, its orders gone; the building's own unload of the others is not run
     let mut t = let_out_world();
@@ -3697,7 +3697,7 @@ fn unload_lets_a_unit_out_of_the_building_it_is_inside() {
 /// queue): the unit comes out, its unit AI stops (slot 0xb0 with 1: its stopAction), forgets
 /// its target and takes its stance again at its new place (slot 0x1c0 with `+0x1a9`).
 #[test]
-fn a_unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
+fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     t.parts.set_unit_ai(
@@ -3738,7 +3738,7 @@ fn a_unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
 /// take in, `FUN_1416136f0`): slot 0x1a8 does nothing (the building's list and volleys
 /// unchanged), slot 0x58 moves it from where it stands to a spot beside the building.
 #[test]
-fn a_unit_on_the_map_let_out_moves_beside_the_building() {
+fn unit_on_the_map_let_out_moves_beside_the_building() {
     let mut t = let_out_world();
     let tc_at = t.players[1].objects[ListIndex::new(0)].position();
     walker(&mut t, PlayerId::new(1), 1000, VILLAGER, tc_at.ground());
@@ -3770,7 +3770,7 @@ fn a_unit_on_the_map_let_out_moves_beside_the_building() {
 }
 
 #[test]
-fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
+fn buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     // FUN_1411d0ce0 = FUN_141213500 (the +0x2f8 count and +0x9a8) less +0xc2c, which counts
     // the units of type 70 that came in with +0x9a0 set (FUN_1411cb850)
     let mut t = garrison_world();
@@ -3843,7 +3843,7 @@ fn transport_ticked(
 /// The unload is the Transport's own call (`FUN_140aa3ba0` in its state 6): the villager is
 /// ashore and the Transport idles while the ship's update still runs, before its unit AI part.
 #[test]
-fn a_transport_unloads_inside_its_own_update() {
+fn transport_unloads_inside_its_own_update() {
     let mut t = coast_world(Point::new(14.5, 10.5));
     t.build_mesh().unwrap();
     UnloadCommand {
@@ -3879,7 +3879,7 @@ fn a_transport_unloads_inside_its_own_update() {
 /// the unit AI (0x1f9 with the transport action value), idles and leaves the list; a done one
 /// (state 1) leaves it quietly.
 #[test]
-fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
+fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
     let t = transport_ticked(Point::new(14.5, 10.5), Point::new(15.5, 10.5), |_| ());
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(
@@ -3999,7 +3999,7 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
 /// 100 and a second centre 101 of player 1 at (16, 4), which the villager's garrison task
 /// takes; `setup` changes the world before the villager is let out toward `point` with
 /// `work_on` ([`World::let_out`]).
-fn let_out_beside_a_second_centre(
+fn let_out_beside_second_centre(
     setup: impl FnOnce(&mut World),
     point: Point,
     work_on: Option<ObjectId>,
@@ -4043,8 +4043,8 @@ fn let_out_beside_a_second_centre(
 /// the unit AI forget its target first (`FUN_140c5e1e0`), then gives the same work command.
 /// Without the garrison filter (3) the villager's tasks give no action on a centre.
 #[test]
-fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
-    let (r, t) = let_out_beside_a_second_centre(|_| (), Point::new(4.5, 4.5), Some(object_id(101)));
+fn unit_let_out_works_its_record_or_the_gather_point_target() {
+    let (r, t) = let_out_beside_second_centre(|_| (), Point::new(4.5, 4.5), Some(object_id(101)));
     assert_eq!(r, Ok(true));
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
@@ -4066,7 +4066,7 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
         )
         .unwrap();
     };
-    let (r, t) = let_out_beside_a_second_centre(gather, Point::new(NO_POINT, NO_POINT), None);
+    let (r, t) = let_out_beside_second_centre(gather, Point::new(NO_POINT, NO_POINT), None);
     assert_eq!(r, Ok(true));
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
@@ -4081,7 +4081,7 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
 /// (`FUN_1411e7220`'s `+0xc30 == 0xff`) and sends it no target; one of state 1 sends a unit
 /// without a point to its target, one of state 0 or none leaves the point.
 #[test]
-fn a_gather_point_of_state_0xff_replaces_the_point_of_a_let_out() {
+fn gather_point_of_state_0xff_replaces_the_point_of_let_out() {
     use super::let_out::{LetOutAim, let_out_aim};
     let at = |state, target| {
         Some(GatherPoint {
@@ -4132,7 +4132,7 @@ fn a_gather_point_of_state_0xff_replaces_the_point_of_a_let_out() {
 /// relation toward a player with no unit inside lets nobody out. Told from the villager's
 /// side (its player's relation toward the building's owner), it leaves the same way.
 #[test]
-fn a_building_lets_out_the_units_of_a_player_no_longer_its_ally() {
+fn building_lets_out_the_units_of_player_no_longer_its_ally() {
     let held = |t: &World| {
         (
             t.players[2].objects[ListIndex::new(0)].life.inside,
@@ -4187,7 +4187,7 @@ fn a_building_lets_out_the_units_of_a_player_no_longer_its_ally() {
 /// A siege tower (class 13) unloads on a new relation, not modelled: the unit inside one of
 /// the other player's, and the tower holding the other player's units, both stop there.
 #[test]
-fn a_siege_tower_s_unload_on_a_new_relation_is_not_modelled() {
+fn siege_tower_unload_on_new_relation_is_not_modelled() {
     let mut t = let_out_world();
     for m in &mut t.masters {
         if let Some(ship) = m.get_mut(SHIP) {
@@ -4233,7 +4233,7 @@ fn a_siege_tower_s_unload_on_a_new_relation_is_not_modelled() {
 /// A human player's market (84), now an ally of a computer player, tells it of its tile (the
 /// computer's tile list); a computer's market, or a human ally, hears nothing.
 #[test]
-fn a_market_tells_a_computer_ally_of_its_tile() {
+fn market_tells_computer_ally_of_its_tile() {
     let market = |computer_ally: bool, own_computer: bool| {
         let mut t = let_out_world();
         for m in &mut t.masters {

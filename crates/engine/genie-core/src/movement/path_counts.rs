@@ -187,7 +187,7 @@ mod tests {
 
     /// A step's plans count up one by one.
     #[test]
-    fn a_step_s_plans_count_up() {
+    fn step_plans_count_up() {
         assert_eq!(StepPlans::ZERO.plus_one().plus_one(), StepPlans::new(2));
         assert!(StepPlans::new(2) < StepPlans::new(3));
     }

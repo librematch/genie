@@ -47,7 +47,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_task_group_is_the_data_s_byte() {
+    fn task_group_is_the_data_byte() {
         assert_eq!(TaskGroup::of_data(0), TaskGroup::NONE);
         assert_eq!(TaskGroup::of_data(4).get(), 4);
         assert_eq!(TaskGroup::NONE.to_string(), "0");

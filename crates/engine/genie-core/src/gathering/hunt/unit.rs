@@ -565,7 +565,7 @@ impl Unit {
             .ok_or(GenieError::unsupported(
                 "a hunt's new target the slice does not hold",
             ))?;
-        let t_master = t.master(c.w.master_tables(), owner)?;
+        let target_master = t.master(c.w.master_tables(), owner)?;
         let relations =
             c.w.spatial
                 .relations
@@ -582,8 +582,8 @@ impl Unit {
         let quarry = crate::gathering::hunt::Quarry {
             id: found,
             position: t.position(),
-            class: t_master.class,
-            kind: t_master.kind,
+            class: target_master.class,
+            kind: target_master.kind,
             state: t.life.state,
             player: owner,
             amount: t.life.amount,

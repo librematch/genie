@@ -240,7 +240,7 @@ mod tests {
     /// A powerup's room is its most less what it took; it takes a loss up to its room and
     /// passes the rest on, and passes all of it at or above its most (a NaN most too).
     #[test]
-    fn a_powerup_takes_a_loss_up_to_its_room_and_passes_the_rest() {
+    fn powerup_takes_loss_up_to_its_room_and_passes_the_rest() {
         let mut p = HpPowerup {
             taken: HitPoints::new(2.0),
             max: HitPoints::new(5.0),

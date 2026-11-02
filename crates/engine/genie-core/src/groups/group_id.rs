@@ -95,7 +95,7 @@ mod tests {
 
     /// A field's −1 is none, any other value a group, and each converts back to its value.
     #[test]
-    fn a_field_s_minus_one_is_none_and_any_other_value_a_group() {
+    fn field_minus_one_is_none_and_any_other_value_group() {
         assert_eq!(GroupId::of_field(-1), None);
         for value in [0, 5, -2, i32::MIN, i32::MAX] {
             assert_eq!(GroupId::of_field(value).map(|g| g.get()), Some(value));
@@ -120,7 +120,7 @@ mod tests {
 
     /// The next group's id is one more, wrapping as the game's 32-bit add.
     #[test]
-    fn the_next_group_s_id_is_one_more() {
+    fn the_next_group_id_is_one_more() {
         let id = GroupId::try_from(6_i32).unwrap();
         assert_eq!(id.successor().get(), 7);
         assert_eq!(

@@ -59,7 +59,7 @@ fn the_frames_hold_their_dt_checkpoint_and_commands() {
 }
 
 #[test]
-fn a_command_before_the_first_sync_is_an_error() {
+fn command_before_the_first_sync_is_an_error() {
     let bytes = body(&[Op::Command {
         packet: &[3, 1],
         world_time: 0,

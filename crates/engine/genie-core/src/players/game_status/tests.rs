@@ -167,7 +167,7 @@ fn game() -> World {
 /// its own attribute 300 + id, Gaia and the defeated player left out; a resigned player and
 /// a history without entries get none.
 #[test]
-fn a_defeat_names_the_player_with_the_most_of_its_own_attribute() {
+fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
     let mut t = game();
     let other = t.players[1].clone();
     t.players.push(other);
@@ -429,7 +429,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
 }
 
 #[test]
-fn a_stopped_hunter_keeps_its_halted_hunt() {
+fn stopped_hunter_keeps_its_halted_hunt() {
     use crate::gathering::hunt::{HuntAction, HuntTask, Lead};
     let hunter = Object::with_actions(
         Unit {
@@ -518,7 +518,7 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
 /// leaves attribute 80; the first keeps its make action. A cancel of the first drops the make
 /// action too; an index past the queue does nothing.
 #[test]
-fn a_cancel_gives_back_one_queued_unit() {
+fn cancel_gives_back_one_queued_unit() {
     let mut t = game();
     let tc = t
         .parts
@@ -574,7 +574,7 @@ fn a_cancel_gives_back_one_queued_unit() {
 /// the town centre died. Each later update counts the queue's changes on; a building in state
 /// 2 keeps its queue for its production step.
 #[test]
-fn a_dying_building_cancels_its_queue_in_its_update() {
+fn dying_building_cancels_its_queue_in_its_update() {
     let mut t = game();
     let tc = t
         .parts
@@ -641,7 +641,7 @@ fn a_dying_building_cancels_its_queue_in_its_update() {
 /// One unit of an entry of three goes: the entry keeps two, and the first unit's cancel
 /// drops the make action though the entry stays (`FUN_1411d66b0`).
 #[test]
-fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
+fn cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
     let mut t = game();
     let tc = t
         .parts
@@ -683,7 +683,7 @@ fn a_cancel_of_the_first_unit_drops_the_make_action_of_an_entry_that_stays() {
 /// all. Each unit gives its 46 food back and leaves attribute 80; the tracker's counter
 /// loses two per unit (the game counts a cancel of several twice).
 #[test]
-fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
+fn cancel_of_all_takes_five_villagers_of_both_sexes() {
     let mut t = game();
     let tc = t
         .parts
@@ -767,7 +767,7 @@ fn a_cancel_of_all_takes_five_villagers_of_both_sexes() {
 /// The kind is the first entry's master or a villager's: all of two archers takes the
 /// villagers after them too; a research shifted into the slot ends the loop.
 #[test]
-fn a_cancel_of_all_goes_on_into_villagers_and_stops_at_a_research() {
+fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
     let archer = |count| Entry {
         master: Some(master_id(4)),
         costs: [
@@ -938,7 +938,7 @@ fn researching(progress: f32) -> World {
 /// (`FUN_1411c5250`); the emptied first entry drops the research, whose destructor tells
 /// the centre's unit AI it failed.
 #[test]
-fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
+fn cancel_of_all_researches_gives_back_the_entry_three() {
     let mut t = researching(10.0);
     t.cancel_order(&object_ids([9]), UnitIndex::of_data(0), true)
         .unwrap();
@@ -989,7 +989,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
 /// (`FUN_140ad0be0`) then counts a stacking technology whose progress reached its time as
 /// researched once more and queued once less, in state 1 below its cap.
 #[test]
-fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_one() {
+fn queue_cancel_gives_back_its_researches_and_the_destructor_counts_done_one() {
     let mut t = researching(30.0);
     let s = &mut t.players[1].techs[22];
     (s.stack, s.research_cap) = (true, crate::technology::ResearchCap::of_data(5));
@@ -1032,7 +1032,7 @@ fn a_queue_s_cancel_gives_back_its_researches_and_the_destructor_counts_a_done_o
 /// 0x10 `FUN_141462440`) the player gets with the building as its object: effect 300 adds 20
 /// gold; an id the table does not hold does nothing.
 #[test]
-fn a_research_gives_the_effect_attribute_269_names() {
+fn research_gives_the_effect_attribute_269_names() {
     use crate::technology::EffectCommand;
     let run = |reward: f32| {
         let mut t = researching(25.0);
@@ -1056,7 +1056,7 @@ fn a_research_gives_the_effect_attribute_269_names() {
 /// Game mode 16's tail: with attribute 6 at most 1 a cancel whose slot at the unit index
 /// holds a military master clears the player's flag (`+0x1378`); above 1 it stays.
 #[test]
-fn a_cancel_in_game_mode_16_clears_the_military_flag() {
+fn cancel_in_game_mode_16_clears_the_military_flag() {
     let run = |age: f32| {
         let mut t = game();
         t.settings.game_mode = crate::world::GameMode::of_data(16);
@@ -1093,7 +1093,7 @@ fn a_cancel_in_game_mode_16_clears_the_military_flag() {
 /// notifies the centre's unit AI, which stops. The victory check then ends the game:
 /// player 2, the one side left, wins.
 #[test]
-fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
+fn resignation_cancels_the_queues_and_the_last_side_wins() {
     let mut t = game();
     t.resign(player_id(1), false).unwrap();
     let p = &t.players[1];
@@ -1129,7 +1129,7 @@ fn a_resignation_cancels_the_queues_and_the_last_side_wins() {
 }
 
 #[test]
-fn a_make_action_the_queue_did_not_pay_for_refunds_its_master_s_costs() {
+fn make_action_the_queue_did_not_pay_for_refunds_its_master_costs() {
     let mut t = game();
     if let Some(Some(Making::Unit(make))) = t
         .parts
@@ -1144,7 +1144,7 @@ fn a_make_action_the_queue_did_not_pay_for_refunds_its_master_s_costs() {
 }
 
 #[test]
-fn early_in_the_game_a_resignation_leaves_the_objects_alone() {
+fn early_in_the_game_resignation_leaves_the_objects_alone() {
     let mut t = game();
     t.world_time = WorldTime::from_millis(60_000);
     t.resign(player_id(1), true).unwrap();
@@ -1153,7 +1153,7 @@ fn early_in_the_game_a_resignation_leaves_the_objects_alone() {
 }
 
 #[test]
-fn one_side_left_after_a_resignation_ends_a_conquest_game() {
+fn one_side_left_after_resignation_ends_conquest_game() {
     let mut c = Count::default();
     c.add(
         PlayerId::new(1),
@@ -1202,7 +1202,7 @@ fn one_side_left_after_a_resignation_ends_a_conquest_game() {
 
 /// A game status keeps the game's byte; won and lost are the ended ones.
 #[test]
-fn a_game_status_keeps_its_byte_and_knows_the_ended_ones() {
+fn game_status_keeps_its_byte_and_knows_the_ended_ones() {
     assert_eq!(GameStatus::of_data(2), GameStatus::LOST);
     assert_eq!(GameStatus::WON.get(), 1);
     assert_eq!(GameStatus::default(), GameStatus::PLAYING);

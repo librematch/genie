@@ -409,7 +409,7 @@ mod tests {
     /// The names in their fixed fields of 21 and 13 bytes, the SLP id -1 for none; the display
     /// settings with 0xFF for no forced colour; both read back.
     #[test]
-    fn a_sprite_s_names_and_display_read_back() {
+    fn sprite_names_and_display_read_back() {
         let sprite = Sprite {
             name: "ARCHR_AN".to_owned(),
             filename: "a.slp".to_owned(),

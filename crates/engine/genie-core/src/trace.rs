@@ -370,7 +370,7 @@ mod tests {
     /// Each step names its stream, the draw count, the raw value and the engine's line that
     /// asked for it, through every draw helper.
     #[test]
-    fn a_draw_tells_its_stream_value_and_the_line_that_asked() {
+    fn draw_tells_its_stream_value_and_the_line_that_asked() {
         let mut streams = crate::math::rng::Streams::default();
         streams.seed_all(29910);
         let ai = streams.get(crate::math::rng::Stream::Ai);
@@ -402,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn without_a_subscriber_no_watch_is_taken() {
+    fn without_subscriber_no_watch_is_taken() {
         assert_eq!(
             Watch::of(
                 &Unit::default(),
@@ -484,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn a_dying_object_tells_its_state_change() {
+    fn dying_object_tells_its_state_change() {
         let mut t = one(vec![Unit {
             id: object_id(5),
             life: Lifecycle {

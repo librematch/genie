@@ -121,7 +121,7 @@ mod tests {
 
     /// Each operator is the one `f32` or int operation; the order is the float's.
     #[test]
-    fn the_statistics_values_do_the_game_s_operations() {
+    fn the_statistics_values_do_the_game_operations() {
         let (a, b) = (TargetScore::new(0.1), TargetScore::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         let mut c = a;

@@ -278,7 +278,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn float01_is_the_game_s_get_rand_float_0_to_1() {
+    fn float01_is_the_game_get_rand_float_0_to_1() {
         // FUN_1408115a0 run in unicorn on this state (words at +0x24, index at +0x64 = 5)
         let mut state: [u32; 16] =
             std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
@@ -359,7 +359,7 @@ mod tests {
     /// The ring turned to its index draws as the game's 16 words with their index (`+0x64`,
     /// the step as the game runs it), over two and a half turns.
     #[test]
-    fn the_turned_ring_draws_as_the_game_s_indexed_ring() {
+    fn the_turned_ring_draws_as_the_game_indexed_ring() {
         let words: [u32; 16] = std::array::from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
         let (mut s, mut i) = (words, 5usize);
         let game: Vec<u32> = (0..40)
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn a_draw_below_n_scales_the_step_by_n() {
+    fn draw_below_bound_scales_the_step_by_the_bound() {
         // FUN_140810cb0: step × n >> 32
         let (mut a, mut b) = (Well512::default(), Well512::default());
         a.set_seed(0);
@@ -423,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    fn a_checked_draw_below_zero_counts_the_draw_but_takes_no_step() {
+    fn checked_draw_below_zero_counts_the_draw_but_takes_no_step() {
         // FUN_140810fc0: the draw count +1, then 0 for n 0 with the state left alone; any other
         // n is FUN_140810cb0's draw
         let (mut a, mut b) = (Well512::default(), Well512::default());
@@ -438,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn a_64_bit_draw_is_two_steps_counted_once() {
+    fn draw_of_64_bits_is_two_steps_counted_once() {
         // FUN_140811100: the first step's word high, the second's low, the draw count +1
         let (mut a, mut b) = (Well512::default(), Well512::default());
         a.set_seed(7);

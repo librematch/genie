@@ -25,7 +25,7 @@ fn interact(num: u16, ids: Vec<i32>) -> Vec<u8> {
 /// An INTERACT of its own list notes its count's units for a primed run; a later count of
 /// `0xffff` orders the last commanded units and leaves the note.
 #[test]
-fn an_interact_notes_its_own_list_and_a_later_one_keeps_it() {
+fn an_interact_notes_its_own_list_and_later_one_keeps_it() {
     let mut d = Decoder::default();
     assert!(matches!(
         d.command(&interact(2, vec![10, 11, 12])),
@@ -73,6 +73,6 @@ fn follow_and_guard_note_no_list() {
 
 /// A packet without its player byte gives no command.
 #[test]
-fn a_packet_without_a_player_gives_no_command() {
+fn packet_without_player_gives_no_command() {
     assert_eq!(Decoder::default().command(&[0]), None);
 }

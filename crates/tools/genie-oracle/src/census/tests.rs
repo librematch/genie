@@ -35,7 +35,7 @@ fn wrong(p: u32) -> [u32; 11] {
 }
 
 #[test]
-fn a_recording_without_checkpoints_runs_to_its_end_or_its_limit() {
+fn recording_without_checkpoints_runs_to_its_end_or_its_limit() {
     let rec = recording(&quiet(), &[Op::Sync { dt: 50 }, Op::Sync { dt: 50 }]);
     let run = census_run(&rec, None, None).unwrap();
     assert_eq!((run.updates, run.syncs, run.checkpoints), (2, 2, 0));
@@ -48,7 +48,7 @@ fn a_recording_without_checkpoints_runs_to_its_end_or_its_limit() {
 /// A checkpoint after N syncs holds the state after N updates: a player's lane that equals its
 /// block holds, one that differs is its mismatch, and its comparisons end there.
 #[test]
-fn a_checkpoint_holds_or_is_the_players_mismatch() {
+fn checkpoint_holds_or_is_the_players_mismatch() {
     let save = quiet();
     let start = header_slice(&save, None);
     let mut lanes = [[0; 11]; 8];
@@ -94,7 +94,7 @@ fn the_run_ends_once_every_player_is_done() {
 
 /// A player whose unit the slice cannot model stops before its first update.
 #[test]
-fn a_stop_is_the_players_first_unmodelled_update() {
+fn stop_is_the_players_first_unmodelled_update() {
     let save = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
     let rec = recording(&save, &[Op::Sync { dt: 50 }, Op::Sync { dt: 50 }]);
     let run = census_run(&rec, None, None).unwrap();
@@ -111,7 +111,7 @@ fn same(save: &Header) -> impl FnMut(usize) -> Option<Vec<u8>> + '_ {
 }
 
 #[test]
-fn a_player_follows_while_its_objects_match_the_games() {
+fn player_follows_while_its_objects_match_the_games() {
     let save = quiet();
     let rec = recording(&save, &syncs(3));
     let followed = header_divergences(&rec, None, &[0, 1], (2, 3), &mut same(&save)).unwrap();
@@ -121,7 +121,7 @@ fn a_player_follows_while_its_objects_match_the_games() {
 /// The first update whose objects differ from the game's save; a player not in the save is an
 /// error.
 #[test]
-fn a_player_leaves_where_its_objects_first_differ() {
+fn player_leaves_where_its_objects_first_differ() {
     let save = quiet();
     let rec = recording(&save, &syncs(3));
     let game = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
@@ -137,7 +137,7 @@ fn a_player_leaves_where_its_objects_first_differ() {
 
 /// A player that stops says nothing more: the run ends once every player has.
 #[test]
-fn a_stopped_player_says_nothing_more() {
+fn stopped_player_says_nothing_more() {
     let save = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
     let rec = recording(&save, &syncs(3));
     let mut never = |_: usize| -> Option<Vec<u8>> { panic!("no save is read after the stop") };
@@ -148,7 +148,7 @@ fn a_stopped_player_says_nothing_more() {
 /// The first update after which the world's next object id differs from the game's save, with
 /// both ids; none while they agree. A missing save is skipped, as is an update before `first`.
 #[test]
-fn the_next_object_id_leaves_the_game_s_at_its_first_differing_save() {
+fn the_next_object_id_leaves_the_game_at_its_first_differing_save() {
     let save = quiet();
     let rec = recording(&save, &syncs(3));
     assert_eq!(

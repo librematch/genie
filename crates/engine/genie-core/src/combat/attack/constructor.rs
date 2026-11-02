@@ -455,10 +455,10 @@ pub fn engagement(
 #[must_use]
 pub fn gaps(
     a: Position,
-    a_radius: Footprint,
+    radius_a: Footprint,
     b: Position,
-    b_radius: Footprint,
+    radius_b: Footprint,
 ) -> (DistanceSquared, Distance) {
-    let squared = footprint_gap_squared(a, a_radius, b, b_radius);
-    (squared, footprint_gap(a, a_radius, b, b_radius))
+    let squared = footprint_gap_squared(a, radius_a, b, radius_b);
+    (squared, footprint_gap(a, radius_a, b, radius_b))
 }

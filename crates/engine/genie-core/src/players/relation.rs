@@ -87,7 +87,7 @@ mod tests {
 
     /// A saved row's bytes are the relations toward the players in their order.
     #[test]
-    fn a_saved_row_is_the_relations_toward_each_player() {
+    fn saved_row_is_the_relations_toward_each_player() {
         use crate::players::{PlayerId, Relations};
         let row = Relations::of_bytes([0, 3, 4]);
         assert_eq!(row.get(PlayerId::new(1)), Some(&Relation::ENEMY));

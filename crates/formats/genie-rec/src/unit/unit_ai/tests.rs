@@ -54,7 +54,7 @@ fn an_order_reads_its_target_and_range() {
 }
 
 #[test]
-fn a_notification_reads_its_parameters() {
+fn notification_reads_its_parameters() {
     let note = read_all::<UnitAiNotification>(&words(&[1, 2, 3, 4, 5, 6]), 11.97);
     assert_eq!(
         (note.caller, note.recipient, note.notification_type),
@@ -78,7 +78,7 @@ fn an_order_history_entry_has_the_attack_category_from_10_50() {
 }
 
 #[test]
-fn a_retarget_entry_reads_its_target_and_timeout() {
+fn retarget_entry_reads_its_target_and_timeout() {
     let entry = read_all::<UnitAiRetargetEntry>(&words(&[507, 25]), 11.97);
     assert_eq!(u32::from(entry.target_id), 507);
     assert_eq!(entry.retarget_timeout, 25);
@@ -140,7 +140,7 @@ fn an_old_unit_ai_ends_at_its_patrol_waypoint() {
 /// From 11.44 on every later field is there: the history, the retargeting, the best unit
 /// to attack and the formation.
 #[test]
-fn a_unit_ai_of_11_44_reads_every_later_field() {
+fn unit_ai_of_11_44_reads_every_later_field() {
     let mut bytes = unit_ai_bytes();
     bytes.extend(words(&[1]));
     bytes.extend(history_bytes(Some(-1)));
@@ -161,7 +161,7 @@ fn a_unit_ai_of_11_44_reads_every_later_field() {
 /// Each later field starts at its own version: at 11.05 the retarget entries are read, the
 /// best unit to attack and the formation are not.
 #[test]
-fn a_unit_ai_of_11_05_stops_after_its_retarget_entries() {
+fn unit_ai_of_11_05_stops_after_its_retarget_entries() {
     let mut bytes = unit_ai_bytes();
     bytes.extend(words(&[0, 80, 90, 0]));
     let ai = read_all::<UnitAi>(&bytes, 11.05);
@@ -173,7 +173,7 @@ fn a_unit_ai_of_11_05_stops_after_its_retarget_entries() {
 }
 
 #[test]
-fn a_short_unit_ai_is_an_error() {
+fn short_unit_ai_is_an_error() {
     let bytes = unit_ai_bytes();
     let mut reader = crate::test_support::header_reader(&bytes[..bytes.len() - 1], 10.0);
     assert!(<UnitAi as crate::element::ReadableHeaderElement>::read_from(&mut reader).is_err());

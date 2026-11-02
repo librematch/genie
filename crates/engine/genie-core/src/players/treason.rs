@@ -259,7 +259,7 @@ mod tests {
 
     /// The castle test asks the player's masters and its tracker.
     #[test]
-    fn a_player_without_a_castle_has_no_treason() {
+    fn player_without_castle_has_no_treason() {
         let t = world();
         assert!(!t.has_treason_building(PlayerId::new(1)));
     }

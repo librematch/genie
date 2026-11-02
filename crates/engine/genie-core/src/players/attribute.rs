@@ -305,7 +305,7 @@ mod tests {
 
     /// The four resources come first, a negative value is no attribute.
     #[test]
-    fn the_resources_are_the_first_four_and_a_negative_value_is_none() {
+    fn the_resources_are_the_first_four_and_negative_value_is_none() {
         assert!(FOOD.is_resource() && GOLD.is_resource());
         assert!(!POPULATION.is_resource());
         assert_eq!(AttributeId::of_data(-1), None);
@@ -317,7 +317,7 @@ mod tests {
 
     /// A field's −1 is none, a value of 0 or more an attribute, another negative one an error.
     #[test]
-    fn a_field_s_minus_one_is_none_and_another_negative_value_an_error() {
+    fn field_minus_one_is_none_and_another_negative_value_an_error() {
         assert_eq!(AttributeId::of_field(-1), Ok(None));
         assert_eq!(AttributeId::of_field(16), Ok(Some(FARM_FOOD)));
         assert!(AttributeId::of_field(-2).is_err_and(|e| e.kind() != ErrorKind::Io));
@@ -326,7 +326,7 @@ mod tests {
     /// The food loads are food and the kinds 15 to 17; a load's resource is itself for 0 to 3,
     /// 9 and 56, food for 15 to 17, none for any other.
     #[test]
-    fn a_load_s_resource_is_itself_food_or_none() {
+    fn load_resource_is_itself_food_or_none() {
         for n in [0, 15, 16, 17] {
             assert!(AttributeId::numbered(n).is_food_load(), "{n}");
         }
@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn an_offset_past_the_range_is_an_error_not_a_panic() {
+    fn an_offset_past_the_range_is_an_error_not_panic() {
         assert_eq!(FOOD.offset(3).unwrap(), GOLD);
         assert!(AttributeId::numbered(i16::MAX).offset(1).is_err());
         assert!(FOOD.offset(usize::MAX).is_err());

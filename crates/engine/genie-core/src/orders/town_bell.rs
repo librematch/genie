@@ -106,7 +106,7 @@ impl TownBell {
 
 /// The unit AI's actions whose record a finished building ends: building (`0x25a`), gathering
 /// (`0x261`) and hunting (`0x265`) (`FUN_1411f8fa0`'s mask `0x881`).
-const ENDED_ON_A_BUILDING: [ActionKind; 3] =
+const ENDED_ON_BUILDING: [ActionKind; 3] =
     [ActionKind::Build, ActionKind::Gather, ActionKind::Hunt];
 
 /// What a back-to-work record's check (`FUN_1411f8fa0`) reads of an object the world holds:
@@ -125,7 +125,7 @@ pub struct RecordTarget {
 }
 
 /// `FUN_1411f8fa0`: the object a record names, its target, else its second target, the world
-/// holds (`lookup`); for the actions of [`ENDED_ON_A_BUILDING`] a building other than a farm
+/// holds (`lookup`); for the actions of [`ENDED_ON_BUILDING`] a building other than a farm
 /// that is built ends the record (no object, no targets in the copy returned). A negative id
 /// names none (`JL`), as −1 does.
 fn record_object(
@@ -147,7 +147,7 @@ fn record_object(
     if let Some(o) = found
         && record
             .action
-            .is_some_and(|a| ENDED_ON_A_BUILDING.contains(&a))
+            .is_some_and(|a| ENDED_ON_BUILDING.contains(&a))
         && o.building
         // The farms' class, whose records a built farm does not end.
         && o.class != class::FARM
@@ -267,8 +267,8 @@ impl World {
                 .building
                 .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS));
             let near = |t: &Self| -> Result<bool, GenieError> {
-                let (o_at, o_radius) = t.ground(id)?;
-                let gap = footprint_gap_squared(o_at, o_radius, at, radius);
+                let (other_at, other_radius) = t.ground(id)?;
+                let gap = footprint_gap_squared(other_at, other_radius, at, radius);
                 // COMISS REACH, gap; JC: a gap above it, or a NaN, is out
                 Ok(!crate::math::fmath::below_or_unordered(REACH, gap.get()))
             };
@@ -324,9 +324,9 @@ impl World {
             }
             let id = b.id;
             self.parts.set_town_bell_flag(id, false);
-            let (b_at, b_radius) = self.ground(id)?;
+            let (building_at, building_radius) = self.ground(id)?;
             // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
-            let gap = footprint_gap_squared(b_at, b_radius, at, radius);
+            let gap = footprint_gap_squared(building_at, building_radius, at, radius);
             if crate::math::fmath::below_or_unordered(REACH, gap.get()) {
                 continue;
             }
@@ -373,9 +373,9 @@ impl World {
             {
                 continue;
             }
-            let (b_at, b_radius) = self.ground(b.id)?;
+            let (building_at, building_radius) = self.ground(b.id)?;
             // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
-            let gap = footprint_gap_squared(b_at, b_radius, at, radius);
+            let gap = footprint_gap_squared(building_at, building_radius, at, radius);
             if crate::math::fmath::below_or_unordered(REACH, gap.get()) {
                 continue;
             }
@@ -633,7 +633,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_work_replaces_the_record_and_building_keeps_the_one_before() {
+    fn new_work_replaces_the_record_and_building_keeps_the_one_before() {
         // MarvinBlue/426048731's 9181: its first record (no target, its own place), then the
         // INTERACT of update 748 while it builds 10028, then the one of 797 while it cuts a tree
         let mut bell = TownBell {
@@ -694,7 +694,7 @@ mod tests {
     }
 
     #[test]
-    fn a_record_names_its_target_else_its_second_target_unless_a_built_building_ended_it() {
+    fn record_names_its_target_else_its_second_target_unless_built_building_ended_it() {
         // FUN_1411f8fa0: the target the world holds
         let shepherd = BackToWork {
             target2: Some(object_id(7)),

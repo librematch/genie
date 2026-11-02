@@ -405,7 +405,7 @@ mod tests {
     /// A forced object's sight follows its state ([`sight_follows`]): from 2 to 3 it dies; from
     /// 3 on it takes the state; from 2 past 3 it dies and takes the state.
     #[test]
-    fn a_forced_object_s_sight_follows_its_state() {
+    fn forced_object_sight_follows_its_state() {
         use crate::map::Distance;
         use crate::map::spatial::Spatial;
         use crate::objects::masters::class;
@@ -434,7 +434,7 @@ mod tests {
     /// The world's own forced values: the frame seed, the game state, the next reusable id and
     /// the pools and unit groups the oracle dumped; a pool not dumped stays the slice's.
     #[test]
-    fn a_forced_world_takes_the_game_s_seed_ids_and_dumped_pools() {
+    fn forced_world_takes_the_game_seed_ids_and_dumped_pools() {
         let mut t = forage_world();
         t.recycling.missiles = vec![(object_id(5), false)];
         let groups = crate::groups::UnitGroups {
@@ -467,7 +467,7 @@ mod tests {
     /// again; every player takes its status and resignation and loses its first unmodelled
     /// part; one that runs keeps its resources.
     #[test]
-    fn a_stopped_player_takes_the_game_s_resources_and_runs_again() {
+    fn stopped_player_takes_the_game_resources_and_runs_again() {
         let game = GameState {
             resources: vec![[0.0; 4], [1.0, 2.0, 3.0, 4.0]],
             pending_debit: vec![[Amount::ZERO; 4], [Amount::new(5.0); 4]],
@@ -511,7 +511,7 @@ mod tests {
     /// hands or masters stays, noted; an object that runs, and a dead one the game does not
     /// resync, are the slice's; an object the game made and the slice did not is noted.
     #[test]
-    fn a_forced_replay_takes_the_game_s_frozen_objects_and_notes_what_it_cannot() {
+    fn forced_replay_takes_the_game_frozen_objects_and_notes_what_it_cannot() {
         let mut t = forage_world();
         let hunted = Some(crate::unit_ai::Hunted::default());
         let forager = &mut t.players[1].objects[ListIndex::new(0)];

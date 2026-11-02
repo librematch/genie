@@ -43,7 +43,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_fly_mode_is_the_data_s_byte() {
+    fn fly_mode_is_the_data_byte() {
         assert_eq!(FlyMode::of_data(0), FlyMode::GROUND);
         assert_eq!(FlyMode::of_data(2).get(), 2);
         assert_eq!(FlyMode::GROUND.to_string(), "0");

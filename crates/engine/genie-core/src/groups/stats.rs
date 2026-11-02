@@ -620,7 +620,7 @@ mod tests {
     /// another type, on no target (and no action's) or on a class outside its groups, the
     /// weapon range alone.
     #[test]
-    fn a_ready_charge_of_type_6_adds_its_charge_event_to_the_range() {
+    fn ready_charge_of_type_6_adds_its_charge_event_to_the_range() {
         let mut t = searched_world();
         let charging = |t: &mut World, charge_type: i16, charge_target: i16| {
             let m = t.masters[1].get_mut(master_id(4)).unwrap();
@@ -786,7 +786,7 @@ mod tests {
     /// from the same place (the cache's answer, not fresh) the list held objects on entry, so
     /// nothing joins twice; a list one short of 70 takes one more.
     #[test]
-    fn a_member_s_search_lists_its_enemies_then_the_neutrals_it_attacks() {
+    fn member_search_lists_its_enemies_then_the_neutrals_it_attacks() {
         let mut t = searched_world();
         t.parts
             .unit_ai
@@ -816,7 +816,7 @@ mod tests {
     /// its enemies within its grown radius (22, 8 tiles off: its line of sight 4 plus 1 plus 7)
     /// but no neutral (its slot 0xa8 never attacks one); a soldier the near ones only.
     #[test]
-    fn a_member_s_search_takes_its_type_s_classes_radius_and_neutral_test() {
+    fn member_search_takes_its_type_classes_radius_and_neutral_test() {
         let world = |ai_type: UnitAiType| {
             let mut t = searched_world();
             let mut far = t.object_of(&t.players[2].objects[ListIndex::new(0)]);
@@ -874,7 +874,7 @@ mod tests {
     /// is none (slot 0x238 is the weapon range), and with it the re-attack does nothing. The
     /// searches fill the sighted objects and leave the units kept apart.
     #[test]
-    fn a_sub_formation_s_range_takes_its_held_units_against_the_group_s_target() {
+    fn sub_formation_range_takes_its_held_units_against_the_group_target() {
         let mut t = searched_world();
         let mut far = Unit {
             id: object_id(50),
@@ -921,7 +921,7 @@ mod tests {
     /// before it), the distance is 40 and it stays; none leaves without `far`, on a patrol or
     /// with [`GroupFlags::PATROL`].
     #[test]
-    fn a_member_far_from_its_slot_leaves_the_group() {
+    fn member_far_from_its_slot_leaves_the_group() {
         let world = |spacing: f32, order: [i32; 2]| {
             let mut t = searched_world();
             for masters in &mut t.masters {

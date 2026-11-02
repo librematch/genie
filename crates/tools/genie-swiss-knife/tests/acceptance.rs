@@ -31,7 +31,7 @@ pub static RUNNER: LazyLock<CmdRunner> = LazyLock::new(|| {
 #[test]
 // False positive: `cmd` holds the runner's exclusive lock, which the consuming `wait` passes on.
 #[allow(clippy::significant_drop_tightening)]
-fn without_a_subcommand_gsk_fails() {
+fn without_subcommand_gsk_fails() {
     let mut runner = RUNNER.clone();
     let mut cmd = runner.capture_stderr().run();
     let mut stderr = String::new();

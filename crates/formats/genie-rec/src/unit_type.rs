@@ -405,9 +405,9 @@ pub struct BuildingUnitAttributes {
     /// The building's facet: which angle of its graphic it shows.
     pub facet: i16,
     // &facet + 62
-    needs_a_name: Option<u8>,
+    needs_name: Option<u8>,
     // &facet + 12
-    needs_a_name_2: Option<u8>,
+    needs_name_2: Option<u8>,
     /// `UserPatch` only: the rate at which garrisoned units heal.
     pub garrison_heal_rate: Option<f32>,
 }
@@ -418,8 +418,8 @@ impl ReadableHeaderElement for BuildingUnitAttributes {
         let facet = input.read_i16::<LE>()?;
         // UserPatch data
         if facet == 32767 {
-            attrs.needs_a_name = Some(input.read_u8()?);
-            attrs.needs_a_name_2 = Some(input.read_u8()?);
+            attrs.needs_name = Some(input.read_u8()?);
+            attrs.needs_name_2 = Some(input.read_u8()?);
             attrs.garrison_heal_rate = Some(input.read_f32::<LE>()?);
             attrs.facet = input.read_i16::<LE>()?;
         } else {
@@ -460,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn a_static_unit_type_reads_its_hidden_flag() {
+    fn static_unit_type_reads_its_hidden_flag() {
         let unit = read_all::<StaticUnitAttributes>(&static_tail(static_head(2)).0, 11.97);
         assert_eq!(u16::from(unit.id), 83);
         assert_eq!((unit.unit_class, unit.hotkey_id), (4, 16000));
@@ -475,7 +475,7 @@ mod tests {
 
     /// A hidden flag of -16 is `UserPatch`'s: its fields, then the real hidden flags.
     #[test]
-    fn a_user_patch_unit_type_reads_its_fields_before_the_hidden_flags() {
+    fn user_patch_unit_type_reads_its_fields_before_the_hidden_flags() {
         let bytes = static_head(0xF0)
             .u16(3)
             .u16(5001)
@@ -510,7 +510,7 @@ mod tests {
     }
 
     #[test]
-    fn a_combat_unit_type_keeps_its_real_costs() {
+    fn combat_unit_type_keeps_its_real_costs() {
         let bytes = costs(21).floats(&[1.5]).u8(2).0;
         let unit = read_all::<CombatUnitAttributes>(&bytes, 11.97);
         assert_eq!(
@@ -528,7 +528,7 @@ mod tests {
 
     /// A create time of 65520 is `UserPatch`'s: its fields, then the real create time.
     #[test]
-    fn a_user_patch_combat_unit_type_reads_its_fields_before_the_create_time() {
+    fn user_patch_combat_unit_type_reads_its_fields_before_the_create_time() {
         let bytes = costs(u16::MAX - 15)
             .u16(1)
             .u16(2)

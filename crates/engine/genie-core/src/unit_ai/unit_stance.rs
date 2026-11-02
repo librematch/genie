@@ -71,7 +71,7 @@ mod tests {
     /// The four stances are 0 to 3; defensive and stand ground are leashed; a group counts only
     /// those four.
     #[test]
-    fn a_stance_is_its_byte_and_a_group_counts_the_four() {
+    fn stance_is_its_byte_and_group_counts_the_four() {
         assert_eq!(
             [
                 UnitStance::AGGRESSIVE,

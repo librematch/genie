@@ -5,8 +5,8 @@ use crate::GenieError;
 use crate::map::Axis;
 use crate::math::fmath::at_most_or_unordered;
 use crate::pathing::hull_path::{
-    EPSILON, FAR, FULL_TURN, HALF, HALF_TURN, Hull, MOST, NO_ANGLE, NUDGE, ONE, Point, QUADRANT,
-    T_HIGH, T_LOW, TURN, UNTURN,
+    EPSILON, FAR, FULL_TURN, HALF, HALF_TURN, HIGH_T, Hull, LOW_T, MOST, NO_ANGLE, NUDGE, ONE,
+    Point, QUADRANT, TURN, UNTURN,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -62,7 +62,7 @@ impl Hull {
             let inv = ONE / denom;
             let t = inv * (ry * ex - rx * ey);
             let u = (ry * dx - dy * rx) * inv;
-            if !((T_LOW..=T_HIGH).contains(&t) && (T_LOW..=T_HIGH).contains(&u)) {
+            if !((LOW_T..=HIGH_T).contains(&t) && (LOW_T..=HIGH_T).contains(&u)) {
                 continue;
             }
             let p = Point::new(dx * t + a.x(), dy * t + a.y());

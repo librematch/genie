@@ -77,9 +77,9 @@ pub struct TerrainBlock {
     /// Highest y of the map (saved map state).
     pub map_max_y: f32,
     /// Highest x of the map plus one (saved map state).
-    pub map_max_x_plus1: f32,
+    pub map_max_plus_one_x: f32,
     /// Highest y of the map plus one (saved map state).
-    pub map_max_y_plus1: f32,
+    pub map_max_plus_one_y: f32,
     /// Number of terrains in use.
     pub terrains_used2: i16,
     /// Number of terrain borders in use.

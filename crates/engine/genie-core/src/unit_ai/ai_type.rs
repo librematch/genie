@@ -82,7 +82,7 @@ mod tests {
 
     /// Any value is a type, and the named ones keep the game's values.
     #[test]
-    fn a_type_is_any_value_and_the_named_ones_keep_the_games() {
+    fn type_is_any_value_and_the_named_ones_keep_the_games() {
         assert_eq!(UnitAiType::of_value(13), UnitAiType::SOLDIER);
         assert_eq!(UnitAiType::BOAR.get(), 4);
         assert_eq!(UnitAiType::of_value(99).get(), 99);

@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn a_kind_set_twice_keeps_one_entry_in_its_place() {
+    fn kind_set_twice_keeps_one_entry_in_its_place() {
         let mut list = ActionList::default();
         assert!(list.is_empty());
         list.put(Action::Artifact(artifact(ArtifactState::Check)));

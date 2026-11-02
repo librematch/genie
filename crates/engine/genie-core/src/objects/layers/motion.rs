@@ -163,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn a_motion_holds_the_layers_its_type_has() {
+    fn motion_holds_the_layers_its_type_has() {
         let a = Animated::new(Speed::new(0.5));
         assert_eq!(Motion::of(None, None), None, "a static object has none");
         assert_eq!(
@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn only_a_moving_object_has_a_mover() {
+    fn only_moving_object_has_mover() {
         let mut flag = Motion::Animated(Animated::default());
         flag.animated_mut().speed = Speed::new(1.0);
         assert_eq!(

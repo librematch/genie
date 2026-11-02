@@ -778,7 +778,7 @@ mod tests {
     /// an id the world does not hold, a unit without movement state, and a unit out for its
     /// update.
     #[test]
-    fn the_objects_view_reads_each_unit_s_gait_by_id() {
+    fn the_objects_view_reads_each_unit_gait_by_id() {
         use crate::map::spatial::Gait;
         let mut t = world(&[&[1, 2]]);
         let walking = Gait {
@@ -836,7 +836,7 @@ mod tests {
     }
 
     #[test]
-    fn a_swap_remove_files_the_object_that_took_the_slot() {
+    fn swap_remove_files_the_object_that_took_the_slot() {
         let mut t = world(&[&[1, 2, 3]]);
         let gone = t
             .swap_remove_live(PlayerId::new(0), ListIndex::new(0))
@@ -863,7 +863,7 @@ mod tests {
     }
 
     #[test]
-    fn a_remove_moves_the_later_objects_up_in_the_table() {
+    fn remove_moves_the_later_objects_up_in_the_table() {
         let mut t = world(&[&[1, 2, 3]]);
         let gone = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
         assert_eq!(gone.unit.id, object_id(1));
@@ -920,7 +920,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_changed_in_place_answers_once_reindexed() {
+    fn list_changed_in_place_answers_once_reindexed() {
         let mut t = world(&[&[1, 2]]);
         t.players[0].objects.push(unit(7));
         assert_eq!(

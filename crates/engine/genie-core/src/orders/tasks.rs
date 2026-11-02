@@ -129,15 +129,20 @@ impl World {
             "a Build's foundation the slice does not hold",
         ))?;
         let tm = t.master(self.master_tables(), tp)?;
-        let (t_at, t_radius, class) = (t.position(), tm.radius, tm.class);
-        let t_state = Some(t.life.state);
+        let (target_at, target_radius, class) = (t.position(), tm.radius, tm.class);
+        let target_state = Some(t.life.state);
         let unit = &self.players.live(player, idx)?;
         let builder = unit.master(self.master_tables(), player)?;
         let to = crate::movement::move_to::WalkTo {
             id: Some(target),
-            at: t_at,
-            gap: crate::movement::footprint_gap(unit.position(), builder.radius, t_at, t_radius),
-            state: t_state,
+            at: target_at,
+            gap: crate::movement::footprint_gap(
+                unit.position(),
+                builder.radius,
+                target_at,
+                target_radius,
+            ),
+            state: target_state,
         };
         let build_task = crate::construction::build::BuildTask::of(
             task,
@@ -457,8 +462,8 @@ impl World {
             ));
         }
         let tm = t.master(self.master_tables(), tp)?;
-        let (t_at, t_radius, class) = (t.position(), tm.radius, tm.class);
-        let t_state = Some(t.life.state);
+        let (target_at, target_radius, class) = (t.position(), tm.radius, tm.class);
+        let target_state = Some(t.life.state);
         let unit = &self.players.live(player, idx)?;
         let old =
             self.parts
@@ -472,9 +477,14 @@ impl World {
         let builder = unit.master(self.master_tables(), player)?;
         let to = crate::movement::move_to::WalkTo {
             id: Some(target),
-            at: t_at,
-            gap: crate::movement::footprint_gap(unit.position(), builder.radius, t_at, t_radius),
-            state: t_state,
+            at: target_at,
+            gap: crate::movement::footprint_gap(
+                unit.position(),
+                builder.radius,
+                target_at,
+                target_radius,
+            ),
+            state: target_state,
         };
         // set_state(4)'s MoveTo to the foundation (FUN_140aa0df0), made before the borrows below
         let move_reads = crate::movement::move_to::MoveToReads::of(
@@ -498,7 +508,7 @@ impl World {
                     "a Build's retarget without its Build",
                 ));
             };
-            build.retarget(target, t_at, walk, mover)?;
+            build.retarget(target, target_at, walk, mover)?;
             return Ok(class);
         }
         let computer = self.players.player(player)?.computer;
@@ -521,11 +531,13 @@ impl World {
             .and_then(|id| self.parts.building.get_mut(id))
             .and_then(|b| b.construction.as_mut())
             .map(|k| &mut k.builders);
-        let r =
-            build
-                .as_mut()
-                .ok_or(NO_BUILD)?
-                .retake(t_at, walk, mover.as_mut(), builders, computer);
+        let r = build.as_mut().ok_or(NO_BUILD)?.retake(
+            target_at,
+            walk,
+            mover.as_mut(),
+            builders,
+            computer,
+        );
         let unit = self.players.live_mut(player, idx)?;
         self.parts.actions.of_mut(unit.id)?.list.set_build(build);
         self.parts.put_mover(unit.id, mover);

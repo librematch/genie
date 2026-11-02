@@ -121,12 +121,12 @@ impl Search<'_> {
             ShapeSide::LowX => (FixedPoint::new(b.x1(), b.y1()), AxisDir::PlusX),
         };
         let sw = self.ctx.sweep(*pos, target, dir)?;
-        let u_new = Self::along(*pos, w);
+        let new_u = Self::along(*pos, w);
         let Some((hid, hs, hp)) = sw.counted()? else {
             if steps == 0 {
                 *first = target;
             }
-            *u = u_new;
+            *u = new_u;
             *side = w;
             *pos = target;
             return Ok(None);
@@ -134,7 +134,7 @@ impl Search<'_> {
         if steps == 0 {
             *first = hp;
         }
-        *u = u_new;
+        *u = new_u;
         *side = hs;
         *pos = hp;
         Ok(Some(hid))
@@ -324,14 +324,14 @@ impl Search<'_> {
         let mut cur = n - 1;
         let mut i: u32 = 0;
         loop {
-            let s_cur = *sides.get(cur as usize)?;
-            let mut s_i = *sides.get(i as usize)?;
+            let cur_side = *sides.get(cur as usize)?;
+            let mut side_i = *sides.get(i as usize)?;
             let mut nxt = i;
-            if s_i == s_cur {
+            if side_i == cur_side {
                 loop {
                     i = (i + 1) % n;
-                    s_i = *sides.get(i as usize)?;
-                    if s_i != s_cur {
+                    side_i = *sides.get(i as usize)?;
+                    if side_i != cur_side {
                         break;
                     }
                 }
@@ -342,13 +342,13 @@ impl Search<'_> {
             }
             let vc = *v.get(cur as usize)?;
             if Self::vertex_in_overlap(mesh, (p, vc, *poly.shapes.get(cur as usize)?), shape, d)
-                || (side == s_cur
-                    && Self::on_edge(s_cur, (vc, *v.get(nxt as usize)?), p, (prev, s_i)))
+                || (side == cur_side
+                    && Self::on_edge(cur_side, (vc, *v.get(nxt as usize)?), p, (prev, side_i)))
             {
                 return Some(VertexIndex::new(cur));
             }
             i = nxt + 1;
-            prev = s_cur;
+            prev = cur_side;
             cur = nxt;
             if i >= limit {
                 return None;
@@ -397,11 +397,11 @@ impl Search<'_> {
         o.x0() < o.x1() && o.y0() < o.y1() && inside(o, p, FixedDistance::ZERO)
     }
 
-    /// `FUN_140fa77b0`'s edge test: `p` lies on the edge of side `s_cur` from `vc` to `vn`; the
+    /// `FUN_140fa77b0`'s edge test: `p` lies on the edge of side `cur_side` from `vc` to `vn`; the
     /// side before the edge's run (`prev`) and the one after it (`next`) decide whether each end
     /// counts.
     pub(super) const fn on_edge(
-        s_cur: ShapeSide,
+        cur_side: ShapeSide,
         (vc, vn): (FixedPoint, FixedPoint),
         p: FixedPoint,
         (prev, next): (ShapeSide, ShapeSide),
@@ -409,7 +409,7 @@ impl Search<'_> {
         use ShapeSide::{HighX, HighY, LowX, LowY};
         // the game's unsigned compares of the side numbers: `prev < 2`, `prev - 1 < 2` and the
         // like name two neighbouring sides
-        match s_cur {
+        match cur_side {
             LowY if vc.y() == p.y() => {
                 let (a, b) = (vc.x(), vn.x());
                 let start = if matches!(prev, LowY | HighX) {
@@ -504,7 +504,7 @@ impl Search<'_> {
                 self.foot_test(Foot {
                     start: vv,
                     end: w,
-                    x_extent: dx,
+                    extent_x: dx,
                     run: Run {
                         poly: pi,
                         dir: WalkDir::Backward,
@@ -531,7 +531,7 @@ impl Search<'_> {
                 self.foot_test(Foot {
                     start: vv,
                     end: w,
-                    x_extent: dx,
+                    extent_x: dx,
                     run: Run {
                         poly: pi,
                         dir: WalkDir::Forward,
@@ -566,7 +566,7 @@ impl Search<'_> {
         self.foot_test(Foot {
             start: p,
             end: vb,
-            x_extent: dxb,
+            extent_x: dxb,
             run: Run {
                 poly: walk.poly,
                 dir: WalkDir::Backward,
@@ -579,7 +579,7 @@ impl Search<'_> {
         self.foot_test(Foot {
             start: p,
             end: vf,
-            x_extent: dxf,
+            extent_x: dxf,
             run: Run {
                 poly: walk.poly,
                 dir: WalkDir::Forward,

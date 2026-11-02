@@ -62,7 +62,7 @@ fn the_hooks_bound_is_the_modules_size_not_the_path_maps() {
 }
 
 #[test]
-fn a_slot_past_the_saved_words_or_the_slots_is_minus_one() {
+fn slot_past_the_saved_words_or_the_slots_is_minus_one() {
     let t = module().tactical;
     assert_eq!(t.slot(0), 7);
     assert_eq!(t.slot(1), 8);
@@ -72,7 +72,7 @@ fn a_slot_past_the_saved_words_or_the_slots_is_minus_one() {
 }
 
 #[test]
-fn the_table_holds_a_module_by_player() {
+fn the_table_holds_module_by_player() {
     let mut t = AiModules::default();
     assert!(t.get(PlayerId::new(3)).is_none());
     t.set(PlayerId::new(3), module());
@@ -214,7 +214,7 @@ fn info(size: i32, fill: u8) -> InfoModule {
 /// The search starts at the unit's tile and finds the first tile a civilian never searched:
 /// an explored tile (0) is passed through, the picked tile becomes explored.
 #[test]
-fn a_civilians_flood_picks_the_first_tile_no_search_touched() {
+fn civilians_flood_picks_the_first_tile_no_search_touched() {
     let mut m = info(6, EXPLORED);
     m.path_map.set(Tile::new(3, 0), UNEXPLORED);
     m.path_map.set(Tile::new(0, 3), UNEXPLORED);
@@ -235,7 +235,7 @@ fn a_civilians_flood_picks_the_first_tile_no_search_touched() {
 /// Another unit takes a tile that is not explored: a punted tile (1) counts for it, not for a
 /// civilian.
 #[test]
-fn another_units_flood_takes_a_punted_tile_a_civilian_passes() {
+fn another_units_flood_takes_punted_tile_civilian_passes() {
     let mut m = info(6, EXPLORED);
     m.path_map.set(Tile::new(2, 0), PUNTED);
     let mut rng = Well512::default();
@@ -264,7 +264,7 @@ fn another_units_flood_takes_a_punted_tile_a_civilian_passes() {
 /// A tile the player sees now is passed through; one of another zone, or where the unit
 /// cannot stand, ends its branch (its neighbours are not met through it). The map is one row.
 #[test]
-fn a_seen_tile_is_passed_through_but_another_zone_ends_the_branch() {
+fn seen_tile_is_passed_through_but_another_zone_ends_the_branch() {
     let row = |zone: Option<[i32; 2]>, blocked: Option<[i32; 2]>| {
         let mut m = info(4, EXPLORED);
         m.path_map.set(Tile::new(3, 0), UNEXPLORED);
@@ -349,7 +349,7 @@ fn an_unreachable_tile_is_punted_and_the_search_starts_from_the_unit() {
 /// A search that already starts at the unit's place punts to a corner of the best quadrant: 16
 /// draws for the scores and one for the corner.
 #[test]
-fn a_punt_from_the_units_place_picks_a_corner_of_the_lowest_scored_quadrant() {
+fn punt_from_the_units_place_picks_corner_of_the_lowest_scored_quadrant() {
     let mut m = info(8, EXPLORED);
     m.path_map.set(Tile::new(4, 4), UNEXPLORED);
     // quadrant 6 (column 1, row 2) scores far below the others
@@ -431,7 +431,7 @@ fn tile_uncovered_is_false_off_the_map_and_for_unexplored_and_dead_ends() {
 /// A ring's points that lie on the map join the stack, from the angle 0 on; the top of an
 /// empty stack and its pop are (-1, -1).
 #[test]
-fn a_ring_pushes_the_points_on_the_map_and_the_stack_gives_minus_one_when_empty() {
+fn ring_pushes_the_points_on_the_map_and_the_stack_gives_minus_one_when_empty() {
     let mut m = info(20, UNEXPLORED);
     assert_eq!(m.top_point(), Tile::new(-1, -1));
     assert_eq!(m.pop_point(), Tile::new(-1, -1));

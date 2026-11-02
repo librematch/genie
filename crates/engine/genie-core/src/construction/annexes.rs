@@ -75,7 +75,7 @@ mod tests {
     /// The constructor links each annex into its master's slot; the slots read in order, the
     /// empty ones left out; a fifth slot is not the building's; the death clears them all.
     #[test]
-    fn a_building_s_annexes_take_their_master_s_slots() {
+    fn building_annexes_take_their_master_slots() {
         let mut a = Annexes::NONE;
         assert_eq!(a.ids().count(), 0);
         a.link(2, object_id(12)).unwrap();
@@ -93,7 +93,7 @@ mod tests {
     /// The update lets go the slots of the gone annexes and keeps the others in their slots; an
     /// error stops it at its slot.
     #[test]
-    fn a_building_lets_its_gone_annexes_go() {
+    fn building_lets_its_gone_annexes_go() {
         let mut a = Annexes::new([
             Some(object_id(10)),
             None,

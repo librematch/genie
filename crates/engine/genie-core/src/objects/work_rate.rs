@@ -99,7 +99,7 @@ mod tests {
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
-    fn work_rates_do_the_game_s_f32_operations() {
+    fn work_rates_do_the_game_f32_operations() {
         let (a, b) = (WorkRate::new(0.1), WorkRate::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         let mut c = a;

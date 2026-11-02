@@ -46,7 +46,7 @@ mod tests {
 
     /// It runs above 0 and is set at any value but 0.
     #[test]
-    fn a_countdown_runs_above_zero_and_is_set_off_zero() {
+    fn countdown_runs_above_zero_and_is_set_off_zero() {
         assert!(RaiderCountdown::of_data(20).runs());
         assert!(!RaiderCountdown::of_data(-1).runs() && RaiderCountdown::of_data(-1).is_set());
         assert!(!RaiderCountdown::NONE.runs() && !RaiderCountdown::NONE.is_set());

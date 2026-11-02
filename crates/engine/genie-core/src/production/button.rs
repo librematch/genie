@@ -70,7 +70,7 @@ mod tests {
 
     /// A queue's button names a location's by its low byte.
     #[test]
-    fn a_queue_button_names_a_location_s_by_its_low_byte() {
+    fn queue_button_names_location_by_its_low_byte() {
         assert!(QueueButton::of_data(0x103).names(LocationButton::of_data(3)));
         assert!(!QueueButton::NONE.names(LocationButton::of_data(3)));
         assert!(QueueButton::NONE.names(LocationButton::of_data(0xff)));

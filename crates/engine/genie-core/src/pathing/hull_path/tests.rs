@@ -38,13 +38,13 @@ fn square() -> Hull {
 
 /// A hull's place is the value a search node holds for it.
 #[test]
-fn a_hull_s_node_slot_is_its_place() {
+fn hull_node_slot_is_its_place() {
     let h = HullIndex::new(3);
     assert_eq!((h.index(), h.slot()), (3, 3));
 }
 
 #[test]
-fn a_hull_holds_the_points_inside_it() {
+fn hull_holds_the_points_inside_it() {
     let h = square();
     assert!(h.inside(Point::new(0.5, 0.5)));
     assert!(!h.inside(Point::new(1.5, 0.5)));
@@ -52,7 +52,7 @@ fn a_hull_holds_the_points_inside_it() {
 }
 
 #[test]
-fn a_walk_meets_the_nearest_side_it_crosses() {
+fn walk_meets_the_nearest_side_it_crosses() {
     let h = square();
     // the side from point 2 (low left) to point 3 (high left)
     assert_eq!(
@@ -92,7 +92,7 @@ fn the_gift_wrap_turns_clockwise_from_the_highest_point() {
 }
 
 #[test]
-fn a_box_overlapping_a_hull_reports_its_corners_outside() {
+fn box_overlapping_hull_reports_its_corners_outside() {
     let h = square();
     let (overlap, outside) = h.shape_overlap(Point::new(0.5, 0.5), Point::new(1.5, 1.5));
     assert_eq!((overlap, outside), (2, [false, true, true, true]));
@@ -109,7 +109,7 @@ fn a_box_overlapping_a_hull_reports_its_corners_outside() {
 }
 
 #[test]
-fn a_ray_leaves_a_hull_by_the_side_it_meets() {
+fn ray_leaves_hull_by_the_side_it_meets() {
     let h = square();
     assert_eq!(
         h.ray_to_hull(Point::new(0.5, 0.5), 0),
@@ -126,7 +126,7 @@ fn a_ray_leaves_a_hull_by_the_side_it_meets() {
 /// short of it nothing; out keeps the point's other coordinate. The span tests are
 /// `COMISS`/`JA` skips (0x140f8ec1c, 0x140f8eb6e): an unordered coordinate passes them.
 #[test]
-fn a_ray_meets_the_nearest_box_side_toward_it() {
+fn ray_meets_the_nearest_box_side_toward_it() {
     let shape = |bounds: [f32; 4], id: RecordId| Shape {
         bounds: Rect::from(bounds),
         id,
@@ -257,7 +257,7 @@ fn the_quick_path_goes_around_one_square_obstruction() {
 /// at 0x140f8b2c4 with esi = n - 1): a box hull whose bottom side alone crosses the grown
 /// hull merges into it.
 #[test]
-fn a_hull_crossing_only_the_other_s_last_tested_side_merges() {
+fn hull_crossing_only_the_other_last_tested_side_merges() {
     let mut w = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![4; 400]),
@@ -309,7 +309,7 @@ fn a_hull_crossing_only_the_other_s_last_tested_side_merges() {
 /// and terrain mask, ignoring it and the target; a path found or none needed gives its
 /// length, a target the world does not hold none.
 #[test]
-fn a_unit_s_short_reach_is_its_old_short_path_s_length() {
+fn unit_short_reach_is_its_old_short_path_length() {
     let mut w = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![4; 400]),
@@ -497,7 +497,7 @@ fn the_node_pool_holds_the_heads_first_and_numbers_nodes_in_order() {
 /// A straight walk is the root of the squares' sum, y's first: the same either way, and
 /// exact for a 3-4-5 triangle.
 #[test]
-fn a_walk_s_length_is_the_root_of_the_squares_sum() {
+fn walk_length_is_the_root_of_the_squares_sum() {
     let (a, b) = (Point::new(1.0, 2.0), Point::new(4.0, 6.0));
     assert_eq!(walk_length(a, b), Distance::new(5.0));
     assert_eq!(walk_length(b, a), Distance::new(5.0));
@@ -538,7 +538,7 @@ fn open_nodes(p: &HullPather<'_>, l: NodeList) -> Vec<NodeIndex> {
 /// closes and the new one takes its place; one that costs no more, or a closed one (all of
 /// them), refuses the new node. Not open: straight into the closed list.
 #[test]
-fn a_node_joins_the_open_list_by_cost_and_distance_and_replaces_a_dearer_one() {
+fn node_joins_the_open_list_by_cost_and_distance_and_replaces_dearer_one() {
     let mut w = open_world();
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -714,7 +714,7 @@ fn a_node_joins_the_open_list_by_cost_and_distance_and_replaces_a_dearer_one() {
 /// axes (`COMISS`/`JA`, an unordered difference is no match), with or without a hull point;
 /// of the closed list, all but the last node count.
 #[test]
-fn a_node_by_place_matches_within_epsilon_and_skips_the_last_closed_node() {
+fn node_by_place_matches_within_epsilon_and_skips_the_last_closed_node() {
     let mut w = open_world();
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -962,7 +962,7 @@ fn nodes_close_one_by_one_or_all_and_the_lists_empty() {
 /// holds the point, moved [`NUDGE`] of the way toward its bounding box's middle (a point on
 /// a side counts as inside), or none.
 #[test]
-fn a_point_lies_in_the_first_hull_holding_it() {
+fn point_lies_in_the_first_hull_holding_it() {
     let mut w = open_world();
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -1024,7 +1024,7 @@ fn hull_ids(p: &HullPather<'_>) -> Vec<Vec<RecordId>> {
 /// half a tile wide (`COMISS`/`JA`: an unordered one too) joins the given hull, a wider one
 /// its own place; an id goes into a hull once.
 #[test]
-fn a_tile_s_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
+fn tile_tall_objects_go_into_the_hulls_unless_passed_or_left_out() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut w = open_world();
     w.insert(object_id(10), tall(5.3, 5.3, 0.2, class::PREDATOR)); // the unit: ignored
@@ -1247,7 +1247,7 @@ fn the_cliffs_in_the_frame_about_the_area_go_into_the_hulls() {
 /// its own place, once per hull; then the tile's objects, then those of its building's anchor
 /// tile when that lies outside the area.
 #[test]
-fn a_tile_s_obstructions_and_its_building_s_go_into_the_hulls() {
+fn tile_obstructions_and_its_building_go_into_the_hulls() {
     let mut classes = vec![4; 400];
     classes[9 * 20 + 9] = 1;
     classes[3 * 20 + 3] = 1;
@@ -1358,7 +1358,7 @@ fn a_tile_s_obstructions_and_its_building_s_go_into_the_hulls() {
 /// obstructions go each to its own place; a run at the row's end ends at the area's last
 /// column plus one.
 #[test]
-fn the_area_s_runs_of_blocked_tiles_make_one_hull_each() {
+fn the_area_runs_of_blocked_tiles_make_one_hull_each() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut classes = vec![4; 400];
     for x in [3, 4, 5, 9, 10] {
@@ -1445,7 +1445,7 @@ fn the_area_s_runs_of_blocked_tiles_make_one_hull_each() {
 /// parent and tests again; one whose walk is blocked hands on to its parent. Then each node
 /// from the end goes first into the path (`FUN_140f95a50`, `InsertWaypoint` at 0).
 #[test]
-fn a_path_skips_the_parents_its_nodes_see_past() {
+fn path_skips_the_parents_its_nodes_see_past() {
     let mut classes = vec![4; 400];
     // blocks the walk (8, 5) -> (2, 2) alone
     classes[3 * 20 + 4] = 1;
@@ -1527,7 +1527,7 @@ fn a_path_skips_the_parents_its_nodes_see_past() {
 /// ignoring both; a result below 2 reaches, with the path's length (its `param_4`); none for a
 /// target the world does not hold or a quick path that is blocked.
 #[test]
-fn a_unit_s_quick_reach_is_its_quick_path_alone() {
+fn unit_quick_reach_is_its_quick_path_alone() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
@@ -1620,7 +1620,7 @@ fn a_unit_s_quick_reach_is_its_quick_path_alone() {
 /// the area -1, bounds 0, four empty exit and entrance paths; the iteration cap 0x40. With
 /// `FUN_140f89e40`'s ignore list: the unit and the target.
 #[test]
-fn a_new_pather_holds_the_constructor_s_state() {
+fn new_pather_holds_the_constructor_state() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
@@ -1666,7 +1666,7 @@ fn a_new_pather_holds_the_constructor_s_state() {
 /// point unless it is farther than the reach (`JA`, 0x140f8d620), and the end's partway test
 /// takes an unordered distance as nearer the goal (`JC`, 0x140f876ca).
 #[test]
-fn the_pather_s_float_tests_take_the_game_s_nan_paths() {
+fn the_pather_float_tests_take_the_game_nan_paths() {
     let mut w = open_world();
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -1805,7 +1805,7 @@ fn walled(wall_x: usize, unit: Point) -> Spatial {
 /// both ways; the first node within range of the target's grown box ends it, and the path
 /// skips every node that sees past its parent.
 #[test]
-fn the_hull_search_goes_around_a_wall_to_the_target() {
+fn the_hull_search_goes_around_wall_to_the_target() {
     let mut w = walled(6, Point::new(2.0, 5.5));
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -1860,7 +1860,7 @@ fn the_hull_search_goes_around_a_wall_to_the_target() {
 /// whose nodes but the last go closed and the last open into the search's list; the goal's
 /// hull its entrance paths (`FUN_140f88ee0`) with the target.
 #[test]
-fn a_start_inside_a_hull_leaves_it_by_its_exit_paths() {
+fn start_inside_hull_leaves_it_by_its_exit_paths() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     w.insert(
         object_id(48),
@@ -1913,7 +1913,7 @@ fn a_start_inside_a_hull_leaves_it_by_its_exit_paths() {
 /// hull's side, nudged out, kept by its end (result 5 from inside a box). With a goal: a node
 /// that sees the goal ends the walk there (0).
 #[test]
-fn a_walk_out_of_a_hull_keeps_its_ways_out_or_reaches_the_goal() {
+fn walk_out_of_hull_keeps_its_ways_out_or_reaches_the_goal() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     let box_hull = |p: &mut HullPather<'_>| {
         p.area = TileRect::new(0, 0, 19, 19);
@@ -1998,7 +1998,7 @@ fn a_walk_out_of_a_hull_keeps_its_ways_out_or_reaches_the_goal() {
 /// each of those is a way out nudged past the edge, kept while fewer than `most` are; toward a
 /// goal the walk goes on from each end too, keeping none.
 #[test]
-fn a_walk_out_s_rays_end_on_the_hull_s_edge_as_ways_out() {
+fn walk_out_rays_end_on_the_hull_edge_as_ways_out() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     let mut rays = |goal: Option<Point>, most| {
         let mut p = HullPather::new(
@@ -2070,7 +2070,7 @@ fn a_walk_out_s_rays_end_on_the_hull_s_edge_as_ways_out() {
 /// start was in no box), none kept is result 2; toward a goal within the unit's radius and range
 /// of the start the start ends the walk (0).
 #[test]
-fn a_walk_out_from_outside_its_boxes_ends_by_its_ways_out_or_at_a_goal_in_range() {
+fn walk_out_from_outside_its_boxes_ends_by_its_ways_out_or_at_goal_in_range() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     let mut walk = |goal: Option<Point>, range, most| {
         let mut p = HullPather::new(
@@ -2123,7 +2123,7 @@ fn a_walk_out_from_outside_its_boxes_ends_by_its_ways_out_or_at_a_goal_in_range(
 /// inside a box toward the start, its ways out nudged back in by [`NUDGE`], each with the hull
 /// side it leaves by (result 5: the goal is inside a box).
 #[test]
-fn a_walk_into_a_hull_keeps_its_entrances_and_their_sides() {
+fn walk_into_hull_keeps_its_entrances_and_their_sides() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -2169,7 +2169,7 @@ fn a_walk_into_a_hull_keeps_its_entrances_and_their_sides() {
 /// `FindShortPath` with a goal off the map less the radius: its target must stand on it and
 /// the goal lie on the map (`FUN_140f89d80` with the map's bounds), else 4.
 #[test]
-fn a_goal_at_the_map_s_edge_needs_its_target_on_it() {
+fn goal_at_the_map_edge_needs_its_target_on_it() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
@@ -2246,7 +2246,7 @@ fn a_goal_at_the_map_s_edge_needs_its_target_on_it() {
 /// `FindShortPath`'s argument 11: the last search's area and hulls stay, none are built; with
 /// no area yet the search makes its own.
 #[test]
-fn a_kept_search_reuses_the_last_area_and_hulls() {
+fn kept_search_reuses_the_last_area_and_hulls() {
     let mut w = walled(6, Point::new(2.0, 5.5));
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -2326,7 +2326,7 @@ fn a_kept_search_reuses_the_last_area_and_hulls() {
 /// way on the map (at most 100 tiles, `GROWTHS` times), its tiles' obstructions join the
 /// hulls and the search starts again in it.
 #[test]
-fn a_node_beyond_the_area_grows_it_once() {
+fn node_beyond_the_area_grows_it_once() {
     let mut classes = vec![4; 400];
     for y in 3..=8 {
         classes[y * 20 + 6] = 1;
@@ -2389,7 +2389,7 @@ fn a_node_beyond_the_area_grows_it_once() {
 /// listed object of radii 0.5 × 0.5 on a tile's centre whose word holds a terrain class the
 /// mask lacks; one off the centre, of another size or on an open tile adds none.
 #[test]
-fn the_ignore_list_takes_the_ids_then_the_tiles_of_one_tile_objects_on_a_centre() {
+fn the_ignore_list_takes_the_ids_then_the_tiles_of_one_tile_objects_on_centre() {
     let mut classes = vec![4; 400];
     classes[3 * 20 + 3] = 1;
     classes[7 * 20 + 7] = 1;
@@ -2468,7 +2468,7 @@ fn the_ignore_list_takes_the_ids_then_the_tiles_of_one_tile_objects_on_a_centre(
 /// ends at a node within the range and the radius of the goal (squared, [`NUDGE`] more):
 /// found, a path (1).
 #[test]
-fn a_walk_to_a_point_goes_around_a_wall_without_a_target() {
+fn walk_to_point_goes_around_wall_without_target() {
     let mut w = walled(6, Point::new(2.0, 5.5));
     let mut p = HullPather::for_list(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -2520,7 +2520,7 @@ fn a_walk_to_a_point_goes_around_a_wall_without_a_target() {
 /// search without finding (2: partway). An ignored object does not count; two objects
 /// holding the goal need the grid's order, which the slice does not hold.
 #[test]
-fn a_goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
+fn goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
     let mut w = walled(6, Point::new(2.0, 5.5));
     w.insert(
         object_id(48),
@@ -2701,7 +2701,7 @@ fn an_included_moving_unit_blocks_the_line_tests() {
 /// next pather make its kept search (argument 11) the one search the game's lasting pather
 /// makes; the constructor's state has no area, so a kept search builds its own.
 #[test]
-fn the_last_search_s_area_and_hulls_carry_into_a_kept_search() {
+fn the_last_search_area_and_hulls_carry_into_kept_search() {
     let mut w = walled(6, Point::new(2.0, 5.5));
     let mut first = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -2790,7 +2790,7 @@ fn the_last_search_s_area_and_hulls_carry_into_a_kept_search() {
 }
 
 #[test]
-fn a_unit_within_range_needs_no_path() {
+fn unit_within_range_needs_no_path() {
     let mut w = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![4; 400]),
@@ -2901,7 +2901,7 @@ fn around_triangle(at: Point, taken: &[i32]) -> (Vec<(Point, Option<usize>, i32)
 /// point on the cheaper way, the forward way on a tie, the way left when the other's point was
 /// refused (an open node there costs no more), none when both were.
 #[test]
-fn a_crossed_hull_s_points_go_both_ways_and_an_odd_one_the_cheaper() {
+fn crossed_hull_points_go_both_ways_and_an_odd_one_the_cheaper() {
     let (made, n) = around_triangle(Point::new(4.5, 5.6), &[]);
     let a = Some(n + 1);
     assert_eq!(
@@ -2938,7 +2938,7 @@ fn a_crossed_hull_s_points_go_both_ways_and_an_odd_one_the_cheaper() {
 /// backwards; a walk in that ended in a box keeps its last leg only when the leg meets nothing
 /// or the target alone, else the last point goes and the path ends partway.
 #[test]
-fn a_found_path_follows_its_entrance_and_keeps_a_last_leg_on_the_target() {
+fn found_path_follows_its_entrance_and_keeps_last_leg_on_the_target() {
     let mut w = walled(8, Point::new(2.0, 5.5));
     let mut p = HullPather::new(
         (&mut w, crate::world::index::ObjectsRef::empty()),
@@ -3064,7 +3064,7 @@ fn an_unfound_search_ends_at_the_node_or_the_walk_nearer_the_goal() {
 /// box the walk reaches (2). Without the target the walk to that goal ends partway on the
 /// hull's side (`within`), and the search goes on from the hull's ways out.
 #[test]
-fn a_goal_in_the_start_s_hull_is_walked_to_within_it() {
+fn goal_in_the_start_hull_is_walked_to_within_it() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     w.insert(
         object_id(48),

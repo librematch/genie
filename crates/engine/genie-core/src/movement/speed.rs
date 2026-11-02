@@ -146,7 +146,7 @@ mod tests {
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
-    fn speeds_do_the_game_s_f32_operations() {
+    fn speeds_do_the_game_f32_operations() {
         let (a, b) = (Speed::new(0.1), Speed::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
@@ -166,7 +166,7 @@ mod tests {
     /// A speed over a span is the way it covers, one `f32` product in either order; a NaN
     /// operand first keeps its payload (`mulss` returns its first NaN operand).
     #[test]
-    fn a_speed_over_seconds_is_a_distance() {
+    fn speed_over_seconds_is_distance() {
         let (v, dt) = (Speed::new(1.2), Seconds::new(0.05));
         assert_eq!(v * dt, Distance::new(1.2 * 0.05));
         assert_eq!((dt * v).get().to_bits(), (0.05_f32 * 1.2).to_bits());

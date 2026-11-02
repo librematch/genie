@@ -49,7 +49,7 @@ mod tests {
 
     /// A hit sets 60, which runs down to 0.
     #[test]
-    fn the_timer_runs_down_from_a_hit() {
+    fn the_timer_runs_down_from_hit() {
         assert_eq!(DamagedTimer::HIT.get(), 60);
         assert!(DamagedTimer::HIT.running() && !DamagedTimer::OUT.running());
         assert_eq!(DamagedTimer::of_data(1).tick(), DamagedTimer::OUT);

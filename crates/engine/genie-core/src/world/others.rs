@@ -545,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn a_lookup_finds_the_owner_s_object_before_another_player_s() {
+    fn lookup_finds_the_owner_object_before_another_player_s() {
         let (own, before, after) = world();
         let foreign = Foreign {
             before: &before,
@@ -616,7 +616,7 @@ mod tests {
     }
 
     #[test]
-    fn the_owner_s_objects_iterate_in_list_order_without_the_one_that_updates() {
+    fn the_owner_objects_iterate_in_list_order_without_the_one_that_updates() {
         let (mut own, mut before, mut after) = world();
         let mut asleep = ObjectList::from(vec![unit(13)]);
         let mut index = ObjectIndex::scanning().clone();
@@ -666,7 +666,7 @@ mod tests {
     }
 
     #[test]
-    fn a_lookup_by_id_reaches_every_list_and_says_whether_the_object_sleeps() {
+    fn lookup_by_id_reaches_every_list_and_says_whether_the_object_sleeps() {
         let (mut own, mut before, mut after) = world();
         let mut asleep = ObjectList::from(vec![unit(13)]);
         let mut index = ObjectIndex::scanning().clone();
@@ -696,7 +696,7 @@ mod tests {
     /// A woken object (`FUN_14119deb0` with 0) leaves its sleeping list for the end of its
     /// player's live list, unflagged, and its player's tracker files it last.
     #[test]
-    fn a_woken_object_moves_to_the_end_of_its_player_s_live_list_and_tracker() {
+    fn woken_object_moves_to_the_end_of_its_player_live_list_and_tracker() {
         use crate::players::tracker::{Tracker, key};
         let (mut own, mut before, mut after) = world();
         let mut asleep = ObjectList::from(vec![unit(13)]);
@@ -753,7 +753,7 @@ mod tests {
     }
 
     #[test]
-    fn a_captured_object_reads_its_new_owner_s_list_as_its_own() {
+    fn captured_object_reads_its_new_owner_list_as_its_own() {
         let (own, before, after) = world();
         let foreign = Foreign {
             before: &before,

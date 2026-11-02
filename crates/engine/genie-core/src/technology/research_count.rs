@@ -86,7 +86,7 @@ mod tests {
 
     /// A negative cap allows 0x100, any other its own count.
     #[test]
-    fn a_negative_cap_allows_0x100() {
+    fn negative_cap_allows_0x100() {
         assert_eq!(ResearchCap::UNSET.limit(), 0x100);
         assert_eq!(ResearchCap::of_data(i16::MIN).limit(), 0x100);
         assert_eq!(ResearchCap::of_data(3).limit(), 3);

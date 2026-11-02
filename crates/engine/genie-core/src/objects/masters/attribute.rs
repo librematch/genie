@@ -336,7 +336,7 @@ mod tests {
 
     /// An attribute command's third argument names the attribute by its low byte.
     #[test]
-    fn an_effect_s_argument_names_the_attribute_by_its_low_byte() {
+    fn an_effect_argument_names_the_attribute_by_its_low_byte() {
         assert_eq!(MasterAttribute::of_effect(9), attribute::ATTACK);
         assert_eq!(MasterAttribute::of_effect(0x109), attribute::ATTACK);
         assert_eq!(MasterAttribute::of_effect(-1).get(), 0xff);

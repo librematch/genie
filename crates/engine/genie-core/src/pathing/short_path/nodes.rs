@@ -30,7 +30,7 @@ pub(super) struct Foot {
     /// The edge's end.
     pub(super) end: FixedPoint,
     /// The edge's x extent: horizontal when not 0.
-    pub(super) x_extent: i32,
+    pub(super) extent_x: i32,
     /// The run of the polygon walked to the edge's start, the edge included.
     pub(super) run: Run,
     /// The cost at the edge's start.
@@ -286,7 +286,7 @@ impl Search<'_> {
         let Foot {
             start: a,
             end: b,
-            x_extent: dx,
+            extent_x: dx,
             run,
             start_cost: g0,
             parent,

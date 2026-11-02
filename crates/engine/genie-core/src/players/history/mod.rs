@@ -503,7 +503,7 @@ mod tests {
 
     /// A saved byte is its kind; the default is the Feudal Age's 0.
     #[test]
-    fn a_saved_byte_is_its_event_kind() {
+    fn saved_byte_is_its_event_kind() {
         assert_eq!(EventKind::from(11), EventKind::BATTLE);
         assert_eq!(EventKind::DEFEAT.get(), 20);
         assert_eq!(EventKind::default(), EventKind::FEUDAL_AGE);
@@ -605,7 +605,7 @@ mod tests {
     /// `mark_new_battle`: up to three battles all stay (the new one's `data3` 1); a fourth
     /// pushes out the battle among the three newest furthest below it, or goes itself.
     #[test]
-    fn a_fourth_battle_pushes_out_the_weakest_of_the_newest_three() {
+    fn fourth_battle_pushes_out_the_weakest_of_the_newest_three() {
         let mut h = with_entry();
         for d in [0.2, 0.9, 0.3] {
             h.add_event(EventKind::BATTLE, 1.0, d, 0, WorldTime::ZERO);
@@ -653,7 +653,7 @@ mod tests {
     /// `FUN_141560e20` and `get_history_event_by_time`: the newest of a kind; the first position
     /// (1 based) and count of a time slice's events.
     #[test]
-    fn the_readers_find_the_newest_event_and_a_time_slice_s_events() {
+    fn the_readers_find_the_newest_event_and_time_slice_events() {
         let h = History {
             events: vec![
                 Event {
@@ -689,7 +689,7 @@ mod tests {
 
     /// `FUN_140b077d0`: the seconds since the current age's event, else the world's seconds.
     #[test]
-    fn the_age_time_counts_from_the_age_s_event() {
+    fn the_age_time_counts_from_the_age_event() {
         let h = History {
             events: vec![Event {
                 kind: EventKind::CASTLE_AGE,
@@ -722,7 +722,7 @@ mod tests {
 
     /// The update counts its runs: the period's run adds the entry and keeps the attributes.
     #[test]
-    fn the_period_s_update_adds_an_entry_and_keeps_the_attributes() {
+    fn the_period_update_adds_an_entry_and_keeps_the_attributes() {
         let mut h = History {
             update_count: HistoryUpdates::of_data(28),
             old_player_kill_bv: vec![Tally::ZERO; 3],
@@ -768,7 +768,7 @@ mod tests {
     /// ends it, with an event when the summed share reached 0.15, against the player whose
     /// razings over the value plus kills since the start weigh most.
     #[test]
-    fn a_battle_starts_sums_and_ends_with_its_event() {
+    fn battle_starts_sums_and_ends_with_its_event() {
         let mut h = History {
             update_count: HistoryUpdates::of_data(29),
             old_current_build_value_units: Tally::of_data(600),
@@ -827,7 +827,7 @@ mod tests {
     /// A battle whose summed share stays below 0.15 ends without an event; a saved battle flag
     /// other than 1 goes on as a battle.
     #[test]
-    fn a_small_battle_ends_without_its_event() {
+    fn small_battle_ends_without_its_event() {
         let mut h = History {
             update_count: HistoryUpdates::of_data(29),
             battle_flag: 2,
@@ -858,7 +858,7 @@ mod tests {
     /// The share is a float compared as a double: 120 of 1000 as an f32 lies just below the
     /// double 0.12 and starts no battle.
     #[test]
-    fn a_share_of_exactly_twelve_percent_starts_no_battle() {
+    fn share_of_exactly_twelve_percent_starts_no_battle() {
         let mut h = History {
             update_count: HistoryUpdates::of_data(29),
             old_current_build_value_units: Tally::of_data(1000),

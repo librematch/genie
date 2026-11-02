@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn a_save_older_than_66_is_refused_before_its_header_is_read() {
+    fn save_older_than_66_is_refused_before_its_header_is_read() {
         let mut save = b"VER 9.4\0".to_vec();
         save.extend((-1.0f32).to_le_bytes());
         save.extend(0x0041_0000u32.to_le_bytes());
@@ -300,7 +300,7 @@ mod tests {
     /// The generated parts' defaults are a save the reader reads back, byte for byte: its
     /// sections end where the writer put them.
     #[test]
-    fn a_default_save_reads_back_byte_for_byte() {
+    fn default_save_reads_back_byte_for_byte() {
         let save = bytes(&default_save());
         let read = parse(&save).unwrap();
         assert_eq!(bytes(&read), save);
@@ -331,7 +331,7 @@ mod tests {
 
     /// A save cut inside its file header or its world does not read.
     #[test]
-    fn a_cut_save_does_not_read() {
+    fn cut_save_does_not_read() {
         let save = bytes(&default_save());
         for len in [20, save.len() - 1] {
             let e = parse(&save[..len]).unwrap_err();
@@ -346,7 +346,7 @@ mod tests {
 
     /// A player whose type has no class is the game's own error.
     #[test]
-    fn a_player_of_no_known_type_is_invalid() {
+    fn player_of_no_known_type_is_invalid() {
         let mut h = default_save();
         let world = &mut h.world.base_world;
         world.num_players = 1;

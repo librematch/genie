@@ -133,7 +133,7 @@ mod tests {
     /// The modes keep their values; a location below 1 names no entry; a disable's whole number
     /// and its low 16 bits differ past a short.
     #[test]
-    fn the_command_arguments_keep_the_data_s_values() {
+    fn the_command_arguments_keep_the_data_values() {
         assert_eq!(ChangeMode::of_data(2), ChangeMode::SCALE);
         assert_eq!(ChangeMode::of_data(7).get(), 7);
         assert_eq!(ModifyMode::of_data(12), ModifyMode::STATE);

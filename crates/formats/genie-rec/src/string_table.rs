@@ -106,7 +106,7 @@ mod tests {
     /// The table: its capacity, its count, a null pointer, then each string behind its
     /// length.
     #[test]
-    fn a_string_table_writes_back_its_strings() {
+    fn string_table_writes_back_its_strings() {
         let table = StringTable {
             max_strings: 4,
             strings: vec!["a".to_owned(), "bc".to_owned()],

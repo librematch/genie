@@ -584,7 +584,7 @@ mod tests {
     ///
     /// [`WalkRig`]: crate::movement::tests::WalkRig
     #[test]
-    fn a_move_to_of_its_own_starts_moves_and_reports_its_end() {
+    fn move_to_of_its_own_starts_moves_and_reports_its_end() {
         use crate::movement::tests::WalkRig;
         let mut rig = WalkRig::on_the_path();
         let mut looks = Looks::default();
@@ -664,7 +664,7 @@ mod tests {
     /// does a walk that arrives; the top speed follows each sprite (the master's 0.8 times its
     /// factor).
     #[test]
-    fn a_move_to_of_its_own_shows_its_sprite_as_it_moves_and_the_standing_one_at_its_end() {
+    fn move_to_of_its_own_shows_its_sprite_as_it_moves_and_the_standing_one_at_its_end() {
         use crate::movement::tests::WalkRig;
         let started = |sprite: Option<Graphic>| {
             let mut rig = WalkRig::on_the_path();
@@ -713,7 +713,7 @@ mod tests {
     /// sprite, else its standing one, never a look's. The unit AI's moves give the running sprite
     /// unless they walk, else the walking one, and none without either.
     #[test]
-    fn a_move_to_without_a_sprite_takes_its_constructor_s() {
+    fn move_to_without_sprite_takes_its_constructor_s() {
         let master = Master {
             run_sprite: Some(SpriteId::named(13154)),
             move_sprite: Some(SpriteId::named(13153)),
@@ -765,7 +765,7 @@ mod tests {
     /// a walker on its path's last stretch follow it there, and any other tell the unit and turn
     /// the `MoveTo` to state 3 before the motion step.
     #[test]
-    fn a_move_to_of_its_own_turns_to_its_start_when_its_target_moved() {
+    fn move_to_of_its_own_turns_to_its_start_when_its_target_moved() {
         use crate::movement::tests::WalkRig;
         let walked = |point: Position, waypoint| {
             let mut rig = WalkRig::on_the_path();
@@ -805,7 +805,7 @@ mod tests {
     /// 0 for a building without one, for a unit with one, and without a master; a range given
     /// stays.
     #[test]
-    fn a_move_to_an_object_without_a_range_takes_a_mule_cart_s() {
+    fn move_to_an_object_without_range_takes_mule_cart_s() {
         use crate::objects::masters::{Master, Task, master_type::BUILDING};
         let cart_task = Task {
             action_type: crate::construction::build::CART_TASK,
@@ -854,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn a_move_to_an_object_at_hand_starts_arrived_and_shows_the_standing_sprite() {
+    fn move_to_an_object_at_hand_starts_arrived_and_shows_the_standing_sprite() {
         let mut world = Spatial::new(GridSize::new(120, 120));
         world.insert(object_id(9185), sheep(30.4, 40.0));
         world.insert(object_id(9186), sheep(35.0, 40.0));
@@ -891,7 +891,7 @@ mod tests {
     /// a town centre walks to its place less 0.2 on both axes without a target. Without a target
     /// the start is state 3, or 13 for a unit without speed.
     #[test]
-    fn a_move_to_an_object_holds_it_unless_it_is_gone_or_a_town_centre_for_livestock() {
+    fn move_to_an_object_holds_it_unless_it_is_gone_or_town_centre_for_livestock() {
         let mut world = Spatial::new(GridSize::new(120, 120));
         world.insert(object_id(9186), sheep(35.0, 40.0));
         world.insert(
@@ -947,7 +947,7 @@ mod tests {
     /// whose not quiet `set_state` shows the standing sprite (its speed); without movement state
     /// a unit has no speed. Its point is `+0x38`.
     #[test]
-    fn a_move_to_a_point_starts_unless_its_unit_has_no_speed() {
+    fn move_to_point_starts_unless_its_unit_has_no_speed() {
         let point = Position::new(12.0, 34.0, 1.0);
         let start = |speed: f32| {
             let mut walker = crate::gathering::hunt::tests::walker();
@@ -988,7 +988,7 @@ mod tests {
     /// without speed away from the target fails at the start (state 13), which shows the
     /// standing sprite as an arrival does.
     #[test]
-    fn a_move_to_an_object_holds_its_place_and_a_unit_without_speed_fails_standing() {
+    fn move_to_an_object_holds_its_place_and_unit_without_speed_fails_standing() {
         let mut world = Spatial::new(GridSize::new(120, 120));
         world.insert(object_id(9186), sheep(35.0, 40.0));
         let me = Position::new(30.0, 40.0, 0.0);

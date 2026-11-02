@@ -266,13 +266,13 @@ impl World {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let t_master = self.master(t.player(), t.master_id())?;
+        let target_master = self.master(t.player(), t.master_id())?;
         let master = u.master(self.master_tables(), p)?;
         let gap = crate::movement::footprint_gap_squared(
             u.position(),
             master.radius,
             t.position(),
-            t_master.radius,
+            target_master.radius,
         );
         let mut reach = self.task_reach(p, master.id, order.filter)?;
         if reach < 0.0 && RANGED_MEMBER_KIND <= master.kind && !self.charge_hits(u, master, &t)? {
@@ -357,14 +357,14 @@ impl World {
                 by_master.push(m.id);
             }
         }
-        let t_class = self.master(t.player(), t.master_id())?.class;
+        let target_class = self.master(t.player(), t.master_id())?.class;
         let mut list: Vec<ObjectId> = Vec::new();
-        if BOTH_LISTS_CLASSES.contains(&t_class) {
+        if BOTH_LISTS_CLASSES.contains(&target_class) {
             take_into(&mut list, &by_master, limit);
             take_into(&mut list, &by_class, limit);
         } else if CLASS_LIST_MASTERS.contains(&t.master_id()) {
             take_into(&mut list, &by_class, limit);
-        } else if CATEGORY_LIST_CLASSES.contains(&t_class) {
+        } else if CATEGORY_LIST_CLASSES.contains(&target_class) {
             for category in CATEGORIES {
                 if limit <= list.len() {
                     break;

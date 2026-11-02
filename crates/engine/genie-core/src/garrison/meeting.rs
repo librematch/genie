@@ -207,15 +207,15 @@ fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<us
     Ok(n)
 }
 
-/// [`MeetingTarget`] of the target `t` with its action layer `t_actions`, why the load could not
-/// read it whole `t_unread` ([`crate::world::Unread`]) and its mover `t_mover` (of master `tm`)
+/// [`MeetingTarget`] of the target `t` with its action layer `target_actions`, why the load could not
+/// read it whole `target_unread` ([`crate::world::Unread`]) and its mover `target_mover` (of master `tm`)
 /// with `room` for
 /// the unit: its top speed ([`crate::movement::MoveStats::speed`]), its top action's state and
 /// its point (`+0x38`, `+0x3c`): a `MoveTo`'s
 /// ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An action the slice
 /// does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    (t, t_actions, t_unread, t_mover): (
+    (t, target_actions, target_unread, target_mover): (
         &crate::objects::unit::Unit,
         &Action,
         Option<&crate::world::Unread>,
@@ -224,16 +224,16 @@ pub(crate) fn meeting_target(
     tm: &Master,
     room: bool,
 ) -> Result<MeetingTarget, GenieError> {
-    if let Some(e) = t_unread {
+    if let Some(e) = target_unread {
         return Err(e.error());
     }
     let action_point = match (
-        t_actions.top_action_kind(),
-        t_actions.list.move_to().copied(),
+        target_actions.top_action_kind(),
+        target_actions.list.move_to().copied(),
     ) {
         (Some(crate::movement::move_to::MOVE_TO), Some(m)) => Ok(m.point.ground()),
         // the Transport's point (+0x38, +0x3c), where it sails
-        (Some(crate::garrison::transport::TRANSPORT), _) => t_actions
+        (Some(crate::garrison::transport::TRANSPORT), _) => target_actions
             .list
             .transport()
             .map(|tr| tr.point.ground())
@@ -242,8 +242,8 @@ pub(crate) fn meeting_target(
     };
     Ok(MeetingTarget {
         room,
-        speed: t_mover.map_or(Speed::ZERO, |m| m.stats.speed),
-        state: t_actions
+        speed: target_mover.map_or(Speed::ZERO, |m| m.stats.speed),
+        state: target_actions
             .top_action()
             .map_or(ActionState::NO_ACTION, |a| a.state),
         class: tm.class,
@@ -448,14 +448,14 @@ pub(crate) fn enter_view(
     spatial: &mut Spatial,
     masters: &[Masters],
     (unit, mover): (&crate::objects::unit::Unit, Option<&Mover>),
-    ((t, t_mover), tm, room): ((&crate::objects::unit::Unit, Option<&Mover>), &Master, bool),
+    ((t, target_mover), tm, room): ((&crate::objects::unit::Unit, Option<&Mover>), &Master, bool),
     range: Distance,
     by_id: crate::world::index::ObjectsRef<'_>,
 ) -> Result<(EnterTarget, WalkStart), GenieError> {
     let building = tm.kind == BUILDING;
     let stats = mover.map(|m| m.stats).ok_or(NO_SPEED)?;
     let moved_at = mover.map_or_else(|| unit.position(), |m| m.moved_at);
-    let target_mover = if building { None } else { t_mover };
+    let target_mover = if building { None } else { target_mover };
     let in_reach = enter_reach(
         spatial,
         masters,

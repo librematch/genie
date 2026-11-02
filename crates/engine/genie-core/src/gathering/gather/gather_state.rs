@@ -89,7 +89,7 @@ mod tests {
 
     /// Each state reads back from its byte; the bytes without a state are errors.
     #[test]
-    fn a_gather_s_states_read_back_from_their_bytes() {
+    fn gather_states_read_back_from_their_bytes() {
         for b in 0..=255_u8 {
             match GatherState::of_byte(b) {
                 Ok(s) => assert_eq!(s.get(), b),

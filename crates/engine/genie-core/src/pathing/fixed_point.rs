@@ -61,7 +61,7 @@ mod tests {
 
     /// x and y keep their places; each `with_` changes one.
     #[test]
-    fn a_fixed_point_keeps_its_x_and_y() {
+    fn fixed_point_keeps_both_coordinates() {
         let p = FixedPoint::new(3, -4);
         assert_eq!((p.x(), p.y(), p.get()), (3, -4, [3, -4]));
         assert_eq!(p.with_x(7), FixedPoint::new(7, -4));

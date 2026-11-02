@@ -53,7 +53,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             player: player_id(p),
             master: master_id(70),
             position: Point::new(0.0, 0.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids(ids.clone())),
             queued: false,
@@ -65,7 +65,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             master: master_id(72),
             from: crate::map::Tile::new(0, 0),
             to: crate::map::Tile::new(1, 1),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             builders: unit_list(object_ids(ids.clone())),
             queued: false,
             commits: true,
@@ -92,7 +92,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             count: 1,
             buildings: vec![],
             tech: crate::technology::TechId::of_data(22),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             shift: false,
         }),
         Command::Unmodelled(UnmodelledCommand {
@@ -208,7 +208,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
             units: unit_list(object_ids(ids.clone())),
             target: None,
             point: Point::new(-1.0, -1.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             through_ai: false,
             nearby: false,
             action: UnitOrderAction::DropOff,
@@ -227,7 +227,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
 /// player's lane, but a GAME sub-command's, which stops its target's (or its issuer's for a
 /// target outside the world).
 #[test]
-fn a_command_names_the_player_whose_lane_it_stops() {
+fn command_names_the_player_whose_lane_it_stops() {
     let commands = one_of_each(3);
     assert_eq!(commands.len(), 28);
     for c in &commands {
@@ -250,7 +250,7 @@ fn a_command_names_the_player_whose_lane_it_stops() {
 
 /// The waypoints the handlers read: the first of their count, none without 1 to 10.
 #[test]
-fn a_patrol_reads_one_to_ten_waypoints() {
+fn patrol_reads_one_to_ten_waypoints() {
     let points = [Point::new(1.0, 2.0), Point::new(3.0, 4.0)];
     let two = Waypoints::of(&points).unwrap();
     assert_eq!(two.used(), Some(&points[..]));
@@ -261,7 +261,7 @@ fn a_patrol_reads_one_to_ten_waypoints() {
 
 /// The market trades the attribute's low byte, food, wood and stone only.
 #[test]
-fn a_trade_of_another_commodity_does_nothing() {
+fn trade_of_another_commodity_does_nothing() {
     let player = crate::world::Player::default();
     let mut w = crate::world::World::new(
         WorldTime::ZERO,

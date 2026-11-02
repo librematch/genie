@@ -87,10 +87,10 @@ impl UnitView<'_, '_> {
             .spatial
             .get(self.unit.id)
             .ok_or(crate::world::ATTACKER_UNPLACED)?;
-        let t_master = player_master(&self.c.w.masters, t.player, t.master).ok_or(
+        let target_master = player_master(&self.c.w.masters, t.player, t.master).ok_or(
             GenieError::unsupported("an attack's target of a master the slice does not have"),
         )?;
-        let visible = self.target_visible(&t, t_master)?;
+        let visible = self.target_visible(&t, target_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
         let look = self.c.w.parts.combat_of(unit.id).abilities.look.as_ref();
@@ -387,7 +387,7 @@ impl UnitView<'_, '_> {
         }))
     }
 
-    /// The attack command's sight of its target `t` (of master `t_master`): its tile seen by the
+    /// The attack command's sight of its target `t` (of master `target_master`): its tile seen by the
     /// unit's player, or explored when the master shows in the fog (its fog flag).
     ///
     /// # Errors
@@ -396,11 +396,11 @@ impl UnitView<'_, '_> {
     fn target_visible(
         &self,
         t: &Placed,
-        t_master: &crate::objects::masters::Master,
+        target_master: &crate::objects::masters::Master,
     ) -> Result<bool, GenieError> {
         let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
         Ok(self.c.w.spatial.sees_tile(self.player, Tile::new(tx, ty))
-            || (t_master.fog_visibility != FogVisibility::INVISIBLE
+            || (target_master.fog_visibility != FogVisibility::INVISIBLE
                 && self.c.w.spatial.explored(self.player, Tile::new(tx, ty))?))
     }
 

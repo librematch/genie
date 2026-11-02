@@ -551,7 +551,7 @@ fn unload_and_unit_order_keep_their_lists_and_counts() {
             units: unit_list(object_ids([61])),
             target: Some(object_id(70)),
             point: Point::new(3.0, 4.0),
-            q_id: genie_core::commands::QueueId::of_data(71),
+            queue_id: genie_core::commands::QueueId::of_data(71),
             through_ai: true,
             nearby: false,
             action: UnitOrderAction::Garrison,
@@ -625,7 +625,7 @@ fn build_and_build_wall_keep_their_fields() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(10.5, 11.5),
-            q_id: genie_core::commands::QueueId::of_data(-1),
+            queue_id: genie_core::commands::QueueId::of_data(-1),
             sprite_override: genie_core::commands::SpriteOverride::of_data(0x2c9),
             builders: unit_list(object_ids([9])),
             queued: true,
@@ -657,7 +657,7 @@ fn build_and_build_wall_keep_their_fields() {
             master: master_id(72),
             from: genie_core::map::Tile::new(1, 2),
             to: genie_core::map::Tile::new(3, 4),
-            q_id: genie_core::commands::QueueId::of_data(-1),
+            queue_id: genie_core::commands::QueueId::of_data(-1),
             builders: unit_list(object_ids([9])),
             queued: false,
             commits: true,
@@ -710,7 +710,7 @@ fn queue_and_research_keep_their_fields() {
             count: 1,
             buildings: object_ids([90]),
             tech: genie_core::technology::TechId::of_data(22),
-            q_id: genie_core::commands::QueueId::of_data(-1),
+            queue_id: genie_core::commands::QueueId::of_data(-1),
             shift: true,
         })
     );
@@ -903,7 +903,7 @@ fn flare_trade_and_game_keep_their_fields() {
 
 /// GIVE ATTRIBUTES keeps its four entries in order and the receiver.
 #[test]
-fn a_tribute_keeps_its_four_gifts() {
+fn tribute_keeps_its_four_gifts() {
     let tribute = packets::TribeGiveAttributes {
         commp_id: 1,
         amt: 100.0,
@@ -945,7 +945,7 @@ fn a_tribute_keeps_its_four_gifts() {
 /// A packet whose command would not write back its bytes stays raw, with the reason the run
 /// stops on: a byte the handler reads as a flag but holds 2, a gap that is not the client's.
 #[test]
-fn a_packet_its_command_does_not_write_back_stays_raw() {
+fn packet_its_command_does_not_write_back_stays_raw() {
     let why = raw(&interact(1, 2, vec![10]));
     assert_eq!(why.kind(), ErrorKind::InvalidInput);
     assert_eq!(
@@ -971,7 +971,7 @@ fn a_packet_its_command_does_not_write_back_stays_raw() {
 /// deleted, a FOLLOW's target). Where the command works without one, an object id's −1 is none
 /// and decodes: in a unit list (a computer's BUILD without builders lists −1), as a target.
 #[test]
-fn a_packet_of_a_value_its_types_refuse_stays_raw() {
+fn packet_of_value_its_types_refuse_stays_raw() {
     let build = |oid| {
         packets::Build {
             commp_id: 1,
@@ -1052,7 +1052,7 @@ fn an_unmodelled_packet_stays_raw() {
 /// A command whose values its packet cannot hold is an error: a FLARE of fewer than three
 /// players' bytes, more ids than a packet's size holds (a player is a byte by its type).
 #[test]
-fn a_command_its_packet_cannot_hold_is_an_error() {
+fn command_its_packet_cannot_hold_is_an_error() {
     let stop = |player, ids: Vec<i32>| {
         Command::Stop(StopCommand {
             player,

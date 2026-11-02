@@ -31,7 +31,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_unread_object_stops_with_the_import_s_error() {
+    fn an_unread_object_stops_with_the_import_error() {
         let why = GenieError::unsupported("a saved production list");
         let unread = Unread::new(why.clone());
         assert_eq!(unread.error(), why);

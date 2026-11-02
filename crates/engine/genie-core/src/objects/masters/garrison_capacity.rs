@@ -53,7 +53,7 @@ mod tests {
 
     /// Only 0 holds none; the count is the byte; an add wraps.
     #[test]
-    fn a_capacity_is_a_count_of_units() {
+    fn capacity_is_count_of_units() {
         assert!(!GarrisonCapacity::NONE.holds());
         assert!(GarrisonCapacity::of_data(5).holds());
         assert_eq!(GarrisonCapacity::of_data(20).units(), 20);

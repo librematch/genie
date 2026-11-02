@@ -72,7 +72,7 @@ mod tests {
     /// −1 is none, 0 and up a restriction, any other negative value an error; the field writes
     /// them back.
     #[test]
-    fn a_field_s_minus_one_is_none() {
+    fn field_minus_one_is_none() {
         assert_eq!(RestrictionId::of_field(-1).unwrap(), None);
         let r = RestrictionId::of_field(7).unwrap();
         assert_eq!(r, Some(RestrictionId::named(7)));

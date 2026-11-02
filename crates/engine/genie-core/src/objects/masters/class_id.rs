@@ -127,7 +127,7 @@ mod tests {
 
     /// A class is 0 or more; a negative value is no class.
     #[test]
-    fn a_negative_value_is_no_class() {
+    fn negative_value_is_no_class() {
         assert_eq!(ClassId::try_from(0).map(ClassId::get), Ok(0));
         assert_eq!(ClassId::try_from(99).map(ClassId::get), Ok(99));
         assert_eq!(
@@ -138,14 +138,14 @@ mod tests {
 
     /// A master's −1 is no class as an optional field holds it; any other class is itself.
     #[test]
-    fn a_master_s_minus_one_is_no_class_in_a_field() {
+    fn master_minus_one_is_no_class_in_field() {
         assert_eq!(class::NO_CLASS.or_none(), None);
         assert_eq!(class::FARM.or_none(), Some(class::FARM));
     }
 
     /// A field of −1 is no class, any other value a class, and each converts back to its value.
     #[test]
-    fn a_field_s_minus_one_is_none_and_any_other_value_a_class() {
+    fn field_minus_one_is_none_and_any_other_value_class() {
         assert_eq!(ClassId::of_field(-1), Ok(None));
         assert_eq!(ClassId::of_field(0), Ok(Some(class::CLASS_0)));
         assert_eq!(ClassId::field(None), -1);
@@ -158,7 +158,7 @@ mod tests {
 
     /// A master of the `.dat` may hold −1, which is a value of the type with no registry place.
     #[test]
-    fn a_master_without_a_class_holds_minus_one() {
+    fn master_without_class_holds_minus_one() {
         assert_eq!(ClassId::of_master(-1).get(), -1);
         assert_eq!(ClassId::of_master(-1).index(), None);
         assert_eq!(class::VILLAGER.index(), Some(4));

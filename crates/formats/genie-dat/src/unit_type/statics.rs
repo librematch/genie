@@ -553,7 +553,7 @@ mod tests {
     /// A unit type's bytes from 11.55 on (with its object flags) read back and written again
     /// give the same bytes; the name ends the record but for the copy id and group.
     #[test]
-    fn a_static_unit_type_writes_back_the_bytes_it_read() {
+    fn static_unit_type_writes_back_the_bytes_it_read() {
         let mut bytes = vec![];
         archer().write_to(&mut bytes, 12.0).unwrap();
         let unit = StaticUnitTypeAttributes::read_from(bytes.as_slice(), 12.0).unwrap();

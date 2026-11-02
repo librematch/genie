@@ -78,7 +78,7 @@ mod tests {
 
     /// A field's −1 is none, a value of 0 or more a task, and each converts back.
     #[test]
-    fn a_field_s_minus_one_is_none_and_any_value_from_0_a_task() {
+    fn field_minus_one_is_none_and_any_value_from_0_task() {
         assert_eq!(TaskId::of_field(-1), Ok(None));
         for value in [0, 85, i16::MAX] {
             let task = TaskId::of_field(value).unwrap();
@@ -90,7 +90,7 @@ mod tests {
 
     /// A negative value is no task; in a field, one other than −1 is an error.
     #[test]
-    fn a_negative_value_is_no_task() {
+    fn negative_value_is_no_task() {
         for value in [-1, -2, i16::MIN] {
             assert_eq!(
                 TaskId::try_from(value).map_err(|e| e.kind()),

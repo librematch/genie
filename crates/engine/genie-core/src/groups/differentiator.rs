@@ -36,7 +36,7 @@ mod tests {
 
     /// The count steps by 1 and wraps; −1 is below every count.
     #[test]
-    fn a_count_steps_and_wraps() {
+    fn count_steps_and_wraps() {
         assert_eq!(Differentiator::NONE.next(), Differentiator::default());
         assert_eq!(Differentiator::of_data(i32::MAX).next().get(), i32::MIN);
         assert!(Differentiator::NONE < Differentiator::of_data(0));

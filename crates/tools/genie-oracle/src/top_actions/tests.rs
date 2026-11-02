@@ -190,7 +190,7 @@ fn an_action_without_its_base_is_unsupported() {
 /// The second target only where the slice models one; an action the slice does not import is
 /// refused.
 #[test]
-fn a_second_target_or_an_unknown_action_is_unsupported() {
+fn second_target_or_an_unknown_action_is_unsupported() {
     let mut b = base(3);
     b.target2_id = 9;
     assert_eq!(
@@ -207,7 +207,7 @@ fn a_second_target_or_an_unknown_action_is_unsupported() {
 /// deleted head, slot 0x28, is not ported), so the import refuses the action below the head
 /// rather than dropping it, and names it.
 #[test]
-fn a_second_saved_action_is_refused() {
+fn second_saved_action_is_refused() {
     let mut object = acting(MOVE_TO, move_to(2, 0.5));
     combat_mut(&mut object)
         .rge_combat_object
@@ -231,7 +231,7 @@ fn a_second_saved_action_is_refused() {
 }
 
 #[test]
-fn a_move_to_takes_its_state_point_range_and_wait() {
+fn move_to_takes_its_state_point_range_and_wait() {
     let m = imported(MOVE_TO, move_to(4, 0.5))
         .unwrap()
         .list
@@ -285,7 +285,7 @@ fn a_move_to_takes_its_state_point_range_and_wait() {
 
 /// A `MoveTo`'s wait state (`+0x6c`) is 0, 1 or 2; a saved 3 fails the read.
 #[test]
-fn a_move_to_s_wait_state_of_none_fails() {
+fn move_to_wait_state_of_none_fails() {
     let mut walk = move_to(4, 0.5);
     if let Some(m) = walk
         .rge_action_by_type
@@ -300,7 +300,7 @@ fn a_move_to_s_wait_state_of_none_fails() {
 /// A `MoveTo`'s sprite (`+0x58`, the save's second `short_val`) comes from the sprites'
 /// table; −1 is none, and an id the table lacks (or no table) is missing data.
 #[test]
-fn a_move_to_takes_its_sprite_from_the_sprites_table() {
+fn move_to_takes_its_sprite_from_the_sprites_table() {
     let walking = Graphic {
         id: SpriteId::named(5),
         frames: Frame::of_data(10),
@@ -505,7 +505,7 @@ fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
 }
 
 #[test]
-fn a_missile_flies_with_its_actions_course() {
+fn missile_flies_with_its_actions_course() {
     assert!(import(&missile(), &PlayerObjects::default()).is_ok());
     let m = saved_missile(&missile()).unwrap();
     assert_eq!(
@@ -536,15 +536,15 @@ fn a_missile_flies_with_its_actions_course() {
         imported(genie_core::combat::missile::MISSILE, explore(base(2))).unwrap_err(),
         GenieError::unsupported("a saved missile action without its part")
     );
-    let not_a_missile = by_type(|t| t.rge_action_missile = Some(Box::default()));
+    let not_missile = by_type(|t| t.rge_action_missile = Some(Box::default()));
     assert_eq!(
-        imported(genie_core::combat::missile::MISSILE, not_a_missile).unwrap_err(),
+        imported(genie_core::combat::missile::MISSILE, not_missile).unwrap_err(),
         GenieError::unsupported("a missile action of an object that is not a missile")
     );
 }
 
 #[test]
-fn a_farms_make_takes_its_timers_and_task() {
+fn farms_make_takes_its_timers_and_task() {
     use genie_core::gathering::make::{MAKE, MakeState};
     let make = |b: RgeAction| {
         by_type(|t| {
@@ -578,7 +578,7 @@ fn a_farms_make_takes_its_timers_and_task() {
 }
 
 #[test]
-fn a_birds_fly_takes_its_home_and_move_to() {
+fn birds_fly_takes_its_home_and_move_to() {
     use genie_core::movement::fly::{FLY, FlyState};
     let bird = |b: RgeAction| by_type(|t| t.rge_action_bird = Some(Box::new(b)));
     let f = imported(FLY, bird(base(3)))
@@ -642,7 +642,7 @@ fn build(b: RgeAction) -> Action {
 /// object's import's, its combat layer's), its quiet `MoveTo` (its range, point, wait and
 /// sprite) and its site.
 #[test]
-fn a_build_takes_its_task_move_to_and_site() {
+fn build_takes_its_task_move_to_and_site() {
     let mut b = base(4);
     b.target_id = 30;
     b.target2_id = 31;
@@ -738,7 +738,7 @@ fn repair(b: RgeAction) -> Action {
 }
 
 #[test]
-fn a_repair_takes_its_task_and_counts_its_builder() {
+fn repair_takes_its_task_and_counts_its_builder() {
     use genie_core::construction::repair::REPAIR;
     let mut b = base(4);
     b.short_val = 2;
@@ -806,7 +806,7 @@ fn hunt(b: RgeAction) -> Action {
 /// A Hunt takes its task, drop site and lead, its quiet `MoveTo` with its range and wait; its Attack needs
 /// the sprites' table; a state or sub-action the slice does not model is refused.
 #[test]
-fn a_hunt_takes_its_task_lead_and_move_to() {
+fn hunt_takes_its_task_lead_and_move_to() {
     use genie_core::gathering::hunt::{HUNT, HuntState};
     let h = imported(HUNT, hunt(base(HuntState::Idle.get())))
         .unwrap()
@@ -910,7 +910,7 @@ fn gather(b: RgeAction) -> Action {
 
 /// A Gather takes its stops and task; a `MoveTo` without a target walks to its point.
 #[test]
-fn a_gather_takes_its_stops_and_move_to() {
+fn gather_takes_its_stops_and_move_to() {
     use genie_core::gathering::gather::{GATHER, GatherState};
     let g = imported(GATHER, gather(base(GatherState::Work.get())))
         .unwrap()
@@ -1028,7 +1028,7 @@ fn an_enter_takes_its_task_and_retry() {
 }
 
 #[test]
-fn a_transport_takes_its_base_alone() {
+fn transport_takes_its_base_alone() {
     use genie_core::garrison::transport::{TRANSPORT, TransportState};
     let transport = |b: RgeAction| Action {
         rge_action_transport: Some(Box::new(b)),
@@ -1144,7 +1144,7 @@ fn an_attack_needs_the_sprites_table() {
 }
 
 #[test]
-fn a_wait_solidify_waits_for_its_foundation() {
+fn wait_solidify_waits_for_its_foundation() {
     use genie_core::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidifyState};
     let wait = |b: RgeAction| Action {
         tribe_action_wait_solidify: Some(Box::new(TribeActionWaitSolidify {
@@ -1215,7 +1215,7 @@ fn attack(state: u8, walk: u16, pending: bool) -> Action {
 /// reload (its master's 2.5 s) less the attack sprite's length (1 s); one with its hit to
 /// come, or in another state, keeps no rest. A swing longer than the reload rests 0.
 #[test]
-fn a_hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
+fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
     use genie_core::combat::attack::{ATTACK, AttackState};
     use genie_core::gathering::hunt::{HUNT, HuntState};
     let master = |reload: f32| {

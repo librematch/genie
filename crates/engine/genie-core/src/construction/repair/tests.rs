@@ -183,7 +183,7 @@ fn house(id: i32, hp: HitPoints) -> Repaired {
 /// its 25 wood per its 550 hit points; the last of it heals it full (1); a player without
 /// the wood pays nothing and heals nothing (2); a house below 1 hit point takes nothing.
 #[test]
-fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
+fn building_repair_pays_its_share_of_the_cost_and_heals() {
     let masters = masters();
     let mut wood = Held(vec![
         Amount::ZERO,
@@ -233,7 +233,7 @@ fn a_building_s_repair_pays_its_share_of_the_cost_and_heals() {
 /// From its repairer an annex's repair is its main building's, which repairs its annexes
 /// (here the annex itself) by the whole amount first, then itself.
 #[test]
-fn an_annex_s_repair_goes_to_its_main_building_and_its_annexes() {
+fn an_annex_repair_goes_to_its_main_building_and_its_annexes() {
     let masters = masters();
     let mut wood = Held(vec![
         Amount::ZERO,
@@ -268,7 +268,7 @@ fn an_annex_s_repair_goes_to_its_main_building_and_its_annexes() {
 /// `FUN_1412143b0` on a ram (class 13): the amount, at most what it lacks of its most, costs
 /// its owner's unit repair rate of its costs per its most hit points; then it heals.
 #[test]
-fn a_siege_unit_s_repair_pays_its_unit_share() {
+fn siege_unit_repair_pays_its_unit_share() {
     let masters = masters();
     let mut held = Held(vec![
         Amount::ZERO,
@@ -422,7 +422,7 @@ fn the_house(t: &crate::world::World) -> (f32, u8, i32) {
 /// constructor, toward the target (state 4, `FUN_140aa0df0`) or the point (11,
 /// `FUN_140aa0d30`); a sprite the table lacks fails the move.
 #[test]
-fn a_repair_s_move_to_shows_its_task_s_moving_sprite_else_its_default() {
+fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
     let g = graphics();
     let shown = |task| {
         let r = RepairAction { task, ..started() };
@@ -457,7 +457,7 @@ fn a_repair_s_move_to_shows_its_task_s_moving_sprite_else_its_default() {
 /// Every `MoveTo` of the Repair is quiet (`0x140ad9c60`: `FUN_140a7a170` with 1): the start's
 /// to the target within the master's weapon range, a move's to its point within 0.
 #[test]
-fn a_repair_s_move_tos_are_quiet() {
+fn repair_move_tos_are_quiet() {
     let g = graphics();
     let r = RepairAction::start(TARGET, TASK, Distance::new(1.5), &move_reads(&g)).unwrap();
     let to_target = MoveToAction {
@@ -485,7 +485,7 @@ fn a_repair_s_move_tos_are_quiet() {
 /// target (0.01 or nearer) it arrived, a repairer without speed failed, and one in state 3 or
 /// later adds none; with no target it walks to (0, 0, 0).
 #[test]
-fn a_repair_s_move_to_starts_as_its_list_adds_it() {
+fn repair_move_to_starts_as_its_list_adds_it() {
     let g = graphics();
     let state = |to, reads: MoveToReads<'_>| {
         RepairAction::start(to, TASK, Distance::ZERO, &reads)
@@ -518,7 +518,7 @@ fn a_repair_s_move_to_starts_as_its_list_adds_it() {
 /// the target (6) the moving one, the work (7) the proceeding one; for none slot 0x68 shows the
 /// master's standing sprite.
 #[test]
-fn a_repairer_shows_its_task_s_sprites_as_it_faces_and_works() {
+fn repairer_shows_its_task_sprites_as_it_faces_and_works() {
     for (task, sprites) in [(SHOWING, [3, 4]), (TASK, [5, 5])] {
         let mut t = repair_at(NEAR, |r| {
             (r.state, r.task) = (moving(MoveTo::Arrived), task);
@@ -540,7 +540,7 @@ fn a_repairer_shows_its_task_s_sprites_as_it_faces_and_works() {
 /// step (`0x140aa29e0`'s `set_state(4)`): the task's moving sprite, else the master's walking
 /// one (`FUN_140aa0d30`'s default).
 #[test]
-fn a_repair_s_walk_to_its_point_shows_its_sprite_as_it_starts() {
+fn repair_walk_to_its_point_shows_its_sprite_as_it_starts() {
     for (task, shown) in [(TASK, 20), (SHOWING, 3)] {
         let mut t = repair_at(NEAR, |r| r.task = task);
         let v = &mut t.players[1].objects[ListIndex::new(0)];
@@ -570,7 +570,7 @@ fn a_repair_s_walk_to_its_point_shows_its_sprite_as_it_starts() {
 /// (`set_state(1)`: notify 0x1fa, the standing sprite, the target let go); the next update
 /// removes it.
 #[test]
-fn a_repair_ends_with_its_target_gone_foreign_or_dead() {
+fn repair_ends_with_its_target_gone_foreign_or_dead() {
     type Change = fn(&mut crate::world::World);
     let cases: [(Change, bool); 4] = [
         (
@@ -622,7 +622,7 @@ fn a_repair_ends_with_its_target_gone_foreign_or_dead() {
 /// [`MoveToAction::check_held`]): the Repair lets its target go (slot 0x68 with none) and ends
 /// (`set_state(1)`: notify 0x1fa, the standing sprite).
 #[test]
-fn a_repair_whose_move_to_target_died_lets_go_and_ends() {
+fn repair_whose_move_to_target_died_lets_go_and_ends() {
     let mut t = repair_at(NEAR, |r| {
         r.state = RepairState::Move {
             move_to: Some(MoveToAction {
@@ -649,7 +649,7 @@ fn a_repair_whose_move_to_target_died_lets_go_and_ends() {
 
 /// Gaia's object is repaired: the repairer faces it, then works and joins its repairers.
 #[test]
-fn gaia_s_object_is_repaired() {
+fn gaia_object_is_repaired() {
     let mut t = repair_at(NEAR, |r| r.state = RepairState::Face);
     let house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
     let _ = t.push_live(PlayerId::new(0), house).unwrap();
@@ -664,7 +664,7 @@ fn gaia_s_object_is_repaired() {
 /// State 4 once the `MoveTo` ended: within reach the unit faces the target (6); out of reach
 /// it waits (10) with a quick path to it, else fails (13), whose update posts 0x1f9.
 #[test]
-fn a_repairer_at_its_target_faces_it_or_waits_or_fails() {
+fn repairer_at_its_target_faces_it_or_waits_or_fails() {
     let arrived = |r: &mut RepairAction| r.state = moving(MoveTo::Arrived);
     let mut t = repair_at(NEAR, arrived);
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
@@ -702,7 +702,7 @@ fn a_repairer_at_its_target_faces_it_or_waits_or_fails() {
 /// counted repairer out of the repairers, the armor back; the player short of resources (2)
 /// posts 0x1fb and ends it too; a target that walked out of reach sends the unit walking.
 #[test]
-fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
+fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
     let working = |r: &mut RepairAction| r.state = RepairState::Work;
     let mut t = repair_at(NEAR, working);
     t.parts
@@ -804,7 +804,7 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
 /// State 10 waits a second (the world's dt off the timer), then faces a target within reach
 /// or waits a second again.
 #[test]
-fn a_waiting_repairer_looks_again_each_second() {
+fn waiting_repairer_looks_again_each_second() {
     let waiting = |r: &mut RepairAction| {
         (r.state, r.timer) = (RepairState::Wait, Seconds::new(0.1));
     };
@@ -830,7 +830,7 @@ fn a_waiting_repairer_looks_again_each_second() {
 /// Slot 8 (`FUN_140ad9700`): the point, the target let go (a counted repairer leaving its
 /// repairers), the walk there; its end ends the Repair.
 #[test]
-fn a_move_sends_the_repairer_to_its_point() {
+fn move_sends_the_repairer_to_its_point() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut r = RepairAction {
         state: RepairState::Work,
@@ -884,7 +884,7 @@ fn a_move_sends_the_repairer_to_its_point() {
 /// Slot 7 (`FUN_140adaa00`, `set_state(2)`): a counted repairer is no longer counted (the
 /// caller's to leave the repairers), the `MoveTo` goes, the target stays.
 #[test]
-fn a_halt_stops_the_repair_and_answers_whether_it_counted() {
+fn halt_stops_the_repair_and_answers_whether_it_counted() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut r = RepairAction {
         state: RepairState::Work,
@@ -902,7 +902,7 @@ fn a_halt_stops_the_repair_and_answers_whether_it_counted() {
 /// `set_state(4)` from a new target: the old `MoveTo` to the point goes, a new walk to the
 /// target starts.
 #[test]
-fn walking_again_starts_a_new_move_to_the_target() {
+fn walking_again_starts_new_move_to_the_target() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let g = graphics();
     let r = started();

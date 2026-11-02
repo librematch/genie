@@ -55,7 +55,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_minimap_mode_is_the_data_s_byte() {
+    fn minimap_mode_is_the_data_byte() {
         assert_eq!(MinimapMode::of_data(255).plus(2).get(), 1);
         assert_eq!(MinimapMode::of_data(0), MinimapMode::NONE);
         assert_eq!(MinimapMode::of_data(10).get(), 10);

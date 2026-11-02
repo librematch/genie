@@ -178,9 +178,9 @@ pub struct LinkedBuilding {
     /// Unit type ID for this linked building.
     pub unit_id: UnitTypeId,
     /// X offset in tiles from the centre of the "owner" building.
-    pub x_offset: f32,
+    pub offset_x: f32,
     /// Y offset in tiles from the centre of the "owner" building.
-    pub y_offset: f32,
+    pub offset_y: f32,
 }
 
 impl LinkedBuilding {
@@ -192,8 +192,8 @@ impl LinkedBuilding {
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         Ok(Self {
             unit_id: input.read_u16::<LE>()?.into(),
-            x_offset: input.read_f32::<LE>()?,
-            y_offset: input.read_f32::<LE>()?,
+            offset_x: input.read_f32::<LE>()?,
+            offset_y: input.read_f32::<LE>()?,
         })
     }
 
@@ -204,8 +204,8 @@ impl LinkedBuilding {
     /// Returns an error if writing to `output` fails.
     pub fn write_to(&self, mut output: impl Write) -> Result<()> {
         output.write_u16::<LE>(self.unit_id.into())?;
-        output.write_f32::<LE>(self.x_offset)?;
-        output.write_f32::<LE>(self.y_offset)?;
+        output.write_f32::<LE>(self.offset_x)?;
+        output.write_f32::<LE>(self.offset_y)?;
         Ok(())
     }
     pub(super) fn write_empty(mut output: impl Write) -> Result<()> {

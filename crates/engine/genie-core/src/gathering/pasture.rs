@@ -283,7 +283,7 @@ mod tests {
     /// edge; its livestock stood on the left edge's second and third (134.5, 71.4), (134.5,
     /// 72.3) and the bottom edge's fourth (137.2, 70.5).
     #[test]
-    fn a_pasture_s_edges_take_four_points_each() {
+    fn pasture_edges_take_four_points_each() {
         let points = edge_points(Position::new(136.0, 72.0, 0.0), Distance::new(2.0));
         assert_eq!(points.len(), 16);
         let t = [0.0f32, 0.3, 0.6, 0.3 + 0.3 + 0.3];

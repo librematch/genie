@@ -688,7 +688,7 @@ mod tests {
     /// its slot follows; a second insert replaces; two tables of the same parts in another
     /// order are equal.
     #[test]
-    fn a_part_table_packs_its_parts_and_finds_them_by_id() {
+    fn part_table_packs_its_parts_and_finds_them_by_id() {
         let mut t = PartTable::default();
         assert_eq!(t.insert(object_id(5), 'a'), None);
         assert_eq!(t.insert(object_id(-3), 'b'), None);
@@ -716,7 +716,7 @@ mod tests {
     /// object without them differs at the part's old path; a table entry whose object the
     /// world does not file fails the check.
     #[test]
-    fn the_world_files_an_object_s_parts_with_it() {
+    fn the_world_files_an_object_parts_with_it() {
         use crate::objects::ListIndex;
         use crate::players::PlayerId;
         use genie_diff::{Scope, differences};
@@ -770,7 +770,7 @@ mod tests {
     /// gather point's and the missile's parts are set and cleared in the object's life, and its
     /// removal from the lists carries them.
     #[test]
-    fn a_loaded_object_s_parts_go_into_the_tables() {
+    fn loaded_object_parts_go_into_the_tables() {
         use crate::objects::ListIndex;
         use crate::players::PlayerId;
         let id = object_id(5);
@@ -872,7 +872,7 @@ mod tests {
     /// A building's production lists are made empty at their first use and found again after;
     /// an object the world does not hold gets none.
     #[test]
-    fn a_production_is_made_empty_once_and_found_again() {
+    fn production_is_made_empty_once_and_found_again() {
         use crate::players::PlayerId;
         let id = object_id(5);
         let mut t = World::new(
@@ -906,7 +906,7 @@ mod tests {
     /// flag's set files the object, its clear lets it go; a record keeps it; a loaded new unit's
     /// bell files nothing, and a removal gives back a new unit's for an object without one.
     #[test]
-    fn the_table_holds_only_the_town_bells_that_differ_from_a_new_unit_s() {
+    fn the_table_holds_only_the_town_bells_that_differ_from_new_unit_s() {
         use crate::objects::ListIndex;
         use crate::players::PlayerId;
         let id = object_id(5);
@@ -997,7 +997,7 @@ mod tests {
     /// table ([`World::master_tables`], [`MasterTables::of`]); an object without one reads its
     /// player's, and its removal from the lists carries the part.
     #[test]
-    fn an_object_reads_its_own_master_from_the_world_s_table() {
+    fn an_object_reads_its_own_master_from_the_world_table() {
         use crate::objects::ListIndex;
         use crate::objects::MasterHitPoints;
         use crate::objects::masters::Masters;
@@ -1061,7 +1061,7 @@ mod tests {
     /// the unit AI at the combat layer's, the missile at its own, a row's field keeps its own
     /// path.
     #[test]
-    fn a_whole_object_compares_its_parts_at_their_old_paths() {
+    fn whole_object_compares_its_parts_at_their_old_paths() {
         use genie_diff::{Scope, differences};
         let a = Object::from(Unit {
             id: object_id(1),

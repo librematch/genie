@@ -35,7 +35,7 @@ fn rest(bytes: Bytes) -> Bytes {
 }
 
 #[test]
-fn an_object_before_11_58_has_a_selected_group() {
+fn an_object_before_11_58_has_selected_group() {
     let object = read_all::<StaticUnitAttributes>(&rest(identity().u8(4)).0, 11.57);
     assert_eq!(u8::from(object.owner_id), 2);
     assert_eq!(u16::from(object.unit_type_id), 83);
@@ -94,7 +94,7 @@ fn an_object_from_11_58_has_no_selected_group() {
 
 /// A unit of class 0 is the end of a list; any other reads the classes up to its own.
 #[test]
-fn a_static_unit_reads_only_its_static_attributes() {
+fn static_unit_reads_only_its_static_attributes() {
     let end = OptionalReadableElement::read_from(&mut header_reader(&[0], 11.58));
     assert!(matches!(end, Ok(None::<Unit>)));
     let bytes = Bytes::default().u8(10).raw(&rest(identity()).0).0;
@@ -106,7 +106,7 @@ fn a_static_unit_reads_only_its_static_attributes() {
 }
 
 #[test]
-fn the_old_format_s_units_are_read_only() {
+fn the_old_format_units_are_read_only() {
     let bytes = Bytes::default().u8(10).raw(&rest(identity()).0).0;
     let unit: Unit = OptionalReadableElement::read_from(&mut header_reader(&bytes, 11.58))
         .unwrap()

@@ -63,7 +63,7 @@ mod tests {
 
     /// A technology's civilisation below 1 is every one's; past a byte is an error.
     #[test]
-    fn a_technology_s_civ_below_one_is_every_civ_s() {
+    fn technology_civ_below_one_is_every_civ_s() {
         assert_eq!(CivId::of_tech(0).unwrap(), None);
         assert_eq!(CivId::of_tech(-1).unwrap(), None);
         assert_eq!(CivId::of_tech(12).unwrap(), Some(CivId::new(12)));

@@ -41,9 +41,9 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "an Artifact's move to an object the slice does not hold",
         ))?;
-        let t_master = t.master(self.master_tables(), tp)?;
-        let to_building = livestock && t_master.kind == BUILDING;
-        let to_town_centre = livestock && t_master.id == TOWN_CENTRE;
+        let target_master = t.master(self.master_tables(), tp)?;
+        let to_building = livestock && target_master.kind == BUILDING;
+        let to_town_centre = livestock && target_master.id == TOWN_CENTRE;
         let at = self
             .spatial
             .get(target)

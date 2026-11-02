@@ -260,7 +260,7 @@ mod tests {
 
     /// A tile with its original terrain behind the marker 0xFF, one without in two bytes.
     #[test]
-    fn a_tile_writes_back_with_or_without_its_original_terrain() {
+    fn tile_writes_back_with_or_without_its_original_terrain() {
         let changed = writes_back(
             &Tile {
                 terrain: 2,
@@ -284,7 +284,7 @@ mod tests {
     /// A zone map: its 255 infos and tiles, a byte per map tile, the passability rules and
     /// the zone count.
     #[test]
-    fn a_zone_map_writes_back_for_its_map_size() {
+    fn zone_map_writes_back_for_its_map_size() {
         let zone = MapZone {
             zone_map: vec![1, 2, 3, 4],
             passability_rules: vec![1.0, 0.5],

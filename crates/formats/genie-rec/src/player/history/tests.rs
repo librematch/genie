@@ -19,7 +19,7 @@ fn an_event_reads_its_times_and_parameters() {
 
 /// Two entries and one event, then 180 bytes of battle statistics the reader skips.
 #[test]
-fn a_history_reads_its_entries_and_events_and_skips_the_statistics() {
+fn history_reads_its_entries_and_events_and_skips_the_statistics() {
     let bytes = Bytes::default()
         .u8(0)
         .words(&[2, 1, 10])
@@ -47,7 +47,7 @@ fn a_history_reads_its_entries_and_events_and_skips_the_statistics() {
 }
 
 #[test]
-fn a_history_short_of_its_statistics_is_an_error() {
+fn history_short_of_its_statistics_is_an_error() {
     let bytes = Bytes::default()
         .u8(0)
         .words(&[0, 0, 0])
@@ -61,7 +61,7 @@ fn a_history_short_of_its_statistics_is_an_error() {
 }
 
 #[test]
-fn a_diplomacy_offer_reads_its_terms_and_message() {
+fn diplomacy_offer_reads_its_terms_and_message() {
     let bytes = Bytes::default()
         .raw(&[1, 2])
         .i32(500)

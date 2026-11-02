@@ -29,7 +29,7 @@ mod tests {
 
     /// A value past its field's width is an `InvalidData` error; an absent id is the none value.
     #[test]
-    fn a_value_past_its_field_is_invalid_data_and_an_absent_id_is_none() {
+    fn value_past_its_field_is_invalid_data_and_an_absent_id_is_none() {
         assert_eq!(fits::<u16, _>(65535usize).unwrap(), 65535);
         assert_eq!(
             fits::<u16, _>(65536usize).unwrap_err().kind(),

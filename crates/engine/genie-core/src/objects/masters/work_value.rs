@@ -45,7 +45,7 @@ mod tests {
 
     /// Only a value above 0 is positive; a NaN is not.
     #[test]
-    fn only_a_value_above_zero_is_positive() {
+    fn only_value_above_zero_is_positive() {
         assert!(WorkValue::ONE.positive());
         assert!(!WorkValue::ZERO.positive());
         assert!(!WorkValue::new(-1.0).positive());

@@ -294,7 +294,7 @@ mod tests {
 
     /// The task lists behind their flags, a list of none for a 0 flag.
     #[test]
-    fn a_task_list_s_flag_says_whether_it_follows() {
+    fn task_list_flag_says_whether_it_follows() {
         let bytes = [2, 0, 0, 0, 0, 0];
         let lists = read_task_lists(bytes.as_slice()).unwrap();
         assert!(lists.iter().all(Option::is_none));
@@ -303,7 +303,7 @@ mod tests {
 
     /// The sprites' flags say which follow; none do here.
     #[test]
-    fn a_sprite_s_flag_says_whether_it_follows() {
+    fn sprite_flag_says_whether_it_follows() {
         let bytes = [2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let sprites = read_sprites(bytes.as_slice()).unwrap();
         assert_eq!(sprites.len(), 2);

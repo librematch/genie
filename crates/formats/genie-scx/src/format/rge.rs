@@ -496,7 +496,7 @@ mod tests {
     /// A timeline with entries is not read.
     #[test]
     #[should_panic(expected = "Unexpected RGE_Timeline")]
-    fn a_timeline_with_entries_panics() {
+    fn timeline_with_entries_panics() {
         let bytes = [1u8, 0, 0, 0, 0, 0, 0, 0];
         let _ = read_timeline(bytes.as_slice(), 1.06);
     }

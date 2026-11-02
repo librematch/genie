@@ -228,7 +228,7 @@ fn state(t: &World, slot: usize) -> SlotState {
 /// timer, distance and the place it last moved to, its failures left; -1 ends it; a unit
 /// that is no member, or that the world does not hold, is refused.
 #[test]
-fn a_member_s_own_move_is_set_or_ended() {
+fn member_own_move_is_set_or_ended() {
     let mut t = world();
     t.groups.get_mut(group_id(1)).unwrap().members[0]
         .specific_move
@@ -302,7 +302,7 @@ fn a_member_s_own_move_is_set_or_ended() {
 /// takes the slot as its unit AI's goal; one more than 10 failures in is moved aside: its
 /// own move (reason 2, its place, 0.1 s), a stop and [`GroupFlags::CATCHING_UP`].
 #[test]
-fn a_member_in_place_or_failing_too_often() {
+fn member_in_place_or_failing_too_often() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_formation.as_mut().unwrap().slots[0].transform_position = BVector::new(5.0, 0.0, 5.0);
@@ -364,7 +364,7 @@ fn a_member_in_place_or_failing_too_often() {
 /// clears its failures, and its slot in state 1 or 2 takes state 3; a slot in another
 /// state keeps it.
 #[test]
-fn a_busy_member_stops_and_its_slot_counts_it_there() {
+fn busy_member_stops_and_its_slot_counts_it_there() {
     for (before, after) in [
         (SlotState::Arriving, SlotState::InPlace),
         (SlotState::Stopping, SlotState::InPlace),
@@ -396,7 +396,7 @@ fn a_busy_member_stops_and_its_slot_counts_it_there() {
 /// is its top speed and it shows its walking sprite (whose speed it takes), the group's
 /// flags take bit 9 and its unit AI's goal is the slot.
 #[test]
-fn a_far_member_turns_and_walks_to_its_slot() {
+fn far_member_turns_and_walks_to_its_slot() {
     let mut t = world();
     t.steer_to_slot(group_id(1), 0, 0, &[]).unwrap();
     let m = mover(&t, 10);
@@ -418,7 +418,7 @@ fn a_far_member_turns_and_walks_to_its_slot() {
 /// the top speed plus 0.2 of it times 1.5 / 3; within five radii (0.5), the top speed,
 /// walking; within the radius (0.1), the group's top speed, walking.
 #[test]
-fn a_near_member_catches_up_or_takes_the_group_s_speed() {
+fn near_member_catches_up_or_takes_the_group_speed() {
     let speed = 0.8f32;
     let cases = [
         (4.0, speed * CATCH_UP, RUNNING, 0x200),
@@ -456,7 +456,7 @@ fn a_near_member_catches_up_or_takes_the_group_s_speed() {
 /// A member whose step would pass its slot (state 2) stops and, its group neither
 /// patrolling nor walking a path, shows its standing sprite.
 #[test]
-fn a_member_about_to_pass_its_slot_stops() {
+fn member_about_to_pass_its_slot_stops() {
     let mut t = world();
     let f = t
         .groups
@@ -480,7 +480,7 @@ fn a_member_about_to_pass_its_slot_stops() {
 /// with a way there (the long pather, the unit without a height) stands on it facing the
 /// group's forward. A slot in state 3 shows standing.
 #[test]
-fn a_due_slot_takes_its_member() {
+fn due_slot_takes_its_member() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.motion.velocity = BVector::new(0.0, 0.0, 1.0);
@@ -553,7 +553,7 @@ fn a_due_slot_takes_its_member() {
 /// move takes it (reason 0, timer and distance 3), the slot takes state 0, the member stops
 /// and its failures count one more.
 #[test]
-fn a_blocked_way_to_the_slot_goes_round() {
+fn blocked_way_to_the_slot_goes_round() {
     let mut t = world();
     widen(&mut t, 1.2);
     t.spatial.insert(object_id(50), post(7.5, 5.0));
@@ -603,7 +603,7 @@ fn a_blocked_way_to_the_slot_goes_round() {
 /// member tries one tile toward it (6, 5), which the short pather reaches within 1.01; the
 /// way serves, its goal that step.
 #[test]
-fn a_slot_a_record_holds_takes_a_step_toward_it() {
+fn slot_record_holds_takes_step_toward_it() {
     let mut t = world();
     widen(&mut t, 1.2);
     t.spatial.insert(object_id(50), post(10.0, 5.0));
@@ -730,7 +730,7 @@ fn rounder(at: BVector) -> detour::Rounder<'static> {
 /// member is on it, held inside the map by the member's radius on x and its height radius on
 /// y; its footprint is near a point within 10 of it (the squared gap below 100).
 #[test]
-fn the_way_round_s_step_goes_one_tile_toward_the_slot_inside_the_map() {
+fn the_way_round_step_goes_one_tile_toward_the_slot_inside_the_map() {
     use detour::one_step_toward;
     let (map, forward) = (GridSize::new(32, 32), BVector::new(0.0, 0.0, 1.0));
     let step = |at, to| one_step_toward(&rounder(at), to, forward, map);
@@ -766,7 +766,7 @@ fn the_way_round_s_step_goes_one_tile_toward_the_slot_inside_the_map() {
 /// `FUN_140f9bcd0` outside the path: a way that ends farther from the slot than the gap
 /// (on the ground) falls short; an empty one ends at the origin.
 #[test]
-fn a_way_round_that_ends_farther_than_the_gap_falls_short() {
+fn way_round_that_ends_farther_than_the_gap_falls_short() {
     use crate::pathing::tile_path::Path;
     use detour::ends_farther;
     let mut way = Path::default();
@@ -799,7 +799,7 @@ fn a_way_round_that_ends_farther_than_the_gap_falls_short() {
 /// failures cleared, the slot in state 3); while it moves the member walks the way, its own
 /// move's goal that place.
 #[test]
-fn a_member_with_its_slot_and_step_held_goes_round_to_the_group() {
+fn member_with_its_slot_and_step_held_goes_round_to_the_group() {
     let run = |moving: bool| {
         let mut t = world();
         widen(&mut t, 1.2);
@@ -834,7 +834,7 @@ fn a_member_with_its_slot_and_step_held_goes_round_to_the_group() {
 /// its code: the goal as reached, the nearest node as partial, nothing as blocked and off the
 /// map as in range.
 #[test]
-fn the_way_round_reads_the_planner_s_result_by_its_code() {
+fn the_way_round_reads_the_planner_result_by_its_code() {
     use crate::pathing::ShortFound;
     use crate::pathing::tile_path::Found;
     for found in [Found::OffMap, Found::Goal, Found::Nearest, Found::Nothing] {

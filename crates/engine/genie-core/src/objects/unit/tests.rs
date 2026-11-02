@@ -41,7 +41,7 @@ const WALKING: Graphic = Graphic {
 /// `RGE_Static_Object::update`'s sleep: a static object flagged to sleep drops the flag and its
 /// update ends; one not flagged goes on; one above the static type is not modelled.
 #[test]
-fn a_static_object_flagged_to_sleep_ends_its_update() {
+fn static_object_flagged_to_sleep_ends_its_update() {
     let flagged = |class| Unit {
         life: Lifecycle {
             class,
@@ -69,7 +69,7 @@ fn a_static_object_flagged_to_sleep_ends_its_update() {
 /// The movement state takes the current sprite's facets and its sequence flag bit 1; without a
 /// sprite it keeps what it had.
 #[test]
-fn the_movement_state_takes_the_sprite_s_facets() {
+fn the_movement_state_takes_the_sprite_facets() {
     let mut u = Unit::default();
     let mut mover = crate::gathering::hunt::tests::walker();
     u.take_sprite_facets(Some(&mut mover));
@@ -91,7 +91,7 @@ fn the_movement_state_takes_the_sprite_s_facets() {
 /// The animated object's update: a sprite with an animation speed runs its clock by the
 /// update's dt; one without a speed stands still.
 #[test]
-fn an_animated_object_s_sprite_runs_by_the_update_s_dt() {
+fn an_animated_object_sprite_runs_by_the_update_dt() {
     let animated = |speed: Option<f32>| {
         let mut t = forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
@@ -178,7 +178,7 @@ fn an_object_past_state_2_loses_its_actions() {
 /// follows (FD-045-D15): nothing copies the index's place back. A walk that met others in its
 /// way is not modelled.
 #[test]
-fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
+fn after_its_actions_the_units_walk_met_take_their_pauses() {
     let mut t = forage_world();
     let at = t.players[1].objects[ListIndex::new(0)].position();
     let mut met = crate::gathering::hunt::tests::walker();
@@ -243,7 +243,7 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
 /// The update up to the actions: a forager goes on to its actions with its life step's answer;
 /// a static object flagged to sleep ends there (None).
 #[test]
-fn the_update_up_to_the_actions_ends_for_a_sleeper() {
+fn the_update_up_to_the_actions_ends_for_sleeper() {
     let mut t = forage_world();
     let step = in_update(
         &mut t,
@@ -340,7 +340,7 @@ fn gone_foundation() -> crate::construction::wait_solidify::WaitSolidify {
 /// (`FUN_140a78470`) of each action below it, which is not ported: a wait for a gone foundation
 /// on top of a Gather stops there, before its deletion.
 #[test]
-fn the_list_s_update_stops_at_an_action_below_its_head() {
+fn the_list_update_stops_at_an_action_below_its_head() {
     let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -424,7 +424,7 @@ fn an_object_inside_another_runs_its_inside_update() {
 /// Slot 0x190 (`FUN_14106d090`, `FUN_140a78450`): the object the top action targets, none for an
 /// action without one (a wait for a foundation) or without an action, and an error for an action the slice does not hold.
 #[test]
-fn the_top_action_s_object_is_its_target_unless_it_has_none() {
+fn the_top_action_object_is_its_target_unless_it_has_none() {
     use crate::construction::build::BuildTask;
     let task = BuildTask {
         range: Distance::new(0.1),
@@ -467,7 +467,7 @@ fn the_top_action_s_object_is_its_target_unless_it_has_none() {
 /// The top action's sub-action: a Hunt's `MoveTo` with its state number, else its Attack; a
 /// Build's `MoveTo`; none for a `MoveTo` of its own or without an action.
 #[test]
-fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
+fn the_top_action_sub_action_is_its_move_to_or_its_attack() {
     use crate::movement::move_to::{MOVE_TO, MoveTo, MoveToAction};
     use crate::world::checkpoint::TopAction;
     let walking = |state| TopAction {
@@ -591,7 +591,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
 /// A unit's master: its own when it has one (a captured unit's copy), else its player's of its
 /// id; an error with neither.
 #[test]
-fn a_unit_reads_its_own_master_before_its_player_s() {
+fn unit_reads_its_own_master_before_its_player_s() {
     use crate::objects::masters::{Master, MasterTables, Masters};
     use crate::world::parts::PartTable;
     let shared = Master {
@@ -645,7 +645,7 @@ fn a_unit_reads_its_own_master_before_its_player_s() {
 /// The walk's view of the unit itself ([`Unit::me`]): its id, its top action's state (none
 /// without one), its group and its last human order's time, which ranks it against a met unit.
 #[test]
-fn a_unit_s_own_view_for_its_walk() {
+fn unit_own_view_for_its_walk() {
     let mut u = Unit {
         id: object_id(5),
         last_human_order: crate::world::WorldTime::from_millis(2001),

@@ -119,7 +119,7 @@ mod tests {
     use genie_diff::{Scope, differences};
 
     #[test]
-    fn a_start_that_fails_names_why() {
+    fn start_that_fails_names_why() {
         for t in [
             DefaultTask::Nothing,
             DefaultTask::Fly,
@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn a_comparison_reads_each_start_in_its_scope() {
+    fn comparison_reads_each_start_in_its_scope() {
         let paths = |a, b, scope| {
             differences(&a, &b, scope)
                 .into_iter()

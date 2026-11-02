@@ -142,7 +142,7 @@ fn the_scores_rank_and_sort_the_entries() {
 /// The order history's weights: the younger an order, the more its category weighs; the
 /// first one older than a minute ends the walk.
 #[test]
-fn the_order_history_weighs_the_last_minute_s_categories() {
+fn the_order_history_weighs_the_last_minute_categories() {
     let record = |time, category| crate::unit_ai::OrderRecord {
         time,
         category: attack_category(category),
@@ -433,7 +433,7 @@ fn the_lists_pass_over_what_the_unit_may_not_attack() {
 /// A unit that attacks walls (its last target a wall) and finds only walls and gates takes
 /// the closest gate; one that does not passes them over.
 #[test]
-fn walls_and_gates_count_for_a_unit_that_attacks_walls() {
+fn walls_and_gates_count_for_unit_that_attacks_walls() {
     let mut field = Field::default();
     let _ = field.things.insert(
         object_id(20),
@@ -535,7 +535,7 @@ fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
 /// A gate answers at once only when nothing but walls and gates counts: with an enemy among
 /// them the choice goes on to the quick paths.
 #[test]
-fn a_gate_answers_at_once_only_among_walls() {
+fn gate_answers_at_once_only_among_walls() {
     let mut field = Field::default();
     let _ = field.things.insert(
         object_id(20),
@@ -621,7 +621,7 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
 /// friends' scan (a unit of another type skips it) and the neutral test of list 3 alone, each
 /// failing it.
 #[test]
-fn a_candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_order() {
+fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_order() {
     let (thing, _) = enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
     let checked = |me: &Searcher, t: &Thing, kind, refused: &[char]| {
         let mut field = Field {
@@ -687,7 +687,7 @@ fn a_candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_
 /// others take by sight, and boats unless it is a boat itself, of class 52 or a boat hunter (the
 /// castle); a human player's unit keeps them all.
 #[test]
-fn a_computer_s_unit_passes_over_gaia_s_holdings_and_boats() {
+fn computer_unit_passes_over_gaia_holdings_and_boats() {
     let (thing, _) = enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
     let any = Ask {
         any_class: true,

@@ -433,7 +433,7 @@ mod tests {
     /// A short path's result keeps the game's code, and the tests its readers make by code:
     /// `result < 2` reaches, 1 and 2 lead on, 3 and 4 fail.
     #[test]
-    fn a_short_path_result_reads_by_the_game_s_code() {
+    fn short_path_result_reads_by_the_game_code() {
         let all = [
             ShortFound::InRange,
             ShortFound::Reached,
@@ -458,7 +458,7 @@ mod tests {
 
     /// A fixed-point length adds and subtracts as the game's 32-bit words, wrapping.
     #[test]
-    fn a_fixed_distance_wraps_as_a_32_bit_word() {
+    fn fixed_distance_wraps_as_32_bit_word() {
         let a = FixedDistance::new(i32::MAX);
         assert_eq!(
             a.wrapping_add(FixedDistance::TILE).get(),
@@ -474,7 +474,7 @@ mod tests {
     /// A fixed-point length squares in 64 bits, `>> 22`: a tile's square is a tile, a length
     /// past 32 bits' square root does not wrap, and the sign drops.
     #[test]
-    fn a_fixed_distance_squares_in_64_bits() {
+    fn fixed_distance_squares_in_64_bits() {
         let tile = FixedDistanceSquared::of(FixedDistance::TILE);
         assert_eq!(tile.get(), i64::from(ONE));
         let far = FixedDistance::new(i32::MAX);
@@ -490,7 +490,7 @@ mod tests {
     /// waited more often than a set delay cap allows; caps of -1 never stop a plan. A plan counts
     /// for its player, and the player's update starts the count over.
     #[test]
-    fn a_players_budget_ends_at_its_attempt_cap() {
+    fn players_budget_ends_at_its_attempt_cap() {
         let b = PlanBudget {
             attempt_cap: PlanCap::of_data(6),
             delay_cap: PlanCap::of_data(2),
@@ -601,7 +601,7 @@ mod tests {
     /// 27175) in update 6292: the smoothing ignores the unit and the annexes, the target's slot
     /// overwritten, and one slot more than written, here never written: object 0.
     #[test]
-    fn the_smoothing_ignores_a_main_building_s_annexes_over_its_own_slot() {
+    fn the_smoothing_ignores_main_building_annexes_over_its_own_slot() {
         let mut p = Pathing::default();
         assert_eq!(
             p.smoothing_ignore(object_id(31128), None).1,
@@ -663,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_s_shape_is_its_box_grown_by_half_a_tile() {
+    fn unit_shape_is_its_box_grown_by_half_tile() {
         let r = shape_rect(&villager(30.0, 89.0));
         assert_eq!(
             r,
@@ -679,7 +679,7 @@ mod tests {
     #[test]
     /// MarvinBlue/426048731's update 1141: the hunter 10029 at (106.53662, 46.65576), standing,
     /// gets its shape at its update's end, the box of its radii (0.2) grown by half a tile.
-    fn a_standing_unit_gets_its_shape_at_its_update_s_end() {
+    fn standing_unit_gets_its_shape_at_its_update_end() {
         let mut p = Pathing::default();
         p.set_mesh(Mesh::new(120), []);
         let hunter = villager(106.53662, 46.65576);
@@ -709,7 +709,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_has_a_shape_while_it_stands_and_none_while_it_moves() {
+    fn unit_has_shape_while_it_stands_and_none_while_it_moves() {
         let mut p = Pathing::default();
         p.set_mesh(Mesh::new(120), []);
         p.moved(object_id(9175), &villager(30.0, 89.0), false);

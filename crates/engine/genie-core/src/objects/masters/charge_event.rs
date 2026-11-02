@@ -47,7 +47,7 @@ mod tests {
 
     /// The short is the range in tiles, and an add wraps.
     #[test]
-    fn a_charge_event_is_a_range() {
+    fn charge_event_is_range() {
         assert_eq!(ChargeEvent::of_data(2).range(), Distance::new(2.0));
         assert_eq!(ChargeEvent::of_data(i16::MAX).plus(1).get(), i16::MIN);
         assert_eq!(ChargeEvent::default().range(), Distance::ZERO);

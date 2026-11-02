@@ -51,7 +51,7 @@ mod tests {
 
     /// A share adds and scales as `f32`.
     #[test]
-    fn a_damage_share_adds_and_scales_as_floats() {
+    fn damage_share_adds_and_scales_as_floats() {
         let mut s = DamageShare::new(0.25);
         s += DamageShare::new(0.5);
         assert_eq!(s, DamageShare::new(0.75));

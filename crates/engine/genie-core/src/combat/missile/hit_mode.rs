@@ -51,7 +51,7 @@ mod tests {
 
     /// The modes are the data's bytes.
     #[test]
-    fn hit_modes_are_the_data_s_bytes() {
+    fn hit_modes_are_the_data_bytes() {
         assert_eq!(HitMode::default(), HitMode::TARGET_ALONE);
         assert_eq!(HitMode::of_data(1), HitMode::MISSED);
         assert_eq!(HitMode::of_data(2).get(), 2);

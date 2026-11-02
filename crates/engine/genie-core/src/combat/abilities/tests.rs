@@ -69,7 +69,7 @@ fn keshik_gold() -> Task {
 }
 
 #[test]
-fn the_living_path_takes_at_least_1_hit_point_or_a_nan() {
+fn the_living_path_takes_at_least_1_hit_point_or_nan() {
     assert!(alive(HitPoints::new(1.0)));
     assert!(alive(HitPoints::new(25.0)));
     assert!(alive(HitPoints::new(f32::NAN)));
@@ -78,7 +78,7 @@ fn the_living_path_takes_at_least_1_hit_point_or_a_nan() {
 }
 
 #[test]
-fn a_task_with_its_type_s_flag_bit_generates_always() {
+fn task_with_its_type_flag_bit_generates_always() {
     // bit 1 for an object of type 70, bit 2 for one of type 80
     let mut t = feitoria_food();
     t.combat_level_flag = TaskFlags::UNITS_ALWAYS;
@@ -90,7 +90,7 @@ fn a_task_with_its_type_s_flag_bit_generates_always() {
 }
 
 #[test]
-fn a_building_generates_once_built() {
+fn building_generates_once_built() {
     let t = feitoria_food();
     assert!(!generates(&t, BUILDING, BUILDING, None, false));
     assert!(generates(&t, BUILDING, BUILDING, None, true));
@@ -99,7 +99,7 @@ fn a_building_generates_once_built() {
 }
 
 #[test]
-fn a_unit_generates_while_its_top_action_works_on_a_target_of_the_task_s_class() {
+fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
     let t = keshik_gold();
     let target = WorkTarget {
         hp: HitPoints::new(45.0),
@@ -347,7 +347,7 @@ fn bystander() -> Bystander {
 }
 
 #[test]
-fn a_movement_damage_strikes_enemies_in_reach() {
+fn movement_damage_strikes_enemies_in_reach() {
     let h = hitter();
     let b = bystander();
     // the gap is 1.5 - 0.6 = 0.9: within 1 (0.81 at most 1), not within 0.5
@@ -434,7 +434,7 @@ fn a_movement_damage_strikes_enemies_in_reach() {
 }
 
 #[test]
-fn a_hit_below_1_hit_point_leaves_0_and_holds_nothing() {
+fn hit_below_1_hit_point_leaves_0_and_holds_nothing() {
     let mut v = Victim {
         hp: HitPoints::new(0.5),
         amount: Amount::new(30.0),
@@ -467,7 +467,7 @@ fn a_hit_below_1_hit_point_leaves_0_and_holds_nothing() {
 }
 
 #[test]
-fn the_terrain_mask_is_a_bitset_of_8() {
+fn the_terrain_mask_is_bitset_of_8() {
     // the longboats' -32: the mask 32
     assert_eq!(
         terrain_mask(TaskTerrain::of_data(-32)),
@@ -510,7 +510,7 @@ fn longboat_look() -> Task {
 }
 
 #[test]
-fn a_terrain_look_gives_the_task_s_sprites_on_its_terrains() {
+fn terrain_look_gives_the_task_sprites_on_its_terrains() {
     let t = longboat_look();
     let all = |_| true;
     assert_eq!(
@@ -557,7 +557,7 @@ fn bounty() -> Task {
 }
 
 #[test]
-fn a_removal_reward_pays_the_rate_times_the_attribute() {
+fn removal_reward_pays_the_rate_times_the_attribute() {
     let t = bounty();
     assert_eq!(
         reward(&t, PlayerId::new(2), Some(Amount::new(1.5)), &[]),
@@ -590,7 +590,7 @@ fn a_removal_reward_pays_the_rate_times_the_attribute() {
 }
 
 #[test]
-fn a_removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_the_rate() {
+fn removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_the_rate() {
     let t = Task {
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..bounty()
@@ -753,7 +753,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
 }
 
 #[test]
-fn a_built_feitoria_trickles_food_through_its_player_s_store() {
+fn built_feitoria_trickles_food_through_its_player_store() {
     let mut t = world();
     // its explore task (6) does nothing here
     give_master(
@@ -848,7 +848,7 @@ fn keshik(t: &mut World) {
 }
 
 #[test]
-fn a_keshik_makes_gold_while_it_fights_a_target_of_its_task_s_class() {
+fn keshik_makes_gold_while_it_fights_target_of_its_task_class() {
     let mut t = world();
     keshik(&mut t);
     give_master(&mut t, master_id(4), COMBAT, class::CLASS_0, Vec::new());
@@ -907,7 +907,7 @@ fn trampler(t: &mut World) {
 }
 
 #[test]
-fn a_moving_unit_s_movement_damage_hits_the_enemies_about_it() {
+fn moving_unit_movement_damage_hits_the_enemies_about_it() {
     let mut t = world();
     trampler(&mut t);
     give_master(&mut t, master_id(4), COMBAT, class::CLASS_6, Vec::new());
@@ -982,7 +982,7 @@ fn a_moving_unit_s_movement_damage_hits_the_enemies_about_it() {
 }
 
 #[test]
-fn a_movement_damage_kill_leaves_0_hit_points_and_counts_the_kill() {
+fn movement_damage_kill_leaves_0_hit_points_and_counts_the_kill() {
     let mut t = world();
     trampler(&mut t);
     give_master(&mut t, master_id(4), COMBAT, class::CLASS_6, Vec::new());
@@ -1044,7 +1044,7 @@ fn waters(t: &mut World) {
 }
 
 #[test]
-fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() {
+fn longboat_takes_its_task_look_on_its_terrains_and_its_master_off_them() {
     let mut t = world();
     waters(&mut t);
     give_master(
@@ -1095,7 +1095,7 @@ fn a_longboat_takes_its_task_s_look_on_its_terrains_and_its_master_s_off_them() 
 }
 
 #[test]
-fn a_dead_object_that_leaves_issues_its_removal_rewards() {
+fn dead_object_that_leaves_issues_its_removal_rewards() {
     let mut t = world();
     let far = Task {
         work_range: Distance::new(1.0),
@@ -1153,7 +1153,7 @@ fn an_object_of_another_type_has_no_abilities() {
 /// `FUN_1416625b0`: an attribute below the player's count, none past it; the resources are the
 /// first four attributes, and the construction rate attribute 195 (0 past the count).
 #[test]
-fn a_player_s_attribute_reads_its_place_and_none_past_the_count() {
+fn player_attribute_reads_its_place_and_none_past_the_count() {
     let mut p = Player {
         attributes: crate::test_ids::attributes(6, [1.0, 2.0, 3.0, 4.0]),
         ..Player::default()

@@ -14,7 +14,7 @@ fn particle() -> Bytes {
 }
 
 #[test]
-fn a_particle_reads_its_sprite_and_location() {
+fn particle_reads_its_sprite_and_location() {
     let particle = read_all::<Particle>(&particle().0, 11.97);
     assert_eq!(
         (particle.start, particle.facet, particle.update),
@@ -26,7 +26,7 @@ fn a_particle_reads_its_sprite_and_location() {
 }
 
 #[test]
-fn a_particle_system_reads_its_particles_behind_their_count() {
+fn particle_system_reads_its_particles_behind_their_count() {
     let bytes = Bytes::default()
         .words(&[5000, 2])
         .raw(&particle().0)
@@ -62,7 +62,7 @@ fn the_lobby_players_come_with_their_versions() {
 
 /// A name's bytes follow its length.
 #[test]
-fn a_lobby_player_s_name_follows_its_length() {
+fn lobby_player_name_follows_its_length() {
     let mut bytes = Bytes::default().words(&[0, 0, 1, 2, 3]).raw(b"Ann");
     for _ in 0..8 {
         bytes = bytes.words(&[0, 0, 0]);

@@ -150,7 +150,7 @@ mod tests {
     /// moves the estimate to the goal along; a turn costs 1 more, wrapping at the top; a popped
     /// tile's distance is a quarter.
     #[test]
-    fn a_step_costs_its_length_and_moves_the_estimate() {
+    fn step_costs_its_length_and_moves_the_estimate() {
         assert_eq!(LongCost::of_gap(3, 4), LongCost(16 * 9 + 16 * 16));
         assert_eq!(LongCost(401).quartered(), LongCost(100));
         assert_eq!(LongCost(i32::MAX).turned(), LongCost(i32::MIN));

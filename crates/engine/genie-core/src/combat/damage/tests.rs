@@ -1,7 +1,7 @@
 /// `FUN_1411cc890`: a building's relics raise its factor (a specific one 1.2, else any 1.1),
 /// a building victim's lower it back the same way; another victim's count for nothing.
 #[test]
-fn a_building_s_relics_scale_its_elevation_factor() {
+fn building_relics_scale_its_elevation_factor() {
     let up = 1.25_f32;
     assert_eq!(
         building_elevation_factor(
@@ -185,7 +185,7 @@ fn hunter() -> Victim {
 /// Slot 0x870 (`FUN_1410857f0`): the best pierce armor, else the base armor and the best of
 /// any; a wall foundation (class 27, state 0) has no case of its own.
 #[test]
-fn a_wall_foundation_s_pierce_armor_is_computed_as_any_other() {
+fn wall_foundation_pierce_armor_is_computed_as_any_other() {
     let a = Armored {
         armors: vec![ClassAmount::new(4, 2), ClassAmount::new(3, 5)],
         base_armor: DamageAmount::new(1),
@@ -218,7 +218,7 @@ fn a_wall_foundation_s_pierce_armor_is_computed_as_any_other() {
 /// Slot 0xf0 (`FUN_14118cab0`): a TRIBE attacker whose charge hits the target (slot 0x2f0)
 /// starts the static damage at its charge; any other starts at 0.
 #[test]
-fn a_static_object_takes_a_ready_charge_first() {
+fn static_object_takes_ready_charge_first() {
     let tree = || Victim {
         hp: HitPoints::new(100.0),
         class: class::TREE,
@@ -249,7 +249,7 @@ fn a_static_object_takes_a_ready_charge_first() {
 /// (`FUN_14118efd0`): the weapons times the factor, no armor; below 1 hit point it has 0,
 /// wakes and loses what it holds but to a villager. A NaN hit point count stays (`COMISS`/`JBE`).
 #[test]
-fn a_moving_object_takes_a_hit_as_a_static_one() {
+fn moving_object_takes_hit_as_static_one() {
     let bird = |hp: HitPoints| Victim {
         hp,
         amount: Amount::new(50.0),
@@ -314,7 +314,7 @@ fn a_moving_object_takes_a_hit_as_a_static_one() {
 }
 
 #[test]
-fn a_hunter_strikes_its_sheep_for_twelve() {
+fn hunter_strikes_its_sheep_for_twelve() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     let weapons = hunter.weapons.clone();
     assert_eq!(
@@ -380,7 +380,7 @@ fn a_hunter_strikes_its_sheep_for_twelve() {
 /// not. The share is at most 1 (`MINSS`), 0 without most hit points (lacking too), and a
 /// NaN most divides.
 #[test]
-fn a_hit_point_share_reads_the_powerups_and_the_master() {
+fn hit_point_share_reads_the_powerups_and_the_master() {
     let mut v = hunter();
     assert_eq!(
         (v.shown_hp(), v.most_hp(), v.hp_share(false)),
@@ -426,7 +426,7 @@ fn a_hit_point_share_reads_the_powerups_and_the_master() {
 /// whole step of a share (the target's with a work range above 0, else the attacker's; the
 /// share lacking with `attribute_type4`), and the sum is at least 0.
 #[test]
-fn bonus_damage_counts_whole_steps_of_a_hit_point_share() {
+fn bonus_damage_counts_whole_steps_of_hit_point_share() {
     let task = |object_group: i16, object_id: Option<MasterId>, range: Distance, lacking: i16| {
         crate::objects::masters::Task {
             action_type: BONUS_DAMAGE,
@@ -506,7 +506,7 @@ fn the_bonus_damage_adds_to_the_first_melee_weapon() {
 /// charge of type 6 or 7 shows the projectile's attack and adds the charge event to the
 /// range; type 50 shows neither powerups nor charges.
 #[test]
-fn a_combat_object_shows_its_attack_armor_and_range() {
+fn combat_object_shows_its_attack_armor_and_range() {
     let (sheep, mut v) = (sheep(), hunter());
     let none = Shown::default();
     assert_eq!(shown_attack(&v, &none), DamageAmount::new(3));
@@ -581,7 +581,7 @@ fn a_combat_object_shows_its_attack_armor_and_range() {
 
 /// Slot 0x2f8: a ready charge of type 6 or 7 that works on the target.
 #[test]
-fn a_range_charge_hits_a_target_its_class_group_names() {
+fn range_charge_hits_target_its_class_group_names() {
     let (sheep, mut v) = (sheep(), hunter());
     (v.source.charge_type, v.source.max_charge, v.source.charge) =
         (ChargeType::of_data(7), Charge::new(5.0), Charge::new(1.0));
@@ -596,7 +596,7 @@ fn a_range_charge_hits_a_target_its_class_group_names() {
 /// The terrain defense scales each weapon's damage; a restriction value of 0 counts as 1 for
 /// the caller ([`crate::map::terrain::Terrain::defense`]).
 #[test]
-fn a_terrain_defense_bonus_scales_the_damage() {
+fn terrain_defense_bonus_scales_the_damage() {
     let hunter = hunter();
     let mut sheep = sheep();
     let x = sheep.armored.as_mut().unwrap();
@@ -612,7 +612,7 @@ fn a_terrain_defense_bonus_scales_the_damage() {
 /// A ready charge of type 1 adds itself to the first melee weapon; the hit is the charge's,
 /// which empties it (no area effect).
 #[test]
-fn a_ready_charge_adds_to_the_first_melee_weapon_and_empties() {
+fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     hunter.source.charge_type = ChargeType::ATTACK;
     hunter.source.charge_target = ChargeTarget::EVERY;
@@ -649,7 +649,7 @@ fn a_ready_charge_adds_to_the_first_melee_weapon_and_empties() {
 }
 
 #[test]
-fn a_charge_target_picks_the_class_groups() {
+fn charge_target_picks_the_class_groups() {
     // 0: everything but buildings outside classes 51 and 54
     assert!(charge_works(
         ChargeTarget::ALL_BUT_BUILDINGS,
@@ -704,7 +704,7 @@ fn a_charge_target_picks_the_class_groups() {
 
 /// A shield of type 5 spends a charge of 1 on a melee hit; type 4 only on a missile.
 #[test]
-fn a_shield_spends_a_charge_per_blocked_hit() {
+fn shield_spends_charge_per_blocked_hit() {
     let mut sheep = sheep();
     sheep.source.charge_type = ChargeType::MELEE_SHIELD;
     sheep.source.charge = Charge::new(1.5);
@@ -719,7 +719,7 @@ fn a_shield_spends_a_charge_per_blocked_hit() {
 }
 
 #[test]
-fn a_facing_offset_counts_facets_from_the_angle() {
+fn facing_offset_counts_facets_from_the_angle() {
     let at = Position::new(10.0, 10.0, 0.0);
     let facing = Facing {
         angle: Angle::ZERO,
@@ -758,7 +758,7 @@ fn a_facing_offset_counts_facets_from_the_angle() {
 
 /// A special attack (flag 1) of an idle target facing its attacker takes the damage to 0.66.
 #[test]
-fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
+fn special_attack_takes_hit_from_the_front_to_two_thirds() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     let x = sheep.armored.as_mut().unwrap();
     x.special_attack = SpecialAttack::FRONT_DEFENCE;
@@ -808,7 +808,7 @@ fn a_special_attack_takes_a_hit_from_the_front_to_two_thirds() {
 /// A retaliation (flag 2) strikes a melee attacker first; an attacker it leaves at 1 hit
 /// point or less takes the hit to nothing.
 #[test]
-fn a_retaliation_strikes_the_melee_attacker_first() {
+fn retaliation_strikes_the_melee_attacker_first() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     sheep.weapons = vec![ClassAmount::new(4, 5)];
     let x = sheep.armored.as_mut().unwrap();
@@ -890,7 +890,7 @@ fn reflected_damage_comes_back_at_least_one() {
 /// `area_damage` leaves the factor as it is (`JC`, then `JBE` past the multiply); the tiles'
 /// rectangle truncates with `CVTTSS2SI`; the answer is whether the radius is above 0 or NaN.
 #[test]
-fn a_blast_s_nan_paths_are_the_game_s() {
+fn blast_nan_paths_are_the_game_s() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(0x42);
@@ -972,7 +972,7 @@ fn a_blast_s_nan_paths_are_the_game_s() {
 /// A melee blast (radius 0.5, level 2, half the damage) reaches the objects about the
 /// attacker but its friends, its target excluded; a falloff (bit 6) scales by the distance.
 #[test]
-fn a_blast_reaches_the_objects_about_its_attacker() {
+fn blast_reaches_the_objects_about_its_attacker() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
@@ -1060,7 +1060,7 @@ fn house() -> Victim {
 /// 0xb0 with it, not the difference: `MOVAPS XMM1,XMM6` at `0x1411cef02`): 1, or 0.1 for an
 /// attacker of class 0, 22, 36, 44 or 52 under the game's setting `+0x680` at 1.
 #[test]
-fn a_building_takes_its_damage_and_at_least_its_least_hit() {
+fn building_takes_its_damage_and_at_least_its_least_hit() {
     let mut villager = hunter();
     let mut h = house();
     take(
@@ -1148,7 +1148,7 @@ fn a_building_takes_its_damage_and_at_least_its_least_hit() {
 /// `COMISS 0, hp` / `JNC` past: a building at 0 hit points or fewer takes nothing (and is not
 /// struck); a NaN goes on.
 #[test]
-fn a_building_without_hit_points_takes_no_hit() {
+fn building_without_hit_points_takes_no_hit() {
     let mut villager = hunter();
     let mut h = Victim {
         hp: HitPoints::ZERO,
@@ -1188,7 +1188,7 @@ fn a_building_without_hit_points_takes_no_hit() {
 /// (`+0xbc0`..) takes its hit points; the annex itself is not struck. A main building the hit
 /// does not hold is not modelled.
 #[test]
-fn a_hit_on_an_annex_goes_to_its_main_building() {
+fn hit_on_an_annex_goes_to_its_main_building() {
     let mut villager = hunter();
     let mut main = Victim {
         id: object_id(10),
@@ -1252,7 +1252,7 @@ fn a_hit_on_an_annex_goes_to_its_main_building() {
 /// 170; owner 152, 155; 350 + owner; owner 375 + attacker's player; 425 + owner) and 172
 /// and 153 with the paid cost. Gaia's buildings count nothing.
 #[test]
-fn a_player_s_building_below_one_hit_point_is_razed() {
+fn player_building_below_one_hit_point_is_razed() {
     let mut villager = hunter();
     let mut castle = Victim {
         hp: HitPoints::new(1.5),
@@ -1358,7 +1358,7 @@ fn a_player_s_building_below_one_hit_point_is_razed() {
 /// 154, 152; 300 + owner; owner 325 + attacker's player; 400 + owner) unless its kill is
 /// counted (`+0x954`: its damage's kill ran slot 0x8b0); 172 and 153 either way.
 #[test]
-fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
+fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
     let trebuchet = |hp| Victim {
         hp,
         class: class::CLASS_54,
@@ -1433,7 +1433,7 @@ fn a_trebuchet_s_razing_counts_a_kill_unless_its_damage_counted_it() {
 /// does anything, which is not modelled. The kill bonus (`FUN_1415c6510`) of a razing: only an
 /// attacker of type 40 and up with a task of action type 0x9a does anything, which is not modelled.
 #[test]
-fn a_building_s_attacker_effects_and_kill_bonus_are_the_game_s() {
+fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
     let mut villager = hunter();
     villager.source.ability = CombatAbility::HIT_EFFECTS;
     let mut h = house();
@@ -1514,7 +1514,7 @@ fn a_building_s_attacker_effects_and_kill_bonus_are_the_game_s() {
 /// least hit of 1 on the main building) comes first in the walk; the main building's own hit
 /// of 5 then takes 4.
 #[test]
-fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
+fn blast_takes_main_building_less_what_its_annexes_took() {
     let mut mangonel = hunter();
     mangonel.source.area_effect = Distance::new(2.0);
     mangonel.source.blast_level = BlastLevel::from_bits_retain(2);
@@ -1572,7 +1572,7 @@ fn a_blast_takes_a_main_building_less_what_its_annexes_took() {
 /// `FUN_14107f690` walks the rows (y outer, x inner) and a tile's objects in its list's
 /// order (`+0x28`), not by id: the blast's targets end in that order.
 #[test]
-fn a_blast_walks_a_tile_s_objects_in_its_list_order() {
+fn blast_walks_tile_objects_in_its_list_order() {
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);
     elephant.source.blast_level = BlastLevel::from_bits_retain(2);
@@ -1616,7 +1616,7 @@ const fn pu(taken: f32, max: f32) -> HpPowerup {
 /// comes off the powerup, never below 0; a powerup above its room first takes the room; at
 /// its most a gain only takes off the powerup.
 #[test]
-fn a_gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
+fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
     let mut hp = HitPoints::new(50.0);
     let mut ups = pu(0.0, 0.0);
     gain_hp(
@@ -1663,7 +1663,7 @@ fn a_gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
 /// plus hit points at least the most) become exactly the master's and answer true; a NaN is
 /// not full.
 #[test]
-fn a_heal_to_full_holds_the_master_s_hit_points() {
+fn heal_to_full_holds_the_master_hit_points() {
     let mut hp = HitPoints::new(30.0);
     let mut ups = HpPowerup::default();
     assert!(!heal_hp(
@@ -1711,7 +1711,7 @@ fn a_heal_to_full_holds_the_master_s_hit_points() {
 /// building is not among them fails. The values read through it: an annex its main building's
 /// share, defense and damage so far, a building the attacker's share and its own.
 #[test]
-fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
+fn blast_keeps_building_damage_on_it_or_its_main_building() {
     use crate::combat::damage::blasts::{blast_ledger, ledger_values};
     let mut main = house();
     main.source.area_damage = crate::objects::masters::DamageShare::new(0.25);
@@ -1760,7 +1760,7 @@ fn a_blast_keeps_a_building_s_damage_on_it_or_its_main_building() {
 /// The square distance to an object's box: 0 inside it, the gaps past its radii beyond; none
 /// at or past the blast's radius; a NaN radius gives no gap on its axis.
 #[test]
-fn a_blast_measures_to_an_object_s_box_within_its_radius() {
+fn blast_measures_to_an_object_box_within_its_radius() {
     use crate::combat::damage::blasts::blast_distance2;
     let at = |x: f32, y: f32, radius| Victim {
         position: Position::new(x, y, 0.0),
@@ -1790,7 +1790,7 @@ fn a_blast_measures_to_an_object_s_box_within_its_radius() {
 /// with `FALLS_OFF` only and not on `main`; a missile's falls off everywhere, but at
 /// distance 0 on a `main` building.
 #[test]
-fn a_blast_s_factor_takes_the_friendly_fire_and_the_falloff() {
+fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
     use crate::combat::damage::blasts::blast_falloff;
     let attacker = hunter();
     let melee = Attacker {
@@ -1851,7 +1851,7 @@ fn a_blast_s_factor_takes_the_friendly_fire_and_the_falloff() {
 /// wide one (`WIDE_CONE`) what lies past its radius or 1.67 facets; a blast of no cone leaves out
 /// nothing; a cone blast of an attacker without a facing fails.
 #[test]
-fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
+fn cone_blast_leaves_out_what_lies_beside_its_facing() {
     use crate::combat::damage::blasts::outside_cone;
     let mut attacker = hunter();
     attacker.position = Position::new(10.0, 10.0, 0.0);
@@ -1912,7 +1912,7 @@ fn a_cone_blast_leaves_out_what_lies_beside_its_facing() {
 /// and holds nothing, a player's combat unit that had 1 counted killed by the attacker,
 /// Gaia's not; an attacker with a kill bonus task fails there.
 #[test]
-fn a_fixed_blast_damage_takes_its_size_and_kills_below_one() {
+fn fixed_blast_damage_takes_its_size_and_kills_below_one() {
     use crate::combat::damage::blasts::fixed_blast;
     let attacker = hunter();
     let mut t = Victim {
@@ -1949,7 +1949,7 @@ fn a_fixed_blast_damage_takes_its_size_and_kills_below_one() {
 /// its ledger. An annex passes its hit on to its main building, and its own loss (none) onto
 /// the main building's ledger.
 #[test]
-fn a_blast_s_hit_adds_a_building_s_loss_to_its_ledger() {
+fn blast_hit_adds_building_loss_to_its_ledger() {
     use crate::combat::damage::blasts::blast_hit;
     let mut attacker = hunter();
     let weapons = [ClassAmount::new(4, 10)];
@@ -2011,7 +2011,7 @@ fn a_blast_s_hit_adds_a_building_s_loss_to_its_ledger() {
 /// artifact, one defending the blast's level and a ram's non-building are passed; an object
 /// whose player's update is not modelled fails.
 #[test]
-fn a_blast_passes_over_what_it_spares_and_hits_the_rest() {
+fn blast_passes_over_what_it_spares_and_hits_the_rest() {
     use crate::combat::damage::blasts::{Blast, blast_one, blast_tiles};
     let mut elephant = hunter();
     elephant.source.area_effect = Distance::new(1.0);

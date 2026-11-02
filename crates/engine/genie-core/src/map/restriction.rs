@@ -44,7 +44,7 @@ mod tests {
     /// A value above 0 passes, 0, a negative value and a NaN do not, and a terrain past the
     /// values has no value and does not pass.
     #[test]
-    fn a_terrain_passes_on_a_value_above_zero() {
+    fn terrain_passes_on_value_above_zero() {
         let r = Restriction::new(vec![1.0, 0.0, -1.0, f32::NAN, 0.25]);
         let t = TerrainId::named;
         assert_eq!(

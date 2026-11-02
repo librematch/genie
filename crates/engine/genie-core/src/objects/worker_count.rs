@@ -60,7 +60,7 @@ mod tests {
 
     /// A cap of 0 or more holds below a count; none never does.
     #[test]
-    fn a_cap_holds_below_the_count() {
+    fn cap_holds_below_the_count() {
         let two = WorkerCount::of_data(2);
         assert!(WorkerCount::ONE.caps(two));
         assert!(!two.caps(two));

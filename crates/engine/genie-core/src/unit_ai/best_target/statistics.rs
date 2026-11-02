@@ -452,7 +452,7 @@ mod tests {
     /// The bounds start reset, take a value as both least and most, widen by each value beyond
     /// them, pass over a NaN, and span the most less the least.
     #[test]
-    fn bounds_widen_by_each_value_beyond_them_and_pass_over_a_nan() {
+    fn bounds_widen_by_each_value_beyond_them_and_pass_over_nan() {
         let mut b = Bounds::<Distance>::reset();
         assert_eq!((b.least.get(), b.most.get()), (f32::MAX, -1.0));
         b.take(Distance::new(3.0));

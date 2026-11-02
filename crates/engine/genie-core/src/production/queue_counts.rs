@@ -175,7 +175,7 @@ mod tests {
 
     /// The counts wrap as shorts, the changes as a byte; the sum is the 16-bit one.
     #[test]
-    fn the_queue_counts_wrap_as_the_game_s_integers() {
+    fn the_queue_counts_wrap_as_the_game_integers() {
         let max = QueuedUnits::of_data(i16::MAX);
         assert_eq!(max.plus(QueuedUnits::ONE).get(), i16::MIN);
         assert_eq!(QueuedUnits::ZERO.minus(QueuedUnits::ONE).get(), -1);

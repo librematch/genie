@@ -86,7 +86,7 @@ fn equal_values_do_not_differ() {
 
 /// A field is named by its path from the value compared, each float in full.
 #[test]
-fn a_nested_field_is_named_by_its_path() {
+fn nested_field_is_named_by_its_path() {
     let mut other = unit();
     other.life.hp = 24.999_998;
     other.actions[0] = Action::Move {
@@ -107,7 +107,7 @@ fn a_nested_field_is_named_by_its_path() {
 
 /// A newtype is its value; a tuple struct of more fields names them by position.
 #[test]
-fn a_newtype_is_its_value_and_a_tuple_struct_s_fields_are_numbered() {
+fn newtype_is_its_value_and_tuple_struct_fields_are_numbered() {
     let mut other = unit();
     other.id = Id(8);
     other.pair = Pair(1, 3);
@@ -120,7 +120,7 @@ fn a_newtype_is_its_value_and_a_tuple_struct_s_fields_are_numbered() {
 /// Two variants differ by their names; the same variant compares its fields, a variant of one
 /// field as that field.
 #[test]
-fn an_enum_differs_by_its_variant_then_by_the_variant_s_fields() {
+fn an_enum_differs_by_its_variant_then_by_the_variant_fields() {
     let mut other = unit();
     other.actions[0] = Action::Idle;
     assert_eq!(
@@ -144,7 +144,7 @@ fn an_enum_differs_by_its_variant_then_by_the_variant_s_fields() {
 
 /// A gap counts only where the gaps do; an unsaved gap only in every field's scope.
 #[test]
-fn a_gap_counts_only_with_the_gaps() {
+fn gap_counts_only_with_the_gaps() {
     let mut other = unit();
     other.sprite = Some(7);
     assert_eq!(found(&unit(), &other, Scope::Saved), []);
@@ -183,7 +183,7 @@ fn an_eq_field_is_one_value() {
 
 /// A generic type takes its parameters' differences.
 #[test]
-fn a_generic_type_compares_its_parameter() {
+fn generic_type_compares_its_parameter() {
     #[derive(Debug, Diff)]
     struct Held<T> {
         value: T,
@@ -206,7 +206,7 @@ struct Parts {
 
 /// A field with a path takes that place in the path, whatever else it is marked.
 #[test]
-fn a_field_with_a_path_takes_that_place() {
+fn field_with_path_takes_that_place() {
     let other = Parts {
         gather_point: Some(2),
         ai: 1,

@@ -59,7 +59,7 @@ mod tests {
 
     /// A rate adds and scales as `f32`.
     #[test]
-    fn a_regeneration_rate_adds_and_scales_as_floats() {
+    fn regeneration_rate_adds_and_scales_as_floats() {
         let mut r = Regeneration::new(30.0) + Regeneration::new(5.0);
         assert_eq!(r, Regeneration::new(35.0));
         r += Regeneration::new(-5.0);

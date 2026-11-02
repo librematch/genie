@@ -16,7 +16,7 @@ fn every(n: usize) -> NonZeroUsize {
 
 /// A field's path without its indices and keys, nested ones too.
 #[test]
-fn a_field_s_key_drops_its_indices() {
+fn field_key_drops_its_indices() {
     assert_eq!(field_key("life.hp"), "life.hp");
     assert_eq!(field_key("actions[0].to[12]"), "actions[].to[]");
     assert_eq!(field_key("costs[[1, 2]].amount"), "costs[].amount");
@@ -26,7 +26,7 @@ fn a_field_s_key_drops_its_indices() {
 /// Every field that differs, counted over every compared save of the window: the saves of
 /// `first` and each `every`-th update after it, a missing one skipped.
 #[test]
-fn a_survey_counts_each_field_over_the_window_s_saves() {
+fn survey_counts_each_field_over_the_window_saves() {
     let quiet = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let game = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
     let rec = recording(
@@ -60,7 +60,7 @@ fn a_survey_counts_each_field_over_the_window_s_saves() {
 /// A player that stops is listed with its stop and compared no more; the survey ends once
 /// every player has.
 #[test]
-fn a_stopped_player_is_listed_and_compared_no_more() {
+fn stopped_player_is_listed_and_compared_no_more() {
     let save = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
     let rec = recording(&save, &[Op::Sync { dt: 50 }, Op::Sync { dt: 50 }]);
     let mut never = |_: usize| -> Option<Vec<u8>> { panic!("no save is read after the stop") };

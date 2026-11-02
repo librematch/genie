@@ -51,7 +51,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_paid_flag_is_the_data_s_byte() {
+    fn paid_flag_is_the_data_byte() {
         assert_eq!(CostPaid::of_data(0), CostPaid::UNPAID);
         assert_eq!(CostPaid::of_data(5).get(), 5);
         assert_eq!(CostPaid::UNPAID.to_string(), "0");

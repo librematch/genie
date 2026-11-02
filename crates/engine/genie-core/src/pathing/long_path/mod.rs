@@ -693,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    fn a_trace_puts_a_point_where_the_direction_changes() {
+    fn trace_puts_point_where_the_direction_changes() {
         // entered: (1, 0) from (0, 0) by step 3 ([1, 0]), (2, 0) by 3, (3, 1) by 4 ([1, 1])
         let w = 4;
         let mut entered = vec![None; 8];
@@ -729,7 +729,7 @@ mod tests {
     }
 
     #[test]
-    fn a_goal_around_a_wall_is_reached_one_behind_a_closed_wall_not() {
+    fn goal_around_wall_is_reached_one_behind_closed_wall_not() {
         let (t, map) = tiles(&[
             "..........",
             ".....#....",
@@ -759,7 +759,7 @@ mod tests {
     /// ally's gate asks the gate on its tile (slot 0x678): a no keeps it closed, a yes opens it
     /// as an unblocked tile, and what the gate cannot answer stops the search.
     #[test]
-    fn an_allied_gate_asks_the_gate_and_an_enemy_s_is_closed() {
+    fn an_allied_gate_asks_the_gate_and_an_enemy_is_closed() {
         let (t, map) = tiles(&[
             ".....#....",
             ".....#....",
@@ -790,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    fn a_diagonal_step_needs_both_tiles_beside_it() {
+    fn diagonal_step_needs_both_tiles_beside_it() {
         // the only way through is a corner between two tall objects
         let (t, map) = tiles(&[
             "....T....",
@@ -806,7 +806,7 @@ mod tests {
     }
 
     #[test]
-    fn a_goal_within_the_range_ends_before_the_search() {
+    fn goal_within_the_range_ends_before_the_search() {
         let (t, map) = tiles(&["..#..", "..#..", "..#.."]);
         let mut req = request([0, 1], [4, 1]);
         req.moves = false;

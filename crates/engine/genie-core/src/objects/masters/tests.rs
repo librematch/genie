@@ -374,7 +374,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
 /// 0.5, truncated; a class the master lacks changes nothing; an attack class at 0 the handicap
 /// raises scales the percentage by the factor (which a product of 0 keeps at 0).
 #[test]
-fn a_combat_multiply_takes_a_percentage_of_the_class_s_amount() {
+fn combat_multiply_takes_percentage_of_the_class_amount() {
     let mut m = of_type(master_type::RGE_COMBAT);
     m.armors = vec![ClassAmount::new(4, 3), ClassAmount::new(3, 5)];
     m.weapons = vec![ClassAmount::new(4, 7), ClassAmount::new(21, 0)];
@@ -723,7 +723,7 @@ fn the_static_setters_truncate_as_the_game_does() {
 /// `FUN_14152e360`: a sprite attribute takes an id only where the world's table holds a
 /// sprite; an add starts from −1 for none.
 #[test]
-fn a_sprite_attribute_takes_only_a_sprite_the_world_has() {
+fn sprite_attribute_takes_only_sprite_the_world_has() {
     let mut m = of_type(master_type::MOVING);
     m.standing_sprite = Some(SpriteId::named(5));
     m.move_sprite = None;
@@ -740,7 +740,7 @@ fn a_sprite_attribute_takes_only_a_sprite_the_world_has() {
 /// `FUN_1410a8b60`, `FUN_1410a8c00`: a capped add or multiply of the speed stops at 4.5, a
 /// missile master's at 20; a NaN speed passes (`COMISS`, `JBE`).
 #[test]
-fn a_capped_speed_stops_at_its_type_s_cap() {
+fn capped_speed_stops_at_its_type_cap() {
     let mut m = of_type(master_type::COMBAT);
     m.max_speed = Speed::new(4.0);
     m.add_attribute(attribute::MOVEMENT_SPEED, 1.0, &world(false));
@@ -759,7 +759,7 @@ fn a_capped_speed_stops_at_its_type_s_cap() {
 /// byte the amount (negated for a negative amount); the first entry of the class changes, a
 /// multiply by `amount / 100`.
 #[test]
-fn armor_and_attack_change_the_class_in_the_amount_s_high_byte() {
+fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
     let mut m = of_type(master_type::COMBAT);
     m.armors = vec![
         ClassAmount::new(4, 1),
@@ -831,7 +831,7 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
 /// `FUN_1410d5b50`: a missile master's smart mode takes the multiply's amount; its arc
 /// multiplies; then the RGE combat master's setter runs.
 #[test]
-fn a_missile_s_smart_mode_multiply_sets_it() {
+fn missile_smart_mode_multiply_sets_it() {
     let mut m = of_type(master_type::MISSILE);
     m.missile_stats = Some(crate::combat::missile::MissileStats {
         projectile_type: crate::combat::missile::ProjectileType::STRAIGHT,
@@ -862,7 +862,7 @@ fn a_missile_s_smart_mode_multiply_sets_it() {
 /// to 106 those of food, wood, gold (3) and stone (2); population (110) sets the unpaid ones
 /// to the negated amount and the population storage to the amount.
 #[test]
-fn the_cost_attributes_change_their_resource_s_entries() {
+fn the_cost_attributes_change_their_resource_entries() {
     let mut m = of_type(master_type::BUILDING);
     m.cost = costs(&[
         (player_attribute::WOOD, 25, true),
@@ -1001,7 +1001,7 @@ fn the_damage_sprite_attributes_resize_and_select() {
 /// its own; its six sprites go to a copy (nothing changes); the rest falls to the combat
 /// master's setter (the regeneration from the hit points, 120).
 #[test]
-fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
+fn building_master_setters_fall_back_on_the_combat_master_s() {
     let mut m = of_type(master_type::BUILDING);
     m.building = Some(BuildingMaster {
         foundation_terrain: Some(TerrainId::named(0)),
@@ -1031,7 +1031,7 @@ fn a_building_master_s_setters_fall_back_on_the_combat_master_s() {
 /// The foundation terrain's add works on the game's short: none is −1, so an add of 2 lays
 /// terrain 1, and a set below 0 is none again.
 #[test]
-fn a_foundation_terrain_add_counts_none_as_minus_one() {
+fn foundation_terrain_add_counts_none_as_minus_one() {
     let mut m = of_type(master_type::BUILDING);
     m.building = Some(BuildingMaster::default());
     m.add_attribute(attribute::FOUNDATION_TERRAIN, 2.0, &world(false));
@@ -1046,7 +1046,7 @@ fn a_foundation_terrain_add_counts_none_as_minus_one() {
 /// What a unit moving with a master reads follows the master's values: its radii, its base
 /// speed and its speeds by its sprites' factors, its turn time and its facets.
 #[test]
-fn a_moving_master_s_derived_values_follow_its_attributes() {
+fn moving_master_derived_values_follow_its_attributes() {
     let graphic = |id, speed_multiplier, facets| crate::objects::sprite::Graphic {
         id,
         frames: crate::objects::Frame::of_data(10),
@@ -1136,7 +1136,7 @@ fn a_moving_master_s_derived_values_follow_its_attributes() {
 /// to −3 and 5 added is 2, as in the game, where a field read as none from −1 would give 4; a
 /// multiply's negative result is kept as well.
 #[test]
-fn an_id_field_keeps_a_negative_value_through_an_add() {
+fn an_id_field_keeps_negative_value_through_an_add() {
     let w = world(false);
     let mut m = of_type(master_type::RGE_COMBAT);
     for a in [attribute::PROJECTILE_UNIT, attribute::TERRAIN_DEFENSE_BONUS] {
@@ -1209,7 +1209,7 @@ fn the_action_and_moving_setters_change_their_values() {
 /// attack sprite (an add from its id), the spawning area; the ability's interface values
 /// change nothing.
 #[test]
-fn the_combat_master_s_own_values_change() {
+fn the_combat_master_own_values_change() {
     let mut m = of_type(master_type::COMBAT);
     m.hit_points = MasterHitPoints::of_data(100);
     m.attack_sprite2 = Some(SpriteId::named(10));
@@ -1319,7 +1319,7 @@ fn the_missile_building_and_animated_setters() {
 /// The master copy (slot 8, `Master::copy_from`): every value but the id, class,
 /// availability, disabling and base id (`+0x260`).
 #[test]
-fn a_master_copy_keeps_its_id_class_and_flags() {
+fn master_copy_keeps_its_id_class_and_flags() {
     let mut militia = master(
         master_id(74),
         1,
@@ -1358,7 +1358,7 @@ fn a_master_copy_keeps_its_id_class_and_flags() {
 /// task naming the farm's master is taken at once; a master whose task has the own task's
 /// type is passed over. A unit of a master the player lacks is not modelled.
 #[test]
-fn a_villager_on_a_farm_takes_its_group_s_farmer_for_the_farm_s_class() {
+fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
     let farm = Master {
         id: ids::FARM,
         kind: master_type::BUILDING,
@@ -1435,7 +1435,7 @@ fn a_villager_on_a_farm_takes_its_group_s_farmer_for_the_farm_s_class() {
 }
 
 #[test]
-fn a_villager_takes_the_first_master_of_its_swap_group_with_a_task_for_its_foundation() {
+fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundation() {
     let m = villagers();
     let site = TaskTarget {
         id: object_id(10028),
@@ -1478,7 +1478,7 @@ fn a_villager_takes_the_first_master_of_its_swap_group_with_a_task_for_its_found
 }
 
 #[test]
-fn a_master_s_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
+fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     let master = |class, volley_missile, combat_level| Master {
         class,
         combat_level,
@@ -1512,7 +1512,7 @@ fn a_master_s_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
 /// The lookup by player and id: the player's table's master, none without the table or the
 /// master.
 #[test]
-fn a_master_is_found_by_its_player_and_id() {
+fn master_is_found_by_its_player_and_id() {
     let every = vec![Masters::default(), villagers()];
     let found = player_master(&every, PlayerId::new(1), ids::VILLAGER_MALE).map(|m| m.id);
     assert_eq!(found, Some(ids::VILLAGER_MALE));
@@ -1522,7 +1522,7 @@ fn a_master_is_found_by_its_player_and_id() {
 
 /// The world's masters by player: a player's own table, none beyond the tables.
 #[test]
-fn the_world_s_masters_are_looked_up_by_player() {
+fn the_world_masters_are_looked_up_by_player() {
     use crate::objects::masters::PlayersMasters;
     let mut every = [Masters::new([house()]), Masters::new([])];
     assert!(
@@ -1549,7 +1549,7 @@ fn the_world_s_masters_are_looked_up_by_player() {
 /// 0xe8, its speed `+0x740`): a moving master whose speed is above 0; one of speed 0 and a
 /// master without a moving part do not.
 #[test]
-fn a_master_moves_with_a_moving_part_whose_speed_is_above_0() {
+fn master_moves_with_moving_part_whose_speed_is_above_0() {
     let moving = |base: f32| MoveStats {
         fly_mode: FlyMode::GROUND,
         speed: Speed::new(base * 1.5),

@@ -90,7 +90,7 @@ fn groups(ids: &[i32]) -> UnitGroups {
 /// A group difference goes with the group's owner, in the game or the slice; Gaia takes the
 /// world's lines and an owner the world does not hold.
 #[test]
-fn a_group_difference_goes_with_its_owner() {
+fn group_difference_goes_with_its_owner() {
     let mut turns = world();
     turns.groups = groups(&[4]);
     let game = GameState {
@@ -150,7 +150,7 @@ fn the_groups_compare_with_the_globals_beside_the_save() {
 
 /// Bytes that are no save are the run's error, before any update.
 #[test]
-fn a_save_that_does_not_parse_stops_each_run() {
+fn save_that_does_not_parse_stops_each_run() {
     let dumps = Dumps::default();
     assert!(forced_ticks(&[], &[], &[], 0, 1, None, dumps).is_err());
     assert!(command_phase(&[], (&[], None), &[], 0, None, dumps).is_err());
@@ -172,7 +172,7 @@ fn syncs(n: usize) -> Vec<u8> {
 
 /// A step and a command phase against the same quiet save have nothing to report.
 #[test]
-fn a_quiet_step_has_no_differences() {
+fn quiet_step_has_no_differences() {
     let (save, rec) = (quiet(), syncs(3));
     let step = forced_ticks(&save, &save, &rec, 0, 1, None, Dumps::default()).unwrap();
     assert_eq!((step.start, step.ticks), (0, 1));
@@ -219,7 +219,7 @@ fn the_continuous_run_reports_each_update_and_forces_the_games_state() {
 /// compares with the saves and dumps after updates 2 and 3; the recording's four frames end
 /// it there. One tick from update 0 plays the second frame.
 #[test]
-fn a_run_from_a_later_update_compares_the_updates_after_it() {
+fn run_from_later_update_compares_the_updates_after_it() {
     let (save, rec) = (quiet(), syncs(4));
     let asked = std::sync::Mutex::new(Vec::new());
     let after = |u: usize| {
@@ -306,7 +306,7 @@ fn differing_groups_are_forced_to_the_games() {
 
 /// The game's state in a save: its frame seed, next reusable id, game state and groups.
 #[test]
-fn a_saves_game_state_is_its_seed_next_id_state_and_groups() {
+fn saves_game_state_is_its_seed_next_id_state_and_groups() {
     let mut save = header(vec![gaia(Vec::new()), human(Vec::new())]);
     let world = &mut save.world.base_world;
     world.current_frame_random_seed = 5;

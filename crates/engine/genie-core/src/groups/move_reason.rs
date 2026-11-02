@@ -57,7 +57,7 @@ mod tests {
 
     /// Both default to a zeroed member's 0 and keep any value.
     #[test]
-    fn a_reason_and_a_path_keep_the_save_s_value() {
+    fn reason_and_path_keep_the_save_value() {
         assert_eq!(MoveReason::default(), MoveReason::DETOUR);
         assert_eq!(MoveReason::of_data(2), MoveReason::ASIDE);
         assert_eq!(MoveReason::of_data(5).get(), 5);

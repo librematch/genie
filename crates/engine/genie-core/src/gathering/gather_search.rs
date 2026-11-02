@@ -734,7 +734,7 @@ mod tests {
     }
 
     #[test]
-    fn a_flood_enters_the_blocked_cells_next_to_what_it_reaches_but_not_past_them() {
+    fn flood_enters_the_blocked_cells_next_to_what_it_reaches_but_not_past_them() {
         // a wall at x = 2 in a 5 x 3 box: the flood from (0, 1) reaches x 0..=1 and enters the
         // wall's cells, never x 3 or 4
         let seen = reached(Tile::new(0, 1), GridSize::new(5, 3), &|t| Ok(t.x() == 2))
@@ -908,7 +908,7 @@ mod tests {
     }
 
     #[test]
-    fn a_search_from_a_drop_site_starts_from_its_footprint_then_from_the_unit() {
+    fn search_from_drop_site_starts_from_its_footprint_then_from_the_unit() {
         let seeker = Seeker {
             player: PlayerId::new(1),
             position: Position::new(10.2, 10.7, 0.0),
@@ -1023,7 +1023,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_below_its_least_state_finds_nothing_and_one_with_a_pasture_stops() {
+    fn unit_below_its_least_state_finds_nothing_and_one_with_pasture_stops() {
         let trees = [tree(1, 12.5, 10.5)];
         let low = Seeker {
             state: ObjectState::Unfinished,
@@ -1058,7 +1058,7 @@ mod tests {
     }
 
     #[test]
-    fn a_full_resource_is_the_fallback_and_minus_1_workers_has_no_cap() {
+    fn full_resource_is_the_fallback_and_minus_1_workers_has_no_cap() {
         // a full tree (3 workers) 2 east, a free one 5 east
         let full = Candidate {
             workers: crate::objects::WorkerCount::of_data(3),
@@ -1113,7 +1113,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unexplored_tile_s_resource_is_not_tested() {
+    fn an_unexplored_tile_resource_is_not_tested() {
         let both = [tree(1, 12.5, 10.5), tree(2, 15.5, 10.5)];
         let dark = |&(): &(), t: Tile| Ok(t != Tile::new(12, 10));
         assert_eq!(
@@ -1155,7 +1155,7 @@ mod tests {
     }
 
     #[test]
-    fn a_held_resource_names_its_gather_group_and_the_workers_the_build_lets_it_have() {
+    fn held_resource_names_its_gather_group_and_the_workers_the_build_lets_it_have() {
         assert_eq!(
             gather_group(Some(attribute::WOOD)),
             (GatherGroup::WOOD, crate::objects::WorkerCount::of_data(2))

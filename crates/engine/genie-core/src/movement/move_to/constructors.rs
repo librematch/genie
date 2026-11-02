@@ -280,7 +280,7 @@ mod tests {
     /// target walks to (0, 0, 0); a unit in state 3 or later adds none; a sprite the table lacks
     /// is an error.
     #[test]
-    fn a_sub_move_to_takes_its_sprite_target_and_start() {
+    fn sub_move_to_takes_its_sprite_target_and_start() {
         let graphics = crate::construction::build::tests::graphics();
         let move_reads = MoveToReads {
             sprites: SpriteReads {

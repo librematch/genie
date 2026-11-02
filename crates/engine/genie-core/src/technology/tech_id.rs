@@ -114,7 +114,7 @@ mod tests {
 
     /// A field's −1 is none, a value of 0 or more a technology, and each converts back.
     #[test]
-    fn a_field_s_minus_one_is_none_and_any_value_from_0_a_technology() {
+    fn field_minus_one_is_none_and_any_value_from_0_technology() {
         assert_eq!(TechId::of_field(-1), Ok(None));
         for value in [0, 101, i16::MAX] {
             let tech = TechId::of_field(value).unwrap();
@@ -126,7 +126,7 @@ mod tests {
 
     /// A negative value is no technology; in a field, one other than −1 is an error.
     #[test]
-    fn a_negative_value_is_no_technology() {
+    fn negative_value_is_no_technology() {
         for value in [-1, -2, i16::MIN] {
             assert_eq!(
                 TechId::try_from(value).map_err(|e| e.kind()),

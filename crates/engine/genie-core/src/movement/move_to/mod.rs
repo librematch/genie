@@ -576,7 +576,7 @@ mod tests {
     ///
     /// [`WalkRig`]: crate::movement::tests::WalkRig
     #[test]
-    fn a_sub_move_to_starts_moves_waits_and_reports_its_code() {
+    fn sub_move_to_starts_moves_waits_and_reports_its_code() {
         use crate::movement::tests::WalkRig;
         let mut rig = WalkRig::on_the_path();
         let mut m = MoveToAction {
@@ -650,7 +650,7 @@ mod tests {
     /// the motion step gave up on in update 5101: it waits a second, `+0x6c` 1; once it waited it
     /// fails, as a computer player's or another class's at once. A stance of 2 waits two.
     #[test]
-    fn a_human_villager_s_moveto_waits_once_before_it_fails() {
+    fn human_villager_moveto_waits_once_before_it_fails() {
         let mut wait = MoveWait::default();
         assert_eq!(wait.give_up(true, UnitStance::AGGRESSIVE), MoveTo::Waiting);
         assert_eq!(
@@ -674,7 +674,7 @@ mod tests {
     /// never waited, or asked again already, keeps its wait state, and one that asked again
     /// never waits again.
     #[test]
-    fn a_moveto_that_waited_asks_again_once() {
+    fn moveto_that_waited_asks_again_once() {
         let mut wait = MoveWait::default();
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::Never);
@@ -709,7 +709,7 @@ mod tests {
     /// tells the unit (notify 0x1fc, though quiet), turns to state 3 and walks on. Each gives
     /// code 0. The motion step's first update turns the unit toward its path (its angle).
     #[test]
-    fn a_moving_sub_move_to_s_target_that_left_its_point_is_followed_asked_for_or_ignored() {
+    fn moving_sub_move_to_target_that_left_its_point_is_followed_asked_for_or_ignored() {
         use crate::movement::tests::{WalkRig, tiled_world};
         let walk_on = |mode, walled: bool| {
             let mut rig = WalkRig::on_the_path();
@@ -784,7 +784,7 @@ mod tests {
     /// `MoveTo`'s update ending with 5, another's with 4 after notify 0x1fb (the move action
     /// value, the id let go, −1, and 0). A sub-action `MoveTo` runs it first and gives its 5.
     #[test]
-    fn a_move_to_lets_a_dying_target_go_and_walks_on_from_one_the_world_lost() {
+    fn move_to_lets_dying_target_go_and_walks_on_from_one_the_world_lost() {
         let checked = |quiet: bool, target: i32, state: Option<ObjectState>| {
             let mut m = MoveToAction {
                 target: ObjectId::of_field(target),
@@ -864,7 +864,7 @@ mod tests {
     /// `0x140aa2a70` in state 1 posts notify 0x1fa and in state 13 notify 0x1f9, each with the
     /// move action value (0x262) and 0, 0, unless the `MoveTo` is quiet; the codes stay 1 and 3.
     #[test]
-    fn a_not_quiet_move_to_posts_its_end_and_a_quiet_one_does_not() {
+    fn not_quiet_move_to_posts_its_end_and_quiet_one_does_not() {
         let mut rig = crate::movement::tests::WalkRig::on_the_path();
         let mut update = |quiet: bool, state: MoveTo| {
             let mut m = MoveToAction {
@@ -913,7 +913,7 @@ mod tests {
     /// in state 3 or later adds none; within 0.01 of its target it arrived (a NaN gap is far);
     /// farther it starts with speed (a NaN speed too) and fails without; one to a point is far.
     #[test]
-    fn an_added_sub_move_to_arrives_starts_or_fails_and_a_dying_unit_adds_none() {
+    fn an_added_sub_move_to_arrives_starts_or_fails_and_dying_unit_adds_none() {
         let m = MoveToAction::sub_to_point(Position::new(1.0, 2.0, 0.0), Distance::new(0.5), None);
         let state = |unit_state, gap, speed| m.added(unit_state, gap, speed).map(|a| a.state);
         assert_eq!(
@@ -978,7 +978,7 @@ mod tests {
     /// `+0x61` from the save: 0 follows, 1 asks again, 2 ignores; any other value is the save's
     /// error.
     #[test]
-    fn a_saved_target_moved_state_is_one_of_three() {
+    fn saved_target_moved_state_is_one_of_three() {
         assert_eq!(TargetMoved::try_from(0), Ok(TargetMoved::Follows));
         assert_eq!(TargetMoved::try_from(1), Ok(TargetMoved::AsksAgain));
         assert_eq!(TargetMoved::try_from(2), Ok(TargetMoved::Ignores));
@@ -991,7 +991,7 @@ mod tests {
     /// blocked (notify 0x1fc, state 3, the motion step on), and one that ignores its target walks
     /// on without reading it. A target gone and a point not held are errors.
     #[test]
-    fn a_target_off_the_move_to_s_point_asks_again_or_moves_the_path_s_end() {
+    fn target_off_the_move_to_point_asks_again_or_moves_the_path_end() {
         let open = vec![4; 120 * 120];
         let mut walled = open.clone();
         for y in 85..92 {

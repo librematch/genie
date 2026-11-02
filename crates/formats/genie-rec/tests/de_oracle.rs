@@ -138,7 +138,7 @@ fn reads_that_nest_or_cover_whole_game_reads_agree() {
 }
 
 #[test]
-fn a_read_that_straddles_a_game_boundary_is_a_crossing() {
+fn read_that_straddles_game_boundary_is_crossing() {
     let game = [4u32, 2, 8];
     assert_eq!(
         first_crossing(&[(0, 4), (2, 4)], &game),

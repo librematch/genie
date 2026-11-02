@@ -101,7 +101,7 @@ mod tests {
 
     /// An object's record is its id; a tile's and an edge's carry the tile under their marks.
     #[test]
-    fn a_record_s_value_is_the_game_s_integer() {
+    fn record_value_is_the_game_integer() {
         assert_eq!(RecordId::from(object_id(7)).value(), 7);
         assert_eq!(
             RecordId::Tile(Tile::new(5, 6)).value(),

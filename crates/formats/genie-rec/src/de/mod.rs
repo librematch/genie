@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn a_chapter_pointing_outside_the_file_is_an_error() {
+    fn chapter_pointing_outside_the_file_is_an_error() {
         let mut data = recording(&[(b"HDR0", b"body")]);
         data[0..4].copy_from_slice(&999u32.to_le_bytes());
         let e = chapters(&data).unwrap_err();
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn a_header_that_does_not_inflate_is_an_error() {
+    fn header_that_does_not_inflate_is_an_error() {
         let data = recording(&[(&[0xff; 16], b"")]);
         let e = chapters(&data).unwrap()[0].save_version().unwrap_err();
         assert_eq!(e, not_inflating(0));

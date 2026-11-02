@@ -381,7 +381,7 @@ mod limit_tests {
 
     /// A value at its limit is an error, one below it converts.
     #[test]
-    fn a_value_at_its_limit_is_an_error() {
+    fn value_at_its_limit_is_an_error() {
         assert_eq!(below::<u16>(5, 6, "x").unwrap(), 5);
         assert!(invalid(&below::<u16>(6, 6, "x").unwrap_err()));
         assert!(invalid(&below::<u8>(300, 1000, "x").unwrap_err()));
@@ -389,7 +389,7 @@ mod limit_tests {
 
     /// A name of the width or more does not pad.
     #[test]
-    fn a_name_of_the_width_does_not_pad() {
+    fn name_of_the_width_does_not_pad() {
         assert_eq!(padded(b"ab", 4, "n").unwrap(), b"ab\0\0");
         assert!(invalid(&padded(b"abcd", 4, "n").unwrap_err()));
     }

@@ -316,7 +316,7 @@ mod genie_error_tests {
     /// The errors convert into `GenieError`s with their kinds and reasons, the original as
     /// source.
     #[test]
-    fn a_string_key_error_converts_into_a_genie_error() {
+    fn string_key_error_converts_into_genie_error() {
         let e: genie_error::GenieError = TryFromStringKeyError.into();
         assert_eq!(
             (e.kind(), e.reason()),

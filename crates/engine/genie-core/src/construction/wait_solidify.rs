@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_wait_holds_its_task_and_foundation_in_state_10() {
+    fn new_wait_holds_its_task_and_foundation_in_state_10() {
         let w = WaitSolidify::new(task(), object_id(8123));
         assert_eq!(
             (w.state, w.task, w.target),
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn the_wait_ends_once_the_foundation_is_past_a_hundredth_or_gone() {
+    fn the_wait_ends_once_the_foundation_is_past_hundredth_or_gone() {
         let w = WaitSolidify::new(task(), object_id(8123));
         assert!(w.update(None), "a foundation the world does not hold");
         assert!(!w.update(Some(Seconds::ZERO)));

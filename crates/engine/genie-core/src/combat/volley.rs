@@ -125,8 +125,8 @@ impl Unit {
         let (
             trebuchet,
             VolleySpread {
-                x: x_spread,
-                y: y_spread,
+                x: spread_x,
+                y: spread_y,
                 ..
             },
         ) = (master.class == class::CLASS_54, master.volley_spread);
@@ -147,8 +147,8 @@ impl Unit {
                 let object = c.w.streams.get(Stream::Object);
                 let (x, y) = (object.rand15(), object.rand15());
                 let scatter = GroundOffset::new(
-                    crate::combat::missile::scatter(x, x_spread),
-                    crate::combat::missile::scatter(y, y_spread),
+                    crate::combat::missile::scatter(x, spread_x),
+                    crate::combat::missile::scatter(y, spread_y),
                 );
                 self.volley_missile(c, &aimed, scatter)?;
             }
@@ -188,13 +188,13 @@ impl Unit {
         let old = c.w.parts.combat_of(self.id).next_volley;
         let mut n = count - old.counted();
         let VolleySpread {
-            x: x_spread,
-            y: y_spread,
+            x: spread_x,
+            y: spread_y,
             ..
         } = spread;
         let mut all = true;
         if !full {
-            let k = if Distance::ZERO < x_spread || Distance::ZERO < y_spread {
+            let k = if Distance::ZERO < spread_x || Distance::ZERO < spread_y {
                 let draw = c.w.streams.get(Stream::Object).rand15() as i32;
                 (draw * 2) / 0x7fff + 1
             } else {

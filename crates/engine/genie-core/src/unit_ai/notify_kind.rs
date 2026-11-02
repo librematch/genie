@@ -96,7 +96,7 @@ mod tests {
     /// Every saved value is a kind, the named ones their constants; the value converts back and
     /// prints in hex as the game's log lines do.
     #[test]
-    fn every_value_is_a_kind() {
+    fn every_value_is_kind() {
         assert_eq!(NotifyKind::from(0x202), NotifyKind::REQUIRES_SEARCH);
         assert_eq!(NotifyKind::from(500), NotifyKind::DAMAGED);
         assert_eq!(NotifyKind::from(0x999).get(), 0x999);

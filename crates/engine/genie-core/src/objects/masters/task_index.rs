@@ -37,7 +37,7 @@ mod tests {
 
     /// A short of 0 or more is a place, a negative one none.
     #[test]
-    fn a_place_is_a_short_of_0_or_more() {
+    fn place_is_short_of_0_or_more() {
         assert_eq!(TaskIndex::of_data(3).map(TaskIndex::index), Some(3));
         assert_eq!(TaskIndex::of_data(-1), None);
         assert_eq!(TaskIndex::of_data(-7), None);

@@ -57,7 +57,7 @@ mod tests {
 
     /// Every byte is kept, an add wraps, and only 0 is no level.
     #[test]
-    fn a_combat_level_keeps_its_byte() {
+    fn combat_level_keeps_its_byte() {
         assert!(!CombatLevel::NONE.is_some());
         assert!(CombatLevel::ANIMAL.is_some());
         assert_eq!(CombatLevel::of_data(255).plus(2), CombatLevel::ANIMAL);

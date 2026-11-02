@@ -149,7 +149,7 @@ mod tests {
     /// getting `have / (fee + 1)` as `have - (have - have / (fee + 1))`; a negative or NaN
     /// amount or fee is 0.
     #[test]
-    fn a_tribute_pays_its_fee_on_top_and_what_the_giver_lacks_lowers_both() {
+    fn tribute_pays_its_fee_on_top_and_what_the_giver_lacks_lowers_both() {
         assert_eq!(
             settle(Amount::new(1000.0), gift(1, 100.0, 0.3)),
             (Amount::new(100.0), Amount::new(100.0 + 100.0 * 0.3))
@@ -220,7 +220,7 @@ mod tests {
     /// (an entry of attribute 4 gives nothing): the resources move with the fee, and both count
     /// it; without a market, or to itself, nothing moves.
     #[test]
-    fn a_tribute_moves_the_resources_and_counts_them_for_both_players() {
+    fn tribute_moves_the_resources_and_counts_them_for_both_players() {
         let gifts = [
             gift(1, 100.0, 0.3),
             gift(3, 200.0, 0.3),
@@ -261,7 +261,7 @@ mod tests {
 
     /// A computer player's AI would hear the tribute (its slot 0x3c8).
     #[test]
-    fn a_computer_player_s_receipt_is_not_modelled() {
+    fn computer_player_receipt_is_not_modelled() {
         let mut t = world(true);
         t.players[2].computer = true;
         assert!(

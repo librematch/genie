@@ -105,7 +105,7 @@ mod tests {
     /// A saved −1 is no category, 0 to 11 a category, and each converts back to its value; any
     /// other value is an error.
     #[test]
-    fn a_saved_category_is_minus_one_or_0_to_11() {
+    fn saved_category_is_minus_one_or_0_to_11() {
         assert_eq!(AttackCategory::of_field(-1), Ok(None));
         let siege = AttackCategory::of_field(6).unwrap();
         assert_eq!(siege, Some(AttackCategory::SIEGE));
@@ -125,7 +125,7 @@ mod tests {
 
     /// A table holds one value per category, read and written by category in their order.
     #[test]
-    fn a_table_by_category_holds_one_value_each() {
+    fn table_by_category_holds_one_value_each() {
         let mut t = ByCategory::new([0; AttackCategory::COUNT]);
         t[AttackCategory::SIEGE] += 3;
         t[AttackCategory::named(11)] = 7;

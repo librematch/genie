@@ -69,7 +69,7 @@ mod tests {
 
     /// The attack adders are 1 and 3, the ranged 6 and 7, the charging ones those above 0.
     #[test]
-    fn a_charge_type_s_groups() {
+    fn charge_type_groups() {
         let of = |test: fn(ChargeType) -> bool| -> Vec<i16> {
             (-5..9)
                 .map(ChargeType::of_data)

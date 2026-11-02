@@ -65,7 +65,7 @@ pub struct BuildWallCommand {
     /// The line's last tile (`+0xc`, `+0xe`).
     pub to: Tile,
     /// `+0x14`: anything but −1 and the command does nothing.
-    pub q_id: crate::commands::QueueId,
+    pub queue_id: crate::commands::QueueId,
     /// The units told to build it, in packet order (the count at `+0x4`, the ids from `+0x1c`).
     pub builders: UnitList,
     /// `+0x1a`: queued (a builder with a unit AI takes the line as orders in its queue).
@@ -233,7 +233,7 @@ impl World {
         builders: &[Option<ObjectId>],
     ) -> Result<(), GenieError> {
         let (player, master) = (w.player, w.master);
-        if w.q_id.is_queued() {
+        if w.queue_id.is_queued() {
             return Ok(());
         }
         let Some(site) = player_master(&self.masters, player, master) else {
@@ -430,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_is_one_segment_when_straight_or_diagonal() {
+    fn line_is_one_segment_when_straight_or_diagonal() {
         assert_eq!(segments(t(3, 4), t(3, 4)), [(t(3, 4), t(3, 4))]);
         assert_eq!(segments(t(3, 4), t(9, 4)), [(t(3, 4), t(9, 4))]);
         assert_eq!(segments(t(3, 4), t(3, 1)), [(t(3, 4), t(3, 1))]);
@@ -438,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bent_line_puts_its_longer_part_first() {
+    fn bent_line_puts_its_longer_part_first() {
         // 8 across, 2 down: the straight part (6) is longer than the diagonal (2)
         assert_eq!(
             segments(t(0, 0), t(8, 2)),
@@ -471,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn a_segment_walks_both_coordinates() {
+    fn segment_walks_both_coordinates() {
         assert_eq!(
             tiles(t(5, 5), t(7, 3)).unwrap(),
             [t(5, 5), t(6, 4), t(7, 3)]
@@ -481,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    fn a_half_tile_footprint_snaps_to_the_tile_centre() {
+    fn half_tile_footprint_snaps_to_the_tile_centre() {
         assert_eq!(
             snap(
                 Footprint::new(0.5, 0.5),

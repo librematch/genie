@@ -96,7 +96,7 @@ mod tests {
 
     /// A field's −1 is none, a value of 0 or more a master, and each converts back.
     #[test]
-    fn a_field_s_minus_one_is_none_and_any_value_from_0_a_master() {
+    fn field_minus_one_is_none_and_any_value_from_0_master() {
         assert_eq!(MasterId::of_field(-1), Ok(None));
         for value in [0, 83, i16::MAX] {
             let master = MasterId::of_field(value).unwrap();
@@ -108,7 +108,7 @@ mod tests {
 
     /// A negative value is no master; in a field, one other than −1 is an error.
     #[test]
-    fn a_negative_value_is_no_master() {
+    fn negative_value_is_no_master() {
         for value in [-1, -2, i16::MIN] {
             assert_eq!(
                 MasterId::try_from(value).map_err(|e| e.kind()),

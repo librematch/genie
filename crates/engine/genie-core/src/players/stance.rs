@@ -74,7 +74,7 @@ mod tests {
 
     /// `FUN_1416397d0`'s relations: 1, 2 an enemy's, 3 a neutral's, 4, 5 an ally's, others none.
     #[test]
-    fn a_stance_makes_its_relation() {
+    fn stance_makes_its_relation() {
         let relation = |s: u8| Stance::from(s).relation();
         assert_eq!(relation(0), None);
         assert_eq!(relation(1), Some(Relation::ENEMY));
@@ -89,7 +89,7 @@ mod tests {
     /// GAME's diplomacy: relation 0 an ally's stance, 1 a neutral's, 3 and 4 an enemy's, 2 and
     /// the others none.
     #[test]
-    fn a_diplomacy_command_s_relation_makes_its_stance() {
+    fn diplomacy_command_relation_makes_its_stance() {
         let stances = [0, 1, 2, 3, 4, 5, u32::MAX].map(Stance::of_diplomacy);
         assert_eq!(
             stances,

@@ -346,7 +346,7 @@ mod tests {
     /// (0xa) lowers the pending gold by 400 only for a player with a castle in its tracker's done
     /// list.
     #[test]
-    fn diplomacy_allied_victory_and_treason_for_the_command_s_player() {
+    fn diplomacy_allied_victory_and_treason_for_the_command_player() {
         use crate::objects::masters::{Master, Masters};
         let mut t = world();
         t.alliance_locked = 1;
@@ -462,7 +462,7 @@ mod tests {
     /// `do_command`'s gate: a sub-command for another player runs only with the game's cheats,
     /// 1, 4 and 0xf for anyone; an issuer outside the world runs nothing.
     #[test]
-    fn a_sub_command_for_another_player_needs_the_game_s_cheats() {
+    fn sub_command_for_another_player_needs_the_game_cheats() {
         let mut t = world();
         assert!(t.game_allowed(&game(1, GameSub::POSTURE, 1, 0, 0)));
         assert!(!t.game_allowed(&game(1, GameSub::POSTURE, 2, 0, 0)));
@@ -480,7 +480,7 @@ mod tests {
 
     /// 0x10, 0x13 and 0x14 flip their flags; a player outside the world changes nothing.
     #[test]
-    fn the_toggles_flip_the_player_s_flags() {
+    fn the_toggles_flip_the_player_flags() {
         let mut t = world();
         t.game(&game(1, GameSub::AUTO_FARM_QUEUE, 1, 0, 0)).unwrap();
         t.game(&game(1, GameSub::AUTO_FISH_TRAP_QUEUE, 1, 0, 0))
@@ -501,7 +501,7 @@ mod tests {
     /// 6 and 4 do nothing without the game's cheats; with them the cheat is not modelled. 4 with
     /// player 0 turns the instant work off, which is the game's state the slice holds.
     #[test]
-    fn a_cheat_does_nothing_without_the_game_s_cheats() {
+    fn cheat_does_nothing_without_the_game_cheats() {
         let mut t = world();
         let before = t.players.clone();
         t.game(&game(1, GameSub::CHEAT, 1, 4, 0)).unwrap();
@@ -533,7 +533,7 @@ mod tests {
     /// 0xb sets a computer player's setting from `+0x10` as its case reads it; a human
     /// player's stays.
     #[test]
-    fn an_ai_setting_goes_to_a_computer_player_only() {
+    fn an_ai_setting_goes_to_computer_player_only() {
         let mut t = world();
         t.players[2].computer = true;
         t.settings.cheats_enabled = true;

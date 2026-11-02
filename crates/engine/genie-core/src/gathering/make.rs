@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn the_start_takes_the_farm_food_and_holds_the_task_s_resource_from_nothing() {
+    fn the_start_takes_the_farm_food_and_holds_the_task_resource_from_nothing() {
         let mut life = Lifecycle {
             attribute_type: Some(attribute::FOOD),
             amount: Amount::new(15.0),
@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn a_fish_trap_takes_the_fish_trap_food_and_keeps_a_holding_of_its_kind() {
+    fn fish_trap_takes_the_fish_trap_food_and_keeps_holding_of_its_kind() {
         let task = Task {
             attribute_type: Some(AttributeId::numbered(17)),
             ..farm_task()
@@ -365,7 +365,7 @@ mod tests {
 
     /// The farm's powerup (slot 0x6e8, `+0xa30`) adds to its master's work rate.
     #[test]
-    fn the_farm_s_powerup_adds_to_the_rate() {
+    fn the_farm_powerup_adds_to_the_rate() {
         let mut t = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 0.0);
         t.parts
             .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
@@ -376,7 +376,7 @@ mod tests {
     }
 
     #[test]
-    fn a_farm_with_nothing_left_to_make_and_nothing_held_is_exhausted_unless_a_pasture() {
+    fn farm_with_nothing_left_to_make_and_nothing_held_is_exhausted_unless_pasture() {
         let exhausted = |master: MasterId, amount: f32| {
             let mut t = farm_world(making(0.0, 175.0, farm_task()), master, amount);
             made(&mut t).3 == 0.0
@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn a_task_with_a_work_flag_makes_for_its_player_and_never_runs_out() {
+    fn task_with_work_flag_makes_for_its_player_and_never_runs_out() {
         let task = Task {
             work_flag: 1,
             ..farm_task()
@@ -412,7 +412,7 @@ mod tests {
 
     /// A farm whose master the slice lacks stops its update, in any state.
     #[test]
-    fn a_farm_without_its_master_fails() {
+    fn farm_without_its_master_fails() {
         let mut t = farm_world(making(0.0, 0.0, farm_task()), master_id(99), 0.0);
         let r = crate::world::tests::in_update(
             &mut t,

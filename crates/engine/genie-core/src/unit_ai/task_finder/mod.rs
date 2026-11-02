@@ -677,7 +677,7 @@ mod tests {
     /// never apply, attacks (7, 9) want an attackable target; then the owner type says whose
     /// target, and the unit itself is never its own target but for type 4.
     #[test]
-    fn a_task_applies_by_what_the_target_holds_and_whose_it_is() {
+    fn task_applies_by_what_the_target_holds_and_whose_it_is() {
         let own = Master {
             combat_level: CombatLevel::NONE,
             ..Master::default()
@@ -797,7 +797,7 @@ mod tests {
     /// `FUN_140fdd950`: an entry for the worker class with resource types, for the civ, whose
     /// basic resources or targets take the kind.
     #[test]
-    fn the_table_gives_the_buildings_that_take_a_kind_from_a_class() {
+    fn the_table_gives_the_buildings_that_take_kind_from_class() {
         let entry = |building, class, types: Vec<AttributeId>, civs: Vec<u8>, attribute| DropSite {
             building,
             worker_class: class,
@@ -891,7 +891,7 @@ mod tests {
     /// `FUN_1412784d0` for a master with object flag 0x10: no task on prey (class 9) whose master
     /// stores something (`+0x610` above 0); prey without storage takes its task as any target.
     #[test]
-    fn a_flag_0x10_master_has_no_task_on_prey_that_stores_food() {
+    fn flag_0x10_master_has_no_task_on_prey_that_stores_food() {
         let hunt = task(crate::gathering::hunt::HUNT, class::PREY.get(), -1, 1.0);
         let hunter = Master {
             object_flags: ObjectFlags::SCOUT,
@@ -925,7 +925,7 @@ mod tests {
     }
 
     #[test]
-    fn a_build_task_for_the_foundation_s_master_or_class_needs_a_work_value() {
+    fn build_task_for_the_foundation_master_or_class_needs_work_value() {
         let house = master(ids::HOUSE, BUILDING, class::BUILDING, vec![]);
         let site = building(&house, PlayerId::new(2), ObjectState::Foundation);
         let by = |tasks: Vec<Task>| {
@@ -952,7 +952,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_carrying_what_a_finished_drop_site_takes_drops_it_off_there() {
+    fn unit_carrying_what_finished_drop_site_takes_drops_it_off_there() {
         let camp = master(master_id(562), BUILDING, class::BUILDING, vec![]);
         let chop = Task {
             attribute_type: Some(attribute::FOOD),
@@ -997,7 +997,7 @@ mod tests {
     /// else the last for any target; under the repair filter with none the finder ends; a whole
     /// building or another player's has none.
     #[test]
-    fn a_damaged_building_takes_the_repair_task_for_its_master_or_class() {
+    fn damaged_building_takes_the_repair_task_for_its_master_or_class() {
         let house = master(ids::HOUSE, BUILDING, class::BUILDING, vec![]);
         let damaged = TaskTarget {
             hp: HitPoints::new(300.0),
@@ -1085,7 +1085,7 @@ mod tests {
     }
 
     #[test]
-    fn the_garrison_filter_goes_on_to_a_transport_s_class_task() {
+    fn the_garrison_filter_goes_on_to_transport_class_task() {
         // FUN_1412784d0 with filter 3 on a transport ship (545, class 20, object flag 0): no
         // building's task, so LAB_1412796b4's first task of action 3 on class 20
         let ship = Master {
@@ -1153,7 +1153,7 @@ mod tests {
     }
 
     #[test]
-    fn a_villager_garrisons_only_a_transport_s_class_without_the_garrison_filter() {
+    fn villager_garrisons_only_transport_class_without_the_garrison_filter() {
         // LAB_1412796b4: a villager takes a target with object flag 0 not of class 20 (a ram,
         // class 13) only under the garrison filter (or mode 1, not modelled)
         let ram = Master {
@@ -1192,7 +1192,7 @@ mod tests {
     }
 
     #[test]
-    fn the_general_search_takes_a_task_for_the_target_s_class_whose_owner_type_fits() {
+    fn the_general_search_takes_task_for_the_target_class_whose_owner_type_fits() {
         let house = master(ids::HOUSE, BUILDING, class::BUILDING, vec![]);
         let attack = Task {
             owner_type: TargetOwner::ENEMY,
@@ -1226,7 +1226,7 @@ mod tests {
     /// that stores something; the relic carrier takes task 0x87 at its monastery (master 109);
     /// a monk's conversion under attribute 95 is not modelled; anything else goes on.
     #[test]
-    fn the_finder_s_head_answers_the_garrison_filter_prey_and_relics() {
+    fn the_finder_head_answers_the_garrison_filter_prey_and_relics() {
         let house = master(ids::HOUSE, BUILDING, class::BUILDING, vec![]);
         let villager = master(
             ids::VILLAGER_MALE,
@@ -1309,7 +1309,7 @@ mod tests {
     /// task, 12 on terrain 2), whatever the filter the finder's tail passes (−1); none without a
     /// terrain (a point off the map, or x or y −1).
     #[test]
-    fn a_point_on_a_terrain_takes_the_task_for_that_terrain() {
+    fn point_on_terrain_takes_the_task_for_that_terrain() {
         let beach = Task {
             terrain: TaskTerrain::of_data(2),
             ..task(crate::garrison::transport::TRANSPORT, -1, -1, 0.0)
@@ -1351,7 +1351,7 @@ mod tests {
     /// master or class the filter takes, and without one goes on; a transport's garrison without
     /// a task ends the finder (none); anything else goes on.
     #[test]
-    fn the_finder_s_steps_on_a_target_answer_or_go_on() {
+    fn the_finder_steps_on_target_answer_or_go_on() {
         let house = master(ids::HOUSE, BUILDING, class::BUILDING, vec![]);
         let builder = master(
             ids::BUILDER,
@@ -1511,7 +1511,7 @@ mod tests {
     /// filter has none and any filter ends the finder after the repair; a villager goes on for
     /// a transport of another class.
     #[test]
-    fn the_garrison_into_a_transport_takes_its_class_s_task() {
+    fn the_garrison_into_transport_takes_its_class_task() {
         fn into<'m>(
             list: &'m Master,
             t: &TaskTarget<'_>,
@@ -1550,7 +1550,7 @@ mod tests {
     /// The repair step: a damaged building takes the repair task for any target; a whole one
     /// goes on; under the repair filter a class's task without a work value leaves none.
     #[test]
-    fn the_repair_step_takes_a_damaged_building_s_task() {
+    fn the_repair_step_takes_damaged_building_task() {
         fn repair<'m>(
             list: &'m Master,
             t: &TaskTarget<'_>,
@@ -1603,7 +1603,7 @@ mod tests {
     /// livestock takes task 110 for class 58; a monk's conversion, task 0x84, healing, task
     /// 0x88, class 53's conversion and master 1105 are not modelled.
     #[test]
-    fn the_finder_s_tail_takes_task_13_livestock_or_the_general_search() {
+    fn the_finder_tail_takes_task_13_livestock_or_the_general_search() {
         fn tail<'m>(
             list: &'m Master,
             t: &TaskTarget<'_>,

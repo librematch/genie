@@ -46,7 +46,7 @@ mod tests {
 
     /// The four ids keep their order; −1 is none.
     #[test]
-    fn a_task_s_sprites_keep_their_order() {
+    fn task_sprites_keep_their_order() {
         let s = TaskSprites::of_data([1, -1, 3, 4]);
         assert_eq!(
             (s.moving, s.proceeding, s.working, s.carrying),

@@ -382,7 +382,7 @@ mod tests {
     /// buildings, more than 20 technologies, units or buildings before 1.18, anything before
     /// 1.04.
     #[test]
-    fn a_version_that_cannot_hold_the_disabled_lists_fails() {
+    fn version_that_cannot_hold_the_disabled_lists_fails() {
         let fails = |scen: &TribeScen, version| scen.write_disabled(&mut vec![], version);
         let buildings = scenario([vec![], vec![], vec![70; 21]]);
         assert!(matches!(

@@ -1364,7 +1364,7 @@ pub struct TechTree {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(xsize_value: i32))]
-pub struct TribeInformationAIModuleEntry1 {
+pub struct TribeInformationAiModuleEntry1 {
     /// game: `(rowValue[j][i])`
     /// read at 0x140f4c865 into the temporary `tempBYTE`; named by the save's write in the same place (0x140f4cb50, write at 0x140f4d3ce)
     #[br(if(xsize_value > 0), count = xsize_value.max(0) as usize)]
@@ -1376,7 +1376,7 @@ pub struct TribeInformationAIModuleEntry1 {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct TribeInformationAIModule {
+pub struct TribeInformationAiModule {
     /// game: `xSizeValue`
     /// read at 0x140f4c0ec
     pub xsize_value: i32,
@@ -1394,7 +1394,7 @@ pub struct TribeInformationAIModule {
     pub unchangeable_limit_value: u8,
     /// a loop of 1 reads; named after the member its entries index (`rowValue`)
     #[br(count = ysize_value.max(0) as usize, args { inner: (xsize_value,) })]
-    pub row_value: Vec<TribeInformationAIModuleEntry1>,
+    pub row_value: Vec<TribeInformationAiModuleEntry1>,
 }
 
 /// Read by `FUN_140b43640` of the build.
@@ -2382,7 +2382,7 @@ pub struct TribeInformationAiState {
     /// unnamed in the binary
     /// read by 0x140f4c080
     #[br(args(ver))]
-    pub tribe_information_ai_module: TribeInformationAIModule,
+    pub tribe_information_ai_module: TribeInformationAiModule,
     /// unnamed in the binary
     /// read at 0x140b502e8 into a local (local_3408)
     pub unnamed_at_0x140b502e8: u64,
@@ -4664,7 +4664,7 @@ pub struct WorldPlayer {
     pub is_scout_map_enabled: Option<i32>,
     /// read by 0x140f4c080; named by the save's write in the same place (0x141631420)
     #[br(if(type_ == 1 && is_scout_map_enabled.unwrap_or_default() != 0), args(ver))]
-    pub scout_map: Option<Box<TribeInformationAIModule>>,
+    pub scout_map: Option<Box<TribeInformationAiModule>>,
     /// game: `&mFinalBattleRoyalePosition`
     /// helper 0x140b4b760
     pub final_battle_royale_position: u32,

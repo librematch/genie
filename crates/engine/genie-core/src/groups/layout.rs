@@ -680,7 +680,7 @@ mod tests {
     /// `FUN_141013eb0`: a held member's slot at its index takes it, its offset from the group's
     /// place (10, 0, 10), longer ones cut to 5; an unheld member's slot stays fresh and inactive.
     #[test]
-    fn a_horde_takes_its_members_places_within_reach() {
+    fn horde_takes_its_members_places_within_reach() {
         let g = group(3, 1.0, &[]);
         let mut f = Formation::new();
         let members = [
@@ -732,7 +732,7 @@ mod tests {
     /// `FUN_141014f60`: the offsets on x move back by the farthest ahead (10) plus 0.5, the
     /// unheld member's slot too, then are cut to 5.
     #[test]
-    fn a_user_defined_formation_moves_back_behind_its_farthest_member() {
+    fn user_defined_formation_moves_back_behind_its_farthest_member() {
         let g = group(3, 1.0, &[]);
         let mut f = Formation::new();
         let members = [
@@ -760,7 +760,7 @@ mod tests {
     /// starts half a step forward; the slots take category 1's three units, then category 3's.
     /// `MAXSS` at 0x141015208 skips a NaN offset in the search for the farthest slot ahead.
     #[test]
-    fn a_user_defined_formation_s_search_ahead_skips_a_nan_offset() {
+    fn user_defined_formation_search_ahead_skips_nan_offset() {
         let g = group(2, 1.0, &[]);
         let mut f = Formation::new();
         let members = [
@@ -776,7 +776,7 @@ mod tests {
     /// an unordered place keeps walking the side it is on. An infinite spacing grows the box to
     /// infinity, and the first step's `-inf + inf` stays on the first side.
     #[test]
-    fn a_box_walk_on_a_nan_place_stays_on_its_side() {
+    fn box_walk_on_nan_place_stays_on_its_side() {
         let mut out = [BVector::ZERO; BOX_POSITIONS];
         let (mut min, mut max) = (BVector::new(-1.0, 0.0, -1.0), BVector::new(1.0, 0.0, 1.0));
         assert!(
@@ -799,7 +799,7 @@ mod tests {
     /// else its places are -1, its depth set, its attack range 0 (true). Its callers' clear
     /// before it keeps only the distance back.
     #[test]
-    fn a_line_reset_needs_a_width_and_a_depth_not_below_0() {
+    fn line_reset_needs_width_and_depth_not_below_0() {
         let line = FormationLine {
             depth: 2,
             indices: vec![7],
@@ -864,7 +864,7 @@ mod tests {
     /// its unit and filled mark, and the slots take the closest (`FUN_141009760`). Each is its
     /// slots and `lay_units` without the column-to-line flag.
     #[test]
-    fn a_phalanx_and_a_box_take_their_units_after_their_slots() {
+    fn phalanx_and_box_take_their_units_after_their_slots() {
         let mut t = three_at_six();
         let g = t.groups.get(group_id(1)).unwrap().clone();
         let stale = Slot {
@@ -914,7 +914,7 @@ mod tests {
     /// slot takes its place (slot 0x520) and sub-formation (`FUN_141011300` with 0); the slot
     /// of a member the world's table does not hold stays fresh and inactive.
     #[test]
-    fn a_horde_looks_its_members_up_in_the_world() {
+    fn horde_looks_its_members_up_in_the_world() {
         let mut t = three_at_six();
         t.groups.groups[0].members.insert(
             1,
@@ -966,14 +966,14 @@ mod tests {
     /// `FUN_141011a00` truncates the box's width by `CVTTSS2SI` (0x141012147): a NaN spacing
     /// gives `i32::MIN`, where Rust's `as` would give 0.
     #[test]
-    fn a_box_of_a_nan_spacing_is_i32_min_wide() {
+    fn box_of_nan_spacing_is_i32_min_wide() {
         let mut f = Formation::new();
         assert!(box_slots(&mut f, &group(2, f32::NAN, &[(1, 2)]), WorldTime::ZERO).unwrap());
         assert_eq!((f.maximum_width, f.maximum_depth), (i32::MIN, i32::MIN));
     }
 
     #[test]
-    fn a_phalanx_grows_by_a_slot_a_line() {
+    fn phalanx_grows_by_slot_line() {
         let g = group(4, 2.0, &[(3, 1), (1, 3)]);
         let mut f = Formation::new();
         assert!(phalanx_slots(&mut f, &g, WorldTime::from_millis(99)).unwrap());
@@ -1153,7 +1153,7 @@ mod tests {
     /// `FUN_141011a00`: category 5's lone unit in the middle, then category 1's three on the box
     /// a spacing (2) wider each way; the box 4 wide; its lines by x.
     #[test]
-    fn a_box_rings_its_categories_from_the_middle_out() {
+    fn box_rings_its_categories_from_the_middle_out() {
         let g = group(4, 2.0, &[(1, 3), (5, 1)]);
         let mut f = Formation::new();
         assert!(box_slots(&mut f, &g, WorldTime::from_millis(5)).unwrap());

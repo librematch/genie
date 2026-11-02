@@ -37,7 +37,7 @@ fn moving_bytes(waypoints: &[u8], substitute: i32) -> Vec<u8> {
 }
 
 #[test]
-fn a_path_has_disable_flags_before_10_25_and_enable_flags_from_10_20() {
+fn path_has_disable_flags_before_10_25_and_enable_flags_from_10_20() {
     let old = read_all::<PathData>(&path_bytes(&[33]), 10.0);
     assert_eq!((old.disable_flags, old.enable_flags), (Some(33), None));
     let both = read_all::<PathData>(&path_bytes(&[33, 44]), 10.20);
@@ -77,7 +77,7 @@ fn movement_data_writes_back_its_velocity_and_acceleration() {
 }
 
 #[test]
-fn a_moving_unit_reads_its_paths_placement_and_waypoints() {
+fn moving_unit_reads_its_paths_placement_and_waypoints() {
     let mut points = words(&[2]);
     points.extend(floats(&[1.0, 1.0, 0.0, 2.0, 2.0, 0.0]));
     let unit = read_all::<MovingUnitAttributes>(&moving_bytes(&points, 1), 11.97);
@@ -118,7 +118,7 @@ fn a_moving_unit_reads_its_paths_placement_and_waypoints() {
 /// A negative waypoint count reads no waypoints; the substitute position is read but kept
 /// only behind its flag.
 #[test]
-fn a_negative_waypoint_count_and_no_substitute_read_nothing() {
+fn negative_waypoint_count_and_no_substitute_read_nothing() {
     let unit = read_all::<MovingUnitAttributes>(&moving_bytes(&words(&[-1]), 0), 11.97);
     assert_eq!(unit.user_defined_waypoints, []);
     assert_eq!(unit.substitute_position, None);
@@ -127,7 +127,7 @@ fn a_negative_waypoint_count_and_no_substitute_read_nothing() {
 
 /// Without the future path's and the movement data's flags neither is read.
 #[test]
-fn a_moving_unit_without_flags_has_no_future_path_or_movement() {
+fn moving_unit_without_flags_has_no_future_path_or_movement() {
     let mut bytes = words(&[11]);
     bytes.extend(floats(&[0.0; 4]));
     bytes.extend(words(&[0, 0, 0, -1, -1]));

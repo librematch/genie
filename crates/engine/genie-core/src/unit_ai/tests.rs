@@ -198,7 +198,7 @@ struct Recorder {
 /// the one above it (the neighbours go left, right, below, above); one at the edge of the reach
 /// (`r − 1` tiles) is tested but its tile is not spread from, one beyond is never reached.
 #[test]
-fn the_builder_s_flood_tests_left_right_below_above() {
+fn the_builder_flood_tests_left_right_below_above() {
     let at = Tile::new(50, 50);
     let found = flood_search(at, 8, |t: Tile| {
         Ok(match (t.x(), t.y()) {
@@ -359,7 +359,7 @@ impl UnitSide for HelpSide {
 /// town centres, walls or a master whose hero flag forbids it; the convert task's attribute
 /// (`+0x26`) must be above 0 for the object's class.
 #[test]
-fn a_priest_converts_by_its_faith_its_task_and_the_object() {
+fn priest_converts_by_its_faith_its_task_and_the_object() {
     let attributes = {
         let mut a = vec![Amount::ZERO; 100];
         a[67] = Amount::new(1.0);
@@ -462,7 +462,7 @@ fn the_order_history_keeps_the_eight_newest_first() {
 /// The full update's start (`0x140c66b10`): an expired retarget entry goes and a live one
 /// stays; a target gone or below 1 hit point empties them all.
 #[test]
-fn the_retarget_entries_expire_and_a_dead_target_empties_them() {
+fn the_retarget_entries_expire_and_dead_target_empties_them() {
     let seen = |hp: HitPoints| UnitSeen {
         hp,
         ..UnitSeen::default()
@@ -509,7 +509,7 @@ fn the_retarget_entries_expire_and_a_dead_target_empties_them() {
 /// villager and the fishing ship), the search sets the alert mode, and the walk of its lists
 /// looks for helpers. 426048706's gate 7558 (a building, p3) in update 4.
 #[test]
-fn a_call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
+fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
     let at = Surroundings {
         position: Position::new(124.5, 174.5, 0.0),
         los: Distance::new(6.0),
@@ -622,7 +622,7 @@ impl UnitSide for OffSide {
 /// villager whose action has a target queues the foundation's order in front and that work
 /// behind, the points the vectors' x and height.
 #[test]
-fn a_unit_sent_off_a_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
+fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
     let site = Named {
         id: object_id(10028),
         master: master_id(70),
@@ -705,7 +705,7 @@ fn a_unit_sent_off_a_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
 /// slot 0x340) gives it its `MoveTo` at once, so the full update's later check (slot 0x430)
 /// sees it busy and the action value 0x2bf stays.
 #[test]
-fn a_unit_sent_off_a_footprint_keeps_its_move_aside_through_the_update() {
+fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
     let mut u = idle(UnitAiType::HUNTED);
     u.post(
         Notify::own(object_id(14054), NotifyKind::SENT_OFF, [200, 200, 14100]),
@@ -757,7 +757,7 @@ fn a_unit_sent_off_a_footprint_keeps_its_move_aside_through_the_update() {
 /// ([`UnitSide::effect_now`]): the cap on the last human order time, then the stop, reach the
 /// unit before the attack command that follows them.
 #[test]
-fn the_unit_ai_s_calls_reach_the_unit_in_their_order() {
+fn the_unit_ai_calls_reach_the_unit_in_their_order() {
     let mut ai = UnitAi::default();
     let mut side = Recorder::default();
     let at = Surroundings::default();
@@ -931,7 +931,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
 /// then the case sets 0x27a again (the last takes it) and the tail takes the order and its
 /// priority, which ends the queue's turn: the work waits in the queue.
 #[test]
-fn a_foundation_order_waits_for_the_foundation_and_ends_the_queue_s_turn() {
+fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
     let mut ai = sent_off_queue();
     let mut side = WaitSide(true, Vec::new());
     let fx = ai
@@ -958,7 +958,7 @@ fn a_foundation_order_waits_for_the_foundation_and_ends_the_queue_s_turn() {
 /// value, the old one the last, and returns 0; the order goes and the queue runs the next,
 /// the work on its old target (priority 100 passes the action value).
 #[test]
-fn a_foundation_order_without_a_wait_goes_and_the_work_runs() {
+fn foundation_order_without_wait_goes_and_the_work_runs() {
     let mut ai = sent_off_queue();
     let mut side = WaitSide(false, Vec::new());
     // the world holds the work's target
@@ -1132,7 +1132,7 @@ fn found_at(id: i32) -> Found {
 /// computer player's villager finding nothing, a found object without its place and a farm
 /// found are not modelled.
 #[test]
-fn a_hunter_asked_for_another_target_hunts_what_its_search_finds() {
+fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
     let hunter = |target: i16, last: i16| UnitAi {
         ai_type: CIVILIAN,
         current_order: Some(OrderKind::Gather),
@@ -1225,7 +1225,7 @@ fn a_hunter_asked_for_another_target_hunts_what_its_search_finds() {
 /// player's villager does nothing more, a computer player's stops. A found object without
 /// its place is not modelled.
 #[test]
-fn a_gatherer_without_a_class_stops_and_one_on_a_farm_searches_for_another() {
+fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
     let gatherer = |target: i16, last: i16| UnitAi {
         ai_type: CIVILIAN,
         current_order: Some(OrderKind::Gather),
@@ -1314,7 +1314,7 @@ fn a_gatherer_without_a_class_stops_and_one_on_a_farm_searches_for_another() {
 /// player's stops; the shepherd's search, a computer builder without a foundation and the
 /// explorer's search are not modelled.
 #[test]
-fn a_villager_searches_by_its_action() {
+fn villager_searches_by_its_action() {
     let villager = |current_action| UnitAi {
         ai_type: CIVILIAN,
         current_action,
@@ -1382,7 +1382,7 @@ fn a_villager_searches_by_its_action() {
 /// `BuildObject` (slot 0xf0, `FUN_140c47d80`) whose build command answers 0 (slot 0x380: the
 /// foundation gone or no task for it) gives no command and leaves the AI as it was.
 #[test]
-fn a_build_object_whose_build_command_answers_0_changes_nothing() {
+fn build_object_whose_build_command_answers_0_changes_nothing() {
     let at = Surroundings {
         units: vec![UnitSeen {
             id: object_id(10028),
@@ -1445,7 +1445,7 @@ fn a_build_object_whose_build_command_answers_0_changes_nothing() {
 /// its target class (7, a bush: gather group 1) names the search from the notify's drop
 /// site, any workers; what it finds it gathers, the AI's target and action taken.
 #[test]
-fn a_gatherer_asked_for_another_target_gathers_what_its_search_finds() {
+fn gatherer_asked_for_another_target_gathers_what_its_search_finds() {
     let bush = Gatherable {
         id: object_id(28200),
         position: Position::new(111.5, 16.5, 0.0),
@@ -1541,7 +1541,7 @@ fn a_gatherer_asked_for_another_target_gathers_what_its_search_finds() {
 /// notify's drop site, kind 0 below 2 workers, another any; what it finds it hunts
 /// (`HuntObject`, slot 0xc8 with 1). Finding nothing a human player's villager stays.
 #[test]
-fn a_hunter_of_a_kind_searches_by_it_from_its_drop_site() {
+fn hunter_of_kind_searches_by_it_from_its_drop_site() {
     let tree = Gatherable {
         id: object_id(28300),
         position: Position::new(50.5, 60.5, 0.0),
@@ -1647,7 +1647,7 @@ fn attacker(id: i32, class: ClassId, gap_squared: DistanceSquared) -> UnitSeen {
 /// then adds to its attackers, but its `AttackObject` is not forced and fails: it keeps the
 /// first.
 #[test]
-fn a_boar_attacks_its_first_attacker_and_keeps_it() {
+fn boar_attacks_its_first_attacker_and_keeps_it() {
     let mut u = hit_boar();
     let at = Surroundings {
         id: object_id(9729),
@@ -1705,7 +1705,7 @@ fn a_boar_attacks_its_first_attacker_and_keeps_it() {
 /// slot 0x3c0) and the villager 27240's hit makes it attack again, forced. The stop is a call
 /// on the unit at once: it empties the action list before the attack command fills it.
 #[test]
-fn a_stop_before_an_attack_command_runs_first() {
+fn stop_before_an_attack_command_runs_first() {
     let mut u = UnitAi {
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(31126)),
@@ -1747,7 +1747,7 @@ fn a_stop_before_an_attack_command_runs_first() {
 /// since the last sighting again; a fresh one without clears the alert mode; a search that
 /// read the last answer changes nothing.
 #[test]
-fn a_fresh_search_s_enemies_set_the_alert_mode() {
+fn fresh_search_enemies_set_the_alert_mode() {
     let found = |fresh, enemies| Found {
         enemies,
         fresh,
@@ -1776,7 +1776,7 @@ fn a_fresh_search_s_enemies_set_the_alert_mode() {
 /// master: a boar (class 10 of combat level 1) lets it be; a wolf (combat level 4) with no
 /// order attacks it, forced, unless its stance is not aggressive.
 #[test]
-fn a_unit_in_the_way_is_attacked_by_a_wolf_not_by_a_boar() {
+fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
     let at = |combat_level| Surroundings {
         id: object_id(29823),
         class: Some(class::PREDATOR),
@@ -2153,7 +2153,7 @@ fn hit_villager() -> (UnitAi, Surroundings, Notify) {
 /// calls for help, sends its order to the queue's end, stops its action and runs from the
 /// attacker (to its west, the attacker being east of it); the call keeps the attacker.
 #[test]
-fn a_villager_evades_another_player_s_attacker() {
+fn villager_evades_another_player_attacker() {
     let (mut u, at, hit) = hit_villager();
     let mut side = DamageSide {
         units: vec![foe(30, class::CLASS_6)],
@@ -2202,7 +2202,7 @@ fn a_villager_evades_another_player_s_attacker() {
 /// or the action `0x26a` changes nothing; an invalidated gather or hunt of a class other
 /// than 10 would search for another of that class (not modelled).
 #[test]
-fn a_villager_s_invalidated_action_off_its_searches_stops_it() {
+fn villager_invalidated_action_off_its_searches_stops_it() {
     let moving = || UnitAi {
         current_action: Some(ActionKind::Move),
         current_target: Some(object_id(30)),
@@ -2396,7 +2396,7 @@ fn an_invalidated_action_of_the_order_or_an_attack_stops_the_unit() {
 /// 701 on a move and 712 on a move of action `0x2bf` only drop the action, and an attack's
 /// completion stops; the rest go on.
 #[test]
-fn a_completed_action_of_the_order_or_an_attack_stops_the_unit() {
+fn completed_action_of_the_order_or_an_attack_stops_the_unit() {
     let at = Surroundings {
         id: object_id(20),
         position: Position::new(12.0, 13.0, 0.0),
@@ -2594,7 +2594,7 @@ fn the_base_handler_takes_each_kind_it_models() {
 /// A villager dodges a missile's warning by its owner's chance (one AI draw); one it does
 /// not dodge is its damage.
 #[test]
-fn a_villager_dodges_a_missile_s_warning_or_takes_it_as_damage() {
+fn villager_dodges_missile_warning_or_takes_it_as_damage() {
     let r = rng().rand15() as i32 * 100 / 0x7fff;
     let (mut u, mut at, hit) = hit_villager();
     let warning = Notify {
@@ -2639,7 +2639,7 @@ fn a_villager_dodges_a_missile_s_warning_or_takes_it_as_damage() {
 /// attacker is: without an order straight away (`AttackObject` forced), and it stops after
 /// the kill.
 #[test]
-fn a_villager_attacks_a_harmless_attacker_back() {
+fn villager_attacks_harmless_attacker_back() {
     let (mut u, at, hit) = hit_villager();
     u.current_order = None;
     u.current_action = None;
@@ -2666,7 +2666,7 @@ fn a_villager_attacks_a_harmless_attacker_back() {
 /// On the move action (`0x262`) a villager at a speed keeps moving (and returns 3); at a
 /// standstill it evades; without its animation speed the slice stops.
 #[test]
-fn a_moving_villager_keeps_its_way() {
+fn moving_villager_keeps_its_way() {
     let (mut u, at, hit) = hit_villager();
     u.current_action = Some(ActionKind::Move);
     let mut side = DamageSide {
@@ -2766,7 +2766,7 @@ fn guarding(defend_target: i32) -> UnitAi {
 /// player's ward ends it (the target goes, the action stops, the order is −1); Gaia's dead
 /// ward does not; an unset target point takes the ward's place.
 #[test]
-fn a_defend_order_ends_with_its_ward_gone_foreign_or_dead() {
+fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
     let at = soldier_at();
     let foreign = UnitSeen {
         allied: false,
@@ -2837,7 +2837,7 @@ fn a_defend_order_ends_with_its_ward_gone_foreign_or_dead() {
 /// ward (slot 0x138) or runs to the point it defends (slot 0x130, forced); within it, it
 /// attacks the ward's nearest attacker (slot 0xb8, forced), or with none its processIdle runs.
 #[test]
-fn a_defend_order_follows_its_ward_and_attacks_its_attackers() {
+fn defend_order_follows_its_ward_and_attacks_its_attackers() {
     let at = soldier_at();
     let mut u = guarding(20);
     let mut side = DamageSide {
@@ -3054,7 +3054,7 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
 /// the boar's and ranged units' empty ones, the priest's 30, the trade AI's by class, a
 /// computer player's soldier's with 10.
 #[test]
-fn each_unit_ai_type_searches_its_constructor_s_classes() {
+fn each_unit_ai_type_searches_its_constructor_classes() {
     let list = |t: UnitAiType, class: ClassId, computer: bool| {
         cared_classes(t, Some(class), computer).unwrap()
     };
@@ -3090,7 +3090,7 @@ fn each_unit_ai_type_searches_its_constructor_s_classes() {
 /// its mask below 50 (61 passes), the tower the soldier's mask; attack priority 3 keeps only
 /// its classes.
 #[test]
-fn each_unit_ai_type_tests_a_neutral_object_by_its_module() {
+fn each_unit_ai_type_tests_neutral_object_by_its_module() {
     for t in [CIVILIAN, BUILDING_AI] {
         assert!(!type_attacks_neutral(
             t,
@@ -3270,7 +3270,7 @@ fn an_idle_soldier_attacks_back_what_best_unit_to_attack_names() {
 /// tower target; on a patrol its patrol is saved and, the attack taken, the order ends with
 /// its timers (an adjusted idle timeout of 750 redrawn, the secondary timer capped).
 #[test]
-fn a_soldier_with_a_target_attacks_back_from_buildings_only() {
+fn soldier_with_target_attacks_back_from_buildings_only() {
     let at = soldier_at();
     let run = |class: ClassId, order: Option<OrderKind>| {
         let mut fx = Vec::new();
@@ -3328,7 +3328,7 @@ fn a_soldier_with_a_target_attacks_back_from_buildings_only() {
 /// a harmless target makes it ask for help and attack back, then the kill times decide again
 /// (the attacker's sooner, or its conversion, but never against a converting target).
 #[test]
-fn a_computer_s_unit_weighs_its_target_against_its_attacker() {
+fn computer_unit_weighs_its_target_against_its_attacker() {
     let duel = |converts: bool, attacks: f32, harmed: f32, hp: HitPoints| Duel {
         converts,
         attacks,
@@ -3471,7 +3471,7 @@ fn a_computer_s_unit_weighs_its_target_against_its_attacker() {
 /// processIdle with 0 (`FUN_140c20db0`) attacks the next sheep `bestUnitToAttack` finds,
 /// forced, and its order goes; finding none, it moves to the dead sheep's point.
 #[test]
-fn a_scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
+fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
     let run = |found: i32| {
         let mut scout = UnitAi {
             current_order: Some(OrderKind::Attack),
@@ -3529,7 +3529,7 @@ fn a_scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
 /// The target block's attack whose target died on a patrol order: the order ends with its
 /// timers reset (an adjusted idle timeout of 750 redrawn, the secondary timer capped).
 #[test]
-fn a_patrol_s_kill_ends_the_patrol_order_with_its_timers() {
+fn patrol_kill_ends_the_patrol_order_with_its_timers() {
     let mut scout = UnitAi {
         current_order: Some(OrderKind::Patrol),
         current_action: Some(ActionKind::Attack),
@@ -3571,7 +3571,7 @@ fn a_patrol_s_kill_ends_the_patrol_order_with_its_timers() {
 /// against an enemy's sheep looks no further in stand ground, nor while it swings (its Attack
 /// in state 6 or 7); otherwise the search for a better target follows.
 #[test]
-fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
+fn retarget_check_stops_in_stand_ground_and_while_attacking() {
     let scout = |stance: UnitStance| UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(ActionKind::Attack),
@@ -3661,7 +3661,7 @@ fn a_retarget_check_stops_in_stand_ground_and_while_attacking() {
 }
 
 #[test]
-fn a_lion_attacks_by_its_priority_or_its_classes() {
+fn lion_attacks_by_its_priority_or_its_classes() {
     assert!(lion_may_attack(AttackPriority::PRIORITY_1, class::BUILDING));
     assert!(!lion_may_attack(
         AttackPriority::PRIORITY_3,
@@ -3676,7 +3676,7 @@ fn a_lion_attacks_by_its_priority_or_its_classes() {
 /// state 12) that hits it: the boar is its target, so it calls nobody for help; it is under
 /// attack, and the hunt order with a class-10 target and a Gaia attacker ignores the damage.
 #[test]
-fn a_hunter_hit_by_its_boar_ignores_the_damage() {
+fn hunter_hit_by_its_boar_ignores_the_damage() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Hunt),
         current_action: Some(ActionKind::Hunt),
@@ -3749,7 +3749,7 @@ fn a_hunter_hit_by_its_boar_ignores_the_damage() {
 }
 
 #[test]
-fn closest_valid_attacker_skips_classes_and_flips_a_coin_on_a_tie() {
+fn closest_valid_attacker_skips_classes_and_flips_coin_on_tie() {
     let mut u = hit_boar();
     u.attackers = Attackers::of_saved(&[1, 2, 3]);
     let at = Surroundings {
@@ -3797,7 +3797,7 @@ fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
 /// it, as 10049 is one of its attackers, and its base handler drops the attacker. A 699 from
 /// a unit that is not attacking it is ignored.
 #[test]
-fn a_released_attacker_leaves_the_set_through_notify_699() {
+fn released_attacker_leaves_the_set_through_notify_699() {
     let mut u = hit_boar();
     u.attackers = Attackers::of_saved(&[10049]);
     let released = |caller| Notify {
@@ -3826,7 +3826,7 @@ fn a_released_attacker_leaves_the_set_through_notify_699() {
 /// A builder on its build order (702, action 602): MarvinBlue/426048731's 9175 in update 681,
 /// whose look-around timer runs out and is redrawn from the AI stream.
 #[test]
-fn a_builder_s_idle_timer_stays_0_and_its_look_around_is_redrawn() {
+fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Build),
         current_action: Some(ActionKind::Build),
@@ -3883,7 +3883,7 @@ fn a_builder_s_idle_timer_stays_0_and_its_look_around_is_redrawn() {
 }
 
 #[test]
-fn a_work_notify_sets_the_order_and_redraws_a_timeout_left_by_order_711() {
+fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Build),
         current_action: Some(ActionKind::Build),
@@ -3927,7 +3927,7 @@ fn a_work_notify_sets_the_order_and_redraws_a_timeout_left_by_order_711() {
 }
 
 #[test]
-fn a_defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
+fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
     // records/425906646's update 1404: player 8's unit on the defend stance (1); within 5
     // tiles of its state position (from its footprint) it goes on to the retarget check
     let defender = |x: f32| {
@@ -4026,7 +4026,7 @@ fn retarget_waits_for_the_timer() {
 }
 
 #[test]
-fn a_last_retarget_ahead_of_the_world_time_wraps_and_retargets() {
+fn last_retarget_ahead_of_the_world_time_wraps_and_retargets() {
     let mut u = UnitAi {
         last_retarget_time: WorldTime::from_millis(400),
         ..idle(UnitAiType::TOWER)
@@ -4199,7 +4199,7 @@ fn non_idle_units_and_unknown_types_are_unsupported() {
 }
 
 #[test]
-fn a_new_building_unit_ai_draws_its_three_timers() {
+fn new_building_unit_ai_draws_its_three_timers() {
     // UnitAIModule's constructor: last retarget r % 500, adjusted idle timeout r % 1500 + 2250,
     // retarget timer 750 + r % 500, in that order
     let mut r = rng();
@@ -4268,7 +4268,7 @@ fn a_new_building_unit_ai_draws_its_three_timers() {
 /// draw for its adjusted one (`r % 2500 + 3750`), stance 0, five notify slots. The recording
 /// 426048706 holds rock churches of base 5000 with adjusted ones of 3881 and 6012.
 #[test]
-fn a_new_artifact_unit_ai_draws_four_timers() {
+fn new_artifact_unit_ai_draws_four_timers() {
     let mut r = rng();
     let ai = UnitAi::constructed(
         ARTIFACT_AI,
@@ -4568,7 +4568,7 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
 /// update; a takeover forgets its target, stops its action (slot 0xb0 with 1) after the
 /// ownership change, and its idle timer is 0.
 #[test]
-fn the_artifact_s_update_hands_it_over_then_stops() {
+fn the_artifact_update_hands_it_over_then_stops() {
     let (mut ai, at) = rock_church();
     ai.idle_timer = Millis::new(900);
     let mut side = ArtifactSide::finding(500, 1, Some(PlayerId::new(3)));
@@ -4606,7 +4606,7 @@ fn the_artifact_s_update_hands_it_over_then_stops() {
 /// failure (with an order, the order's action) and any kind it does not know end in its
 /// stop; a moved target it still sees goes on, one it does not see ends.
 #[test]
-fn the_artifact_s_notifies_stop_it_or_go_on() {
+fn the_artifact_notifies_stop_it_or_go_on() {
     let run = |ai: &mut UnitAi, kind: NotifyKind, p: [i32; 3], at: &Surroundings| {
         let n = Notify {
             caller: Some(object_id(500)),
@@ -4696,7 +4696,7 @@ fn the_artifact_s_notifies_stop_it_or_go_on() {
 /// 1000 and a fourth draw for its adjusted idle timeout (`r % 500 + 750`). records/428759682
 /// update 2019: the town centre 8768 a 621's completion makes holds base 1000, adjusted 818.
 #[test]
-fn a_new_tower_unit_ai_draws_four_timers() {
+fn new_tower_unit_ai_draws_four_timers() {
     let mut r = rng();
     let ai = UnitAi::constructed(
         TOWER_AI,
@@ -4828,7 +4828,7 @@ fn each_unit_ai_constructor_draws_its_timers_and_sets_its_stance() {
 /// `FUN_141215560` has no constructor for the types outside 2..=0x13: such an object gets
 /// no unit AI and nothing is drawn.
 #[test]
-fn a_unit_ai_type_without_a_constructor_makes_none_and_draws_nothing() {
+fn unit_ai_type_without_constructor_makes_none_and_draws_nothing() {
     for ai_type in [0, 1, 0x14, 99].map(UnitAiType::of_value) {
         let mut r = rng();
         assert_eq!(
@@ -4844,7 +4844,7 @@ fn a_unit_ai_type_without_a_constructor_makes_none_and_draws_nothing() {
 /// keeps the base's 3. The boar's (`FUN_140c11720`) origin is its place too, neither
 /// furious nor sent home.
 #[test]
-fn a_new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
+fn new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
     let mut deer = placed(Position::new(20.0, 30.0, 2.0), class::PREY);
     deer.hunt_range = Distance::new(7.5);
     let mut r = rng();
@@ -4890,7 +4890,7 @@ fn a_new_hunted_animal_and_boar_keep_their_place_as_their_origin() {
 /// The soldier's constructor (`FUN_140c12300`): a computer player's idle timeout is 1500
 /// (the fourth draw `r % 750 + 1125`); its stance by the rules of [`soldier_stance`].
 #[test]
-fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
+fn new_soldier_takes_its_stance_from_its_master_and_owner() {
     let mut computer = placed(Position::ORIGIN, class::CLASS_6);
     computer.computer = true;
     computer.posture = Posture::DEFENSIVE;
@@ -5035,7 +5035,7 @@ fn a_new_soldier_takes_its_stance_from_its_master_and_owner() {
 /// The siege unit's stance (`FUN_140c12040`): a computer player's and the trebuchets' (51,
 /// 54) 0, the scorpion's (55) the owner's posture, any other's 1.
 #[test]
-fn a_new_siege_unit_takes_its_stance_from_its_class_and_owner() {
+fn new_siege_unit_takes_its_stance_from_its_class_and_owner() {
     let stance = |class: ClassId, computer: bool, posture: i32| {
         siege_stance(&NewObject {
             class,
@@ -5057,7 +5057,7 @@ fn a_new_siege_unit_takes_its_stance_from_its_class_and_owner() {
 /// [`NewObject::of`]: the master's copy, class, flags and hero flag, and the work range of
 /// its last task of action type 6 (0 without one).
 #[test]
-fn a_new_object_takes_its_hunt_range_from_its_master_s_last_task_of_type_6() {
+fn new_object_takes_its_hunt_range_from_its_master_last_task_of_type_6() {
     let task = |action_type, work_range| crate::objects::masters::Task {
         action_type,
         work_range,
@@ -5179,7 +5179,7 @@ fn seed_for(wanders: bool) -> Well512 {
 }
 
 #[test]
-fn a_boar_at_home_draws_its_leash_and_mostly_stays() {
+fn boar_at_home_draws_its_leash_and_mostly_stays() {
     // updates 766, 910 and 1039: processIdle draws `0..81` and a rand15, which is not a
     // multiple of 7; nothing moves
     let mut u = boar();
@@ -5200,7 +5200,7 @@ fn a_boar_at_home_draws_its_leash_and_mostly_stays() {
 }
 
 #[test]
-fn a_boar_wanders_up_to_three_tiles_once_in_seven() {
+fn boar_wanders_up_to_three_tiles_once_in_seven() {
     let mut u = boar();
     let mut r = seed_for(true);
     let mut e = r.clone();
@@ -5242,7 +5242,7 @@ fn a_boar_wanders_up_to_three_tiles_once_in_seven() {
 }
 
 #[test]
-fn a_boar_away_from_home_goes_back_and_a_furious_one_stays() {
+fn boar_away_from_home_goes_back_and_furious_one_stays() {
     // more than 2 tiles from its origin and once in 7: home, at its own height
     let mut u = boar();
     let mut r = seed_for(true);
@@ -5314,7 +5314,7 @@ fn a_boar_away_from_home_goes_back_and_a_furious_one_stays() {
 }
 
 #[test]
-fn a_deer_s_adjusted_idle_timeout_is_five_quarters_of_its_idle_timeout() {
+fn deer_adjusted_idle_timeout_is_five_quarters_of_its_idle_timeout() {
     // FUN_140c17170, the deer's and fox's slot 0x1a8: no draw
     let mut u = UnitAi {
         idle_timeout: Millis::new(4000),
@@ -5327,7 +5327,7 @@ fn a_deer_s_adjusted_idle_timeout_is_five_quarters_of_its_idle_timeout() {
 }
 
 #[test]
-fn a_move_forgets_the_target_and_an_order_keeps_its_history() {
+fn move_forgets_the_target_and_an_order_keeps_its_history() {
     // MOVE of 9185 in 1044: order 710, action 610, no target, the point on the ground
     let mut u = UnitAi {
         current_target: Some(object_id(9365)),
@@ -5357,7 +5357,7 @@ fn a_move_forgets_the_target_and_an_order_keeps_its_history() {
 }
 
 #[test]
-fn an_idle_transport_ship_retargets_like_a_soldier() {
+fn an_idle_transport_ship_retargets_like_soldier() {
     // type 11, TribeTransportShipUnitAIModule: base slots 4 and 73, slot 72 0x140c21d20 draws
     // nothing
     let mut u = idle(UnitAiType::TRANSPORT);
@@ -5424,7 +5424,7 @@ fn wander_seed(wanders: bool) -> Well512 {
 }
 
 #[test]
-fn a_deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
+fn deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
     let mut searched = Vec::new();
     let mut nothing = |s: &Search<'_>| {
         searched.push((s.at, s.radius, s.classes.len(), s.size));
@@ -5482,7 +5482,7 @@ fn a_deer_that_sees_nothing_stays_six_times_in_seven_and_otherwise_wanders() {
 }
 
 #[test]
-fn a_deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
+fn deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
     let mut u = deer();
     let mut r = wander_seed(true);
     let away = deer_at(Position::new(34.5, 106.5, 0.5));
@@ -5521,7 +5521,7 @@ fn a_deer_away_from_home_goes_back_and_one_beyond_its_leash_at_once() {
 /// and running, and holds the move action and the point; an enemy among what it saw sets its
 /// alert mode and starts its sighting time again (deer 9655 at update 2626).
 #[test]
-fn a_deer_that_sees_an_object_evades_it() {
+fn deer_that_sees_an_object_evades_it() {
     let mut u = UnitAi {
         time_since_enemy: Seconds::new(12.0),
         ..deer()
@@ -5691,7 +5691,7 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
 }
 
 #[test]
-fn between_turns_a_walking_unit_or_one_with_notifies_keeps_its_queue() {
+fn between_turns_walking_unit_or_one_with_notifies_keeps_its_queue() {
     let mut walking = scout();
     assert_eq!(
         walking.off_turn_fx(&scout_at(false, true), &mut no_search, false, &mut rng()),
@@ -5722,7 +5722,7 @@ fn between_turns_a_walking_unit_or_one_with_notifies_keeps_its_queue() {
 }
 
 #[test]
-fn a_completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
+fn completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
     // the base handler's 0x1fa: 610 + 100 = 710, so slot 0xb0 ends the order too; the
     // notifies go with the owner's time; the queue then runs (the unit is no longer busy)
     let mut u = UnitAi {
@@ -5759,7 +5759,7 @@ fn a_completed_move_on_its_order_ends_the_order_and_stops_the_unit() {
 }
 
 #[test]
-fn a_failed_action_stops_like_a_completed_one_and_an_order_s_own_failure_ends_it() {
+fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
     // records/425906646's update 1234: a Gaia animal's own MoveTo failed (state 13, notify
     // 0x1f9); without an order the failure of the current action stops it
     let mut u = UnitAi {
@@ -5849,7 +5849,7 @@ fn a_failed_action_stops_like_a_completed_one_and_an_order_s_own_failure_ends_it
 /// went out of sight, which sent it home (`+0x1fd`); the failure's processIdle (slot 0x240)
 /// walks it there and breaks off. A boar that stays forgets its target and stops.
 #[test]
-fn a_boar_s_failed_attack_runs_its_idle_check() {
+fn boar_failed_attack_runs_its_idle_check() {
     let home = |go_home, furious| Home {
         origin: Position::new(171.5, 51.5, 0.0),
         furious,
@@ -5901,7 +5901,7 @@ fn a_boar_s_failed_attack_runs_its_idle_check() {
 }
 
 #[test]
-fn an_animal_s_completed_wander_becomes_its_last_action() {
+fn an_animal_completed_wander_becomes_its_last_action() {
     // the fox 9851 in 718: its MoveTo's completion through the hunted animal's handler to
     // the base: no order, its action completed
     let mut u = UnitAi {
@@ -5933,7 +5933,7 @@ fn an_animal_s_completed_wander_becomes_its_last_action() {
 }
 
 #[test]
-fn a_movement_completion_reaches_only_a_moving_unit_ai() {
+fn movement_completion_reaches_only_moving_unit_ai() {
     let completed = Notify::own(
         object_id(9181),
         NotifyKind::ACTION_COMPLETED,
@@ -5962,7 +5962,7 @@ fn a_movement_completion_reaches_only_a_moving_unit_ai() {
 }
 
 #[test]
-fn a_livestock_s_ownership_notify_drops_its_action_value_and_breaks_off() {
+fn livestock_ownership_notify_drops_its_action_value_and_breaks_off() {
     // FUN_140c26ac0: the notify ends the pass; the update's FUN_140c5dc10 clears the queue
     let mut u = UnitAi {
         current_action: Some(ActionKind::Move),
@@ -6054,7 +6054,7 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
 }
 
 #[test]
-fn a_saved_order_and_notify_read_as_the_game_wrote_them() {
+fn saved_order_and_notify_read_as_the_game_wrote_them() {
     let mut order = [0u8; 52];
     for (i, w) in [1i32, 710, 100, -1, -1].iter().enumerate() {
         order[4 * i..4 * i + 4].copy_from_slice(&w.to_le_bytes());
@@ -6124,7 +6124,7 @@ fn builder_done() -> UnitAi {
 }
 
 #[test]
-fn a_making_building_runs_process_idle_only_without_a_target() {
+fn making_building_runs_process_idle_only_without_target() {
     // a town centre (type 15, class 3) on its make action: with a target, or within its idle
     // timeout, the idle part does nothing and keeps the timer
     let tc = |target| UnitAi {
@@ -6204,7 +6204,7 @@ fn a_making_building_runs_process_idle_only_without_a_target() {
 /// an order after `HuntObject`, a villager waiting for its foundation (734/634 with the
 /// foundation), a boar moved aside off its attacker (-1/703).
 #[test]
-fn a_unit_ai_with_a_target_runs_its_update_on_any_order() {
+fn unit_ai_with_target_runs_its_update_on_any_order() {
     let at = Surroundings {
         busy: true,
         player: PlayerId::new(1),
@@ -6274,7 +6274,7 @@ fn a_unit_ai_with_a_target_runs_its_update_on_any_order() {
 }
 
 #[test]
-fn the_target_block_keeps_a_standing_target_and_drops_a_gone_one() {
+fn the_target_block_keeps_standing_target_and_drops_gone_one() {
     // 1497: the house exists in state 2, which keeps it
     let standing = Surroundings {
         state: ObjectState::Alive,
@@ -6334,7 +6334,7 @@ fn the_target_block_keeps_a_standing_target_and_drops_a_gone_one() {
 }
 
 #[test]
-fn a_dead_target_stops_an_action_that_needs_a_live_one() {
+fn dead_target_stops_an_action_that_needs_live_one() {
     let dead = Surroundings {
         state: ObjectState::Alive,
         target: Some(Seen {
@@ -6479,7 +6479,7 @@ fn follower(deer: Position, visible: bool) -> (UnitAi, Surroundings) {
 }
 
 #[test]
-fn the_follow_order_moves_to_a_target_that_left_its_point() {
+fn the_follow_order_moves_to_target_that_left_its_point() {
     // 2652: the deer is more than a tile off the point in y; beyond 2 the AI moves to it
     let deer = Position::new(114.75516, 40.34795, 0.0);
     let (mut u, at) = follower(deer, true);
@@ -6511,7 +6511,7 @@ fn the_follow_order_moves_to_a_target_that_left_its_point() {
 }
 
 #[test]
-fn the_follow_order_ends_on_a_target_out_of_sight() {
+fn the_follow_order_ends_on_target_out_of_sight() {
     let (mut u, at) = follower(Position::new(114.75516, 40.34795, 0.0), false);
     let mut fx = Vec::new();
     assert!(u.follow(&at, &mut fx, &mut rng()).unwrap());
@@ -6529,7 +6529,7 @@ fn the_follow_order_ends_on_a_target_out_of_sight() {
 /// The base handler's case 0x1fc (a `MoveTo`'s moved target): nothing without a saved
 /// patrol; with one processIdle runs (slot 0x240 with 1; this Gaia soldier only caps).
 #[test]
-fn a_moved_target_notify_runs_process_idle_with_a_saved_patrol() {
+fn moved_target_notify_runs_process_idle_with_saved_patrol() {
     let (mut u, at) = follower(Position::new(115.0, 40.2, 0.0), true);
     let n = Notify::own(object_id(9183), NotifyKind::TARGET_MOVED, [0, 0, 0]);
     let (mut r, mut side) = (rng(), Recorder::default());
@@ -6674,7 +6674,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
 }
 
 #[test]
-fn a_gaia_soldier_that_takes_owners_by_sight_does_not_search() {
+fn gaia_soldier_that_takes_owners_by_sight_does_not_search() {
     let (mut u, at) = idle_scout();
     let gaia = Surroundings {
         player: PlayerId::new(0),
@@ -6831,7 +6831,7 @@ fn each_unit_ai_type_has_its_own_attack_check() {
 }
 
 #[test]
-fn a_tower_passes_a_boar_but_not_a_wolf() {
+fn tower_passes_boar_but_not_wolf() {
     assert_eq!(can_attack(&TC, &IDLE, &BOAR), Ok(false));
     let wolf = Target {
         combat_level: CombatLevel::MILITARY,
@@ -6910,7 +6910,7 @@ const STAND_GROUND: Seeker = Seeker {
 };
 
 #[test]
-fn a_soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() {
+fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() {
     let villager = |x: f32| Target {
         owner: PlayerId::new(2),
         class: class::VILLAGER,
@@ -7049,7 +7049,7 @@ fn forgetting_the_targets_clears_the_current_and_the_last_and_the_point() {
 /// exists or it has an action value; with the second argument set a unit that passes takes
 /// orders only with that task, and without it any unit that passes does.
 #[test]
-fn a_unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
+fn unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
     let mut u = idle(UnitAiType::SOLDIER);
     let plain = Surroundings::default();
     let carter = Surroundings {
@@ -7076,7 +7076,7 @@ fn a_unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
 /// tower's check once a builder started it; a foundation still desolid (`+0xc60`) does not.
 /// The flag counts only for a building: a unit that holds it passes.
 #[test]
-fn a_tower_attacks_a_started_building_but_not_a_desolid_foundation() {
+fn tower_attacks_started_building_but_not_desolid_foundation() {
     let house = Target {
         owner: PlayerId::new(1),
         class: class::BUILDING,
@@ -7147,7 +7147,7 @@ fn the_soldier_passes_over_neutrals_of_its_masked_classes() {
 /// `FUN_140c42640`: an order goes after the last unless it goes in front of a queue that
 /// holds one.
 #[test]
-fn an_inserted_order_goes_in_front_only_of_a_queue_that_holds_one() {
+fn an_inserted_order_goes_in_front_only_of_queue_that_holds_one() {
     let order = |target| QueuedOrder {
         target,
         order: OrderKind::Move,
@@ -7331,7 +7331,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
 /// target stays. Within a tile nothing happens. A gap that is not a number walks too
 /// (`COMISS 1.0, gap; JNC`).
 #[test]
-fn a_unit_off_its_state_position_walks_back_and_keeps_its_target() {
+fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
     let mut u = UnitAi {
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(77)),
@@ -7374,7 +7374,7 @@ fn a_unit_off_its_state_position_walks_back_and_keeps_its_target() {
 
 /// `FUN_140a847c0` clamps each axis by `MAXSS 0, gap`: a gap that is not a number stays one.
 #[test]
-fn the_point_gap_keeps_a_gap_that_is_not_a_number() {
+fn the_point_gap_keeps_gap_that_is_not_number() {
     assert_eq!(
         point_gap_squared(
             Point::new(3.0, 0.0),
@@ -7397,7 +7397,7 @@ fn the_point_gap_keeps_a_gap_that_is_not_a_number() {
 /// `FUN_140c20db0` in `NoAttack` ("searching and returning to state pos."): the search alone
 /// (slot 0x50 with mode 1), then off the patrol orders the walk back; processIdle stays 5.
 #[test]
-fn a_no_attack_soldier_searches_then_walks_back_to_its_state_position() {
+fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
     let (mut u, at) = idle_scout();
     u.stance = UnitStance::NO_ATTACK;
     u.state_position = Point::new(25.0, 92.5);
@@ -7452,7 +7452,7 @@ fn a_no_attack_soldier_searches_then_walks_back_to_its_state_position() {
 /// part, and its target's range test (`FUN_140c41690`) answers 0 for a human player; action
 /// `0x2c0` (moved aside) ends, the last action keeping it, unless the group moves.
 #[test]
-fn a_grouped_unit_s_full_update_reads_its_group() {
+fn grouped_unit_full_update_reads_its_group() {
     let group = |idle, moving, member_moving| {
         Some(GroupState {
             commanded: true,
@@ -7601,7 +7601,7 @@ fn a_grouped_unit_s_full_update_reads_its_group() {
 /// The transport ship's processIdle (`0x140c21d20`): `FUN_140c41e50`, then 5. An idle ship
 /// whose idle timer passed its timeout caps its last human order time and does nothing more.
 #[test]
-fn an_idle_transport_ship_s_check_caps_its_human_order_time_and_does_nothing() {
+fn an_idle_transport_ship_check_caps_its_human_order_time_and_does_nothing() {
     let mut u = UnitAi {
         idle_timer: Millis::new(3001),
         adjusted_idle_timeout: Millis::new(3000),
@@ -7645,7 +7645,7 @@ fn an_idle_transport_ship_s_check_caps_its_human_order_time_and_does_nothing() {
 /// (`FUN_140c1e610`: the cap, then 5) produces nothing, so the AI moves to the dead target's
 /// point within its weapon range and the order ends.
 #[test]
-fn a_villager_whose_attack_target_died_walks_to_its_point() {
+fn villager_whose_attack_target_died_walks_to_its_point() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Attack),
         order_priority: OrderPriority::of_data(100),
@@ -7689,7 +7689,7 @@ fn a_villager_whose_attack_target_died_walks_to_its_point() {
 /// value is still current; the 6 it gives all the same keeps it from walking to the dead
 /// one's point.
 #[test]
-fn a_wolf_whose_attack_target_died_attacks_the_next_villager() {
+fn wolf_whose_attack_target_died_attacks_the_next_villager() {
     let mut u = UnitAi {
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(50)),
@@ -7728,7 +7728,7 @@ fn a_wolf_whose_attack_target_died_attacks_the_next_villager() {
 /// The tower in `NoAttack` (stance 3, `FUN_140c564c0`): after the cap only the search (slot
 /// 0x50 with mode 1, its cared classes), whose alert mode it sets; then 5.
 #[test]
-fn a_no_attack_tower_only_searches() {
+fn no_attack_tower_only_searches() {
     let mut u = UnitAi {
         idle_timer: Millis::new(504),
         adjusted_idle_timeout: Millis::new(503),
@@ -7819,7 +7819,7 @@ fn an_idle_tower_attacks_what_its_search_found() {
 /// master 704, not inside another, without an order) has its unit's slot 0x7e8, which is not
 /// modelled.
 #[test]
-fn a_human_player_s_king_s_idle_check_only_caps() {
+fn human_player_king_idle_check_only_caps() {
     let at = Surroundings {
         position: Position::new(31.5, 106.5, 0.0),
         player: PlayerId::new(1),
@@ -7880,7 +7880,7 @@ fn a_human_player_s_king_s_idle_check_only_caps() {
 /// refuses classes 1 and 42, and at attack priority 3 the classes outside
 /// [`PRIORITY_3_CLASSES`].
 #[test]
-fn a_villager_hunts_an_animal_and_attacks_another_object() {
+fn villager_hunts_an_animal_and_attacks_another_object() {
     let at = |priority: u8| Surroundings {
         id: object_id(10041),
         state: ObjectState::Alive,
@@ -7984,7 +7984,7 @@ fn a_villager_hunts_an_animal_and_attacks_another_object() {
 /// Slot 0xa0 of the types whose `AttackObject` is the base's: the transport ship's and the
 /// livestock's (`FUN_140c48400`) pass anything, the building's (`FUN_140c18b60`) nothing.
 #[test]
-fn a_ship_or_livestock_may_attack_anything_and_a_building_nothing() {
+fn ship_or_livestock_may_attack_anything_and_building_nothing() {
     let at = Surroundings {
         id: object_id(10041),
         state: ObjectState::Alive,
@@ -8028,7 +8028,7 @@ fn handled(
 /// (`FUN_140c5e1e0`), its slot 0x1f0 (`FUN_140c16d50`) sends it home on its next idle check,
 /// then the base handler stops the completed action.
 #[test]
-fn a_boar_whose_move_aside_completed_heads_home_next() {
+fn boar_whose_move_aside_completed_heads_home_next() {
     let mut u = UnitAi {
         current_action: Some(ActionKind::MoveAside),
         current_target: Some(object_id(50)),
@@ -8058,7 +8058,7 @@ fn a_boar_whose_move_aside_completed_heads_home_next() {
 /// timeout to 1000 and redraws the adjusted one (`FUN_140c41bc0`), drops the target and
 /// stops (slot 0xb0 with 1); the base handler then stops on the attack's completion again.
 #[test]
-fn a_lion_s_completed_attack_resets_its_idle_timeout_and_stops() {
+fn lion_completed_attack_resets_its_idle_timeout_and_stops() {
     let mut u = UnitAi {
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(700)),
@@ -8100,7 +8100,7 @@ fn a_lion_s_completed_attack_resets_its_idle_timeout_and_stops() {
 /// stops before the base handler; one within its sight it attacks again (slot 0xb8 with the
 /// target, forced) and the processing breaks (3).
 #[test]
-fn a_lion_drops_a_moved_target_out_of_its_sight() {
+fn lion_drops_moved_target_out_of_its_sight() {
     let lion = || UnitAi {
         current_action: Some(ActionKind::Attack),
         current_target: Some(object_id(700)),
@@ -8168,7 +8168,7 @@ fn a_lion_drops_a_moved_target_out_of_its_sight() {
 /// adds an attacker already known or its target; a new one makes a human player's building
 /// ask for help (`FUN_140c42ce0`, not modelled), and a computer player's AI hears of it.
 #[test]
-fn a_building_counts_its_attackers() {
+fn building_counts_its_attackers() {
     let mut u = idle(UnitAiType::BUILDING);
     let at = Surroundings::default();
     let (r, _, side) = handled(
@@ -8229,7 +8229,7 @@ fn a_building_counts_its_attackers() {
 /// The tower's handler (`FUN_140c299f0`) for damage at no hit points: the owner's alert
 /// (0x209, a human player's alert list), the notifies end and it gives up (4).
 #[test]
-fn a_destroyed_tower_gives_up() {
+fn destroyed_tower_gives_up() {
     let mut u = UnitAi {
         notifies: vec![Notify::own(object_id(60), NotifyKind::DAMAGED, [60, 0, 0])],
         ..idle(UnitAiType::TOWER)
@@ -8249,7 +8249,7 @@ fn a_destroyed_tower_gives_up() {
 /// `FUN_140c4d140`): an object on its own point gives a point that is not a number, which
 /// becomes its own place minus one on each axis (above 5) before the map's hold.
 #[test]
-fn a_deer_evading_an_object_on_its_own_point_steps_off_by_one() {
+fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
     let mut u = deer();
     let mut r = wander_seed(false);
     let place = Surroundings {
@@ -8359,7 +8359,7 @@ impl UnitSide for StandSide {
 /// sign, its amount: `rand15 & 1`, `rand15 & 3`), held on the map, up to five times; then the
 /// forced running move within 0, the move action value and the point, the AI commanded.
 #[test]
-fn an_evasive_move_steps_off_a_point_the_unit_cannot_stand_at() {
+fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     let at = Surroundings {
         position: Position::new(10.0, 20.0, 1.5),
         map: GridSize::new(64, 64),
@@ -8451,7 +8451,7 @@ fn an_evasive_move_steps_off_a_point_the_unit_cannot_stand_at() {
 /// a footprint; forced, or without one, the unit's slot 0x340 gets the move
 /// ([`AiCommand::MoveAside`]) and the action value becomes 0x2bf, the old one the last.
 #[test]
-fn a_move_off_a_footprint_needs_force_or_no_action() {
+fn move_off_footprint_needs_force_or_no_action() {
     let m = |force| AiMove {
         point: Position::new(4.0, 5.0, 0.0),
         range: Distance::ZERO,
@@ -8525,7 +8525,7 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
 /// exactly 750 and caps the secondary timer at 750 by a signed compare (a timer read as
 /// negative stays); with its third argument 0 the last order stays.
 #[test]
-fn the_order_setter_caps_by_a_signed_compare_and_may_keep_the_last_order() {
+fn the_order_setter_caps_by_signed_compare_and_may_keep_the_last_order() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Patrol),
         last_order: Some(OrderKind::Wait),
@@ -8560,7 +8560,7 @@ fn the_order_setter_caps_by_a_signed_compare_and_may_keep_the_last_order() {
 /// its action and ends the order (slot 0xb0 with 0: the state position takes its place);
 /// with a target, or on another order, nothing.
 #[test]
-fn a_villager_on_the_attack_order_without_a_target_gives_it_up() {
+fn villager_on_the_attack_order_without_target_gives_it_up() {
     let at = Surroundings {
         position: Position::new(12.0, 13.0, 0.0),
         class: Some(class::VILLAGER),
@@ -8681,7 +8681,7 @@ fn the_factory_picks_the_unit_ai_type_by_master_and_class() {
 
 /// The building's cared classes (`FUN_140c11470`) are the soldier's in another order.
 #[test]
-fn the_building_cares_about_the_soldier_s_classes_in_its_own_order() {
+fn the_building_cares_about_the_soldier_classes_in_its_own_order() {
     let mut building = BUILDING_CARED.to_vec();
     let mut soldier = SOLDIER_CARED.to_vec();
     assert_ne!(building, soldier);
@@ -8696,7 +8696,7 @@ fn the_building_cares_about_the_soldier_s_classes_in_its_own_order() {
 /// unconditionally, so only without an action value), by twice its speed away from them;
 /// processing breaks off (3). A computer player's AI would hear the alert (not modelled).
 #[test]
-fn a_human_player_s_king_runs_from_its_attacker() {
+fn human_player_king_runs_from_its_attacker() {
     let mut u = UnitAi {
         hunted: None,
         ..idle(UnitAiType::HUNTED)
@@ -8767,7 +8767,7 @@ fn a_human_player_s_king_runs_from_its_attacker() {
 /// most 5 tiles from its state position. A computer player's siege unit, a computer's unit
 /// attacked by class 22 and a computer's transport ship are not modelled.
 #[test]
-fn a_unit_runs_from_its_attackers_within_its_leash() {
+fn unit_runs_from_its_attackers_within_its_leash() {
     let seen = |id, class, x| UnitSeen {
         id,
         class,
@@ -8881,7 +8881,7 @@ fn a_unit_runs_from_its_attackers_within_its_leash() {
 /// `FUN_140c64c10`: the target and its class become the last ones, the id and the point are
 /// taken, and the class only when the world holds the object (else it stays).
 #[test]
-fn a_target_takes_its_class_only_from_an_object_the_world_holds() {
+fn target_takes_its_class_only_from_an_object_the_world_holds() {
     let mut u = UnitAi {
         current_target: Some(object_id(40)),
         target_class: class_of(9),
@@ -8928,7 +8928,7 @@ fn a_target_takes_its_class_only_from_an_object_the_world_holds() {
 /// 699 from a unit that is not attacking it and for the invalidation of another action; 1
 /// for a movement completion it ignores (not queued) and for one it queues.
 #[test]
-fn the_unit_ai_s_notify_answers_whether_it_took_it() {
+fn the_unit_ai_notify_answers_whether_it_took_it() {
     let mut u = UnitAi {
         current_action: Some(ActionKind::Gather),
         attackers: Attackers::of_saved(&[70]),
@@ -8978,7 +8978,7 @@ fn the_unit_ai_s_notify_answers_whether_it_took_it() {
 /// `0x140aa2a70` in state 3: a unit without an AI asks for its path even in range and keeps
 /// its attack move; one off the patrol orders ends in range and stops attack-moving.
 #[test]
-fn a_unit_off_patrol_asks_a_plain_path() {
+fn unit_off_patrol_asks_plain_path() {
     let ask = UnitAi::path_ask(None, Point::new(20.0, 20.0), Point::new(30.0, 20.0));
     assert_eq!(
         ask,
@@ -9005,7 +9005,7 @@ fn a_unit_off_patrol_asks_a_plain_path() {
 /// `0x140aa2a70` in state 3 on a patrol order: the path loops; without a saved patrol it goes
 /// back and forth from 3 tiles (`SETBE`: a NaN distance too); order 733 attack-moves.
 #[test]
-fn a_patrol_order_s_path_loops_and_turns_back_from_three_tiles() {
+fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Patrol),
         ..idle(UnitAiType::SOLDIER)
@@ -9038,7 +9038,7 @@ fn a_patrol_order_s_path_loops_and_turns_back_from_three_tiles() {
 /// and forth (`getPatrolLinear`, flags bit 1) are the path's, and it goes
 /// (`zeroPatrolInformation`), which then stops the attack move.
 #[test]
-fn a_saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
+fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Patrol),
         patrol_path: Some(PatrolPath {
@@ -9084,7 +9084,7 @@ fn patroller(secondary: u32) -> (UnitAi, Surroundings) {
 /// The idle part's patrol branch (`0x140c67f0b`) while the secondary timer runs: nothing
 /// but the timer's count down; the busy check lets the walking patrol through.
 #[test]
-fn a_patrol_waits_for_its_secondary_timer() {
+fn patrol_waits_for_its_secondary_timer() {
     let (mut u, at) = patroller(300);
     let mut side = SoldierSide {
         found: 77,
@@ -9115,7 +9115,7 @@ fn a_patrol_waits_for_its_secondary_timer() {
 /// unit's slot 0x468), the attack command given, and the order goes without its history
 /// (`FUN_140c64b60` with -1 and 0).
 #[test]
-fn a_patrol_saves_itself_and_attacks_what_it_finds() {
+fn patrol_saves_itself_and_attacks_what_it_finds() {
     let (mut u, at) = patroller(0);
     u.last_order = Some(OrderKind::Wait);
     let saved = PatrolPath {
@@ -9153,7 +9153,7 @@ fn a_patrol_saves_itself_and_attacks_what_it_finds() {
 /// The patrol branch passes over processIdle while the top action's target is a building
 /// (slot 400); a unit target it does not.
 #[test]
-fn a_patrol_attacking_a_building_keeps_at_it() {
+fn patrol_attacking_building_keeps_at_it() {
     let (mut u, mut at) = patroller(0);
     at.top_target = Some(TopTarget {
         id: object_id(50),
@@ -9185,7 +9185,7 @@ fn a_patrol_attacking_a_building_keeps_at_it() {
 /// range (slot 400, slot 0x1e8: the footprints' squared gap between the least range and the
 /// weapon range squared) without a search; out of range it searches.
 #[test]
-fn a_soldier_s_idle_check_attacks_its_top_action_s_target_in_range() {
+fn soldier_idle_check_attacks_its_top_action_target_in_range() {
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
     let near = TopTarget {
@@ -9245,7 +9245,7 @@ fn a_soldier_s_idle_check_attacks_its_top_action_s_target_in_range() {
 /// attack on its own current target with an action takes nothing); a computer player's
 /// check and a healer's ally search are not modelled.
 #[test]
-fn a_soldier_s_idle_check_holds_its_target_with_retargeting_off() {
+fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     let side = |found| SoldierSide {
         found,
         attacks: Vec::new(),
@@ -9298,7 +9298,7 @@ fn a_soldier_s_idle_check_holds_its_target_with_retargeting_off() {
 /// the update's start, and searches (426750657's scout inside its transport, update 467);
 /// an effect that leaves the actions does not change it.
 #[test]
-fn a_soldier_stopped_in_the_update_finds_no_top_action_s_target() {
+fn soldier_stopped_in_the_update_finds_no_top_action_target() {
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
     at.top_target = Some(TopTarget {
@@ -9335,7 +9335,7 @@ fn a_soldier_stopped_in_the_update_finds_no_top_action_s_target() {
 /// `restorePatrolInformation` gives the unit its walk back onto the patrol, the order 711
 /// (733 for a unit that attack-moves) and a secondary timer of 750; processIdle produced.
 #[test]
-fn a_soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
+fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
     u.current_action = None;
@@ -9381,7 +9381,7 @@ fn a_soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
 /// (an adjusted idle timeout of 750 redrawn, the secondary timer capped at 750); the patrol
 /// order (711) stays.
 #[test]
-fn an_attack_move_not_busy_ends_and_a_patrol_stays() {
+fn an_attack_move_not_busy_ends_and_patrol_stays() {
     let at = Surroundings::default();
     let mut u = UnitAi {
         current_order: Some(OrderKind::AttackMove),
@@ -9408,7 +9408,7 @@ fn an_attack_move_not_busy_ends_and_a_patrol_stays() {
 /// orders, its secondary timer capped at 750; with an adjusted idle timeout of exactly 750
 /// the redraw (the AI stream's) is not modelled here.
 #[test]
-fn a_stop_ends_a_patrol_order_with_its_secondary_timer_capped() {
+fn stop_ends_patrol_order_with_its_secondary_timer_capped() {
     let mut u = UnitAi {
         current_order: Some(OrderKind::Patrol),
         current_action: Some(ActionKind::Move),
@@ -9446,7 +9446,7 @@ fn a_stop_ends_a_patrol_order_with_its_secondary_timer_capped() {
 /// The order's tail (`LAB_140c5d611`) and the Build's end (`FUN_140c64b60` with −1): leaving
 /// a patrol order caps the secondary timer; staying on it does not.
 #[test]
-fn leaving_a_patrol_order_caps_its_secondary_timer() {
+fn leaving_patrol_order_caps_its_secondary_timer() {
     let order = |order| QueuedOrder {
         order,
         priority: OrderPriority::of_data(100),
@@ -9508,7 +9508,7 @@ fn ordered(ai_type: UnitAiType) -> UnitAi {
 /// ([`AfterOrder`]: its `busy` and group) go to the caller; slot 73, the idle part and the
 /// look-around check have not run (no draw, the timers as they grew).
 #[test]
-fn a_full_update_stops_at_its_order_on_a_target() {
+fn full_update_stops_at_its_order_on_target() {
     let mut u = ordered(SOLDIER_AI);
     let order = u.orders[0];
     let mut r = rng();
@@ -9734,7 +9734,7 @@ fn the_transport_ship_passes_other_notifies_to_the_base_handler() {
 /// (slot 0x160 with 1) and breaks off (3). With an order it ignores the damage (2). At no hit
 /// points left it gives up (4). A computer player's AI would hear the alert (not modelled).
 #[test]
-fn a_transport_ship_runs_from_its_attackers_without_an_order() {
+fn transport_ship_runs_from_its_attackers_without_an_order() {
     let (mut u, at) = attacked_transport();
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let mut side = StandSide {
@@ -9842,7 +9842,7 @@ fn a_transport_ship_runs_from_its_attackers_without_an_order() {
 /// A missile's warning (`0x20f`): one draw, `r * 100 / 0x7fff` below the owner's
 /// `chance_to_dodge_missiles` dodges it (2); else it is damage.
 #[test]
-fn a_transport_ship_dodges_a_missile_s_warning_by_its_owner_s_chance() {
+fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
     let r = rng().rand15() as i32 * 100 / 0x7fff;
     let warning = Notify::own(object_id(77), NotifyKind::MISSILE_WARNING, [77, 40, 0]);
     let mut side = StandSide {
@@ -9886,7 +9886,7 @@ fn a_transport_ship_dodges_a_missile_s_warning_by_its_owner_s_chance() {
 /// time; its damage notify (`FUN_140c28400`) is the transport ship's, but a human player's
 /// tower in a group that is not idle ignores the damage (2), and one in an idle group runs.
 #[test]
-fn a_siege_tower_in_a_busy_group_ignores_its_damage() {
+fn siege_tower_in_busy_group_ignores_its_damage() {
     let mut u = idle(SIEGE_TOWER_AI);
     let mut fx = Vec::new();
     let mut r = rng();
@@ -10054,7 +10054,7 @@ impl UnitSide for ShipSide {
 /// the closest object of its classes, its radius grown by 7, and moves away from it by seven
 /// times its speed (6); a trade cart searches its own classes; finding nothing, 5.
 #[test]
-fn a_computer_player_s_ship_evades_the_closest_object_it_sees() {
+fn computer_player_ship_evades_the_closest_object_it_sees() {
     let at = Surroundings {
         id: object_id(500),
         position: Position::new(20.0, 30.0, 0.0),
@@ -10139,7 +10139,7 @@ fn a_computer_player_s_ship_evades_the_closest_object_it_sees() {
 /// The trade ship's case 0x202 (`FUN_140c29bf0`) off its trade and explore actions: the
 /// target goes, the action stops, and the processing goes on (2).
 #[test]
-fn a_trade_ship_whose_action_needs_a_search_stops() {
+fn trade_ship_whose_action_needs_search_stops() {
     let (mut u, at) = attacked_transport();
     u.ai_type = TRADE_AI;
     u.current_action = Some(ActionKind::Move);
@@ -10185,7 +10185,7 @@ fn a_trade_ship_whose_action_needs_a_search_stops() {
 /// and no call for help; without an order, off the move action, the action stops and it
 /// runs from its attackers (3); on the move action it runs on (no stop).
 #[test]
-fn a_trade_ship_stops_and_runs_from_its_attackers() {
+fn trade_ship_stops_and_runs_from_its_attackers() {
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let (mut u, at) = attacked_transport();
     u.ai_type = TRADE_AI;
@@ -10228,7 +10228,7 @@ fn a_trade_ship_stops_and_runs_from_its_attackers() {
 /// The fishing ship's damage notify (`FUN_140c25ca0`): on the move action it neither stops
 /// nor runs (3, nothing); off it, it stops and runs.
 #[test]
-fn a_fishing_ship_on_the_move_takes_its_damage_without_running() {
+fn fishing_ship_on_the_move_takes_its_damage_without_running() {
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let (mut u, at) = attacked_transport();
     u.ai_type = FISHING_AI;
@@ -10272,7 +10272,7 @@ fn a_fishing_ship_on_the_move_takes_its_damage_without_running() {
 /// builds (3). Reaching none, a human player's ship goes on (2); a computer player's posts
 /// itself its build's completion.
 #[test]
-fn a_fishing_ship_builds_the_nearest_foundation_it_reaches() {
+fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
     let at = Surroundings {
         id: object_id(500),
         position: Position::new(20.0, 30.0, 0.0),
@@ -10445,7 +10445,7 @@ fn an_attacker_spares_by_its_priority_and_its_blast() {
 /// player's packed unit (unless any) or while packing; by priority 0 a ram only at siege and
 /// buildings, a trebuchet only at buildings; priority 3 only its classes.
 #[test]
-fn a_siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
+fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
     let villager = |x: f32| Target {
         owner: PlayerId::new(2),
         class: class::VILLAGER,
@@ -10709,7 +10709,7 @@ impl UnitSide for SiegeSide {
 /// nothing, a unit in a group gives 5 and one defending walks back. Gaia's that takes no
 /// owners by sight does nothing.
 #[test]
-fn a_siege_unit_attacks_what_its_idle_search_finds() {
+fn siege_unit_attacks_what_its_idle_search_finds() {
     let at = Surroundings {
         id: object_id(500),
         position: Position::new(20.0, 20.0, 0.0),
@@ -10794,7 +10794,7 @@ fn a_siege_unit_attacks_what_its_idle_search_finds() {
 /// With retargeting off and its current target held, a top target the siege unit reaches
 /// within its range ends the check (5); not reached, retargeting comes back on.
 #[test]
-fn a_siege_unit_with_retargeting_off_keeps_a_reachable_top_target() {
+fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
     let at = Surroundings {
         id: object_id(500),
         position: Position::new(20.0, 20.0, 0.0),
@@ -10854,7 +10854,7 @@ fn a_siege_unit_with_retargeting_off_keeps_a_reachable_top_target() {
 /// up (not modelled); a human player's executed action and damage are the base handler's; a
 /// computer player's executed attack draws whether it keeps its distance.
 #[test]
-fn a_siege_unit_hands_its_notifies_to_the_base_handler() {
+fn siege_unit_hands_its_notifies_to_the_base_handler() {
     let at = Surroundings {
         id: object_id(500),
         weapon_range: Distance::new(7.0),
@@ -10941,7 +10941,7 @@ fn a_siege_unit_hands_its_notifies_to_the_base_handler() {
 /// The priest's slot 73 (`FUN_140c21f30`): the base's retarget check (a used timer redrawn),
 /// but on the order on a target and for a computer player's priest none.
 #[test]
-fn a_priest_retargets_but_on_an_order_on_a_target() {
+fn priest_retargets_but_on_an_order_on_target() {
     let at = Surroundings {
         player: PlayerId::new(1),
         ..Surroundings::default()
@@ -11068,7 +11068,7 @@ fn tail(u: &mut UnitAi, player: PlayerId, flags: TargetFlags, fx: &mut Vec<Effec
 }
 
 #[test]
-fn the_tail_stops_a_gaia_unit_on_a_gaia_object_others_can_take_again() {
+fn the_tail_stops_gaia_unit_on_gaia_object_others_can_take_again() {
     // 0x140c68519: a Gaia unit, a Gaia target of type 70 or more, its +0x924 2: the target
     // goes (FUN_140c5e1e0) and the action stops (slot 0xb0 with 1)
     let again = TargetFlags {
@@ -11122,7 +11122,7 @@ fn the_tail_stops_a_gaia_unit_on_a_gaia_object_others_can_take_again() {
 }
 
 #[test]
-fn the_tail_stops_work_on_a_target_without_its_targeting_flag() {
+fn the_tail_stops_work_on_target_without_its_targeting_flag() {
     // 0x140c685cf: outside a pasture, a target that cannot be targeted (+0x689 0) stops any
     // action but the trade
     let untargetable = TargetFlags {
@@ -11188,7 +11188,7 @@ fn the_tail_stops_work_on_a_target_without_its_targeting_flag() {
 }
 
 #[test]
-fn the_tail_reads_the_top_target_the_update_s_commands_left() {
+fn the_tail_reads_the_top_target_the_update_commands_left() {
     let untargetable = TargetFlags {
         untargetable: true,
         ..PLAIN
@@ -11311,7 +11311,7 @@ fn queued_builds_on_started_or_gone_foundations_leave_the_queue() {
 }
 
 #[test]
-fn a_unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
+fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
     // slot 73's stand ground leash (0x140c57bc4): the squared gap to the state position
     // (4 tiles: 16) against the range plus 0.25
     let at = Surroundings {
@@ -11415,7 +11415,7 @@ fn a_unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back()
 /// consecutive points (the lines, not the segments); a path of one point answers the largest
 /// f32, an empty one is unreachable; a NaN distance is kept until the next one.
 #[test]
-fn a_patrol_s_distance_is_the_least_to_the_lines_through_its_points() {
+fn patrol_distance_is_the_least_to_the_lines_through_its_points() {
     assert_eq!(
         line_distance(
             BVector::new(3.0, 0.0, 4.0),
@@ -11467,7 +11467,7 @@ fn a_patrol_s_distance_is_the_least_to_the_lines_through_its_points() {
 /// order the patrol's (10); within it stand ground goes on to the retarget check (its
 /// state position's leash not read), the defend stance ends slot 73 (9) before it.
 #[test]
-fn a_unit_with_patrol_information_leashes_to_its_patrol_s_path() {
+fn unit_with_patrol_information_leashes_to_its_patrol_path() {
     let path = PatrolPath {
         path: crate::pathing::tile_path::Path {
             points: vec![BVector::new(0.0, 0.0, 10.0), BVector::new(20.0, 0.0, 10.0)],
@@ -11535,7 +11535,7 @@ fn a_unit_with_patrol_information_leashes_to_its_patrol_s_path() {
 }
 
 #[test]
-fn a_busy_villager_on_the_attack_order_runs_its_full_update() {
+fn busy_villager_on_the_attack_order_runs_its_full_update() {
     // records (6)/426406723's villagers attacking (order 700, action 600, a target), busy: the
     // update runs whole (the civilian's processMisc, the idle part keeping the timer of a
     // player's unit with an action at 0)
@@ -11783,7 +11783,7 @@ fn an_order_not_ready_stays_and_patrol_or_unnamed_orders_take_nothing() {
 /// The idle part's patrol branch (`0x140c67f0b`): a patrol or an attack-move order patrols, and
 /// so does a unit of a group that patrols, but not on the hero power's order (`0x326`).
 #[test]
-fn a_patrolling_group_s_unit_on_the_hero_power_does_not_patrol() {
+fn patrolling_group_unit_on_the_hero_power_does_not_patrol() {
     let group = GroupState {
         patrol: true,
         ..GroupState::default()
@@ -11797,7 +11797,7 @@ fn a_patrolling_group_s_unit_on_the_hero_power_does_not_patrol() {
 }
 
 #[test]
-fn the_attack_order_attacks_by_the_unit_ai_s_type_and_becomes_the_ai_s() {
+fn the_attack_order_attacks_by_the_unit_ai_type_and_becomes_the_ai_s() {
     // a soldier: the base's AttackObject through its slot 0xa0 (the side's test), then a
     // member of a group stops moving (FUN_140c17550)
     let mut u = idle(SOLDIER_AI);
@@ -11998,7 +11998,7 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
 }
 
 #[test]
-fn the_heal_conversion_and_repair_orders_give_the_unit_s_commands() {
+fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
     for (order, action, command) in [
         (
             OrderKind::Heal,
@@ -12142,7 +12142,7 @@ fn the_stop_order_stops_and_ends_the_order() {
 }
 
 #[test]
-fn the_run_away_order_runs_from_the_unit_s_attackers() {
+fn the_run_away_order_runs_from_the_unit_attackers() {
     // no attackers: a random direction (two draws), by twice the speed (0 here: the unit's
     // own place), through evasiveMoveTo
     let mut side = OrderSide::default();
@@ -12304,7 +12304,7 @@ fn the_move_orders_move_to_their_point_within_their_range() {
 }
 
 #[test]
-fn the_follow_order_follows_and_moves_to_a_target_beyond_its_range() {
+fn the_follow_order_follows_and_moves_to_target_beyond_its_range() {
     // the gap (1) within the range squared (9): no move
     let mut side = OrderSide::holding(&[(70, class::CLASS_6)]);
     let mut u = idle(SOLDIER_AI);
@@ -12378,7 +12378,7 @@ fn the_follow_order_follows_and_moves_to_a_target_beyond_its_range() {
 }
 
 #[test]
-fn the_transport_enter_and_unload_orders_give_the_unit_s_commands() {
+fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
     let mut side = OrderSide::holding(&[(70, class::BUILDING)]);
     let transport = OrderKind::Transport;
     let mut u = idle(UnitAiType::TRANSPORT);
@@ -12522,7 +12522,7 @@ fn seek_and_destroy_attacks_and_explore_and_destroy_explores_at_tiles() {
 }
 
 #[test]
-fn the_wait_order_waits_and_leaves_a_patrol_order() {
+fn the_wait_order_waits_and_leaves_patrol_order() {
     // case 0x2d8: the action value 0x274 (the last stays), the patrol order's timers, then
     // the order; an adjusted idle timeout of 750 is redrawn (one draw)
     let mut side = OrderSide::default();
@@ -12599,7 +12599,7 @@ fn the_attack_roundup_passes_its_own_target_and_one_it_cannot_reach() {
 }
 
 #[test]
-fn the_order_on_a_target_goes_to_the_caller_or_moves_to_a_gone_one_s_point() {
+fn the_order_on_target_goes_to_the_caller_or_moves_to_gone_one_point() {
     let mut side = OrderSide::holding(&[(70, class::CLASS_6)]);
     let o = queued(OrderKind::OnTarget, 70);
     let mut u = idle(CIVILIAN);
@@ -12628,7 +12628,7 @@ fn the_order_on_a_target_goes_to_the_caller_or_moves_to_a_gone_one_s_point() {
 }
 
 #[test]
-fn a_gone_target_of_a_type_sends_the_unit_to_the_closest_resource_of_its_kind() {
+fn gone_target_of_type_sends_the_unit_to_the_closest_resource_of_its_kind() {
     // the order's type a class (no owner): a tree's (15, wood: kind 0, fewer than 2
     // workers), searched from the order's shown point at any state; the unit works what it
     // finds (slot 0x7e8) and the order is not taken
@@ -12725,7 +12725,7 @@ fn a_gone_target_of_a_type_sends_the_unit_to_the_closest_resource_of_its_kind() 
 }
 
 #[test]
-fn slot_0x1b0_gives_the_kind_of_resource_by_the_unit_ai_s_type() {
+fn slot_0x1b0_gives_the_kind_of_resource_by_the_unit_ai_type() {
     let kind = |ai_type, class| idle(ai_type).resource_kind(class_id(class));
     // the byte the game returns: −1 for none
     let group = |n: i32| (0 <= n).then(|| GatherGroup::try_from(n).unwrap());
@@ -12743,7 +12743,7 @@ fn slot_0x1b0_gives_the_kind_of_resource_by_the_unit_ai_s_type() {
 }
 
 #[test]
-fn the_attack_move_attacks_with_a_trebuchet_and_moves_otherwise() {
+fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
     let mut side = OrderSide::holding(&[(70, class::BUILDING)]);
     for class in [TREBUCHET_CLASS, TREBUCHET_PACKED_CLASS] {
         let mut u = idle(SIEGE_AI);
@@ -12772,7 +12772,7 @@ fn the_attack_move_attacks_with_a_trebuchet_and_moves_otherwise() {
 }
 
 #[test]
-fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
+fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
     let patrolling = |order| UnitAi {
         current_order: order,
         order_priority: OrderPriority::of_data(7),
@@ -12865,7 +12865,7 @@ fn the_order_tail_takes_the_order_and_leaves_a_patrol_order() {
 /// 0x1f9 with 600, 0, 0), else an invalidation, a moved target or a search goes to the base
 /// handler (a moved target without a saved patrol: nothing).
 #[test]
-fn a_villager_s_attack_target_that_moved_is_the_base_handler_s_or_its_failure() {
+fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
     let attacking = |stop_after_kill| UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(ActionKind::Attack),
@@ -12913,7 +12913,7 @@ fn a_villager_s_attack_target_that_moved_is_the_base_handler_s_or_its_failure() 
 /// (`FUN_141658e20`), which the unit works and whose way back the caller queues; without a
 /// building nothing. The processing goes on.
 #[test]
-fn a_villager_drops_another_resource_at_the_table_s_building() {
+fn villager_drops_another_resource_at_the_table_building() {
     let at = Surroundings {
         id: object_id(20),
         state: ObjectState::Alive,
@@ -12960,7 +12960,7 @@ fn a_villager_drops_another_resource_at_the_table_s_building() {
 /// the world holds, the unit works at its place (slot 0x7e8); off another action nothing.
 /// The processing goes on.
 #[test]
-fn a_villager_works_the_pasture_it_built() {
+fn villager_works_the_pasture_it_built() {
     let pasture = UnitSeen {
         id: object_id(15342),
         position: Position::new(136.0, 72.0, 0.0),
@@ -13120,7 +13120,7 @@ fn packed_siege() -> (UnitAi, Surroundings) {
 /// computer player's unit lets the units inside it go first (`FUN_141225c40`, not modelled);
 /// dead, its owner's AI would hear the alert (not modelled either).
 #[test]
-fn a_computer_s_packed_siege_unit_stops_and_runs_when_damaged() {
+fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let (mut u, at) = packed_siege();
     let mut fx = Vec::new();
@@ -13294,7 +13294,7 @@ fn retargeting(target: i32) -> (UnitAi, Surroundings) {
 /// than the live current target's ends it (9), as does any find without a building target.
 /// Without a target the search starts from the unit, without a reference distance, any class.
 #[test]
-fn a_retarget_search_ends_on_another_category_or_without_a_building_target() {
+fn retarget_search_ends_on_another_category_or_without_building_target() {
     let (mut u, at) = retargeting(25954);
     let mut side = RetargetSide::finding(30);
     let plain = RetargetSearch {
@@ -13350,7 +13350,7 @@ fn a_retarget_search_ends_on_another_category_or_without_a_building_target() {
 /// not any; 10), the current target itself is not (9). A computer player's unit in stance 0
 /// keeps its building target past the category test.
 #[test]
-fn a_retarget_search_with_a_building_target_attacks_what_it_finds() {
+fn retarget_search_with_building_target_attacks_what_it_finds() {
     let building = RetargetSearch {
         building: true,
         work_state: false,

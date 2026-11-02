@@ -77,7 +77,7 @@ mod tests {
 
     /// A tree's int names a master or a technology only within their ids.
     #[test]
-    fn a_tree_int_names_an_id_within_range() {
+    fn tree_int_names_an_id_within_range() {
         assert_eq!(
             TreeMaster::of_master(MasterId::named(74)).master(),
             Some(MasterId::named(74))

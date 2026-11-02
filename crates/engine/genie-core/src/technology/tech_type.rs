@@ -32,7 +32,7 @@ mod tests {
 
     /// A `.dat` value is its type; the shared and the re-enabled types are 0x20 and 0x21.
     #[test]
-    fn a_dat_value_is_its_type() {
+    fn dat_value_is_its_type() {
         assert_eq!(TechType::from(0x20), TechType::SHARED);
         assert_eq!(TechType::REENABLED.get(), 0x21);
         assert_eq!(TechType::default().get(), 0);

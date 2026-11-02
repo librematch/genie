@@ -249,7 +249,7 @@ mod tests {
     /// A target's `object_state` is its state; a missing key or a negative value any state
     /// (none); a value past 8 an error.
     #[test]
-    fn a_target_s_object_state_reads_as_a_state_or_none() {
+    fn target_object_state_reads_as_state_or_none() {
         let state = |s| drop_sites(&table(s)).map(|sites| sites[0].targets[0].state);
         assert_eq!(state(Some(5)).unwrap(), Some(ObjectState::Dead));
         assert_eq!(state(None).unwrap(), None);

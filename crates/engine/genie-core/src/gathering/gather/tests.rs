@@ -261,7 +261,7 @@ fn farm() -> Resource {
 }
 
 #[test]
-fn a_farm_s_stop_is_a_tile_centre_of_its_footprint_other_than_the_last() {
+fn farm_stop_is_tile_centre_of_its_footprint_other_than_the_last() {
     let mut rng = Well512::default();
     rng.set_seed(29910);
     let mut last = Point::ORIGIN;
@@ -289,7 +289,7 @@ fn a_farm_s_stop_is_a_tile_centre_of_its_footprint_other_than_the_last() {
 }
 
 #[test]
-fn under_the_farm_setting_a_farm_s_gather_goes_in_four_timed_stops() {
+fn under_the_farm_setting_farm_gather_goes_in_four_timed_stops() {
     let rate = StopRate {
         work_rate: WorkRate::new(0.33),
         capacity: Amount::new(10.0),
@@ -321,7 +321,7 @@ fn under_the_farm_setting_a_farm_s_gather_goes_in_four_timed_stops() {
 /// timer clears, the unit stands, the target and the drop site go (returned for the
 /// caller's release) and the point is −1.
 #[test]
-fn a_stop_idles_the_gather_and_lets_its_targets_go() {
+fn stop_idles_the_gather_and_lets_its_targets_go() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut g = GatherAction {
         state: GatherState::Walk,
@@ -364,7 +364,7 @@ fn a_stop_idles_the_gather_and_lets_its_targets_go() {
 /// `FUN_140aa0df0` takes a target in state 6 or below and holds a later one as none
 /// (`FUN_140a7a230`): the `MoveTo` has no target and walks to its place as to a point, far.
 #[test]
-fn a_gather_s_move_to_refuses_a_target_past_state_6() {
+fn gather_move_to_refuses_target_past_state_6() {
     let mover = crate::gathering::hunt::tests::walker();
     let g = GatherAction::new(task(), &farm(), true, rate()).unwrap();
     let to = |state| WalkTo {
@@ -389,7 +389,7 @@ fn a_gather_s_move_to_refuses_a_target_past_state_6() {
 }
 
 #[test]
-fn past_its_time_per_stop_a_farmer_walks_to_the_next_stop() {
+fn past_its_time_per_stop_farmer_walks_to_the_next_stop() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut g = GatherAction {
         state: GatherState::Work,
@@ -426,7 +426,7 @@ fn past_its_time_per_stop_a_farmer_walks_to_the_next_stop() {
 }
 
 #[test]
-fn a_farm_s_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
+fn farm_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
     let g = GatherAction {
         state: GatherState::Work,
         ..GatherAction::new(task(), &farm(), false, rate()).unwrap()
@@ -466,7 +466,7 @@ fn a_farm_s_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
 }
 
 #[test]
-fn a_gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
+fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let gatherer = || GatherAction {
         state: GatherState::Work,
@@ -556,7 +556,7 @@ fn a_gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
 }
 
 #[test]
-fn at_its_point_a_human_s_moved_gatherer_idles_and_a_computer_s_is_done() {
+fn at_its_point_human_moved_gatherer_idles_and_computer_is_done() {
     let run = |computer: bool| {
         let mut g = GatherAction {
             state: GatherState::Moved,
@@ -584,7 +584,7 @@ fn at_its_point_a_human_s_moved_gatherer_idles_and_a_computer_s_is_done() {
 }
 
 #[test]
-fn a_gatherer_without_a_target_or_a_load_asks_for_another_every_ten_seconds() {
+fn gatherer_without_target_or_load_asks_for_another_every_ten_seconds() {
     // the 4v4's forager 31237 at update 10820: its bush went while it walked there
     let run = |master: MasterId, g: &mut GatherAction, dt: u32| {
         let mut rig = Rig::on_the_path();
@@ -642,7 +642,7 @@ fn farm_update(
 /// Case 5 (`FUN_141162db0`): a gatherer with a turn time turns a facet a turn time; not yet
 /// facing its target, the switch breaks and it stays in state 6 for the next update.
 #[test]
-fn a_gatherer_turning_over_time_faces_its_target_later() {
+fn gatherer_turning_over_time_faces_its_target_later() {
     let mut g = GatherAction {
         state: GatherState::Face,
         target: Some(object_id(28222)),
@@ -686,7 +686,7 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
 /// unit, then a site gone starts again, a site that does not take the load idles, one out of
 /// reach waits, and one in reach takes the load, as its player's resource kind.
 #[test]
-fn a_gatherer_s_drop_off_waits_walks_and_drops_its_load_at_the_site() {
+fn gatherer_drop_off_waits_walks_and_drops_its_load_at_the_site() {
     let dropping = |move_to: Option<MoveTo>, timer| GatherAction {
         state: GatherState::Drop,
         carry_to: Some(DropSiteId::new(object_id(10028))),
@@ -757,7 +757,7 @@ fn a_gatherer_s_drop_off_waits_walks_and_drops_its_load_at_the_site() {
 /// let its target go (code 5: its check of the target found it past state 6) waits a random
 /// while as a failed one does; the `MoveTo` then walks on to the point it held.
 #[test]
-fn a_drop_off_whose_site_was_let_go_waits_a_random_while() {
+fn drop_off_whose_site_was_let_go_waits_random_while() {
     let mut rig = Rig::on_the_path().with_house(ObjectState::Removed);
     let mut g = GatherAction {
         state: GatherState::Drop,
@@ -779,7 +779,7 @@ fn a_drop_off_whose_site_was_let_go_waits_a_random_while() {
 /// toward the site, asking for a path; moving, it walks on while the site stays on its point
 /// and starts again once the site left it.
 #[test]
-fn a_gatherer_walks_to_its_drop_site_and_starts_again_when_it_moved() {
+fn gatherer_walks_to_its_drop_site_and_starts_again_when_it_moved() {
     let dropping = |move_to| GatherAction {
         state: GatherState::Drop,
         carry_to: Some(DropSiteId::new(object_id(10028))),
@@ -817,7 +817,7 @@ fn a_gatherer_walks_to_its_drop_site_and_starts_again_when_it_moved() {
 /// the unit and faces the target (`set_state(6)`); a failed one near a target of more than 3
 /// workers searches (`set_state(3)`), else waits a random while; none is not modelled.
 #[test]
-fn a_gatherer_walks_to_its_target_and_faces_it_on_arrival() {
+fn gatherer_walks_to_its_target_and_faces_it_on_arrival() {
     let walking = |move_to: Option<MoveTo>| GatherAction {
         state: GatherState::Walk,
         target: Some(object_id(10028)),
@@ -918,7 +918,7 @@ fn a_gatherer_walks_to_its_target_and_faces_it_on_arrival() {
 /// within the task's range (`set_state(11)`, no target's radius), a `MoveTo` to the point whose
 /// `+0x61` stays 0.
 #[test]
-fn a_gatherer_whose_move_to_lost_its_target_walks_back_to_its_point() {
+fn gatherer_whose_move_to_lost_its_target_walks_back_to_its_point() {
     let mut rig = Rig::on_the_path().with_house(ObjectState::Removed);
     let mut g = GatherAction {
         state: GatherState::Walk,
@@ -945,7 +945,7 @@ fn a_gatherer_whose_move_to_lost_its_target_walks_back_to_its_point() {
 /// human's gatherer and ends a computer's, state 0xf2 ends as an arrived walk does; code 3 is
 /// failed in states 11 and 15, and a quiet `MoveTo` never gives the codes above 5.
 #[test]
-fn a_walk_to_a_point_ends_on_its_target_let_go_as_on_its_arrival() {
+fn walk_to_point_ends_on_its_target_let_go_as_on_its_arrival() {
     let at = |state, target| GatherAction {
         state,
         target: None,
@@ -996,7 +996,7 @@ fn a_walk_to_a_point_ends_on_its_target_let_go_as_on_its_arrival() {
 /// works (`set_state(7)`): the gathering starts at the unit's place, a load of another kind
 /// gives way to the task's, and the unit shows its working sprite.
 #[test]
-fn a_gatherer_facing_its_target_works_it() {
+fn gatherer_facing_its_target_works_it() {
     let working = Graphic {
         id: SpriteId::named(7),
         frames: crate::objects::Frame::of_data(10),
@@ -1057,7 +1057,7 @@ fn waiting(worked: bool) -> GatherAction {
 /// State 0xf3 counts the world's dt up to 0; then a farmer that never gathered idles, one
 /// that gathered walks back to where it gathered (state 0xf2).
 #[test]
-fn a_farmer_without_its_farm_waits_a_second_then_walks_back_to_reseed() {
+fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
     let mut g = waiting(true);
     assert_eq!(farm_update(&mut g, None, 600, false), Ok(Next::Stay));
     assert_eq!(
@@ -1096,7 +1096,7 @@ fn a_farmer_without_its_farm_waits_a_second_then_walks_back_to_reseed() {
 /// A farmer that never gathered, at a farm another farmer works too, walks back to its
 /// point to search (state 11, the farm's radius none) and lets the farm go.
 #[test]
-fn a_farmer_at_a_farm_another_works_walks_back_to_search() {
+fn farmer_at_farm_another_works_walks_back_to_search() {
     let mut g = waiting(false);
     g.target = Some(object_id(12557));
     let mut farm = Victim {
@@ -1120,7 +1120,7 @@ fn a_farmer_at_a_farm_another_works_walks_back_to_search() {
 /// State 0xf2's walk: once it arrived without a target, or failed, the caller reseeds; a
 /// target standing (state 2) is faced again.
 #[test]
-fn at_the_end_of_its_walk_back_a_farmer_reseeds() {
+fn at_the_end_of_its_walk_back_farmer_reseeds() {
     let walking = |move_to| GatherAction {
         state: GatherState::ReseedWalk,
         target: None,
@@ -1163,7 +1163,7 @@ fn at_the_end_of_its_walk_back_a_farmer_reseeds() {
 /// Without a reseed a computer's farmer whose walk arrived is done; any other idles and
 /// lets its targets go.
 #[test]
-fn without_a_reseed_the_farmer_idles_or_a_computer_s_is_done() {
+fn without_reseed_the_farmer_idles_or_computer_is_done() {
     let after = |arrived: bool, computer: bool| {
         let mut g = GatherAction {
             state: GatherState::ReseedWalk,
@@ -1211,7 +1211,7 @@ fn without_a_reseed_the_farmer_idles_or_a_computer_s_is_done() {
 }
 
 #[test]
-fn a_forager_walks_to_its_bush() {
+fn forager_walks_to_its_bush() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut g = GatherAction::new(task(), &bush(), true, rate()).unwrap();
     assert_eq!(
@@ -1274,7 +1274,7 @@ fn a_forager_walks_to_its_bush() {
 /// gathering it, it keeps on; a computer player's walking one too. A loaded one sent to its
 /// player's drop site takes its load there (`set_state(8)`, the site its second target).
 #[test]
-fn a_gatherer_sent_again_to_its_bush_walks_to_it_anew() {
+fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let walking = |state| GatherAction {
         state,
@@ -1388,7 +1388,7 @@ fn a_gatherer_sent_again_to_its_bush_walks_to_it_anew() {
 /// losing as much; the last bit below 0.1 goes with a thousandth of the master's storage; a
 /// load that would pass the capacity asks for the drop-off.
 #[test]
-fn a_forager_gathers_until_its_load_is_full() {
+fn forager_gathers_until_its_load_is_full() {
     let g = GatherAction {
         state: GatherState::Work,
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()

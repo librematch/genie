@@ -478,7 +478,7 @@ mod tests {
     /// beyond the columns included, through any order of inserts, overwrites and removes; a
     /// walk to change takes the same order.
     #[test]
-    fn the_table_walks_its_ids_as_a_sorted_map() {
+    fn the_table_walks_its_ids_as_sorted_map() {
         let mut table = IdTable::new();
         let mut map = BTreeMap::new();
         let ids = [
@@ -524,7 +524,7 @@ mod tests {
     /// A value changes in place, through a lookup or a walk; a removed id is gone and the table
     /// empty after the last.
     #[test]
-    fn a_value_changes_in_place_and_goes_with_its_id() {
+    fn value_changes_in_place_and_goes_with_its_id() {
         let mut table: IdTable<i32> = [(id(3), 1), (id(-4), 2), (id(i32::MAX), 9)]
             .into_iter()
             .collect();

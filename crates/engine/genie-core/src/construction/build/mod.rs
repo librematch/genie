@@ -315,7 +315,7 @@ mod built_sprite_tests {
     /// to the master's standing one (slot 0x68), whose node takes the BUILD command's frame
     /// (slot 0x28, slot 9 with it); a static standing sprite takes the frame alone.
     #[test]
-    fn a_completed_building_shows_its_standing_sprite_at_its_frame() {
+    fn completed_building_shows_its_standing_sprite_at_its_frame() {
         let g = |id, flags| Graphic {
             id,
             frames: crate::objects::Frame::of_data(4),
@@ -679,7 +679,7 @@ mod stack_tests {
     /// its counts, the owner's id as `data1` at the world's time (`FUN_1411dbb70`:
     /// `FUN_141560ae0` on `+0xdb8` with `(float)+0x718`, 0 and 0), then counts it.
     #[test]
-    fn a_castle_s_completion_records_its_owner_s_id_in_its_history() {
+    fn castle_completion_records_its_owner_id_in_its_history() {
         let mut t = world();
         t.world_time = WorldTime::from_millis(912_000);
         t.players[1].history.add_entry(
@@ -726,7 +726,7 @@ mod stack_tests {
     /// points the foundation lacked; then 621 disappears (state 7, hit points 0) without paying
     /// attributes 98 and 165.
     #[test]
-    fn a_town_centre_foundation_completes_into_the_town_centre_and_its_annexes() {
+    fn town_centre_foundation_completes_into_the_town_centre_and_its_annexes() {
         let mut t = world();
         assert_eq!(
             t.work_building(object_id(8759), Seconds::new(1.0)),
@@ -815,7 +815,7 @@ mod stack_tests {
     /// pasture's post, master 1888: collision height 0) gets none, though its obstruction kind
     /// and class would give one; with a height it does (431153923's builder, update 412).
     #[test]
-    fn a_new_building_without_a_height_gets_no_record() {
+    fn new_building_without_height_gets_no_record() {
         for (height, record) in [
             (0.0, None),
             (1.0, Some((ObstructionType::CIRCLE, ObstructionClass::UNIT))),
@@ -846,7 +846,7 @@ mod stack_tests {
     /// gate's slot 0x670 with the old one's `+0xc7c`): locked, the new gate's last move time is
     /// the world time plus 1; unlocked it stays unlocked and keeps its last move time.
     #[test]
-    fn a_gate_s_stack_gate_takes_the_foundation_s_lock() {
+    fn gate_stack_gate_takes_the_foundation_lock() {
         for locked in [true, false] {
             let mut t = world();
             t.world_time = WorldTime::from_millis(5000);
@@ -914,7 +914,7 @@ mod stack_tests {
     /// world still holds of the new object (slot 0x140, not modelled); one it no longer holds
     /// is passed over.
     #[test]
-    fn a_stack_unit_s_completion_reads_the_foundation_s_attacking_units() {
+    fn stack_unit_completion_reads_the_foundation_attacking_units() {
         let mut gone = world();
         gone.parts
             .building_mut(gone.players[1].objects[ListIndex::new(0)].id)

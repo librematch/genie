@@ -64,7 +64,7 @@ mod tests {
 
     /// A byte reads as its state, 0 as none; a saved value past a byte is an error.
     #[test]
-    fn a_state_reads_from_its_byte_and_0_is_none() {
+    fn state_reads_from_its_byte_and_0_is_none() {
         assert_eq!(GatherPointState::of_byte(0), None);
         assert_eq!(GatherPointState::of_byte(1), Some(GatherPointState::POINT));
         assert_eq!(

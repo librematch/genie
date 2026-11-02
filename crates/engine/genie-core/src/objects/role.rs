@@ -141,7 +141,7 @@ mod tests {
     /// A role's id names its object for any object's routine and its lookups, and prints its
     /// role.
     #[test]
-    fn a_role_s_id_names_its_object_and_prints_its_role() {
+    fn role_id_names_its_object_and_prints_its_role() {
         let id = tested(7);
         assert_eq!(id.id(), ObjectId::try_from(7).unwrap());
         assert_eq!(ObjectId::from(id), id.id());
@@ -155,7 +155,7 @@ mod tests {
     /// A raw field's −1 is none, another value the object in the role; the ids order and compare
     /// as their objects'.
     #[test]
-    fn a_field_s_minus_one_is_none_and_ids_order_as_their_objects() {
+    fn field_minus_one_is_none_and_ids_order_as_their_objects() {
         assert_eq!(RoleId::<Tested>::of_field(-1), None);
         assert_eq!(RoleId::<Tested>::of_field(-2), Some(tested(-2)));
         assert!(tested(-2) < tested(3));

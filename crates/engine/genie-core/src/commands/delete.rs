@@ -710,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn a_delete_takes_a_unit_s_hit_points_but_not_another_player_s_or_livestock() {
+    fn delete_takes_unit_hit_points_but_not_another_player_or_livestock() {
         let mut t = game(0.0, true);
         t.delete(player_id(1), object_id(10)).unwrap();
         t.delete(player_id(1), object_id(20)).unwrap();
@@ -736,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    fn a_deleted_foundation_gives_back_what_its_build_time_has_still_to_go() {
+    fn deleted_foundation_gives_back_what_its_build_time_has_still_to_go() {
         // no builder started it: all of its paid cost, and it is destroyed at once (state 7)
         let mut t = game(0.0, true);
         t.delete(player_id(1), object_id(11)).unwrap();
@@ -766,7 +766,7 @@ mod tests {
     /// `FUN_1411cd780` and `FUN_1411cfb30`), which only a treaty fills (`FUN_141461c00`): without
     /// one the delete is any building's; with one the zones are not held.
     #[test]
-    fn a_deleted_town_centre_foundation_clears_no_zones_without_a_treaty() {
+    fn deleted_town_centre_foundation_clears_no_zones_without_treaty() {
         let town_centre = |t: &mut World| {
             for m in &mut t.masters {
                 let mut tc = m.get(ids::HOUSE).unwrap().clone();
@@ -971,7 +971,7 @@ mod clearing_tests {
     /// in its tile's list order is destroyed (`FUN_14118f1e0`): its hit points go, it wakes to
     /// the end of Gaia's live list and goes to state 7.
     #[test]
-    fn a_footprint_clearing_wakes_two_sleeping_decorations_in_their_tile_s_order() {
+    fn footprint_clearing_wakes_two_sleeping_decorations_in_their_tile_order() {
         let mut t = world(
             vec![object(1, master_id(1351), 3.5, 3.5)],
             vec![
@@ -1005,7 +1005,7 @@ mod clearing_tests {
     /// off its footprint: the base destroy takes it to state 7 and its storage of flag 32 leaves
     /// its owner (`FUN_14119d710`).
     #[test]
-    fn a_cleared_corpse_goes_to_state_7_and_its_flag_32_storage_leaves() {
+    fn cleared_corpse_goes_to_state_7_and_its_flag_32_storage_leaves() {
         let mut corpse = object(30, master_id(43), 10.5, 10.5);
         corpse.life.state = ObjectState::Dead;
         corpse.life.class = Class::Animated;
@@ -1025,7 +1025,7 @@ mod clearing_tests {
     /// (`FUN_14106c420`), and the combat object's `set_state(7)` (`FUN_14121cc40`) drops its
     /// record and its height and sets `+0x686`; it gets no refund (only state 3 from 2 does).
     #[test]
-    fn a_cleared_pile_loses_its_record_in_its_destroy() {
+    fn cleared_pile_loses_its_record_in_its_destroy() {
         let mut t = world(vec![object(40, master_id(254), 10.5, 10.5)], vec![], vec![]);
         t.players[0].attributes[98] = Amount::new(5.0);
         assert!(t.spatial.get(object_id(40)).unwrap().obstruction.is_some());
@@ -1046,7 +1046,7 @@ mod clearing_tests {
     /// the base destroy takes it to state 7 through the building's and the combat object's
     /// `set_state`, and its owner's watched list lets it go.
     #[test]
-    fn a_cleared_dead_farm_goes_through_the_building_s_destroy() {
+    fn cleared_dead_farm_goes_through_the_building_destroy() {
         let mut t = world(vec![], vec![], vec![object(50, ids::ID_357, 10.5, 10.5)]);
         t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), false)
             .unwrap();
@@ -1062,7 +1062,7 @@ mod clearing_tests {
     /// of flag 32 only at 7, a kind below 0 never); a sleeping object wakes to the end of the
     /// live list unless the state is 6; an object the world does not hold is not modelled.
     #[test]
-    fn the_base_set_state_lets_its_storage_go_and_wakes_a_sleeper() {
+    fn the_base_set_state_lets_its_storage_go_and_wakes_sleeper() {
         let mut t = world(
             vec![object(1, master_id(1351), 3.5, 3.5)],
             vec![
@@ -1131,7 +1131,7 @@ mod clearing_tests {
     /// `FUN_14121cc40`'s refund at a death from state 2: a unit's paid cost leaves attributes 98
     /// and 164, a building's 98 and 165, the castle's and the wonder's 98 alone, an annex's none.
     #[test]
-    fn a_death_refunds_its_paid_cost_by_its_type() {
+    fn death_refunds_its_paid_cost_by_its_type() {
         let unit = Master {
             kind: COMBAT,
             cost: costs(&[

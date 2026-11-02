@@ -227,7 +227,7 @@ mod tests {
 
     /// A position past a slice's end is an error that names it.
     #[test]
-    fn a_position_past_the_end_is_an_error_naming_it() {
+    fn position_past_the_end_is_an_error_naming_it() {
         let mut v = [1, 2, 3];
         assert_eq!(*v.checked(2).unwrap(), 3);
         *v.checked_mut(0).unwrap() = 9;
@@ -246,7 +246,7 @@ mod tests {
 
     /// A player or a position the table does not hold is an error that names it.
     #[test]
-    fn a_missing_player_or_slot_is_an_error_naming_it() {
+    fn missing_player_or_slot_is_an_error_naming_it() {
         let mut players = [Player::default(), Player::default()];
         assert!(players.player(PlayerId::new(1)).is_ok());
         let e = players.player(PlayerId::new(2)).unwrap_err();

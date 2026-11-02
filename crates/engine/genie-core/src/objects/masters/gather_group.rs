@@ -80,7 +80,7 @@ mod tests {
 
     /// A master's byte is its group and its table's place; an `i32` outside a byte is no group.
     #[test]
-    fn a_gather_group_is_a_byte() {
+    fn gather_group_is_byte() {
         assert_eq!(GatherGroup::from(4), GatherGroup::GOLD);
         assert_eq!((GatherGroup::FISH.get(), GatherGroup::FISH.index()), (2, 2));
         assert_eq!(GatherGroup::try_from(3), Ok(GatherGroup::STONE));

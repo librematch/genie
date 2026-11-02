@@ -721,7 +721,7 @@ mod tests {
     /// The sprite its `MoveTo` shows: the master's walking sprite, for none `FUN_140aa0d30`'s
     /// default.
     #[test]
-    fn an_explore_s_move_to_shows_the_master_s_walking_sprite_else_the_default() {
+    fn an_explore_move_to_shows_the_master_walking_sprite_else_the_default() {
         let other = Graphic {
             id: SpriteId::named(20),
             ..WALKING
@@ -739,7 +739,7 @@ mod tests {
     /// The scout map (`FUN_140f4a240`, `FUN_140f4d5e0`): 480 by 480 from tile (0, 0), each
     /// byte the fill; a set off the map is let be, a read off it is none.
     #[test]
-    fn an_influence_map_holds_a_byte_per_tile_from_its_reference_point() {
+    fn an_influence_map_holds_byte_per_tile_from_its_reference_point() {
         let mut m = InfluenceMap::new(GridSize::new(SCOUT_MAP_SIZE, SCOUT_MAP_SIZE), 0);
         assert_eq!(
             (
@@ -775,7 +775,7 @@ mod tests {
     /// An Explore without a point waits for one; a point makes the quiet `MoveTo` to it (range
     /// 0, the sprite its maker resolved, a new wait), which a code of 1 drops again.
     #[test]
-    fn an_explore_without_a_point_waits_for_one_then_walks() {
+    fn an_explore_without_point_waits_for_one_then_walks() {
         let table = Graphics::from([(SpriteId::named(7), WALKING)]);
         let walk = walk_of(&table, Some(SpriteId::named(7)));
         let (mut a, owner) = ExploreAction::new(Position::new(-1.0, -1.0, 0.0), &walk).unwrap();
@@ -998,7 +998,7 @@ mod tests {
     }
 
     #[test]
-    fn the_unit_ai_s_search_takes_the_nearest_unexplored_tile_it_reaches() {
+    fn the_unit_ai_search_takes_the_nearest_unexplored_tile_it_reaches() {
         let seeker = Seeker {
             at: Position::new(20.5, 92.5, 0.0),
             line_of_sight: Distance::new(4.0),

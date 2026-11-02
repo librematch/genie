@@ -15,7 +15,7 @@ use genie_core::world::parts::Object;
 /// MarvinBlue/426048706's town centre 7150 after update 7499: its Attack in state 7 and its
 /// make action in state 6 count 9 + 6); its type stays the top action's, −1 without one.
 #[test]
-fn a_building_s_production_state_comes_before_its_top_action_s() {
+fn building_production_state_comes_before_its_top_action_s() {
     let artifact = genie_core::ownership::artifact::Artifact {
         state: ArtifactState::Wait,
         timer: Seconds::ZERO,

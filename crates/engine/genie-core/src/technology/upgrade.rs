@@ -927,7 +927,7 @@ mod tests {
     /// `FUN_141193590`: a dead tree's share is that of its storage left (the entry of the kind
     /// it holds; none, 0), a living one's that of its hit points.
     #[test]
-    fn a_resource_object_s_damage_share_is_its_storage_s() {
+    fn resource_object_damage_share_is_its_storage_s() {
         let tree = Master {
             class: class::TREE,
             hit_points: MasterHitPoints::of_data(20),
@@ -953,7 +953,7 @@ mod tests {
     /// 4, any other object always; a class change makes a new unit AI but for the pairs 12/47,
     /// 18/43 and 43/18 (the new class first).
     #[test]
-    fn who_takes_an_upgrade_and_who_a_new_unit_ai() {
+    fn who_takes_an_upgrade_and_who_new_unit_ai() {
         assert!(upgradable(master_type::BUILDING, ObjectState::Dying));
         assert!(!upgradable(master_type::BUILDING, ObjectState::DyingSprite));
         assert!(!upgradable(master_type::COMBAT, ObjectState::Removed));
@@ -995,7 +995,7 @@ mod tests {
     /// (1403, whose copy differs from 464's 1435) take masters of their own, the dead one also
     /// its death spawn's; the player's master 70 then takes 464's values but its id and class.
     #[test]
-    fn an_age_s_upgrade_keeps_a_house_s_share_of_its_hit_points() {
+    fn an_age_upgrade_keeps_house_share_of_its_hit_points() {
         let old = Master {
             death_spawns: [Some(master_id(1403)), None],
             ..building(70, 550, SPRITE_PLACED, 1403)
@@ -1170,7 +1170,7 @@ mod tests {
     /// master's tasks (action type, target class and master; the last of equals) and takes it; an
     /// action without a match keeps its task.
     #[test]
-    fn an_upgrade_s_actions_take_the_new_master_s_last_matching_task() {
+    fn an_upgrade_actions_take_the_new_master_last_matching_task() {
         use crate::construction::build::BuildTask;
         use crate::gathering::gather::GATHER;
         use crate::gathering::hunt::HuntTask;
@@ -1399,7 +1399,7 @@ mod tests {
     /// In mode 3 an object whose own master has `from`'s id takes the upgrade too, and so does a
     /// sleeping object; masters the table lacks change nothing.
     #[test]
-    fn a_mode_2_upgrade_gives_the_effect_s_object_a_master_of_its_own() {
+    fn mode_2_upgrade_gives_the_effect_object_master_of_its_own() {
         let hp = |t: &World| -> Vec<f32> {
             let p = &t.players[0];
             p.objects
@@ -1471,7 +1471,7 @@ mod tests {
     /// The upgrades to 0x67f and 0x6a1 move the tracker's list of `from` to `to`'s
     /// (`FUN_14104fd10`); another upgrade leaves it.
     #[test]
-    fn an_upgrade_to_0x67f_moves_the_tracker_s_list() {
+    fn an_upgrade_to_0x67f_moves_the_tracker_list() {
         let mut t = upgrade_world();
         t.upgrade_objects(
             PlayerId::new(0),
@@ -1529,7 +1529,7 @@ mod tests {
     /// `FUN_14106a530`'s stop: without the master kept, a forager whose new master has no task
     /// for its top Gather stops (the Gather goes); kept, or with a Gather task, it goes on.
     #[test]
-    fn an_upgrade_stops_a_top_action_the_new_master_has_no_task_for() {
+    fn an_upgrade_stops_top_action_the_new_master_has_no_task_for() {
         let mut t = crate::world::tests::forage_world();
         t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
             .unwrap();
@@ -1572,7 +1572,7 @@ mod tests {
     /// and keeps its sprite when the new master has none; one showing the running sprite shows
     /// the new running sprite; any other sprite stays.
     #[test]
-    fn an_upgrade_s_moving_object_shows_the_new_walking_or_running_sprite() {
+    fn an_upgrade_moving_object_shows_the_new_walking_or_running_sprite() {
         let old = Master {
             id: master_id(4),
             move_sprite: Some(SpriteId::named(100)),
@@ -1615,7 +1615,7 @@ mod tests {
     /// villager's load goes to its player (berries as food, wood as wood) and its hands empty;
     /// another combat object, an empty load or one of no kind stays.
     #[test]
-    fn an_upgrade_hands_a_villager_s_load_to_its_player() {
+    fn an_upgrade_hands_villager_load_to_its_player() {
         let villager = Master {
             id: ids::VILLAGER_MALE,
             kind: master_type::COMBAT,

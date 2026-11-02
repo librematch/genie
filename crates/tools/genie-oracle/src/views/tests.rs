@@ -52,7 +52,7 @@ fn with_actions(id: i32, actions: Vec<(i16, Action)>) -> genie_save::Object {
 }
 
 #[test]
-fn a_group_view_lists_its_units_formations_and_command() {
+fn group_view_lists_its_units_formations_and_command() {
     let mut save = header(vec![]);
     let groups = &mut save.world.base_world.unit_groups;
     groups.number_unit_groups = 1;
@@ -93,7 +93,7 @@ fn a_group_view_lists_its_units_formations_and_command() {
 /// With `full` the groups print as genie-core imports them; a group the import refuses says
 /// why.
 #[test]
-fn a_full_group_view_imports_the_groups() {
+fn full_group_view_imports_the_groups() {
     let mut save = header(vec![]);
     save.world.base_world.unit_groups.unit_group = vec![UnitGroup {
         id: 3,
@@ -113,7 +113,7 @@ fn a_full_group_view_imports_the_groups() {
 /// state, the retarget timer and the sprite with its node; `actions_of` prints that object's
 /// action list first.
 #[test]
-fn an_object_view_has_a_row_per_live_object() {
+fn an_object_view_has_row_per_live_object() {
     let mut walker = with_actions(5, vec![(4, explore(3))]);
     let s = static_mut(&mut walker);
     s.hp = 25.0;
@@ -146,7 +146,7 @@ fn an_object_view_has_a_row_per_live_object() {
 /// The objects asked for, with their velocity, orientation and path data; each level's path
 /// from the world's table.
 #[test]
-fn a_movement_view_shows_the_paths_of_the_objects_asked_for() {
+fn movement_view_shows_the_paths_of_the_objects_asked_for() {
     let mut walker = combat_object(5, 83);
     let m = moving_mut(&mut walker);
     m.angle = 0.5;
@@ -182,7 +182,7 @@ fn a_movement_view_shows_the_paths_of_the_objects_asked_for() {
 /// The objects asked for that have a unit AI: its order, action and target, the timers, an
 /// elephant's origin, the actions and the queued orders.
 #[test]
-fn a_unit_ai_view_shows_the_ai_of_the_objects_asked_for() {
+fn unit_ai_view_shows_the_ai_of_the_objects_asked_for() {
     let mut boar = with_actions(5, vec![(4, explore(3))]);
     combat_mut(&mut boar).tribe_elephant_unit_ai_module =
         Some(Box::new(TribeElephantUnitAiModule {
@@ -267,7 +267,7 @@ fn the_checkpoint_view_names_the_differing_words() {
 /// The views of a recording's bytes are their header's; bytes that are no recording are an
 /// error.
 #[test]
-fn the_views_of_a_recording_read_its_header() {
+fn the_views_of_recording_read_its_header() {
     let mut boar = combat_object(6, 4);
     // a unit AI module of type 1 (`needUnitAI`), which the save writes after the flag
     let combat = combat_mut(&mut boar);

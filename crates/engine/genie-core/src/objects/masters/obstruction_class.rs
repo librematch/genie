@@ -62,7 +62,7 @@ mod tests {
 
     /// A class keeps its byte and marks a tile with its low six bits.
     #[test]
-    fn a_class_marks_its_low_six_bits() {
+    fn class_marks_its_low_six_bits() {
         assert_eq!(ObstructionClass::from(5), ObstructionClass::GATE);
         assert_eq!(ObstructionClass::GATE.get(), 5);
         assert_eq!(ObstructionClass::from(0xc3).mark_bits(), 3);

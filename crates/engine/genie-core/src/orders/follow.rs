@@ -377,16 +377,16 @@ impl World {
         let (tp, t) = self
             .object(target)
             .ok_or(crate::movement::move_to::TARGET_LACKING)?;
-        let t_state = t.life.state;
-        let t_master = t.master(self.master_tables(), tp)?.id;
-        if crate::movement::move_to::holds_object(livestock, t_master, t_state) {
+        let target_state = t.life.state;
+        let target_master = t.master(self.master_tables(), tp)?.id;
+        if crate::movement::move_to::holds_object(livestock, target_master, target_state) {
             self.take(target, self.releaser(player, idx)?)?;
         }
         self.clear_actions(player, idx)?;
-        self.start_object_move(player, idx, (target, t_state), livestock)
+        self.start_object_move(player, idx, (target, target_state), livestock)
     }
 
-    /// [`World::move_to_object_with`]'s new `MoveTo` toward `target` (in state `t_state`), once the
+    /// [`World::move_to_object_with`]'s new `MoveTo` toward `target` (in state `target_state`), once the
     /// unit's actions are cleared: its range and sprite, the action's start and the standing
     /// sprite it may show. Always false: no action took the move.
     ///
@@ -397,7 +397,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (target, t_state): (ObjectId, crate::objects::ObjectState),
+        (target, target_state): (ObjectId, crate::objects::ObjectState),
         livestock: bool,
     ) -> Result<bool, GenieError> {
         let master = self
@@ -419,7 +419,7 @@ impl World {
             &self.spatial,
             here,
             mover,
-            (target, t_state),
+            (target, target_state),
             range,
             (sprite, livestock),
         )?;

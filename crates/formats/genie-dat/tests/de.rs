@@ -60,7 +60,7 @@ fn the_installed_data_file_has_the_values_genieutils_reads() {
 /// A `file_version` set outside the versions the reader takes is the caller's invalid input, not
 /// a format the reader lacks.
 #[test]
-fn a_file_version_set_outside_the_read_ones_is_invalid_input() {
+fn file_version_set_outside_the_read_ones_is_invalid_input() {
     let Some(data) = inflated() else {
         return eprintln!("GENIE_DAT is not set; skipping");
     };

@@ -31,7 +31,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_64_bit_cvttss2si_keeps_the_low_word_past_the_i32_range() {
+    fn cvttss2si_of_64_bits_keeps_the_low_word_past_the_i32_range() {
         assert_eq!((cvttss2si_64(2.9), cvttss2si_64(-2.9)), (2, -2));
         // 2^31 fits 64 bits; its low word is i32::MIN, 2^32 + 2^31 wraps the same way
         assert_eq!(cvttss2si_64(2_147_483_648.0) as i32, i32::MIN);

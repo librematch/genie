@@ -66,7 +66,7 @@ pub(super) const ATAN_OF_MINUS_HUGE: f32 = f32::from_bits(0xbfc9_0fda);
 /// 2 (`DAT_142e8c150`).
 pub(super) const TWO: f32 = f32::from_bits(0x4000_0000);
 /// 3/2 (`DAT_142eb4838`).
-pub(super) const ONE_AND_A_HALF: f32 = f32::from_bits(0x3fc0_0000);
+pub(super) const THREE_HALVES: f32 = f32::from_bits(0x3fc0_0000);
 /// −1 (`DAT_14330ec20`).
 pub(super) const MINUS_ONE: f32 = f32::from_bits(0xbf80_0000);
 /// atanf's series in z = t², w = z²: (T1 − w T3) w + ((w T4 + T2) w + T0) z. T0 (`DAT_142ec8a6c`).
@@ -133,7 +133,7 @@ pub fn atan(x: f32) -> f32 {
                 (Some(1), (a - ONE) / (a + ONE))
             }
         } else if ix < 0x401c_0000 {
-            (Some(2), (a - ONE_AND_A_HALF) / (a * ONE_AND_A_HALF + ONE))
+            (Some(2), (a - THREE_HALVES) / (a * THREE_HALVES + ONE))
         } else {
             (Some(3), MINUS_ONE / a)
         }

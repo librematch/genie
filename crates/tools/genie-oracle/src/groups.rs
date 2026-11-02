@@ -675,7 +675,7 @@ mod tests {
     /// A formation slot's saved state reads as its state (3, in place); 4 names none and the
     /// formation does not import.
     #[test]
-    fn a_slot_takes_its_saved_state() {
+    fn slot_takes_its_saved_state() {
         let saved = |state: i32| saved::Formation {
             slots: vec![saved::FormationEntry1 {
                 slots_state: state,
@@ -695,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn a_field_that_differs_is_named_by_its_path_with_both_values_in_full() {
+    fn field_that_differs_is_named_by_its_path_with_both_values_in_full() {
         let mut theirs = group(3);
         theirs.motion.velocity = theirs.motion.velocity.with_height(0.1);
         theirs.members[0].specific_move.timer = Seconds::new(-0.0);
@@ -710,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_of_another_length_shows_its_length_and_the_entries_one_side_holds() {
+    fn list_of_another_length_shows_its_length_and_the_entries_one_side_holds() {
         let mut theirs = group(3);
         theirs.waypoints.push(BVector::new(1.5, 2.5, 0.0));
         let d = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);

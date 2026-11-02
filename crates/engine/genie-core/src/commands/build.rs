@@ -25,7 +25,7 @@ pub struct BuildCommand {
     pub position: Point,
     /// `+0x14`, the formatter's `qId`: a human player's BUILD with one other than −1 does
     /// nothing (`FUN_140e7a400`'s first test).
-    pub q_id: crate::commands::QueueId,
+    pub queue_id: crate::commands::QueueId,
     /// `+0x18`: the foundation's sprite override (`+0x788`, `FUN_141189e70`), which a house
     /// (master 70) of civ 12 keeps from 0x2c9 to 0x2ce; any other is −1.
     pub sprite_override: crate::commands::SpriteOverride,
@@ -58,7 +58,7 @@ impl BuildCommand {
         let Some(builders) = w.command_check(player, listed)? else {
             return Ok(());
         };
-        if self.q_id.is_queued() && !w.players.player(player)?.computer {
+        if self.queue_id.is_queued() && !w.players.player(player)?.computer {
             return Ok(());
         }
         let (x, y) = (self.position.x(), self.position.y());

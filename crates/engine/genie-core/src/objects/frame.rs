@@ -145,7 +145,7 @@ mod tests {
     /// Frames add, subtract, negate and take remainders as shorts; the effects' ops wrap; a
     /// byte frame keeps its byte.
     #[test]
-    fn frames_are_the_game_s_shorts() {
+    fn frames_are_the_game_shorts() {
         let count = Frame::of_data(10);
         assert_eq!(count - Frame::ONE, Frame::of_data(9));
         assert_eq!(Frame::of_data(3) + -Frame::of_data(5), Frame::of_data(-2));

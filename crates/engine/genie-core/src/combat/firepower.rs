@@ -157,7 +157,7 @@ mod tests {
 
     /// A firepower adds, takes off and scales as `f32`.
     #[test]
-    fn a_firepower_adds_and_scales_as_floats() {
+    fn firepower_adds_and_scales_as_floats() {
         let mut f = Firepower::new(1.0) + Firepower::new(0.5);
         f += Firepower::new(2.0);
         f -= Firepower::new(1.5);

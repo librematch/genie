@@ -41,7 +41,7 @@ const DT: f32 = 0.02;
 /// MarvinBlue/426048731's boar (master 48): a walking sprite of 16 facets at a turn speed of
 /// 0.05 turns 2π / 0.8 a second, 11.25° in a tick of 0.025 s; a villager turns at once.
 #[test]
-fn a_master_s_turn_rate_comes_from_its_turn_speed_and_walking_facets() {
+fn master_turn_rate_comes_from_its_turn_speed_and_walking_facets() {
     let rate = turn_rate(
         Seconds::new(0.05),
         Some(crate::objects::FacetCount::of_data(16)),
@@ -58,7 +58,7 @@ fn a_master_s_turn_rate_comes_from_its_turn_speed_and_walking_facets() {
 /// `FUN_1410e3a70` writes all five turning values: a zero turn speed resets them, a walking
 /// sprite sets the revolution and both rates, no sprite changes nothing.
 #[test]
-fn a_master_s_turning_values_follow_its_turn_speed_and_walking_sprite() {
+fn master_turning_values_follow_its_turn_speed_and_walking_sprite() {
     let before = Turning {
         radius: Distance::new(1.0),
         radius_speed: Speed::new(2.0),
@@ -160,7 +160,7 @@ fn level(level: u8, points: &[Point], state: PathState) -> PathData {
 /// walks to its path's end when its target, the hunter 10049, walks off; the walked level's
 /// waypoint and the top path's end follow the hunter, in the paths' layout (x, z, y).
 #[test]
-fn a_path_s_end_follows_a_moved_target_in_the_paths_layout() {
+fn path_end_follows_moved_target_in_the_paths_layout() {
     let mut m = builder_9177();
     m.paths[0].flags = LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
     assert!(m.walks_to_path_end().unwrap());
@@ -383,7 +383,7 @@ fn drop_off_world(class: u8, near: &[(i32, Point, f32, ClassId, PlayerId)]) -> S
 /// allied, and not touching the target; with its start free, or walking, or in another state,
 /// none of them.
 #[test]
-fn a_drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
+fn drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
     let mut objects = crate::world::index::TestObjects::default();
     let near = [
         (
@@ -518,7 +518,7 @@ fn a_drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
 /// weapon range and the target's radii: blocked deep in terrain its mask lacks, free on
 /// terrain it has.
 #[test]
-fn the_drop_off_walker_s_start_is_blocked_in_terrain_its_mask_lacks() {
+fn the_drop_off_walker_start_is_blocked_in_terrain_its_mask_lacks() {
     let test = |class: u8| {
         let world = Spatial::with_tiles(
             GridSize::new(16, 16),
@@ -594,7 +594,7 @@ fn walled(radius: Distance) -> Spatial {
 /// `FUN_140f9e540`'s dispatch: `COMISS 0.5, radius; JC` (0x140f9e71f): a radius above half a
 /// tile, or an unordered one, takes the old pather.
 #[test]
-fn a_radius_above_half_a_tile_or_unordered_takes_the_old_pather() {
+fn radius_above_half_tile_or_unordered_takes_the_old_pather() {
     assert!(!old_pather_for(Distance::new(0.2)));
     assert!(!old_pather_for(Distance::new(0.5)));
     assert!(old_pather_for(Distance::new(f32::from_bits(
@@ -609,7 +609,7 @@ fn a_radius_above_half_a_tile_or_unordered_takes_the_old_pather() {
 /// point (its area, grown once, holds 96 tiles). A unit of half a tile takes the new pather,
 /// which needs the game's mesh.
 #[test]
-fn a_big_unit_s_short_path_takes_the_old_pather() {
+fn big_unit_short_path_takes_the_old_pather() {
     let mut world = walled(Distance::new(0.6));
     let mut pathing = Pathing::default();
     let mut object = Well512::default();
@@ -702,7 +702,7 @@ fn a_big_unit_s_short_path_takes_the_old_pather() {
 /// kept, is kept all the same: the first hit loop takes it into the include list and gives
 /// it its temporary shape (0x1411547c0..0x141154855) before the test (0x1411549ac).
 #[test]
-fn a_kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
+fn kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut w = world();
     let mut close = *w.get(object_id(9175)).unwrap();
@@ -748,7 +748,7 @@ fn a_kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
 /// so the rest of the object's update and the objects after it see it standing (425789782's
 /// villager 2785, stopped in update 404, which builder 2787 tests in update 405).
 #[test]
-fn a_stop_clears_the_animation_speed_within_the_call() {
+fn stop_clears_the_animation_speed_within_the_call() {
     let mut m = builder_9177();
     m.animated.speed = Speed::new(0.8);
     m.waiting = 1;
@@ -776,7 +776,7 @@ fn a_stop_clears_the_animation_speed_within_the_call() {
 /// parent asks for a path again (state 2); a walk without one (a group member's own path,
 /// level 0 from slot 0x540) stops the unit (slot 0x5d0) and the step gives up (1).
 #[test]
-fn kept_hits_replan_the_parent_or_stop_a_walk_without_one() {
+fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
     let w = world();
     let me = Me {
         human_order: WorldTime::ZERO,
@@ -819,7 +819,7 @@ fn kept_hits_replan_the_parent_or_stop_a_walk_without_one() {
 /// 0x141154709), while it counts among the hits (`local_1758`'s count, 0x14115488a): the
 /// walked level's target alone among two hits is no lone target.
 #[test]
-fn a_map_edge_s_record_is_a_hit_without_an_object() {
+fn map_edge_record_is_hit_without_an_object() {
     let w = world();
     let me = Me {
         human_order: WorldTime::ZERO,
@@ -903,7 +903,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
 /// (`DAT_143f4a000`): a moving unit in the way counts only when included, and the new level
 /// goes round it.
 #[test]
-fn a_big_unit_s_path_request_takes_the_old_pather_with_the_walk_s_kept_hits() {
+fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut w = Spatial::with_tiles(
         GridSize::new(20, 20),
@@ -1091,7 +1091,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
 /// `FUN_14114f630`: an angle at most the turn's most, or a NaN most (an infinite turn rate
 /// times dt 0), turns the whole angle and is not clipped (JBE on unordered).
 #[test]
-fn a_nan_most_turns_the_whole_angle_unclipped() {
+fn nan_most_turns_the_whole_angle_unclipped() {
     let mut m = builder_9177();
     m.forward = BVector::new(1.0, 0.0, 0.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
@@ -1116,7 +1116,7 @@ fn a_nan_most_turns_the_whole_angle_unclipped() {
 /// of +x (toward +z) is negative, clipped to the turn rate times dt; the fast turn's dt is a
 /// hundred times longer.
 #[test]
-fn a_turn_toward_a_direction_is_signed_and_clipped_by_the_turn_rate() {
+fn turn_toward_direction_is_signed_and_clipped_by_the_turn_rate() {
     let mut m = builder_9177();
     m.stats.turn_rate = TurnRate::new(1.0);
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
@@ -1142,7 +1142,7 @@ fn a_turn_toward_a_direction_is_signed_and_clipped_by_the_turn_rate() {
 /// rebuilds the right one (slot 173); the angle is the new facet's. Without facets it stops
 /// after the vectors.
 #[test]
-fn a_yaw_turns_forward_and_right_and_takes_the_facet_s_angle() {
+fn yaw_turns_forward_and_right_and_takes_the_facet_angle() {
     let mut m = builder_9177();
     m.forward = BVector::new(1.0, 0.0, 0.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
@@ -1208,7 +1208,7 @@ fn the_orientation_speed_and_pause_slots() {
 /// `LAB_141152ec1`: a waypoint a tile away, or a target a tile from the unit, or a near one of
 /// master 45, is the long pather's.
 #[test]
-fn a_far_waypoint_or_a_target_of_master_45_takes_the_long_pather() {
+fn far_waypoint_or_target_of_master_45_takes_the_long_pather() {
     assert!(far_waypoint(Distance::new(1.0), None) && !far_waypoint(Distance::new(0.5), None));
     assert!(far_waypoint(
         Distance::ZERO,
@@ -1231,7 +1231,7 @@ fn a_far_waypoint_or_a_target_of_master_45_takes_the_long_pather() {
 /// `FUN_141161950`: a moving unit's footprint stays 0.01 inside the map, its y by the map's
 /// width as its x (the game reads `+0x18` for both).
 #[test]
-fn the_position_setter_holds_y_by_the_map_s_width() {
+fn the_position_setter_holds_the_row_by_the_map_width() {
     let m = builder_9177();
     // a map 40 wide and 120 high: y 100 lies beyond the width less the radius and the gap
     let at = m.set_position(Position::new(10.0, 100.0, 0.0), GridSize::new(40, 120));
@@ -1250,7 +1250,7 @@ fn the_position_setter_holds_y_by_the_map_s_width() {
 /// `FUN_140f98bc0` with 1: a loop's next point or 0 past its end; a back-and-forth path turns
 /// at its ends and flips bit 2; a path that does not loop has none.
 #[test]
-fn a_looping_path_s_next_waypoint_goes_round_or_back_and_forth() {
+fn looping_path_next_waypoint_goes_round_or_back_and_forth() {
     let mut l = level(
         1,
         &[
@@ -1304,7 +1304,7 @@ fn a_looping_path_s_next_waypoint_goes_round_or_back_and_forth() {
 /// `LAB_141151b6d`: an arrived level of link 2 hands its looping parent its next waypoint;
 /// one of another link stays and the step walks on.
 #[test]
-fn an_arrived_level_hands_a_looping_parent_its_next_waypoint() {
+fn an_arrived_level_hands_looping_parent_its_next_waypoint() {
     let goal = Goal {
         target: None,
         gap: Distance::new(FAR),
@@ -1330,7 +1330,7 @@ fn an_arrived_level_hands_a_looping_parent_its_next_waypoint() {
 /// its first waypoint the step ends (`LAB_141155637`): the unit turns toward the direction
 /// the step's walk last took (zero without one) and, its level in state 2, stops.
 #[test]
-fn a_loop_s_reached_waypoint_moves_on_and_its_first_ends_the_step() {
+fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     let looping = |waypoint| {
         let place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
         let mut m = builder_9177();
@@ -1422,7 +1422,7 @@ fn a_loop_s_reached_waypoint_moves_on_and_its_first_ends_the_step() {
 /// `0x141150f00`: a level whose target is gone walks as to a point (`FUN_1415417a0` finds
 /// none, `LAB_1411512df`), as one with no target does.
 #[test]
-fn a_walk_whose_target_is_gone_walks_as_to_a_point() {
+fn walk_whose_target_is_gone_walks_as_to_point() {
     let walk = |target: i32| {
         let mut place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
         let mut m = builder_9177();
@@ -1454,7 +1454,7 @@ fn a_walk_whose_target_is_gone_walks_as_to_a_point() {
 /// least of its own and its first two annexes' through the site's terms (`MINSS`); any other
 /// target's is its own.
 #[test]
-fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
+fn gate_gap_is_the_least_over_it_and_its_annexes() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut world = Spatial::new(GridSize::new(40, 40));
     let wall = |x: f32, class: ClassId| Placed {
@@ -1518,7 +1518,7 @@ fn a_gate_s_gap_is_the_least_over_it_and_its_annexes() {
 /// `FUN_140f98d50` and `FUN_140f98dd0`: a point goes, or the path ends before it and is
 /// measured again; an index outside the path, or an empty path, changes nothing.
 #[test]
-fn a_path_loses_a_point_or_its_end_only_for_an_index_inside_it() {
+fn path_loses_point_or_its_end_only_for_an_index_inside_it() {
     let mut points = vec![
         BVector::ZERO,
         BVector::new(1.0, 0.0, 0.0),
@@ -1573,7 +1573,7 @@ fn the_top_level_has_more_waypoints_unless_its_count_less_one_reaches_its_index(
 /// `FUN_140f9b8f0` compares `i` with the point count less one, signed: an empty path or the
 /// last point has no stretch to split; any other stretch gets its midpoint.
 #[test]
-fn a_split_takes_the_midpoint_of_a_stretch_and_skips_an_empty_path() {
+fn split_takes_the_midpoint_of_stretch_and_skips_an_empty_path() {
     let mut empty = Path::default();
     split(&mut empty, 0);
     assert_eq!(empty.points, Vec::<BVector>::new());
@@ -1597,7 +1597,7 @@ fn a_split_takes_the_midpoint_of_a_stretch_and_skips_an_empty_path() {
 /// Slot 196 (`FUN_14114f400`) at 0x14114f520..0x14114f52d: a NaN distance to the waypoint
 /// goes past the first test and stops at the second (JBE on unordered): short.
 #[test]
-fn a_nan_waypoint_distance_is_short() {
+fn nan_waypoint_distance_is_short() {
     let w = BVector::new(f32::NAN, 0.0, 5.0);
     assert!(matches!(
         reach(w, BVector::ZERO, BVector::new(1.0, 0.0, 0.0)),
@@ -1624,7 +1624,7 @@ fn a_nan_waypoint_distance_is_short() {
 /// The ground direction (`FUN_14114f210`): a NaN length divides (JBE on unordered), so the
 /// direction is NaN, not the forward vector.
 #[test]
-fn a_direction_of_a_nan_length_is_nan() {
+fn direction_of_nan_length_is_nan() {
     let m = crate::gathering::hunt::tests::walker();
     let d = m.direction_to(
         BVector::new(f32::NAN, 0.0, 0.0),
@@ -1762,7 +1762,7 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
 
 /// A trade cart plans only within its owner's budget; any unit at most three times a step.
 #[test]
-fn a_trade_cart_plans_within_its_owners_budget() {
+fn trade_cart_plans_within_its_owners_budget() {
     let spent = PlanBudget {
         attempt_cap: PlanCap::of_data(6),
         delay_cap: PlanCap::of_data(2),
@@ -1912,7 +1912,7 @@ pub(crate) fn tiled_world(classes: Vec<u8>) -> Spatial {
 /// through another unit (9175 at (30, 89)) does not, but for the target, which the query
 /// ignores.
 #[test]
-fn a_unit_closes_in_along_a_clear_straight_line() {
+fn unit_closes_in_along_clear_straight_line() {
     let m = builder_9177();
     let me = Me {
         human_order: WorldTime::ZERO,
@@ -1993,7 +1993,7 @@ fn a_unit_closes_in_along_a_clear_straight_line() {
 /// first, empties it (false); a moving building and a clear path leave it; a villager's path
 /// is never cut.
 #[test]
-fn a_long_path_ends_before_its_first_walled_stretch() {
+fn long_path_ends_before_its_first_walled_stretch() {
     let m = builder_9177();
     let me = Me {
         human_order: WorldTime::ZERO,
@@ -2072,7 +2072,7 @@ fn a_long_path_ends_before_its_first_walled_stretch() {
 /// to 74) ends at the band's edge (false), and farther from the waypoint than `way` allows the
 /// path empties and the gap of its end comes back (3.54 here).
 #[test]
-fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
+fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
     let mut band = vec![4; 120 * 120];
     for y in 70..75 {
         for x in 20..40 {
@@ -2153,7 +2153,7 @@ fn a_long_plan_reaches_its_waypoint_stops_short_or_ends_at_a_band() {
 /// at its end (state 5); a looping level, an attack move, a level above 1 and a top path
 /// without more are not modelled. With a target, bit 2 moves from the level to its parents.
 #[test]
-fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
+fn level_without_path_marks_its_waypoint_pauses_or_waits() {
     let target = *world().get(object_id(10028)).unwrap();
     let mut m = builder_9177();
     m.paths[0].flags = LevelFlags::MET_TARGET;
@@ -2332,7 +2332,7 @@ fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) 
 /// waypoint the walk ends: arrived, the levels reset); with more than 2 substitutes a short
 /// step counts it reached too (flags 3) and the walk goes on.
 #[test]
-fn a_walk_on_or_past_its_waypoint_counts_it_reached() {
+fn walk_on_or_past_its_waypoint_counts_it_reached() {
     let me = || Me {
         human_order: WorldTime::ZERO,
         id: object_id(9177),
@@ -2408,7 +2408,7 @@ fn the_first_step_reaches_top_speed_and_moves_along_the_saved_forward_vector() {
 /// not capped by the top speed (from 10 on, and a NaN, it is). A member on an own move takes
 /// the group's speed while its walked level walks unpaused (a NaN pause too), else it stands.
 #[test]
-fn the_speed_slot_caps_the_speed_unless_the_unit_s_group_steers_it() {
+fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     let mut m = builder_9177();
     m.stats.speed = Speed::new(1.2);
     assert_eq!(m.next_speed(Speed::new(5.0), None), Speed::new(1.2));
@@ -2453,7 +2453,7 @@ fn the_speed_slot_caps_the_speed_unless_the_unit_s_group_steers_it() {
 /// The velocity step (`FUN_140f9ba80`) takes slot 0x5e0's speed: a member on an own move whose
 /// walked level is paused stands where it is, whatever its acceleration.
 #[test]
-fn the_velocity_step_of_a_paused_member_on_its_own_move_stands() {
+fn the_velocity_step_of_paused_member_on_its_own_move_stands() {
     let mut m = builder_9177();
     m.paths[0].pause_time = Seconds::new(0.028);
     let at = m.step_velocity(
@@ -2537,7 +2537,7 @@ fn the_gap_is_the_distance_between_the_footprints() {
 
 /// MarvinBlue/426048731's hawk 9926 after tick 679: a flight to a point, no range.
 #[test]
-fn a_walk_to_a_point_goes_on_until_its_range() {
+fn walk_to_point_goes_on_until_its_range() {
     let mut hawk_place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
     let mut hawk = builder_9177();
     for l in &mut hawk.paths {
@@ -2605,7 +2605,7 @@ fn a_walk_to_a_point_goes_on_until_its_range() {
 /// range, takes state 6 and is done (1); on a tie of times the higher player, then the higher
 /// id yields (427222982, 428355643, 428376971).
 #[test]
-fn a_top_level_short_of_its_moved_target_arrives() {
+fn top_level_short_of_its_moved_target_arrives() {
     let mut objects = crate::world::index::TestObjects::default();
     let walk = |weapon_range: Distance| {
         let mut m = builder_9177();
@@ -2703,7 +2703,7 @@ fn a_top_level_short_of_its_moved_target_arrives() {
 /// record holds it, unless the manager's ignore list as the last `FUN_1410562e0` left it
 /// holds the object (426916909's p0 in update 4036, 428265662's in 4931).
 #[test]
-fn a_next_waypoint_an_object_stands_on_goes() {
+fn next_waypoint_an_object_stands_on_goes() {
     let walk = || {
         let place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
         let mut m = builder_9177();
@@ -2808,7 +2808,7 @@ fn a_next_waypoint_an_object_stands_on_goes() {
 /// reached; the next motion step puts the unit onto it, the level arrives and hands over to the
 /// top level, which arrives too: the walk ends.
 #[test]
-fn a_reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
+fn reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
     let mut m = builder_9177();
     m.paths[0].points = vec![BVector::new(30.0, 0.0, 89.0), BVector::new(29.5, 0.0, 89.5)];
     m.paths[1].points = vec![BVector::new(30.0, 0.0, 89.0), BVector::new(29.5, 0.0, 89.5)];
@@ -2865,7 +2865,7 @@ fn a_reached_waypoint_ends_the_walk_at_the_end_of_the_path() {
 /// MarvinBlue/426048731's 9175 in update 682: the path request of its `MoveTo` off the house
 /// footprint, which the game saves as the top level of its path data.
 #[test]
-fn a_path_request_makes_the_top_level_from_the_unit_to_its_goal() {
+fn path_request_makes_the_top_level_from_the_unit_to_its_goal() {
     let mut place = crate::objects::layers::Static::at(Position::new(30.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.request_path(
@@ -2914,7 +2914,7 @@ fn a_path_request_makes_the_top_level_from_the_unit_to_its_goal() {
 }
 
 #[test]
-fn a_unit_with_no_speed_or_no_path_is_done() {
+fn unit_with_no_speed_or_no_path_is_done() {
     let mut place = crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     m.stats.speed = Speed::ZERO;
@@ -2954,7 +2954,7 @@ fn a_unit_with_no_speed_or_no_path_is_done() {
 /// The 4v4's hawk 30594 in update 2007: its level 0 arrived under a top level without a path
 /// (a bird's); the parent takes the reached mark and the step ends there, the unit flying on.
 #[test]
-fn an_arrived_level_under_one_without_a_path_ends_the_step() {
+fn an_arrived_level_under_one_without_path_ends_the_step() {
     let mut place = crate::objects::layers::Static::at(Position::new(30.0, 88.0, 0.0));
     let mut m = builder_9177();
     m.velocity.as_mut().unwrap().velocity = BVector::new(0.0, 0.0, 1.32);
@@ -3003,7 +3003,7 @@ fn an_arrived_level_under_one_without_a_path_ends_the_step() {
 }
 
 #[test]
-fn a_human_walker_pauses_a_met_unit_of_an_older_human_order() {
+fn human_walker_pauses_met_unit_of_an_older_human_order() {
     let mut objects = crate::world::index::TestObjects::default();
     // 9177 meets 9175 of its own player: ordered at the same time, the lower id outranks
     // and 9177 walks on; once 9175's last human order is the older, 9177 pauses it for dt
@@ -3152,7 +3152,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
 /// not list (−1) and a group the world does not hold keep the hit as any walker does.
 /// (430356142's scout cavalry 9585 walking its own move through goat 34792 at update 291.)
 #[test]
-fn a_group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates() {
+fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut w = world();
     let mut close = *w.get(object_id(9175)).unwrap();
@@ -3224,7 +3224,7 @@ fn a_group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gate
 /// coordinate less than 1e-7 above a whole number moves to the tile's middle, the height
 /// stays; a NaN stays (`COMISS`, `JBE`). Slot 0x450 (`FUN_141070ce0`) empties the list.
 #[test]
-fn a_user_waypoint_on_a_tile_edge_moves_to_the_tile_s_middle() {
+fn user_waypoint_on_tile_edge_moves_to_the_tile_middle() {
     let mut m = builder_9177();
     m.add_user_waypoint(Position::new(25.0, 20.0, 1.0));
     m.add_user_waypoint(Position::new(25.25, 20.000_000_1, 0.0));
@@ -3246,7 +3246,7 @@ fn a_user_waypoint_on_a_tile_edge_moves_to_the_tile_s_middle() {
 /// loops (flags bit 0), a far one goes back and forth (bit 1); an attack move (1) clears bit
 /// 0 and sets `+0x7fb`, 0 clears it, none leaves it.
 #[test]
-fn a_patrol_s_path_request_walks_the_own_waypoints_and_takes_the_patrol_flags() {
+fn patrol_path_request_walks_the_own_waypoints_and_takes_the_patrol_flags() {
     let mut m = builder_9177();
     m.user_waypoints = vec![BVector::new(25.5, 0.0, 20.5), BVector::new(26.5, 0.0, 20.5)];
     let ask = PathAsk {
@@ -3320,7 +3320,7 @@ fn a_patrol_s_path_request_walks_the_own_waypoints_and_takes_the_patrol_flags() 
 /// waypoints alone and the level walks on from that waypoint; without any, the unit's place
 /// and the goal on the ground (height 0).
 #[test]
-fn a_resumed_patrol_s_path_is_its_waypoints_from_the_saved_one() {
+fn resumed_patrol_path_is_its_waypoints_from_the_saved_one() {
     let mut m = builder_9177();
     m.user_waypoints = vec![
         BVector::new(20.0, 0.0, 20.0),
@@ -3368,7 +3368,7 @@ fn a_resumed_patrol_s_path_is_its_waypoints_from_the_saved_one() {
 /// waypoint marks it reached (flag 1), and the waypoint itself (flag 2) without a target or
 /// away from the target's footprint. Both go again; elsewhere the request goes on.
 #[test]
-fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
+fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     let house = world_target();
     let start = BVector::new(28.0, 0.0, 89.0);
     let near = Goal {
@@ -3435,7 +3435,7 @@ fn a_request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
 /// as does a level 2 on its last waypoint; a level 2 short of it gets its tries again
 /// (`CONTINUE`) and goes on (flag 1).
 #[test]
-fn a_request_spends_a_try_and_gives_up_or_goes_on_without_more() {
+fn request_spends_try_and_gives_up_or_goes_on_without_more() {
     let mut m = builder_9177();
     assert_eq!(m.spend_try(), Ok(None));
     assert_eq!(m.paths[0].continue_counter, PlanTries::of_data(9));
@@ -3495,7 +3495,7 @@ fn way_9177(goal: Goal<'_>, range: Distance) -> Way<'_> {
 /// on (flag 1), but on the last waypoint of a path made this update it resets to state 6 and
 /// the unit stops (it gives up).
 #[test]
-fn a_waypoint_in_range_ends_the_level_or_gives_up_on_a_fresh_path() {
+fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
     let point = |gap| Goal {
         target: None,
         gap,
@@ -3551,7 +3551,7 @@ fn a_waypoint_in_range_ends_the_level_or_gives_up_on_a_fresh_path() {
 /// A unit without a footprint takes the straight way ([`Mover::straight_way`]) to its
 /// waypoint, found; past the level's last waypoint the way has only its start.
 #[test]
-fn a_unit_without_a_footprint_takes_the_straight_way() {
+fn unit_without_footprint_takes_the_straight_way() {
     let m = builder_9177();
     let start = BVector::new(28.0, 0.0, 89.0);
     let mut np = NewPath::new(WorldTime::ZERO);
@@ -3571,7 +3571,7 @@ fn a_unit_without_a_footprint_takes_the_straight_way() {
 /// A new `MoveTo`'s wait (`FUN_140aa0d30`, `FUN_140aa0df0`): never waited, no time waited, and
 /// `kDefaultWaitTime` (`+0x74`) 1 s, which a give-up replaces by the stance's.
 #[test]
-fn a_new_move_to_s_wait_lasts_a_second() {
+fn new_move_to_wait_lasts_second() {
     use crate::movement::move_to::MoveWait;
     let new = MoveWait::default();
     assert_eq!(
@@ -3589,7 +3589,7 @@ fn a_new_move_to_s_wait_lasts_a_second() {
 /// The unit's top speed with the sprite it shows (slot 0x208, `FUN_14114d1d0`): the master's
 /// speed times the sprite's factor when that is above 0, else the master's.
 #[test]
-fn a_mover_that_shows_a_sprite_has_the_top_speed_of_its_factor() {
+fn mover_that_shows_sprite_has_the_top_speed_of_its_factor() {
     use crate::objects::sprite::Graphic;
     let with = |factor: f32| Graphic {
         id: SpriteId::named(1),

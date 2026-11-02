@@ -102,7 +102,7 @@ fn the_record_cells_answer_as_the_full_scan_does() {
 }
 
 #[test]
-fn a_query_takes_its_kinds_of_players_from_the_save() {
+fn query_takes_its_kinds_of_players_from_the_save() {
     // player 2's +0x278 as loaded: itself 1, Gaia 0, player 1 an ally (2) whatever its
     // diplomacy byte (2 here, which no derivation knew)
     let mut s = Spatial::new(GridSize::new(10, 10));
@@ -124,7 +124,7 @@ fn a_query_takes_its_kinds_of_players_from_the_save() {
 /// `FUN_1410576a0`: counter-clockwise 1, clockwise -1, on the segment 0, beyond its end 1;
 /// a NaN falls through every COMISS/JA to 0.
 #[test]
-fn ccw_answers_as_the_game_s_compares() {
+fn ccw_answers_as_the_game_compares() {
     assert_eq!(
         ccw(
             Point::new(0.0, 0.0),
@@ -186,7 +186,7 @@ const fn walk(x0: f32, y0: f32, x1: f32, y1: f32) -> Segment {
 /// `FUN_141052e10`: a walk from a NaN point meets the box's first side already (ccw answers
 /// 0 for a NaN, so the segments meet); a walk inside it meets it; one past it does not.
 #[test]
-fn a_walk_meets_a_box_by_its_sides_or_from_inside() {
+fn walk_meets_box_by_its_sides_or_from_inside() {
     let b = Rect::new(0.0, 0.0, 1.0, 1.0);
     assert!(box_meets_segment(
         b,
@@ -208,7 +208,7 @@ fn a_walk_meets_a_box_by_its_sides_or_from_inside() {
 /// `FUN_141051630` (and `FUN_141053130`): a circle record's box is read as it stands, so a
 /// box whose x1 lies below its x0 holds no walk inside it; `FUN_1410512f0` orders it first.
 #[test]
-fn a_circle_record_s_box_is_read_unordered_and_another_s_ordered() {
+fn circle_record_box_is_read_unordered_and_another_ordered() {
     let b = Rect::new(2.0, 0.0, 1.0, 1.0);
     let inside = walk(1.4, 0.4, 1.6, 0.6);
     assert!(record_meets_segment(
@@ -271,7 +271,7 @@ fn villager(x: f32, y: f32) -> Placed {
 }
 
 #[test]
-fn a_search_near_the_last_reads_its_answer_until_a_unit_ai_lets_it_go() {
+fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
     use crate::unit_ai::{Pick, Search};
     use crate::vision::registry::Registry;
     let mut s = Spatial::new(GridSize::new(120, 120));
@@ -348,7 +348,7 @@ fn a_search_near_the_last_reads_its_answer_until_a_unit_ai_lets_it_go() {
 }
 
 #[test]
-fn a_rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses() {
+fn rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses() {
     let mut s = Spatial::new(GridSize::new(120, 120));
     assert_eq!(
         s.edge_records(Rect::new(0.0, 0.0, 120.0, 120.0), 25),
@@ -405,7 +405,7 @@ fn a_rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses
 /// box, [`Spatial::put_tile_records`]); a line leaving the map meets the edge; the buffer
 /// the formation finds grows the records.
 #[test]
-fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
+fn still_line_meets_standing_records_and_the_temporary_tiles() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut classes = vec![1u8; 100];
     classes[2 * 10 + 7] = 2;
@@ -504,7 +504,7 @@ fn a_still_line_meets_standing_records_and_the_temporary_tiles() {
 /// empty list ignores the unit itself; a tile of a class outside the mask, or off the map,
 /// is never clear.
 #[test]
-fn a_point_is_clear_among_the_ignored_objects() {
+fn point_is_clear_among_the_ignored_objects() {
     let mut classes = vec![1u8; 100];
     classes[5 * 10 + 4] = 2;
     let mut s = Spatial::with_tiles(
@@ -610,7 +610,7 @@ fn a_point_is_clear_among_the_ignored_objects() {
 /// and with the villager ignored it meets nothing; a line whose grown rectangle leaves the
 /// map meets the map edge's record first.
 #[test]
-fn a_line_meets_the_records_and_the_tiles_its_mask_lacks() {
+fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
     let mut classes = vec![1u8; 100];
     classes[5 * 10 + 5] = 2;
     let mut s = Spatial::with_tiles(
@@ -809,7 +809,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
 /// The walk's query beyond the map's edge meets the edge's record first (`FUN_141057290`),
 /// then the objects as before.
 #[test]
-fn a_walk_past_the_maps_edge_meets_its_record_first() {
+fn walk_past_the_maps_edge_meets_its_record_first() {
     let mut s = Spatial::new(GridSize::new(10, 10));
     s.insert(object_id(7), villager(1.0, 5.5));
     let (from, to) = (Point::new(0.1, 5.5), Point::new(2.0, 5.5));
@@ -832,7 +832,7 @@ fn a_walk_past_the_maps_edge_meets_its_record_first() {
 }
 
 #[test]
-fn a_units_box_is_its_position_plus_and_minus_its_radii() {
+fn units_box_is_its_position_plus_and_minus_its_radii() {
     // MarvinBlue/426048731 tick 680: 9177's record box in the game's obstruction manager
     assert_eq!(
         villager(28.0, 89.0).bounds(),
@@ -841,7 +841,7 @@ fn a_units_box_is_its_position_plus_and_minus_its_radii() {
 }
 
 #[test]
-fn a_query_finds_the_boxes_its_rectangle_meets_but_not_the_ignored_or_unobstructing() {
+fn query_finds_the_boxes_its_rectangle_meets_but_not_the_ignored_or_unobstructing() {
     let mut s = Spatial::new(GridSize::new(120, 120));
     s.insert(object_id(9177), villager(28.0, 89.0));
     s.insert(object_id(9175), villager(30.0, 89.0));
@@ -880,7 +880,7 @@ fn a_query_finds_the_boxes_its_rectangle_meets_but_not_the_ignored_or_unobstruct
 }
 
 #[test]
-fn a_record_filed_in_a_cell_the_query_does_not_visit_is_not_found() {
+fn record_filed_in_cell_the_query_does_not_visit_is_not_found() {
     // records/425906646's update 553: the smoothing of 27272's plan (radius 0.25) tests
     // (32.25, 154.59375) -> (32.5, 151.5); bush 13594's box (31, 154)-(32, 155) grown by 0.25
     // touches the start, but it is filed in level 5's cell (3, 19) (tiles 24..31) and the
@@ -916,7 +916,7 @@ fn a_record_filed_in_a_cell_the_query_does_not_visit_is_not_found() {
 }
 
 #[test]
-fn a_record_leaving_a_tile_another_static_record_stands_on_leaves_its_marks() {
+fn record_leaving_tile_another_static_record_stands_on_leaves_its_marks() {
     // records/425906646: Gaia's state-8 bush 0 shares tile (140, 3) with bush 808; its
     // removal (FUN_141055980) stops at the tile, which stays marked, and the planners hear
     // nothing
@@ -951,7 +951,7 @@ fn a_record_leaving_a_tile_another_static_record_stands_on_leaves_its_marks() {
 /// its tiles and keeps its record (true); a type 2 foundation without its record still clears
 /// its player's marks (false); a unit (type 5) drops its record (true).
 #[test]
-fn a_record_goes_by_its_master_s_obstruction_type() {
+fn record_goes_by_its_master_obstruction_type() {
     let mut s = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(crate::map::GridSize::new(20, 20), vec![1; 400]),
@@ -1010,7 +1010,7 @@ fn a_record_goes_by_its_master_s_obstruction_type() {
 }
 
 #[test]
-fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
+fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
     let mut objects = crate::world::index::TestObjects::default();
     let mut s = Spatial::new(GridSize::new(120, 120));
     s.relations = ByPlayer::new(vec![
@@ -1105,7 +1105,7 @@ fn a_walk_hits_the_boxes_its_step_crosses_and_a_moving_ally_s_box_shrinks() {
 /// MarvinBlue/426048731's Town Centre 9157 of player 2 (class 3) and a tree of Gaia (class 1),
 /// with the words the game's obstruction manager holds for their tiles.
 #[test]
-fn a_static_record_marks_its_tiles_with_its_class_and_player() {
+fn static_record_marks_its_tiles_with_its_class_and_player() {
     let mut s = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(crate::map::GridSize::new(4, 4), vec![4; 16]),
@@ -1159,7 +1159,7 @@ fn a_static_record_marks_its_tiles_with_its_class_and_player() {
 }
 
 #[test]
-fn a_unit_counts_on_the_tile_its_centre_is_on_and_marks_nothing() {
+fn unit_counts_on_the_tile_its_centre_is_on_and_marks_nothing() {
     let mut s = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(crate::map::GridSize::new(4, 4), vec![4; 16]),
@@ -1180,7 +1180,7 @@ fn a_unit_counts_on_the_tile_its_centre_is_on_and_marks_nothing() {
 }
 
 #[test]
-fn a_tile_s_list_keeps_the_game_s_order() {
+fn tile_list_keeps_the_game_order() {
     let mut s = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(crate::map::GridSize::new(4, 4), vec![4; 16]),
@@ -1241,7 +1241,7 @@ fn a_tile_s_list_keeps_the_game_s_order() {
 /// `FUN_140f5f0a0`: a tile of 250 objects takes no more and keeps its tall count;
 /// `FUN_140f5f560`: an object not on the list leaves nothing changed (no recount).
 #[test]
-fn a_full_tile_takes_no_object_and_one_not_on_it_leaves_its_count() {
+fn full_tile_takes_no_object_and_one_not_on_it_leaves_its_count() {
     let mut s = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(crate::map::GridSize::new(4, 4), vec![4; 16]),
@@ -1268,7 +1268,7 @@ fn a_full_tile_takes_no_object_and_one_not_on_it_leaves_its_count() {
 /// A ghost enters and leaves a tile's list as any object does (`FUN_140f5f0a0`,
 /// `FUN_140f5f560`): the tile's tall count is redone over the list.
 #[test]
-fn a_ghost_entering_or_leaving_a_tile_redoes_its_tall_count() {
+fn ghost_entering_or_leaving_tile_redoes_its_tall_count() {
     let mut s = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(crate::map::GridSize::new(4, 4), vec![4; 16]),
@@ -1307,7 +1307,7 @@ fn site() -> (Spatial, Placed) {
 }
 
 #[test]
-fn a_tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
+fn tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
     let (mut s, _) = site();
     assert_eq!(
         s.passable(
@@ -1395,7 +1395,7 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
 }
 
 #[test]
-fn a_revealed_map_gives_the_player_the_ended_bits() {
+fn revealed_map_gives_the_player_the_ended_bits() {
     let mut s = Spatial {
         vision: ByPlayer::new(vec![
             crate::vision::own_masks(PlayerId::new(0), false),
@@ -1437,7 +1437,7 @@ fn sighted(words: Vec<VisionBits>) -> Spatial {
 /// `FUN_141663500`: 0xf seen, 0x80 explored, 0 neither; a word revealed to all (bit 29 with
 /// an explored hit or bit 61) is seen, one explored for all (bit 61) explored.
 #[test]
-fn a_player_s_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits() {
+fn player_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits() {
     let (seen, explored) = (
         VisionBits::from_bits_retain(1 << 1),
         VisionBits::from_bits_retain(1 << 33),
@@ -1485,7 +1485,7 @@ fn a_player_s_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_
 /// `FUN_141285350` and `FUN_140c68a00`: the word under the registry's mask only, so the
 /// revealed bits 29 and 61 count for nothing.
 #[test]
-fn the_visible_map_s_tile_test_reads_only_the_players_bits() {
+fn the_visible_map_tile_test_reads_only_the_players_bits() {
     let (seen, explored) = (
         VisionBits::from_bits_retain(1 << 1),
         VisionBits::from_bits_retain(1 << 33),
@@ -1525,7 +1525,7 @@ fn the_visible_map_s_tile_test_reads_only_the_players_bits() {
 }
 
 #[test]
-fn the_free_spot_beside_a_footprint_is_the_closest_empty_tile_around_it() {
+fn the_free_spot_beside_footprint_is_the_closest_empty_tile_around_it() {
     // the game sends 9175 to (29.5, 89.5): (30, 89) is as close but holds 9175 itself
     let (mut s, house) = site();
     assert_eq!(
@@ -1541,7 +1541,7 @@ fn the_free_spot_beside_a_footprint_is_the_closest_empty_tile_around_it() {
 }
 
 #[test]
-fn the_footprint_s_occupants_are_the_objects_whose_centre_is_on_it() {
+fn the_footprint_occupants_are_the_objects_whose_centre_is_on_it() {
     let (mut s, house) = site();
     assert_eq!(
         s.footprint_occupants(
@@ -1572,7 +1572,7 @@ fn the_footprint_s_occupants_are_the_objects_whose_centre_is_on_it() {
 /// at once in update 1305. An object the view does not look at (the owner's sleeping
 /// objects: types below 30, alive) counts.
 #[test]
-fn a_foundation_not_allied_both_ways_or_a_dead_object_occupies_no_footprint() {
+fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
     use crate::construction::build::ClearLook;
     let (mut s, house) = site();
     // player 2 counts player 3 allied, player 3 counts player 2 neutral
@@ -1660,7 +1660,7 @@ fn a_foundation_not_allied_both_ways_or_a_dead_object_occupies_no_footprint() {
 /// `FUN_1411d4b80` reads a tile's players as the low 32 bits of `word >> 23` and casts the
 /// footprint's edges by `CVTTSS2SI`: a NaN place casts to `i32::MIN`, so no tile is read.
 #[test]
-fn foreign_marks_read_the_players_in_32_bits_and_skip_a_nan_place() {
+fn foreign_marks_read_the_players_in_32_bits_and_skip_nan_place() {
     let (mut s, mut house) = site();
     // player 2 of 30.0, 88.0: tile (29, 87) marked by player 3, then a bit past 32 players
     s.tiles.mark_for_test(Tile::new(29, 87), 0x80_0000 << 3);
@@ -1675,7 +1675,7 @@ fn foreign_marks_read_the_players_in_32_bits_and_skip_a_nan_place() {
 }
 
 #[test]
-fn a_walk_meets_a_static_box_in_its_way_but_not_one_beside_it() {
+fn walk_meets_static_box_in_its_way_but_not_one_beside_it() {
     // tiles of class 1 everywhere: a unit with mask 1 crosses them all
     let mut s = Spatial::with_tiles(
         GridSize::new(16, 16),
@@ -1729,7 +1729,7 @@ fn a_walk_meets_a_static_box_in_its_way_but_not_one_beside_it() {
 }
 
 #[test]
-fn a_walk_meets_a_tile_whose_terrain_the_unit_cannot_cross() {
+fn walk_meets_tile_whose_terrain_the_unit_cannot_cross() {
     let mut classes = vec![1; 256];
     classes[5 * 16 + 9] = 2;
     let mut s = Spatial::with_tiles(
@@ -1764,7 +1764,7 @@ fn a_walk_meets_a_tile_whose_terrain_the_unit_cannot_cross() {
 /// earlier walks: the walk from (6.5, 6.5) with a buffer of 0.5 puts no record on tile
 /// (5, 5), but touches the record an earlier walk put there, until the records are cleared.
 #[test]
-fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
+fn pather_walk_meets_the_tile_records_of_earlier_walks() {
     let mut classes = vec![1; 64 * 64];
     classes[5 * 64 + 5] = 0;
     let mut s = Spatial::with_tiles(
@@ -1844,7 +1844,7 @@ fn a_pather_walk_meets_the_tile_records_of_earlier_walks() {
 /// walk passes by is no hit, and a record of kind 11 or a gate's meeting the walk is not
 /// modelled.
 #[test]
-fn a_pather_walk_off_the_map_meets_its_edge_first() {
+fn pather_walk_off_the_map_meets_its_edge_first() {
     let mut s = Spatial::with_tiles(
         GridSize::new(16, 16),
         Tiles::new(crate::map::GridSize::new(16, 16), vec![1; 256]),
@@ -1947,7 +1947,7 @@ fn a_pather_walk_off_the_map_meets_its_edge_first() {
 /// 426327574's transport at update 309: the smoothing's walk (77.5, 90.5) -> (76.5, 91.5)
 /// puts tile (78, 90)'s record, and the next walk from (77.5, 91.5) touches its grown box.
 #[test]
-fn a_tile_record_blocks_later_walks_until_the_records_are_cleared() {
+fn tile_record_blocks_later_walks_until_the_records_are_cleared() {
     let mut classes = vec![1; 128 * 128];
     classes[90 * 128 + 78] = 0;
     classes[87 * 128 + 78] = 0;
@@ -2019,7 +2019,7 @@ fn a_tile_record_blocks_later_walks_until_the_records_are_cleared() {
 }
 
 #[test]
-fn a_frozen_object_may_be_anywhere_its_speed_could_take_it() {
+fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
     let (mut s, house) = site();
     let mut deer = villager(34.0, 88.0);
     deer.moves = true;
@@ -2066,7 +2066,7 @@ fn a_frozen_object_may_be_anywhere_its_speed_could_take_it() {
 }
 
 #[test]
-fn a_frozen_object_that_does_not_move_is_known_unless_a_stopped_unit_may_reach_it() {
+fn frozen_object_that_does_not_move_is_known_unless_stopped_unit_may_reach_it() {
     let mut s = Spatial::new(GridSize::new(64, 64));
     let tree = Placed {
         player: PlayerId::new(0),
@@ -2207,7 +2207,7 @@ const fn seer_in(state: ObjectState) -> crate::vision::visibility::Seer {
 /// after a NaN distance; it stays before a farther record and an equally near one of a higher
 /// id.
 #[test]
-fn closest_object_keeps_the_nearest_record_and_on_a_tie_the_lower_id() {
+fn closest_object_keeps_the_nearest_record_and_on_tie_the_lower_id() {
     use crate::map::spatial::search::nearer;
     let record = |id, distance| Record {
         id,
@@ -2410,7 +2410,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
 /// fishing ship, any other for a villager) counts; a worked one only with a master asked for;
 /// a pasture's livestock never; a pasture and a farm the caller does not hold fail.
 #[test]
-fn closest_object_takes_a_free_farm_its_searcher_gathers_from() {
+fn closest_object_takes_free_farm_its_searcher_gathers_from() {
     use crate::map::spatial::search::{Searcher, closest_kept, farm_kept};
     let filter = Filter {
         group: Some(class_id(49)),

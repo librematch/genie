@@ -32,7 +32,7 @@ use self::reduction::{floor, rem_pio2_large, scalbn};
 use self::sin_cos::{HALF_F64, MINUS_ONE_F64, ONE_F64};
 pub use self::sin_cos::{cos, sin};
 #[cfg(test)]
-use self::sin_cos::{k_cos, k_sin};
+use self::sin_cos::{kernel_cos, kernel_sin};
 pub use self::vectors::{
     BVector, Rotation, add, angle_between, cross, dot, length, line_distance, normalize, rotate,
     rotation, scale, sub,

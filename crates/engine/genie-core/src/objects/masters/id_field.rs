@@ -108,7 +108,7 @@ mod tests {
     /// A field keeps every short: −3 plus 5 is 2, where an `Option` would have started from −1;
     /// it names an id only when 0 or more.
     #[test]
-    fn a_field_keeps_its_negatives_through_an_add() {
+    fn field_keeps_its_negatives_through_an_add() {
         let m = MasterField::of_data(-3);
         assert_eq!(m.master(), None);
         assert_eq!(m.plus(5).master(), MasterId::of_data(2));

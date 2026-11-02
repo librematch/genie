@@ -582,7 +582,7 @@ mod genie_error_tests {
 
     /// The victory conditions' ids 0 to 11 and any other kept as it is, both ways.
     #[test]
-    fn a_victory_condition_s_id_reads_and_writes_both_ways() {
+    fn victory_condition_id_reads_and_writes_both_ways() {
         let named = [
             VictoryCondition::Capture,
             VictoryCondition::Create,

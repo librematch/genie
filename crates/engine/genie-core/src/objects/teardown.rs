@@ -285,7 +285,7 @@ mod tests {
     /// the base teardown (`FUN_140a73fc0`) lets the building, then the drop site (the second
     /// target) go, and its `MoveTo` stops the unit; an uncounted one only lets go.
     #[test]
-    fn a_build_s_destructor_leaves_its_building_and_stops_its_walk() {
+    fn build_destructor_leaves_its_building_and_stops_its_walk() {
         let mut motion = moving();
         let mut b = build();
         (b.added, b.state) = (
@@ -319,7 +319,7 @@ mod tests {
 
     /// `FUN_140a78430` reads any action's second target (`+0x34`): a Build's is its drop site.
     #[test]
-    fn a_build_s_second_target_is_its_drop_site() {
+    fn build_second_target_is_its_drop_site() {
         let mut b = build();
         assert_eq!(Action::Build(b).second_target(), None);
         b.site = Some(DropSiteId::new(object_id(10050)));
@@ -329,7 +329,7 @@ mod tests {
     /// A `MoveTo`'s destructor (`FUN_140aa1f30`) stops the unit and lets its target go; one
     /// without a target lets nothing go.
     #[test]
-    fn a_move_to_s_destructor_stops_the_unit() {
+    fn move_to_destructor_stops_the_unit() {
         let mut motion = moving();
         let to = MoveToAction::to_point(
             Position::new(5.0, 5.0, 0.0),
@@ -346,7 +346,7 @@ mod tests {
     /// destructor, the list is empty after; an empty list deletes nothing. A second action under
     /// the head below state 3 (its slot 0x28) is not ported; at state 3 or more it stays.
     #[test]
-    fn the_list_s_deletions_tear_down_the_head_and_stop_at_a_second_action() {
+    fn the_list_deletions_tear_down_the_head_and_stop_at_second_action() {
         let mut motion = moving();
         let mut list = ActionList::default().with_build(Some(build()));
         let torn = list.delete_all(motion.lent(), ObjectState::Alive).unwrap();

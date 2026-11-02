@@ -57,7 +57,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn an_interaction_mode_is_the_data_s_byte() {
+    fn an_interaction_mode_is_the_data_byte() {
         assert_eq!(InteractionMode::of_data(255).plus(2).get(), 1);
         assert_eq!(InteractionMode::of_data(0), InteractionMode::NONE);
         assert_eq!(InteractionMode::of_data(9).get(), 9);

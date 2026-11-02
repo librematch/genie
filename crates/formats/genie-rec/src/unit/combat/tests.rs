@@ -16,7 +16,7 @@ fn head() -> Bytes {
 }
 
 #[test]
-fn a_missile_without_its_own_base_reads_its_range_and_shooter() {
+fn missile_without_its_own_base_reads_its_range_and_shooter() {
     let bytes = Bytes::default().floats(&[7.0]).i32(610).u8(0).0;
     let missile = read_all::<MissileUnitAttributes>(&bytes, 11.97);
     assert_eq!(missile.max_range.to_bits(), 7.0_f32.to_bits());
@@ -26,7 +26,7 @@ fn a_missile_without_its_own_base_reads_its_range_and_shooter() {
 
 /// With its flag set the missile reads its own unit type, here from nothing: an error.
 #[test]
-fn a_missile_s_own_base_is_read_behind_its_flag() {
+fn missile_own_base_is_read_behind_its_flag() {
     let bytes = Bytes::default().floats(&[7.0]).i32(610).u8(1).0;
     let read = MissileUnitAttributes::read_from(&mut header_reader(&bytes, 11.97));
     assert!(read.is_err());
@@ -47,7 +47,7 @@ fn an_old_combat_unit_has_only_its_amounts_and_ai_flag() {
 }
 
 #[test]
-fn a_combat_unit_of_11_74_reads_every_counter_and_the_town_bell() {
+fn combat_unit_of_11_74_reads_every_counter_and_the_town_bell() {
     let bytes = head()
         .u16(5)
         .words(&[6, 7])
@@ -78,7 +78,7 @@ fn a_combat_unit_of_11_74_reads_every_counter_and_the_town_bell() {
 
 /// A negative x is no town bell location.
 #[test]
-fn a_negative_town_bell_x_is_no_location() {
+fn town_bell_is_no_location_with_negative_x() {
     let bytes = head()
         .u16(5)
         .words(&[6, 7, 0])

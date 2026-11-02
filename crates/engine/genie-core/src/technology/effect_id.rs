@@ -41,7 +41,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn an_effect_id_keeps_the_data_s_short() {
+    fn an_effect_id_keeps_the_data_short() {
         assert_eq!(EffectId::of_data(-1), EffectId::NONE);
         assert_eq!(EffectId::of_data(42).get(), 42);
         assert_eq!(EffectId::NONE.to_string(), "-1");

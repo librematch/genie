@@ -160,7 +160,7 @@ mod tests {
     /// A box keeps its corners' bits in their order, grows the low corner by subtracting first,
     /// overlaps another with the edges included but not with a NaN, and orders its corners.
     #[test]
-    fn a_box_keeps_its_bits_grows_overlaps_and_orders_its_corners() {
+    fn box_keeps_its_bits_grows_overlaps_and_orders_its_corners() {
         let b = Rect::new(-0.0, 1.0, f32::from_bits(0x7fc0_0001), 3.0);
         assert_eq!(
             b.get().map(f32::to_bits),

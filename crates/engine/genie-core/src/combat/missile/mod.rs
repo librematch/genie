@@ -536,7 +536,7 @@ mod tests {
     /// in the update that made the save after 3137: 2.80657 to go when `set_state(3)` ran, and its
     /// arc's acceleration −23.52 and vertical speed 4.71503 as the game held them.
     #[test]
-    fn a_spear_arcs_to_its_point() {
+    fn spear_arcs_to_its_point() {
         let stats = MissileStats {
             projectile_type: ProjectileType::STRAIGHT,
             arc: ArcRatio::new(-0.06),
@@ -586,7 +586,7 @@ mod tests {
     /// and strays by up to the ground distance times the spread, half each way. A missed missile
     /// of master 528 with an attack count strays by that share; master 527 and the others by all.
     #[test]
-    fn a_missile_misses_by_its_spread_and_master_528_by_its_attack_count_s_share() {
+    fn missile_misses_by_its_spread_and_master_528_by_its_attack_count_share() {
         let aimer = Aimer {
             hit_chance: HitChance::of_data(70),
             spread: MissSpread::new(0.5),
@@ -669,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shot_turns_its_offset_by_the_facing() {
+    fn shot_turns_its_offset_by_the_facing() {
         // facing along x: the offset's y is ahead, its x to the side
         let p = spawn_point(
             Position::new(10.0, 20.0, 0.0),
@@ -687,7 +687,7 @@ mod tests {
     /// -30, 0.27 past its point, keeps its height 0.3496 above the flat ground; -29 would sink to
     /// −0.3602 and is lifted onto it (the ground hit: its height is the ground's).
     #[test]
-    fn a_spear_past_its_point_takes_the_ground_by_its_fly_mode() {
+    fn spear_past_its_point_takes_the_ground_by_its_fly_mode() {
         assert_eq!(
             grounded(0.349_624_8, 0.0, false, FlyMode::ABOVE),
             0.349_624_8
@@ -702,7 +702,7 @@ mod tests {
     }
 
     #[test]
-    fn a_missile_meets_an_object_at_its_height_and_lands_on_its_box() {
+    fn missile_meets_an_object_at_its_height_and_lands_on_its_box() {
         // an object half a tile high meets a missile of no height from its foot to its top
         assert!(meets_height(0.0, 0.5, 0.3, 0.0));
         assert!(!meets_height(0.0, 0.5, 0.6, 0.0));
@@ -723,7 +723,7 @@ mod tests {
     }
 
     #[test]
-    fn a_volley_fires_whole_missiles_up_to_its_master_s_most_scattered_about_its_point() {
+    fn volley_fires_whole_missiles_up_to_its_master_most_scattered_about_its_point() {
         // a town center with 7 villagers inside fires 8 a volley, 11 at most
         assert_eq!(
             volley_count(Firepower::new(8.0), MissileCount::of_data(11)),
@@ -748,8 +748,7 @@ mod tests {
     }
 
     #[test]
-    fn a_building_s_volley_missile_starts_at_its_target_when_the_target_is_nearer_than_its_offset()
-    {
+    fn building_volley_missile_starts_at_its_target_when_the_target_is_nearer_than_its_offset() {
         let at = Position::new(10.0, 10.0, 0.0);
         // facing x (angle 0): the offset's x goes along -y, its y along x
         let p = volley_spawn_point(

@@ -57,7 +57,7 @@ fn the_slice_of_the_save_compares_without_differences() {
 
 /// A player the game's save does not hold is an error.
 #[test]
-fn a_player_the_game_does_not_hold_is_an_error() {
+fn player_the_game_does_not_hold_is_an_error() {
     let save = save();
     let turns = slice(&save, None);
     let mut after = same(&save, &turns);
@@ -181,7 +181,7 @@ fn stops_and_freezes_are_reported_by_their_update() {
 /// A stopped player's resources and attributes are not compared: they stood still from its
 /// stop on. A player that runs has them compared.
 #[test]
-fn a_stopped_player_s_stock_is_not_compared() {
+fn stopped_player_stock_is_not_compared() {
     let save = save();
     let mut turns = slice(&save, None);
     let mut after = same(&save, &turns);
@@ -264,7 +264,7 @@ fn the_dumps_go_into_the_slice() {
 
 /// A dump out of shape is its error.
 #[test]
-fn a_dump_out_of_shape_is_an_error() {
+fn dump_out_of_shape_is_an_error() {
     let mut turns = slice(&save(), None);
     let bad = |dumps: Dumps<'_>| load_dumps(&mut slice(&save(), None), dumps);
     assert!(matches!(
@@ -333,7 +333,7 @@ fn priming_sets_the_update_count_and_the_last_commanded_units() {
 
 /// A frame's command phase moves the world's time on; without a frame nothing happens.
 #[test]
-fn a_frames_command_phase_moves_the_time_on() {
+fn frames_command_phase_moves_the_time_on() {
     let save = save();
     let mut turns = slice(&save, None);
     let mut decoder = Decoder::default();
@@ -353,7 +353,7 @@ fn a_frames_command_phase_moves_the_time_on() {
 
 /// Bytes that are no recording are the parse's error, before any run.
 #[test]
-fn a_save_or_recording_that_does_not_parse_is_an_error() {
+fn save_or_recording_that_does_not_parse_is_an_error() {
     assert!(save_header(&[]).is_err());
     assert!(from_save(&[], &[], 0, 1, None, Dumps::default(), false).is_err());
     let mut turns = slice(&save(), None);
@@ -378,7 +378,7 @@ fn three_syncs() -> Vec<u8> {
 /// A run from the save after update `start` primes the decoder with the updates before and
 /// runs on; with the command phase alone it stops after the next update's commands.
 #[test]
-fn a_run_from_a_save_starts_after_its_update() {
+fn run_from_save_starts_after_its_update() {
     let (save, rec) = (quiet_save(), three_syncs());
     let turns = crate::run_from_save(&save, &rec, 0, 2, None, Dumps::default()).unwrap();
     assert_eq!(turns.ticks.get(), 3);

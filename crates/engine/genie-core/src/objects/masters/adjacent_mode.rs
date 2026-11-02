@@ -40,7 +40,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn an_adjacent_mode_is_the_data_s_byte() {
+    fn an_adjacent_mode_is_the_data_byte() {
         assert_eq!(AdjacentMode::of_data(0), AdjacentMode::NONE);
         assert_eq!(AdjacentMode::of_data(1).get(), 1);
         assert_eq!(AdjacentMode::NONE.to_string(), "0");

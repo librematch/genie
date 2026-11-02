@@ -660,7 +660,7 @@ mod tests {
     /// A terrain's objects: 30 slots in three blocks (0 past the objects given), then their
     /// count, which the reader passes over; read back, the 30 slots.
     #[test]
-    fn a_terrain_s_objects_fill_thirty_slots() {
+    fn terrain_objects_fill_thirty_slots() {
         let objects = [TerrainObject {
             object_id: 59.into(),
             density: 3,
@@ -685,7 +685,7 @@ mod tests {
 
     /// The minimap's colours and the passable and impassable terrains, 0xFF for none.
     #[test]
-    fn a_terrain_s_minimap_reads_back_with_none_as_0xff() {
+    fn terrain_minimap_reads_back_with_none_as_0xff() {
         let terrain = Terrain {
             minimap_color_high: 1,
             minimap_color_cliff_rt: 5,

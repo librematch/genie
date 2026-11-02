@@ -53,7 +53,7 @@ mod tests {
 
     /// A master's id widens to the word and back; −1 is all bits.
     #[test]
-    fn a_unit_type_is_a_master_s_id_in_a_word() {
+    fn unit_type_is_master_id_in_word() {
         let archer = MasterId::of_data(4).unwrap();
         assert_eq!(UnitType::of(archer).word(), 4);
         assert_eq!(UnitType::of_word(4), UnitType::of(archer));

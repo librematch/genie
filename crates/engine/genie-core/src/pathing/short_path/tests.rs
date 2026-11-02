@@ -58,7 +58,7 @@ const RUN_0: Run = Run {
 /// A node's index is its place in the arena, the start's 0; a goal node beats only a cheaper
 /// one, and anything beats none.
 #[test]
-fn a_node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
+fn node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
     let mesh = Mesh::new(64);
     let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     assert_eq!(NodeIndex::next_of(&s.arena), NodeIndex::new(1));
@@ -87,7 +87,7 @@ fn a_node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
 /// A vertex index steps round its polygon (`next_in`, `prev_in`) or along its list (`succ`,
 /// `pred`), and reads the polygon's columns.
 #[test]
-fn a_vertex_index_steps_round_its_polygon_and_reads_its_columns() {
+fn vertex_index_steps_round_its_polygon_and_reads_its_columns() {
     let (first, last) = (VertexIndex::FIRST, VertexIndex::new(3));
     assert_eq!((last.next_in(4), first.prev_in(4)), (first, last));
     assert_eq!(
@@ -112,7 +112,7 @@ fn a_vertex_index_steps_round_its_polygon_and_reads_its_columns() {
 
 /// A polygon's index is its place in the search's list.
 #[test]
-fn a_polygon_index_reads_the_search_s_list() {
+fn polygon_index_reads_the_search_list() {
     let mesh = Mesh::new(64);
     let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     assert!(s.poly(PolyIndex::of(0)).is_err());
@@ -128,7 +128,7 @@ fn a_polygon_index_reads_the_search_s_list() {
 /// far; any other node becomes the best when it lies nearer than the best's estimate, and a
 /// node no nearer adds nothing.
 #[test]
-fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() {
+fn goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() {
     let mesh = Mesh::new(64);
     let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     assert!(
@@ -172,13 +172,13 @@ fn a_goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() 
 /// start cost plus the walk along the edge, is a goal candidate; an edge that does not span
 /// the goal gives none.
 #[test]
-fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
+fn the_goal_foot_on_spanning_edge_is_goal_candidate() {
     let mesh = Mesh::new(64);
     let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     s.foot_test(Foot {
         start: FixedPoint::new(9 * ONE, 12 * ONE),
         end: FixedPoint::new(9 * ONE, 20 * ONE),
-        x_extent: 0,
+        extent_x: 0,
         run: RUN_0,
         start_cost: FixedDistance::TILE,
         parent: NodeIndex::START,
@@ -188,7 +188,7 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
     s.foot_test(Foot {
         start: FixedPoint::new(15 * ONE, 9 * ONE),
         end: FixedPoint::new(5 * ONE, 9 * ONE),
-        x_extent: 1,
+        extent_x: 1,
         run: RUN_0,
         start_cost: FixedDistance::TILE,
         parent: NodeIndex::START,
@@ -207,7 +207,7 @@ fn the_goal_s_foot_on_a_spanning_edge_is_a_goal_candidate() {
 /// `FUN_140fa8350`: a junction moved `d` into the free space beside each side, a contact at its
 /// side's start turning it along the side.
 #[test]
-fn a_contact_point_moves_off_its_side() {
+fn contact_point_moves_off_its_side() {
     let p = FixedPoint::new(100, 200);
     let moved: Vec<FixedPoint> = ShapeSide::ALL
         .into_iter()
@@ -233,7 +233,7 @@ fn a_contact_point_moves_off_its_side() {
 /// `FUN_140fa39f0`: a point goes onto a side of the rectangle shrunk by `d` (the side's
 /// coordinate set, the other held between the shrunk corners).
 #[test]
-fn a_point_snaps_onto_a_side_within_its_corners() {
+fn point_snaps_onto_side_within_its_corners() {
     let r = FixedRect::new(0, 0, 100, 50);
     let snap = |p: FixedPoint, side: usize| {
         let mut q = p;
@@ -261,7 +261,7 @@ fn the_integer_square_root_is_exact_below_and_truncates_between_squares() {
 }
 
 #[test]
-fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
+fn ray_crosses_the_side_it_faces_and_reports_how_far() {
     // a ray from (0, 1) to (4, 1) against the box (2, 0)-(3, 2): its left side at x = 2
     let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let mut t = RayFraction::START;
@@ -310,7 +310,7 @@ fn a_ray_crosses_the_side_it_faces_and_reports_how_far() {
 /// bottom going up and the top going down, nearer than `t` and from at or outside the side;
 /// a slanted ray meets them as `FUN_140fa9f10` does.
 #[test]
-fn a_ray_along_y_crosses_the_bottom_or_the_top() {
+fn ray_crosses_the_bottom_or_the_top_along_y() {
     let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let x = 2 * ONE + ONE / 2;
     let cast = |a: FixedPoint, b: FixedPoint, t: RayFraction| {
@@ -416,7 +416,7 @@ fn a_ray_along_y_crosses_the_bottom_or_the_top() {
 /// ray's end, a touch at the ray's start on the segment's end (`t` 0), and none for a parallel
 /// segment or one beyond `t`.
 #[test]
-fn a_segment_meets_a_ray_by_crossing_or_touching() {
+fn segment_meets_ray_by_crossing_or_touching() {
     let p = |x: i32, y: i32| FixedPoint::new(x * ONE, y * ONE);
     let (c, e) = (p(2, 0), p(2, 2));
     let mut t = RayFraction::START;
@@ -451,7 +451,7 @@ fn a_segment_meets_a_ray_by_crossing_or_touching() {
 /// edge it crossed (`(dy * (edge - x) >> 22 << 22) / dx`, truncated); a segment beside the
 /// box is none, one inside it stays; the box's corners may come in any order.
 #[test]
-fn a_segment_clipped_to_the_box_keeps_its_part_inside() {
+fn segment_clipped_to_the_box_keeps_its_part_inside() {
     let b = FixedRect::new(0, 0, 2 * ONE, 2 * ONE);
     assert_eq!(
         clip(FixedPoint::new(-ONE, ONE), FixedPoint::new(3 * ONE, ONE), b),
@@ -493,7 +493,7 @@ fn a_segment_clipped_to_the_box_keeps_its_part_inside() {
 /// a shape with fewer than two escape candidates; a free start or one in range is not. The
 /// terrain's temporary shapes leave the mesh after it.
 #[test]
-fn a_start_deep_in_blocked_terrain_is_blocked_unless_in_range() {
+fn start_deep_in_blocked_terrain_is_blocked_unless_in_range() {
     let blocked = |_: u32, _: u32| 1;
     let free = |_: u32, _: u32| 0;
     let mut q = Query {
@@ -521,7 +521,7 @@ fn a_start_deep_in_blocked_terrain_is_blocked_unless_in_range() {
 /// each end lies off the map by `COMISS`/`JA` below 0 and `JNC` at the size (0x140f9e67c..
 /// 0x140f9e6da): an unordered coordinate is on it.
 #[test]
-fn the_entry_s_float_tests_take_the_game_s_nan_paths() {
+fn the_entry_float_tests_take_the_game_nan_paths() {
     let call = |from: Point, target: Option<Target>| Call {
         from,
         to: Point::new(7.0, 5.0),
@@ -597,7 +597,7 @@ fn around(walls: &[[f32; 4]], from: Point, to: Point, ignored: bool) -> (ShortFo
 /// (3.25 tiles down against 4.25 up), over its two corners; ignored, the wall leaves the path
 /// direct (the start, the start node's own point, the goal).
 #[test]
-fn a_path_bends_round_a_wall_at_its_nearer_end() {
+fn path_bends_round_wall_at_its_nearer_end() {
     let wall = [[10.0, 4.0, 11.0, 12.0]];
     assert_eq!(
         around(&wall, Point::new(6.5, 8.5), Point::new(14.5, 8.5), false),
@@ -628,7 +628,7 @@ fn a_path_bends_round_a_wall_at_its_nearer_end() {
 /// nearer arm's end (the lower, 2.75 tiles down against 3.75 up) and runs along it to the
 /// corner it shares with the U's back.
 #[test]
-fn a_path_leaves_a_u_by_its_open_side() {
+fn path_leaves_horseshoe_by_its_open_side() {
     let u = [
         [8.0, 4.0, 9.0, 12.0],
         [4.0, 4.0, 9.0, 5.0],
@@ -652,7 +652,7 @@ fn a_path_leaves_a_u_by_its_open_side() {
 /// A goal shut inside a box: the path is partial (result 2) and ends at the point nearest the
 /// goal the unit's centre reaches, on the box's outer side.
 #[test]
-fn a_goal_shut_in_a_box_gives_a_partial_path_to_its_nearest_point() {
+fn goal_shut_in_box_gives_partial_path_to_its_nearest_point() {
     let walls = [
         [10.0, 6.0, 15.0, 7.0],
         [10.0, 10.0, 15.0, 11.0],
@@ -675,7 +675,7 @@ fn a_goal_shut_in_a_box_gives_a_partial_path_to_its_nearest_point() {
 /// Two staggered walls: the path reaches the goal over one corner of the second wall (a
 /// shortest path bends only at corners); the first wall's lower end lies off it.
 #[test]
-fn a_path_past_staggered_walls_bends_only_at_their_corners() {
+fn path_past_staggered_walls_bends_only_at_their_corners() {
     let walls = [[10.0, 4.0, 11.0, 9.0], [12.0, 8.0, 13.0, 14.0]];
     let (result, points) = around(&walls, Point::new(6.5, 6.5), Point::new(16.5, 12.5), false);
     assert_eq!(result, ShortFound::Reached);
@@ -748,7 +748,7 @@ fn square(run: bool) -> Poly {
 /// outline of no vertices or no shape; a vertex of a shape whose overlap with the shape asked
 /// holds the point answers whatever the side.
 #[test]
-fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
+fn the_edge_holding_point_is_the_first_vertex_of_its_side_run() {
     let mut mesh = Mesh::new(64);
     mesh.shapes = vec![
         FixedRect::new(0, 0, 4 * ONE, 4 * ONE),
@@ -823,7 +823,7 @@ fn the_edge_holding_a_point_is_the_first_vertex_of_its_side_s_run() {
 /// shape asked (shrunk by `d`) holds it; not another vertex, a vertex of no shape, an empty
 /// overlap or one shrunk past the point.
 #[test]
-fn a_vertex_holds_a_point_in_its_shape_s_overlap_with_the_other() {
+fn vertex_holds_point_in_its_shape_overlap_with_the_other() {
     let mut mesh = Mesh::new(64);
     mesh.shapes = vec![
         FixedRect::new(0, 0, 4 * ONE, 4 * ONE),
@@ -849,7 +849,7 @@ fn a_vertex_holds_a_point_in_its_shape_s_overlap_with_the_other() {
 /// `FUN_140fa77b0`'s edge test on each side: the point on the edge's line between its ends;
 /// whether an end counts follows the side before the run and the one after it.
 #[test]
-fn a_point_lies_on_an_edge_between_ends_its_neighbour_sides_open_or_close() {
+fn point_lies_on_an_edge_between_ends_its_neighbour_sides_open_or_close() {
     let (lo, hi, mid) = (0, 4 * ONE, 2 * ONE);
     // (side, from, to, point, side before, side after, on the edge)
     let cases: [(
@@ -1060,7 +1060,7 @@ fn shape_at_2_2() -> Mesh {
 /// opens its node and answers 0; a held start with escape candidates keeps open only the one
 /// of the lowest estimate, its estimate taken again (1), and with fewer than two answers 2.
 #[test]
-fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
+fn start_in_range_free_or_held_answers_by_its_escape_candidates() {
     let mesh = shape_at_2_2();
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 2 * ONE);
     assert_eq!(
@@ -1107,7 +1107,7 @@ fn a_start_in_range_free_or_held_answers_by_its_escape_candidates() {
 /// each holding shape 0 gives its four sides' candidates again, as the game scans a tile's
 /// shapes without a seen list; an ignored shape gives none.
 #[test]
-fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
+fn the_start_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     let mesh = shape_at_2_2();
     let p = FixedPoint::new(4 * ONE, 3 * ONE);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
@@ -1144,7 +1144,7 @@ fn the_start_s_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
 /// away, the touching point twice and the foot there; side 2, three tiles away, nothing. A
 /// corner within the circle is a candidate; a crossing another shape holds is not.
 #[test]
-fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
+fn shape_side_gives_the_circle_crossings_the_foot_and_near_corner() {
     let mesh = shape_at_2_2();
     let side = |shape, side: usize| Kind::Side {
         shape: ShapeId::new(shape),
@@ -1230,7 +1230,7 @@ fn a_shape_s_side_gives_the_circle_s_crossings_the_foot_and_a_near_corner() {
 /// The start's foot on a side: strictly between the side's corners, in the search's box and
 /// free, at the perpendicular distance; not past either corner, outside the box or held.
 #[test]
-fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
+fn the_start_foot_on_side_lies_between_its_corners_in_the_box_and_free() {
     let mesh = shape_at_2_2();
     let corners = |k: usize| {
         let r = mesh.shapes[0];
@@ -1306,7 +1306,7 @@ fn the_start_s_foot_on_a_side_lies_between_its_corners_in_the_box_and_free() {
 /// point in the box within the circle is a candidate; one on a side of its own number counts
 /// only when its other shape holds the point nudged into it, and costs 0x32 more.
 #[test]
-fn a_side_s_contacts_become_candidates_when_wide_free_and_near() {
+fn side_contacts_become_candidates_when_wide_free_and_near() {
     use crate::pathing::mesh::Contact;
     let mut mesh = shape_at_2_2();
     let _ = mesh.add(FixedRect::new(5 * ONE, 0, 9 * ONE, 3 * ONE));

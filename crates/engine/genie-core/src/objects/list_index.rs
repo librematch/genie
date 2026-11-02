@@ -81,7 +81,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_list_index_counts_from_the_first_place() {
+    fn list_index_counts_from_the_first_place() {
         let i = ListIndex::FIRST;
         assert_eq!((i.get(), i.next().get()), (0, 1));
         assert_eq!(ListIndex::new(7).next(), ListIndex::new(8));
@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_of_three_has_three_places_either_way() {
+    fn list_of_three_has_three_places_either_way() {
         let places: Vec<_> = Places::of(3).map(ListIndex::get).collect();
         assert_eq!(places, [0, 1, 2]);
         let back: Vec<_> = Places::of(3).rev().map(ListIndex::get).collect();

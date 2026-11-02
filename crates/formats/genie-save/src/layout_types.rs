@@ -249,7 +249,7 @@ mod tests {
     use binrw::io::Cursor;
 
     #[test]
-    fn a_positioned_value_keeps_where_it_was_read_and_writes_the_value_only() {
+    fn positioned_value_keeps_where_it_was_read_and_writes_the_value_only() {
         let mut c = Cursor::new(b"\x01\x02\x00".as_slice());
         let _ = u8::read_le(&mut c).unwrap();
         let p = Positioned::<u16>::read_le(&mut c).unwrap();
@@ -268,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sig_string_takes_the_signature_before_or_after_the_length() {
+    fn sig_string_takes_the_signature_before_or_after_the_length() {
         let mut c = Cursor::new(b"\x60\x0a\x02\x00hi\x01\x00\x60\x0a!".as_slice());
         assert_eq!(
             SigString::read_le(&mut c).unwrap(),
@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn a_vec_reads_its_count_then_the_values() {
+    fn vec_reads_its_count_then_the_values() {
         let mut c = Cursor::new(
             b"\x02\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff"
                 .as_slice(),

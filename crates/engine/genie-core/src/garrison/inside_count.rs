@@ -51,7 +51,7 @@ mod tests {
 
     /// A count adds a unit's and holds against a capacity: within up to it, below short of it.
     #[test]
-    fn a_count_holds_against_a_capacity() {
+    fn count_holds_against_capacity() {
         let two = InsideCount::ONE.plus(InsideCount::ONE);
         assert_eq!(two, InsideCount::new(2));
         assert_eq!(InsideCount::ZERO.get(), 0);

@@ -260,7 +260,7 @@ mod tests {
     /// (2, truncated) in hundredths and grows the swing; the price stays within the minimum
     /// and the maximum; net trades back at 0 reset the swing and the starting price.
     #[test]
-    fn a_trade_moves_the_price_a_step_and_back_at_no_net_trades_it_resets() {
+    fn trade_moves_the_price_step_and_back_at_no_net_trades_it_resets() {
         let mut m = market();
         m.trade(attribute::WOOD, true);
         assert_eq!(
@@ -337,7 +337,7 @@ mod tests {
     /// truncated (70 gold, also counted as gathered gold, 49 and 169), takes the 100 wood and
     /// lowers the price; a second lot the player does not hold sells nothing.
     #[test]
-    fn a_sale_gives_the_lot_s_worth_less_the_fee_at_the_old_price() {
+    fn sale_gives_the_lot_worth_less_the_fee_at_the_old_price() {
         let mut t = trading();
         t.sell(
             player_id(1),
@@ -364,7 +364,7 @@ mod tests {
     /// (149): the player's 170 gold pays one lot, not the second; the price rises after the
     /// payment. A cheap lot costs at least 21.
     #[test]
-    fn a_purchase_costs_the_lot_s_worth_and_the_fee_at_least_21() {
+    fn purchase_costs_the_lot_worth_and_the_fee_at_least_21() {
         let mut t = trading();
         t.players[1].attributes[attribute::GOLD.index()] = Amount::new(170.0);
         t.buy(

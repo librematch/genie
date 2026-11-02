@@ -136,7 +136,7 @@ mod tests {
 
     /// Each operator is the one `f32` operation, bit for bit and in its operand order.
     #[test]
-    fn amounts_do_the_game_s_f32_operations() {
+    fn amounts_do_the_game_f32_operations() {
         let (a, b) = (Amount::new(0.1), Amount::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         assert_eq!((a - b).get().to_bits(), (0.1_f32 - 0.2).to_bits());
@@ -162,7 +162,7 @@ mod tests {
 
     /// A master's whole amount converts exactly, a negative one too.
     #[test]
-    fn a_master_s_whole_amount_converts_exactly() {
+    fn master_whole_amount_converts_exactly() {
         let of = |amount| Amount::of_master(CarryCapacity::of_data(amount));
         assert_eq!(of(10), Amount::new(10.0));
         assert_eq!(of(i16::MAX).get(), 32767.0);

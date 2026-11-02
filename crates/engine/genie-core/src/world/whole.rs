@@ -141,7 +141,7 @@ mod tests {
     use crate::world::parts::ObjectParts;
 
     #[test]
-    fn only_a_moving_object_s_parts_hold_a_mover() {
+    fn only_moving_object_parts_hold_mover() {
         let walker = crate::gathering::hunt::tests::walker();
         let moving = ObjectParts {
             motion: Some(Motion::Moving(walker.clone())),

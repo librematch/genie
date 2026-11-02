@@ -17,7 +17,7 @@ fn row(path: &str, left: &str, right: &str) -> (String, String, String) {
 
 /// A value compared at the top has the empty path.
 #[test]
-fn a_number_differs_by_its_value() {
+fn number_differs_by_its_value() {
     assert_eq!(found(&3_i32, &3), []);
     assert_eq!(found(&3_i32, &4), [row("", "3", "4")]);
     assert_eq!(found(&true, &false), [row("", "true", "false")]);
@@ -27,7 +27,7 @@ fn a_number_differs_by_its_value() {
 /// A float compares by its bits: the zeros differ, the same NaN does not, and two NaNs show
 /// their bits.
 #[test]
-fn a_float_differs_by_its_bits() {
+fn float_differs_by_its_bits() {
     assert_eq!(found(&0.0_f32, &-0.0), [row("", "0.0", "-0.0")]);
     assert_eq!(found(&f32::NAN, &f32::NAN), []);
     let other = f32::from_bits(f32::NAN.to_bits() | 1);
@@ -49,7 +49,7 @@ fn an_option_compares_its_value() {
 /// A sequence names its length and each element by its index; an element one side lacks is
 /// absent there.
 #[test]
-fn a_sequence_compares_its_length_and_elements() {
+fn sequence_compares_its_length_and_elements() {
     assert_eq!(
         found(&vec![1_i32, 2, 3], &vec![1, 5]),
         [
@@ -70,7 +70,7 @@ fn a_sequence_compares_its_length_and_elements() {
 /// A map compares by key; a key one side lacks is absent there. A set names the members only
 /// one side holds.
 #[test]
-fn a_map_compares_by_key() {
+fn map_compares_by_key() {
     let left = BTreeMap::from([(1_i16, 0.5_f32), (2, 1.0)]);
     let right = BTreeMap::from([(2_i16, 1.5_f32), (3, 0.0)]);
     assert_eq!(
@@ -91,7 +91,7 @@ fn a_map_compares_by_key() {
 
 /// A tuple's fields are numbered.
 #[test]
-fn a_tuple_numbers_its_fields() {
+fn tuple_numbers_its_fields() {
     assert_eq!(
         found(&(1_u8, 2.0_f32, 'a'), &(1, 2.5, 'b')),
         [row("1", "2.0", "2.5"), row("2", "'a'", "'b'")]

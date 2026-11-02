@@ -49,7 +49,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_a_filter_or_verbose_installs_a_subscriber() {
+    fn only_filter_or_verbose_installs_subscriber() {
         assert_eq!(filter(None, false), None);
         assert_eq!(filter(Some(" "), false), None);
         assert_eq!(

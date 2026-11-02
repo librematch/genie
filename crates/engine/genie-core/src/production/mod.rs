@@ -516,7 +516,7 @@ mod tests {
     /// A zeroed slot (the buffer's growth, `calloc`) holds master 0 and technology 0, as the
     /// game's save writes a slot past the entries: not the −1 of a research's master.
     #[test]
-    fn a_zeroed_slot_holds_master_0() {
+    fn zeroed_slot_holds_master_0() {
         let e = Entry::default();
         assert_eq!(
             (
@@ -554,7 +554,7 @@ mod tests {
     /// `FUN_1411d66b0` walks the units entry by entry: index 4 of [3 archers, 2 villagers] is
     /// the second villager, index 5 none.
     #[test]
-    fn a_unit_index_walks_the_entries_counts() {
+    fn unit_index_walks_the_entries_counts() {
         let q = queue(&[
             unit(master_id(4), 3, 25.0),
             unit(ids::VILLAGER_MALE, 2, 50.0),
@@ -604,7 +604,7 @@ mod tests {
 
     /// The regrowth by ten keeps every old slot but its costs, which it fills anew.
     #[test]
-    fn a_full_buffer_grows_by_ten_and_fills_the_old_costs_anew() {
+    fn full_buffer_grows_by_ten_and_fills_the_old_costs_anew() {
         let mut q = queue(&[unit(ids::VILLAGER_MALE, 1, 50.0)]);
         q.slots[3] = unit(ids::ID_7, 0, 9.0);
         assert!(!q.full());
@@ -698,7 +698,7 @@ mod tests {
     /// A villager at the town centre (109) with button 1 trains in 25 seconds there; another
     /// building or button takes the first location's time; no locations, 0.
     #[test]
-    fn a_train_time_is_the_building_s_and_button_s_else_the_first() {
+    fn train_time_is_the_building_and_button_else_the_first() {
         let at = |location, time, button| TrainLocation {
             location,
             time,
@@ -768,7 +768,7 @@ mod tests {
 
     /// A villager stores −1 headroom, +1 population and +1 of attribute 19.
     #[test]
-    fn a_villager_takes_one_population() {
+    fn villager_takes_one_population() {
         assert_eq!(
             population(&[
                 (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
@@ -809,7 +809,7 @@ mod tests {
     /// above 0 and truncated to 16 bits (not an age's), and is in state 1 with no work done; in
     /// another state nothing happens.
     #[test]
-    fn a_cancelled_research_gives_back_its_paid_costs() {
+    fn cancelled_research_gives_back_its_paid_costs() {
         use crate::technology::{Cost, TechDef, TechState};
         let def = TechDef {
             costs: [
@@ -890,7 +890,7 @@ mod tests {
     /// it), not what the master costs now; an unpaid cost and a master below type 70 give
     /// nothing.
     #[test]
-    fn a_refund_gives_back_what_the_entry_paid() {
+    fn refund_gives_back_what_the_entry_paid() {
         let m = Master {
             kind: COMBAT,
             cost: costs(&[
@@ -973,7 +973,7 @@ mod tests {
     /// `resource_costs`): a queue entry's costs keep the empty slot in its place
     /// (MarvinBlue/426048731's 9149 at update 25: (0, 50), (−1, 0), (4, 1)).
     #[test]
-    fn a_queue_entry_keeps_the_empty_cost_slot_in_its_place() {
+    fn queue_entry_keeps_the_empty_cost_slot_in_its_place() {
         let mut m = villager(&[]);
         m.cost = [
             CostSlot::new(attribute::FOOD, CostAmount::of_data(50), true),
@@ -1027,7 +1027,7 @@ mod tests {
 
     /// `FUN_14162fb60` pays the paid entries times the count in one subtraction.
     #[test]
-    fn a_payment_takes_the_paid_entries_times_the_count() {
+    fn payment_takes_the_paid_entries_times_the_count() {
         let ms = Masters::new([villager(&[
             (attribute::FOOD, 50, true),
             (attribute::HEADROOM, 1, false),
@@ -1145,7 +1145,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shared_research_joins_both_lists_once_and_a_cancel_drops_it() {
+    fn shared_research_joins_both_lists_once_and_cancel_drops_it() {
         let mut p = Production::default();
         p.note_shared_research(tech_id(7));
         p.note_shared_research(tech_id(7));

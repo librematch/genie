@@ -83,7 +83,7 @@ mod tests {
     /// The set sorts by the game's integers: none (−1) sorts above a negative id and below the
     /// others; an id joins once and leaves by its value.
     #[test]
-    fn attackers_sort_by_the_game_s_integers() {
+    fn attackers_sort_by_the_game_integers() {
         let mut a = Attackers::default();
         assert!(a.add(Some(object_id(7))));
         assert!(a.add(None));

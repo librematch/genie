@@ -181,7 +181,7 @@ mod tests {
 
     /// A value no action names is an error; −1 is a field's none.
     #[test]
-    fn a_value_no_action_names_is_an_error() {
+    fn value_no_action_names_is_an_error() {
         for v in [0, 0x25e, 0x263, 0x2c1, 0x2c6, 700 + 100] {
             assert_eq!(
                 ActionKind::try_from(v).map_err(|e| e.kind()),
@@ -197,7 +197,7 @@ mod tests {
     /// An action's order is the value 100 above it: the move's, the trade's, the hero power's;
     /// the make, research and the two moves aside have none.
     #[test]
-    fn an_action_s_order_is_100_above_it() {
+    fn an_action_order_is_100_above_it() {
         assert_eq!(ActionKind::Move.order(), Some(OrderKind::Move));
         assert_eq!(ActionKind::Trade.order(), Some(OrderKind::Trade));
         assert_eq!(ActionKind::HeroPower.order(), Some(OrderKind::HeroPower));

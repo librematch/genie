@@ -80,7 +80,7 @@ fn run(
 /// The speed is the master's times the shown sprite's factor; walking and running by their
 /// sprites'; the restriction's mask from the table.
 #[test]
-fn a_walker_moves_by_its_master_and_sprites() {
+fn walker_moves_by_its_master_and_sprites() {
     let objects = with_masters(vec![master()]);
     let m = run(&walker(11), &objects, Some(&table())).unwrap().unwrap();
     assert_eq!(m.stats.speed.get().to_bits(), 2.0_f32.to_bits());
@@ -104,7 +104,7 @@ fn a_walker_moves_by_its_master_and_sprites() {
 
 /// An object below type 30 does not move.
 #[test]
-fn a_static_object_has_no_mover() {
+fn static_object_has_no_mover() {
     let tree = genie_save::Object {
         rge_object: Some(Box::new(genie_save::generated::world::RgeObject {
             rge_static_object: Some(Box::default()),

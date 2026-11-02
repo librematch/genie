@@ -59,7 +59,7 @@ use crate::world::step::Step;
 /// without a target and ready again past its interrupt frame (its firing frame without one);
 /// at or past the interrupt frame readyToAttack runs, the swing going on.
 #[test]
-fn a_swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
+fn swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
     use AfterHit::{Continue, Done, Ready};
     let f = crate::objects::Frame::of_data;
     // ranged, timer run out (NaN counts too)
@@ -165,7 +165,7 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
 /// Slot 0x38 (`FUN_140a82ac0`): `set_state(1)`: its `MoveTo` goes, stopping the unit and its
 /// animation, then the animation runs at speed 1 and the unit stands; the target stays.
 #[test]
-fn a_stop_ends_the_attack_and_the_unit_stands() {
+fn stop_ends_the_attack_and_the_unit_stands() {
     let stand = Graphic {
         id: SpriteId::named(1),
         frames: crate::objects::Frame::of_data(10),
@@ -276,7 +276,7 @@ fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
 /// keeps a target only within its reach (the range, half a tile more up to 0.1; the gap
 /// between the footprints); a NaN speed asks the unit AI, a NaN gap is within (`JA`).
 #[test]
-fn an_attack_that_cannot_follow_keeps_a_target_only_in_reach() {
+fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
     // the gap: 13 - 10 - (0.4 + 0.2) = 2.4
     let deer = mark(7, 13.0);
     let reach = |range: Distance, speed: f32, can: bool| {
@@ -361,7 +361,7 @@ fn an_attack_that_cannot_follow_keeps_a_target_only_in_reach() {
 /// Attack; a sub-action does neither); a target in state 7 or more is not taken, and one of
 /// class 60 changes nothing but where it was seen.
 #[test]
-fn an_area_effect_s_attack_takes_a_building_s_main_building() {
+fn an_area_effect_attack_takes_building_main_building() {
     let annex = Mark {
         kind: BUILDING,
         class: class::BUILDING,
@@ -456,7 +456,7 @@ fn an_area_effect_s_attack_takes_a_building_s_main_building() {
 /// `FUN_1413b9f00`: the sprite of the graphic asked for goes back to its first frame (true);
 /// another graphic's, or none, is left (false).
 #[test]
-fn a_sprite_resets_only_for_its_own_graphic() {
+fn sprite_resets_only_for_its_own_graphic() {
     let swing = Graphic {
         id: SpriteId::named(224),
         frames: crate::objects::Frame::of_data(10),
@@ -860,7 +860,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
 /// the main building among the objects the hit may reach loses it, and the annex takes its
 /// hit points.
 #[test]
-fn a_strike_on_an_annex_hits_its_main_building() {
+fn strike_on_an_annex_hits_its_main_building() {
     let mut annex = struck_building(
         21,
         Position::new(10.5, 10.0, 0.0),
@@ -922,7 +922,7 @@ fn a_strike_on_an_annex_hits_its_main_building() {
 /// building's (`FUN_1411cc890`), the combat object's times 1.2 while it holds a specific relic
 /// (`+0xc24`), so its hit on a lower target does more than a tower's without one.
 #[test]
-fn a_building_s_relic_raises_its_missile_s_hit() {
+fn building_relic_raises_its_missile_hit() {
     let hit_by = |relics: Relics| {
         let mut target = struck_building(
             21,
@@ -999,7 +999,7 @@ fn a_building_s_relic_raises_its_missile_s_hit() {
 /// target's main building (5 of 10 at half the damage), whose blast so far (`+0xb90`,
 /// `0x141211933`) the hit on the annex then leaves out: 10 less 5.
 #[test]
-fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
+fn trample_hit_leaves_out_its_building_target_blast_so_far() {
     let mut blasted = vec![struck_building(
         20,
         Position::new(10.5, 10.0, 0.0),
@@ -1055,7 +1055,7 @@ fn a_trample_s_hit_leaves_out_its_building_target_s_blast_so_far() {
 /// The blast so far a trample's hit leaves out: a building's own, an annex's main building's
 /// (one the hit does not hold is not modelled), none for another object.
 #[test]
-fn a_trample_reads_a_building_s_blast_so_far_or_its_main_building_s() {
+fn trample_reads_building_blast_so_far_or_its_main_building_s() {
     let building = |main, blast_taken| {
         struck_building(
             21,
@@ -1218,7 +1218,7 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
 /// queue empty it posts 0x1f9 with 600, with orders queued not. A sub-action does none of these.
 /// Another predator's unit AI is not modelled.
 #[test]
-fn an_attack_on_a_target_out_of_sight_fails() {
+fn an_attack_on_target_out_of_sight_fails() {
     let run = |a: &mut Attack, class, ai_type, queue_empty| {
         let mut rig = Rig::on_the_path(Victim::default()).holding(77, PlayerId::new(1));
         (rig.f.own.class, rig.r.ai_type, rig.r.queue_empty) = (class, ai_type, queue_empty);
@@ -1269,7 +1269,7 @@ fn an_attack_on_a_target_out_of_sight_fails() {
 /// move waits (`set_state` 5: a `MoveTo` to where it saw the target); any other fails
 /// (`set_state` 13).
 #[test]
-fn ready_to_attack_on_a_target_out_of_sight_fails_or_waits() {
+fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
     let at = Position::new(11.0, 10.0, 0.0);
     for (stance, fails) in [
         (UnitStance::AGGRESSIVE, false),
@@ -1461,7 +1461,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
 /// (the reach decides and the target's place becomes the point); a NaN attack timer has run
 /// out (slot 0x100's `SETBE`).
 #[test]
-fn ready_to_attack_s_at_once_test_and_its_nan_paths() {
+fn ready_to_attack_at_once_test_and_its_nan_paths() {
     let at = Position::new(11.0, 10.0, 0.0);
     let run = |point: Position, skip: bool, range: Distance, timer: f32| {
         let victim = Victim {
@@ -1558,7 +1558,7 @@ fn the_ready_at_once_range_test_passes_nan() {
 
 /// `FUN_140a82ae0`'s state without a case (of an Attack's, 0) returns 0; its timer runs.
 #[test]
-fn an_attack_in_a_state_without_a_case_returns_0() {
+fn an_attack_in_state_without_case_returns_0() {
     let at = Position::new(11.0, 10.0, 0.0);
     let victim = Victim {
         id: object_id(7),
@@ -1587,7 +1587,7 @@ fn an_attack_in_a_state_without_a_case_returns_0() {
 /// was its player's when the Attack took it (`+0x9f`). 427003795's update 357: the hunters'
 /// goat (class 58), Gaia's when their Attacks began, is now their player's.
 #[test]
-fn an_attack_on_a_target_its_player_counts_as_its_own_ends() {
+fn an_attack_on_target_its_player_counts_as_its_own_ends() {
     let at = Position::new(11.0, 10.0, 0.0);
     let run =
         |class: ClassId, allied: bool, same_owner: bool, player: PlayerId, sub_action: bool| {
@@ -1655,7 +1655,7 @@ fn an_attack_on_a_target_its_player_counts_as_its_own_ends() {
 /// nothing go (slot 0x68 with none), ends (`set_state` 1) and then posts 0x1fb with 600 and
 /// 0x202 before it returns 5.
 #[test]
-fn a_sub_action_s_attack_after_its_kill_posts_0x1fb_and_returns_5() {
+fn sub_action_attack_after_its_kill_posts_0x1fb_and_returns_5() {
     let at = Position::new(11.0, 10.0, 0.0);
     let victim = Victim {
         id: object_id(7),
@@ -1688,7 +1688,7 @@ fn a_sub_action_s_attack_after_its_kill_posts_0x1fb_and_returns_5() {
 /// attack on it ends (`set_state` 1) and returns 5. A villager's, or one on a tree past
 /// state 5, ends at the update's start, letting the target go at once.
 #[test]
-fn a_dead_tree_keeps_a_soldier_s_attack_until_it_is_ready() {
+fn dead_tree_keeps_soldier_attack_until_it_is_ready() {
     let at = Position::new(11.0, 10.0, 0.0);
     let run = |unit_class: ClassId, tree_state: ObjectState| {
         let victim = Victim {
@@ -1736,7 +1736,7 @@ fn a_dead_tree_keeps_a_soldier_s_attack_until_it_is_ready() {
 /// that failed (`set_state` 13, the standing sprite from its first frame) keeps the attack in
 /// state 13, though the attack sprite had looped.
 #[test]
-fn a_swing_that_fails_its_interrupt_check_stays_failed() {
+fn swing_that_fails_its_interrupt_check_stays_failed() {
     let at = Position::new(15.0, 10.0, 0.0);
     let victim = Victim {
         id: object_id(7),
@@ -1771,7 +1771,7 @@ fn a_swing_that_fails_its_interrupt_check_stays_failed() {
 }
 
 #[test]
-fn a_rangeless_attack_reaches_a_tenth_squared_in_f32() {
+fn rangeless_attack_reaches_tenth_squared_in_f32() {
     // the image holds 0x3c23d70b (0.1f * 0.1f), one ULP above 0.01f
     assert_eq!(squared_reach(Distance::ZERO).get().to_bits(), 0x3c23_d70b);
     assert_eq!(
@@ -1786,7 +1786,7 @@ fn a_rangeless_attack_reaches_a_tenth_squared_in_f32() {
 /// (`set_state(1)`, the standing sprite at speed 1) and posts 0x1fb with 600 and its target,
 /// −1.
 #[test]
-fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
+fn disarmed_building_targetless_attack_ends_with_its_notify() {
     let standing = Graphic {
         id: SpriteId::named(418),
         frames: crate::objects::Frame::of_data(1),
@@ -1855,7 +1855,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
 /// running sprite, else its walking one, slots 0x7d0 and 0x7c8: a terrain look's while the
 /// unit has one; the attack sprite stays the master's.
 #[test]
-fn an_attack_walks_with_the_unit_s_running_or_walking_slot() {
+fn an_attack_walks_with_the_unit_running_or_walking_slot() {
     let g = |id| Graphic {
         id,
         frames: crate::objects::Frame::of_data(10),
@@ -1991,7 +1991,7 @@ fn own_start_among(
 /// (the target's place the point, a NaN gap within) is `set_state(6)`; out of reach (0x1fd)
 /// or below the least range (0x1fe with −1s) it fails (`set_state(13)`).
 #[test]
-fn the_start_of_a_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() {
+fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() {
     let start = |e: Engagement| {
         let mut mover = soldier_mover(e.speed.get());
         let world = world_with(7, PlayerId::new(2), class::CLASS_6, e.target_position);
@@ -2054,7 +2054,7 @@ fn the_start_of_a_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it(
 /// animation at speed 1; stance 1's leash fails a target 5 past the range from the unit AI's
 /// point and holds a nearer one.
 #[test]
-fn the_start_of_a_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_found() {
+fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_found() {
     let start = |e: Engagement, visible: bool| {
         let mut mover = soldier_mover(e.speed.get());
         mover.animated.speed = Speed::new(1.0);
@@ -2180,7 +2180,7 @@ fn the_start_faces_the_target_but_for_masters_1704_and_1706() {
 /// order, `MINSS`), in the start's readyToAttack and an update's; the least range reads the
 /// gate's own gap. A gate 3 tiles off with a part 0.5 off is in reach of a range of 1.
 #[test]
-fn a_gate_s_reach_is_to_its_nearest_part() {
+fn gate_reach_is_to_its_nearest_part() {
     let gate_at = Position::new(13.4, 10.0, 0.0);
     let parts = [(8, 10.9), (9, 20.0), (10, 10.5)];
     let gated = || {
@@ -2316,7 +2316,7 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
 /// sprite comes first and draws nothing, and so does a special graphic on a charge that
 /// hits.
 #[test]
-fn a_swing_with_a_second_sprite_draws_which_one_it_shows() {
+fn swing_with_second_sprite_draws_which_one_it_shows() {
     let at = Position::new(10.5, 10.0, 0.0);
     let sprite = |id: i16| Graphic {
         id: SpriteId::named(id),
@@ -2383,7 +2383,7 @@ fn a_swing_with_a_second_sprite_draws_which_one_it_shows() {
 /// plus 5 or more from its unit AI's `state_position` fails (`set_state(13)`) after its
 /// 0x1fd; a nearer one follows. A NaN distance holds (`COMISS`/`JNC`).
 #[test]
-fn ready_to_attack_s_leash_fails_a_target_too_far_from_the_unit_ai_s_point() {
+fn ready_to_attack_leash_fails_target_too_far_from_the_unit_ai_point() {
     let at = Position::new(15.0, 10.0, 0.0);
     for (centre, follows) in [
         (Point::new(10.0, 10.0), true),
@@ -2425,7 +2425,7 @@ fn ready_to_attack_s_leash_fails_a_target_too_far_from_the_unit_ai_s_point() {
 ///
 /// [`Unit::attack_part`]: crate::objects::unit::Unit::attack_part
 #[test]
-fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
+fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
     use crate::world::tests::{forage_world, in_update};
     let stand = Graphic {
         id: SpriteId::named(9),
@@ -2542,7 +2542,7 @@ fn swinging_attack(state: AttackState, ranged: bool, fire: i16) -> Attack {
 ///
 /// [`archer_world`]: crate::world::tests::archer_world
 #[test]
-fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
+fn ranged_swing_fires_at_its_firing_frame_and_melee_one_counts_down() {
     use crate::world::tests::{archer_world, missiles};
     let mut t = archer_world(100, 0, 0.0);
     let mut a = *t
@@ -2623,7 +2623,7 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
 /// without a firing frame and a self-destructing attacker's melee hit; and a ranged hit on a
 /// target the strike reads dead ends the swing (`set_state` 2).
 #[test]
-fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
+fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
     let reason = |class, master, ranged, fire| {
         let mut rig = Rig::on_the_path(Victim {
             hp: HitPoints::new(50.0),
@@ -2699,7 +2699,7 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
 /// saw it, state 5); one going on waits for its sprite to loop; a looped sprite with reload
 /// left shows the idle sprite at speed 1 and readies.
 #[test]
-fn a_swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
+fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
     let after = |target, interrupt, sprite: ActiveSprite, swing| {
         let mut rig = Rig::on_the_path(Victim::default());
         let mut a = swinging_attack(AttackState::Swing, true, 3);
@@ -2771,7 +2771,7 @@ fn walk_to_house(state: MoveTo, wait: MoveWait) -> MoveToAction {
 /// moves, whose factor sets the top speed (0.8 × 1.5); one in range at once arrives (its code is
 /// still 0), the quiet `MoveTo` showing no idle sprite.
 #[test]
-fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
+fn an_attack_move_to_starts_running_or_arrives_in_range() {
     let walking = Graphic {
         id: SpriteId::named(301),
         speed_multiplier: SpeedMultiplier::of_data(1.5),
@@ -2831,7 +2831,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
 /// walking sprite and `+0x61`, the target's place and its target; it starts arrived within 0.01
 /// of the target, in state 3 with speed, 13 without; a unit whose state is 3 or more adds none.
 #[test]
-fn an_attack_s_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
+fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
     let at = Position::new(12.0, 10.0, 0.0);
     let table = Graphics::from([(STANDING.id, STANDING)]);
     let made = |gap, speed, state, mode| {
@@ -2915,7 +2915,7 @@ fn an_attack_s_move_to_the_target_takes_its_range_sprite_and_target_moved_mode()
 /// state 5 within the Attack's range, state 11 onto the point (range 0); the point's gap is none,
 /// so state 3, or 13 for a unit without speed; none for a unit whose state is 3 or more.
 #[test]
-fn an_attack_s_move_to_where_it_saw_the_target_walks_within_its_range_or_onto_it() {
+fn an_attack_move_to_where_it_saw_the_target_walks_within_its_range_or_onto_it() {
     let seen = Position::new(12.0, 10.0, 0.0);
     let made = |state, speed, unit_state| {
         let mut a = own_attack(7, state, Distance::new(3.0));
@@ -2958,7 +2958,7 @@ fn an_attack_s_move_to_where_it_saw_the_target_walks_within_its_range_or_onto_it
 /// a failed one ends the Attack (code 3), a unit's own posting 0x1f9 with 600. An empty list
 /// gives code 1 as an arrived one does.
 #[test]
-fn an_attack_s_walk_walks_waits_arrives_or_fails() {
+fn an_attack_walk_walks_waits_arrives_or_fails() {
     let walked = |move_to: Option<MoveTo>, timer: f32| {
         let mut rig = Rig::on_the_path(Victim::default());
         let mut a = own_attack(10028, AttackState::Move, Distance::new(0.1));
@@ -3034,7 +3034,7 @@ fn an_attack_s_walk_walks_waits_arrives_or_fails() {
 /// unit's own posting 0x1fb with 600 and 0x202 first) and stops the unit; failed it fails the
 /// Attack (code 3, a unit's own posting 0x1f9 with 600).
 #[test]
-fn an_attack_without_a_target_walks_to_where_it_saw_it_and_ends_there() {
+fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
     let gone = |state: MoveTo, sub_action: bool| {
         let mut rig = Rig::on_the_path(Victim::default());
         let mut a = own_attack(-1, AttackState::GotoSeen, Distance::new(1.0));
@@ -3162,7 +3162,7 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
 /// order and an empty queue waits from state 4 and walks on in state 5; seen in state 4 it
 /// goes on.
 #[test]
-fn an_attack_on_a_moved_target_follows_waits_or_fails() {
+fn an_attack_on_moved_target_follows_waits_or_fails() {
     let moved = (
         PlayerId::new(2),
         class::CLASS_6,
@@ -3211,7 +3211,7 @@ fn an_attack_on_a_moved_target_follows_waits_or_fails() {
 /// own ends it with 1 (a unit's own Attack posting 0x1fb); a target inside another ends it
 /// with 4; a building that cannot attack ends it with 1; else the state's step follows.
 #[test]
-fn an_attack_ends_early_on_an_ally_a_hidden_target_or_disarmed() {
+fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
     let live = (
         PlayerId::new(2),
         class::CLASS_6,
@@ -3262,7 +3262,7 @@ fn an_attack_ends_early_on_an_ally_a_hidden_target_or_disarmed() {
 /// State 6's step: ready in reach swings; ready on a dead tree ends with 5; a target out of
 /// reach is followed (`set_state(4)`).
 #[test]
-fn a_ready_attack_swings_ends_on_a_dead_tree_or_follows() {
+fn ready_attack_swings_ends_on_dead_tree_or_follows() {
     let (mut rig, mut a) = on_target(
         (
             PlayerId::new(2),
@@ -3313,7 +3313,7 @@ fn a_ready_attack_swings_ends_on_a_dead_tree_or_follows() {
 /// unit's own Attack lets its target go at once, posts 0x1fb with 600 and 0x202, ends and
 /// returns 2.
 #[test]
-fn a_killing_attack_ends_once_its_swing_looped() {
+fn killing_attack_ends_once_its_swing_looped() {
     let dead = (
         PlayerId::new(0),
         class::CLASS_6,
@@ -3350,7 +3350,7 @@ fn a_killing_attack_ends_once_its_swing_looped() {
 /// The unit AI's order as the Attack reads it ([`AiOrder::of`]): absent without a unit AI,
 /// idle for one without an order.
 #[test]
-fn the_attack_reads_its_unit_ai_s_order() {
+fn the_attack_reads_its_unit_ai_order() {
     assert_eq!(AiOrder::of(None), AiOrder::Absent);
     let mut ai = UnitAi::default();
     assert_eq!(AiOrder::of(Some(&ai)), AiOrder::Idle);
@@ -3366,7 +3366,7 @@ fn the_attack_reads_its_unit_ai_s_order() {
 /// and an empty queue posts 0x1fb with 600 and 0x202, as a computer player's does; orders
 /// queued post nothing. A unit AI forgets the target, but a villager's on Gaia's.
 #[test]
-fn an_attack_on_a_dead_target_posts_by_its_unit_ai() {
+fn an_attack_on_dead_target_posts_by_its_unit_ai() {
     let dead = (
         PlayerId::new(2),
         class::CLASS_6,

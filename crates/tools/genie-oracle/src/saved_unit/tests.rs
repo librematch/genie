@@ -36,7 +36,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
 /// row's; a gather state the import cannot read leaves the part out and is the row's
 /// unmodelled part. The dead master is the import's gap.
 #[test]
-fn a_saved_building_s_parts_are_its_object_s() {
+fn saved_building_parts_are_its_object_s() {
     use genie_core::commands::GatherPointState;
     let whole = |state: i32| {
         let mut barracks = building_object(11, 12);
@@ -107,7 +107,7 @@ fn livestock_starts_with_its_artifact() {
 
 /// Without a table the default task is unknown: reported, as the object's.
 #[test]
-fn without_a_table_the_default_task_is_reported() {
+fn without_table_the_default_task_is_reported() {
     let u = object(
         &combat_object(5, 83),
         &PlayerObjects::default(),
@@ -129,7 +129,7 @@ fn without_a_table_the_default_task_is_reported() {
 
 /// A saved action the slice does not model stops the object.
 #[test]
-fn a_saved_action_the_slice_does_not_model_is_reported() {
+fn saved_action_the_slice_does_not_model_is_reported() {
     let mut scout = combat_object(5, 83);
     let explore = Action {
         rge_action_by_type: Some(Box::new(RgeActionByType {
@@ -159,7 +159,7 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
 
 /// A missile without its action (it met its target) flies on with its own fields.
 #[test]
-fn a_missile_without_its_action_keeps_flying() {
+fn missile_without_its_action_keeps_flying() {
     let mut missile = RgeMissileObject {
         max_range: 7.0,
         fired_from_id: 900,
@@ -207,7 +207,7 @@ fn a_missile_without_its_action_keeps_flying() {
 /// A builder's Build takes its master's Build task with the builder's work-rate powerup (its
 /// combat layer's) added to the master's work rate.
 #[test]
-fn a_build_s_work_rate_takes_the_builder_s_powerup() {
+fn build_work_rate_takes_the_builder_powerup() {
     use genie_core::objects::masters::action_type::BUILD;
     use genie_save::generated::world::{Task, TaskList, TaskListEntry1, TribeActionBuild};
     let mut master = combat_master(83);

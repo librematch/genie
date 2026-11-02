@@ -50,7 +50,7 @@ mod tests {
 
     /// Only a factor above 0 scales the speed; 0, a negative factor and NaN leave it.
     #[test]
-    fn only_a_factor_above_zero_scales_the_speed() {
+    fn only_factor_above_zero_scales_the_speed() {
         let base = Speed::new(0.8);
         assert_eq!(
             SpeedMultiplier::of_data(1.5).applied_to(base),

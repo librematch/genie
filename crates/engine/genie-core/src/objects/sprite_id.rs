@@ -41,7 +41,7 @@ mod tests {
 
     /// An id 0 and up names a sprite; −1 and below are none.
     #[test]
-    fn a_sprite_id_below_zero_is_none() {
+    fn sprite_id_below_zero_is_none() {
         assert_eq!(SpriteId::of_data(0), Some(SpriteId::named(0)));
         assert_eq!(SpriteId::of_data(1903).map(SpriteId::get), Some(1903));
         assert_eq!(SpriteId::of_data(-1), None);

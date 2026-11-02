@@ -215,7 +215,7 @@ mod tests {
     /// `FUN_141302150`: the force drop counts in the scenario modes but King of the Hill; in
     /// the standard modes, and in any mode without it, a hunter keeps what it carries.
     #[test]
-    fn the_carry_rule_needs_the_force_drop_in_a_scenario_mode_but_king_of_the_hill() {
+    fn the_carry_rule_needs_the_force_drop_in_scenario_mode_but_king_of_the_hill() {
         let with = |game_mode: i32, villager_force_drop| Settings {
             game_mode: GameMode::of_data(game_mode),
             villager_force_drop,
@@ -248,7 +248,7 @@ mod tests {
     /// `FUN_141302520`: Regicide (mode 1) or the sub-mode's bit 2; the sudden death rule: Sudden
     /// Death (mode 11) or the sub-mode's bit 1. Each bit alone, in any mode.
     #[test]
-    fn regicide_and_sudden_death_come_from_the_mode_or_the_sub_mode_s_bits() {
+    fn regicide_and_sudden_death_come_from_the_mode_or_the_sub_mode_bits() {
         let with = |game_mode: i32, sub_game_mode_flag: i32| Settings {
             game_mode: GameMode::of_data(game_mode),
             sub_game_mode_flag: SubModeFlags::from_bits_retain(sub_game_mode_flag),
@@ -267,7 +267,7 @@ mod tests {
     /// Empire Wars: the mode 13 or the sub-mode's bit 0 (426422314: a random map game with the
     /// bit, whose villagers start at work), alone or with the other bits.
     #[test]
-    fn empire_wars_comes_from_the_mode_or_the_sub_mode_s_bit_0() {
+    fn empire_wars_comes_from_the_mode_or_the_sub_mode_bit_0() {
         let with = |game_mode: i32, sub_game_mode_flag: i32| Settings {
             game_mode: GameMode::of_data(game_mode),
             sub_game_mode_flag: SubModeFlags::from_bits_retain(sub_game_mode_flag),
@@ -296,7 +296,7 @@ mod tests {
 
     /// The content mode 1 alone ends a predator's hunt.
     #[test]
-    fn a_predator_s_hunt_ends_in_content_mode_1() {
+    fn predator_hunt_ends_in_content_mode_1() {
         let with = |selected_content_mode: i32| Settings {
             selected_content_mode: ContentMode::of_data(selected_content_mode),
             ..Settings::default()
@@ -433,7 +433,7 @@ mod tests {
     /// by the game mode (27, 28, 32, 34), a negative mode the opposite (but −32), 0, 1 and those
     /// not listed for every game; 15 is the root's entry, not held.
     #[test]
-    fn a_technology_s_mode_reads_the_game_s_options() {
+    fn technology_mode_reads_the_game_options() {
         let s = Settings {
             game_mode: GameMode::of_data(2),
             ..Settings::default()

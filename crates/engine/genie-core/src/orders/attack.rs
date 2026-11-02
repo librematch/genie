@@ -129,11 +129,11 @@ impl World {
             .spatial
             .get(self.players.live(player, idx)?.id)
             .ok_or(crate::world::ATTACKER_UNPLACED)?;
-        let t_at = *self
+        let target_at = *self
             .spatial
             .get_known(target)?
             .ok_or(crate::world::TARGET_UNPLACED)?;
-        let (tx, ty) = (t_at.position.x() as i32, t_at.position.y() as i32);
+        let (tx, ty) = (target_at.position.x() as i32, target_at.position.y() as i32);
         let visible = self.spatial.sees_tile(player, Tile::new(tx, ty))
             || (aim.fog_visibility != FogVisibility::INVISIBLE
                 && self.spatial.explored(player, Tile::new(tx, ty))?);
@@ -147,7 +147,7 @@ impl World {
             speed,
             master,
             &me_at,
-            &t_at,
+            &target_at,
             world_time,
         )?;
         let unit = self.players.live_mut(player, idx)?;

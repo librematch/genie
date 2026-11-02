@@ -81,7 +81,7 @@ mod tests {
     /// A saved target is none at (−1, −1), an object at kind 1 and another kind's target else,
     /// and it writes back the integers it was read from.
     #[test]
-    fn a_saved_target_is_none_an_object_or_another_kind() {
+    fn saved_target_is_none_an_object_or_another_kind() {
         assert_eq!(GroupTarget::of_saved(-1, -1), GroupTarget::None);
         assert_eq!(
             GroupTarget::of_saved(7, 1),
@@ -105,7 +105,7 @@ mod tests {
 
     /// Only another kind's target names a group; a lookup reads the integer of every kind.
     #[test]
-    fn a_lookup_reads_the_integer_of_every_kind() {
+    fn lookup_reads_the_integer_of_every_kind() {
         assert_eq!(
             GroupTarget::of_saved(3, 2).group().map(|g| g.get()),
             Some(3)

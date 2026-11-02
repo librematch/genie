@@ -654,7 +654,7 @@ mod tests {
     /// A data file that does not open is the data file's error; one that is not a `.dat`
     /// too.
     #[test]
-    fn a_data_file_that_does_not_read_is_its_error() {
+    fn data_file_that_does_not_read_is_its_error() {
         let dir = scratch("no-dat");
         let path = dir.join("empires2_x2_p1.dat");
         assert!(matches!(MasterTable::read(&path), Err(ReadError::Dat(_))));
@@ -732,7 +732,7 @@ mod tests {
     }
 
     #[test]
-    fn a_task_s_sound_event_of_0_with_a_sound_of_files_takes_the_default_event() {
+    fn task_sound_event_of_0_with_sound_of_files_takes_the_default_event() {
         // FUN_1413af9a0: a valid sound number whose sound has files gives an id of 0 the
         // default event; an id set stays, and so does 0 with no sound or an empty one
         let sounds = [sound(0), sound(2)];

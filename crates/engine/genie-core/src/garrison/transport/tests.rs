@@ -201,7 +201,7 @@ fn ship(loaded: bool) -> Ship<'static> {
 }
 
 #[test]
-fn a_new_transport_sails_to_its_own_place_and_a_start_off_the_map_idles() {
+fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     let s = ship(true);
     let mut c = coast(true);
     let mut t = TransportAction::new(s.position);
@@ -232,7 +232,7 @@ fn a_new_transport_sails_to_its_own_place_and_a_start_off_the_map_idles() {
 }
 
 #[test]
-fn a_sail_takes_the_shore_point_and_drops_its_old_move_to() {
+fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
     let s = ship(true);
     let mut c = coast(true);
     c.shore = Some(Point::new(19.5, 8.5));
@@ -270,7 +270,7 @@ fn a_sail_takes_the_shore_point_and_drops_its_old_move_to() {
 }
 
 #[test]
-fn a_move_sails_to_its_point_and_a_stop_idles() {
+fn move_sails_to_its_point_and_stop_idles() {
     let s = ship(true);
     let mut c = coast(true);
     c.shore = Some(Point::new(19.5, 8.5));
@@ -299,7 +299,7 @@ fn a_move_sails_to_its_point_and_a_stop_idles() {
 }
 
 #[test]
-fn a_work_order_near_its_zone_unloads_at_once_else_sails_there() {
+fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let s = ship(true);
     // within reach of the point's zone and 2 from the footprint (squared 4, at most 4)
     let mut c = coast(true);
@@ -361,7 +361,7 @@ fn a_work_order_near_its_zone_unloads_at_once_else_sails_there() {
 }
 
 #[test]
-fn the_shore_search_looks_about_the_footprint_for_the_point_s_zone_or_land() {
+fn the_shore_search_looks_about_the_footprint_for_the_point_zone_or_land() {
     let mut c = coast(true);
     // the ship at x 12.5 with radius 0.5: tiles 10..=15; zone 2 is x 10..19
     let mut t = TransportAction::new(ship(true).position);
@@ -435,7 +435,7 @@ fn an_unload_out_of_reach_or_beside_no_shore_tells_the_owner_unless_over_water()
 }
 
 #[test]
-fn an_unload_beside_the_shore_is_the_caller_s_then_idles_unless_it_sails_on() {
+fn an_unload_beside_the_shore_is_the_caller_then_idles_unless_it_sails_on() {
     let s = ship(true);
     let mut c = coast(true);
     let mut t = TransportAction {
@@ -461,7 +461,7 @@ fn an_unload_beside_the_shore_is_the_caller_s_then_idles_unless_it_sails_on() {
 }
 
 #[test]
-fn a_sail_ends_with_its_move_to_and_a_failed_one_returns_3() {
+fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let s = ship(true);
     let mut c = coast(true);
     // state 4 without a MoveTo: the list answers 1, so it unloads
@@ -552,7 +552,7 @@ fn a_sail_ends_with_its_move_to_and_a_failed_one_returns_3() {
 /// a move walks on; the units in the way go to the unit AI at once; a waiting `MoveTo` (only a
 /// villager's waits) is not a ship's.
 #[test]
-fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
+fn sail_move_to_asks_for_its_path_then_walks_on() {
     use crate::combat::attack::tests::Rig;
     let graphic = Graphic {
         id: SpriteId::named(3),
@@ -635,7 +635,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
 /// sprite, without a task the master's walking sprite, for none the constructor's default; a
 /// task the master lacks is an error.
 #[test]
-fn a_transport_s_move_to_shows_its_task_s_or_its_master_s_sprite() {
+fn transport_move_to_shows_its_task_or_its_master_sprite() {
     use crate::objects::masters::{Master, Task, TaskId};
     let master = Master {
         move_sprite: Some(SpriteId::named(7)),
@@ -709,7 +709,7 @@ fn draw_tile(seed: u32, n: usize) -> [i16; 2] {
 }
 
 #[test]
-fn a_retry_draws_about_the_old_point_until_it_leaves_the_water() {
+fn retry_draws_about_the_old_point_until_it_leaves_the_water() {
     // the draws as the game makes them: x then y, each r / 0xccc tiles
     let mut copy = rng();
     let draws: Vec<u32> = (0..6).map(|_| copy.rand15() / RETRY_STEP).collect();
@@ -771,7 +771,7 @@ fn the_99th_draw_leaving_the_water_comes_too_late() {
 }
 
 #[test]
-fn a_drop_location_is_drawn_on_a_side_past_both_footprints() {
+fn drop_location_is_drawn_on_side_past_both_footprints() {
     let around = Around {
         center: Point::new(10.0, 10.0),
         radius: Footprint::new(1.0, 1.0),
@@ -858,7 +858,7 @@ fn a_drop_location_is_drawn_on_a_side_past_both_footprints() {
 /// A drop location's zone ([`in_zone`]): any for −1; else the tile's zone (its low byte) or
 /// one beside it on the zone map; without a map only zone 0's tiles, none beside.
 #[test]
-fn a_drop_location_lies_in_the_transport_s_zone_or_beside_it() {
+fn drop_location_lies_in_the_transport_zone_or_beside_it() {
     assert_eq!(in_zone(Point::new(3.5, 4.5), None, None), Ok(true));
     assert_eq!(
         in_zone(Point::new(3.5, 4.5), Some(ZoneId::new(0)), None),

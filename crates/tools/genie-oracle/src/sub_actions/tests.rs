@@ -46,7 +46,7 @@ fn slot() -> TribeBuildingObjectEntry1 {
 }
 
 #[test]
-fn a_building_s_production_holds_its_slots_and_make_action() {
+fn building_production_holds_its_slots_and_make_action() {
     let mut town_centre = building_object(10, 109);
     let b = building_mut(&mut town_centre);
     b.production_queue = vec![slot(), slot()];
@@ -82,7 +82,7 @@ fn a_building_s_production_holds_its_slots_and_make_action() {
 }
 
 #[test]
-fn a_research_is_a_production_action_too() {
+fn research_is_production_action_too() {
     let mut university = building_object(11, 209);
     let research = Action {
         tribe_action_make_tech: Some(Box::new(TribeActionMakeTech {
@@ -104,7 +104,7 @@ fn a_research_is_a_production_action_too() {
 
 /// A make action saved in a state no make action has (2) fails the read.
 #[test]
-fn a_make_action_in_a_state_of_none_fails() {
+fn make_action_in_state_of_none_fails() {
     let mut barracks = building_object(11, 12);
     let mut made = make();
     if let Some(m) = made.tribe_action_make_obj.as_deref_mut() {
@@ -119,7 +119,7 @@ fn a_make_action_in_a_state_of_none_fails() {
 
 /// A research saved in a state no research has (2) fails the read.
 #[test]
-fn a_research_in_a_state_of_none_fails() {
+fn research_in_state_of_none_fails() {
     let mut university = building_object(11, 209);
     let research = Action {
         tribe_action_make_tech: Some(Box::new(TribeActionMakeTech {
@@ -142,7 +142,7 @@ fn a_research_in_a_state_of_none_fails() {
 /// A building's gather point takes its saved state: 0 is none, 1 and 0xff read as theirs, a
 /// value past a byte fails the read.
 #[test]
-fn a_gather_point_takes_its_saved_state() {
+fn gather_point_takes_its_saved_state() {
     use genie_core::commands::GatherPointState;
     let with = |state: i32| {
         let mut barracks = building_object(11, 12);
@@ -159,7 +159,7 @@ fn a_gather_point_takes_its_saved_state() {
 /// No building, or one without slots, action or local lists, has no production; its local
 /// lists alone make one.
 #[test]
-fn a_building_without_anything_to_make_has_no_production() {
+fn building_without_anything_to_make_has_no_production() {
     assert!(production(&combat_object(5, 83)).unwrap().is_none());
     let mut house = building_object(12, 70);
     assert!(production(&house).unwrap().is_none());
@@ -262,7 +262,7 @@ fn the_default_task_starts_what_the_table_names() {
 
 /// Only action objects have a default task; without a table it is unknown.
 #[test]
-fn a_static_object_has_no_default_task() {
+fn static_object_has_no_default_task() {
     let tree = genie_save::Object {
         rge_object: Some(Box::new(RgeObject {
             rge_static_object: Some(Box::default()),
@@ -327,7 +327,7 @@ fn move_to() -> Action {
 /// The Attack's target, state and range; in states 5 and 11 its `MoveTo`'s point is where it
 /// walks, and the `MoveTo` comes with its state.
 #[test]
-fn a_saved_attack_reads_its_target_range_and_move_to() {
+fn saved_attack_reads_its_target_range_and_move_to() {
     let graphics = genie_core::objects::Graphics::new();
     let a = saved_attack(
         &attack(5, vec![(genie_core::movement::move_to::MOVE_TO, move_to())]),

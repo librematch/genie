@@ -223,7 +223,7 @@ mod tests {
 
     /// The modes' rules, the ages' order and the options' tests are the game's.
     #[test]
-    fn the_options_keep_the_game_s_values() {
+    fn the_options_keep_the_game_values() {
         for m in [3, 4, 5, 15] {
             assert!(GameMode::of_data(m).scenario() && !GameMode::of_data(m).standard());
         }

@@ -211,9 +211,9 @@ impl World {
                 continue;
             };
             let id = o.id;
-            let (o_at, o_radius) = self.ground(id)?;
+            let (other_at, other_radius) = self.ground(id)?;
             // COMISS NEARBY, gap; JC: a gap above it, or a NaN, is out
-            let gap = footprint_gap_squared(o_at, o_radius, at, radius);
+            let gap = footprint_gap_squared(other_at, other_radius, at, radius);
             if crate::math::fmath::below_or_unordered(NEARBY, gap.get()) {
                 continue;
             }

@@ -451,7 +451,7 @@ mod tests {
     /// From the villager the mill is the nearer; from the farm at (20, 17) the town centre; at
     /// (20, 19.5) both lie 5.5 away and the first in the list wins (428339149's farmers at 420).
     #[test]
-    fn a_villager_working_a_farm_searches_from_the_farm_by_distance() {
+    fn villager_working_farm_searches_from_the_farm_by_distance() {
         let at = Position::new(20.0, 20.0, 0.0);
         let near_tc = spatial(Point::new(20.0, 17.0));
         // by path without planners: no length, no site
@@ -516,7 +516,7 @@ mod tests {
     /// the work filters; a point at or below −1 on one axis has no zone and goes by the squared
     /// distance.
     #[test]
-    fn a_search_from_no_point_takes_the_first_site_and_one_below_it_goes_by_distance() {
+    fn search_from_no_point_takes_the_first_site_and_one_below_it_goes_by_distance() {
         let map = spatial(Point::new(20.0, 17.0));
         let none = Position::new(NO_POINT, NO_POINT, 0.0);
         assert_eq!(

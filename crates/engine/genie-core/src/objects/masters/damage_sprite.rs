@@ -94,7 +94,7 @@ mod tests {
 
     /// The shares order as bytes and add wrapping; the modes are the data's bytes.
     #[test]
-    fn the_damage_sprite_values_are_the_game_s_bytes() {
+    fn the_damage_sprite_values_are_the_game_bytes() {
         assert!(HpPercent::of_data(25) < HpPercent::WHOLE);
         assert_eq!(HpPercent::of_data(250).plus(10), HpPercent::of_data(4));
         assert_eq!(DamageSpriteMode::default(), DamageSpriteMode::PLACED);

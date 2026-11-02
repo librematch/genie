@@ -150,7 +150,7 @@ fn harmless(master: crate::objects::masters::Master) -> bool {
 /// Slot 0x78 of the ward's unit AI: of its attackers the world holds, the nearest by the
 /// footprint gap, the first of a tie; −1 for none, None for a ward without a unit AI.
 #[test]
-fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
+fn ward_nearest_attacker_is_its_closest_held_one() {
     let master = |id, radius| crate::objects::masters::Master {
         id,
         kind: master_type::COMBAT,
@@ -281,7 +281,7 @@ fn a_ward_s_nearest_attacker_is_its_closest_held_one() {
 }
 
 #[test]
-fn a_villager_fights_back_a_weak_attacker_of_its_own_master() {
+fn villager_fights_back_weak_attacker_of_its_own_master() {
     let villager = crate::objects::masters::Master {
         id: ids::VILLAGER_MALE,
         copy_id: Some(ids::VILLAGER_MALE),
@@ -321,7 +321,7 @@ fn a_villager_fights_back_a_weak_attacker_of_its_own_master() {
 /// 6 damage a hit, its reload, the candidate's distance and category as given; not the
 /// seeker's target, not a conversion. An object the world does not hold is not modelled.
 #[test]
-fn a_candidate_s_statistics_are_its_class_hit_points_and_the_damage_to_it() {
+fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     use crate::unit_ai::AttackPicker;
     let master = |id, class, weapons| crate::objects::masters::Master {
         id,

@@ -739,7 +739,7 @@ mod tests {
     /// `FUN_141010a80` with `param_9`: the move joins the command queue (`queueOrder`, approved
     /// with `direct`) and nothing moves; a group without a command hibernates for a direct one.
     #[test]
-    fn a_queued_move_joins_the_command_queue() {
+    fn queued_move_joins_the_command_queue() {
         let mut t = moving_world();
         let how = MoveTo {
             range: Distance::new(0.5),
@@ -834,7 +834,7 @@ mod tests {
     /// A move without `direct` behind queued commands joins them unapproved; the approved ones
     /// go and the queue runs: the group moves to the new point.
     #[test]
-    fn a_move_behind_queued_commands_runs_the_queue() {
+    fn move_behind_queued_commands_runs_the_queue() {
         let mut t = moving_world();
         t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![command(1, -1, 5.0, 5.0, 1)];
         let how = MoveTo {
@@ -859,7 +859,7 @@ mod tests {
     /// member's unit AI drops its notifies (`FUN_140c5dc10` at the world's time); a NaN length
     /// keeps the path (`COMISS`/`JC`).
     #[test]
-    fn a_held_move_keeps_flags_bit_11_and_a_patrol_is_the_top_path_s() {
+    fn held_move_keeps_flags_bit_11_and_patrol_is_the_top_path_s() {
         let mut t = moving_world();
         let hold = MoveTo {
             hold: true,
@@ -920,7 +920,7 @@ mod tests {
     /// too); [`GroupFlags::PATROL`] clears, [`GroupFlags::RELAYOUT_AT_TURN`] and
     /// [`GroupFlags::PLACE_AGAIN`] stay off for a leg on a patrol.
     #[test]
-    fn a_patrol_s_leg_loops_and_turns_back_from_five_tiles() {
+    fn patrol_leg_loops_and_turns_back_from_five_tiles() {
         let leg = MoveTo {
             leg: true,
             forget_target: true,

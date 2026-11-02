@@ -461,7 +461,7 @@ mod tests {
     /// The steps before the players' run first, then each player's steps player by player, Gaia
     /// first, then the steps after them.
     #[test]
-    fn the_update_runs_each_player_s_steps_between_the_world_s() {
+    fn the_update_runs_each_player_steps_between_the_world_s() {
         let mut w = bare(3);
         let mut seen = Vec::new();
         w.tick_observed(Millis::new(10), &[], &mut |_, step| seen.push(step));
@@ -507,7 +507,7 @@ mod tests {
 
     /// A step's name is its variant's, for the harness's game points and the traces.
     #[test]
-    fn a_step_is_named_by_its_variant() {
+    fn step_is_named_by_its_variant() {
         assert_eq!(UpdateStep::World(WorldStep::FrameSeed).name(), "FrameSeed");
         let objects = UpdateStep::Player(PlayerStep::Objects, PlayerId::new(2));
         assert_eq!(objects.name(), "Objects");

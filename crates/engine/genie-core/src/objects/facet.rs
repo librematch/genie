@@ -85,7 +85,7 @@ mod tests {
 
     /// A count has facets above 0, several above 1, and counts at least 8.
     #[test]
-    fn a_facet_count_counts_at_least_eight() {
+    fn facet_count_counts_at_least_eight() {
         assert!(!FacetCount::of_data(0).any() && FacetCount::of_data(1).any());
         assert!(!FacetCount::of_data(1).several() && FacetCount::of_data(2).several());
         assert_eq!(FacetCount::of_data(4).at_least_eight(), 8);

@@ -60,7 +60,7 @@ use crate::world::WorldTime;
 /// `;`): a set and an add keep the charge's share of the maximum, without a maximum a set
 /// takes the value and an add adds it, a multiply scales the charge.
 #[test]
-fn a_charge_keeps_its_share_of_a_changed_maximum() {
+fn charge_keeps_its_share_of_changed_maximum() {
     assert_eq!(
         charge_after(Charge::new(10.0), Charge::new(20.0), Change::Set, 40.0),
         Charge::new(20.0)
@@ -109,7 +109,7 @@ fn an_object_has_actions_while_it_holds_one() {
 /// task's proceeding or working one), a sprite it lacks stays lacking, and only a combat
 /// master's idle attack and second attack sprites replace its own.
 #[test]
-fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
+fn an_attack_takes_its_master_sprites_but_its_task_s() {
     let g = |id| crate::objects::sprite::Graphic {
         id,
         frames: crate::objects::Frame::of_data(10),
@@ -194,7 +194,7 @@ fn an_attack_takes_its_master_s_sprites_but_its_task_s() {
 /// and resource 19 take back the old amount and add the value's magnitude; other kinds and a
 /// fourth entry change nothing.
 #[test]
-fn a_population_set_moves_each_storage_entry_to_the_new_value() {
+fn population_set_moves_each_storage_entry_to_the_new_value() {
     let mut t = World::new(
         WorldTime::ZERO,
         crate::world::FrameSeed::of_data(0),
@@ -486,7 +486,7 @@ fn attribute(kind: u8, a: i16, b: i16, c: i16, d: f32) -> EffectCommand {
 /// `FUN_1412167d0`, `FUN_141216970`): its volleys (`+0xa00`) take a set's value, add an add's and
 /// scale by a multiply's; an object the world lacks changes nothing.
 #[test]
-fn a_total_missiles_change_sets_adds_or_scales_the_volleys() {
+fn total_missiles_change_sets_adds_or_scales_the_volleys() {
     use crate::objects::masters::attribute::TOTAL_MISSILES;
     let player = Player {
         objects: vec![unit_of(1, master_id(4), HitPoints::new(30.0))].into(),
@@ -576,7 +576,7 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
 /// before the change and take the new shares after (`FUN_141217ac0`, `FUN_14120b910`); the
 /// change of the archers' attack moves an archer's share.
 #[test]
-fn a_change_moves_the_shares_of_the_units_inside_a_building() {
+fn change_moves_the_shares_of_the_units_inside_building() {
     let mut tower = unit_of(10, master_id(79), HitPoints::new(1000.0));
     tower.garrison = vec![object_id(11)];
     let mut archer = unit_of(11, master_id(4), HitPoints::new(30.0));
@@ -632,7 +632,7 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
 /// annexes of the class, which the tracker files under no class; a foundation of the class
 /// (pending) takes it too.
 #[test]
-fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
+fn class_effect_reaches_buildings_their_annexes_and_foundations() {
     let mut main = unit_of(20, master_id(30), HitPoints::new(100.0));
     main.life.master_id = master_id(30);
     let main_layer = Building {
@@ -700,7 +700,7 @@ fn a_class_effect_reaches_buildings_their_annexes_and_foundations() {
 /// The allies' block (14: add) reaches the player's mutual allies, itself among them, and
 /// Gaia's (44) Gaia alone.
 #[test]
-fn a_team_effect_reaches_the_mutual_allies() {
+fn team_effect_reaches_the_mutual_allies() {
     let player = |relations: Vec<u8>| Player {
         relations: crate::players::relation_row(relations),
         ..Player::default()
@@ -748,7 +748,7 @@ fn a_team_effect_reaches_the_mutual_allies() {
 /// A set of a resource storage (`FUN_141195a50`'s 21): each object's player loses the old
 /// amount and gains the new (slot 0xf8 twice), unless the master keeps it (`'@'`).
 #[test]
-fn a_storage_set_moves_the_player_s_attribute_by_each_object() {
+fn storage_set_moves_the_player_attribute_by_each_object() {
     let player = Player {
         objects: vec![
             unit_of(1, ids::HOUSE, HitPoints::new(550.0)),
@@ -789,7 +789,7 @@ fn a_storage_set_moves_the_player_s_attribute_by_each_object() {
 /// master's plus it; a multiply: the master's times it, truncated); off the map (state 0)
 /// nothing. A set of the second storage (26) moves its attribute as the first does.
 #[test]
-fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
+fn static_object_line_of_sight_and_second_storage_take_the_change() {
     let (w, h) = (20, 20);
     let n = (w * h) as usize;
     let sight = |t: &World| {
@@ -928,7 +928,7 @@ fn a_static_object_s_line_of_sight_and_second_storage_take_the_change() {
 /// sprite of factor 2 moves at twice the new speed, one whose sprite the slice does not hold
 /// at the master's running speed.
 #[test]
-fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
+fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     use crate::objects::masters::attribute as a;
     let fast = crate::objects::sprite::Graphic {
         id: SpriteId::named(7),
@@ -988,7 +988,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
 /// second), a foundation's build time and record, a placed object's height test and a
 /// seer's line of sight; another master's objects and a master the player lacks keep theirs.
 #[test]
-fn an_object_s_copies_of_its_master_follow_its_change() {
+fn an_object_copies_of_its_master_follow_its_change() {
     use crate::objects::masters::attribute as a;
     let site = unit_of(1, master_id(4), HitPoints::new(30.0));
     let player = Player {
@@ -1114,7 +1114,7 @@ fn an_object_s_copies_of_its_master_follow_its_change() {
 
 /// A speed's change reaches what a unit of the master moves with (the game reads its master).
 #[test]
-fn a_speed_change_reaches_the_units_movement() {
+fn speed_change_reaches_the_units_movement() {
     let walker = unit_of(1, master_id(4), HitPoints::new(25.0));
     let mover = crate::gathering::hunt::tests::walker();
     let stats = mover.stats;
@@ -1197,7 +1197,7 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
 /// `(f / before)^exponent × amount + f − held` with `f = held + still to make`
 /// (`FUN_141615270`), the exponent attribute 31.
 #[test]
-fn a_farm_food_change_grows_the_farms_food() {
+fn farm_food_change_grows_the_farms_food() {
     let mut farm = unit_of(5, ids::FARM, HitPoints::new(480.0));
     farm.life.amount = Amount::new(75.0);
     let mut layer = crate::objects::layers::Action::default();
@@ -1371,7 +1371,7 @@ fn the_research_time_modifier_changes_the_adjustment_and_may_complete() {
 /// stone), 4 a location's building to a master the player has, 5 its button, 10 the research
 /// cap, 12 the state, −1 the research time (with the dependents' update).
 #[test]
-fn a_technology_change_reaches_its_costs_locations_and_state() {
+fn technology_change_reaches_its_costs_locations_and_state() {
     use crate::technology::Cost;
     let mut t = barracks_tech();
     t.techs[0].costs[0] = Cost {
@@ -1436,7 +1436,7 @@ fn a_technology_change_reaches_its_costs_locations_and_state() {
 /// makes it unavailable; 18 the effect override (a researched technology's new effect would
 /// run from the world's effect table, not modelled).
 #[test]
-fn a_technology_change_s_location_stacking_and_effect_override() {
+fn technology_change_location_stacking_and_effect_override() {
     use crate::technology::Location;
     let mut t = barracks_tech();
     t.players[0].techs[0].locations.push(Location {
@@ -1660,7 +1660,7 @@ fn the_enable_command_sets_available_unless_disabled() {
 /// A research whose effect reaches its building (the object `FUN_1413cdcd0` passes, which its
 /// callers do not yet) stops before it changes anything; one with an effect override too.
 #[test]
-fn a_research_whose_effect_needs_its_building_stops() {
+fn research_whose_effect_needs_its_building_stops() {
     use crate::technology::{TechDef, TechState};
     let state = TechState {
         state: ResearchState::Researching,
@@ -1768,7 +1768,7 @@ fn an_age_adds_its_event_to_the_history() {
 /// location (`FUN_1413cce70`'s call of `FUN_1413cdcd0`) is done at once, and so are those
 /// that depend on it in turn; one still missing a requirement stays unavailable.
 #[test]
-fn a_dependent_technology_done_already_completes_with_its_requirement() {
+fn dependent_technology_done_already_completes_with_its_requirement() {
     use crate::technology::{Location, TechDef, TechState};
     let def = |required: i16, count| TechDef {
         required: [TechId::of_data(required), None, None, None, None, None],
@@ -1807,7 +1807,7 @@ fn a_dependent_technology_done_already_completes_with_its_requirement() {
 /// its own of mode 0 does too under the full tech tree (`+0x63`), not one of mode 1; one for
 /// every civilisation (civ 0) is available either way.
 #[test]
-fn the_full_tech_tree_disables_a_civ_s_own_technologies_but_those_of_mode_1() {
+fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
     use crate::technology::{TechDef, TechState};
     let def = |required: i16, civ: i16, mode: i16| TechDef {
         required: [TechId::of_data(required), None, None, None, None, None],
@@ -1942,7 +1942,7 @@ fn the_technology_commands_disable_and_adjust_costs() {
 /// `FUN_1413cdb00` reads the id as a short (`MOVZX EDX, BX` in `FUN_14163a500`): 65538 is
 /// technology 2, 65535 is −1, every technology.
 #[test]
-fn the_disable_command_reads_its_id_s_low_16_bits() {
+fn the_disable_command_reads_its_id_low_16_bits() {
     use crate::technology::{TechDef, TechState};
     let state = |s: ResearchState| TechState {
         state: s,
@@ -1978,7 +1978,7 @@ fn the_disable_command_reads_its_id_s_low_16_bits() {
 /// `FUN_1413d10f0` converts with `CVTTSS2SI` and adds the low word: an amount of 2^31 or
 /// more adds 0 (0x80000000's low word), where a saturating cast would add −1.
 #[test]
-fn a_cost_change_past_the_i32_range_adds_nothing() {
+fn cost_change_past_the_i32_range_adds_nothing() {
     use crate::technology::{Cost, TechDef, TechState};
     let player = Player {
         techs: vec![TechState::default()],
@@ -2021,7 +2021,7 @@ fn a_cost_change_past_the_i32_range_adds_nothing() {
 /// A dead building's master technology goes back to 0 (`FUN_1413d4ec0`) when no other
 /// building of the master stands, and only from a state above 0.
 #[test]
-fn the_last_building_of_a_master_withdraws_its_technology() {
+fn the_last_building_of_master_withdraws_its_technology() {
     use crate::technology::{TechDef, TechState};
     let building = |id, state| {
         let mut u = Unit {
@@ -2070,7 +2070,7 @@ fn the_last_building_of_a_master_withdraws_its_technology() {
 /// idle variant is 1 keeps its sprite (it shows the second standing sprite, 72); one with
 /// actions leaves its sprite to them (an Explore's slot 0x50 does nothing).
 #[test]
-fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
+fn standing_sprite_change_shows_on_the_master_idle_units() {
     use crate::objects::sprite::{ActiveSprite, Graphic};
     let graphic = |id| Graphic {
         id,
@@ -2155,7 +2155,7 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
 /// new kind. A hero status (40) of a unit in a group is not modelled; one outside a group
 /// changes.
 #[test]
-fn a_height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
+fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     let mut house = unit_of(1, ids::HOUSE, HitPoints::new(550.0));
     house.place_for_test(Position::new(5.5, 5.5, 0.0));
     let mut soldier = unit_of(2, master_id(4), HitPoints::new(30.0));

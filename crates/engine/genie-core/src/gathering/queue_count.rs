@@ -74,7 +74,7 @@ mod tests {
 
     /// A count adds, subtracts and holds at least one from 1 on.
     #[test]
-    fn a_count_adds_subtracts_and_knows_when_it_holds_any() {
+    fn count_adds_subtracts_and_knows_when_it_holds_any() {
         let mut c = QueueCount::of_data(3);
         c += QueueCount::ONE;
         assert_eq!(c, QueueCount::of_data(4));

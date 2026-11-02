@@ -426,7 +426,7 @@ mod tests {
     /// A points entry from version 2.0 on carries a second attribute and its amount; an older
     /// one ends after the first amount. Each writes back the bytes it read.
     #[test]
-    fn a_points_entry_writes_back_the_bytes_of_its_version() {
+    fn points_entry_writes_back_the_bytes_of_its_version() {
         let mut bytes = vec![1u8, 2];
         for word in [3i32, 4, 5, 6] {
             bytes.extend(word.to_le_bytes());

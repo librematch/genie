@@ -47,7 +47,7 @@ mod tests {
 
     /// A saved byte is its type; the default is the phantom's 0.
     #[test]
-    fn a_saved_byte_is_its_type() {
+    fn saved_byte_is_its_type() {
         assert_eq!(PlayerType::from(3), PlayerType::COMPUTER);
         assert_eq!(PlayerType::GAIA.get(), 2);
         assert_eq!(PlayerType::default(), PlayerType::PHANTOM);

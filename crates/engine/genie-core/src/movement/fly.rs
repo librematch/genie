@@ -552,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn a_flight_whose_time_runs_out_chooses_the_next_at_once_without_a_rest() {
+    fn flight_whose_time_runs_out_chooses_the_next_at_once_without_rest() {
         // update 717: the timer of 0.016 runs out: set_state(2) drops the MoveTo (the bird
         // stops), the empty list's update is 1 and the task has no rest: set_state(3) draws the
         // next flight's time
@@ -583,7 +583,7 @@ mod tests {
     /// a class to keep away from, a distance factor (the animation speed) and only a carrying
     /// sprite are not modelled.
     #[test]
-    fn a_choice_without_a_distance_or_a_point_rests() {
+    fn choice_without_distance_or_point_rests() {
         let mover = &wings(1.32);
         let choose = |fly: &mut Fly, map: GridSize| {
             let mut r = Well512::default();
@@ -642,7 +642,7 @@ mod tests {
     /// or carrying sprite takes the master's walking one without a draw; only a carrying sprite
     /// is not modelled (the game's draw loops on).
     #[test]
-    fn a_flight_s_sprite_is_the_first_of_the_task_s_from_the_drawn_index_on() {
+    fn flight_sprite_is_the_first_of_the_task_from_the_drawn_index_on() {
         let graphics = hawk_graphics();
         let sprites = FlightSprites {
             walking: Some(SpriteId::named(846)),
@@ -680,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    fn a_choice_flies_speed_times_time_along_a_drawn_angle() {
+    fn choice_flies_speed_times_time_along_drawn_angle() {
         // update 718: 10 s left less dt, 1.32 a second: 13.17 tiles at the drawn angle, then
         // the sprite draw; the MoveTo starts at the bird's height
         let mut t = sky_world(hawk(FlyState::Choosing, 10.0), 1.32, 7);
@@ -711,7 +711,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_flight_posts_its_failure_and_ends() {
+    fn failed_flight_posts_its_failure_and_ends() {
         // records/425906646's update 2025: the hawk 30594's MoveTo failed (state 13) the update
         // before; its update returns 3, the flight ends as an arrived one does (no rest: the
         // next flight's choice, without the MoveTo)
@@ -734,7 +734,7 @@ mod tests {
     /// The motion step gives up in the update the flight's start runs (a bird without speed
     /// here): the bird's `MoveTo` fails there, as in its moving state; the next update posts it.
     #[test]
-    fn a_flight_the_motion_step_gives_up_at_its_start_fails() {
+    fn flight_the_motion_step_gives_up_at_its_start_fails() {
         let fly = hawk(
             FlyState::Flying {
                 move_to: Some(flight(MoveTo::Start, Position::new(60.5, 104.5, 9.0))),
@@ -754,7 +754,7 @@ mod tests {
     }
 
     #[test]
-    fn a_resting_bird_chooses_once_its_rest_ran_out() {
+    fn resting_bird_chooses_once_its_rest_ran_out() {
         let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
         let fly = flown(&mut t).unwrap();
         assert_eq!(
@@ -778,7 +778,7 @@ mod tests {
 
     /// A bird without movement state fails its update, whatever its state.
     #[test]
-    fn a_bird_without_movement_state_does_not_fly() {
+    fn bird_without_movement_state_does_not_fly() {
         let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
         let bird = &mut t.players[0].objects[ListIndex::new(0)];
         bird.place = crate::objects::layers::Static::at(AT);
@@ -791,7 +791,7 @@ mod tests {
     /// default task as it starts (slot 0x7f0): the Fly runs with that task; a master without a
     /// default task lacks it.
     #[test]
-    fn a_bird_s_default_fly_takes_its_master_s_default_task() {
+    fn bird_default_fly_takes_its_master_default_task() {
         let task = Task {
             action_type: FLY,
             wait_time: Seconds::new(3.0),
@@ -832,7 +832,7 @@ mod tests {
     }
 
     #[test]
-    fn a_leash_keeps_the_point_near_home() {
+    fn leash_keeps_the_point_near_home() {
         let fly = Fly {
             home: Point::new(10.0, 10.0),
             ..hawk(FlyState::Choosing, 1.0)

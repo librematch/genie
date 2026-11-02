@@ -645,7 +645,7 @@ mod tests {
     /// The guessed count: the place of the first id not above 0, plus one; 0 when every id is
     /// above 0.
     #[test]
-    fn an_old_scenario_s_count_is_guessed_from_its_ids() {
+    fn an_old_scenario_count_is_guessed_from_its_ids() {
         let bytes = words(&[[1; 20].as_slice(), &[0; 20]].concat());
         let mut nums = [9; 2];
         let mut lists = [vec![], vec![]];

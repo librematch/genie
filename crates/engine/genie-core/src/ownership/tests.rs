@@ -76,7 +76,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieErro
 /// `FUN_14108c050` without an Artifact: the action list goes (the `MoveTo`'s teardown stops the
 /// unit), then the unit AI of any class but livestock ends its order and forgets its target.
 #[test]
-fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
+fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     let (o, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
     assert_eq!(o.parts.actions.list.move_to().copied(), None);
     assert_eq!(released, []);
@@ -117,7 +117,7 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
 /// `MoveTo` (which stops the unit) and lets its target go; an animal walking without movement
 /// state is not modelled.
 #[test]
-fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
+fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     let artifact = || Artifact {
         move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
         goal: Some(Position::new(32.5, 89.5, 0.0)),

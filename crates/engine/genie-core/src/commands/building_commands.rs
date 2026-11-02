@@ -312,7 +312,7 @@ impl World {
         let Some(tech_id) = r.tech.filter(|t| t.index() < owner.techs.len()) else {
             return Ok(());
         };
-        if r.q_id.is_queued() {
+        if r.queue_id.is_queued() {
             return Ok(());
         }
         let tech = tech_id.index();

@@ -93,7 +93,7 @@ mod tests {
     /// The even directions are diagonal and need the two tiles beside them; each direction's
     /// tile is its place in the table.
     #[test]
-    fn a_diagonal_step_needs_the_tiles_beside_it() {
+    fn diagonal_step_needs_the_tiles_beside_it() {
         let n = Tile::new(5, 5);
         assert_eq!(
             StepDir(0).beside_diagonal(n),

@@ -29,7 +29,7 @@ use crate::world::WorldTime;
 /// Slot 0x280 (`FUN_141082d60`) passes only a target id above -1 the world holds: a
 /// recycled object's negative id gives -1 like none.
 #[test]
-fn a_top_target_below_minus_one_is_none() {
+fn top_target_below_minus_one_is_none() {
     use crate::objects::unit::Unit;
     use crate::world::Player;
     // the hunter 5's action layer, which the world's table holds
@@ -65,7 +65,7 @@ fn a_top_target_below_minus_one_is_none() {
 /// `FUN_14104c150` turns only when 1e-7 is below the yaw's size (an ordered compare): a NaN
 /// yaw leaves the vectors and the motion flags alone.
 #[test]
-fn a_nan_yaw_does_not_turn() {
+fn nan_yaw_does_not_turn() {
     let mut m = Motion::new();
     let before = m.clone();
     m.turn(Angle::new(f32::NAN));
@@ -98,7 +98,7 @@ fn level(level: u8, points: &[Point], waypoint: i32, state: PathState) -> PathDa
 /// `FUN_141046600` and `FUN_141046640`: a motion moves with any velocity, and waits to move
 /// while its walked level wants a path (state 1 or 2).
 #[test]
-fn a_motion_moves_with_a_velocity_and_waits_for_a_path() {
+fn motion_moves_with_velocity_and_waits_for_path() {
     let mut m = Motion::new();
     assert!(!m.moving() && !m.waits_to_move());
     m.velocity = BVector::new(0.0, 0.0, -0.5);
@@ -182,7 +182,7 @@ fn the_walked_levels_below_the_high_level_go() {
 
 /// `FUN_140f9b4d0`: a bit on or off the walked level; bit 2 also goes on for its parents.
 #[test]
-fn a_levels_flag_and_its_parents_bit_2() {
+fn levels_flag_and_its_parents_bit_2() {
     let mut paths = vec![
         level(0, &[], 0, PathState::Walking),
         level(1, &[], 0, PathState::Idle),
@@ -206,7 +206,7 @@ fn a_levels_flag_and_its_parents_bit_2() {
 
 /// `FUN_140f98e80`: the walked level and its parents go; the level keeps its repath time.
 #[test]
-fn a_reset_level_drops_its_parents_and_keeps_its_repath_time() {
+fn reset_level_drops_its_parents_and_keeps_its_repath_time() {
     let mut paths = vec![
         level(0, &[Point::new(1.0, 1.0)], 1, PathState::Walking),
         level(2, &[], 0, PathState::Idle),
@@ -225,7 +225,7 @@ fn a_reset_level_drops_its_parents_and_keeps_its_repath_time() {
 
 /// `FUN_140f98bc0`: a loop goes round; a path back and forth turns at its ends.
 #[test]
-fn a_looping_path_goes_round_or_back_and_forth() {
+fn looping_path_goes_round_or_back_and_forth() {
     let mut l = level(
         1,
         &[
@@ -272,7 +272,7 @@ fn a_looping_path_goes_round_or_back_and_forth() {
 
 /// `FUN_141046130`: short of the waypoint, on it, or past it (or a step under 0.1).
 #[test]
-fn a_step_falls_short_of_reaches_or_passes_its_waypoint() {
+fn step_falls_short_of_reaches_or_passes_its_waypoint() {
     let w = BVector::new(10.0, 0.0, 0.0);
     assert_eq!(
         passes_waypoint(w, BVector::ZERO, BVector::new(5.0, 0.0, 0.0)),
@@ -327,7 +327,7 @@ fn a_step_falls_short_of_reaches_or_passes_its_waypoint() {
 
 /// `FUN_1411570c0`'s ends held inside the map.
 #[test]
-fn a_querys_ends_stay_inside_the_map() {
+fn querys_ends_stay_inside_the_map() {
     assert_eq!(
         hold(BVector::new(-1.0, 5.0, 3.0), GridSize::new(10, 20)),
         Point::new(0.0, 3.0)
@@ -341,7 +341,7 @@ fn a_querys_ends_stay_inside_the_map() {
 /// `calculateYawAngle` with its clamp: a quarter turn to the left is negative, and limited
 /// by the yaw per second times dt; without the clamp (`param_5` 0) the whole angle.
 #[test]
-fn a_turn_is_limited_by_the_yaw_per_second() {
+fn turn_is_limited_by_the_yaw_per_second() {
     let mut m = Motion::new();
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     let free = m.calculate_yaw_angle(x, z, Seconds::new(0.1), true);
@@ -365,7 +365,7 @@ fn a_turn_is_limited_by_the_yaw_per_second() {
 /// angle stays NaN (an ordered `<=` would take the limit both times); a NaN cross product
 /// keeps the sign (`COMISS`/`JBE`).
 #[test]
-fn the_yaw_clamp_keeps_the_angle_for_a_nan_operand() {
+fn the_yaw_clamp_keeps_the_angle_for_nan_operand() {
     let mut m = Motion::new();
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     m.maximum_yaw_per_second_moving = TurnRate::new(f32::NAN);
@@ -461,7 +461,7 @@ fn lead() -> Lead {
 
 /// A walked level heads for its waypoint: the group turns to it and takes its top speed.
 #[test]
-fn a_walked_level_turns_the_group_toward_its_waypoint() {
+fn walked_level_turns_the_group_toward_its_waypoint() {
     let mut fx = Fixture::new();
     let mut m = Motion::new();
     m.position[0] = BVector::new(5.0, 0.0, 5.0);
@@ -504,7 +504,7 @@ fn the_last_waypoint_of_the_top_level_ends_the_walk() {
 /// An arrived walked level linked as found hands over to its parent, whose waypoint then
 /// counts as reached; a pause makes the group stand until it ran out.
 #[test]
-fn an_arrived_level_hands_over_and_a_pause_waits() {
+fn an_arrived_level_hands_over_and_pause_waits() {
     let mut fx = Fixture::new();
     let mut m = Motion::new();
     m.position[0] = BVector::new(5.0, 0.0, 9.0);
@@ -615,7 +615,7 @@ fn grouped(flags: u32) -> Lead {
 /// loop, of a group that does not patrol, spends a plan and gives up with the last; a patrol's
 /// level, or a lone lead's, keeps its plans.
 #[test]
-fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
+fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     use crate::pathing::PlanBudget;
     let mut fx = Fixture::new();
     let budget = |plans| PlanBudget {
@@ -668,7 +668,7 @@ fn a_request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
 /// it becomes level 1 in state 2 under the top (state 0, its plans back to 10), linked as
 /// found, and the next pass makes its stretches.
 #[test]
-fn a_top_level_without_a_planner_plans_the_straight_way() {
+fn top_level_without_planner_plans_the_straight_way() {
     let mut fx = Fixture::new();
     let mut m = requesting(2, 30.0);
     m.paths[0].continue_counter = crate::movement::PlanTries::of_data(4);
@@ -706,7 +706,7 @@ fn a_top_level_without_a_planner_plans_the_straight_way() {
 /// level resets in state 6, the group stands); a group within reach of its target arrived
 /// (state 4), the reach [`NEAR`] for a level without a range.
 #[test]
-fn a_near_waypoint_without_a_way_is_reached_or_arrived_at() {
+fn near_waypoint_without_way_is_reached_or_arrived_at() {
     let mut fx = Fixture::new();
     let lead = Lead {
         solid: false,
@@ -757,7 +757,7 @@ fn a_near_waypoint_without_a_way_is_reached_or_arrived_at() {
 /// A far waypoint whose target is near takes the straight way when nothing stands on it: a
 /// walked level 0 (state 3), linked as found, steers at once (no pass ends the request).
 #[test]
-fn a_near_target_takes_the_straight_way() {
+fn near_target_takes_the_straight_way() {
     let mut fx = open_fixture();
     let mut m = requesting(0, 30.0);
     let placed = target_at(30.0);
@@ -795,7 +795,7 @@ fn open_fixture() -> Fixture {
 /// A near waypoint takes the short pather's path (a lead wider than half a tile: the old
 /// pather): a walked level 0 linked as found, which steers at once.
 #[test]
-fn a_near_waypoint_takes_the_short_pather_s_path() {
+fn near_waypoint_takes_the_short_pather_path() {
     let mut fx = open_fixture();
     let mut m = requesting(0, 9.0);
     let mut lead = lead();
@@ -817,7 +817,7 @@ fn a_near_waypoint_takes_the_short_pather_s_path() {
 /// A far waypoint without a near target takes the long pather's path through the tiles'
 /// centres: a walked level 0 linked as found.
 #[test]
-fn a_far_waypoint_takes_the_long_pather_s_path() {
+fn far_waypoint_takes_the_long_pather_path() {
     let mut fx = open_fixture();
     let mut m = requesting(0, 30.0);
     assert!(
@@ -842,7 +842,7 @@ fn a_far_waypoint_takes_the_long_pather_s_path() {
 /// pauses a moment. A found path of fewer than two points arrived (the level resets), or counts
 /// the waypoint reached on a looping path.
 #[test]
-fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
+fn request_without_path_pauses_waits_gives_up_or_counts_its_waypoint() {
     use super::request::link;
     use crate::pathing::tile_path::Path;
     let at = |n: u8, waypoints: &[Point], counter| {
@@ -924,7 +924,7 @@ fn a_request_without_a_path_pauses_waits_gives_up_or_counts_its_waypoint() {
 /// bits 0 and 1 clear; with waypoints left a level above 0 asks for the next stretch (state 2),
 /// level 0 walks on; a looping path takes its next waypoint and asks again.
 #[test]
-fn a_reached_waypoint_moves_the_level_on() {
+fn reached_waypoint_moves_the_level_on() {
     use step::reached;
     let three = [
         Point::new(5.0, 5.0),
@@ -968,7 +968,7 @@ fn a_reached_waypoint_moves_the_level_on() {
 /// level 0's, or at least [`CLOSE`]; else it arrived (state 4). With a target the gap to its
 /// footprint counts; a level that reached its target with bit 2 arrived, the bit cleared.
 #[test]
-fn past_its_last_waypoint_a_level_steps_back_or_arrived() {
+fn past_its_last_waypoint_level_steps_back_or_arrived() {
     use step::reached;
     let two = [Point::new(5.0, 5.0), Point::new(5.0, 9.0)];
     let state = |n: u8, at: Point, target: Option<&Placed>, flags: u32| {
@@ -1201,7 +1201,7 @@ fn what_stands_in_the_way_stops_the_walk() {
 /// point arrived (the level resets); one whose gap to its target is the range counts the
 /// waypoint reached.
 #[test]
-fn a_walk_in_range_of_its_end_stops() {
+fn walk_in_range_of_its_end_stops() {
     let mut fx = open_fixture();
     let mut m = requesting(0, 9.0);
     m.paths[0].state = PathState::Walking;
@@ -1231,7 +1231,7 @@ fn a_walk_in_range_of_its_end_stops() {
 /// away its new place takes a share of the centre (on the ground); a member without a target
 /// pulls nothing.
 #[test]
-fn the_members_centre_pulls_a_group_whose_members_all_act() {
+fn the_members_centre_pulls_group_whose_members_all_act() {
     let mut fx = open_fixture();
     let walk = |fx: &mut Fixture, members: Vec<Option<(Option<ObjectId>, BVector)>>| {
         let mut m = requesting(0, 9.0);

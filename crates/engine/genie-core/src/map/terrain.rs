@@ -311,18 +311,18 @@ impl Terrain {
                     shapes.push(0);
                     continue;
                 };
-                let (w_last, h_last) = (self.size.width() - 1, self.size.height() - 1);
+                let (last_column, last_row) = (self.size.width() - 1, self.size.height() - 1);
                 // FUN_140f69470's reads: a neighbour past the map's edge is the tile itself
                 let n = if 0 < y { at(x, y - 1, e) } else { e };
-                let east = if x < w_last { at(x + 1, y, e) } else { e };
+                let east = if x < last_column { at(x + 1, y, e) } else { e };
                 let west = if 0 < x { at(x - 1, y, e) } else { e };
-                let s = if y < h_last { at(x, y + 1, e) } else { e };
-                let ne = if 0 < y && x < w_last {
+                let s = if y < last_row { at(x, y + 1, e) } else { e };
+                let ne = if 0 < y && x < last_column {
                     at(x + 1, y - 1, e)
                 } else {
                     e
                 };
-                let sw = if 0 < x && y < h_last {
+                let sw = if 0 < x && y < last_row {
                     at(x - 1, y + 1, e)
                 } else {
                     e
@@ -332,7 +332,7 @@ impl Terrain {
                 } else {
                     e
                 };
-                let se = if y < h_last && x < w_last {
+                let se = if y < last_row && x < last_column {
                     at(x + 1, y + 1, e)
                 } else {
                     e
@@ -628,7 +628,7 @@ mod tests {
     /// else its terrain; 0 counts as 1, a tile off the map has 1, and a restriction or terrain
     /// the data lacks has none.
     #[test]
-    fn a_tile_s_defense_is_its_restriction_s_value_for_its_terrain() {
+    fn tile_defense_is_its_restriction_value_for_its_terrain() {
         let mut t = map(vec![0, 1, 2, 3], vec![0; 4]);
         let mut values = vec![0.0; 40];
         values[1] = 1.25;
@@ -661,7 +661,7 @@ mod tests {
     /// `FUN_1411a8ba0`'s terrain at a point: x or y exactly −1 reads none, a NaN reads tile 0
     /// (`CVTTSS2SI` gives `0x80000000`, whose low 16 bits are 0), a tile off the map none.
     #[test]
-    fn the_task_search_reads_the_terrain_at_a_point_on_the_map() {
+    fn the_task_search_reads_the_terrain_at_point_on_the_map() {
         let t = map(vec![0, 1, 2, 3], vec![0; 4]);
         assert_eq!(
             t.at_task_point(Point::new(1.5, 1.25)),
@@ -692,7 +692,7 @@ mod tests {
     }
 
     #[test]
-    fn the_ground_is_the_tile_s_elevation_plus_its_slope_s_share() {
+    fn the_ground_is_the_tile_elevation_plus_its_slope_share() {
         // two columns, four rows: (0, 3) is one up, so (0, 2) slopes up to the south (shape 7)
         // and (1, 2) up to the south-west corner (9); (1, 3) slopes up to the west (5)
         let mut t = map(vec![0; 8], vec![-1; 8]);
@@ -708,7 +708,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tile_s_flags_are_its_seen_terrain_s() {
+    fn tile_flags_are_its_seen_terrain_s() {
         // water 1 at (0, 0), a beach 2 at (1, 0), a hidden 3 and 45, beyond the records, at
         // (0, 1) and (1, 1): both read as terrain 0, shallows
         let mut t = map(vec![1, 2, 3, 45], vec![-1; 4]);
@@ -744,7 +744,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tile_s_shape_follows_its_sides_then_its_corners_one_step_up() {
+    fn tile_shape_follows_its_sides_then_its_corners_one_step_up() {
         let flat = [1; 4];
         assert_eq!(tile_shape(1, flat, flat), 0);
         assert_eq!(tile_shape(1, [2, 2, 1, 1], flat), 14);
@@ -757,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn a_slope_s_share_is_how_far_up_the_tile_the_point_lies() {
+    fn slope_share_is_how_far_up_the_tile_the_point_lies() {
         assert_eq!(slope_share(5, 0.25, 0.5), 0.75);
         assert_eq!(slope_share(6, 0.25, 0.5), 0.5);
         assert_eq!(slope_share(9, 0.25, 0.5), 0.25);
@@ -802,7 +802,7 @@ mod tests {
     /// MarvinBlue/426048731's house 10026 at (104, 38): its tiles 103..104 x 37..38 were snow (32)
     /// and grass 9 with a snow layer; the save after 1115 holds terrain 6 with layer 32 on each.
     #[test]
-    fn a_house_completed_on_snow_leaves_terrain_6_under_a_snow_layer() {
+    fn house_completed_on_snow_leaves_terrain_6_under_snow_layer() {
         let mut t = map(vec![32, 32, 32, 9], vec![-1, -1, -1, 32]);
         assert!(t.snow_under(Tile::new(0, 0)).unwrap());
         assert!(t.snow_under(Tile::new(1, 1)).unwrap());
@@ -827,7 +827,7 @@ mod tests {
     /// first two columns of the clamped rectangle's third and fourth rows, which keep their
     /// terrain (and still keep it to restore).
     #[test]
-    fn the_town_centre_s_foundation_leaves_its_gap() {
+    fn the_town_centre_foundation_leaves_its_gap() {
         let mut t = map(vec![0; 2 * 4], vec![-1; 2 * 4]);
         t.size = GridSize::new(4, 4);
         t.kinds = ids(&[0; 16]);
@@ -859,7 +859,7 @@ mod tests {
     }
 
     #[test]
-    fn foundation_27_covers_grass_but_not_a_terrain_outside_its_list() {
+    fn foundation_27_covers_grass_but_not_terrain_outside_its_list() {
         let mut t = map(vec![0, 2, 9, 47], vec![-1, -1, -1, -1]);
         assert!(!t.snow_under(Tile::new(0, 0)).unwrap());
         t.cover(&Foundation {
@@ -880,7 +880,7 @@ mod tests {
     /// terrain but 47 and 69, into the terrain even where setting `+0x680` at 1 would put another
     /// foundation into the layer (records/425906646's farm 31311 from update 8654).
     #[test]
-    fn a_farm_s_foundation_lays_its_terrain_into_the_terrain() {
+    fn farm_foundation_lays_its_terrain_into_the_terrain() {
         let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
         let farm = Foundation {
             position: Position::new(1.0, 1.0, 0.0),

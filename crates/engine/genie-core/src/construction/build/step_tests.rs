@@ -370,7 +370,7 @@ fn remove_house(t: &mut World) {
 /// two builders; the prelude of the `set_state(4)` of slot 0x48 on the annex again
 /// (`FUN_140ab1b30`, [`BuildAction::retake`]) lowers the main building's count.
 #[test]
-fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
+fn builder_on_an_annex_counts_among_its_main_building_builders() {
     const ANNEX: ObjectId = object_id(10029);
     let b = BuildAction {
         state: BuildState::Wait,
@@ -443,7 +443,7 @@ fn a_builder_on_an_annex_counts_among_its_main_building_s_builders() {
 /// (`set_state(224)`) drops it there (`FUN_140aadc50`: the player gains it, the builder carries
 /// nothing); food kinds become food; at a house it keeps its load, as one carrying nothing.
 #[test]
-fn a_builder_drops_its_load_at_a_drop_site_it_completes() {
+fn builder_drops_its_load_at_drop_site_it_completes() {
     let finish = |held: Held, site: MasterId| {
         let b = BuildAction {
             state: BuildState::Place,
@@ -492,7 +492,7 @@ fn a_builder_drops_its_load_at_a_drop_site_it_completes() {
 /// the old `MoveTo` stops the unit, a quiet `MoveTo` to the point starts in state 3, with the
 /// task's moving sprite: none).
 #[test]
-fn a_builder_whose_foundation_dies_walks_to_its_point() {
+fn builder_whose_foundation_dies_walks_to_its_point() {
     // a drop's sprite, which the walk to the point drops for the task's moving one (none)
     let b = BuildAction {
         state: BuildState::Move {
@@ -537,7 +537,7 @@ fn a_builder_whose_foundation_dies_walks_to_its_point() {
 /// failed, or without a `MoveTo` the Build waits (`set_state(3)`: notify 0x202 and the
 /// standing sprite without queued orders).
 #[test]
-fn a_builder_without_its_foundation_walks_on_then_waits() {
+fn builder_without_its_foundation_walks_on_then_waits() {
     let gone = BuildAction {
         target: None,
         state: BuildState::Move {
@@ -588,7 +588,7 @@ fn a_builder_without_its_foundation_walks_on_then_waits() {
 /// tiles off, plans its path there). A foundation the `MoveTo` takes (state 0) stays its
 /// target.
 #[test]
-fn a_waiting_builder_whose_foundation_dies_walks_to_its_place() {
+fn waiting_builder_whose_foundation_dies_walks_to_its_place() {
     let b = BuildAction {
         state: BuildState::Wait,
         timer: Seconds::new(0.916),
@@ -638,7 +638,7 @@ fn a_waiting_builder_whose_foundation_dies_walks_to_its_place() {
 /// footprint, works on it (state 6) and walks off it in update 681 (state 223) to the free tile
 /// the game picks, (29.5, 89.5), with the task's moving sprite (`FUN_140aa0d30`).
 #[test]
-fn a_builder_on_its_footprint_faces_it_then_walks_to_a_free_tile_beside_it() {
+fn builder_on_its_footprint_faces_it_then_walks_to_free_tile_beside_it() {
     let b = BuildAction {
         target: Some(HOUSE),
         state: BuildState::Work,
@@ -724,7 +724,7 @@ fn walking(state: Option<MoveTo>) -> BuildAction {
 /// The waiting `MoveTo` (state 2): the world's dt goes onto its timer; at its delay it asks
 /// again (`set_state(3)`), and that start marks the wait asked (`+0x6c` 2).
 #[test]
-fn a_build_s_waiting_move_to_asks_again_at_its_delay() {
+fn build_waiting_move_to_asks_again_at_its_delay() {
     let b = BuildAction {
         state: BuildState::Move {
             move_to: Some(MoveToAction {
@@ -766,7 +766,7 @@ fn a_build_s_waiting_move_to_asks_again_at_its_delay() {
 /// walks to it again (`set_state(4)`), one within it works; without a sub-action the list's
 /// update returns 1 as well.
 #[test]
-fn a_builder_at_its_move_to_s_end_works_or_walks_again() {
+fn builder_at_its_move_to_end_works_or_walks_again() {
     let after = |class, at, move_to| {
         let mut t = site_world(class, at, walking(move_to));
         let _ = code(&mut t, 250);
@@ -795,7 +795,7 @@ fn a_builder_at_its_move_to_s_end_works_or_walks_again() {
 /// planner that finds the way from where the builder last moved to the foundation
 /// (`FUN_140f7c530` below 2) it walks again (`set_state(4)`).
 #[test]
-fn a_builder_whose_move_to_failed_waits_or_halts_on_marks() {
+fn builder_whose_move_to_failed_waits_or_halts_on_marks() {
     let failed = |prepare: fn(&mut World)| {
         let mut t = site_world(
             class::VILLAGER,
@@ -852,7 +852,7 @@ fn a_builder_whose_move_to_failed_waits_or_halts_on_marks() {
 /// `0x140aa29e0`, slot 0x68), before the motion step: the task's moving sprite, else
 /// `FUN_140aa0df0`'s default, the master's walking sprite.
 #[test]
-fn a_build_s_move_to_shows_its_sprite_as_it_starts() {
+fn build_move_to_shows_its_sprite_as_it_starts() {
     for (task, shown) in [(TASK, WALKING), (MOVING_TASK, TASK_SPRITE)] {
         let mut t = site_world(
             class::VILLAGER,
@@ -874,7 +874,7 @@ fn a_build_s_move_to_shows_its_sprite_as_it_starts() {
 /// that ended goes back to the foundation (`set_state(4)`); the walk to the action's point that
 /// ended or failed waits (`set_state(3)`); a state without a case does nothing.
 #[test]
-fn a_build_s_other_cases_end_walk_to_a_point_go_back_or_wait() {
+fn build_other_cases_end_walk_to_point_go_back_or_wait() {
     let at = Position::new(2.5, 2.5, 0.0);
     let start = || started(HOUSE, AT_HOUSE, Distance::new(5.0), TASK);
     let done = BuildAction {
@@ -1008,7 +1008,7 @@ fn placing() -> BuildAction {
 /// (`+0x686` set); the occupants' test passes over it (state 7) and the tiles hold no other
 /// player's mark: the builder joins the work.
 #[test]
-fn a_builder_s_set_state_7_clears_a_stump_and_joins() {
+fn builder_set_state_7_clears_stump_and_joins() {
     let mut t = site_world(class::VILLAGER, Position::new(12.5, 10.5, 0.0), placing());
     stump(&mut t);
     sighted(&mut t);
@@ -1035,7 +1035,7 @@ fn a_builder_s_set_state_7_clears_a_stump_and_joins() {
 /// stays, and `set_state(2)` halts the Build: the standing sprite, the foundation let go, no
 /// point.
 #[test]
-fn another_player_s_marks_on_the_footprint_halt_the_build() {
+fn another_player_marks_on_the_footprint_halt_the_build() {
     for (computer, kept) in [
         (false, ObjectState::Removed),
         (true, ObjectState::Foundation),
@@ -1064,7 +1064,7 @@ fn another_player_s_marks_on_the_footprint_halt_the_build() {
 /// after 21 waits the builder gives up (the interface's event 0x88, not held): `set_state(2)`
 /// halts the Build and its waits (`+0x889`) start again; before, it waits a second more.
 #[test]
-fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
+fn builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
     for (waits, state, after) in [
         (
             crate::construction::FootprintWaits::MOST.get(),
@@ -1121,7 +1121,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
 /// the stack unit made (notify 0x21d), leaves the builders, lets the foundation go, gives its
 /// load of berries to its player as food and ends (`set_state(1)`, returns 1).
 #[test]
-fn a_human_builder_of_a_built_pasture_hands_it_over() {
+fn human_builder_of_built_pasture_hands_it_over() {
     let b = BuildAction {
         state: BuildState::Work,
         added: true,
@@ -1166,7 +1166,7 @@ fn a_human_builder_of_a_built_pasture_hands_it_over() {
 /// the unit stands, a target goes) and returns 3, which removes it. In state 3 with a target
 /// the update does nothing (the default case).
 #[test]
-fn a_halted_build_fails_and_its_failure_removes_it() {
+fn halted_build_fails_and_its_failure_removes_it() {
     let failed = (NotifyKind::ACTION_FAILED, [ActionKind::Build.value(), 0, 0]);
     let halted = BuildAction {
         state: BuildState::Halted,
@@ -1216,7 +1216,7 @@ fn a_halted_build_fails_and_its_failure_removes_it() {
 /// then looks for more work around it in the same update (`FUN_1415cc4e0`), finds none here,
 /// lets it go and waits.
 #[test]
-fn a_builder_lets_a_dead_foundation_go() {
+fn builder_lets_dead_foundation_go() {
     let run = |master: MasterId, state: ObjectState, progress: f32| {
         let b = BuildAction {
             state: BuildState::Place,
@@ -1262,7 +1262,7 @@ fn a_builder_lets_a_dead_foundation_go() {
 /// The end of the work (case 0xdf): a villager works the farm it built (class 49), its unit AI
 /// dropping its build orders: slot 0x7e8 on the farm at its place, within the update.
 #[test]
-fn a_villager_works_the_farm_it_built() {
+fn villager_works_the_farm_it_built() {
     let b = BuildAction {
         state: BuildState::Finished,
         ..started(HOUSE, AT_HOUSE, Distance::ZERO, TASK)
@@ -1291,7 +1291,7 @@ fn a_villager_works_the_farm_it_built() {
 /// (`0x140ab0370`'s prelude) lets it go (slot 0x68 with none), then `set_state(3)`: its
 /// `MoveTo` goes, and without orders it tells its unit AI (0x202).
 #[test]
-fn a_builder_at_the_foundation_works_in_its_first_update_the_others_walk_to_it() {
+fn builder_at_the_foundation_works_in_its_first_update_the_others_walk_to_it() {
     let near = started(HOUSE, Position::ORIGIN, Distance::ZERO, TASK);
     let far = started(HOUSE, Position::ORIGIN, Distance::new(0.8), TASK);
     let state = |b: BuildAction| (b.state.bare(), b.state.move_to().copied().map(|m| m.state));
@@ -1363,7 +1363,7 @@ fn with_mill(t: &mut World) {
 /// nothing does without a search. Without a foundation that `MoveTo` has no target and walks to
 /// its zeroed point.
 #[test]
-fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
+fn builder_drop_off_walks_to_the_drop_site_its_search_found() {
     let b = BuildAction {
         state: BuildState::Work,
         added: true,
@@ -1522,7 +1522,7 @@ fn wood(t: &World) -> (f32, f32, i32) {
 /// waits 3 seconds with its animation stopped, then searches again; a drop site that does not
 /// take the load halts the Build.
 #[test]
-fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
+fn builder_at_its_drop_site_gives_its_load_and_walks_back() {
     let mut t = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(MoveTo::Arrived));
     own(&mut t, object_id(300)).workers = crate::objects::WorkerCount::of_data(1);
     let _ = code(&mut t, 250);
@@ -1585,7 +1585,7 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
 /// (`set_state(8)`); without a drop site of the table for the load the search tells the unit
 /// AI (notify 0x203) and walks back to the foundation.
 #[test]
-fn a_builder_s_drop_off_without_its_drop_site_searches_again() {
+fn builder_drop_off_without_its_drop_site_searches_again() {
     let searched = |prepare: fn(&mut World), move_to| {
         let mut t = drop_world(Position::new(14.0, 10.5, 0.0), at_the_mill(move_to));
         prepare(&mut t);
@@ -1618,7 +1618,7 @@ fn a_builder_s_drop_off_without_its_drop_site_searches_again() {
 /// (a human's, `set_state(2)`: the drop site goes); with a point it walks there
 /// (`set_state(11)`).
 #[test]
-fn a_builder_without_a_foundation_after_its_drop_off() {
+fn builder_without_foundation_after_its_drop_off() {
     let lone = |point| BuildAction {
         target: None,
         point,
@@ -1693,7 +1693,7 @@ fn a_builder_without_a_foundation_after_its_drop_off() {
 /// searches again, and the table's search passes over the mill past state 6: notify 0x203 and
 /// the walk back to the foundation.
 #[test]
-fn a_drop_off_whose_site_went_past_state_6_searches_again() {
+fn drop_off_whose_site_went_past_state_6_searches_again() {
     let mut t = drop_world(Position::new(2.5, 2.5, 0.0), at_the_mill(MoveTo::Moving));
     own(&mut t, object_id(300)).life.state = ObjectState::Removed;
     let _ = code(&mut t, 250);
@@ -1777,7 +1777,7 @@ fn sent_off(t: &World) -> usize {
 /// halts the Build (the interface's event 0x88, not held): the standing sprite, the foundation
 /// let go, no point.
 #[test]
-fn a_foundation_a_building_overlaps_halts_the_build() {
+fn foundation_building_overlaps_halts_the_build() {
     let mut t = site_world(class::VILLAGER, Position::new(12.8, 10.5, 0.0), placing());
     sighted(&mut t);
     camp(&mut t, Position::new(11.6, 10.5, 0.0));
@@ -1795,7 +1795,7 @@ fn a_foundation_a_building_overlaps_halts_the_build() {
 /// `LAB_140aaf5d4`) though no unit stands on the foundation; an annex a building overlaps
 /// halts the Build and sends no unit off.
 #[test]
-fn an_annex_s_test_sends_its_units_off_or_halts_the_build() {
+fn an_annex_test_sends_its_units_off_or_halts_the_build() {
     for blocked in [false, true] {
         let mut t = site_world(class::VILLAGER, Position::new(15.2, 10.5, 0.0), placing());
         sighted(&mut t);
@@ -1829,7 +1829,7 @@ fn an_annex_s_test_sends_its_units_off_or_halts_the_build() {
 /// (`set_state(223)` with the annex as the target) when units stand on the foundation; the
 /// foundation is its target again.
 #[test]
-fn a_builder_on_an_annex_walks_off_it() {
+fn builder_on_an_annex_walks_off_it() {
     let mut t = site_world(class::VILLAGER, Position::new(12.4, 10.5, 0.0), placing());
     t.spatial = Spatial::with_tiles(
         GridSize::new(20, 20),

@@ -7,7 +7,7 @@ use crate::player::reader::{
 use crate::test_support::{Bytes, consumed, header_reader, skipped_length};
 
 #[test]
-fn a_check_byte_is_read_from_10_55_on() {
+fn check_byte_is_read_from_10_55_on() {
     let mut old = header_reader(&[22], 10.54);
     expect_marker(&mut old, 11).unwrap();
     assert!(!consumed(&mut old));
@@ -18,13 +18,13 @@ fn a_check_byte_is_read_from_10_55_on() {
 
 #[test]
 #[should_panic(expected = "assertion `left == right` failed")]
-fn a_wrong_check_byte_panics() {
+fn wrong_check_byte_panics() {
     let _ = expect_marker(&mut header_reader(&[33], 10.55), 11);
 }
 
 /// The kind, one relation per player, nine diplomacy words, the allied flags and the name.
 #[test]
-fn a_player_starts_with_its_relations_and_name() {
+fn player_starts_with_its_relations_and_name() {
     let bytes = Bytes::default()
         .u8(2)
         .raw(&[0, 1, 4])
@@ -85,7 +85,7 @@ fn the_saved_views_come_from_11_62() {
 }
 
 #[test]
-fn a_player_reads_its_civilization_and_status() {
+fn player_reads_its_civilization_and_status() {
     let bytes = Bytes::default()
         .u16(40)
         .u16(41)
@@ -107,7 +107,7 @@ fn a_player_reads_its_civilization_and_status() {
 }
 
 #[test]
-fn a_selection_reads_its_object_and_ids() {
+fn selection_reads_its_object_and_ids() {
     let none = read_selection(&mut header_reader(&[0; 4], 11.72)).unwrap();
     assert!(none.is_none());
     let bytes = Bytes::default().words(&[2, 700, 9, 701, 702]).0;
@@ -122,7 +122,7 @@ fn a_selection_reads_its_object_and_ids() {
 }
 
 #[test]
-fn a_unit_list_ends_at_class_0() {
+fn unit_list_ends_at_class_0() {
     let bytes = Bytes::default().words(&[0, 0]).u8(0).0;
     let mut reader = header_reader(&bytes, 11.0);
     assert!(read_unit_list(&mut reader).unwrap().is_empty());
@@ -144,7 +144,7 @@ fn unavailable_unit_types_are_none() {
 /// A computer player (kind 3) has a flag for its AI; a human has none, and only Gaia
 /// (kind 2) has Gaia's data. Before 9.38 there is no tech tree.
 #[test]
-fn only_a_computer_player_has_an_ai_flag() {
+fn only_computer_player_has_an_ai_flag() {
     let mut human = Player::default();
     let mut reader = header_reader(&[], 9.0);
     human.read_tech_tree_ai_and_gaia(&mut reader).unwrap();

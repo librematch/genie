@@ -601,14 +601,14 @@ mod tests {
     use crate::test_ids::object_id;
 
     #[test]
-    fn a_check_finds_no_owner_and_waits_one_second() {
+    fn check_finds_no_owner_and_waits_one_second() {
         let mut a = Artifact::new(false, None);
         let _ = a.step(Millis::new(50), None).unwrap();
         assert_eq!((a.state, a.timer), (ArtifactState::Wait, Seconds::new(1.0)));
     }
 
     #[test]
-    fn a_move_s_point_starts_a_moveto_and_the_check_runs_again() {
+    fn move_point_starts_moveto_and_the_check_runs_again() {
         // MarvinBlue/426048731's cow 9517 in 1118: MOVE to (28.5, 93.5); slot 8 takes the point
         let mut a = Artifact {
             state: ArtifactState::Wait,
@@ -666,7 +666,7 @@ mod tests {
     /// the unit (429750109's livestock 11962 walking into the transport 11970, then MOVE to
     /// (32.854168, 120.729164) in update 44: the new `MoveTo` alone holds it).
     #[test]
-    fn a_move_deletes_the_held_enter_letting_its_transport_go() {
+    fn move_deletes_the_held_enter_letting_its_transport_go() {
         let walking_enter = || {
             crate::garrison::EnterAction::new(
                 ContainerId::new(object_id(11970)),
@@ -823,7 +823,7 @@ mod tests {
     }
 
     #[test]
-    fn gaia_waits_half_a_second() {
+    fn gaia_waits_half_second() {
         let mut a = Artifact::new(true, None);
         let _ = a.step(Millis::new(50), None).unwrap();
         assert_eq!(a.timer, Seconds::new(0.5));
@@ -845,7 +845,7 @@ mod tests {
     }
 
     #[test]
-    fn a_check_that_finds_a_new_owner_hands_the_animal_over_and_stays_a_check() {
+    fn check_that_finds_new_owner_hands_the_animal_over_and_stays_check() {
         let mut a = Artifact::new(true, None);
         let found = a.step(Millis::new(50), Some(PlayerId::new(2))).unwrap();
         assert_eq!(
@@ -907,7 +907,7 @@ mod tests {
     /// stopped by the caller) and keeps its point and target, which the conversion's stop then
     /// leaves (no sub-action).
     #[test]
-    fn a_walking_animal_taken_over_keeps_its_point_and_target() {
+    fn walking_animal_taken_over_keeps_its_point_and_target() {
         let mut a = Artifact::new(true, None);
         a.goal = Some(Position::new(5.0, 6.0, 0.0));
         a.target = Some(object_id(9149));
@@ -954,7 +954,7 @@ mod tests {
     /// (slot 0x68 twice); the same object is let go and taken again; a dead one is not taken.
     /// The teardown lets the target go and stops a walk.
     #[test]
-    fn a_move_to_an_object_lets_the_old_target_go_and_takes_the_new() {
+    fn move_to_an_object_lets_the_old_target_go_and_takes_the_new() {
         let mut a = Artifact::new(false, None);
         let (t, gone) = a
             .take_object(
@@ -1035,7 +1035,7 @@ mod tests {
     /// state, and the next update ends it with its failure: the unit stops and its AI hears it
     /// (0x1f9 with the move action value).
     #[test]
-    fn a_walk_the_motion_step_gives_up_at_its_start_fails() {
+    fn walk_the_motion_step_gives_up_at_its_start_fails() {
         let mut a = Artifact::new(false, None);
         let _ = a
             .take_point(Position::new(35.5, 88.5, 0.0), &move_reads(&sprites()))
@@ -1148,7 +1148,7 @@ mod tests {
     /// The sprite its `MoveTo` shows: the task's moving sprite, else the default of its
     /// constructor, toward an object (`FUN_140aa0df0`) or the point (`FUN_140aa0d30`).
     #[test]
-    fn an_artifact_s_move_to_shows_its_task_s_moving_sprite_else_its_default() {
+    fn an_artifact_move_to_shows_its_task_moving_sprite_else_its_default() {
         let graphics = [3, 20, 21]
             .map(|id| (SpriteId::named(id), graphic(id)))
             .into();
@@ -1204,7 +1204,7 @@ mod tests {
     /// A move to a town centre's object by livestock (`FUN_140aa0df0` with master 109) walks to
     /// the point 0.2 below the centre's on both axes, without the target.
     #[test]
-    fn livestock_moved_to_a_town_centre_walks_to_the_point_below_it() {
+    fn livestock_moved_to_town_centre_walks_to_the_point_below_it() {
         let mut a = Artifact::new(false, None);
         let _ = a
             .take_object(
@@ -1230,7 +1230,7 @@ mod tests {
     /// step, here one that gives up (a unit without speed); the units in the way of its walk go
     /// to the unit AI at once, starting or walking on.
     #[test]
-    fn an_artifact_s_walk_shows_its_sprite_as_it_starts() {
+    fn an_artifact_walk_shows_its_sprite_as_it_starts() {
         let mut a = Artifact::new(false, Some(SpriteId::named(3)));
         let graphics = Graphics::from([(SpriteId::named(3), graphic(3))]);
         let with_3 = SpriteReads {
@@ -1375,7 +1375,7 @@ mod tests {
     /// that finds one drops the sub-actions, whose effects follow at once ([`let_go_gone`]): the
     /// held Enter's transport is let go and the walking unit stops.
     #[test]
-    fn an_update_checks_after_its_walk_and_lets_go_what_a_handover_drops() {
+    fn an_update_checks_after_its_walk_and_lets_go_what_handover_drops() {
         let mut a = Artifact::new(false, None);
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
         let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));

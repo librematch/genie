@@ -141,7 +141,7 @@ mod tests {
     /// Each operator is the one `f32` operation, bit for bit and in its operand order; a
     /// comparison is `f32`'s.
     #[test]
-    fn charges_do_the_game_s_f32_operations() {
+    fn charges_do_the_game_f32_operations() {
         let mut c = Charge::new(0.1);
         c += Charge::new(0.2);
         assert_eq!(c.get().to_bits(), (0.1_f32 + 0.2).to_bits());

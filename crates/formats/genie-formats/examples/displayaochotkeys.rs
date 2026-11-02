@@ -35,11 +35,11 @@ struct DisplayLang {
 fn main() -> anyhow::Result<()> {
     let cli_input = DisplayLang::from_args();
 
-    let mut f_lang = File::open(&cli_input.lang_file_name)?;
-    let lang_file = cli_input.file_type.read_from(&mut f_lang)?;
+    let mut lang_input = File::open(&cli_input.lang_file_name)?;
+    let lang_file = cli_input.file_type.read_from(&mut lang_input)?;
 
-    let mut f_hki = File::open(&cli_input.hki_file_name)?;
-    let info = HotkeyInfo::from(&mut f_hki)?;
+    let mut hki_input = File::open(&cli_input.hki_file_name)?;
+    let info = HotkeyInfo::from(&mut hki_input)?;
     let aoc_him = hki::default_him();
 
     println!("{}", info.get_string_from_lang(&lang_file, &aoc_him));

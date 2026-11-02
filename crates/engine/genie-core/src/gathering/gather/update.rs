@@ -6,7 +6,7 @@ use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
     GatherAction, GatherReads, Next, REGATHERED, SEARCH_WAIT, STOP_FARMS, StopRate, WAIT_GAP,
-    WAIT_WORKERS, waits_for_a_farm,
+    WAIT_WORKERS, waits_for_farm,
 };
 use crate::gathering::hunt::walk_sprite;
 use crate::map::Distance;
@@ -171,7 +171,7 @@ impl GatherAction {
         if Amount::ZERO < unit.life.amount {
             return Ok(Next::Drop);
         }
-        if waits_for_a_farm(r.master, self.target_class) {
+        if waits_for_farm(r.master, self.target_class) {
             return self.begin_farm_wait(c, unit, r);
         }
         self.begin_search(c, unit, r)

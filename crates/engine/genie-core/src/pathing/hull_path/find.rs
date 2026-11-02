@@ -314,10 +314,11 @@ impl HullPather<'_> {
             .last()
             .unwrap_or(&Point::new(f32::NAN, f32::NAN));
         let e = self.nodes.checked(end)?.at;
-        let d_path =
+        let path_distance =
             (last.y() - to.y()) * (last.y() - to.y()) + (last.x() - to.x()) * (last.x() - to.x());
-        let d_node = (e.y() - to.y()) * (e.y() - to.y()) + (e.x() - to.x()) * (e.x() - to.x());
-        Ok(below_or_unordered(d_node, d_path))
+        let node_distance =
+            (e.y() - to.y()) * (e.y() - to.y()) + (e.x() - to.x()) * (e.x() - to.x());
+        Ok(below_or_unordered(node_distance, path_distance))
     }
 
     /// The found node's path on into the goal's hull: along its entrance, if any, backwards. A

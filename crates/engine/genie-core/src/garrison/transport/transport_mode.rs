@@ -38,7 +38,7 @@ mod tests {
 
     /// The three modes are the game's −1, 0 and 1.
     #[test]
-    fn the_modes_are_the_game_s_ints() {
+    fn the_modes_are_the_game_ints() {
         assert_eq!(
             [TransportMode::NEW, TransportMode::MOVE, TransportMode::WORK].map(TransportMode::get),
             [-1, 0, 1]

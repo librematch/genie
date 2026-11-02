@@ -53,7 +53,7 @@ mod tests {
 
     /// The data's bytes are the named types, anything else is kept as it is.
     #[test]
-    fn an_owner_type_is_the_data_s_byte() {
+    fn an_owner_type_is_the_data_byte() {
         assert_eq!(TargetOwner::of_data(2), TargetOwner::ENEMY);
         assert_eq!(TargetOwner::default(), TargetOwner::ANY);
         assert_eq!(TargetOwner::of_data(9).get(), 9);

@@ -41,7 +41,7 @@ mod tests {
 
     /// A count grows by one, wrapping as an int.
     #[test]
-    fn a_count_grows_by_one() {
+    fn count_grows_by_one() {
         assert_eq!(RelicCount::ZERO.plus_one().get(), 1);
         assert_eq!(RelicCount::of_data(i32::MAX).plus_one().get(), i32::MIN);
     }

@@ -42,7 +42,7 @@ use std::collections::BTreeMap;
 /// The two tiles beside a builder on a footprint's diagonal (`LAB_140aafc09`'s arguments), by
 /// the quarter its step points into: up-left, down-left, and the rest.
 #[test]
-fn the_tiles_beside_a_diagonal_follow_its_quarter() {
+fn the_tiles_beside_diagonal_follow_its_quarter() {
     assert_eq!(
         beside_diagonal(5, 5, -1, -1),
         (Tile::new(6, 5), Tile::new(5, 6))
@@ -258,7 +258,7 @@ fn the_clearing_reads_the_objects_on_its_tiles() {
 /// one whose record went (`+0x686`); a unit below state 3 loses it in its destroy's death
 /// part whatever the call; a building only when it is tall and not desolid.
 #[test]
-fn a_cleared_object_loses_its_record_by_its_type_and_the_call() {
+fn cleared_object_loses_its_record_by_its_type_and_the_call() {
     use crate::map::spatial::Tiles;
     let mut world = Spatial::with_tiles(
         GridSize::new(20, 20),
@@ -343,7 +343,7 @@ fn a_cleared_object_loses_its_record_by_its_type_and_the_call() {
 /// and names a master the owner does not have; a pasture is not modelled; a mule cart's
 /// search follows with a unit AI only.
 #[test]
-fn a_farm_s_bonus_wants_both_attributes_238_and_239() {
+fn farm_bonus_wants_both_attributes_238_and_239() {
     let farm = Master {
         id: ids::FARM,
         class: class::FARM,
@@ -505,7 +505,7 @@ pub(crate) fn started_on(
 /// A Build's start (`0x140aadd80`, `set_state(4)`) takes the task's moving sprite for its
 /// `MoveTo` ([`BuildTask::walk`]).
 #[test]
-fn a_build_s_move_to_takes_its_task_s_moving_sprite() {
+fn build_move_to_takes_its_task_moving_sprite() {
     let moving = started(
         object_id(10028),
         Position::new(10.5, 10.5, 0.0),
@@ -547,7 +547,7 @@ fn house() -> crate::map::spatial::Placed {
 /// takes it out of the foundation's builders when it did), its `MoveTo` goes and stops the
 /// unit, the foundation goes (the caller releases it) and the point; state 2.
 #[test]
-fn a_stop_halts_the_build_and_lets_its_foundation_go() {
+fn stop_halts_the_build_and_lets_its_foundation_go() {
     let mut mover = crate::gathering::hunt::tests::walker();
     let mut b = BuildAction {
         state: BuildState::Move {
@@ -577,7 +577,7 @@ fn a_stop_halts_the_build_and_lets_its_foundation_go() {
 /// The Build's constructor (`FUN_140aad4e0`) and `set_state(4)` take the foundation's place
 /// as the action's point (`+0x38`..`+0x40`) and its `MoveTo` the foundation as its target.
 #[test]
-fn a_build_s_point_is_its_foundation_s_place() {
+fn build_point_is_its_foundation_place() {
     let b = started(
         object_id(10913),
         Position::new(61.5, 92.5, 1.0),
@@ -602,7 +602,7 @@ fn a_build_s_point_is_its_foundation_s_place() {
 }
 
 #[test]
-fn a_builder_sent_to_another_foundation_starts_over() {
+fn builder_sent_to_another_foundation_starts_over() {
     let mut b = BuildAction {
         state: BuildState::Work,
         added: true,
@@ -641,7 +641,7 @@ fn a_builder_sent_to_another_foundation_starts_over() {
 /// 7, counted among its builders), are told to build it again: each leaves the builders and
 /// starts over (state 4, its `MoveTo` arrived beside the house); one at work (state 6) stays.
 #[test]
-fn a_builder_told_to_build_its_foundation_again_starts_over() {
+fn builder_told_to_build_its_foundation_again_starts_over() {
     let mut c = Construction {
         progress: Seconds::new(3.0),
         desolid: false,
@@ -1134,7 +1134,7 @@ fn the_work_starts_the_desolid_annexes_first() {
 /// meets the new record: it outranks a path made before (429513284's builder 30830 meeting
 /// the house 33439 that 30828 started in update 199).
 #[test]
-fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
+fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
     use crate::map::spatial::Tiles;
     let mut world = Spatial::with_tiles(
         GridSize::new(120, 120),
@@ -1178,7 +1178,7 @@ fn a_construction_s_start_moves_its_foundation_for_the_walks_of_the_update() {
 /// building's (its start's build points, then the work): its construction goes on, and no
 /// longer once the work reaches its build time and completes it.
 #[test]
-fn an_annex_s_work_goes_to_its_main_building() {
+fn an_annex_work_goes_to_its_main_building() {
     let foundation = Construction {
         progress: Seconds::ZERO,
         desolid: true,

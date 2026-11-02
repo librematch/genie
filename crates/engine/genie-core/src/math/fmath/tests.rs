@@ -293,7 +293,7 @@ fn atan2_is_the_games_atan2f_on_special_pairs() {
 /// (y's) when both are NaNs, quieted. (Unicorn's softfloat picks the larger payload there, as
 /// the x87 does, so these outputs follow Intel's rule, not the emulator.)
 #[test]
-fn atan2_of_a_nan_is_y_plus_x() {
+fn atan2_of_nan_is_the_sum_of_its_arguments() {
     for (y, x, game) in [
         (0xffc0_0002, 0x7fc0_0003, 0xffc0_0002),
         (0x7f80_0001, 0xff80_0002, 0x7fc0_0001),
@@ -467,7 +467,7 @@ fn the_kernels_are_the_games_on_doubles() {
         (0xfff0_0000_0000_0000, 0xff80_0000),
         (0x7ff8_0000_0000_0001, 0x7fc0_0000),
     ] {
-        let got = k_sin(f64::from_bits(x)).to_bits();
+        let got = kernel_sin(f64::from_bits(x)).to_bits();
         assert_eq!(got, game, "k_sin({x:016x}): {got:08x}, game {game:08x}");
     }
     for (x, game) in [
@@ -489,7 +489,7 @@ fn the_kernels_are_the_games_on_doubles() {
         (0xfff0_0000_0000_0000, 0xffc0_0000),
         (0x7ff8_0000_0000_0001, 0x7fc0_0000),
     ] {
-        let got = k_cos(f64::from_bits(x)).to_bits();
+        let got = kernel_cos(f64::from_bits(x)).to_bits();
         assert_eq!(got, game, "k_cos({x:016x}): {got:08x}, game {game:08x}");
     }
 }
@@ -607,7 +607,7 @@ fn rem_pio2_is_the_games_reduction() {
 /// all 0 (one or two more terms of 2/π, with and without the carry of 1 − q), q0 of 0, 1 and
 /// 2 with the high chunk's bit test (ih 1), and a negative input.
 #[test]
-fn rem_pio2_takes_more_terms_when_the_fraction_s_chunks_are_zero() {
+fn rem_pio2_takes_more_terms_when_the_fraction_chunks_are_zero() {
     for (x, n, game) in [
         (0x6f79_be45, 5, 0x3e1b_bdd5_2a58_eafb),
         (0x7b16_75c0, 3, 0x3e70_e91f_c449_51b6),
@@ -873,7 +873,7 @@ fn rem_pio2_large_is_the_games_at_every_precision() {
 /// by the smallest subnormal, x below y), x itself by an infinite y; the invalid cases give
 /// SSE's default NaN and a NaN argument comes back quieted.
 #[test]
-fn fmod_is_the_exact_remainder_with_x_s_sign() {
+fn fmod_is_the_exact_remainder_with_the_dividend_sign() {
     for (x, y, want) in [
         (0x40b0_0000, 0x4000_0000, 0x3fc0_0000),
         (0xc0b0_0000, 0x4000_0000, 0xbfc0_0000),
@@ -960,7 +960,7 @@ fn is_nan_is_true_for_every_nan_only() {
 }
 
 #[test]
-fn a_jc_after_comiss_is_taken_below_and_unordered() {
+fn jc_after_comiss_is_taken_below_and_unordered() {
     assert!(below_or_unordered(1.0, 2.0));
     assert!(!below_or_unordered(2.0, 2.0) && !below_or_unordered(3.0, 2.0));
     assert!(below_or_unordered(f32::NAN, 2.0) && below_or_unordered(2.0, f32::NAN));
@@ -998,7 +998,7 @@ fn the_angle_between_unit_vectors_follows_the_games_compares() {
 
 /// `FUN_14087e710`: (3, 4, 0) lies 4 from the x axis, whatever the direction's length.
 #[test]
-fn a_points_distance_from_a_line() {
+fn points_distance_from_line() {
     assert_eq!(
         line_distance(
             BVector::new(3.0, 4.0, 0.0),
@@ -1024,7 +1024,7 @@ fn a_points_distance_from_a_line() {
 /// with a non-integer exponent the default NaN, with an odd one a negative result; a
 /// subnormal base normalised; beyond 2^128 +∞ (−∞ with the sign bias), below 2^-150 ±0.
 #[test]
-fn powf_takes_the_image_s_branches_and_exact_powers() {
+fn powf_takes_the_image_branches_and_exact_powers() {
     let bits = |v: f32| v.to_bits();
     for (x, y, want) in [
         (2.0f32, 10.0f32, 1024.0f32),

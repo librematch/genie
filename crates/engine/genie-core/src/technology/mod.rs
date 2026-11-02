@@ -615,7 +615,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cost_beyond_the_attribute_takes_the_rest_from_gold() {
+    fn cost_beyond_the_attribute_takes_the_rest_from_gold() {
         let (mut s, mut d) = loom();
         d.costs[0].attribute = Some(attribute::WOOD);
         let mut held = Held([

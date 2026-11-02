@@ -43,7 +43,7 @@ use crate::world::WorldTime;
 
 /// `FUN_14102d580` copies a slot in use without its transform mark (`+0x44`).
 #[test]
-fn a_larger_slots_array_drops_the_transform_marks() {
+fn larger_slots_array_drops_the_transform_marks() {
     let mut f = Formation::new();
     f.resize_slots(1);
     f.use_slots(1);
@@ -230,7 +230,7 @@ fn the_point_from_the_front_runs_along_the_stored_positions() {
 /// category (2), as the rams' rule never holds; a combat master whose hero flag grants
 /// [`crate::objects::masters::HeroFlags::PROTECTED_FORMATION`] is 5.
 #[test]
-fn a_unit_s_category_is_its_masters_and_none_for_a_null_object_or_a_ghost() {
+fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
     let mut t = slot_world(&[(10, 4, 1.0, 0.0), (35, 35, 2.0, 0.0)], &[]);
     for masters in &mut t.masters {
         *masters = crate::objects::masters::Masters::new([
@@ -378,7 +378,7 @@ fn the_slots_take_their_units_in_the_shorter_of_two_orders() {
 /// distances differ least, 11 in the first (9) and 10 in the second (9). A member the world
 /// does not hold (12) keeps its row of costs (0 as the process starts) and takes a slot.
 #[test]
-fn the_feature_s_assignment_keeps_the_start_of_least_variance() {
+fn the_feature_assignment_keeps_the_start_of_least_variance() {
     let y = (80.0f32 / 9.0).sqrt();
     let run = |feature: bool, gone: bool| {
         let mut t = slot_world(&[(10, 4, 0.0, 0.0), (11, 4, 1.0 / 3.0, y)], &[]);
@@ -423,7 +423,7 @@ fn the_feature_s_assignment_keeps_the_start_of_least_variance() {
 /// longer holds is placed by the row its last call wrote, and a cost row runs into the next
 /// member's with more slots than members.
 #[test]
-fn the_feature_s_costs_of_a_gone_member_are_its_last() {
+fn the_feature_costs_of_gone_member_are_its_last() {
     let mut t = slot_world(&[(10, 4, 0.0, 0.0), (11, 4, 3.0, 0.0)], &[]);
     let g = t.groups.get(group_id(1)).unwrap().clone();
     let mut costs = Vec::new();
@@ -459,7 +459,7 @@ fn the_feature_s_costs_of_a_gone_member_are_its_last() {
 /// `FUN_141009760` measures from the slot's `+0x1c`, which the load fills from the save's
 /// `mTransformPosition` (0x141018637), not from `+0x10` (`mDesiredTransformPosition`).
 #[test]
-fn a_slot_takes_the_unit_nearest_its_transform_position() {
+fn slot_takes_the_unit_nearest_its_transform_position() {
     let t = slot_world(&[(10, 4, 1.0, 0.0), (11, 4, 9.0, 0.0)], &[]);
     let g = t.groups.get(group_id(1)).unwrap().clone();
     let mut f = Formation::new();
@@ -474,7 +474,7 @@ fn a_slot_takes_the_unit_nearest_its_transform_position() {
 /// from the middle out (1, 0, 2), one of 4 into (2, 0, 1, 3); with a line part-transformed,
 /// or no column before, the slots take the closest units or none.
 #[test]
-fn a_line_after_a_column_fills_from_its_middle_out() {
+fn line_after_column_fills_from_its_middle_out() {
     let run = |width: usize, transformed: i32, previous: FormationKind| {
         let units: Vec<(i32, i16, f32, f32)> = (0..width)
             .map(|i| (10 + i as i32, 4, i as f32, 0.0))
@@ -644,7 +644,7 @@ pub(crate) fn ghost_at(id: i32, x: f32, y: f32) -> crate::vision::ghost::Ghost {
 /// only, at −2) changes nothing. The first active slot's unit tests the slots, and slot 1
 /// moves as with that unit as the lead.
 #[test]
-fn the_passability_tests_with_the_world_s_object_of_the_lead_id() {
+fn the_passability_tests_with_the_world_object_of_the_lead_id() {
     use crate::map::terrain::{Terrain, TerrainKind};
     let run = |ghost: bool| {
         let mut t = slot_world(&[(10, 4, 5.5, 5.5), (11, 4, 7.5, 5.5)], &[(8, 5)]);
@@ -705,7 +705,7 @@ fn the_passability_tests_with_the_world_s_object_of_the_lead_id() {
 /// first, which points toward the nearest slot (0, at (5.5, 5.5): -y), and the line to the
 /// next cell's middle (6.5, 6.5) is clear, so the slot takes that cell.
 #[test]
-fn a_found_cell_steps_toward_the_nearest_slot_when_the_way_is_clear() {
+fn found_cell_steps_toward_the_nearest_slot_when_the_way_is_clear() {
     let mut t = slot_world(&[(10, 4, 5.5, 5.5), (11, 4, 7.5, 7.5)], &[(8, 5)]);
     t.groups.groups[0].motion.position[0] = BVector::new(5.5, 0.0, 5.5);
     t.groups.groups[0].motion.lead = Some(object_id(10));
@@ -730,7 +730,7 @@ fn a_found_cell_steps_toward_the_nearest_slot_when_the_way_is_clear() {
 /// box's old bounds (`MINSS`/`MAXSS` of the new value first) and the earlier nearest slot
 /// (`COMISS`/`CMOVBE`); an inactive slot counts for neither.
 #[test]
-fn the_passability_box_keeps_its_bounds_and_nearest_for_a_nan_place() {
+fn the_passability_box_keeps_its_bounds_and_nearest_for_nan_place() {
     let nan = BVector::new(f32::NAN, 0.0, f32::NAN);
     let mut idle = slot_at(BVector::new(50.0, 0.0, 50.0), 1);
     idle.active = 0;
@@ -763,7 +763,7 @@ fn the_passability_box_keeps_its_bounds_and_nearest_for_a_nan_place() {
 /// below 0 or NaN), else along x (bits 6 and 7 for a `dx` below 0 or NaN, bit 6 else); the
 /// count goes up and bit 0 is set.
 #[test]
-fn a_cell_mark_points_toward_the_nearest_slot_and_a_nan_along_y() {
+fn cell_mark_points_toward_the_nearest_slot_and_nan_along_y() {
     assert_eq!(cell_mark(0, 0.0, 2.0), 3);
     assert_eq!(cell_mark(0, 0.0, -2.0), 0x83);
     assert_eq!(cell_mark(0, 3.0, 1.0), 0x43);
@@ -782,7 +782,7 @@ fn a_cell_mark_points_toward_the_nearest_slot_and_a_nan_along_y() {
 /// The line transform's distance back (0x14103a850, `COMISS`/`JA`): a line's own when it is
 /// above 0, else, a NaN too, the line's index times the spacing.
 #[test]
-fn a_nan_distance_back_takes_the_index_times_the_spacing() {
+fn nan_distance_back_takes_the_index_times_the_spacing() {
     let mut t = slot_world(&[(10, 4, 5.0, 5.0)], &[]);
     t.groups.groups[0].motion.position[0] = BVector::new(9.0, 0.0, 5.0);
     t.groups.groups[0].desired_spacing = Distance::new(2.0);
@@ -827,7 +827,7 @@ fn clearing_the_units_empties_every_slot_of_the_array() {
 
 /// The grid's count (bits 1 to 5) counts on and wraps, the other bits stay.
 #[test]
-fn a_grid_cell_counts_its_slots_in_bits_1_to_5() {
+fn grid_cell_counts_its_slots_in_bits_1_to_5() {
     assert_eq!(count_up(0), 2);
     assert_eq!(count_up(3), 5);
     assert_eq!(count_up(0xc1 | 0x3e), 0xc1);
@@ -857,7 +857,7 @@ fn one_statistic(t: &mut World, units: &[ObjectId]) {
 /// column takes its members from the middle out (11, 10, 12), after a line the closest
 /// (10, 11, 12); each as its slots and `lay_units` with that flag.
 #[test]
-fn a_line_after_a_column_takes_its_units_in_the_column_s_order() {
+fn line_after_column_takes_its_units_in_the_column_order() {
     let run = |previous: FormationKind| {
         let mut t = slot_world(
             &[(10, 4, 5.5, 5.5), (11, 4, 5.5, 6.5), (12, 4, 5.5, 7.5)],
@@ -1000,7 +1000,7 @@ fn the_last_high_level_waypoint_is_the_top_levels_last_point() {
 /// minimum column distance, whatever the current type; a target's radius and range lengthen
 /// the column-to-line distance.
 #[test]
-fn a_group_chooses_a_column_far_along_its_path_and_a_line_near_its_end() {
+fn group_chooses_column_far_along_its_path_and_line_near_its_end() {
     assert_eq!(own(&type_world(Vec::new())), FormationKind::LINE);
     let walked = level(&[BVector::ZERO, BVector::new(1.0, 0.0, 0.0)], 0, 0);
     let path_to = |x: f32, waypoint: i32, flags: u32| {
@@ -1036,7 +1036,7 @@ fn a_group_chooses_a_column_far_along_its_path_and_a_line_near_its_end() {
 /// [`crate::groups::GroupFlags::LINE`] (`MinAutoDistanceLock`) chooses a line, horde units only a
 /// horde; given a type, or locked to one (not -1 or 0), the group takes it.
 #[test]
-fn a_lock_or_a_given_type_overrides_the_groups_own_choice() {
+fn lock_or_given_type_overrides_the_groups_own_choice() {
     let walked = level(&[BVector::ZERO, BVector::new(1.0, 0.0, 0.0)], 0, 0);
     let far = vec![
         walked,
@@ -1077,7 +1077,7 @@ fn a_lock_or_a_given_type_overrides_the_groups_own_choice() {
 /// createColumnLine's sizes: a line at least twice as wide as it is deep, a column the other
 /// way round.
 #[test]
-fn a_line_is_twice_as_wide_as_deep_and_a_column_the_reverse() {
+fn line_is_twice_as_wide_as_deep_and_column_the_reverse() {
     assert_eq!(sizes(1, true), (1, 1));
     // root 4: 10 / 4 = 2 lines of 5
     assert_eq!(sizes(10, true), (2, 5));
@@ -1118,7 +1118,7 @@ fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> 
 /// offsets forward), the types alternating with the second line starting on the type the
 /// first ended with.
 #[test]
-fn a_line_of_two_unit_types_alternates_its_slots() {
+fn line_of_two_unit_types_alternates_its_slots() {
     let g = group_of(3, 10, 1.0, &[(4, 5), (24, 5)]);
     let mut f = Formation::new();
     assert!(
@@ -1152,7 +1152,7 @@ fn a_line_of_two_unit_types_alternates_its_slots() {
 /// back, the odd forward); a flanked line's slots move apart from its middle by 2.5 less the
 /// line's share of the depth.
 #[test]
-fn a_staggered_line_shifts_its_lines_and_a_flanked_one_parts_them() {
+fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
     let g = group_of(3, 10, 1.0, &[(4, 10)]);
     let offsets = |f: &Formation, line: usize| -> Vec<f32> {
         f.slots[line * 5..line * 5 + 5]
@@ -1193,7 +1193,7 @@ fn a_staggered_line_shifts_its_lines_and_a_flanked_one_parts_them() {
 /// width, ahead of the wider (ten of category 3, spacing 1.5); the wider one's first line
 /// stands back by the narrower's spacing plus the difference of the spacings.
 #[test]
-fn a_narrow_sub_formation_takes_one_line_ahead_of_a_wider_one() {
+fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
     let mut g = group_of(3, 10, 1.5, &[(4, 10)]);
     let narrow = group_of(0, 3, 1.0, &[(83, 3)]);
     g.unit_types.insert(0, narrow.unit_types[0].clone());
@@ -1220,7 +1220,7 @@ fn a_narrow_sub_formation_takes_one_line_ahead_of_a_wider_one() {
 /// than its empty places (7 units at 1.3: 6 lines of 2 leave 5 empty, 5 leave 3, 4 leave 1); a
 /// NaN width (`CVTTSS2SI` of a NaN, clamped) one line.
 #[test]
-fn a_sub_formation_fits_the_widest_line() {
+fn sub_formation_fits_the_widest_line() {
     use super::column_line::{Category, fit_to_widest};
     let cat = |count, spacing| Category {
         count,

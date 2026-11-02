@@ -28,9 +28,9 @@ struct WololoLang {
 /// file into an ini language file.
 fn main() -> anyhow::Result<()> {
     let cli_input = WololoLang::from_args();
-    let mut f_in = File::open(&cli_input.path_in)?;
-    let lang_file = KeyValue.read_from(&mut f_in)?;
-    let mut f_out = File::create(&cli_input.path_out)?;
-    lang_file.write_to_ini(&mut f_out)?;
+    let mut in_file = File::open(&cli_input.path_in)?;
+    let lang_file = KeyValue.read_from(&mut in_file)?;
+    let mut out_file = File::create(&cli_input.path_out)?;
+    lang_file.write_to_ini(&mut out_file)?;
     Ok(())
 }

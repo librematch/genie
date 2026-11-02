@@ -13,7 +13,7 @@ owner 900 0
 ";
 
 #[test]
-fn a_mesh_dump_reads_its_shapes_contacts_and_tiles() {
+fn mesh_dump_reads_its_shapes_contacts_and_tiles() {
     let mesh = mesh_from_dump(MESH).unwrap();
     assert_eq!((mesh.width, mesh.free), (2, Some(ShapeId::new(0x10))));
     assert_eq!(mesh.shapes, [FixedRect::new(1, 2, 3, 4)]);
@@ -44,7 +44,7 @@ fn a_mesh_dump_reads_its_shapes_contacts_and_tiles() {
 
 /// Without its mesh line, or with a header out of shape, a dump holds no mesh.
 #[test]
-fn a_mesh_dump_without_its_mesh_line_holds_none() {
+fn mesh_dump_without_its_mesh_line_holds_none() {
     assert!(mesh_from_dump("shape 0 1 2 3 4\n").is_none());
     assert!(mesh_from_dump("side 1 0 0 0 0 0 0 0\n").is_none());
     assert!(mesh_from_dump("tile 0 0 1\n").is_none());
@@ -87,7 +87,7 @@ mod unit_terrain {
     }
 
     #[test]
-    fn a_units_master_gives_its_radius_and_terrain_restriction() {
+    fn units_master_gives_its_radius_and_terrain_restriction() {
         let save = save();
         let (radius, restriction) = unit_terrain(&save, 7).unwrap().unwrap();
         assert_eq!(

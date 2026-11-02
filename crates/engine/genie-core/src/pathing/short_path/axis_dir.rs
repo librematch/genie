@@ -61,7 +61,7 @@ mod tests {
     /// A step's sign picks the direction (0 the negative one); the reverse and the side met are
     /// across from it.
     #[test]
-    fn a_walk_meets_the_side_across_from_its_heading() {
+    fn walk_meets_the_side_across_from_its_heading() {
         let all = [
             AxisDir::MinusY,
             AxisDir::PlusX,

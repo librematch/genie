@@ -64,7 +64,7 @@ mod tests {
 
     /// A mask blocks the classes outside it; its classes leave the temporary record's bit out.
     #[test]
-    fn a_mask_blocks_the_classes_outside_it() {
+    fn mask_blocks_the_classes_outside_it() {
         let land = TerrainMask::of_bits(0x83);
         assert_eq!(
             (land.bits(), land.blocked(), land.classes()),

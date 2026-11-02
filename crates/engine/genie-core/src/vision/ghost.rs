@@ -798,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    fn a_watched_entry_keeps_the_tiles_bits_and_a_building_with_a_umv_entry_follows_its_mask() {
+    fn watched_entry_keeps_the_tiles_bits_and_building_with_umv_entry_follows_its_mask() {
         // FUN_141090430: the tile's word masked, then the cell switched to the mask for an
         // object of type 50 and up with +0x904
         let mut t = world(true);
@@ -841,7 +841,7 @@ mod tests {
     }
 
     #[test]
-    fn a_death_leaves_a_ghost_for_each_player_who_explored_its_tile_and_does_not_see_it() {
+    fn death_leaves_ghost_for_each_player_who_explored_its_tile_and_does_not_see_it() {
         // FUN_14118e990: player 1 explored and sees the mine's tile, player 2 explored it only;
         // Gaia gets none; the bit of a fourth player ends the walk
         let mut t = world(true);
@@ -889,7 +889,7 @@ mod tests {
     }
 
     #[test]
-    fn a_ghost_takes_a_pooled_id_a_reusable_one_or_for_a_master_not_recyclable_a_new_one() {
+    fn ghost_takes_pooled_id_reusable_one_or_for_master_not_recyclable_new_one() {
         // FUN_1410cfe80: the pool's head, else FUN_1411a45a0's id by the master's +0x680
         let original = Original {
             id: object_id(9),
@@ -1035,7 +1035,7 @@ mod tests {
     }
 
     #[test]
-    fn a_ghost_without_an_original_keeps_its_master_and_one_not_recyclable_is_deleted() {
+    fn ghost_without_an_original_keeps_its_master_and_one_not_recyclable_is_deleted() {
         // FUN_141090000: a null +0x7c0 sets only +0x7f8 = -1, +0x7d0 stays
         let mut t = world(false);
         let ghost = Ghost {
@@ -1100,7 +1100,7 @@ mod tests {
     /// change nothing; its viewer seeing them destroys it. A ghost marked seen below state 3 is
     /// destroyed before any of that.
     #[test]
-    fn a_ghost_its_viewer_sees_again_is_destroyed_and_the_owner_notes_itself() {
+    fn ghost_its_viewer_sees_again_is_destroyed_and_the_owner_notes_itself() {
         let mut t = world(true);
         t.players[2].ghosts = vec![house_ghost(0)];
         set_tile(&mut t, 2, 1, 1 << 1);
@@ -1135,7 +1135,7 @@ mod tests {
     /// owner's) does not see it: viewer 2 shares the sight of players 3 and 4, player 3 only the
     /// viewer's; the tile seen by player 4 alone keeps the ghost, by player 3 too destroys it.
     #[test]
-    fn a_ghost_stays_while_a_player_sharing_the_viewer_s_sight_does_not_see_it() {
+    fn ghost_stays_while_player_sharing_the_viewer_sight_does_not_see_it() {
         let mut t = world(true);
         for _ in 0..2 {
             t.players.push(Player::default());
@@ -1177,7 +1177,7 @@ mod tests {
     /// marked seen, not destroyed, and the next update destroys it; without its UMV entry it is
     /// not modelled.
     #[test]
-    fn a_building_s_ghost_seen_on_its_footprint_alone_is_marked_seen() {
+    fn building_ghost_seen_on_its_footprint_alone_is_marked_seen() {
         let mut t = world(true);
         let sight = t.spatial.sight.as_mut().unwrap();
         sight.extents = vec![crate::vision::visibility::Extent {
@@ -1218,7 +1218,7 @@ mod tests {
     }
 
     #[test]
-    fn a_watched_list_gives_ghosts_to_the_players_who_lost_sight_and_tells_a_computer() {
+    fn watched_list_gives_ghosts_to_the_players_who_lost_sight_and_tells_computer() {
         // FUN_1410905e0: lost = ((old ^ new) & old) >> 1, from player 1, not the list's player
         let mut t = world(true);
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0007);
@@ -1261,7 +1261,7 @@ mod tests {
     }
 
     #[test]
-    fn a_load_watches_dead_objects_that_leave_ghosts_and_buildings_but_their_annexes() {
+    fn load_watches_dead_objects_that_leave_ghosts_and_buildings_but_their_annexes() {
         // FUN_14119df60's dead objects, FUN_1411ac170's FUN_1411cc980 with no annex link yet,
         // then the rehook drops every annex but a gate's
         let mut t = world(true);

@@ -31,7 +31,7 @@ mod tests {
 
     /// The three answers are the game's 0, 1 and 0xe.
     #[test]
-    fn the_outcomes_are_the_game_s_codes() {
+    fn the_outcomes_are_the_game_codes() {
         assert_eq!(
             [
                 OrderOutcome::NotTaken,

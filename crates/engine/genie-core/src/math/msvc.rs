@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn a_map_lists_a_key_of_a_taken_bucket_in_front_of_it() {
+    fn map_lists_key_of_taken_bucket_in_front_of_it() {
         // FNV-1a & 7: 1 -> bucket 4, 9 -> bucket 4 too, 2 -> bucket 7 (as the game's hash)
         assert_eq!(bucket(1, 7), bucket(9, 7));
         assert_ne!(bucket(1, 7), bucket(2, 7));
@@ -415,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    fn a_rehash_keeps_every_key_once() {
+    fn rehash_keeps_every_key_once() {
         let order = unordered_map_order((0..100).chain(0..10));
         assert_eq!(order.len(), 100);
         let mut sorted = order;
@@ -424,14 +424,14 @@ mod tests {
     }
 
     #[test]
-    fn a_short_range_sorts_by_insertion_and_keeps_equal_elements_in_order() {
+    fn short_range_sorts_by_insertion_and_keeps_equal_elements_in_order() {
         let mut v: Vec<(u32, usize)> = [3, 1, 3, 2, 1, 3].iter().copied().zip(0..).collect();
         by_key(&mut v);
         assert_eq!(v, [(3, 0), (3, 2), (3, 5), (2, 3), (1, 1), (1, 4)]);
     }
 
     #[test]
-    fn a_long_range_is_sorted_and_keeps_every_element() {
+    fn long_range_is_sorted_and_keeps_every_element() {
         // a fixed pseudo-random sequence with many equal keys (an LCG)
         let mut x = 12345u32;
         let mut v: Vec<(u32, usize)> = (0..500)
@@ -460,7 +460,7 @@ mod tests {
         assert!(v.windows(2).all(|w| w[0].0 >= w[1].0));
     }
 
-    /// The keys of [`the_game_s_sort_orders_equal_keys_as_its_own`]: an LCG's `(x >> 16) % m`.
+    /// The keys of [`the_game_sort_orders_equal_keys_as_its_own`]: an LCG's `(x >> 16) % m`.
     fn lcg_keys(n: usize, m: u32, seed: u32) -> Vec<(f32, usize)> {
         let mut x = seed;
         (0..n)
@@ -476,7 +476,7 @@ mod tests {
     /// the partition (100 elements), the heap sort (no divisions left), Tukey's ninther (above
     /// 40) and a partition that runs out of divisions (3 for 120).
     #[test]
-    fn the_game_s_sort_orders_equal_keys_as_its_own() {
+    fn the_game_sort_orders_equal_keys_as_its_own() {
         #[rustfmt::skip]
         let cases: [(usize, u32, u32, isize, &[usize]); 5] = [
             (100, 37, 12345, 100, &[
@@ -534,7 +534,7 @@ mod tests {
     /// The garrison's `std::sort` instance (`0x1415f0830`: 0x28-byte pairs by their f32 gap at
     /// `+0x20`, ascending) run in unicorn on the keys of [`lcg_keys`]: genie's orders.
     #[test]
-    fn the_garrison_s_sort_orders_equal_gaps_as_its_own() {
+    fn the_garrison_sort_orders_equal_gaps_as_its_own() {
         #[rustfmt::skip]
         let cases: [(usize, u32, u32, isize, &[usize]); 5] = [
             (100, 37, 12345, 100, &[

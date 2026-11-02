@@ -141,7 +141,7 @@ mod tests {
     /// A bitmap with a size: its header, the info with its 256 colours and the rows of pixels
     /// padded to 4 bytes; written back byte for byte. One without a size has no more.
     #[test]
-    fn a_bitmap_writes_back_the_bytes_it_read() {
+    fn bitmap_writes_back_the_bytes_it_read() {
         let mut bytes = vec![];
         for word in [1u32, 2, 3] {
             bytes.extend(word.to_le_bytes());

@@ -107,7 +107,7 @@ mod tests {
 
     /// A player's index is its number, and the index converts back.
     #[test]
-    fn a_player_s_index_is_its_number() {
+    fn player_index_is_its_number() {
         for number in [0, 8, u8::MAX] {
             let p = PlayerId::from(number);
             assert_eq!((p.get(), p.index()), (number, usize::from(number)));
@@ -118,7 +118,7 @@ mod tests {
     /// A saved −1 is no player, a number up to a byte a player, any other value an error; each
     /// converts back to its value.
     #[test]
-    fn a_player_field_s_minus_one_is_none() {
+    fn player_field_minus_one_is_none() {
         assert_eq!(PlayerId::of_field(-1), Ok(None));
         assert_eq!(PlayerId::of_field(3), Ok(Some(PlayerId::new(3))));
         assert_eq!(PlayerId::field(Some(PlayerId::new(3))), 3);
@@ -143,7 +143,7 @@ mod tests {
 
     /// A player prints as its number and differs by equality.
     #[test]
-    fn a_player_prints_as_its_number_and_differs_by_equality() {
+    fn player_prints_as_its_number_and_differs_by_equality() {
         use genie_diff::{Scope, differences};
         let (one, two) = (PlayerId::new(1), PlayerId::new(2));
         assert_eq!(PlayerId::new(7).to_string(), "7");
@@ -153,7 +153,7 @@ mod tests {
 
     /// An index past a byte is no player.
     #[test]
-    fn an_index_past_a_byte_is_no_player() {
+    fn an_index_past_byte_is_no_player() {
         assert_eq!(
             PlayerId::try_from(256_usize).map_err(|e| e.kind()),
             Err(ErrorKind::InvalidInput)

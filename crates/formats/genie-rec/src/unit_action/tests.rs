@@ -56,7 +56,7 @@ fn an_attack_reads_its_ranges_sprites_and_last_target() {
 
 /// Every action type the reader knows, behind its head, ends a list at type 0.
 #[test]
-fn a_list_reads_every_known_action_type() {
+fn list_reads_every_known_action_type() {
     let mut bytes = Bytes::default();
     for (action_type, params) in [
         (1, Bytes::default().floats(&[2.0])),
@@ -101,7 +101,7 @@ fn a_list_reads_every_known_action_type() {
 
 /// After 11.76 the state is a word.
 #[test]
-fn an_action_after_11_76_has_a_word_state() {
+fn an_action_after_11_76_has_word_state() {
     let bytes = Bytes::default()
         .u16(4)
         .i32(0x0102)

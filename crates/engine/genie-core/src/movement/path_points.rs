@@ -290,12 +290,12 @@ pub(crate) enum AfterRequest {
 #[must_use]
 pub fn footprint_gap_squared(
     a: Position,
-    a_radius: Footprint,
+    radius_a: Footprint,
     b: Position,
-    b_radius: Footprint,
+    radius_b: Footprint,
 ) -> DistanceSquared {
-    let x = ((b.x() - a.x()).abs() - (a_radius.x() + b_radius.x())).max(0.0);
-    let y = ((b.y() - a.y()).abs() - (a_radius.y() + b_radius.y())).max(0.0);
+    let x = ((b.x() - a.x()).abs() - (radius_a.x() + radius_b.x())).max(0.0);
+    let y = ((b.y() - a.y()).abs() - (radius_a.y() + radius_b.y())).max(0.0);
     DistanceSquared::new(x * x + y * y)
 }
 
@@ -304,11 +304,11 @@ pub fn footprint_gap_squared(
 #[must_use]
 pub fn footprint_gap(
     a: Position,
-    a_radius: Footprint,
+    radius_a: Footprint,
     b: Position,
-    b_radius: Footprint,
+    radius_b: Footprint,
 ) -> Distance {
-    let x = ((b.x() - a.x()).abs() - (b_radius.x() + a_radius.x())).max(0.0);
-    let y = ((b.y() - a.y()).abs() - (b_radius.y() + a_radius.y())).max(0.0);
+    let x = ((b.x() - a.x()).abs() - (radius_b.x() + radius_a.x())).max(0.0);
+    let y = ((b.y() - a.y()).abs() - (radius_b.y() + radius_a.y())).max(0.0);
     Distance::new(fmath::sqrt(x * x + y * y))
 }

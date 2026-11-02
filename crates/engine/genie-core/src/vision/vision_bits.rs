@@ -70,7 +70,7 @@ mod tests {
     /// Player p's visible bit is p, its explored bit 32 + p; words meet on a shared bit; no bit
     /// is ever dropped.
     #[test]
-    fn a_player_s_bits_are_p_and_32_plus_p() {
+    fn player_bits_are_its_index_and_32_plus_its_index() {
         let p = PlayerId::new(3);
         assert_eq!(VisionBits::visible(p).bits(), 1 << 3);
         assert_eq!(VisionBits::explored(p).bits(), 1 << 35);

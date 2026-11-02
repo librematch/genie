@@ -53,7 +53,7 @@ mod tests {
 
     /// Any byte is a type, and the named ones compare as the game's thresholds do.
     #[test]
-    fn a_type_is_any_byte_and_the_named_ones_are_ordered() {
+    fn type_is_any_byte_and_the_named_ones_are_ordered() {
         assert_eq!(MasterKind::of_data(70), master_type::COMBAT);
         assert_eq!(MasterKind::of_data(0).get(), 0);
         assert!(master_type::ACTION < master_type::COMBAT);

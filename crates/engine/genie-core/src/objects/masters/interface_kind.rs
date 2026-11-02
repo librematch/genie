@@ -55,7 +55,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn an_interface_kind_is_the_data_s_byte() {
+    fn an_interface_kind_is_the_data_byte() {
         assert_eq!(InterfaceKind::of_data(255).plus(2).get(), 1);
         assert_eq!(InterfaceKind::of_data(0), InterfaceKind::LIVING);
         assert_eq!(InterfaceKind::of_data(12).get(), 12);

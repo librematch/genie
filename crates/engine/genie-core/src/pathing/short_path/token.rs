@@ -32,7 +32,7 @@ mod tests {
     /// A side's token is its number, a shape's its id + 4: shape 251's is the none token, as
     /// the game compares them.
     #[test]
-    fn shape_251_s_token_is_the_none_token() {
+    fn shape_251_token_is_the_none_token() {
         assert_eq!(Token::of_side(ShapeSide::LowX), Token(3));
         assert_eq!(Token::of_shape(ShapeId::new(0)), Token(4));
         assert_eq!(Token::of_shape(ShapeId::new(251)), Token::NONE);

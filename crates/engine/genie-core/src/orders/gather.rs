@@ -8,7 +8,7 @@ use crate::gathering::gather::{GatherRetarget, GatherStart};
 use crate::gathering::hunt::{HuntAction, HuntMove, HuntStart, HuntTask, Quarry};
 use crate::map::Position;
 use crate::math::rng::Stream;
-use crate::movement::Speed;
+use crate::movement::{Speed, footprint_gap};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
@@ -69,21 +69,20 @@ impl World {
         if !self.gatherable_building(player, (tp, t), tm)? {
             return Ok(false);
         }
-        let (t_at, t_radius) = (t.position(), tm.radius);
         let owner = self.players.player(player)?;
         let unit = owner.live(idx)?;
         let me = unit.master(self.master_tables(), player)?;
         let resource = crate::gathering::gather::Resource {
             id: target,
-            position: t_at,
+            position: t.position(),
             class: tm.class,
             master: tm.id,
             player: tp,
             workers: t.workers,
             drop_site: self.drops_at_main(player, idx, target)?,
-            gap: crate::movement::footprint_gap(unit.position(), me.radius, t_at, t_radius),
+            gap: footprint_gap(unit.position(), me.radius, t.position(), tm.radius),
             state: t.life.state,
-            radius: t_radius,
+            radius: tm.radius,
         };
         let computer = owner.computer;
         let farm_stops = self.settings.walkable_farms;
@@ -192,7 +191,7 @@ impl World {
             player: tp,
             drop_site: self.drops_at_main(player, idx, target)?,
             position: at,
-            gap: crate::movement::footprint_gap(unit.position(), me.radius, at, radius),
+            gap: footprint_gap(unit.position(), me.radius, at, radius),
         });
         let by = self.releaser(player, idx)?;
         let walks = unit.move_walks(
@@ -325,7 +324,7 @@ impl World {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
-        let t_master = t.master(self.master_tables(), tp)?;
+        let target_master = t.master(self.master_tables(), tp)?;
         let world = TaskWorld {
             players: &self.players,
             drop_sites: &self.drop_sites,
@@ -333,8 +332,8 @@ impl World {
         Ok(Quarry {
             id: target,
             position: t.position(),
-            class: t_master.class,
-            kind: t_master.kind,
+            class: target_master.class,
+            kind: target_master.kind,
             state: t.life.state,
             player: tp,
             amount: t.life.amount,
@@ -363,20 +362,19 @@ impl World {
             "a gather's target the slice does not hold",
         ))?;
         let tm = t.master(self.master_tables(), tp)?;
-        let (t_at, t_radius) = (t.position(), tm.radius);
         let unit = &self.players.live(player, idx)?;
         let me = unit.master(self.master_tables(), player)?;
         let resource = crate::gathering::gather::Resource {
             id: target,
-            position: t_at,
+            position: t.position(),
             class: tm.class,
             master: tm.id,
             player: tp,
             workers: t.workers,
             drop_site: self.drops_at_main(player, idx, target)?,
-            gap: crate::movement::footprint_gap(unit.position(), me.radius, t_at, t_radius),
+            gap: footprint_gap(unit.position(), me.radius, t.position(), tm.radius),
             state: t.life.state,
-            radius: t_radius,
+            radius: tm.radius,
         };
         let task = HuntTask {
             id: task.id,

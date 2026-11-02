@@ -38,7 +38,7 @@ mod tests {
 
     /// The percent is kept, an add wraps.
     #[test]
-    fn a_hit_chance_is_a_percent() {
+    fn hit_chance_is_percent() {
         assert_eq!(HitChance::of_data(70).get(), 70);
         assert_eq!(HitChance::of_data(i16::MAX).plus(1).get(), i16::MIN);
         assert!(HitChance::of_data(30) < HitChance::of_data(70));

@@ -412,7 +412,7 @@ impl World {
         }
         let gone = FOUNDATION_GONE;
         let (fp, f) = self.object(foundation).ok_or_else(|| gone.clone())?;
-        let (site, f_at) = (f.master(self.master_tables(), fp)?, f.position());
+        let (site, foundation_at) = (f.master(self.master_tables(), fp)?, f.position());
         let find = |id: ObjectId| self.object(id);
         let t = task_target_with(
             foundation.id(),
@@ -454,7 +454,7 @@ impl World {
         // slot 0x820 with any action type (0xffff): whatever task it finds, the Build takes
         // (FUN_140aad4e0 on it), its type and its enablement unread
         // slot 0x820's point: the foundation's place
-        let terrain = point_terrain(self.spatial.terrain.as_ref(), f_at);
+        let terrain = point_terrain(self.spatial.terrain.as_ref(), foundation_at);
         let Some((task, switch)) =
             task_search(masters, &actor, &t, &general, terrain, None, &world)?
         else {
@@ -463,8 +463,8 @@ impl World {
         let builder = switch.unwrap_or(actor.master);
         let to = WalkTo {
             id: Some(foundation.id()),
-            at: f_at,
-            gap: footprint_gap(unit.position(), builder.radius, f_at, site.radius),
+            at: foundation_at,
+            gap: footprint_gap(unit.position(), builder.radius, foundation_at, site.radius),
             state: Some(f.life.state),
         };
         let move_reads = MoveToReads::of(

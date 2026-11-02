@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn a_chain_maps_each_master_to_its_line_its_first_and_the_next() {
+    fn chain_maps_each_master_to_its_line_its_first_and_the_next() {
         // the archer line (-299: 4, 24, 492) and the tower line (-398: 79, 234, 235)
         let lines = UnitLines::build(
             600,
@@ -250,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_out_of_table_two_or_without_a_key_is_skipped_whole() {
+    fn line_out_of_table_two_or_without_key_is_skipped_whole() {
         let lines = UnitLines::build(
             100,
             &[
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn a_later_line_replaces_an_earlier_lines_entry_of_a_master() {
+    fn later_line_replaces_an_earlier_lines_entry_of_master() {
         let lines = UnitLines::build(
             100,
             &[

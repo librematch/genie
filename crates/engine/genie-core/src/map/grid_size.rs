@@ -75,7 +75,7 @@ mod tests {
 
     /// A grid size keeps its width and height in their order.
     #[test]
-    fn a_grid_size_keeps_its_width_and_height() {
+    fn grid_size_keeps_its_width_and_height() {
         let s = GridSize::new(120, 80);
         assert_eq!((s.width(), s.height(), s.get()), (120, 80, [120, 80]));
         assert_eq!(GridSize::from([120, 80]), s);

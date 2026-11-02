@@ -451,7 +451,7 @@ mod tests {
     /// relation and the walk's and queries' copies; an enemy's makes it an enemy again; a
     /// player outside the world changes nothing.
     #[test]
-    fn a_diplomacy_change_sets_the_stance_and_the_relation() {
+    fn diplomacy_change_sets_the_stance_and_the_relation() {
         let mut t = world();
         t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::ALLY)
             .unwrap();
@@ -520,7 +520,7 @@ mod tests {
     /// The world's teams: two players allied both ways with allied victory at 1 form team 2;
     /// one way, or without allied victory, they stay alone; locked teams stay.
     #[test]
-    fn mutual_allies_with_allied_victory_form_a_team() {
+    fn mutual_allies_with_allied_victory_form_team() {
         let mut t = world();
         t.set_diplomacy(PlayerId::new(1), PlayerId::new(3), Stance::ALLY)
             .unwrap();
@@ -581,7 +581,7 @@ mod tests {
 
     /// Attribute 204 truncated to 0 reveals nothing; 1 or more is not modelled.
     #[test]
-    fn a_player_s_attribute_204_reveals_its_units() {
+    fn player_attribute_204_reveals_its_units() {
         let mut t = world();
         assert_eq!(t.reveal_units(), Ok(()));
         t.players[2].attributes[REVEAL_UNIT] = Amount::new(0.5);

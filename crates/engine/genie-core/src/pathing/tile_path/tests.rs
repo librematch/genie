@@ -7,7 +7,7 @@ use crate::map::TerrainId;
 use crate::map::Tile;
 
 #[test]
-fn a_search_leaves_the_grid_as_it_was() {
+fn search_leaves_the_grid_as_it_was() {
     let terrain = vec![TerrainId::named(0); 64];
     let open = |_: Tile| false;
     let built = Planner::new(
@@ -36,7 +36,7 @@ fn open_map(_: Tile) -> bool {
 /// `FUN_140f7c530` reads the start's cell only after the search over the levels found the
 /// goal: a start off the map ends the search there, without the tile search.
 #[test]
-fn a_plan_from_off_the_map_reads_no_start_cell() {
+fn plan_from_off_the_map_reads_no_start_cell() {
     let mut p = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
@@ -59,7 +59,7 @@ fn a_plan_from_off_the_map_reads_no_start_cell() {
 }
 
 #[test]
-fn the_last_open_point_walks_the_path_back_to_a_tile_with_an_edge() {
+fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
     // water (terrain 0) left of x = 10, land (1, impassable) right of it
     let terrain: Vec<TerrainId> = (0..128)
         .map(|i| TerrainId::named(u8::from(10 <= i % 16)))
@@ -142,7 +142,7 @@ fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
 /// `FUN_140f78ba0` on an open map: the tiles' A* (`FUN_140f79250`, its neighbours by
 /// `FUN_140f76840`) reaches the goal, and the path runs from the start to the goal point.
 #[test]
-fn the_tile_search_reaches_a_goal_on_an_open_map() {
+fn the_tile_search_reaches_goal_on_an_open_map() {
     let mut p = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
@@ -170,7 +170,7 @@ fn the_tile_search_reaches_a_goal_on_an_open_map() {
 /// A wall across the map: the tile search ends at the tile nearest the goal (its centre),
 /// on the start's side.
 #[test]
-fn the_tile_search_ends_nearest_the_goal_behind_a_wall() {
+fn the_tile_search_ends_nearest_the_goal_behind_wall() {
     let wall = |t: Tile| t.x() == 3;
     let mut p = Planner::new(
         GridSize::new(8, 8),
@@ -196,7 +196,7 @@ fn the_tile_search_ends_nearest_the_goal_behind_a_wall() {
 /// searched again on the tiles; a long one has its start shortened over the tiles
 /// (`shorter_start`); either way the path runs from the start to the goal.
 #[test]
-fn a_full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
+fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
     let mut p = Planner::new(
         GridSize::new(64, 8),
         vec![TerrainId::named(0); 512],
@@ -249,7 +249,7 @@ fn an_open_map_is_one_node_cell_per_eight_tiles() {
 }
 
 #[test]
-fn padding_tiles_of_a_map_that_is_not_a_multiple_of_eight_lie_off_the_map() {
+fn padding_tiles_of_map_that_is_not_multiple_of_eight_lie_off_the_map() {
     let p = Planner::new(
         GridSize::new(6, 6),
         vec![TerrainId::named(0); 36],
@@ -269,7 +269,7 @@ fn padding_tiles_of_a_map_that_is_not_a_multiple_of_eight_lie_off_the_map() {
 }
 
 #[test]
-fn a_wall_splits_its_level_three_cell_into_its_children() {
+fn wall_splits_its_level_three_cell_into_its_children() {
     // a blocked column at x = 3 cuts the first 8 × 8 cell in two
     let wall = |t: Tile| t.x() == 3;
     let p = Planner::new(
@@ -291,7 +291,7 @@ fn a_wall_splits_its_level_three_cell_into_its_children() {
 }
 
 #[test]
-fn a_path_skips_a_point_equal_to_its_neighbour() {
+fn path_skips_point_equal_to_its_neighbour() {
     let mut path = Path::default();
     assert!(path.push(BVector::new(1.0, 0.0, 2.0)));
     assert!(!path.push(BVector::new(1.0, 0.0, 2.0)));
@@ -302,7 +302,7 @@ fn a_path_skips_a_point_equal_to_its_neighbour() {
 
 /// `FUN_140f761b0` with fewer than one point between `first` and `last`: no change, 0 fewer.
 #[test]
-fn a_stretch_without_points_between_is_left_as_it_is() {
+fn stretch_without_points_between_is_left_as_it_is() {
     let mut path = Path {
         points: vec![
             BVector::ZERO,
@@ -322,7 +322,7 @@ fn a_stretch_without_points_between_is_left_as_it_is() {
 /// MarvinBlue/426048731's 9520 in update 758 (the probe's log): the search's twelve tile
 /// points become three where the walk is blocked at (103.5, 46.5) and beyond.
 #[test]
-fn the_smoothing_keeps_the_points_before_a_blocked_walk() {
+fn the_smoothing_keeps_the_points_before_blocked_walk() {
     let points = [
         Point::new(109.5, 42.5),
         Point::new(108.5, 42.5),
@@ -394,7 +394,7 @@ impl SegmentTest<()> for Walls {
 /// the last is left out), then takes the source's length or, at most 1e-7, measures anew:
 /// `COMISS` with `JBE` (0x140f95d66), so an unordered (NaN) length measures too.
 #[test]
-fn an_appended_path_takes_the_source_s_length_or_measures_a_short_or_nan_one() {
+fn an_appended_path_takes_the_source_length_or_measures_short_or_nan_one() {
     let mut path = Path::default();
     let _ = path.push(BVector::ZERO);
     let other = Path {
@@ -418,7 +418,7 @@ fn an_appended_path_takes_the_source_s_length_or_measures_a_short_or_nan_one() {
 }
 
 #[test]
-fn a_closed_rectangle_closes_the_node_cells_under_it() {
+fn closed_rectangle_closes_the_node_cells_under_it() {
     // tile (0, 0) has no passable neighbour: its level-3, 2 and 1 cells are mixed, and the
     // four tiles of the level-1 cell are nodes
     let walls = |t: Tile| t == Tile::new(1, 0) || t == Tile::new(0, 1);
@@ -501,7 +501,7 @@ fn the_open_list_pops_the_cheapest_and_the_older_of_equal_costs_first() {
 /// A search's result keeps the game's code, and the tests its readers make by code: `result < 2`
 /// reaches (off the map too), 1 and 2 lead on.
 #[test]
-fn a_search_result_reads_by_the_game_s_code() {
+fn search_result_reads_by_the_game_code() {
     let all = [Found::OffMap, Found::Goal, Found::Nearest, Found::Nothing];
     assert_eq!(all.map(Found::code), [0, 1, 2, 3]);
     assert_eq!(all.map(Found::reaches), [true, true, false, false]);
@@ -512,7 +512,7 @@ fn a_search_result_reads_by_the_game_s_code() {
 /// 1 holds a bit per child off the map, and a mark is added and subtracted as the game's byte
 /// arithmetic does (an added mark that is set already carries into the next bit).
 #[test]
-fn a_cell_keeps_the_game_s_two_bytes_and_byte_arithmetic() {
+fn cell_keeps_the_game_two_bytes_and_byte_arithmetic() {
     let cell = Cell::from_bytes([0x3f, 0xf5]);
     assert_eq!(cell.bytes(), [0x3f, 0xf5]);
     assert!(
@@ -540,7 +540,7 @@ fn a_cell_keeps_the_game_s_two_bytes_and_byte_arithmetic() {
 /// A grid level: the tiles at 0, the top at 3, each a step up or down, read as the shift and
 /// the per-level index.
 #[test]
-fn a_grid_level_steps_between_the_tiles_and_the_top() {
+fn grid_level_steps_between_the_tiles_and_the_top() {
     assert_eq!(GridLevel::ALL, [0, 1, 2, 3].map(GridLevel::new));
     assert_eq!(GridLevel::TILES.up().up().up(), GridLevel::TOP);
     assert_eq!(GridLevel::TOP.down(), GridLevel::new(2));
@@ -550,7 +550,7 @@ fn a_grid_level_steps_between_the_tiles_and_the_top() {
 
 /// The grid reads and changes a cell by its place, and gives a level's run of cells.
 #[test]
-fn the_grid_reads_a_cell_by_its_place() {
+fn the_grid_reads_cell_by_its_place() {
     let mut cells = Cells::cleared(4);
     cells[CellIndex::new(2)].kind = CellKind::NODE;
     assert_eq!(cells[CellIndex::new(2)].kind, CellKind::NODE);

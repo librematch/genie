@@ -37,7 +37,7 @@ mod tests {
 
     /// A count adds tiles one by one and reads back.
     #[test]
-    fn a_count_adds_tiles() {
+    fn count_adds_tiles() {
         let mut n = TileCount::ZERO;
         n += TileCount::ONE;
         n += TileCount::new(2);

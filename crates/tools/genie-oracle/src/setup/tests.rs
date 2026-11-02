@@ -36,7 +36,7 @@ fn wonder(id: i32, state: u8, timer: f32) -> Object {
 }
 
 #[test]
-fn a_player_without_a_standing_wonder_has_no_countdown() {
+fn player_without_standing_wonder_has_no_countdown() {
     let save = header(vec![human(vec![combat_object(1, 83), wonder(2, 1, 50.0)])]);
     assert_eq!(
         wonder_time(&save.players()[0]).get().to_bits(),
@@ -128,7 +128,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
 
 /// A resign is the flag without the drop's bit.
 #[test]
-fn a_resign_is_not_a_drop() {
+fn resign_is_not_drop() {
     let mut player = human(Vec::new());
     human_mut(&mut player).base.resigned = 1;
     let turns = slice(&header(vec![gaia(Vec::new()), player]), None);
@@ -138,7 +138,7 @@ fn a_resign_is_not_a_drop() {
 /// A saved technology state reads as its state (4, queued); one that names none (5) stops
 /// every player.
 #[test]
-fn a_technology_state_of_none_stops_every_player() {
+fn technology_state_of_none_stops_every_player() {
     let with = |state: i16| {
         let mut player = human(Vec::new());
         human_mut(&mut player).tech_tree.tech_player_tree = vec![TechPlayerTree {
@@ -182,7 +182,7 @@ fn the_slice_takes_the_master_tables() {
 /// With the master table, a unit inside a building of its player is in the building's garrison
 /// list; a building whose master the player lacks takes no share, so its volleys stay.
 #[test]
-fn a_unit_inside_a_building_is_in_its_garrison() {
+fn unit_inside_building_is_in_its_garrison() {
     let table = MasterTable::of_master(
         CivId::GAIA,
         MasterId::of_data(83).unwrap(),

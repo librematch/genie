@@ -279,7 +279,7 @@ mod tests {
     use crate::world::parts::Parts;
 
     #[test]
-    fn a_taken_mover_leaves_the_animated_layer_and_comes_back_with_it() {
+    fn taken_mover_leaves_the_animated_layer_and_comes_back_with_it() {
         let id = object_id(7);
         let mut parts = Parts::default();
         let mut walker = crate::movement::tests::builder_9177();

@@ -200,7 +200,7 @@ mod tests {
 
     /// A tile keeps its x and y, orders by x then y, and steps by an offset.
     #[test]
-    fn a_tile_keeps_its_place_orders_by_x_then_y_and_steps() {
+    fn tile_keeps_its_place_orders_by_column_then_row_and_steps() {
         let t = Tile::new(3, -4);
         assert_eq!((t.x(), t.y(), t.get()), (3, -4, [3, -4]));
         assert_eq!(Tile::from([3, -4]), t);
@@ -230,7 +230,7 @@ mod tests {
 
     /// A tile box holds the tiles between its corners, the corners included.
     #[test]
-    fn a_tile_box_holds_the_tiles_between_its_corners() {
+    fn tile_box_holds_the_tiles_between_its_corners() {
         let r = TileRect::new(1, 2, 3, 4);
         assert_eq!(
             (r.x0(), r.y0(), r.x1(), r.y1(), r.get()),

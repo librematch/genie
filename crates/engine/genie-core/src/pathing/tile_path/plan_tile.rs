@@ -138,7 +138,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_plan_tile_steps_shifts_and_widens() {
+    fn plan_tile_steps_shifts_and_widens() {
         let t = PlanTile::new(13, -2);
         assert_eq!((t.x(), t.y(), t.get()), (13, -2, [13, -2]));
         assert_eq!(t.stepped(-1, 3), PlanTile::new(12, 1));
@@ -155,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cell_s_children_go_in_the_game_s_order_and_its_centre_by_level() {
+    fn cell_children_go_in_the_game_order_and_its_centre_by_level() {
         assert_eq!(
             PlanTile::new(3, 1).children(),
             [
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn a_rect_holds_a_cell_of_a_level_by_its_shifted_corners() {
+    fn rect_holds_cell_of_level_by_its_shifted_corners() {
         let r = PlanRect::new(8, 4, 23, 15);
         assert_eq!(r.get(), [8, 4, 23, 15]);
         assert!(r.holds_at(GridLevel::TILES, PlanTile::new(8, 15)));

@@ -115,9 +115,9 @@ pub fn powf(x: f32, y: f32) -> f32 {
     let mut ix = x.to_bits();
     let iy = y.to_bits();
     let mut sign_bias = 0u64;
-    let y_special = iy.wrapping_mul(2).wrapping_sub(1) >= 0xfeff_ffff;
-    if ix.wrapping_sub(0x0080_0000) >= 0x7f00_0000 || y_special {
-        if y_special {
+    let special_y = iy.wrapping_mul(2).wrapping_sub(1) >= 0xfeff_ffff;
+    if ix.wrapping_sub(0x0080_0000) >= 0x7f00_0000 || special_y {
+        if special_y {
             let y2 = iy.wrapping_mul(2);
             if y2 == 0 || ix == 0x3f80_0000 {
                 return ONE;

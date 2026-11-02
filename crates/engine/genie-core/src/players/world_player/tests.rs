@@ -191,7 +191,7 @@ fn attribute_44_is_the_kills_less_the_losses() {
 /// and of its gathered total (gold's also of attribute 49); 0, below 0 and NaN give nothing.
 /// A lost player's trickles stop.
 #[test]
-fn the_trickles_give_a_sixtieth_of_their_rate_each_second() {
+fn the_trickles_give_sixtieth_of_their_rate_each_second() {
     let mut t = world();
     let a = &mut t.players[1].attributes;
     (a[230], a[231], a[232], a[233]) = (
@@ -219,7 +219,7 @@ fn the_trickles_give_a_sixtieth_of_their_rate_each_second() {
 /// buildings sums (another type's is passed by); food grows by attribute 254 over 60 times
 /// (the update time before the step times logf(sum / 200 + 1)), its gathered total too.
 #[test]
-fn a_mill_s_livestock_makes_food() {
+fn mill_livestock_makes_food() {
     let mut t = world();
     let masters = Masters::new([
         master(master_id(68), master_type::BUILDING, class::BUILDING),
@@ -260,7 +260,7 @@ fn a_mill_s_livestock_makes_food() {
 /// sharing on, the allies that count it as theirs get the resource and its gathered total,
 /// an enemy, Gaia and a one-sided ally nothing.
 #[test]
-fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
+fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
     let mut t = world();
     t.players[1].kind = PlayerType::COMPUTER;
     t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(crate::players::EscrowShare::of_data);
@@ -319,7 +319,7 @@ fn the_income_fills_a_computer_s_escrow_and_goes_to_mutual_allies() {
 /// a scenario mode; a storage of attribute 11 in store mode 0x20. A player kept by nothing
 /// loses: the status setter takes 2 and attribute 45 is cleared.
 #[test]
-fn a_player_without_an_object_that_keeps_it_loses() {
+fn player_without_an_object_that_keeps_it_loses() {
     let masters = Masters::new([
         master(ids::VILLAGER_MALE, master_type::COMBAT, class::VILLAGER),
         master(master_id(117), master_type::BUILDING, class::WALL),
@@ -412,7 +412,7 @@ fn a_player_without_an_object_that_keeps_it_loses() {
 
 /// Each victory timer at 0 or more keeps the player; −1 and NaN do not.
 #[test]
-fn a_running_victory_timer_keeps_the_player() {
+fn running_victory_timer_keeps_the_player() {
     assert!(!VictoryTimes::default().running());
     for t in [
         VictoryTimes {
@@ -479,7 +479,7 @@ fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
 /// Sudden death: the first built town centre found sets the latch; once set, a player
 /// without one loses. Regicide: a player without a king loses though its units keep it.
 #[test]
-fn sudden_death_and_regicide_end_a_player_their_ways() {
+fn sudden_death_and_regicide_end_player_their_ways() {
     let masters = Masters::new([
         master(ids::VILLAGER_MALE, master_type::COMBAT, class::VILLAGER),
         master(ids::TOWN_CENTRE, master_type::BUILDING, class::BUILDING),

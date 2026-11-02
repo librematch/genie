@@ -174,10 +174,10 @@ impl World {
                 };
                 let keeps =
                     tm == MONASTERY && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
-                let t_master = self.master(tp, tm)?;
+                let target_master = self.master(tp, tm)?;
                 if !keeps
-                    && COMBAT <= t_master.kind
-                    && t_master.garrison.holds()
+                    && COMBAT <= target_master.kind
+                    && target_master.garrison.holds()
                     // a queued order's target −1 is a point: it takes nothing in
                     && o.target
                         .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?

@@ -109,7 +109,7 @@ fn the_tactical_module_ends_after_its_unit_lists() {
 
 /// A player's AI reads its modules in order and stops in the information module.
 #[test]
-fn a_player_s_ai_stops_in_the_information_module() {
+fn player_ai_stops_in_the_information_module() {
     let zeros = vec![0u8; 1 << 18];
     let e = PlayerAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
     assert!(matches!(e, crate::Error::NotRead(_)));

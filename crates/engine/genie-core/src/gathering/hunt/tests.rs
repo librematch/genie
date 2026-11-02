@@ -84,7 +84,7 @@ pub(crate) fn walks(held: Held) -> Walks<'static> {
 /// `FUN_140aa0df0` takes a target in state 6 or below and holds a later one as none
 /// (`FUN_140a7a230`): the hunt's `MoveTo` then has no target and walks to its place.
 #[test]
-fn a_hunt_s_move_to_refuses_a_target_past_state_6() {
+fn hunt_move_to_refuses_target_past_state_6() {
     let mover = walker();
     let h = hunting(31);
     let walk = |state| {
@@ -144,7 +144,7 @@ const fn me(state: HuntState) -> Me {
 /// [`resource_kind`], meat 15 counting as food) does not, the caller's unit AI taking notify
 /// 0x21c.
 #[test]
-fn a_load_of_another_resource_asks_no_drop_off() {
+fn load_of_another_resource_asks_no_drop_off() {
     assert!(asked_drop_off(
         Some(attribute::FOOD),
         Some(attribute::MEAT),
@@ -183,7 +183,7 @@ pub(crate) fn hunting(target: i32) -> HuntAction {
 /// `FUN_140ac44b0`: the decay task (`attribute_type4` 0x124) under attribute 292 turns a
 /// decaying target's decay negative once; any other task or a player without it leaves it.
 #[test]
-fn a_decay_task_stops_its_target_s_decay_once() {
+fn decay_task_stops_its_target_decay_once() {
     let mut hunt = hunting(7);
     let decaying = || Victim {
         decay: AmountRate::new(0.25),
@@ -207,7 +207,7 @@ fn a_decay_task_stops_its_target_s_decay_once() {
 /// The decay check on the step ([`HuntAction::decay_check`]): a target whose decay it stops
 /// goes back to the world at once; one it leaves does not.
 #[test]
-fn a_stopped_decay_goes_back_to_the_world_at_once() {
+fn stopped_decay_goes_back_to_the_world_at_once() {
     let decaying = Victim {
         id: object_id(10028),
         decay: AmountRate::new(0.25),
@@ -341,7 +341,7 @@ const CHOP: HuntTask = HuntTask {
 };
 
 #[test]
-fn a_villager_sent_to_a_tree_attacks_it_first_and_walks_there() {
+fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
     let mut mover = walker();
     let mut held = Held::default();
     let (hunt, _) = HuntAction::start(
@@ -382,7 +382,7 @@ fn a_villager_sent_to_a_tree_attacks_it_first_and_walks_there() {
 /// starts arrived, which the caller shows (records/425906646's 31110 in update 7967). Its own
 /// target it does not take.
 #[test]
-fn a_hunt_retargeted_to_a_tree_beside_it_starts_its_attack_arrived() {
+fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
     let mut mover = walker();
     let mut held = Held::default();
     let (mut hunt, _) = HuntAction::start(
@@ -452,7 +452,7 @@ fn a_hunt_retargeted_to_a_tree_beside_it_starts_its_attack_arrived() {
 /// shepherd 30721 at update 184: its next sheep, more than 3 tiles from the town centre, is
 /// sent there.
 #[test]
-fn a_hunt_s_new_target_clears_its_lead() {
+fn hunt_new_target_clears_its_lead() {
     let mut mover = walker();
     let mut held = Held::default();
     let (mut hunt, _) = HuntAction::start(
@@ -513,7 +513,7 @@ fn a_hunt_s_new_target_clears_its_lead() {
 }
 
 #[test]
-fn a_hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
+fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
     let start = |held: Held, carry_rule: bool| {
         let mut held = held;
         let _ = HuntAction::start(
@@ -560,7 +560,7 @@ fn victim(amount: f32) -> Victim {
 }
 
 #[test]
-fn a_villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full() {
+fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full() {
     let hunt = HuntAction {
         target: Some(object_id(9357)),
         state: HuntState::Gather,
@@ -616,7 +616,7 @@ fn a_villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full
 /// Case 6 without a target: a load is carried off (`set_state(8)`), none or a NaN load searches
 /// (`set_state(3)`, `COMISS` with `JBE`).
 #[test]
-fn a_hunt_without_a_target_carries_its_load_off_or_searches() {
+fn hunt_without_target_carries_its_load_off_or_searches() {
     let mut h = HuntAction {
         target: None,
         state: HuntState::Gather,
@@ -642,7 +642,7 @@ fn a_hunt_without_a_target_carries_its_load_off_or_searches() {
 /// A live allied target fails the hunt at once (`set_state` 13, its timer cleared), as house
 /// 9158 did MarvinBlue/426048731's 9181 after its drop-off in update 1897.
 #[test]
-fn a_hunt_on_a_live_ally_fails() {
+fn hunt_on_live_ally_fails() {
     let ally = Quarry {
         allied: true,
         ..tree()
@@ -673,7 +673,7 @@ fn a_hunt_on_a_live_ally_fails() {
 /// `MoveTo` within the task's range, or 1.5 to the livestock (MarvinBlue/426048731's 9171 to its
 /// own sheep 9520 in update 1116).
 #[test]
-fn a_hunt_walks_to_a_dead_target_or_its_own_livestock() {
+fn hunt_walks_to_dead_target_or_its_own_livestock() {
     let dead = Quarry {
         state: ObjectState::Dying,
         ..tree()
@@ -725,7 +725,7 @@ fn a_hunt_walks_to_a_dead_target_or_its_own_livestock() {
 /// its walk ends and a new one to the hunt's point starts (state 11), the unit stopped; a
 /// lumberjack (its unit AI's class 15) would search for another tree first.
 #[test]
-fn a_hunt_whose_target_went_walks_to_its_point() {
+fn hunt_whose_target_went_walks_to_its_point() {
     let mut hunt = HuntAction {
         target: Some(object_id(28813)),
         state: HuntState::Walk,
@@ -772,7 +772,7 @@ fn a_hunt_whose_target_went_walks_to_its_point() {
 /// timer 0; another player's (a farm changes hands, a pasture's livestock ends the hunt) is
 /// not modelled.
 #[test]
-fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
+fn hunt_faces_its_own_pasture_dead_livestock() {
     const MOVING: Graphic = Graphic {
         id: SpriteId::named(1880),
         frames: crate::objects::Frame::of_data(10),
@@ -833,7 +833,7 @@ fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
 /// player's would end the hunt (`set_state` 13). A human player's villager whose motion step
 /// gave up waits first (425906646's p4 villagers 27238, 31018, 31034 and 31042 in update 5724).
 #[test]
-fn a_walk_to_the_point_ends_in_a_search_or_done() {
+fn walk_to_the_point_ends_in_search_or_done() {
     let hunt = |state, move_to| HuntAction {
         target: None,
         state,
@@ -945,7 +945,7 @@ fn a_walk_to_the_point_ends_in_a_search_or_done() {
 /// another try. A drop-off or a point walk without its `MoveTo`, a drop site gone and a
 /// computer player's ended walk are not modelled.
 #[test]
-fn a_hunter_walks_to_its_drop_site_and_to_its_point() {
+fn hunter_walks_to_its_drop_site_and_to_its_point() {
     let who = PointWalker {
         computer: false,
         villager: true,
@@ -1052,7 +1052,7 @@ fn a_hunter_walks_to_its_drop_site_and_to_its_point() {
 /// motion step's [`crate::movement::Mover::in_the_way`]) go to the unit AI at once, in their
 /// order, as the Hunt's own walk passes them on.
 #[test]
-fn a_hunter_s_walks_pass_on_the_units_in_their_way() {
+fn hunter_walks_pass_on_the_units_in_their_way() {
     let who = PointWalker {
         computer: false,
         villager: true,
@@ -1095,7 +1095,7 @@ fn a_hunter_s_walks_pass_on_the_units_in_their_way() {
 /// `OWN_LIVESTOCK_RANGE`, the point the target's place; a target the hunter touches already
 /// starts arrived. Another live target is not modelled; a unit without speed fails it at its start.
 #[test]
-fn a_hunt_walks_to_its_target_s_place_within_its_range() {
+fn hunt_walks_to_its_target_place_within_its_range() {
     let set_walk = |h: &mut HuntAction, rig: &mut Rig, victim: &Victim| {
         let crate::world::World {
             spatial,
@@ -1167,7 +1167,7 @@ fn a_hunt_walks_to_its_target_s_place_within_its_range() {
 /// −1 s, and one farther is walked to (`set_state(4)`). A hunt leading unprepared is not
 /// modelled.
 #[test]
-fn a_herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
+fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
     let herd = |idle| Herd {
         own: true,
         drop_site: None,
@@ -1282,7 +1282,7 @@ fn a_herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
 /// target left the `MoveTo`'s point; a lead and a face on nothing search; a gather without a
 /// target carries its load off (full) or searches.
 #[test]
-fn a_hunt_s_update_runs_the_step_of_its_state() {
+fn hunt_update_runs_the_step_of_its_state() {
     let update = |h: &mut HuntAction, rig: &mut Rig, computer: bool, held: f32| {
         (
             rig.unit_mut().life.attribute_type,
@@ -1382,7 +1382,7 @@ fn a_hunt_s_update_runs_the_step_of_its_state() {
 /// (3) it tells the caller, whose search for the next tree follows; its target inside another (4)
 /// goes and the hunt walks to its point. A hunt in state 12 without its Attack is not modelled.
 #[test]
-fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
+fn hunt_attack_ends_into_walk_search_or_its_point() {
     use crate::combat::attack::tests::own_attack;
     let sheep = || Victim {
         id: object_id(10028),
@@ -1482,12 +1482,12 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
 /// `set_state(6)` on livestock (`0x140ac60e0` case 6): the hunter's own live animal more
 /// than 3 tiles from its drop site and nearer than 30 is led there (`set_state(10)`; an
 /// animal that stands is sent first, which the world test
-/// `a_hunter_s_sheep_walks_before_the_hunter_s_update_ends` shows), and once led it is led on
+/// `hunter_sheep_walks_before_the_hunter_update_ends` shows), and once led it is led on
 /// however far; a nearer or a farther one is slaughtered (`set_state(12)`). A dead animal out
 /// of the task's range plus `GAP` is walked to (`set_state(4)`); one at hand is faced. A live
 /// one unprepared is not modelled.
 #[test]
-fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
+fn hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
     let herd = |site: Option<(DropSiteId, DistanceSquared)>, idle| Herd {
         own: true,
         drop_site: site,
@@ -1584,7 +1584,7 @@ fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
 /// (state 1); the TC takes wood within a tile, so the load goes to player 2 as wood (1) and
 /// the unit carries nothing after; the hunt has no target to go back to.
 #[test]
-fn a_drop_off_gives_the_load_to_the_player() {
+fn drop_off_gives_the_load_to_the_player() {
     let mut hunt = HuntAction {
         target: None,
         state: HuntState::Drop,
@@ -1706,7 +1706,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
 /// a wait `+0x6c` goes from 1 to 2, the walk asks for its path and the unit shows the hunt's
 /// moving sprite; a target within the walk range is reached at once.
 #[test]
-fn a_hunt_s_walk_starts_toward_its_target() {
+fn hunt_walk_starts_toward_its_target() {
     const MOVING: Graphic = Graphic {
         id: SpriteId::named(1880),
         frames: crate::objects::Frame::of_data(10),
@@ -1764,7 +1764,7 @@ fn a_hunt_s_walk_starts_toward_its_target() {
 /// its target and it walked on to its point, code 1): the decay check does nothing and
 /// `set_state(6)` without a target only shows the walking sprite, timer 0.
 #[test]
-fn a_walk_that_ended_without_its_target_only_turns_to_the_face() {
+fn walk_that_ended_without_its_target_only_turns_to_the_face() {
     let mut rig = Rig::on_the_path(Victim::default());
     let mut h = HuntAction {
         state: HuntState::Walk,
@@ -1786,7 +1786,7 @@ fn a_walk_that_ended_without_its_target_only_turns_to_the_face() {
 /// walk as a failure does (the hunt waits 3 seconds, the animation stopped, cases 3 to 5) and
 /// the point walk as an arrival does (state 11 searches).
 #[test]
-fn a_move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
+fn move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
     let who = PointWalker {
         computer: false,
         villager: true,
@@ -1831,7 +1831,7 @@ fn a_move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
 /// first check finds the target it holds past state 6 (code 5); a target the world no longer
 /// holds is not a loss (the `MoveTo` walks on to its point), and nor is a `MoveTo` on its way.
 #[test]
-fn a_hunt_of_a_tree_searches_on_a_failed_walk_or_a_target_let_go() {
+fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
     let tree_lost = |state: ObjectState, move_to: MoveTo, holding: bool| {
         let mut rig = Rig::on_the_path(Victim::default());
         if holding {
@@ -1873,7 +1873,7 @@ fn a_hunt_of_a_tree_searches_on_a_failed_walk_or_a_target_let_go() {
 /// A unit in a state of 3 or more adds no sub-action (`FUN_140a977e0` deletes the new
 /// `MoveTo`): the hunt's `set_state` leaves it without one.
 #[test]
-fn a_dying_hunter_makes_no_move_to() {
+fn dying_hunter_makes_no_move_to() {
     let mut mover = walker();
     let mut h = hunting(-1);
     h.point = Position::new(5.0, 6.0, 0.0);

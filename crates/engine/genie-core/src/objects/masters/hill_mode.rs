@@ -48,7 +48,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_hill_mode_is_the_data_s_byte() {
+    fn hill_mode_is_the_data_byte() {
         assert_eq!(HillMode::of_data(0), HillMode::ANY);
         assert_eq!(HillMode::of_data(9).get(), 9);
         assert_eq!(HillMode::ANY.to_string(), "0");

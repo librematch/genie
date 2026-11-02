@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn a_command_borrows_its_packet() {
+    fn command_borrows_its_packet() {
         let mut body = le(&[1, 3]);
         body.extend([0x67, 1, 0x10]);
         body.extend(le(&[4242]));
@@ -358,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sync_followed_by_another_op_is_a_plain_sync() {
+    fn sync_followed_by_another_op_is_plain_sync() {
         let mut body = le(&[2, 104, 3]);
         body.extend(le(&[0x431e_0000, 0x41c0_0000, 5]));
         let view = View {
@@ -373,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sync_followed_by_a_zero_marker_carries_a_checkpoint() {
+    fn sync_followed_by_zero_marker_carries_checkpoint() {
         let (body, checkpoint) = checkpoint_body();
         let checkpoint = Box::new(checkpoint);
         assert_eq!(
@@ -383,12 +383,12 @@ mod tests {
     }
 
     #[test]
-    fn a_sync_at_the_end_of_the_body_is_a_plain_sync() {
+    fn sync_at_the_end_of_the_body_is_plain_sync() {
         assert_eq!(read(&le(&[2, 20]), false), vec![Ok(Op::Sync { dt: 20 })]);
     }
 
     #[test]
-    fn a_chat_borrows_its_text() {
+    fn chat_borrows_its_text() {
         let mut body = le(&[4, u32::MAX, 2]);
         body.extend(b"hi");
         assert_eq!(
@@ -413,7 +413,7 @@ mod tests {
     }
 
     #[test]
-    fn a_truncated_record_reports_its_file_offset_and_stops() {
+    fn truncated_record_reports_its_file_offset_and_stops() {
         let mut body = le(&[2, 20, 1, 10]);
         body.extend([1, 2, 3]);
         let ops = read(&body, false);

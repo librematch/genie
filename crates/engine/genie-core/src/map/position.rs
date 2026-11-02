@@ -104,7 +104,7 @@ mod tests {
 
     /// A place's tile is its ground point's: x and y cut toward zero, the height left out.
     #[test]
-    fn a_place_s_tile_is_its_ground_point_s() {
+    fn place_tile_is_its_ground_point_s() {
         assert_eq!(
             Position::new(3.9, -0.5, 7.0).tile(),
             crate::map::Tile::new(3, 0)
@@ -113,7 +113,7 @@ mod tests {
 
     /// A place's x, y and z keep their bits, and its vector swaps y and the height.
     #[test]
-    fn a_place_keeps_its_bits_and_its_vector_swaps_y_and_the_height() {
+    fn place_keeps_its_bits_and_its_vector_swaps_the_height_and_y() {
         let p = Position::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
             (p.x().to_bits(), p.y(), p.z().to_bits()),

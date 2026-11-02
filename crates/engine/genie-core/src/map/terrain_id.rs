@@ -52,7 +52,7 @@ mod tests {
 
     /// A short from 0 to 255 names a terrain; −1, any id below and one beyond a byte are none.
     #[test]
-    fn a_terrain_id_is_a_tile_s_byte() {
+    fn terrain_id_is_tile_byte() {
         assert_eq!(TerrainId::of_data(0), Some(TerrainId::named(0)));
         assert_eq!(TerrainId::of_data(255), Some(TerrainId::named(255)));
         assert_eq!(TerrainId::of_data(-1), None);

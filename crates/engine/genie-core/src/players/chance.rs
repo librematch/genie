@@ -38,7 +38,7 @@ mod tests {
     /// A draw passes when its percent lies below the chance: 0x7fff is 100, 0 passes any
     /// chance but none.
     #[test]
-    fn a_draw_passes_below_the_chance_s_percent() {
+    fn draw_passes_below_the_chance_percent() {
         let chance = Chance::of_data(30);
         // 9830 * 100 / 0x7fff = 29, 9831 * 100 / 0x7fff = 30
         assert!(chance.passes(9830));

@@ -155,7 +155,7 @@ mod tests {
 
     /// A sprite list: each node behind its type (2 with an animation, 1 without), then a 0.
     #[test]
-    fn a_sprite_list_writes_back_its_nodes() {
+    fn sprite_list_writes_back_its_nodes() {
         let animation = SpriteNodeAnimation {
             animate_interval: 2,
             animate_last: 3,

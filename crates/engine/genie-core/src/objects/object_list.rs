@@ -416,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn a_lookup_by_id_finds_the_object_s_slot() {
+    fn lookup_by_id_finds_the_object_slot() {
         let mut l = list(&[5, 7, 9]);
         assert_eq!(l.position_of(object_id(7)), Some(ListIndex::new(1)));
         assert_eq!(l.by_id(object_id(9)).map(|u| u.id.get()), Some(9));
@@ -433,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_s_places_are_counted_once_and_checked() {
+    fn list_places_are_counted_once_and_checked() {
         let mut l = list(&[4, 5, 6]);
         let places: Vec<_> = l.places().map(ListIndex::get).collect();
         assert_eq!(places, [0, 1, 2]);
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn the_list_s_removals_keep_every_slot() {
+    fn the_list_removals_keep_every_slot() {
         let mut l = list(&[1, 2, 3, 4, 5, 6]);
         assert_eq!(
             l.swap_remove(ListIndex::new(1)).unwrap().id,
@@ -557,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stand_in_that_left_its_list_takes_nothing_back() {
+    fn stand_in_that_left_its_list_takes_nothing_back() {
         let mut l = list(&[1, 2]);
         let out = l.take_out(ListIndex::new(1)).unwrap();
         assert_eq!(l.pop().map(|u| u.id), Some(TAKEN_OUT));
@@ -593,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_that_held_an_id_twice_finds_its_first_slot() {
+    fn list_that_held_an_id_twice_finds_its_first_slot() {
         let mut l = list(&[0, 4, 0]);
         assert_eq!(l.position_of(object_id(0)), Some(ListIndex::new(0)));
         let _ = l.swap_remove(ListIndex::new(0)).unwrap();

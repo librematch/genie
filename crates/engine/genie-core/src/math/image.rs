@@ -457,6 +457,10 @@ pub mod hull_path {
     pub const HALF: f32 = f32::from_bits(0x3f00_0000);
     /// 2.0
     pub const HALF_TURN: f32 = f32::from_bits(0x4000_0000);
+    /// 1.0000001192092896
+    pub const HIGH_T: f32 = f32::from_bits(0x3f80_0001);
+    /// -1.0000000116860974e-07
+    pub const LOW_T: f32 = f32::from_bits(0xb3d6_bf95);
     /// 3.4028234663852886e+38
     pub const MOST: f32 = f32::from_bits(0x7f7f_ffff);
     /// 4.0
@@ -482,10 +486,6 @@ pub mod hull_path {
     pub const SQRT_2: f32 = f32::from_bits(0x3fb5_04f3);
     /// 360.0
     pub const TURN: f32 = f32::from_bits(0x43b4_0000);
-    /// 1.0000001192092896
-    pub const T_HIGH: f32 = f32::from_bits(0x3f80_0001);
-    /// -1.0000000116860974e-07
-    pub const T_LOW: f32 = f32::from_bits(0xb3d6_bf95);
     /// -360.0
     pub const UNTURN: f32 = f32::from_bits(0xc3b4_0000);
 }

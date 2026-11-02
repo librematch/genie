@@ -49,7 +49,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_fog_visibility_is_the_data_s_byte() {
+    fn fog_visibility_is_the_data_byte() {
         assert_eq!(FogVisibility::of_data(0), FogVisibility::INVISIBLE);
         assert_eq!(FogVisibility::of_data(9).get(), 9);
         assert_eq!(FogVisibility::INVISIBLE.to_string(), "0");

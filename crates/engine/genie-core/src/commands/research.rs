@@ -6,7 +6,7 @@ use crate::players::PlayerId;
 use crate::world::World;
 
 /// RESEARCH (0x65, `0x140e7e270`): the technology `tech` at the building `building`
-/// ([`World::research`]). `count` (`+0x8`) counts the buildings the packet lists, `q_id`
+/// ([`World::research`]). `count` (`+0x8`) counts the buildings the packet lists, `queue_id`
 /// (`+0xc`, the formatter's `qId`) is −1 for a research to run, and `shift` (`+0x10`) asks for five at once.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResearchCommand {
@@ -21,7 +21,7 @@ pub struct ResearchCommand {
     /// `+0xa`: the technology, none for −1 (or any id below 0).
     pub tech: Option<crate::technology::TechId>,
     /// `+0xc`, the formatter's `qId`: −1 for a research to run.
-    pub q_id: crate::commands::QueueId,
+    pub queue_id: crate::commands::QueueId,
     /// `+0x10`: five at once.
     pub shift: bool,
 }

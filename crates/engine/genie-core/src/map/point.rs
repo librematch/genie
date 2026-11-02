@@ -114,7 +114,7 @@ mod tests {
 
     /// A point's x and y keep their bits, and a height makes it a place.
     #[test]
-    fn a_point_keeps_its_bits_and_a_height_makes_it_a_place() {
+    fn point_keeps_its_bits_and_height_makes_it_place() {
         let p = Point::new(-0.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(p.get().map(f32::to_bits), [0x8000_0000, 0x7fc0_0001]);
         assert_eq!(
@@ -132,7 +132,7 @@ mod tests {
 
     /// A point's tile cuts x and y toward zero; a NaN or a value past 32 bits is `i32::MIN`.
     #[test]
-    fn a_point_s_tile_cuts_toward_zero() {
+    fn point_tile_cuts_toward_zero() {
         assert_eq!(Point::new(3.9, -0.5).tile(), Tile::new(3, 0));
         assert_eq!(Point::new(-1.5, 7.0).tile(), Tile::new(-1, 7));
         assert_eq!(
@@ -143,7 +143,7 @@ mod tests {
 
     /// A point's component along an axis is its x or its y, and setting it changes only that.
     #[test]
-    fn a_point_s_component_along_an_axis_is_its_x_or_y() {
+    fn point_component_along_axis_is_that_coordinate() {
         let p = Point::new(1.0, 2.0);
         assert_eq!((p.along(Axis::X), p.along(Axis::Y)), (1.0, 2.0));
         assert_eq!(p.with_along(Axis::X, 5.0), Point::new(5.0, 2.0));

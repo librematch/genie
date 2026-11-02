@@ -38,7 +38,7 @@ mod tests {
 
     /// The results are the game's bytes.
     #[test]
-    fn strike_results_are_the_game_s_bytes() {
+    fn strike_results_are_the_game_bytes() {
         assert_eq!(StrikeResult::default(), StrikeResult::NONE);
         assert_eq!(StrikeResult::of_data(2), StrikeResult::SHIELDED);
         assert_eq!(StrikeResult::HIT.get(), 1);

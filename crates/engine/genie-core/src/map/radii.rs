@@ -158,7 +158,7 @@ mod tests {
 
     /// Radii keep their components' bits in the map's order, and their ground part is x and y.
     #[test]
-    fn radii_keep_their_bits_and_their_ground_part_is_x_and_y() {
+    fn radii_keep_their_bits_and_their_ground_part_is_both_axes() {
         let r = Radii::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
             r.get().map(f32::to_bits),
@@ -190,7 +190,7 @@ mod tests {
 
     /// A footprint keeps its components' bits and takes a height to three radii.
     #[test]
-    fn a_footprint_keeps_its_bits_and_takes_a_height() {
+    fn footprint_keeps_its_bits_and_takes_height() {
         let f = Footprint::new(-0.0, 0.5);
         assert_eq!(f.get().map(f32::to_bits), [0x8000_0000, 0.5f32.to_bits()]);
         assert_eq!((f.x().to_bits(), f.y()), (0x8000_0000, 0.5));

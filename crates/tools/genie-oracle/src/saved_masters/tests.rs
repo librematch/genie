@@ -62,7 +62,7 @@ fn table(facets: [i16; 3]) -> MasterTable {
 /// The facets of the sprites the master shows, when they are all of one count; the data
 /// file's sprites only.
 #[test]
-fn a_master_s_facets_are_its_sprites_when_they_agree() {
+fn master_facets_are_its_sprites_when_they_agree() {
     let master = walker();
     let s = master.tribe_master_combat_object.as_deref().unwrap();
     let s = &s
@@ -84,7 +84,7 @@ fn a_master_s_facets_are_its_sprites_when_they_agree() {
 /// The speed is the top speed times the sprite's factor above 0 (the run sprite, else the
 /// move sprite), the turning the data file's, the restriction its mask.
 #[test]
-fn a_walker_moves_by_its_sprites_speed_factors() {
+fn walker_moves_by_its_sprites_speed_factors() {
     let master = walker();
     let s = {
         let c = master.tribe_master_combat_object.as_deref().unwrap();
@@ -128,7 +128,7 @@ fn a_walker_moves_by_its_sprites_speed_factors() {
 
 /// Without a moving part, the data file's turning, or a restriction the table has, no stats.
 #[test]
-fn a_master_without_its_movement_has_no_stats() {
+fn master_without_its_movement_has_no_stats() {
     let master = walker();
     let s = {
         let c = master.tribe_master_combat_object.as_deref().unwrap();

@@ -248,7 +248,7 @@ fn lost_members_leave_the_group_and_stop() {
 /// waits while its target is pending; a follow (2) and a command above 106 but the relics'
 /// go.
 #[test]
-fn a_hibernating_group_waits_runs_its_queue_or_goes() {
+fn hibernating_group_waits_runs_its_queue_or_goes() {
     let mut t = world();
     let set = |t: &mut World, command: i32, target: i32, queued: bool| {
         let g = t.groups.get_mut(group_id(1)).unwrap();
@@ -303,7 +303,7 @@ fn a_hibernating_group_waits_runs_its_queue_or_goes() {
 /// other object, of a player the owner does not count an ally, that the owner sees (or only
 /// explored, for a master with `fog_visibility`).
 #[test]
-fn a_target_is_pending_while_seen_and_no_ally_s() {
+fn target_is_pending_while_seen_and_no_ally_s() {
     let mut t = world();
     let target = |t: &mut World, command: i32, id: i32| {
         let g = t.groups.get_mut(group_id(1)).unwrap();
@@ -434,7 +434,7 @@ fn relic_carriers_keep_their_command_pending() {
 /// `FUN_141017f00`: a member is free by its top action's state and its unit AI; an object
 /// the world does not hold is not.
 #[test]
-fn a_member_is_free_by_its_action_and_its_unit_ai() {
+fn member_is_free_by_its_action_and_its_unit_ai() {
     let mut t = world();
     assert!(t.member_idle(object_id(10)).unwrap());
     assert!(!t.member_idle(object_id(99)).unwrap());
@@ -518,7 +518,7 @@ fn a_member_is_free_by_its_action_and_its_unit_ai() {
 /// `FUN_141007a50`: a group rests without a command, its motion standing and no held
 /// member moving.
 #[test]
-fn a_group_rests_without_command_motion_or_moving_member() {
+fn group_rests_without_command_motion_or_moving_member() {
     let mut t = world();
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::NONE;
     assert!(t.at_rest(group_id(1)));
@@ -592,7 +592,7 @@ fn kept_apart_units_leave_unless_busy() {
 /// The group's deletion: its held members whose link names it leave it; an idle one stands
 /// and shows standing, a busy one walks on. A group without members goes at its update.
 #[test]
-fn a_deleted_group_lets_its_members_go() {
+fn deleted_group_lets_its_members_go() {
     let mut t = world();
     for u in &mut t.players[1].objects {
         t.parts
@@ -636,7 +636,7 @@ fn a_deleted_group_lets_its_members_go() {
 /// standing and walking sprites are its goods', which the slice does not hold, its running
 /// one the master's.
 #[test]
-fn a_unit_shows_its_standing_walking_or_running_sprite() {
+fn unit_shows_its_standing_walking_or_running_sprite() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
     t.parts
@@ -717,7 +717,7 @@ fn a_unit_shows_its_standing_walking_or_running_sprite() {
 /// The formation's turn: past π/4 (not a NaN), or with [`MotionFlags::NEW`] or
 /// [`GroupFlags::RELAYOUT_AT_TURN`].
 #[test]
-fn the_formation_turns_past_a_quarter_turn() {
+fn the_formation_turns_past_quarter_turn() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.flags = GroupFlags::NONE;
@@ -904,7 +904,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
 /// since attacking go to `f32::MAX`); without the target it ends as a finished move: deleted
 /// without queued commands, else hibernating.
 #[test]
-fn a_follow_moves_to_its_target_when_it_strays() {
+fn follow_moves_to_its_target_when_it_strays() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::FOLLOW;
@@ -946,7 +946,7 @@ fn a_follow_moves_to_its_target_when_it_strays() {
 /// 12 a strayed target (a squared 1 from the top path's end) turns the move into a follow;
 /// wait delays and a group waiting for a path do nothing.
 #[test]
-fn a_moving_group_s_move_waits_or_follows() {
+fn moving_group_move_waits_or_follows() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::MOVE;
@@ -1011,7 +1011,7 @@ fn a_moving_group_s_move_waits_or_follows() {
 /// goes on; on a patrol it does not finish; a formation whose slots are all in their places lets
 /// their units go and ends the command; one with none in place locks to its kind.
 #[test]
-fn a_standing_group_s_move_ends_or_goes_on() {
+fn standing_group_move_ends_or_goes_on() {
     let mut t = world();
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::MOVE;
@@ -1143,7 +1143,7 @@ fn units_out_of_their_places_get_paths() {
 /// timer down and, at 0, drops its move and stands; a busy one or one without an active
 /// move is passed; another reason's step is not modelled.
 #[test]
-fn a_member_moved_aside_waits_out_its_timer() {
+fn member_moved_aside_waits_out_its_timer() {
     let mut t = world();
     t.dt_seconds = Seconds::new(0.5);
     for u in &mut t.players[1].objects {
@@ -1213,7 +1213,7 @@ fn a_member_moved_aside_waits_out_its_timer() {
 /// later), the move's distance loses the ground distance from its last position to where the
 /// unit last moved to (here 1 tile short of it on y), which becomes its last position.
 #[test]
-fn a_member_s_own_move_walks_its_path() {
+fn member_own_move_walks_its_path() {
     let mut t = world();
     t.dt_seconds = Seconds::new(0.5);
     let mut walker = crate::gathering::hunt::tests::walker();
@@ -1267,7 +1267,7 @@ fn a_member_s_own_move_walks_its_path() {
 /// group update that changes its members' movers, they read the movers as it left them. Here the
 /// group goes (its members have no unit AI) and its free members stand, no longer moving.
 #[test]
-fn a_group_update_leaves_its_members_gaits_current() {
+fn group_update_leaves_its_members_gaits_current() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
     for u in &mut t.players[1].objects {
@@ -1370,7 +1370,7 @@ fn an_idle_group_goes() {
 /// whose member leaves it (no unit AI) stops the member, which then does not move in the
 /// same update.
 #[test]
-fn a_player_s_groups_update_before_its_objects() {
+fn player_groups_update_before_its_objects() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
     for u in &mut t.players[1].objects {
@@ -1401,7 +1401,7 @@ fn a_player_s_groups_update_before_its_objects() {
 /// (reason −1), keeps its speed of 1 above its top speed of 0.8 (below 10) and moves 1 a second
 /// (0.1 in the update); 12, on an own move (reason 0) without a walked level, stands.
 #[test]
-fn a_group_steers_its_free_members_speeds_in_their_own_update() {
+fn group_steers_its_free_members_speeds_in_their_own_update() {
     let mut t = world();
     let walker = crate::gathering::hunt::tests::walker();
     for u in &mut t.players[1].objects {
@@ -1458,7 +1458,7 @@ fn a_group_steers_its_free_members_speeds_in_their_own_update() {
 /// one outside a group the world holds and one in none are not steered. The reason picks the
 /// answer: 2 aside, −1 free, any other an own move at the group's top speed.
 #[test]
-fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
+fn the_speed_slot_reads_the_group_that_steers_free_member() {
     let t = world();
     let mut g = t.groups.get(group_id(1)).unwrap().clone();
     g.motion.maximum_velocity_forward = Speed::new(0.9);
@@ -1546,7 +1546,7 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
 /// moves to the group's flags, and both motion bits clear. A motion that did not move keeps
 /// its stored positions.
 #[test]
-fn the_update_end_stores_a_moved_group_s_new_position() {
+fn the_update_end_stores_moved_group_new_position() {
     let mut g = UnitGroup::new(group_id(1));
     g.motion.new_position[0] = BVector::new(3.0, 0.0, 4.0);
     g.motion.flags = MotionFlags::MOVED | MotionFlags::NEW;
@@ -1617,7 +1617,7 @@ fn the_lead_is_the_member_nearest_the_targets_place() {
 
 /// `FUN_141017630`, `resetIdleTimer` (`FUN_14102d370`) and `IsIdle` (`FUN_141017ad0`).
 #[test]
-fn a_group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
+fn group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
     let held = Unit {
         id: object_id(10),
         ..Unit::default()
@@ -1669,7 +1669,7 @@ fn a_group_holds_members_draws_its_idle_timer_and_tells_when_it_is_idle() {
 /// `FUN_14102bb40`: the command queue empties; a hibernating group (1) wakes with flags
 /// `0x4c000`, any other hibernation value wakes without them.
 #[test]
-fn emptying_the_command_queue_wakes_a_hibernating_group() {
+fn emptying_the_command_queue_wakes_hibernating_group() {
     let mut g = UnitGroup::new(group_id(1));
     g.command_queue = vec![crate::groups::GroupCommand::default()];
     g.hibernating = 1;
@@ -1688,7 +1688,7 @@ fn emptying_the_command_queue_wakes_a_hibernating_group() {
 /// The long pather's list of a unit in group 1 (whose differentiator groups are 1 and 2) is
 /// 10, 11 and 12; a unit of no group, or of a group the world does not hold, has none.
 #[test]
-fn a_grouped_units_list_is_its_groups_differentiator_units() {
+fn grouped_units_list_is_its_groups_differentiator_units() {
     let member = |id| Member {
         id,
         ..Member::default()
@@ -1769,7 +1769,7 @@ fn grounded() -> World {
 /// [`GroupFlags::LEAD_TO_TARGET`] puts it at its centroid; [`GroupFlags::PLACE_AGAIN`] places it
 /// too, and clears.
 #[test]
-fn an_awake_group_without_a_command_places_itself_and_turns_its_formation() {
+fn an_awake_group_without_command_places_itself_and_turns_its_formation() {
     let mean = BVector::new(4.0 / 3.0, 0.0, 4.0 / 3.0);
     let run = |flags, motion_flags| {
         let mut t = grounded();
@@ -1810,7 +1810,7 @@ fn an_awake_group_without_a_command_places_itself_and_turns_its_formation() {
 /// formation turns: the group stands at its members' mean place facing their forward (-x),
 /// the slots turn with it about that place and take the nearest units anew.
 #[test]
-fn an_awake_group_s_members_walk_to_their_slots_and_its_due_orders_go() {
+fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
     let run = |flags, motion_flags| {
         let mut t = grounded();
         let slot = |x: f32| crate::groups::Slot {
@@ -1999,7 +1999,7 @@ fn an_attack_whose_target_is_gone_from_sight_ends_or_goes_back() {
 
 /// A first member the world does not hold ends the update without finishing it.
 #[test]
-fn an_attack_without_a_first_member_does_nothing() {
+fn an_attack_without_first_member_does_nothing() {
     let mut t = world();
     attacking(&mut t);
     t.groups.get_mut(group_id(1)).unwrap().members[0].id = object_id(99);
@@ -2017,7 +2017,7 @@ fn an_attack_without_a_first_member_does_nothing() {
 /// and each unit is sent (its own move clears). A group arrived and on its way (bit 4) sends all
 /// its members at the end of the update, clears bit 4 and is finished.
 #[test]
-fn an_attack_releases_a_category_in_reach_or_arrived() {
+fn an_attack_releases_category_in_reach_or_arrived() {
     let mut t = world();
     attacking(&mut t);
     register(&mut t);
@@ -2066,7 +2066,7 @@ fn an_attack_releases_a_category_in_reach_or_arrived() {
 /// A unit in contact (a footprint gap of 0.14 less 0.25 within no range) releases the category
 /// without the group having arrived.
 #[test]
-fn a_unit_in_contact_releases_its_category() {
+fn unit_in_contact_releases_its_category() {
     let mut t = world();
     attacking(&mut t);
     t.players[1].objects[ListIndex::new(0)].place =
@@ -2091,7 +2091,7 @@ fn a_unit_in_contact_releases_its_category() {
 /// A target that moved more than 1 from where it stood and is in sight is attacked anew; the
 /// group's move to it begins, which ends the update (not finished).
 #[test]
-fn an_attack_follows_a_target_that_moved() {
+fn an_attack_follows_target_that_moved() {
     let mut t = world();
     attacking(&mut t);
     register(&mut t);
@@ -2144,7 +2144,7 @@ fn gate_world() -> World {
 /// the footprint gap squared, the gate first; a gate in reach, and any other target, stands for
 /// itself.
 #[test]
-fn a_gate_out_of_reach_is_struck_at_its_nearest_part() {
+fn gate_out_of_reach_is_struck_at_its_nearest_part() {
     let mut t = gate_world();
     // 11 at (2, 1): the annex is nearer than the gate
     assert_eq!(
@@ -2183,7 +2183,7 @@ fn a_gate_out_of_reach_is_struck_at_its_nearest_part() {
 /// Slot 0x208 (`FUN_141202c70`) of a unit: its mover's speed (0 without a mover); a charger
 /// (type 70 with `max_charge`) of special attack 3 is the charge's, which is not modelled.
 #[test]
-fn a_unit_s_speed_is_its_movers_unless_a_charge_runs() {
+fn unit_speed_is_its_movers_unless_charge_runs() {
     let mut t = world();
     t.parts.put_mover(
         t.players[1].objects[ListIndex::new(0)].id,
@@ -2213,7 +2213,7 @@ fn a_unit_s_speed_is_its_movers_unless_a_charge_runs() {
 /// (about 2.37) over 0.8 is 2 whole seconds, 4000 ms, so the timer is a draw below 2000 plus
 /// 3000.
 #[test]
-fn a_released_special_unit_draws_its_retarget_timer() {
+fn released_special_unit_draws_its_retarget_timer() {
     let mut t = world();
     attacking(&mut t);
     register(&mut t);

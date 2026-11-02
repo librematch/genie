@@ -458,7 +458,7 @@ mod tests {
 
     /// A map elevation's six words, read in file order and written back byte for byte.
     #[test]
-    fn a_map_elevation_writes_back_its_six_words() {
+    fn map_elevation_writes_back_its_six_words() {
         let bytes: Vec<u8> = [30i32, 2, 5, 3, -1, 0]
             .iter()
             .flat_map(|w| w.to_le_bytes())

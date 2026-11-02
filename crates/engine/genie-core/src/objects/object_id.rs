@@ -143,7 +143,7 @@ mod tests {
 
     /// A field's −1 is none, any other value an id, and each converts back to its value.
     #[test]
-    fn a_field_s_minus_one_is_none_and_any_other_value_an_id() {
+    fn field_minus_one_is_none_and_any_other_value_an_id() {
         assert_eq!(ObjectId::of_field(-1), None);
         for value in [0, 5, -2, i32::MIN, i32::MAX] {
             assert_eq!(ObjectId::of_field(value).map(ObjectId::get), Some(value));
@@ -166,7 +166,7 @@ mod tests {
     /// A map keyed by ids lists them in the order of one keyed by their values: the game hashes
     /// the value (`std::hash<int>`).
     #[test]
-    fn a_map_of_ids_lists_them_as_their_values() {
+    fn map_of_ids_lists_them_as_their_values() {
         use crate::math::msvc::unordered_map_order;
         let values = [1, 2, 9, 2, -2];
         let by_value: Vec<ObjectId> = unordered_map_order(values).into_iter().map(id).collect();
@@ -176,7 +176,7 @@ mod tests {
 
     /// A lookup key names an id, none or (a raw field) −1 for none.
     #[test]
-    fn a_lookup_key_names_its_id_or_none() {
+    fn lookup_key_names_its_id_or_none() {
         use crate::objects::ObjectKey;
         assert_eq!(id(7).key(), Some(id(7)));
         assert_eq!(Some(id(7)).key(), Some(id(7)));

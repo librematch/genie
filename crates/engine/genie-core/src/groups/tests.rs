@@ -33,7 +33,7 @@ use crate::world::World;
 /// `+0xa0`, `+0xa8`, zero speeds and accelerations, the lead (`+0xc4`) -1, flags 3, the
 /// frame at the origin facing x, one level without a path.
 #[test]
-fn a_new_motion_holds_the_constructor_s_values() {
+fn new_motion_holds_the_constructor_values() {
     let m = Motion::new();
     assert_eq!(
         (
@@ -103,7 +103,7 @@ fn member(id: i32) -> Member {
 /// `FUN_1410175f0`: a member's place in the list, none for a unit that is no member, which
 /// orders before every member as the game's −1 does.
 #[test]
-fn a_member_s_index_is_its_place_and_a_stranger_s_none() {
+fn member_index_is_its_place_and_stranger_none() {
     let mut g = UnitGroup::new(group_id(1));
     g.members = vec![member(10), member(11)];
     assert_eq!(g.index_of(object_id(11)), Some(1));
@@ -114,7 +114,7 @@ fn a_member_s_index_is_its_place_and_a_stranger_s_none() {
 /// `FUN_141017590`: a member's own move's reason (`+0xf8`'s record at the member's index,
 /// its `+8`), whatever its place in the list; −1 for a unit that is no member.
 #[test]
-fn a_member_s_reason_is_its_own_move_s() {
+fn member_reason_is_its_own_move_s() {
     let mut group = UnitGroup::new(group_id(1));
     let with_reason = |id, reason| Member {
         id,
@@ -137,7 +137,7 @@ fn a_member_s_reason_is_its_own_move_s() {
 /// decides: in place when its state (`+0x2c`) is 3. A unit without a slot, and a group without
 /// a current formation, is not in place; the previous formation is not read.
 #[test]
-fn a_unit_is_in_place_when_its_first_slot_in_the_current_formation_is() {
+fn unit_is_in_place_when_its_first_slot_in_the_current_formation_is() {
     let slot = |unit_id, state| Slot {
         unit_id,
         state,
@@ -192,7 +192,7 @@ fn the_differentiator_units_are_the_members_of_the_listed_groups() {
 /// oldest points go while the line without its last stretch stays longer.
 /// `FUN_14102bae0`: the points go, the lengths stay.
 #[test]
-fn clearing_a_lines_points_keeps_its_lengths() {
+fn clearing_lines_points_keeps_its_lengths() {
     let mut line = PointLine {
         points: vec![LinePoint::default(); 3],
         length: Distance::new(2.5),
@@ -236,7 +236,7 @@ fn the_stored_positions_keep_their_desired_length() {
 }
 
 #[test]
-fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
+fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     assert_eq!(
         sub_formation(
             master_type::MISSILE,
@@ -301,7 +301,7 @@ fn a_unit_s_sub_formation_follows_its_category_and_its_hero_flag() {
 
 /// `FUN_140fe1550`: every value the constructor writes that the group holds.
 #[test]
-fn a_new_group_holds_the_constructor_s_values() {
+fn new_group_holds_the_constructor_values() {
     let g = UnitGroup::new(group_id(7));
     assert_eq!((g.id, g.owner, g.stance), (group_id(7), None, None));
     assert_eq!(
@@ -332,7 +332,7 @@ fn a_new_group_holds_the_constructor_s_values() {
 }
 
 #[test]
-fn a_new_group_takes_the_next_id_at_the_list_s_end() {
+fn new_group_takes_the_next_id_at_the_list_end() {
     let mut groups = UnitGroups {
         counter: group_id(4),
         ..UnitGroups::default()
@@ -455,7 +455,7 @@ fn member_11() -> ObjectId {
 
 /// `FUN_14106b8b0`: the unit's own master's task is the command, with the task's range.
 #[test]
-fn a_member_s_own_task_is_the_command_with_the_task_s_range() {
+fn member_own_task_is_the_command_with_the_task_range() {
     let t = tasked_world(
         vec![
             task_master(
@@ -481,7 +481,7 @@ fn a_member_s_own_task_is_the_command_with_the_task_s_range() {
 
 /// The slot answers none (-1) for a target that is the member itself.
 #[test]
-fn a_member_has_no_task_on_itself() {
+fn member_has_no_task_on_itself() {
     let t = tasked_world(
         vec![
             task_master(
@@ -532,7 +532,7 @@ fn the_ranges_of_tasks_0x69_and_0x68_do_not_come_from_the_task() {
 /// A master without a task for the target takes the first master of its class, type and swap
 /// group that has one, searched with the same filter.
 #[test]
-fn a_member_without_a_task_takes_the_swap_group_s_first_with_one() {
+fn member_without_task_takes_the_swap_group_first_with_one() {
     let t = tasked_world(
         vec![
             task_master(ids::VILLAGER_MALE, vec![]),
@@ -566,7 +566,7 @@ fn a_member_without_a_task_takes_the_swap_group_s_first_with_one() {
 
 /// A master of a swap group 0 does not search the others; none found is none.
 #[test]
-fn a_master_without_a_swap_group_has_no_other_to_try() {
+fn master_without_swap_group_has_no_other_to_try() {
     let mut own = task_master(ids::VILLAGER_MALE, vec![]);
     own.task_by_group = TaskGroup::NONE;
     let t = tasked_world(
@@ -589,7 +589,7 @@ fn a_master_without_a_swap_group_has_no_other_to_try() {
 /// A master of type 0x28 or above that holds a board task (0x84) asks the player's commands
 /// when it finds no task, which is not modelled; a type below does not.
 #[test]
-fn a_master_with_a_board_task_and_no_task_found_is_not_modelled() {
+fn master_with_board_task_and_no_task_found_is_not_modelled() {
     let mut own = task_master(
         ids::VILLAGER_MALE,
         vec![plain_task(
@@ -748,7 +748,7 @@ fn building_60() -> ObjectId {
 /// moves to it: command 9, [`crate::groups::GroupFlags::ARRIVED`] off and [`GroupFlags::ATTACKING`]
 /// on.
 #[test]
-fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
+fn group_commanded_on_target_out_of_reach_moves_to_it() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
     assert!(
         t.command_attack(
@@ -790,7 +790,7 @@ fn a_group_commanded_on_a_target_out_of_reach_moves_to_it() {
 /// [`crate::groups::GroupFlags::JOINED`], only notes where the target is (false); with it, or a
 /// member on another target, it commands again.
 #[test]
-fn a_group_already_on_its_target_only_notes_the_place() {
+fn group_already_on_its_target_only_notes_the_place() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     assert!(
         t.command_attack(group_id(1), building_60(), attack_on(None))
@@ -820,7 +820,7 @@ fn a_group_already_on_its_target_only_notes_the_place() {
 /// With two commands queued the members' pass does not run: the range is the group's smallest unit
 /// range, and a member within reach attacks nothing here.
 #[test]
-fn a_group_with_two_queued_commands_takes_its_smallest_unit_range() {
+fn group_with_two_queued_commands_takes_its_smallest_unit_range() {
     let mut t = attack_world(&[(7, 4, 38.0, 45.0)]);
     t.groups.get_mut(group_id(1)).unwrap().command_queue =
         vec![GroupCommand::default(), GroupCommand::default()];
@@ -837,7 +837,7 @@ fn a_group_with_two_queued_commands_takes_its_smallest_unit_range() {
 /// `FUN_14102bbd0`: the pass raises the range to the largest a member works at; a member
 /// within its weapon's reach of the target and not nearer than its minimum range is sent at it.
 #[test]
-fn the_reach_pass_raises_the_range_and_sends_a_member_in_reach() {
+fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 38.0, 45.0)]);
     register(&mut t);
     for u in &mut t.players[1].objects {
@@ -875,7 +875,7 @@ fn the_reach_pass_raises_the_range_and_sends_a_member_in_reach() {
 /// action type (the conversion's adds attribute 280); no such task -1; a master the player does
 /// not have 0.
 #[test]
-fn a_filter_takes_the_range_of_the_members_task_of_that_type() {
+fn filter_takes_the_range_of_the_members_task_of_that_type() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
         master.tasks = vec![
@@ -954,7 +954,7 @@ fn general(queued: bool, direct: bool) -> CommandArgs {
 /// length, no retargeting, certain action -1); the members' seconds since attacking are the
 /// maximum.
 #[test]
-fn a_general_command_moves_the_group_to_the_target_and_takes_the_command() {
+fn general_command_moves_the_group_to_the_target_and_takes_the_command() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     let moved = t
         .general_command(
@@ -988,7 +988,7 @@ fn a_general_command_moves_the_group_to_the_target_and_takes_the_command() {
 
 /// A group that cannot move (its top speed below the tolerance) takes no command (false).
 #[test]
-fn a_general_command_of_a_group_that_cannot_move_does_nothing() {
+fn general_command_of_group_that_cannot_move_does_nothing() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     t.groups
         .get_mut(group_id(1))
@@ -1015,7 +1015,7 @@ fn a_general_command_of_a_group_that_cannot_move_does_nothing() {
 /// directly hibernates; not direct behind queued commands it joins unapproved, the queue is
 /// approved and runs, and a general command on a held target in it is run (the group takes it).
 #[test]
-fn a_general_command_queues_or_runs_the_queue() {
+fn general_command_queues_or_runs_the_queue() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     assert!(
         !t.general_command(
@@ -1068,7 +1068,7 @@ fn a_general_command_queues_or_runs_the_queue() {
 /// 46 ones; a target of master 6 or 7 the class 46 ones only; a target of a villager's class the
 /// units by formation category; any other target none.
 #[test]
-fn the_special_units_follow_the_target_s_class() {
+fn the_special_units_follow_the_target_class() {
     let units = [
         (7, 4, 0.0, 0.0),
         (8, 5, 0.0, 0.0),
@@ -1161,7 +1161,7 @@ fn command_args(queued: bool, direct: bool) -> CommandArgs {
 /// `FUN_14100efd0`: a group's order on a building of another player runs the attack path (task 7):
 /// the group moves to it in command 9 and the move stops the members.
 #[test]
-fn a_group_ordered_on_an_enemy_building_runs_the_attack_path() {
+fn group_ordered_on_an_enemy_building_runs_the_attack_path() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
     let moved = t
         .group_command(
@@ -1183,7 +1183,7 @@ fn a_group_ordered_on_an_enemy_building_runs_the_attack_path() {
 /// `FUN_14100efd0`: a member whose task on the building is action 5 gives the general command: the
 /// group moves to it within the task's range and is in command 5 with the target's data.
 #[test]
-fn a_group_ordered_with_a_general_task_runs_the_general_command() {
+fn group_ordered_with_general_task_runs_the_general_command() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
         master.tasks = vec![crate::objects::masters::Task {
@@ -1214,7 +1214,7 @@ fn a_group_ordered_with_a_general_task_runs_the_general_command() {
 
 /// A target the world does not hold is a null object for the command: the plain move.
 #[test]
-fn a_group_ordered_on_an_object_the_world_lacks_moves_to_the_point() {
+fn group_ordered_on_an_object_the_world_lacks_moves_to_the_point() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     assert!(
         t.group_command(
@@ -1236,7 +1236,7 @@ fn a_group_ordered_on_an_object_the_world_lacks_moves_to_the_point() {
 /// retargeting byte and the filter's 16 bits kept) and nothing moves; a group without a command
 /// that is told directly hibernates.
 #[test]
-fn a_queued_attack_joins_the_command_queue() {
+fn queued_attack_joins_the_command_queue() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     let args = CommandArgs {
         queued: true,
@@ -1308,7 +1308,7 @@ fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
 /// command (`FUN_14100f7f0` with the node's retargeting byte and filter) and ends the run
 /// without the move to the last command's point.
 #[test]
-fn a_queued_attack_on_a_held_target_ends_the_run_with_the_attack() {
+fn queued_attack_on_held_target_ends_the_run_with_the_attack() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
         command: GroupCommandKind::named(7),

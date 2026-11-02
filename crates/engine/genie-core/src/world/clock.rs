@@ -291,7 +291,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_clock_wraps_as_the_game_s_u32() {
+    fn the_clock_wraps_as_the_game_u32() {
         let late = WorldTime::from_millis(u32::MAX - 9);
         let later = late.after(Millis::new(20));
         assert_eq!(later.millis(), 10);
@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn a_span_counts_up_wrapping_and_down_to_none() {
+    fn span_counts_up_wrapping_and_down_to_none() {
         let t = Millis::new(u32::MAX).wrapping_add(Millis::new(2));
         assert_eq!(t.get(), 1);
         assert_eq!(
@@ -321,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn seconds_do_the_game_s_f32_operations() {
+    fn seconds_do_the_game_f32_operations() {
         let (a, b) = (Seconds::new(0.1), Seconds::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         assert_eq!((b - a).get().to_bits(), (0.2_f32 - 0.1).to_bits());
@@ -353,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn seconds_are_the_milliseconds_over_a_thousand_in_f32() {
+    fn seconds_are_the_milliseconds_over_thousand_in_f32() {
         assert_eq!(
             Millis::new(50).seconds().get().to_bits(),
             (50.0_f32 / 1000.0).to_bits()

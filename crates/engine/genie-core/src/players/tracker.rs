@@ -610,7 +610,7 @@ mod tests {
 
     /// A list's key is the game's integer: a master's id, a class + 900, each + 90000 pending.
     #[test]
-    fn a_list_key_is_the_games_integer() {
+    fn list_key_is_the_games_integer() {
         assert_eq!(
             (list_of(109).get(), list_of(109).pending().get()),
             (109, 90_109)
@@ -630,7 +630,7 @@ mod tests {
 
     /// A waiting key files under its pending lists, a done one under its done lists.
     #[test]
-    fn a_keys_lists_are_pending_while_it_waits() {
+    fn keys_lists_are_pending_while_it_waits() {
         let tc = Key {
             master: Some(master_id(109)),
             class: Some(class::BUILDING),
@@ -673,7 +673,7 @@ mod tests {
     /// own 24, not its key master 4) and its key's class (+ 90900); `FUN_14104f330` drops the
     /// last of each, whatever it is, and leaves an empty list alone.
     #[test]
-    fn a_queued_unit_places_a_minus_one_and_its_spawn_drops_the_last() {
+    fn queued_unit_places_minus_one_and_its_spawn_drops_the_last() {
         let mut t = Tracker::default();
         t.place(Some(master_id(24)), Some(class::CLASS_0));
         t.place(Some(master_id(24)), Some(class::CLASS_0));
@@ -700,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_keys_by_its_lines_first_master_and_a_building_by_its_stack_unit() {
+    fn unit_keys_by_its_lines_first_master_and_building_by_its_stack_unit() {
         let (m, l) = (masters(), lines());
         let k = |id| key(Some(&m), &l, id);
         // the crossbowman (24) files under the archer (4), class 0 a military one
@@ -772,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn a_building_waits_until_its_completion_moves_it_to_the_end_of_the_done_lists() {
+    fn building_waits_until_its_completion_moves_it_to_the_end_of_the_done_lists() {
         let (m, l) = (masters(), lines());
         let tc = key(Some(&m), &l, ids::TOWN_CENTRE);
         let mut t = Tracker::default();
@@ -810,7 +810,7 @@ mod tests {
     }
 
     #[test]
-    fn a_removal_keeps_the_others_order() {
+    fn removal_keeps_the_others_order() {
         let (m, l) = (masters(), lines());
         let v = key(Some(&m), &l, ids::VILLAGER_MALE);
         let mut t = Tracker::default();
@@ -843,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn a_promotion_moves_an_object_to_the_end_of_its_new_lists() {
+    fn promotion_moves_an_object_to_the_end_of_its_new_lists() {
         let (m, l) = (masters(), lines());
         let (villager, builder) = (
             key(Some(&m), &l, ids::VILLAGER_MALE),
@@ -976,7 +976,7 @@ mod tests {
     }
 
     #[test]
-    fn a_relisted_object_goes_last_and_a_completed_one_joins_its_done_lists() {
+    fn relisted_object_goes_last_and_completed_one_joins_its_done_lists() {
         let mut t = world();
         t.load_trackers().unwrap();
         t.track_relist(PlayerId::new(1), object_id(11), ids::VILLAGER_MALE)
@@ -1031,7 +1031,7 @@ mod tests {
     }
 
     #[test]
-    fn a_move_of_all_reads_each_objects_class_from_the_world() {
+    fn move_of_all_reads_each_objects_class_from_the_world() {
         let mut t = world();
         t.load_trackers().unwrap();
         // the villagers' list (83) moves to 118's; their class (4) stays theirs
@@ -1060,7 +1060,7 @@ mod tests {
     }
 
     #[test]
-    fn a_move_of_all_takes_the_list_and_its_pending_one_and_empties_them() {
+    fn move_of_all_takes_the_list_and_its_pending_one_and_empties_them() {
         let mut t = Tracker::default();
         t.push(list_of(500), Some(object_id(1)));
         t.push(list_of(500), None);

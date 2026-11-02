@@ -83,7 +83,7 @@ mod tests {
     /// The tests against a path's count are signed: −1 lies within any path, the last point of
     /// an empty one is −1.
     #[test]
-    fn the_tests_against_a_count_are_signed() {
+    fn the_tests_against_count_are_signed() {
         assert!(WaypointIndex::NONE.within(0) && !WaypointIndex::FIRST.within(0));
         assert_eq!(WaypointIndex::last_of(0), WaypointIndex::NONE);
         assert!(WaypointIndex::of_data(2).at_or_past_last(3));

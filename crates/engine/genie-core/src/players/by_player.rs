@@ -105,7 +105,7 @@ mod tests {
 
     /// A player's value is at its number; a player past the row has none.
     #[test]
-    fn a_player_s_value_is_at_its_number() {
+    fn player_value_is_at_its_number() {
         let mut row: ByPlayer<u8> = [7, 8, 9].into_iter().collect();
         assert_eq!(row.get(PlayerId::new(1)), Some(&8));
         assert_eq!(row.get(PlayerId::new(3)), None);

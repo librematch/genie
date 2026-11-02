@@ -35,7 +35,7 @@ mod tests {
 
     /// A rate reads back and divides by another as the game's `DIVSS`.
     #[test]
-    fn a_rate_divides_by_another() {
+    fn rate_divides_by_another() {
         assert_eq!(DamageRate::new(6.0).over(DamageRate::new(4.0)), 1.5);
         assert_eq!(DamageRate::ZERO.get(), 0.0);
         assert!(DamageRate::new(1.0).over(DamageRate::ZERO).is_infinite());

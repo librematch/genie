@@ -157,7 +157,7 @@ mod tests {
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
     /// `MoveTo` of a state that does not walk; the walks give theirs.
     #[test]
-    fn a_build_s_states_read_back_from_their_bytes() {
+    fn build_states_read_back_from_their_bytes() {
         for b in 0..=255_u8 {
             match BuildState::of_byte(b, None) {
                 Ok(s) => assert_eq!(s.get(), b),

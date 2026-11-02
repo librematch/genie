@@ -181,7 +181,7 @@ mod tests {
     /// An offset keeps its components' bits in the map's order, scales each by the factor
     /// first and moves a place by its components.
     #[test]
-    fn an_offset_keeps_its_bits_scales_and_moves_a_place() {
+    fn an_offset_keeps_its_bits_scales_and_moves_place() {
         let o = Offset::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
             o.get().map(f32::to_bits),
@@ -208,7 +208,7 @@ mod tests {
     /// A ground offset keeps its components' bits in the map's order, makes a table in its
     /// order, takes a height and moves a point by its components.
     #[test]
-    fn a_ground_offset_keeps_its_bits_takes_a_height_and_moves_a_point() {
+    fn ground_offset_keeps_its_bits_takes_height_and_moves_point() {
         let o = GroundOffset::new(-0.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(o.get().map(f32::to_bits), [0x8000_0000, 0x7fc0_0001]);
         assert_eq!(

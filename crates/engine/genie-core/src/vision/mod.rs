@@ -239,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    fn a_player_alone_sees_with_its_own_bits() {
+    fn player_alone_sees_with_its_own_bits() {
         assert_eq!(
             own_masks(PlayerId::new(2), false),
             masks(0x2000_0004, 0x2000_0004_0000_0000)

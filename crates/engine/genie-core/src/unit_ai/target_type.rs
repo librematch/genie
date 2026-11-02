@@ -86,7 +86,7 @@ mod tests {
     /// A saved −1 is no type, any other number 0 or more a type that reads as the master and the
     /// class of that number; a negative number or one past `i16` is an error.
     #[test]
-    fn a_saved_target_type_reads_as_a_master_and_a_class() {
+    fn saved_target_type_reads_as_master_and_class() {
         assert_eq!(OrderTargetType::of_field(-1), Ok(None));
         let t = OrderTargetType::of_field(42).unwrap().unwrap();
         assert_eq!((t.master(), t.class()), (master_id(42), class::RELIC));
@@ -102,7 +102,7 @@ mod tests {
 
     /// A target's master gives its number; a class gives its number, and a master's −1 none.
     #[test]
-    fn a_type_is_made_of_a_master_or_a_class() {
+    fn type_is_made_of_master_or_class() {
         assert_eq!(
             OrderTargetType::field(Some(OrderTargetType::of_master(master_id(285)))),
             285

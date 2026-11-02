@@ -348,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn an_object_joins_a_list_when_seen_and_leaves_by_a_swap_with_the_last() {
+    fn an_object_joins_list_when_seen_and_leaves_by_swap_with_the_last() {
         let mut r = registry();
         for id in [1, 2, 3] {
             r.update_unit(UnitUpdate {
@@ -394,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    fn a_query_finds_the_records_within_its_rounded_box_by_relation() {
+    fn query_finds_the_records_within_its_rounded_box_by_relation() {
         let mut r = registry();
         r.update_unit(UnitUpdate {
             id: object_id(1),
@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn a_query_caps_its_radius_at_44() {
+    fn query_caps_its_radius_at_44() {
         let mut r = registry();
         r.update_unit(UnitUpdate {
             id: object_id(1),
@@ -540,7 +540,7 @@ mod tests {
     }
 
     #[test]
-    fn a_query_keeps_a_wide_object_whose_centre_lies_beyond_the_radius() {
+    fn query_keeps_wide_object_whose_centre_lies_beyond_the_radius() {
         let mut r = registry();
         r.update_unit(UnitUpdate {
             id: object_id(1),

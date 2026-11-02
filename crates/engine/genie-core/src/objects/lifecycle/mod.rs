@@ -303,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn a_dead_static_object_holds_its_state_while_its_amount_decays_then_leaves() {
+    fn dead_static_object_holds_its_state_while_its_amount_decays_then_leaves() {
         // FLARE3 (MarvinBlue/426048731 object 10025): 1.0 of attribute 12, decay 1.0 per second;
         // the game's states after updates 1 to 13, then it is gone in update 14
         let flare = Lifecycle {
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn a_dead_animated_object_without_a_death_sprite_leaves_in_its_fourth_update() {
+    fn dead_animated_object_without_death_sprite_leaves_in_its_fourth_update() {
         // PLACEHOLDER2 and the empty town-centre annex of the same recording
         let (states, left) = run(dead(Class::Animated), Millis::new(104), 20);
         assert_eq!(
@@ -383,7 +383,7 @@ mod tests {
     /// MarvinBlue/426048731's sheep 9520 (dying sprite 8220): killed, it dies into state 4, which
     /// holds while its dying sprite animates (updates 1252 to 1333), then 5.
     #[test]
-    fn a_dying_sprite_holds_state_4_while_it_animates() {
+    fn dying_sprite_holds_state_4_while_it_animates() {
         let mut sheep = Lifecycle {
             dying_sprite: Some(SpriteId::named(8220)),
             ..dead(Class::Animated)
@@ -400,7 +400,7 @@ mod tests {
     /// The marlin (master 61) without a dying sprite, at 0 hit points, ends in state 5 in the
     /// update it dies, as the game's direct `set_state(5)` leaves it.
     #[test]
-    fn a_marlin_goes_to_state_5_at_once() {
+    fn marlin_goes_to_state_5_at_once() {
         let mut marlin = Lifecycle {
             master_id: master_id(61),
             dying_sprite: None,
@@ -448,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    fn an_object_of_a_resource_in_state_7_goes_to_state_8_and_then_leaves() {
+    fn an_object_of_resource_in_state_7_goes_to_state_8_and_then_leaves() {
         // MarvinBlue/426048731's Gaia objects 0, 1, 43, 44 and 47 in the header's state 7
         let mut life = Lifecycle {
             state: ObjectState::Removed,
@@ -468,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn a_felled_tree_draws_its_facet_and_keeps_its_wood() {
+    fn felled_tree_draws_its_facet_and_keeps_its_wood() {
         // MarvinBlue/426048731's tree 9357 in update 1128: its second hit left 0 hit points; it
         // dies (state 3) and its falling sprite takes a random facet from the Object stream
         let mut tree = Lifecycle {
@@ -504,7 +504,7 @@ mod tests {
     /// go to the owner (resources and attributes alike), one without an attribute (−1) does
     /// not; the last of flag 0 is what the object holds.
     #[test]
-    fn a_new_object_s_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {
+    fn new_object_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {
         let mut owner = crate::world::player::Player {
             attributes: vec![Amount::ZERO; 20],
             ..crate::world::player::Player::default()

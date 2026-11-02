@@ -89,7 +89,7 @@ mod tests {
     /// Each state reads back from its byte; the bytes without a state are errors; the states
     /// that keep their target are 4 to 7 and 11.
     #[test]
-    fn an_attack_s_states_read_back_from_their_bytes() {
+    fn an_attack_states_read_back_from_their_bytes() {
         for b in 0..=255_u8 {
             match AttackState::of_byte(b) {
                 Ok(s) => assert_eq!(s.get(), b),

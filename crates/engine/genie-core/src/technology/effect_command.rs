@@ -423,7 +423,7 @@ mod tests {
 
     /// A kind's tens name its block's players and its units the command; 9 and 49 up are none.
     #[test]
-    fn a_kinds_tens_are_its_party_and_its_units_the_command() {
+    fn kinds_tens_are_its_party_and_its_units_the_command() {
         assert_eq!(
             parse(24, 4, -1, 0x0108, 2.0),
             EffectCommand::Attribute {
@@ -457,7 +457,7 @@ mod tests {
     /// edits the cost slots: of the class named by 900 and up, else the master; NaN and Gaia's
     /// block multiply the attribute.
     #[test]
-    fn a_negative_cost_multiply_edits_the_cost_slots() {
+    fn negative_cost_multiply_edits_the_cost_slots() {
         assert_eq!(
             parse(5, 4, -1, 104, -2.0),
             EffectCommand::Costs {
@@ -562,7 +562,7 @@ mod tests {
 
     /// A class below −1, or a cost's resource below −1, is no value of the data.
     #[test]
-    fn a_class_or_resource_below_minus_one_fails() {
+    fn class_or_resource_below_minus_one_fails() {
         assert!(EffectCommand::of_data(0, -1, -2, 0, 1.0).is_err());
         assert!(EffectCommand::of_data(b'e', 0, -2, 0, 1.0).is_err());
     }

@@ -150,7 +150,7 @@ mod tests {
 
     /// A step raises or lowers a price by one `f32` operation; the net trades count both ways.
     #[test]
-    fn the_market_values_move_by_the_game_s_operations() {
+    fn the_market_values_move_by_the_game_operations() {
         let p = Price::new(1.3);
         assert_eq!(p.raised(0.02).get().to_bits(), (1.3_f32 + 0.02).to_bits());
         assert_eq!(p.lowered(0.02).get().to_bits(), (1.3_f32 - 0.02).to_bits());
@@ -165,7 +165,7 @@ mod tests {
 
     /// A volume trades from 1; its floats are the int's and its negation's.
     #[test]
-    fn a_volume_trades_from_one() {
+    fn volume_trades_from_one() {
         assert!(LotVolume::of_data(1).any() && !LotVolume::of_data(0).any());
         assert_eq!(
             LotVolume::of_data(100).as_f32().to_bits(),

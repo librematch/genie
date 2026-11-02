@@ -43,7 +43,7 @@ mod tests {
 
     /// Player p is bit p; a set holds the players it was given, and keeps every bit.
     #[test]
-    fn a_player_is_its_bit() {
+    fn player_is_its_bit() {
         let (one, four) = (PlayerId::new(1), PlayerId::new(4));
         assert_eq!(PlayerSet::of(four).bits(), 1 << 4);
         let mut set = PlayerSet::NONE;

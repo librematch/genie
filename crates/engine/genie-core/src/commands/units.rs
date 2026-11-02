@@ -122,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn a_handler_reads_60_units_of_a_human_and_500_of_a_computer() {
+    fn handler_reads_60_units_of_human_and_500_of_computer() {
         let w = world();
         let many = unit_list(object_ids(0..600));
         assert_eq!(
@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn a_check_refuses_a_count_past_the_ids_and_a_player_the_world_lacks() {
+    fn check_refuses_count_past_the_ids_and_player_the_world_lacks() {
         let w = world();
         let short = UnitList {
             count: 2,
@@ -160,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn a_refused_list_command_does_nothing_and_stops_no_one() {
+    fn refused_list_command_does_nothing_and_stops_no_one() {
         let mut w = world();
         let before = w.clone();
         // BUILD of the last commanded units: its count overruns the packet (do_command's 0x66)
@@ -168,7 +168,7 @@ mod tests {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(1.0, 1.0),
-            q_id: crate::commands::QueueId::NONE,
+            queue_id: crate::commands::QueueId::NONE,
             sprite_override: crate::commands::SpriteOverride::NONE,
             builders: UnitList::last_commanded(),
             queued: false,
@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_reads_its_first_count_ids_at_most_the_cap() {
+    fn list_reads_its_first_count_ids_at_most_the_cap() {
         let list = UnitList {
             count: 3,
             ids: object_ids([1, 2, 3, 4]),
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn a_count_past_the_ids_overruns_and_reads_what_the_packet_holds() {
+    fn count_past_the_ids_overruns_and_reads_what_the_packet_holds() {
         let list = UnitList {
             count: 5,
             ids: object_ids([1, 2]),
@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_of_ids_counts_them() {
+    fn list_of_ids_counts_them() {
         assert_eq!(
             unit_list(object_ids([7, 8])),
             UnitList {
@@ -223,7 +223,7 @@ mod tests {
     /// A list of `0xffff` ids or more is an error: no count names it (`0xffff` names the last
     /// commanded units); `0xfffe` ids are a list.
     #[test]
-    fn a_list_no_count_names_is_an_error() {
+    fn list_no_count_names_is_an_error() {
         let ids = |n: usize| vec![None; n];
         assert_eq!(
             UnitList::try_from(ids(0xffff)).map_err(|e| e.kind()),

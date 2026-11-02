@@ -55,11 +55,11 @@ impl UnitView<'_, '_> {
             }
             others.find(id)
         };
-        let Some((_, t_unit)) = find(target) else {
+        let Some((_, target_unit)) = find(target) else {
             return Ok(false);
         };
         // slot 0x820's point: the target's place
-        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), t_unit.position());
+        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
         if self.actions.top_action_kind() == Some(crate::construction::repair::REPAIR) {
             let order = RepairOrder::Retake(target);
             self.c
@@ -186,7 +186,7 @@ impl UnitView<'_, '_> {
             }
             others.find(id)
         };
-        let Some((_, t_unit)) = find(target) else {
+        let Some((_, target_unit)) = find(target) else {
             return Ok(false);
         };
         let under_artifact =
@@ -247,7 +247,7 @@ impl UnitView<'_, '_> {
             drop_sites: &self.c.w.drop_sites,
         };
         // slot 0x820's point: the target's place
-        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), t_unit.position());
+        let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
         let Some((task, switch)) = task_search(
             masters,
             &actor,

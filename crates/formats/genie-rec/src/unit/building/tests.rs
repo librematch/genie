@@ -43,7 +43,7 @@ fn read_gather_point(bytes: &Bytes) -> Option<GatherPoint> {
 }
 
 #[test]
-fn a_gather_point_is_none_a_location_or_an_object() {
+fn gather_point_is_none_location_or_an_object() {
     assert!(read_gather_point(&gather_point(0, 5, 5)).is_none());
     assert!(matches!(
         read_gather_point(&gather_point(1, -1, 0xFFFF)),
@@ -98,7 +98,7 @@ fn an_old_building_reads_its_links_and_queue() {
 /// From 11.54 on the building has the pending order, the gate's fields, the terrain and both
 /// flags; of the two endpoints the second is kept.
 #[test]
-fn a_building_of_11_54_reads_every_later_field() {
+fn building_of_11_54_reads_every_later_field() {
     let head = head().raw(&gather_point(1, -1, 0xFFFF).0).u8(0).i32(9);
     let bytes = links_and_queues(head)
         .floats(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0])

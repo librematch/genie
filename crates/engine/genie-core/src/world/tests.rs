@@ -437,7 +437,7 @@ fn retarget(t: &World) -> Vec<u32> {
 }
 
 #[test]
-fn a_removed_object_is_replaced_by_the_last_one_which_updates_in_the_same_tick() {
+fn removed_object_is_replaced_by_the_last_one_which_updates_in_the_same_tick() {
     // RGE_Object_List::update: the dead building leaves in its fourth update; the last object
     // takes its slot and updates there, so it draws before the object behind the slot
     let mut t = World::new(
@@ -478,7 +478,7 @@ fn a_removed_object_is_replaced_by_the_last_one_which_updates_in_the_same_tick()
 }
 
 #[test]
-fn a_dead_objects_unit_ai_draws_nothing() {
+fn dead_objects_unit_ai_draws_nothing() {
     // the dead building's unit AI is the building's, the live ones' theirs
     let one = |objects: Vec<Unit>| {
         let ais: Vec<_> = objects
@@ -690,7 +690,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
 ///
 /// [`BVector`]: crate::math::fmath::BVector
 #[test]
-fn an_order_on_a_target_joins_the_unit_ai_s_history() {
+fn an_order_on_target_joins_the_unit_ai_history() {
     use crate::math::fmath::BVector;
     let master = |id, class| Master {
         id,
@@ -787,7 +787,7 @@ fn an_order_on_a_target_joins_the_unit_ai_s_history() {
 /// with height 0, which the static `new_position` (slot 0x58, slot 0x60 `FUN_141193a10`) puts
 /// on the ground, as 426048706's flare of update 2486 stands at 4 on raised ground.
 #[test]
-fn a_flare_at_a_point_stands_on_the_ground() {
+fn flare_at_point_stands_on_the_ground() {
     let player = || Player {
         attributes: vec![Amount::ZERO; 300],
         ..Player::default()
@@ -821,7 +821,7 @@ fn a_flare_at_a_point_stands_on_the_ground() {
 /// A hit on player 2's object makes player 2 a flare (master 112) at the attacker's place
 /// (`FUN_14120c0a0`'s slot 0x1c0), whose amount (`+0x310`, its time) a trebuchet's hit doubles.
 #[test]
-fn a_hit_s_flare_lasts_twice_as_long_from_a_trebuchet() {
+fn hit_flare_lasts_twice_as_long_from_trebuchet() {
     let player = || Player {
         attributes: vec![Amount::ZERO; 300],
         ..Player::default()
@@ -946,7 +946,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
 /// facet and its angle, then the routine its first facet. Each is the pasture's, holds its share
 /// of the food, no unit targets it, and the pasture lists it.
 #[test]
-fn a_completed_pasture_puts_its_livestock_on_its_edges() {
+fn completed_pasture_puts_its_livestock_on_its_edges() {
     use crate::gathering::pasture::{LIVESTOCK, edge_points};
     let mut t = pasture_game(
         Position::new(20.0, 20.0, 0.0),
@@ -1011,7 +1011,7 @@ fn a_completed_pasture_puts_its_livestock_on_its_edges() {
 /// sixteen asked give twelve and the points run out; at the map's left edge the points off it
 /// (x below 0 after CVTTSS2SI: −1.5, not −0.6) go too, leaving six tiles.
 #[test]
-fn a_pasture_puts_one_animal_a_tile_on_the_map() {
+fn pasture_puts_one_animal_tile_on_the_map() {
     let mut t = pasture_game(
         Position::new(20.0, 20.0, 0.0),
         16.0,
@@ -1047,7 +1047,7 @@ fn a_pasture_puts_one_animal_a_tile_on_the_map() {
 /// A master the owner has not got makes nothing but counts as an attempt, its point staying; no
 /// livestock asked draws nothing; the food is the pasture's over the count (DIVSS).
 #[test]
-fn a_pasture_counts_each_attempt_and_shares_its_food() {
+fn pasture_counts_each_attempt_and_shares_its_food() {
     use crate::gathering::pasture::{LIVESTOCK, edge_points};
     let mut t = pasture_game(Position::new(20.0, 20.0, 0.0), 3.0, &[master_id(1899)]);
     t.streams.get(Stream::Object).set_seed(7);
@@ -1112,7 +1112,7 @@ fn a_pasture_counts_each_attempt_and_shares_its_food() {
 /// Its top speed (slot 65, `FUN_14114d1d0`) follows the sprite: the master's speed, times the
 /// sprite's speed factor above 0.
 #[test]
-fn a_dying_livestock_shows_its_dying_sprite() {
+fn dying_livestock_shows_its_dying_sprite() {
     for (factor, speed) in [(0.0, 0.737), (2.0, 1.474)] {
         let o = dying_animal(master_type::MOVING, factor);
         let u = &o.unit;
@@ -1218,7 +1218,7 @@ fn tended_pasture(at: Position, room: f32) -> World {
 /// the first without workers, else the first whose workers are below the owner's attribute
 /// 290, else none; a unit of another player gets none. Slot 0x780 sums the livestock's workers.
 #[test]
-fn a_villager_tends_the_nearest_livestock_with_room() {
+fn villager_tends_the_nearest_livestock_with_room() {
     let livestock = |t: &World| {
         t.parts
             .building_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -1305,7 +1305,7 @@ fn a_villager_tends_the_nearest_livestock_with_room() {
 /// full one has its unit AI take a search (0x202 with the hunt action, class 49, −1) and it
 /// tends none.
 #[test]
-fn a_villager_ordered_on_a_pasture_works_its_livestock() {
+fn villager_ordered_on_pasture_works_its_livestock() {
     let order = |target| crate::orders::Work {
         target,
         point: Position::new(20.0, 20.0, 0.0),
@@ -1357,7 +1357,7 @@ fn a_villager_ordered_on_a_pasture_works_its_livestock() {
 /// Slot 0x7e8 of a unit in state 3 or later ignores the order: nothing of the pasture's or the
 /// unit's changes.
 #[test]
-fn a_unit_past_state_2_ignores_a_work_order() {
+fn unit_past_state_2_ignores_work_order() {
     let order = crate::orders::Work {
         target: Some(object_id(50)),
         point: Position::new(20.0, 20.0, 0.0),
@@ -1377,7 +1377,7 @@ fn a_unit_past_state_2_ignores_a_work_order() {
 /// none and the order ends there, before `FUN_141189ca0`: the pasture the villager tended stays
 /// its own.
 #[test]
-fn a_villager_ordered_on_a_pasture_without_livestock_tends_on() {
+fn villager_ordered_on_pasture_without_livestock_tends_on() {
     let order = crate::orders::Work {
         target: Some(object_id(50)),
         point: Position::new(20.0, 20.0, 0.0),
@@ -1413,7 +1413,7 @@ fn a_villager_ordered_on_a_pasture_without_livestock_tends_on() {
 /// `FUN_141189ca0`: a unit tending a pasture joins its workers once; tending none drops it
 /// from the pasture it tended (`FUN_1411cafa0`); an object that is no building keeps no list.
 #[test]
-fn a_unit_joins_and_leaves_a_pasture_s_workers() {
+fn unit_joins_and_leaves_pasture_workers() {
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
     t.tend_pasture(PlayerId::new(1), v, Some(PastureId::new(object_id(50))))
@@ -1460,7 +1460,7 @@ fn a_unit_joins_and_leaves_a_pasture_s_workers() {
 /// `Process_New_Tiles`: player 1's newly explored tiles, in order, give the objects of its
 /// masters that gather by themselves to its lists by group, at their places.
 #[test]
-fn a_player_s_new_tiles_give_their_resources_to_its_lists() {
+fn player_new_tiles_give_their_resources_to_its_lists() {
     use crate::objects::masters::{Master, Masters};
     use crate::vision::visibility::{VisibleResource, VisibleResources};
     let object = |id, master, x, y| Unit {
@@ -1552,7 +1552,7 @@ fn a_player_s_new_tiles_give_their_resources_to_its_lists() {
 /// visible-resource lists at once; an animated one (state 5 to 7, not below 4) only when it
 /// is deleted (state 8 leaving its list, `FUN_14116b5e0`).
 #[test]
-fn a_resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
+fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
     use crate::objects::lifecycle::MasterData;
     use crate::objects::masters::{Master, Masters};
     use crate::vision::visibility::VisibleResources;
@@ -1645,7 +1645,7 @@ fn a_resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
 /// `FUN_14162ce00`: a new object of a master that gathers by itself joins the lists of the
 /// players that explored its tile; one of another master joins none.
 #[test]
-fn a_new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
+fn new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
     use crate::objects::masters::{Master, Masters};
     use crate::vision::visibility::{VisibleResource, VisibleResources};
     let made = |id, master| Unit {
@@ -1703,7 +1703,7 @@ fn a_new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
 
 /// `FUN_141226060`: the class counters by class and master.
 #[test]
-fn a_combat_object_counts_in_its_player_s_class_attributes() {
+fn combat_object_counts_in_its_player_class_attributes() {
     use crate::objects::masters::Master;
     let counted = |class, id, task_by_group| {
         let mut a = vec![Amount::ZERO; 240];
@@ -1769,7 +1769,7 @@ fn a_combat_object_counts_in_its_player_s_class_attributes() {
 /// above 0x3fff, swaps to the other standing sprite at its first frame; a sprite that did not
 /// loop, another sprite or a master without a second standing sprite draws nothing.
 #[test]
-fn an_idle_object_swaps_its_standing_sprite_on_a_high_draw() {
+fn an_idle_object_swaps_its_standing_sprite_on_high_draw() {
     use crate::objects::sprite::{ActiveSprite, Graphic};
     let g = |id| Graphic {
         id,
@@ -1929,13 +1929,13 @@ fn build_world() -> World {
 /// a house of civ 12 keeps the packet's sprite override (`+0x18`, 0x2c9 to 0x2ce), any other
 /// none.
 #[test]
-fn a_human_build_with_a_target_places_nothing_and_a_house_keeps_its_sprite_override() {
+fn human_build_with_target_places_nothing_and_house_keeps_its_sprite_override() {
     let build = |target, sprite_override| {
         Command::Build(BuildCommand {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: target,
+            queue_id: target,
             sprite_override,
             builders: unit_list(object_ids([9175, 9181])),
             queued: false,
@@ -1984,7 +1984,7 @@ fn a_human_build_with_a_target_places_nothing_and_a_house_keeps_its_sprite_overr
 }
 
 #[test]
-fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
+fn build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
     let mut t = build_world();
     t.tick_with(
         Millis::new(50),
@@ -1992,7 +1992,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids([9175, 9181])),
             queued: false,
@@ -2062,7 +2062,7 @@ fn a_build_pays_the_cost_and_tasks_the_builders_of_its_own_player() {
 /// on. 430020666's villager 6676 drops the move it queued in update 40 when BUILD sends it to
 /// another house in update 119.
 #[test]
-fn a_direct_build_empties_its_builder_s_order_queue() {
+fn direct_build_empties_its_builder_order_queue() {
     let mut t = build_world();
     let queued_move = crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -2089,7 +2089,7 @@ fn a_direct_build_empties_its_builder_s_order_queue() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
@@ -2116,7 +2116,7 @@ fn a_direct_build_empties_its_builder_s_order_queue() {
 /// handler only while players may order each other's (`do_command`'s check, the setting
 /// `+0x1074`).
 #[test]
-fn a_queued_build_queues_its_order_for_another_player_s_villager() {
+fn queued_build_queues_its_order_for_another_player_villager() {
     let villager = |id, master, x, y| Unit {
         id,
         place: crate::objects::layers::Static::at(Position::new(x, y, 0.0)),
@@ -2161,7 +2161,7 @@ fn a_queued_build_queues_its_order_for_another_player_s_villager() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9618, 9175])),
         queued: true,
@@ -2289,7 +2289,7 @@ fn task(action_type: ActionType) -> crate::objects::masters::Task {
 /// the player's masters by id of the unit's class, type and swap group, with any filter,
 /// the first with a task giving it with the master to switch to; none without a group.
 #[test]
-fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_group() {
+fn slot_0x820_search_takes_the_own_task_else_the_first_master_of_the_swap_group() {
     let t = sent_off_world(vec![]);
     let masters = &t.masters[1];
     let find = |id: ObjectId| t.object(id);
@@ -2338,7 +2338,7 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
 /// The task finder's target (`World::task_target`'s reading): an annex stands for its main
 /// building, once per step; an object not held is none.
 #[test]
-fn a_task_target_reads_an_annex_as_its_main_building() {
+fn task_target_reads_an_annex_as_its_main_building() {
     let mut t = sent_off_world(vec![]);
     t.parts
         .building_mut(t.players[1].objects[ListIndex::new(0)].id)
@@ -2364,7 +2364,7 @@ fn a_task_target_reads_an_annex_as_its_main_building() {
 /// master slot 0x820's search gave (slot 0x90), the actions cleared and the wait (type 0x9a,
 /// state 10) the only one, its target −1 (the foundation is at its `+0x68`).
 #[test]
-fn a_wait_for_a_foundation_switches_the_villager_and_holds_the_task() {
+fn wait_for_foundation_switches_the_villager_and_holds_the_task() {
     let mut t = sent_off_world(vec![]);
     let wait = Wait {
         target: object_id(10028),
@@ -2412,7 +2412,7 @@ fn a_wait_for_a_foundation_switches_the_villager_and_holds_the_task() {
 /// the task finder reads the owner's diplomacy from the update and another player's from its
 /// own record.
 #[test]
-fn a_unit_s_side_reads_the_other_players_relations_around_its_own() {
+fn unit_side_reads_the_other_players_relations_around_its_own() {
     let players: Vec<Player> = (0..3)
         .map(|q| Player {
             relations: relation_row(vec![q as u8; 3]),
@@ -2453,7 +2453,7 @@ fn a_unit_s_side_reads_the_other_players_relations_around_its_own() {
 /// The wait's foundation as its update reads it: its build points among the owner's other
 /// objects or the other players', none when the world does not hold it.
 #[test]
-fn a_wait_reads_its_foundation_s_build_points_wherever_it_is() {
+fn wait_reads_its_foundation_build_points_wherever_it_is() {
     let t = sent_off_world(vec![]);
     let (none, players) = (&t.players[..0], &t.players[..]);
     let own = Foreign {
@@ -2589,7 +2589,7 @@ fn repair_world() -> World {
 /// range. The same command again while it faces the house (state 6) keeps the action; a
 /// computer player's repairer walking to it keeps it too.
 #[test]
-fn a_work_command_on_a_damaged_building_starts_a_repair() {
+fn work_command_on_damaged_building_starts_repair() {
     let mut t = repair_world();
     let work = crate::orders::Work {
         target: Some(object_id(10028)),
@@ -2657,7 +2657,7 @@ fn a_work_command_on_a_damaged_building_starts_a_repair() {
 /// repairer counted among the first house's repairers leaves them, takes the new one and walks
 /// to it again (state 4, not counted).
 #[test]
-fn a_work_command_on_another_building_moves_the_repair_there() {
+fn work_command_on_another_building_moves_the_repair_there() {
     let mut t = repair_world();
     let other = Unit {
         id: object_id(10031),
@@ -2740,7 +2740,7 @@ fn a_work_command_on_another_building_moves_the_repair_there() {
 /// (state 4, its `MoveTo` starting: the footprints lie 0.3 apart) with the task's range, work
 /// value and the builder's work rate.
 #[test]
-fn a_work_command_on_a_foundation_starts_a_build_as_its_builder() {
+fn work_command_on_foundation_starts_build_as_its_builder() {
     let mut t = sent_off_world(vec![]);
     // a villager moves: its MoveTo starts with speed (FUN_140aa2100)
     t.parts.put_mover(
@@ -2814,7 +2814,7 @@ fn a_work_command_on_a_foundation_starts_a_build_as_its_builder() {
 /// Build's `MoveTo` starts with the own master's walking sprite (`FUN_140aa0df0`'s default),
 /// not the one of its player's master of its id, which has none.
 #[test]
-fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
+fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     use crate::map::spatial::Placed;
     use crate::objects::sprite::Graphic;
     let mut t = sent_off_world(vec![]);
@@ -2921,7 +2921,7 @@ fn a_builder_with_a_master_of_its_own_walks_with_its_own_master_s_sprite() {
 /// (state 6) keeps on; one counted among the builders that waits (state 222) leaves them and
 /// walks again (state 4), its `MoveTo` arrived where the footprints touch.
 #[test]
-fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() {
+fn work_command_on_the_build_own_foundation_keeps_the_work_or_walks_again() {
     let mut t = sent_off_world(vec![]);
     let work = crate::orders::Work {
         target: Some(object_id(10028)),
@@ -3017,7 +3017,7 @@ fn a_work_command_on_the_build_s_own_foundation_keeps_the_work_or_walks_again() 
 /// a counted builder leaves the first foundation's builders, lets it go and takes the new
 /// one, walking to it again (state 4).
 #[test]
-fn a_work_command_on_another_foundation_moves_the_build_there() {
+fn work_command_on_another_foundation_moves_the_build_there() {
     let mut t = sent_off_world(vec![]);
     let other = Unit {
         id: object_id(10031),
@@ -3123,7 +3123,7 @@ fn a_work_command_on_another_foundation_moves_the_build_there() {
 /// the queued order's priority. An order on the unit itself works on nothing but still takes
 /// the tail; one on a target that is gone, or for a unit without a unit AI, is not modelled.
 #[test]
-fn a_queued_order_on_a_target_works_on_it_with_the_order_s_priority() {
+fn queued_order_on_target_works_on_it_with_the_order_priority() {
     use crate::unit_ai::QueuedOrder;
     let order = |target| QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -3370,7 +3370,7 @@ pub(crate) fn forage_world() -> World {
 /// task's range. The command on the other bush while it walks (slot 0x48, `0x140a903a0`) moves
 /// the Gather there: the first bush is let go, the second taken.
 #[test]
-fn a_work_command_on_a_bush_starts_a_gather_and_another_moves_it() {
+fn work_command_on_bush_starts_gather_and_another_moves_it() {
     let mut t = forage_world();
     let work = |target| crate::orders::Work {
         target,
@@ -3509,7 +3509,7 @@ fn a_work_command_on_a_bush_starts_a_gather_and_another_moves_it() {
 /// the forager's actions without the unit AI's notify (the AI set its order itself); the command on the other bush while the Gather on the same task is on
 /// top retargets it (slot 0x48): the first bush let go, the second taken.
 #[test]
-fn the_unit_ai_s_gather_command_starts_a_gather_or_retargets_its_own() {
+fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
     let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -3558,7 +3558,7 @@ fn the_unit_ai_s_gather_command_starts_a_gather_or_retargets_its_own() {
 /// go as the first, counts one worker. A Gather at work on its bush sent there (slot 0x48 on a
 /// building that is no farm answers 0) starts the same new Gather.
 #[test]
-fn a_loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
+fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
     let work = crate::orders::Work {
         target: Some(object_id(700)),
         point: Position::new(20.0, 89.5, 0.0),
@@ -3621,7 +3621,7 @@ fn a_loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
 /// its class) and walks to the centre; sent to a point it walks there; in state 1 it is told of
 /// no order (−1) and stays; a master that does not move does nothing.
 #[test]
-fn a_work_command_without_a_task_moves_the_unit_there() {
+fn work_command_without_task_moves_the_unit_there() {
     let work = |target| crate::orders::Work {
         target,
         point: Position::new(20.0, 89.5, 0.0),
@@ -3697,7 +3697,7 @@ fn a_work_command_without_a_task_moves_the_unit_there() {
 /// (state 15) without a target, the first bush let go. Loaded and moved toward its town centre,
 /// a drop site, it carries the load there (state 8, the centre its second target, taken).
 #[test]
-fn a_gather_takes_a_move_toward_an_object_as_its_point_or_drop_site() {
+fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
     let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -3805,7 +3805,7 @@ fn a_gather_takes_a_move_toward_an_object_as_its_point_or_drop_site() {
 /// dropping at the dock (45) too searches without a seeker; with no drop site found it does
 /// nothing.
 #[test]
-fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
+fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
     let mut t = forage_world();
     let far = Unit {
         id: object_id(701),
@@ -3890,7 +3890,7 @@ fn a_drop_off_order_takes_a_forager_to_its_nearest_drop_site() {
 /// nothing. A villager with orders waits; a fishing ship without a fish trap under it, and the
 /// pass without the farm setting, are not modelled.
 #[test]
-fn the_empire_wars_start_puts_a_villager_on_its_farm_to_work() {
+fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
     let mut t = forage_world();
     t.settings.walkable_farms = true;
     for masters in &mut t.masters {
@@ -4040,7 +4040,7 @@ fn with_effects(t: &mut World, effects: Vec<Effect>) -> Result<(), GenieError> {
 /// AI for a point (notify 0x202 with the explore's action). An Explore replacing a Gather is
 /// not modelled.
 #[test]
-fn the_unit_ai_s_explore_walks_to_its_point_or_asks_for_one() {
+fn the_unit_ai_explore_walks_to_its_point_or_asks_for_one() {
     use crate::movement::explore::ExploreState;
     use crate::unit_ai::Effect;
     let mut t = forage_world();
@@ -4077,7 +4077,7 @@ fn the_unit_ai_s_explore_walks_to_its_point_or_asks_for_one() {
 /// cap of its last human order (slot 0x300) and its works follow in order: a work on the bush
 /// (slot 0x7e8 with the carried-resource test) starts a Gather there.
 #[test]
-fn the_unit_ai_s_moves_and_works_apply_in_order() {
+fn the_unit_ai_moves_and_works_apply_in_order() {
     use crate::unit_ai::Effect;
     let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
@@ -4149,7 +4149,7 @@ fn the_unit_ai_s_moves_and_works_apply_in_order() {
 /// again. An AI move of a master the slice does not have is not modelled; a restored patrol
 /// without one saved does nothing, and the stop stops.
 #[test]
-fn the_unit_ai_s_hunt_build_and_target_orders_apply_after_its_run() {
+fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
     use crate::unit_ai::{AiMove, Effect, QueuedOrder};
     let mut t = hunt_world();
     with_effects(
@@ -4238,7 +4238,7 @@ fn the_unit_ai_s_hunt_build_and_target_orders_apply_after_its_run() {
 /// look-around check redraws the timeout past it), and the regeneration after the unit AI runs
 /// once, as in an update without the order.
 #[test]
-fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
+fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
     use crate::unit_ai::QueuedOrder;
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -4319,7 +4319,7 @@ fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
 ///
 /// [`UnitSide::off_footprint`]: crate::unit_ai::UnitSide::off_footprint
 #[test]
-fn a_unit_sent_off_a_foundation_finds_the_spot_beside_it() {
+fn unit_sent_off_foundation_finds_the_spot_beside_it() {
     let mut t = forage_world();
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -4400,7 +4400,7 @@ fn an_explored_map_leaves_the_auto_scout_nothing_to_seek() {
 ///
 /// [`UnitSide::closest_resource`]: crate::unit_ai::UnitSide::closest_resource
 #[test]
-fn the_unit_ai_s_resource_search_finds_the_nearest_bush_it_reaches() {
+fn the_unit_ai_resource_search_finds_the_nearest_bush_it_reaches() {
     use crate::unit_ai::{NO_POINT, ResourceSearch};
     let mut t = forage_world();
     for masters in &mut t.masters {
@@ -4549,7 +4549,7 @@ fn cart_world() -> World {
 /// with its place. Without its movement state the search is not modelled; without a task of
 /// a known class it finds none (its own place).
 #[test]
-fn a_mule_cart_finds_the_nearest_resource_of_its_task_s_class() {
+fn mule_cart_finds_the_nearest_resource_of_its_task_class() {
     let mut t = cart_world();
     assert_eq!(
         t.cart_find(PlayerId::new(1), ListIndex::new(3)),
@@ -4599,7 +4599,7 @@ fn footprint_world() -> World {
 /// foundation; a bush (without a unit AI), an object the world does not hold, a unit at work
 /// on the foundation, one walking and one moving off already are passed over.
 #[test]
-fn the_units_on_a_new_foundation_are_sent_off_it() {
+fn the_units_on_new_foundation_are_sent_off_it() {
     let sent = |t: &World| {
         t.parts
             .unit_ai
@@ -4660,7 +4660,7 @@ fn the_units_on_a_new_foundation_are_sent_off_it() {
 /// from the first, and the forager the splitter leaves loose takes the action of moving off a
 /// footprint (`0x2bf`) and moves there, so it hears no notify `0x21b`.
 #[test]
-fn a_formation_s_units_on_a_new_foundation_move_off_together() {
+fn formation_units_on_new_foundation_move_off_together() {
     let mut t = footprint_world();
     for masters in &mut t.masters {
         masters.get_mut(master_id(120)).unwrap().formation_category = FormationClass::of_data(1);
@@ -4683,7 +4683,7 @@ fn a_formation_s_units_on_a_new_foundation_move_off_together() {
 /// the castle count (attribute 134) falls by one, not below 0, and it goes to state 3. A
 /// computer player's building, or one with units inside, is not modelled.
 #[test]
-fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
+fn built_castle_death_takes_its_headroom_and_its_count() {
     let castle = Master {
         id: ids::CASTLE,
         kind: BUILDING,
@@ -4768,7 +4768,7 @@ fn a_built_castle_s_death_takes_its_headroom_and_its_count() {
 /// another, a desolid foundation, an object the spatial table lacks and one whose master lacks
 /// a kind or class take none.
 #[test]
-fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
+fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
     let house = |id, state, inside, desolid: bool, master| {
         Object::with_building(
             Unit {
@@ -5002,7 +5002,7 @@ pub(crate) fn hunt_world() -> World {
 /// 9, `0x140ac97c0`): the Hunt takes it and starts over on it (its Attack walking there), the
 /// first deer let go and the second taken; the unit AI hears the hunt order on it.
 #[test]
-fn a_work_command_on_another_deer_moves_the_hunt_there() {
+fn work_command_on_another_deer_moves_the_hunt_there() {
     let mut t = hunt_world();
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
@@ -5051,7 +5051,7 @@ fn a_work_command_on_another_deer_moves_the_hunt_there() {
 /// toward its town centre, a drop site, it carries the load there (state 8, the centre its second
 /// target, taken).
 #[test]
-fn a_hunt_takes_a_move_toward_an_object_as_its_point_or_drop_site() {
+fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
     let mut t = hunt_world();
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
@@ -5200,7 +5200,7 @@ fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
 /// dt; at its end the drop site goes and `set_state(8)` searches again, finding the town centre
 /// and walking there.
 #[test]
-fn a_hunter_s_drop_off_waits_then_searches_its_drop_site_again() {
+fn hunter_drop_off_waits_then_searches_its_drop_site_again() {
     let wait = |timer| {
         hunter_in(|h| {
             (h.state, h.timer, h.target, h.carry_to) = (
@@ -5260,7 +5260,7 @@ fn a_hunter_s_drop_off_waits_then_searches_its_drop_site_again() {
 /// A failed walk waits 3
 /// seconds and stops the animation; a centre that does not take the load is not modelled.
 #[test]
-fn a_hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
+fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
     use crate::gathering::hunt::HuntState;
     use crate::movement::move_to::{MoveTo, MoveToAction};
     let dropping = |move_to| {
@@ -5322,7 +5322,7 @@ fn a_hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
 /// its deer, another player's, is let go after the update. With a sub-action it is not
 /// modelled; without a hunt the part does nothing.
 #[test]
-fn a_failed_hunt_tells_its_unit_ai_and_lets_its_target_go() {
+fn failed_hunt_tells_its_unit_ai_and_lets_its_target_go() {
     let mut t = hunter_in(|h| {
         h.state = HuntState::Failed;
         h.attack = None;
@@ -5358,7 +5358,7 @@ fn a_failed_hunt_tells_its_unit_ai_and_lets_its_target_go() {
 /// the town centre the search finds. Without its target a lead (state 10, case 9) searches at
 /// once; a done hunt (state 2) waits, but of a tree's class it is not modelled.
 #[test]
-fn a_searching_hunt_asks_its_unit_ai_again_after_ten_seconds() {
+fn searching_hunt_asks_its_unit_ai_again_after_ten_seconds() {
     use crate::gathering::hunt::HuntState;
     let search = [ActionKind::Hunt.value(), 9, 700];
     let mut t = hunter_in(|h| {
@@ -5434,7 +5434,7 @@ fn a_searching_hunt_asks_its_unit_ai_again_after_ten_seconds() {
 /// walk asks again after its delay. Waiting after a given-up `MoveTo` without its target (state
 /// 4, its timer below 0) the timer runs, then the walk to the point (state 11).
 #[test]
-fn a_hunt_s_walk_to_a_point_ends_done_or_in_a_search() {
+fn hunt_walk_to_point_ends_done_or_in_search() {
     use crate::gathering::hunt::HuntState;
     use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
     let walked = |state| {
@@ -5519,7 +5519,7 @@ fn a_hunt_s_walk_to_a_point_ends_done_or_in_a_search() {
 /// 50 ms and the deer loses it; with less room than that it is full and carries its load to the
 /// town centre (state 8) without taking it.
 #[test]
-fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
+fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
     use crate::gathering::hunt::HuntState;
     use crate::movement::move_to::MoveTo;
     let mut t = hunter_in(|_| {});
@@ -5604,7 +5604,7 @@ fn a_hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
 /// A hunter's work on its dead deer reaches the deer where it ran (the hit's write-back,
 /// [`crate::combat::victims::write_back`]): in the same update the deer holds 0.05 less.
 #[test]
-fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
+fn hunter_work_reaches_its_deer_in_the_same_update() {
     let mut t = hunter_in(|h| {
         (h.state, h.attack, h.move_to) = (HuntState::Gather, None, None);
         (h.task.work_value, h.task.resource) = (
@@ -5659,7 +5659,7 @@ fn a_hunter_s_work_reaches_its_deer_in_the_same_update() {
 /// ends without a target in the same update: holding nothing, it searches (state 3), reading no
 /// target.
 #[test]
-fn a_gathering_hunt_whose_target_left_searches_without_reading_one() {
+fn gathering_hunt_whose_target_left_searches_without_reading_one() {
     use crate::gathering::hunt::HuntState;
     let mut t = hunter_in(|h| (h.state, h.attack, h.move_to) = (HuntState::Gather, None, None));
     let _ = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
@@ -5789,7 +5789,7 @@ fn shepherd_world(x: f32) -> World {
 /// walks; the lead goes on in the next update. A sheep beside the centre is slaughtered at once
 /// (state 12, the Attack).
 #[test]
-fn a_hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_a_near_one() {
+fn hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_near_one() {
     use crate::gathering::hunt::HuntState;
     let mut t = shepherd_world(30.2);
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
@@ -5847,7 +5847,7 @@ fn a_hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_a_near_one() {
 /// `set_state(10)`): the far sheep has its `MoveTo` to the town centre while the hunter's
 /// update still runs, not after it.
 #[test]
-fn a_hunter_s_sheep_walks_before_the_hunter_s_update_ends() {
+fn hunter_sheep_walks_before_the_hunter_update_ends() {
     let mut t = shepherd_world(30.2);
     let walks = in_update(
         &mut t,
@@ -6009,7 +6009,7 @@ fn lets_world() -> World {
 /// Gaia's own taker is allied; one the world does not hold is not taken; the updating unit
 /// itself counts its worker at once, within its update.
 #[test]
-fn an_update_s_take_counts_its_worker_and_wakes_a_sleeping_object() {
+fn an_update_take_counts_its_worker_and_wakes_sleeping_object() {
     use crate::world::lets::take;
     let mut t = lets_world();
     let gaia = Releaser {
@@ -6068,7 +6068,7 @@ fn an_update_s_take_counts_its_worker_and_wakes_a_sleeping_object() {
 /// main building for the annex, the updating unit itself at once; the teardown's pair applies
 /// leaves before releases ([`crate::world::lets::torn_down`]).
 #[test]
-fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
+fn an_update_release_and_builder_leave_change_the_objects_at_once() {
     use crate::world::lets::{leave_builders, release, torn_down};
     let mut t = lets_world();
     for id in [520, 521] {
@@ -6201,7 +6201,7 @@ fn an_own_object_taken_out_leaves_the_world_until_it_goes_back() {
 /// the side's unit): the unit counts its worker less at once, and the notify 699 for its own AI,
 /// which the side does not hold while it runs, reaches the AI as the side's call returns.
 #[test]
-fn a_side_s_own_release_tells_the_unit_ai_as_the_side_returns() {
+fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
     use crate::unit_ai::world_view::OwnerView;
     let mut t = hunt_world();
     let id = t.players[1].objects[ListIndex::new(0)].id;
@@ -6258,7 +6258,7 @@ fn a_side_s_own_release_tells_the_unit_ai_as_the_side_returns() {
 ///
 /// [`Step::notify_own`]: crate::world::step::Step::notify_own
 #[test]
-fn a_step_s_own_notify_waits_for_the_unit_ai_s_side_to_return() {
+fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
     use crate::unit_ai::Notify;
     use crate::unit_ai::world_view::OwnerView;
     let mut t = hunt_world();
@@ -6318,7 +6318,7 @@ fn a_step_s_own_notify_waits_for_the_unit_ai_s_side_to_return() {
 /// the world's stream after the run, and a world routine that draws from it meanwhile fails the
 /// run.
 #[test]
-fn the_ai_stream_is_the_unit_ai_s_while_its_side_runs() {
+fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
     use crate::unit_ai::world_view::OwnerView;
     let mut t = hunt_world();
     let mut drawn = t.streams.get(Stream::Ai).clone();
@@ -6369,7 +6369,7 @@ fn the_ai_stream_is_the_unit_ai_s_while_its_side_runs() {
 /// The unit AI's stop (`Effect::Stop`, [`Unit::stop_action`]): the forager's Gather goes and
 /// its bush counts a worker less within the update, through the view, not after the step.
 #[test]
-fn a_unit_ai_s_stop_lets_its_target_go_within_the_update() {
+fn unit_ai_stop_lets_its_target_go_within_the_update() {
     let mut t = forage_world();
     let work = crate::orders::Work {
         target: Some(object_id(600)),
@@ -6409,7 +6409,7 @@ fn a_unit_ai_s_stop_lets_its_target_go_within_the_update() {
 /// (slot 0x48: its Attack on the tree) and the tree counts the hunter. A hunt farther than
 /// `within` from its point, a tree farther than `near` from the unit, or no tree, find none.
 #[test]
-fn a_hunt_that_lost_its_tree_takes_the_next_one() {
+fn hunt_that_lost_its_tree_takes_the_next_one() {
     let search = |t: &mut World, within, near| {
         in_update(
             t,
@@ -6458,7 +6458,7 @@ fn a_hunt_that_lost_its_tree_takes_the_next_one() {
 /// within 5 of it; with none so near, or a unit AI that targets another class, the hunt
 /// searches (state 3, its timer at -10 s) with its target kept.
 #[test]
-fn a_hunt_whose_attack_failed_takes_a_near_tree_or_searches() {
+fn hunt_whose_attack_failed_takes_near_tree_or_searches() {
     let failed = |t: &mut World| {
         in_update(
             t,
@@ -6533,7 +6533,7 @@ fn repairer_world(orders: Vec<crate::unit_ai::QueuedOrder>, repairer: bool) -> W
 /// and the AI holds the repair action on it. Without the repairer master the villager's own list
 /// must give the task, which it does not: the order is not taken.
 #[test]
-fn the_unit_ai_s_repair_order_switches_a_villager_to_the_repairer() {
+fn the_unit_ai_repair_order_switches_villager_to_the_repairer() {
     use crate::unit_ai::QueuedOrder;
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -6629,7 +6629,7 @@ fn villager_side<R>(
 /// its slot): within the run the villager is its player's repairer, holds the Repair, and its top
 /// target is the house ([`crate::unit_ai::UnitSide::top_target_now`]).
 #[test]
-fn the_unit_ai_s_repair_command_is_the_unit_s_within_its_run() {
+fn the_unit_ai_repair_command_is_the_unit_within_its_run() {
     use crate::unit_ai::{UnitCommand, UnitSide};
     let mut t = repairer_world(vec![], true);
     let house = Placed {
@@ -6672,7 +6672,7 @@ fn the_unit_ai_s_repair_command_is_the_unit_s_within_its_run() {
 ///
 /// [`Step::lend`]: crate::world::step::Step::lend
 #[test]
-fn a_world_routine_that_reaches_the_running_unit_ai_fails_the_side_s_lend() {
+fn world_routine_that_reaches_the_running_unit_ai_fails_the_side_lend() {
     let mut t = repairer_world(vec![], false);
     let held = villager_side(&mut t, |side| {
         side.c
@@ -6841,7 +6841,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
 /// standing sprite and notify 0x1f9 with the enter's action value to its unit AI; the update
 /// then returns 3 and the list removes it.
 #[test]
-fn an_enter_of_a_unit_inside_an_object_fails_at_its_start() {
+fn an_enter_of_unit_inside_an_object_fails_at_its_start() {
     let mut t = enter_world(vec![], 5);
     t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(4242)));
     assert_eq!(
@@ -6867,7 +6867,7 @@ fn an_enter_of_a_unit_inside_an_object_fails_at_its_start() {
 /// object: its Enter fails at the start, and the notify 0x1f9 for its own AI, which the side does
 /// not hold, reaches the AI as the side returns.
 #[test]
-fn the_unit_ai_s_enter_from_inside_tells_its_ai_as_the_side_returns() {
+fn the_unit_ai_enter_from_inside_tells_its_ai_as_the_side_returns() {
     use crate::unit_ai::{UnitCommand, UnitSide};
     let mut t = enter_world(vec![], 5);
     t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(4242)));
@@ -6936,7 +6936,7 @@ fn livestock_enter_world() -> World {
 /// Artifact's sub-action (its list emptied, `FUN_140a98e20`, then `FUN_140a977e0`), the Artifact
 /// staying the top action; the next update runs it through the Artifact's.
 #[test]
-fn livestock_s_enter_command_becomes_its_artifact_s_sub_action() {
+fn livestock_enter_command_becomes_its_artifact_sub_action() {
     let mut t = livestock_enter_world();
     assert_eq!(
         t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), false),
@@ -6967,7 +6967,7 @@ fn livestock_s_enter_command_becomes_its_artifact_s_sub_action() {
 /// constructor the task's moving sprite, `0x140aa29e0`'s `set_state(4)` shows it): the task's,
 /// else `FUN_140aa0df0`'s default toward a building, the master's walking sprite.
 #[test]
-fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
+fn an_enter_move_to_shows_its_sprite_as_it_starts() {
     for (moving, shown) in [
         (Some(SpriteId::named(30)), SpriteId::named(30)),
         (None, SpriteId::named(31)),
@@ -7058,7 +7058,7 @@ fn an_enter_s_move_to_shows_its_sprite_as_it_starts() {
 /// `MoveTo`'s stops the unit: its speed and acceleration 0, so the update's velocity step does
 /// not move it.
 #[test]
-fn livestock_s_second_enter_command_stops_the_walk_and_lets_the_old_enter_s_target_go() {
+fn livestock_second_enter_command_stops_the_walk_and_lets_the_old_enter_target_go() {
     let mut t = livestock_enter_world();
     let mut walking = crate::garrison::EnterAction::new(
         ContainerId::new(object_id(10028)),
@@ -7102,7 +7102,7 @@ fn livestock_s_second_enter_command_stops_the_walk_and_lets_the_old_enter_s_targ
 /// unit), and the update after has nothing left to delete (426027790-style villagers in a town
 /// bell: 427445417's p3, 429184426's p4).
 #[test]
-fn an_inside_unit_s_update_deletes_its_top_action() {
+fn an_inside_unit_update_deletes_its_top_action() {
     let mut t = enter_world(vec![], 5);
     t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(10028)));
     t.spatial
@@ -7129,7 +7129,7 @@ fn an_inside_unit_s_update_deletes_its_top_action() {
 /// building adds the unit to its list in the same update, its own player's and an ally's
 /// (player 2's) alike.
 #[test]
-fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
+fn an_enter_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
     let entered = |ally: bool| {
         let mut t = enter_world(vec![], 5);
         if ally {
@@ -7204,7 +7204,7 @@ fn an_enter_s_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
 /// inside `FUN_140a867b0`): the group has lost it and the unit its link while the update still
 /// runs.
 #[test]
-fn an_enter_s_unit_leaves_its_group_inside_the_update() {
+fn an_enter_unit_leaves_its_group_inside_the_update() {
     let mut t = enter_world(vec![], 5);
     let member = |id| crate::groups::Member {
         id,
@@ -7262,7 +7262,7 @@ fn an_enter_s_unit_leaves_its_group_inside_the_update() {
 /// An Enter that got the unit in, the unit let out again before its next update: that update's
 /// 1 has the action list remove it (its teardown lets the building go).
 #[test]
-fn an_entered_enter_of_a_unit_let_out_goes_at_its_update() {
+fn an_entered_enter_of_unit_let_out_goes_at_its_update() {
     let mut t = enter_world(vec![], 5);
     let mut e = crate::garrison::EnterAction::new(
         ContainerId::new(object_id(10028)),
@@ -7295,7 +7295,7 @@ fn an_entered_enter_of_a_unit_let_out_goes_at_its_update() {
 /// the house), and the AI holds the enter action on it. A house without room gives no task:
 /// the order is not taken.
 #[test]
-fn the_unit_ai_s_enter_order_gives_the_unit_an_enter() {
+fn the_unit_ai_enter_order_gives_the_unit_an_enter() {
     use crate::unit_ai::QueuedOrder;
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -7349,7 +7349,7 @@ fn the_unit_ai_s_enter_order_gives_the_unit_an_enter() {
 /// while the foundation has no build points; once they pass 0.01 its next update drops the
 /// wait, the unit AI's action value staying 0x27a.
 #[test]
-fn a_villager_sent_off_a_foundation_waits_for_it_as_a_builder() {
+fn villager_sent_off_foundation_waits_for_it_as_builder() {
     use crate::unit_ai::QueuedOrder;
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -7413,7 +7413,7 @@ fn a_villager_sent_off_a_foundation_waits_for_it_as_a_builder() {
 /// the swap group), then the tail makes the order the AI's with its priority, leaving a patrol
 /// order: its secondary timer capped at 750 and an adjusted idle timeout of 750 redrawn.
 #[test]
-fn a_queued_build_order_builds_and_leaves_a_patrol_order() {
+fn queued_build_order_builds_and_leaves_patrol_order() {
     use crate::unit_ai::QueuedOrder;
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
@@ -7477,7 +7477,7 @@ fn a_queued_build_order_builds_and_leaves_a_patrol_order() {
 /// hold and for a unit without a task on it (its own master's list and its swap group's); the
 /// Gather's `set_state(6)` ignores that 0.
 #[test]
-fn a_build_command_without_its_foundation_or_a_task_does_nothing() {
+fn build_command_without_its_foundation_or_task_does_nothing() {
     let without_build_tasks = |t: &mut World| {
         for id in [118, 212] {
             let m = t.masters[1].get_mut(master_id(id)).unwrap();
@@ -7524,7 +7524,7 @@ fn a_build_command_without_its_foundation_or_a_task_does_nothing() {
 /// `World::run_ai_calls`): the AI's calls run on the unit at once, so the AI reads the action
 /// list a stop left before it returns, and the unit is back in its slot after it.
 #[test]
-fn a_world_routine_s_unit_ai_calls_run_on_the_unit_at_once() {
+fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
     let mut t = sent_off_world(vec![]);
     let (explore, _) = crate::movement::explore::ExploreAction::new(
         Position::new(10.0, 10.0, 0.0),
@@ -7556,7 +7556,7 @@ fn a_world_routine_s_unit_ai_calls_run_on_the_unit_at_once() {
 /// step began: a target the update changed (the Build's work order on a resource) is the new
 /// one, and a unit that is its own target reads itself out of its slot.
 #[test]
-fn the_unit_ai_reads_the_target_its_unit_s_update_left() {
+fn the_unit_ai_reads_the_target_its_unit_update_left() {
     use crate::unit_ai::world_view::OwnerView;
     let mut t = sent_off_world(vec![]);
     let mut read = Vec::new();
@@ -7598,7 +7598,7 @@ fn the_unit_ai_reads_the_target_its_unit_s_update_left() {
 /// (`UnitSide::builds`): 0 for a foundation the world does not hold or no task for it, 1 with a
 /// task or a Build on top (its slot 0x48), whatever the master's lists then hold.
 #[test]
-fn the_unit_ai_s_view_answers_the_build_command_before_it_runs() {
+fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
     let answers = |t: &mut World, foundation| {
         let mut answer = None;
         t.run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {
@@ -7693,7 +7693,7 @@ fn the_build_command_at_once_matches_the_one_after_the_update() {
 /// type, its owner the target's, its place the point), else on the record's target as recorded
 /// (owner −1, the record's point); issued by the unit's owner, priority 100, ready.
 #[test]
-fn the_way_back_after_a_drop_off_queues_the_order_on_the_recorded_work() {
+fn the_way_back_after_drop_off_queues_the_order_on_the_recorded_work() {
     use crate::orders::town_bell::BackToWork;
     let mut t = sent_off_world(vec![]);
     let work = BackToWork {
@@ -7763,7 +7763,7 @@ fn the_way_back_after_a_drop_off_queues_the_order_on_the_recorded_work() {
 /// names: a carrying villager without a gather action, of a master without drop sites and a
 /// class the drop-site table does not list, does nothing, whoever commands it.
 #[test]
-fn a_unit_order_drop_off_takes_any_player_s_unit() {
+fn unit_order_drop_off_takes_any_player_unit() {
     let mut t = sent_off_world(vec![]);
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     (v.life.attribute_type, v.life.amount) = (Some(attribute::WOOD), Amount::new(5.0));
@@ -7951,7 +7951,7 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
 }
 
 #[test]
-fn a_build_creates_a_foundation_whose_unit_ai_draws_before_the_turn_players_units() {
+fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() {
     // MarvinBlue/426048731 tick 281: player 1's BUILD draws three AI values in the command
     // phase, so player 2's units, on their turn, get the draws after them (a computer's
     // BUILD here: it needs no builder that can build it)
@@ -7987,7 +7987,7 @@ fn a_build_creates_a_foundation_whose_unit_ai_draws_before_the_turn_players_unit
             player: player_id(0),
             master: master_id(70),
             position: Point::new(10.0, 10.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(vec![]),
             queued: false,
@@ -8313,7 +8313,7 @@ type LifeLeft = (Vec<(i16, f32)>, Vec<(i16, Position)>);
 /// hit point gives back each storage entry of kind 2 or 16 with an attribute (the amount
 /// negated); one at a hit point, or at a NaN one, gives back nothing.
 #[test]
-fn a_dying_object_gives_back_its_storage_of_kinds_2_and_16() {
+fn dying_object_gives_back_its_storage_of_kinds_2_and_16() {
     let storage = |hp: HitPoints| {
         life_part(
             |m, v| {
@@ -8341,7 +8341,7 @@ fn a_dying_object_gives_back_its_storage_of_kinds_2_and_16() {
 /// dead object's death spawn ([`Unit::death_spawn_comes`]) comes the same way. A master the
 /// player lacks fails.
 #[test]
-fn a_dead_object_leaves_its_remains_and_its_death_spawn() {
+fn dead_object_leaves_its_remains_and_its_death_spawn() {
     let ended = |kind: MasterKind, remains: Option<MasterId>| {
         life_part(
             |m, _| {
@@ -8456,7 +8456,7 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
 }
 
 #[test]
-fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
+fn farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
     let farm = Object::with_actions(
         Unit {
             id: object_id(40),
@@ -8523,7 +8523,7 @@ fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
 }
 
 #[test]
-fn a_built_farm_s_master_starts_a_make_and_another_default_task_is_reported() {
+fn built_farm_master_starts_make_and_another_default_task_is_reported() {
     use crate::objects::layers::DefaultTask;
     assert_eq!(farm_master().default_start(), DefaultTask::Make);
     let mut other = farm_master();
@@ -8545,7 +8545,7 @@ fn a_built_farm_s_master_starts_a_make_and_another_default_task_is_reported() {
 /// the walls' branch (a barracks) has its `damaged_lately_timer` (`+0x30d`) lose one in an
 /// update that passes whole seconds, however many, and stay at 0.
 #[test]
-fn a_building_s_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
+fn building_damaged_lately_timer_loses_one_an_update_with_whole_seconds() {
     let barracks = Unit {
         id: object_id(40),
         life: Lifecycle {
@@ -8614,7 +8614,7 @@ fn centre(id: i32) -> Unit {
 }
 
 #[test]
-fn a_unit_inside_heals_up_to_its_hit_points() {
+fn unit_inside_heals_up_to_its_hit_points() {
     // records/425906646's update 2191: villager 27260 inside TC 27150 heals by the TC's
     // garrison heal rate once a second
     let master = Master {
@@ -8731,7 +8731,7 @@ fn an_order_resets_its_units_sleeping_ones_too() {
 }
 
 #[test]
-fn a_load_goes_to_its_player_alone_unless_the_player_shares() {
+fn load_goes_to_its_player_alone_unless_the_player_shares() {
     // records/425906646's update 818: player 6, with allies, does not share (+0x1426 0)
     let relations = ByPlayer::new(vec![
         relation_row([0, 3, 3]),
@@ -8766,7 +8766,7 @@ fn a_load_goes_to_its_player_alone_unless_the_player_shares() {
 /// A gate's slot 0x678 (`FUN_1411d4a30`): a standing, unlocked object of class 39 whose
 /// master transforms (`+0x9ba` not -1), between allies; any other object answers false.
 #[test]
-fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
+fn only_standing_unlocked_transforming_gate_lets_an_ally_pass() {
     let object = |id: i32, master: MasterId, state: ObjectState, locked: bool| {
         Object::with_building(
             Unit {
@@ -8845,7 +8845,7 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
 }
 
 #[test]
-fn a_gate_opens_for_its_allies_while_they_update() {
+fn gate_opens_for_its_allies_while_they_update() {
     // records/425906646's update 636: player 2's gate 27687 (master 64, class 39 with a
     // transform unit) has no record, marks or shape while its team updates, so 27274's plan
     // passes it; the next player, an enemy, finds it closed again
@@ -8972,7 +8972,7 @@ fn a_gate_opens_for_its_allies_while_they_update() {
 /// ally walking between the posts opens it; a standing Gaia animal does not count, an enemy
 /// counts but is no ally, a wall next to it neither.
 #[test]
-fn a_gate_counts_the_moving_units_between_its_posts() {
+fn gate_counts_the_moving_units_between_its_posts() {
     let mut s = Spatial::with_tiles(
         GridSize::new(40, 40),
         crate::map::spatial::Tiles::new(GridSize::new(40, 40), vec![1; 1600]),
@@ -9296,7 +9296,7 @@ fn the_long_pather_asks_the_gate_on_its_anchor() {
 /// move time; the shut one opens again (no height) without either. A gate without a
 /// `transform_unit` stays; one with masters of its own is not modelled.
 #[test]
-fn a_gate_toggle_shuts_on_the_units_between_its_posts_or_opens() {
+fn gate_toggle_shuts_on_the_units_between_its_posts_or_opens() {
     let mut t = gate_world();
     let state = |t: &World| {
         let g = &t.players[1].objects[ListIndex::new(0)];
@@ -9371,7 +9371,7 @@ fn gate_update_of(
 /// Its first update clears every time it runs; a gate whose master transforms into nothing is
 /// passed over, and one without its gate state is not modelled.
 #[test]
-fn a_gate_opens_for_an_ally_inside_and_shuts_after_its_close_timer() {
+fn gate_opens_for_an_ally_inside_and_shuts_after_its_close_timer() {
     let gate = |locked, close_timer| {
         Some(Gate {
             locked,
@@ -9431,7 +9431,7 @@ fn a_gate_opens_for_an_ally_inside_and_shuts_after_its_close_timer() {
 }
 
 #[test]
-fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
+fn the_forced_replay_takes_the_game_state_for_what_froze() {
     // a frozen unit takes the game's (and runs again), a frozen unit the game no longer
     // holds goes, a unit that ran keeps the slice's, a stopped player takes its resources
     let mut t =
@@ -9504,7 +9504,7 @@ fn the_forced_replay_takes_the_game_s_state_for_what_froze() {
 /// object whose update returned 1 ([`World::leave_world`]): its owner's watched list lets it go
 /// (`FUN_141091310`) and a recyclable master's missile goes to the pool of type 60.
 #[test]
-fn the_forced_replay_s_removal_leaves_as_an_update_s_leave_does() {
+fn the_forced_replay_removal_leaves_as_an_update_leave_does() {
     let missile = Unit {
         id: object_id(9),
         stopped: true,
@@ -9613,7 +9613,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
 }
 
 #[test]
-fn a_queue_pays_its_cost_and_the_building_starts_making() {
+fn queue_pays_its_cost_and_the_building_starts_making() {
     let mut t = one_player(vec![centre(9)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
@@ -9657,7 +9657,7 @@ fn a_queue_pays_its_cost_and_the_building_starts_making() {
 }
 
 #[test]
-fn a_queued_villager_is_male_or_female_by_an_action_stream_draw() {
+fn queued_villager_is_male_or_female_by_an_action_stream_draw() {
     let mut t = one_player(vec![centre(9)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let mut streams = Streams::default();
@@ -9681,7 +9681,7 @@ fn a_queued_villager_is_male_or_female_by_an_action_stream_draw() {
 }
 
 #[test]
-fn a_queue_the_player_cannot_pay_or_at_a_missing_building_queues_nothing() {
+fn queue_the_player_cannot_pay_or_at_missing_building_queues_nothing() {
     // too little food for the villager (46 here): no entry, no cost, no draw (records/
     // 425906646's update 31: player 5's refused QUEUE leaves player 6's draws alone)
     let mut poor = one_player(vec![centre(9)], [40.0, 0.0, 0.0, 0.0]);
@@ -9715,7 +9715,7 @@ fn a_queue_the_player_cannot_pay_or_at_a_missing_building_queues_nothing() {
 /// (`FUN_1411d0e90`) takes it, the last pick kept on a tie: five of master 99 (25 seconds each)
 /// go to 9, 10, 10, 9, 9.
 #[test]
-fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
+fn queue_at_several_buildings_shares_its_units_out_by_load() {
     let several = |amount| {
         Command::Queue(QueueCommand {
             player: player_id(0),
@@ -9772,7 +9772,7 @@ fn a_queue_at_several_buildings_shares_its_units_out_by_load() {
 /// 427647190's players queued villagers at their trophy (master 1649, which trains none) and
 /// the game queued nothing there.
 #[test]
-fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
+fn queue_at_building_that_does_not_train_the_unit_queues_nothing_there() {
     let trophy = |id| {
         let mut u = town_centre(id);
         u.life.master_id = master_id(1649);
@@ -9831,7 +9831,7 @@ fn a_queue_at_a_building_that_does_not_train_the_unit_queues_nothing_there() {
 /// (`+0x138`); the cost check before reads the ordering player's stock. Without the setting the
 /// packet's check drops it.
 #[test]
-fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
+fn queue_at_another_player_building_queues_and_pays_for_its_owner() {
     let two = |cheats| {
         let mut t = one_player(vec![], [200.0; 4]);
         let mut other = t.players[0].clone();
@@ -9876,7 +9876,7 @@ fn a_queue_at_another_player_s_building_queues_and_pays_for_its_owner() {
 /// `FUN_141614450` reads a listed object live or sleeping (`FUN_140e6b750`): a sleeping one the
 /// unit does not train at keeps room −1, and the town centre beside it takes the unit.
 #[test]
-fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
+fn queue_passes_over_sleeping_object_the_unit_does_not_train_at() {
     let mut t = one_player(vec![centre(9)], [200.0; 4]);
     let mut asleep = town_centre(11);
     asleep.life.master_id = master_id(99);
@@ -9908,7 +9908,7 @@ fn a_queue_passes_over_a_sleeping_object_the_unit_does_not_train_at() {
 /// packet's and the listed ones the world holds; a tie keeps the one taken; one alone is the
 /// packet's.
 #[test]
-fn a_research_at_several_buildings_takes_the_least_loaded() {
+fn research_at_several_buildings_takes_the_least_loaded() {
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 99, 1)]);
     let at = |player, building, count, buildings: Vec<i32>| ResearchCommand {
@@ -9917,7 +9917,7 @@ fn a_research_at_several_buildings_takes_the_least_loaded() {
         count,
         buildings: object_ids(buildings),
         tech: TechId::of_data(0),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         shift: false,
     };
     let loaded = |r: ResearchCommand| t.least_loaded(&r, &r.buildings).unwrap();
@@ -9945,7 +9945,7 @@ fn a_research_at_several_buildings_takes_the_least_loaded() {
 /// listed, another player's or one the world lacks becomes −1, and a human's left without one
 /// is refused.
 #[test]
-fn a_research_s_check_refuses_another_player_s_buildings() {
+fn research_check_refuses_another_player_buildings() {
     let mut t = one_player(vec![centre(9), centre(10)], [200.0; 4]);
     t.players.push(Player::default());
     t.reindex();
@@ -9955,7 +9955,7 @@ fn a_research_s_check_refuses_another_player_s_buildings() {
         count,
         buildings: object_ids(buildings),
         tech: TechId::of_data(0),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         shift: false,
     };
     // its own: listed alone, or with the others checked
@@ -10027,7 +10027,7 @@ fn a_research_s_check_refuses_another_player_s_buildings() {
 /// only in game mode 16 does it mark the world's treaty monitor (`+0x820`'s `+0x17`), which the
 /// slice does not hold.
 #[test]
-fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
+fn research_of_castle_age_queues_it_but_in_game_mode_16() {
     use crate::technology::{Location, TechDef, TechState};
     let castle = |mode| {
         let mut t = one_player(vec![centre(9)], [1000.0; 4]);
@@ -10053,7 +10053,7 @@ fn a_research_of_castle_age_queues_it_but_in_game_mode_16() {
             count: 1,
             buildings: vec![],
             tech: TechId::of_data(0x66),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             shift: false,
         };
         let r = research_listed(&mut t, &at);
@@ -10118,7 +10118,7 @@ fn research_at(tech: i16, target: i32) -> ResearchCommand {
         count: 1,
         buildings: vec![],
         tech: TechId::of_data(tech),
-        q_id: crate::commands::QueueId::of_data(target),
+        queue_id: crate::commands::QueueId::of_data(target),
         shift: false,
     }
 }
@@ -10128,7 +10128,7 @@ fn research_at(tech: i16, target: i32) -> ResearchCommand {
 /// target, a technology the tree lacks, one neither available nor repeatable, a building
 /// nowhere, a dead one or one at no location do nothing past the debit.
 #[test]
-fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
+fn research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
     let queued = |t: &World| {
         t.parts
             .production
@@ -10181,7 +10181,7 @@ fn a_research_queues_at_an_alive_location_after_its_costs_come_off_the_debit() {
 /// A queued research starts in the building's production list (`0x140ad1d80`): the technology
 /// takes state 2 at the building's master, the action state 6 with no work done.
 #[test]
-fn a_queued_research_starts_at_the_buildings_master() {
+fn queued_research_starts_at_the_buildings_master() {
     let mut t = research_world();
     research_listed(&mut t, &research_at(5, -1)).unwrap();
     t.produce(PlayerId::new(0), ListIndex::new(0), Seconds::ZERO)
@@ -10207,7 +10207,7 @@ fn a_queued_research_starts_at_the_buildings_master() {
 /// technology, a building of another player, a computer player's research and a building with
 /// an unmodelled action.
 #[test]
-fn a_research_s_unmodelled_parts_fail() {
+fn research_unmodelled_parts_fail() {
     let fails = |change: &dyn Fn(&mut World)| {
         let mut t = research_world();
         change(&mut t);
@@ -10262,7 +10262,7 @@ fn a_research_s_unmodelled_parts_fail() {
 /// which keeps it until the unit spawns; the make action's start counts the one it makes in
 /// 81.
 #[test]
-fn a_queue_counts_its_units_population_as_queued() {
+fn queue_counts_its_units_population_as_queued() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     t.tick_with(Millis::new(104), &[queue(9, 83, 3)]);
     let a = &t.players[0].attributes;
@@ -10274,7 +10274,7 @@ fn a_queue_counts_its_units_population_as_queued() {
 }
 
 #[test]
-fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
+fn queue_takes_as_many_as_the_room_and_the_resources_allow() {
     // food for two of three: two entries, two draws
     let mut two = one_player(vec![centre(9)], [100.0, 0.0, 0.0, 0.0]);
     two.tick_with(Millis::new(104), &[queue(9, 83, 3)]);
@@ -10312,7 +10312,7 @@ fn a_queue_takes_as_many_as_the_room_and_the_resources_allow() {
 /// another button opens an entry with that button's train time; a full buffer of ten grows by
 /// ten, the serials numbering the entries.
 #[test]
-fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
+fn queued_units_join_the_last_entry_and_full_buffer_grows() {
     let with = |amount, button| {
         Command::Queue(QueueCommand {
             player: player_id(0),
@@ -10380,7 +10380,7 @@ fn queued_units_join_the_last_entry_and_a_full_buffer_grows() {
 /// (`FUN_1411cff00`): the villager's 46 food come back and attribute 80 empties; a disabled
 /// queue (`+0xbf6` clear) makes nothing.
 #[test]
-fn a_computer_player_s_housed_building_cancels_its_queue() {
+fn computer_player_housed_building_cancels_its_queue() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     t.players[0].computer = true;
     t.players[0].attributes[4] = Amount::new(0.5);
@@ -10432,7 +10432,7 @@ fn a_computer_player_s_housed_building_cancels_its_queue() {
 /// Game mode 16 with attribute 6 at most 1: a military unit (master 99, class 0) is queued
 /// one at a time, the player's flag (`+0x1378`) set; a second QUEUE queues nothing.
 #[test]
-fn game_mode_16_queues_one_military_unit_at_a_time() {
+fn game_mode_16_queues_one_military_unit_at_time() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
     t.settings.game_mode = GameMode::of_data(16);
     t.tick_with(Millis::new(104), &[queue(9, 99, 3)]);
@@ -10646,7 +10646,7 @@ fn hands(
 /// with player 1's fog visibility) and a copy of Gaia's dead archer, its unit AI's notifies
 /// go with the world time and it tells its unit AI it changed hands.
 #[test]
-fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() {
+fn taken_gaia_archer_keeps_copy_of_gaia_master_with_its_new_owner_fog() {
     let masters = hands_masters();
     let mut own = PartTable::default();
     let mut s = hands_world(
@@ -10657,12 +10657,12 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
         Distance::new(6.0),
     );
     let mut u = hands_unit(21712, master_id(4));
-    let mut u_ai = hands_ai(21712);
+    let mut unit_ai = hands_ai(21712);
     let dead =
         crate::ownership::change::dead_master_of(&u, 0, MasterTables::new(&masters, &own), false);
     assert_eq!(
         hands(
-            (&mut u, Some(&mut u_ai)),
+            (&mut u, Some(&mut unit_ai)),
             (0, PlayerId::new(1)),
             (&masters, &mut own),
             &mut s,
@@ -10698,7 +10698,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
     let tile = |x: usize, y: usize| y * 40 + x;
     assert_eq!(v.maps[0].counts[tile(10, 10)], 0);
     assert_eq!(v.maps[1].counts[tile(16, 10)], 1);
-    let ai = &u_ai;
+    let ai = &unit_ai;
     assert_eq!(ai.last_update_time, Millis::new(1250));
     assert_eq!(
         ai.notifies,
@@ -10715,7 +10715,7 @@ fn a_taken_gaia_archer_keeps_a_copy_of_gaia_s_master_with_its_new_owner_s_fog() 
 /// A master of its own it had stays (with the new fog visibility), and so does a dead
 /// master; a dead master of a type the copy leaves (25) gives none.
 #[test]
-fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
+fn taken_sheep_sees_with_its_new_owner_line_of_sight() {
     let masters = hands_masters();
     let mut own = PartTable::default();
     let mut s = hands_world(
@@ -10726,14 +10726,14 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
         Distance::new(3.0),
     );
     let mut u = hands_unit(9520, master_id(705));
-    let mut u_ai = hands_ai(9520);
+    let mut unit_ai = hands_ai(9520);
     assert_eq!(
         crate::ownership::change::dead_master_of(&u, 1, MasterTables::new(&masters, &own), false),
         None
     );
     assert_eq!(
         hands(
-            (&mut u, Some(&mut u_ai)),
+            (&mut u, Some(&mut unit_ai)),
             (1, PlayerId::new(2)),
             (&masters, &mut own),
             &mut s,
@@ -10755,7 +10755,7 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     // back to player 1: the copy stays, with player 1's fog and line of sight
     assert_eq!(
         hands(
-            (&mut u, Some(&mut u_ai)),
+            (&mut u, Some(&mut unit_ai)),
             (2, PlayerId::new(1)),
             (&masters, &mut own),
             &mut s,
@@ -10777,14 +10777,14 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
         Distance::new(7.0),
     );
     let mut a = hands_unit(7, master_id(4));
-    let mut a_ai = hands_ai(7);
+    let mut other_ai = hands_ai(7);
     assert_eq!(
         crate::ownership::change::dead_master_of(&a, 1, MasterTables::new(&masters, &own), false),
         None
     );
     assert_eq!(
         hands(
-            (&mut a, Some(&mut a_ai)),
+            (&mut a, Some(&mut other_ai)),
             (1, PlayerId::new(0)),
             (&masters, &mut own),
             &mut s,
@@ -10799,7 +10799,7 @@ fn a_taken_sheep_sees_with_its_new_owner_s_line_of_sight() {
     );
     assert_eq!(
         hands(
-            (&mut a, Some(&mut a_ai)),
+            (&mut a, Some(&mut other_ai)),
             (0, PlayerId::new(1)),
             (&masters, &mut own),
             &mut s,
@@ -10870,7 +10870,7 @@ fn artifact_players(attribute_97: &[f32], status: &[GameStatus]) -> Vec<Player> 
 /// is out (`+0x89` not 0) and over such a player as a taker: 428265662's Gaia sheep 27530 in
 /// update 642 stays Gaia's next to the units of player 7, who resigned in update 428.
 #[test]
-fn an_owner_search_passes_over_a_player_out_of_the_game() {
+fn an_owner_search_passes_over_player_out_of_the_game() {
     let unit = owner_search_unit;
     let mut s = hands_world(
         27530,
@@ -10949,7 +10949,7 @@ fn an_owner_search_passes_over_a_player_out_of_the_game() {
 /// owner. A unit of a class that never counts (a building's, 3) and a Gaia unit with `+0x924`
 /// set do not count; an animal inside another object searches about its record there.
 #[test]
-fn an_owner_search_keeps_the_owner_s_animal_unless_attribute_97_takes_it() {
+fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
     let unit = owner_search_unit;
     let none = [0.0; 3];
     let mut s = hands_world(
@@ -11059,7 +11059,7 @@ fn an_owner_search_keeps_the_owner_s_animal_unless_attribute_97_takes_it() {
 /// The owner search's unmodelled parts: an animal the world does not hold, a unit of a player
 /// beyond the lists, and a stopped unit that counts and may have moved onto the tiles.
 #[test]
-fn an_owner_search_s_unmodelled_parts_fail() {
+fn an_owner_search_unmodelled_parts_fail() {
     let none = [0.0; 3];
     let reason = |s: &Spatial, me, status: &[GameStatus]| {
         s.artifact_owner(me, &artifact_players(&none, status))
@@ -11212,10 +11212,10 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
     );
     let before = s.sight.as_ref().unwrap().maps.clone();
     let mut u = hands_unit(21712, master_id(4));
-    let mut u_ai = hands_ai(21712);
+    let mut unit_ai = hands_ai(21712);
     assert_eq!(
         hands(
-            (&mut u, Some(&mut u_ai)),
+            (&mut u, Some(&mut unit_ai)),
             (0, PlayerId::new(2)),
             (&masters, &mut own),
             &mut s,
@@ -11238,11 +11238,11 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
         Some(PlayerId::new(0))
     );
     assert!(!own.contains(u.id));
-    assert_eq!(u_ai.notifies.len(), 1);
+    assert_eq!(unit_ai.notifies.len(), 1);
     u.life.inside = Some(ContainerId::new(object_id(100)));
     assert_eq!(
         hands(
-            (&mut u, Some(&mut u_ai)),
+            (&mut u, Some(&mut unit_ai)),
             (0, PlayerId::new(1)),
             (&masters, &mut own),
             &mut s,
@@ -11268,7 +11268,7 @@ fn an_ownership_change_without_the_master_writes_the_records_alone() {
 /// A player whose table lacks the master ends the loop without taking it; outside the
 /// standard modes a computer player that does not allow it is passed over.
 #[test]
-fn a_gaia_archer_a_player_sees_goes_to_that_player() {
+fn gaia_archer_player_sees_goes_to_that_player() {
     let world = |masters: Vec<Masters>, computer: bool, mode: i32| {
         let mut t = World::new(
             WorldTime::ZERO,
@@ -11670,7 +11670,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
 /// the object holds itself (attribute 4: it holds nothing after); each entry of mode 16 (a flag
 /// bit 0x10) leaves its own store when the store holds its attribute.
 #[test]
-fn a_built_building_s_storage_leaves_its_owner_and_its_store() {
+fn built_building_storage_leaves_its_owner_and_its_store() {
     let master = Master {
         id: ids::TOWN_CENTRE,
         kind: BUILDING,
@@ -11893,7 +11893,7 @@ fn deaths_world() -> World {
 /// worker left, it goes to sleep), the Hunt lets its boar go (notify 699 from the hunter, its
 /// class 4), the Build takes its builder out of the foundation's builders and lets it go.
 #[test]
-fn a_dead_unit_s_actions_go_and_let_their_targets_go_in_the_update_of_its_death() {
+fn dead_unit_actions_go_and_let_their_targets_go_in_the_update_of_its_death() {
     let mut t = deaths_world();
     t.tick(Millis::new(100));
     assert_eq!(
@@ -11947,7 +11947,7 @@ fn a_dead_unit_s_actions_go_and_let_their_targets_go_in_the_update_of_its_death(
 /// in any other object itself, and in none once the world no longer holds its target; a dead
 /// builder of the annex leaves the main building's builders.
 #[test]
-fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
+fn build_on_an_annex_counts_its_builder_in_the_main_building() {
     let mut t = deaths_world();
     let mut main = t.object_of(&t.players[1].objects[ListIndex::new(3)]);
     main.unit.id = object_id(10030);
@@ -11997,7 +11997,7 @@ fn a_build_on_an_annex_counts_its_builder_in_the_main_building() {
 /// base teardown `FUN_140a73fc0`) lets the old one go (no worker left on the tree: it is flagged
 /// to sleep), and a clearing of the list lets the town centre go.
 #[test]
-fn a_move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() {
+fn move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() {
     let mut t = teardown_world();
     let tree = Unit {
         id: object_id(50),
@@ -12085,7 +12085,7 @@ fn a_move_to_an_object_takes_it_and_lets_it_go_when_it_is_replaced_or_cleared() 
 /// `FUN_140a98e20`) lets its target go (the base teardown, slot 0x180); one that dies with the
 /// unit does too (`FUN_140a98620`).
 #[test]
-fn a_move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
+fn move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
     let mut t = deaths_world();
     t.players[0].objects[ListIndex::new(0)].workers = crate::objects::WorkerCount::of_data(2);
     let mover = crate::gathering::hunt::tests::walker();
@@ -12177,7 +12177,7 @@ fn a_move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
 /// tree counts a worker less), and the list keeps the `MoveTo` (code 4), now to its point; one
 /// the world no longer holds is cleared, with nothing released.
 #[test]
-fn a_move_to_of_its_own_lets_a_dying_target_go_and_forgets_a_lost_one() {
+fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
     let run = |target: i32, tree_state: ObjectState| {
         let mut t = deaths_world();
         t.players[0].objects[ListIndex::new(0)].workers = crate::objects::WorkerCount::of_data(2);
@@ -12255,7 +12255,7 @@ fn a_move_to_of_its_own_lets_a_dying_target_go_and_forgets_a_lost_one() {
 /// second target (`FUN_140a7a190`): the caller takes it (slot 0x178). With the drop site held
 /// already it walks there and takes nothing new.
 #[test]
-fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
+fn hunter_drop_off_takes_the_drop_site_it_found() {
     let mut t = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
@@ -12377,7 +12377,7 @@ fn a_hunter_s_drop_off_takes_the_drop_site_it_found() {
 /// holds only dropped; the teardown (`FUN_140a73fc0`) of a dead hunter's Hunt and of a failed
 /// one (state 13, removed by `FUN_140a98e20`) lets its drop site go too.
 #[test]
-fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
+fn hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
     let mut t = deaths_world();
     let site = |state| Unit {
         id: object_id(9149),
@@ -12521,7 +12521,7 @@ fn a_hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
 /// `0x140ac7a00`): a drop site past state 6 is let go and goes, one the world's table lacks only
 /// goes, one in state 2 (or 6) stays.
 #[test]
-fn a_second_target_past_state_6_is_let_go_and_one_gone_dropped() {
+fn second_target_past_state_6_is_let_go_and_one_gone_dropped() {
     use crate::objects::unit::second_target_checked;
     assert_eq!(
         second_target_checked(
@@ -12560,7 +12560,7 @@ fn a_second_target_past_state_6_is_let_go_and_one_gone_dropped() {
 /// the others keeping their order. An ally's take, a built building's and one of a master
 /// without a stack unit list nothing. Both still count the workers.
 #[test]
-fn a_foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
+fn foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
     let unit = |id, master| Unit {
         id,
         life: Lifecycle {
@@ -12708,7 +12708,7 @@ fn a_foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
 /// object's (`FUN_141071ea0`, types 20 to 40) only counts the worker less. A sleeping object
 /// (`FUN_1415417a0` finds it) counts one less and stays asleep without the flag.
 #[test]
-fn only_a_static_object_let_go_by_its_last_worker_goes_to_sleep() {
+fn only_static_object_let_go_by_its_last_worker_goes_to_sleep() {
     let by = Releaser {
         id: object_id(40),
         class: Some(class::VILLAGER),
@@ -12776,7 +12776,7 @@ fn only_the_wonder_keeps_its_actions_past_state_2() {
 /// The Artifact's move to an object (slot 8 with an object, `FUN_140aaca30`): the old target
 /// is let go, then the new one taken (slot 0x68 twice, `+0x60` 0).
 #[test]
-fn an_artifact_s_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
+fn an_artifact_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
     let mut t = teardown_world();
     for (id, at) in [(9149, [20.0, 20.0]), (9150, [25.0, 20.0])] {
         t.spatial.insert(
@@ -12842,7 +12842,7 @@ fn an_artifact_s_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
 /// 1's, completes in player 1's tracker, loses its gather point and its actions, and comes to
 /// the end of player 1's list with its record again.
 #[test]
-fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
+fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
     let master = |id, class, los| Master {
         id,
         kind: master_type::COMBAT,
@@ -13059,7 +13059,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
 /// the one player's object in its lists, and asks its unit to change hands (slot 0x70); the
 /// torch leaves Gaia's list for the end of player 1's.
 #[test]
-fn a_gaia_torch_goes_to_the_one_player_near_it() {
+fn gaia_torch_goes_to_the_one_player_near_it() {
     let master = |id, class, los| Master {
         id,
         kind: master_type::COMBAT,
@@ -13202,7 +13202,7 @@ fn a_gaia_torch_goes_to_the_one_player_near_it() {
 /// own with player 1's line of sight), the end of player 1's list, with its food (storage
 /// flag 1 to the new owner).
 #[test]
-fn a_gaia_sheep_a_player_stands_by_goes_to_it() {
+fn gaia_sheep_player_stands_by_goes_to_it() {
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.velocity = None;
     walker.stats.speed = Speed::new(0.8);
@@ -13384,7 +13384,7 @@ fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
 /// saw it (an attacker the world does not hold then, out for its update or gone, counts too); a
 /// computer player's killed object (its AI is told) is not modelled.
 #[test]
-fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
+fn killed_villager_counts_its_attacker_kind_and_player_type() {
     let unit = |id, master_id| Unit {
         id,
         life: Lifecycle {
@@ -13494,7 +13494,7 @@ fn a_killed_villager_counts_its_attacker_s_kind_and_player_type() {
     );
 }
 
-/// [`a_killed_sheep_goes_to_gaia`]'s world: player 1's town centre 10029 (`killer_last`: the
+/// [`killed_sheep_goes_to_gaia`]'s world: player 1's town centre 10029 (`killer_last`: the
 /// list's last object) and its sheep 9520, and the hit that kills the sheep for Gaia.
 fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
     let sheep = Unit {
@@ -13573,7 +13573,7 @@ fn killed_sheep(killer_last: bool) -> (World, crate::combat::damage::Victim) {
 /// 12 damage): it has none, Gaia takes it (its list, its storage, its unit AI's notifies),
 /// and the players count the kill (300 + 1 and 325 + 1; a sheep costs nothing).
 #[test]
-fn a_killed_sheep_goes_to_gaia() {
+fn killed_sheep_goes_to_gaia() {
     let (mut t, v) = killed_sheep(false);
     write_hit(&mut t, (PlayerId::new(1), ListIndex::new(0)), v);
     assert_eq!(t.players[1].objects.len(), 1);
@@ -13594,7 +13594,7 @@ fn a_killed_sheep_goes_to_gaia() {
 /// slot holds the stand-in again after; a removal in the call that moves the object is
 /// followed. One the call takes from its list fails the update, the stand-in in nobody's list.
 #[test]
-fn a_lent_object_is_the_world_s_for_the_call() {
+fn lent_object_is_the_world_for_the_call() {
     let mut t = house_builder();
     let last = t.players[1].objects.last_place().unwrap();
     let id = t.players[1].objects[last].id;
@@ -13639,7 +13639,7 @@ fn a_lent_object_is_the_world_s_for_the_call() {
 /// last, moves into it while it is out, goes back there, and the step reports that slot for the
 /// list's loop to file it at.
 #[test]
-fn a_kill_in_the_step_reports_the_object_s_new_slot() {
+fn kill_in_the_step_reports_the_object_new_slot() {
     let (mut t, mut v) = killed_sheep(true);
     let stepped = t
         .step_object(
@@ -13666,7 +13666,7 @@ fn a_kill_in_the_step_reports_the_object_s_new_slot() {
 /// and the kill counted. The updating unit's own kill (its target's retaliation) counts there
 /// too, on the unit out of its slot: its owner counts the loss to Gaia (attribute 325).
 #[test]
-fn a_hit_s_kill_reaches_the_world_where_the_hit_runs() {
+fn hit_kill_reaches_the_world_where_the_hit_runs() {
     use crate::combat::victims::{KillLeft, file_kill};
     let (mut t, mut v) = killed_sheep(false);
     let seen = in_update(
@@ -13734,7 +13734,7 @@ fn an_own_kill_gives_the_livestock_to_gaia_at_once() {
 /// the stand-in its last object) puts the object back where the stand-in went; one whose
 /// stand-in left the list goes to its end, and the step fails.
 #[test]
-fn a_step_puts_its_object_back_where_its_stand_in_went() {
+fn step_puts_its_object_back_where_its_stand_in_went() {
     use crate::objects::unit::Outcome;
     let ids = |t: &World| {
         t.players[1]
@@ -13781,7 +13781,7 @@ fn a_step_puts_its_object_back_where_its_stand_in_went() {
 /// sleeps or changes hands, and again at the same count after one that leaves, whose slot the
 /// list's last object took.
 #[test]
-fn the_list_s_loop_runs_its_count_again_only_after_a_leave() {
+fn the_list_loop_runs_its_count_again_only_after_leave() {
     use crate::objects::unit::Outcome;
     let mut t = house_builder();
     let n = t.players[1].objects.len();
@@ -13808,7 +13808,7 @@ fn the_list_s_loop_runs_its_count_again_only_after_a_leave() {
 /// building's class counts no kill, both players count it against the other and its cost),
 /// then the razing's history event (7, `data1` the owner) on the attacker's player and its adds.
 #[test]
-fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
+fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
     let building = |id: i32, master_id: MasterId, annex_of: Option<ObjectId>| {
         Object::with_building(
             Unit {
@@ -13955,7 +13955,7 @@ fn write_hit(t: &mut World, (p, i): (PlayerId, ListIndex), mut v: crate::combat:
 /// below 1 it wakes to the end of its player's live list and takes the rest, the hit's cleared
 /// sleep flag among it.
 #[test]
-fn a_hit_wakes_a_sleeping_object_only_below_1_hit_point() {
+fn hit_wakes_sleeping_object_only_below_1_hit_point() {
     let tree = |id| Unit {
         id,
         life: Lifecycle {
@@ -14021,7 +14021,7 @@ fn a_hit_wakes_a_sleeping_object_only_below_1_hit_point() {
 /// above 0) is a trebuchet; the paid cost (`+0x880`) sums the entries with a resource and the
 /// paid flag, as floats in their order.
 #[test]
-fn a_trebuchet_is_a_master_of_class_51_or_54_with_a_weapon() {
+fn trebuchet_is_master_of_class_51_or_54_with_weapon() {
     use crate::combat::victims::is_trebuchet;
     use crate::combat::victims::paid_cost;
     let m = |kind, class, weapons: Vec<ClassAmount>| Master {
@@ -14171,7 +14171,7 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
 /// keeps what it had (a state of 0 clears whatever the building is), and an object the player
 /// does not hold is left out.
 #[test]
-fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_object() {
+fn set_gather_state_leaves_building_that_takes_no_gather_point_and_gone_object() {
     let mut house = gathering_centre(10909, Position::new(20.0, 30.0, 0.0));
     house.life.master_id = ids::HOUSE;
     let gather = Some(GatherPoint {
@@ -14207,7 +14207,7 @@ fn set_gather_state_leaves_a_building_that_takes_no_gather_point_and_a_gone_obje
 /// and y move, its target and master stay and its state stays 0xff; on itself the state becomes 1
 /// with the target kept.
 #[test]
-fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
+fn set_gather_point_keeps_the_target_of_kept_gather_point() {
     let tc = gathering_centre(9149, Position::new(104.0, 47.0, 0.5));
     let gather = Some(GatherPoint {
         state: GatherPointState::KEPT,
@@ -14261,7 +14261,7 @@ fn set_gather_point_keeps_the_target_of_a_kept_gather_point() {
 /// the gather point when the player trains a unit there (`FUN_141625a20`'s count above 0); one
 /// that neither garrisons nor trains ignores it, and the player goes on.
 #[test]
-fn set_gather_point_takes_a_building_that_trains_without_garrisoning() {
+fn set_gather_point_takes_building_that_trains_without_garrisoning() {
     let mut barracks = town_centre(10908);
     barracks.life.master_id = master_id(12);
     let mut house = town_centre(10909);
@@ -14312,7 +14312,7 @@ fn set_gather_point_takes_a_building_that_trains_without_garrisoning() {
 /// into the queue first and clears, then the packet's step; a second packet adds its step
 /// alone; SET GATHER POINT empties the queue.
 #[test]
-fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
+fn command_queue_takes_the_gather_point_first_then_the_steps() {
     let mut tc = town_centre(9149);
     tc.life.master_id = ids::TOWN_CENTRE;
     let ai = UnitAi {
@@ -14383,7 +14383,7 @@ fn a_command_queue_takes_the_gather_point_first_then_the_steps() {
 }
 
 #[test]
-fn a_unit_due_to_spawn_stops_the_player() {
+fn unit_due_to_spawn_stops_the_player() {
     let mut t = one_player(vec![centre(9)], [200.0; 4]);
     let quick = queue(9, 97, 1);
     t.tick_with(Millis::new(1000), &[quick]);
@@ -14402,7 +14402,7 @@ fn a_unit_due_to_spawn_stops_the_player() {
 /// Slot 0x468 (`FUN_141157c50`): the top level's path, its points, length and flags, and
 /// that level's waypoint; nothing without a path at the top or without movement state.
 #[test]
-fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
+fn unit_patrol_information_is_its_top_path_and_waypoint() {
     let mut m = crate::gathering::hunt::tests::walker();
     let mut walked = crate::movement::PathData::without_path();
     walked.has_path = true;
@@ -14437,7 +14437,7 @@ fn a_unit_s_patrol_information_is_its_top_path_and_waypoint() {
 /// `MoveTo` goes to the saved waypoint; the old `MoveTo` to an object lets it go (its teardown's
 /// slot 0x180, the caller's).
 #[test]
-fn a_restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
+fn restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
     let saved = crate::unit_ai::PatrolPath {
         path: crate::pathing::tile_path::Path {
             points: vec![
@@ -14503,7 +14503,7 @@ fn a_restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
 /// out, no main target), then dies. 426048706 (Aftermath): Gaia's petards 7948.. placed at −1
 /// hit points blast the players' walls in update 1.
 #[test]
-fn a_petard_below_1_hit_point_blasts_about_itself_then_dies() {
+fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
     use crate::map::spatial::Placed;
     let petard = Master {
         id: master_id(706),
@@ -15024,7 +15024,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
 /// 200) has the armor its charge's hits took back (`+0x9e4`/`+0x9e6` zeroed); below its most it
 /// keeps the loss.
 #[test]
-fn a_unit_regenerated_to_its_most_has_its_armor_back() {
+fn unit_regenerated_to_its_most_has_its_armor_back() {
     let berserk = Master {
         id: master_id(692),
         kind: master_type::COMBAT,
@@ -15070,7 +15070,7 @@ fn a_unit_regenerated_to_its_most_has_its_armor_back() {
 /// negative one takes off at most the hit points (slot 0xb0); below 1 hit point, out of state
 /// 2 or below 1.2e-7 in size nothing changes.
 #[test]
-fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
+fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     use crate::objects::hit_points::regeneration_rate;
     let berserk = Master {
         id: master_id(692),
@@ -15091,13 +15091,13 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     // 20 a minute: a point per 3 s; 2 s of dt plus 1.5 held is one point, the rest held back
     // (in f32: 3.5 / 3 less its whole point, times 3)
     let mut u = unit(HitPoints::new(30.0));
-    let mut u_combat = crate::objects::layers::Combat {
+    let mut unit_combat = crate::objects::layers::Combat {
         regen_timer: Seconds::new(1.5),
         ..Default::default()
     };
-    u.regenerate(&mut u_combat, &berserk, Seconds::new(2.0));
+    u.regenerate(&mut unit_combat, &berserk, Seconds::new(2.0));
     assert_eq!(
-        (u.life.hp, u_combat.regen_timer),
+        (u.life.hp, unit_combat.regen_timer),
         (
             HitPoints::new(31.0),
             Seconds::new(((3.5f32 / 3.0) % 1.0) * 3.0)
@@ -15141,8 +15141,8 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..Master::default()
     };
     let mut g = unit(HitPoints::new(1650.0));
-    let mut g_combat = crate::objects::layers::Combat::default();
-    g.regenerate(&mut g_combat, &gate, Seconds::new(0.104));
+    let mut gate_combat = crate::objects::layers::Combat::default();
+    g.regenerate(&mut gate_combat, &gate, Seconds::new(0.104));
     assert_eq!(g.life.hp, HitPoints::new(1649.0));
     let mut low = unit(HitPoints::new(1.0));
     let mut low_combat = crate::objects::layers::Combat::default();
@@ -15161,7 +15161,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
 /// `TRIBE_Combat_Object::update`'s hit point powerup check: a powerup above its room comes off
 /// the hit points, at least 1 left (`MAXSS`), and takes the room; at most the room, nothing.
 #[test]
-fn a_hit_point_powerup_above_its_room_comes_off_the_hit_points() {
+fn hit_point_powerup_above_its_room_comes_off_the_hit_points() {
     let with = |hp, up, room| {
         (
             Unit {
@@ -15180,14 +15180,14 @@ fn a_hit_point_powerup_above_its_room_comes_off_the_hit_points() {
             },
         )
     };
-    let (mut u, mut u_combat) = with(100.0, 10.0, 4.0);
-    u.clamp_hp_powerup(&mut u_combat);
+    let (mut u, mut unit_combat) = with(100.0, 10.0, 4.0);
+    u.clamp_hp_powerup(&mut unit_combat);
     let at_room = HpPowerup {
         taken: HitPoints::new(4.0),
         max: HitPoints::new(4.0),
     };
     assert_eq!(
-        (u.life.hp, u_combat.hp_powerup),
+        (u.life.hp, unit_combat.hp_powerup),
         (HitPoints::new(94.0), at_room)
     );
     let (mut low, mut low_combat) = with(3.0, 10.0, 4.0);
@@ -15210,7 +15210,7 @@ fn a_hit_point_powerup_above_its_room_comes_off_the_hit_points() {
 /// `RGE_Combat_Object::update`: the attack timer runs down by dt times the object's rate
 /// (`+0x87c`), which a terrain look sets ([`crate::combat::abilities`]).
 #[test]
-fn the_attack_timer_runs_down_at_the_object_s_rate() {
+fn the_attack_timer_runs_down_at_the_object_rate() {
     let unit = Object::with_combat(
         Unit {
             id: object_id(1),
@@ -15251,7 +15251,7 @@ fn the_attack_timer_runs_down_at_the_object_s_rate() {
 /// sprite (389), not its death sprite (2573) (`RGE_Static_Object::update`'s sprite after the
 /// death), a foundation (state 0) as a building in state 2.
 #[test]
-fn a_building_short_of_its_build_time_that_dies_plays_its_destruction_sprite() {
+fn building_short_of_its_build_time_that_dies_plays_its_destruction_sprite() {
     for state in [ObjectState::Foundation, ObjectState::Alive] {
         building_short_of_its_build_time_dies(state);
     }
@@ -15351,7 +15351,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
 /// GAME's cheat code (sub-command 6, `FUN_1415c92c0`): without the game's cheats it does
 /// nothing; with them the cheat would run, which the slice does not model: its player stops.
 #[test]
-fn a_cheat_code_does_nothing_without_the_game_s_cheats() {
+fn cheat_code_does_nothing_without_the_game_cheats() {
     let mut t = sent_off_world(vec![]);
     let before = t.players.clone();
     let cheat = Command::Game(GameCommand {
@@ -15505,7 +15505,7 @@ fn forced(walk: bool) -> crate::unit_ai::AiMove {
 /// teardown lets both its targets go. The `MoveTo` starts (state 3: no target, so never within
 /// 0.01, and the unit has speed).
 #[test]
-fn an_ai_move_replaces_a_done_attack_with_a_move_to_the_point() {
+fn an_ai_move_replaces_done_attack_with_move_to_the_point() {
     let (mut u, mut actions, mut motion) = mover_unit(123);
     actions
         .list
@@ -15607,7 +15607,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
 /// update 1465, its Hunt idle). A task with a range answers 0: the `MoveTo` replaces the list and
 /// the Hunt's teardown lets its target and its drop site go.
 #[test]
-fn an_ai_move_hands_the_point_to_a_hunt_without_a_work_range() {
+fn an_ai_move_hands_the_point_to_hunt_without_work_range() {
     let (mut u, mut actions, mut motion) = mover_unit(47);
     let mut hunt = crate::gathering::hunt::tests::hunting(9149);
     hunt.state = HuntState::Idle;
@@ -15655,7 +15655,7 @@ fn an_ai_move_hands_the_point_to_a_hunt_without_a_work_range() {
 /// an object one (the target's place when it last took it); forced, or to another point,
 /// the new `MoveTo` replaces it (its teardown stops the unit and lets its target go).
 #[test]
-fn an_unforced_ai_move_leaves_a_move_to_the_same_point() {
+fn an_unforced_ai_move_leaves_move_to_the_same_point() {
     let unforced = crate::unit_ai::AiMove {
         force: false,
         ..forced(false)
@@ -15725,7 +15725,7 @@ fn an_unforced_ai_move_leaves_a_move_to_the_same_point() {
 /// (class 51) moves as any unit. The base slot 0x40 of an Explore and of a wait for a foundation
 /// takes nothing; an action the slice does not hold stops it.
 #[test]
-fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
+fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
     let (mut u, mut actions, mut motion) = mover_unit(7);
     assert!(
         ai_move_of(
@@ -15786,7 +15786,7 @@ fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
 /// quiet) shows the master's standing sprite: the mover's speed is the standing sprite's and
 /// the unit's `+0x7b8` clears.
 #[test]
-fn an_ai_move_of_a_unit_without_speed_fails_at_its_start_standing() {
+fn an_ai_move_of_unit_without_speed_fails_at_its_start_standing() {
     let (mut u, mut actions, mut motion) = mover_unit(8);
     let m = motion.mover_mut().unwrap();
     m.stats.speed = Speed::ZERO;
@@ -15812,7 +15812,7 @@ fn an_ai_move_of_a_unit_without_speed_fails_at_its_start_standing() {
 /// (426049848's deer 14064 in update 2077, which then evaded at 0.737, not 1.4) and `+0x7b8`
 /// clears. A human's villager waits once (`set_state(2)`), which shows nothing.
 #[test]
-fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
+fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
     let standing = Graphic {
         id: SpriteId::named(764),
         frames: crate::objects::Frame::of_data(10),
@@ -15876,10 +15876,10 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
     );
     assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(764)));
     assert_eq!(motion.lent().anim_speed(), Some(Speed::ZERO));
-    let (mut v, mut v_actions, mut v_motion) = deer(&mut rng);
+    let (mut v, mut deer_actions, mut deer_motion) = deer(&mut rng);
     v.own_move_gave_up(
-        &mut v_actions,
-        v_motion.lent(),
+        &mut deer_actions,
+        deer_motion.lent(),
         true,
         UnitStance::AGGRESSIVE,
         (
@@ -15890,11 +15890,11 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_a_villager_waits() {
     )
     .unwrap();
     assert_eq!(
-        v_actions.list.move_to().map(|m| m.state),
+        deer_actions.list.move_to().map(|m| m.state),
         Some(MoveTo::Waiting)
     );
     assert_eq!(
-        v_motion.mover().map(|m| m.stats.speed),
+        deer_motion.mover().map(|m| m.stats.speed),
         Some(Speed::new(1.4003))
     );
     assert_eq!(v.sprite.map(|s| s.graphic.id), Some(SpriteId::named(765)));
@@ -16270,7 +16270,7 @@ fn attack_by(
 /// its player's villager 83 first (slot 0x90 with 0: its storage leaves and the new one's comes,
 /// the tracker promotes it), then attacks with the new master.
 #[test]
-fn a_villager_s_attack_command_switches_it_to_the_villager_first() {
+fn villager_attack_command_switches_it_to_the_villager_first() {
     let villager = |id, storage| Master {
         id,
         kind: master_type::COMBAT,
@@ -16503,7 +16503,7 @@ fn ask_for_help_asks_only_an_idle_helper_that_may_attack() {
 /// it. A unit without a unit AI never answers; the helper of another player than the asker's
 /// answers as one of its own.
 #[test]
-fn a_helper_in_a_group_answers_only_while_its_group_patrols() {
+fn helper_in_group_answers_only_while_its_group_patrols() {
     let idle = UnitAi {
         ai_type: UnitAiType::SOLDIER,
         current_order: None,
@@ -16566,7 +16566,7 @@ fn a_helper_in_a_group_answers_only_while_its_group_patrols() {
 /// target the same (nothing taken). In state 4 the Attack keeps it as it is; unforced nothing
 /// changes either.
 #[test]
-fn an_attack_command_on_its_own_attack_s_target_asks_that_attack_again() {
+fn an_attack_command_on_its_own_attack_target_asks_that_attack_again() {
     let own = |state: AttackState| crate::combat::attack::Attack {
         state,
         seen: Position::new(-1.0, -1.0, -1.0),
@@ -16609,7 +16609,7 @@ fn an_attack_command_on_its_own_attack_s_target_asks_that_attack_again() {
 /// standing sprite. The constructor takes the target either way. A unit inside another fails at
 /// the start (`set_state(13)`: speed 1, the standing sprite).
 #[test]
-fn an_attack_command_of_a_unit_that_cannot_move_goes_ready_and_swings_at_once() {
+fn an_attack_command_of_unit_that_cannot_move_goes_ready_and_swings_at_once() {
     let (o, attacked, takes) = scout_attack(0.0, None);
     let unit = &o.unit;
     assert_eq!((attacked.attacks, attacked.posted), (true, vec![]));
@@ -16681,7 +16681,7 @@ const fn house_moves() -> crate::movement::MoveStats {
 /// a move at the world time (`+0x870`), which the walk reads of a building it meets (slot 0x5e8,
 /// `FUN_14106d2d0`): a foundation made after a unit's path was can be kept as a hit.
 #[test]
-fn a_build_command_s_foundation_holds_its_movement_state() {
+fn build_command_foundation_holds_its_movement_state() {
     let mut masters = builder_masters();
     let house = masters.get_mut(ids::HOUSE).unwrap();
     house.moving = Some(house_moves());
@@ -16729,7 +16729,7 @@ fn a_build_command_s_foundation_holds_its_movement_state() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
@@ -16771,7 +16771,7 @@ fn a_build_command_s_foundation_holds_its_movement_state() {
 /// powerup offset (line 0x1c1). 429730863's palisade 15472 (standing sprite 588: 5 facets,
 /// sequence type 3) faces facet 4, 5.0265484.
 #[test]
-fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
+fn build_command_foundation_draws_its_facing_before_its_powerup_offset() {
     let build = |flags: SpriteFlags| {
         let mut masters = builder_masters();
         let house = masters.get_mut(ids::HOUSE).unwrap();
@@ -16834,7 +16834,7 @@ fn a_build_command_s_foundation_draws_its_facing_before_its_powerup_offset() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids([9175])),
             queued: false,
@@ -16983,7 +16983,7 @@ fn reseed_world() -> World {
 /// `FUN_140a8aa60` with the automatic farm queue: the farmer pays a farm (60 wood), its
 /// foundation goes on the farm spot and the farmer builds it (as 118, its Gather gone).
 #[test]
-fn a_farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
+fn farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
     let mut t = reseed_world();
     t.players[1].auto_farm_queue = true;
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
@@ -17012,7 +17012,7 @@ fn a_farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
 /// Without the automatic queue the farm comes from the mill's queue (one less) unpaid; with
 /// it but too little wood, from the queue too.
 #[test]
-fn a_reseed_takes_a_queued_farm() {
+fn reseed_takes_queued_farm() {
     for (auto, wood) in [(false, 100.0), (true, 59.0)] {
         let mut t = reseed_world();
         t.players[1].auto_farm_queue = auto;
@@ -17032,7 +17032,7 @@ fn a_reseed_takes_a_queued_farm() {
 /// Without a farm to make (nothing queued, no automatic queue, or no wood) the reseed makes
 /// nothing: a human's farmer idles, a computer's is done.
 #[test]
-fn without_a_farm_to_make_the_farmer_idles() {
+fn without_farm_to_make_the_farmer_idles() {
     let mut t = reseed_world();
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
         .unwrap();
@@ -17078,7 +17078,7 @@ fn reseeded(setup: impl FnOnce(&mut World)) -> (Result<bool, GenieError>, usize)
 /// villager with only fish traps queued, for a fishing ship (class 21) with only farms queued and
 /// for a farm the player cannot make (its master unavailable).
 #[test]
-fn a_reseed_without_a_farm_to_make_makes_nothing() {
+fn reseed_without_farm_to_make_makes_nothing() {
     let none: [fn(&mut World); 5] = [
         |t| {
             t.parts
@@ -17114,7 +17114,7 @@ fn a_reseed_without_a_farm_to_make_makes_nothing() {
 /// A fishing ship (class 21) reseeds a fish trap (199) from the dock's queue (one less), with
 /// the automatic fish trap queue paying it (60 wood) instead.
 #[test]
-fn a_fishing_ship_reseeds_a_fish_trap() {
+fn fishing_ship_reseeds_fish_trap() {
     let ship = |t: &mut World| {
         let trap = Master {
             id: FISH_TRAP,
@@ -17159,7 +17159,7 @@ fn a_fishing_ship_reseeds_a_fish_trap() {
 /// farm spot, a building): the new foundation goes over it. The same farm when it is not the
 /// target fails the test, and nothing is made.
 #[test]
-fn a_reseed_s_placement_passes_over_the_old_farm() {
+fn reseed_placement_passes_over_the_old_farm() {
     let old_farm = |target: i32| {
         move |t: &mut World| {
             let farm = Unit {
@@ -17209,7 +17209,7 @@ fn a_reseed_s_placement_passes_over_the_old_farm() {
 /// (`FUN_140c42b60` at 0x140e7b252) makes every queued order ready, the ready ones kept, and
 /// the unit is not stopped.
 #[test]
-fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
+fn committing_build_or_wall_to_busy_builder_readies_its_queue() {
     let unready = crate::unit_ai::QueuedOrder {
         order: OrderKind::Move,
         ready: false,
@@ -17260,7 +17260,7 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
         player: player_id(1),
         master: master_id(70),
         position: Point::new(30.0, 88.0),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         sprite_override: crate::commands::SpriteOverride::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
@@ -17282,7 +17282,7 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
         master: master_id(70),
         from: Tile::new(30, 88),
         to: Tile::new(30, 88),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         builders: unit_list(object_ids([9175])),
         queued: false,
         commits: true,
@@ -17301,7 +17301,7 @@ fn a_committing_build_or_wall_to_a_busy_builder_readies_its_queue() {
 /// point at the unit's height; (−1, −1) exactly, or a site, keeps the unit's place; one part −1
 /// or not a number is a point.
 #[test]
-fn a_resource_search_starts_from_its_point_unless_it_is_none_or_has_a_site() {
+fn resource_search_starts_from_its_point_unless_it_is_none_or_has_site() {
     let unit = Position::new(5.0, 6.0, 0.5);
     assert_eq!(
         search_origin(Point::new(12.5, 30.5), false, unit),
@@ -17323,7 +17323,7 @@ fn a_resource_search_starts_from_its_point_unless_it_is_none_or_has_a_site() {
 /// Where a stop lands its error names what was running: a command's stop the command, an
 /// object's freeze the object, its master, its top action and its unit AI's order.
 #[test]
-fn a_stop_s_error_names_the_command_or_the_object_it_happened_on() {
+fn stop_error_names_the_command_or_the_object_it_happened_on() {
     let why = GenieError::unsupported("QUEUE at two buildings");
     let mut t = one_player(vec![town_centre(9)], [200.0; 4]);
     stock_masters(&mut t);
@@ -17378,7 +17378,7 @@ fn a_stop_s_error_names_the_command_or_the_object_it_happened_on() {
 /// for a fishing ship seeking by path whose footprint gap to it is within 100 squared
 /// (429521544's p3 in update 5601).
 #[test]
-fn a_fishing_ship_counts_a_near_drop_site_its_path_does_not_reach() {
+fn fishing_ship_counts_near_drop_site_its_path_does_not_reach() {
     use crate::gathering::drop_sites::counted;
     use crate::pathing::tile_path::Found;
     assert!(counted(Found::OffMap, true, false, || false));
@@ -17395,7 +17395,7 @@ fn a_fishing_ship_counts_a_near_drop_site_its_path_does_not_reach() {
 /// or rice 65 to 67, elsewhere its foundation terrain plus 2 (63 and 117: 65.., 119..); another
 /// master none (427445417's p4 in update 16981, 427557935's p4 in 22813).
 #[test]
-fn a_farm_foundation_lays_its_stage_terrain() {
+fn farm_foundation_lays_its_stage_terrain() {
     use crate::construction::building_update::farm_stage_terrain;
     assert_eq!(
         farm_stage_terrain(
@@ -17477,7 +17477,7 @@ fn a_farm_foundation_lays_its_stage_terrain() {
 /// (431096717's goat 12959 in update 78: 2001 against villager 16025's 2034, so it does not
 /// pause it).
 #[test]
-fn a_unit_s_human_order_count_down_is_the_walk_s_view_at_once() {
+fn unit_human_order_count_down_is_the_walk_view_at_once() {
     let mut t = enter_world(vec![], 5);
     let mut counted = |before: u32| {
         let v = &mut t.players[1].objects[ListIndex::new(0)];
@@ -17520,7 +17520,7 @@ fn a_unit_s_human_order_count_down_is_the_walk_s_view_at_once() {
 /// 10556 entering the transport 10579 in update 137, the Artifact gone after 138); an animal
 /// inside at the update's start runs no Artifact step.
 #[test]
-fn livestock_got_in_by_its_artifact_s_enter_keeps_the_artifact_to_its_next_update() {
+fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update() {
     let mut t = livestock_enter_world();
     // the sheep out of reach of the house, standing, so that its Enter walks
     let place = |t: &mut World, at: Position| {
@@ -17625,7 +17625,7 @@ fn livestock_inside_gets_its_default_artifact_and_loses_it_by_turns() {
 /// player 5's villagers 9618 and 9620). With one of its own the foundation goes down, and only
 /// that one builds.
 #[test]
-fn a_build_of_another_player_s_builders_is_refused_and_theirs_are_left_out() {
+fn build_of_another_player_builders_is_refused_and_theirs_are_left_out() {
     let mut t = build_world();
     t.masters[0] = builder_masters();
     let theirs = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
@@ -17635,7 +17635,7 @@ fn a_build_of_another_player_s_builders_is_refused_and_theirs_are_left_out() {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(30.0, 88.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             sprite_override: crate::commands::SpriteOverride::of_data(-1),
             builders: unit_list(object_ids(builders)),
             queued: false,
@@ -17840,7 +17840,7 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
 /// within the shooter's update: here for the shooter's own player, whose list holds the
 /// shooter's stand-in.
 #[test]
-fn a_hit_s_flare_is_made_where_the_volley_runs() {
+fn hit_flare_is_made_where_the_volley_runs() {
     let mut t = archer_world(100, 1, 0.0);
     let flare = Master {
         id: master_id(112),
@@ -17913,7 +17913,7 @@ fn assert_near(a: Position, b: Position) {
 /// four updates after the hit for the pool of type 60, whose id the next swing takes again 20
 /// updates after the first (the 2 s reload).
 #[test]
-fn a_ranged_swing_fires_its_missile_which_flies_to_the_target_and_hits_it() {
+fn ranged_swing_fires_its_missile_which_flies_to_the_target_and_hits_it() {
     let mut t = archer_world(100, 0, 0.0);
     for _ in 0..5 {
         t.tick(Millis::new(100));
@@ -17972,7 +17972,7 @@ fn a_ranged_swing_fires_its_missile_which_flies_to_the_target_and_hits_it() {
 /// 0x2d0, which files it in the tracker), inside the archer's update: what the update does after
 /// the fire reaches it by id, as the game's table does.
 #[test]
-fn a_fired_missile_joins_its_owner_s_list_at_its_making() {
+fn fired_missile_joins_its_owner_list_at_its_making() {
     let mut t = archer_world(100, 0, 0.0);
     for _ in 0..5 {
         t.tick(Millis::new(100));
@@ -18007,7 +18007,7 @@ fn a_fired_missile_joins_its_owner_s_list_at_its_making() {
 /// times the master's missed spread; it flies past the deer, lands on the ground (its height 0,
 /// `FUN_140a9c890`) and goes to the pool as landed (not flying).
 #[test]
-fn a_missed_missile_strays_and_lands_on_the_ground() {
+fn missed_missile_strays_and_lands_on_the_ground() {
     let mut t = archer_world(0, 0, 0.0);
     for m in &mut t.masters {
         m.get_mut(master_id(4)).unwrap().missed_spread =
@@ -18043,7 +18043,7 @@ fn a_missed_missile_strays_and_lands_on_the_ground() {
 /// swing and then it is 0. Each missile that meets the deer takes a hit point. Without a spread
 /// one missile a swing.
 #[test]
-fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
+fn volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
     let mut t = archer_world(100, 3, 0.5);
     for _ in 0..6 {
         t.tick(Millis::new(100));
@@ -18111,7 +18111,7 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
 /// missiles are shooterless, each hits by its own master (`FUN_140a9e6e0`'s slot 0x860, the
 /// missile as the attacker: 1 hit point), the first stays the master's missile with the shooter.
 #[test]
-fn a_volley_s_own_missiles_hit_without_the_shooter() {
+fn volley_own_missiles_hit_without_the_shooter() {
     let mut t = archer_world(100, 3, 0.5);
     for m in &mut t.masters {
         let mut all: Vec<Master> = m.iter().cloned().collect();
@@ -18165,7 +18165,7 @@ fn a_volley_s_own_missiles_hit_without_the_shooter() {
 /// missile's angle is then its flight's. A missile without a standing sprite draws none of them
 /// (the draw counters count each step; the streams' indexes restart at each seeding).
 #[test]
-fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
+fn new_missile_sprite_draws_as_new_object_s() {
     let mut plain = archer_world(100, 0, 0.0);
     let mut drawn = archer_world(100, 0, 0.0);
     let sprite = Graphic {
@@ -18195,7 +18195,7 @@ fn a_new_missile_s_sprite_draws_as_a_new_object_s() {
 /// computer player (its notify 0x214), a missile master that cannot be pooled, moved or flown,
 /// a smart missile and a projectile of type 1.
 #[test]
-fn the_missile_chain_s_unmodelled_cases_stop_the_player_with_their_reason() {
+fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
     type Change = fn(&mut World);
     let cases: [(Change, &str); 7] = [
         (
@@ -18273,7 +18273,7 @@ fn the_missile_chain_s_unmodelled_cases_stop_the_player_with_their_reason() {
 /// flies on without one: past the place it would have hit the live deer, down to the ground, and
 /// into the pool as landed.
 #[test]
-fn a_missile_whose_target_died_flies_on_without_it_and_lands() {
+fn missile_whose_target_died_flies_on_without_it_and_lands() {
     let mut t = archer_world(100, 0, 0.0);
     for _ in 0..7 {
         t.tick(Millis::new(100));
@@ -18302,7 +18302,7 @@ fn a_missile_whose_target_died_flies_on_without_it_and_lands() {
 /// QUEUE's pick (`FUN_141614450`): the building with room and the least load, the last pick holding
 /// against an equal load; a comparison with a NaN load replaces nothing; with none with room, none.
 #[test]
-fn a_queued_unit_goes_to_the_least_loaded_building_with_room() {
+fn queued_unit_goes_to_the_least_loaded_building_with_room() {
     use crate::commands::least_loaded;
     assert_eq!(
         least_loaded(
@@ -18380,7 +18380,7 @@ fn forage_until(t: &mut World, n: usize, stop: impl Fn(&World) -> bool) {
 /// them to its town centre (8, the centre its second target), whose drop gives the player 10
 /// food, and walks back to the bush (4), arrives and works again.
 #[test]
-fn a_forager_fills_up_carries_its_berries_home_and_comes_back() {
+fn forager_fills_up_carries_its_berries_home_and_comes_back() {
     let mut t = foraging();
     let mut states = vec![GatherState::Walk];
     for _ in 0..1200 {
@@ -18428,7 +18428,7 @@ fn a_forager_fills_up_carries_its_berries_home_and_comes_back() {
 /// Gather searches (state 3): the unit AI hears 0x202 with the gather action and the target
 /// type 7.
 #[test]
-fn a_forager_whose_bush_dies_lets_it_go_and_asks_for_a_search() {
+fn forager_whose_bush_dies_lets_it_go_and_asks_for_search() {
     let mut t = foraging();
     let working = |t: &World| {
         t.parts
@@ -18478,7 +18478,7 @@ fn a_forager_whose_bush_dies_lets_it_go_and_asks_for_a_search() {
 /// of the Gather's target type's group, 1 for bushes, within its sight plus 5: bush 601 beside
 /// the centre, state 4); with none it walks back to where it worked to search again (state 11).
 #[test]
-fn a_forager_without_its_bush_after_the_drop_takes_the_next_one() {
+fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
     let carrying = |near: bool| {
         let mut t = foraging();
         for masters in &mut t.masters {
@@ -18538,7 +18538,7 @@ fn a_forager_without_its_bush_after_the_drop_takes_the_next_one() {
 
 /// [`foraging`] up to the forager's drop at its town centre without a target (bush 600 gone
 /// on the way, `setup` run before), after which the Gather's state follows.
-fn dropped_without_a_bush(setup: impl FnOnce(&mut World)) -> World {
+fn dropped_without_bush(setup: impl FnOnce(&mut World)) -> World {
     let mut t = foraging();
     let carries = |t: &World| {
         t.parts
@@ -18570,7 +18570,7 @@ fn dropped_without_a_bush(setup: impl FnOnce(&mut World)) -> World {
 /// computer player; with orders queued (on a target the world holds) the unit AI ends its
 /// order and the Gather is done. An order on a target gone leaves the queue first.
 #[test]
-fn a_forager_with_nothing_found_after_the_drop_idles_or_is_done() {
+fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
     let pointless = |t: &mut World| {
         t.parts
             .actions
@@ -18581,7 +18581,7 @@ fn a_forager_with_nothing_found_after_the_drop_idles_or_is_done() {
             .unwrap()
             .point = Position::new(-1.0, -1.0, -1.0);
     };
-    let t = dropped_without_a_bush(pointless);
+    let t = dropped_without_bush(pointless);
     let g = t
         .parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -18597,7 +18597,7 @@ fn a_forager_with_nothing_found_after_the_drop_idles_or_is_done() {
         t.players[1].objects[ListIndex::new(1)].workers,
         crate::objects::WorkerCount::of_data(0)
     );
-    let t = dropped_without_a_bush(|t| {
+    let t = dropped_without_bush(|t| {
         pointless(t);
         t.players[1].computer = true;
     });
@@ -18681,9 +18681,9 @@ fn gather_step(t: &mut World) -> Result<(), GenieError> {
 /// target the update changed lets the old one go, where the update does; the reseed after the
 /// walk back, without a farm to reseed, idles the human player's gatherer and lets both targets
 /// go within the update (the build command:
-/// [`the_unit_ai_s_orders_reach_the_unit_and_the_units_they_name`]).
+/// [`the_unit_ai_orders_reach_the_unit_and_the_units_they_name`]).
 #[test]
-fn what_follows_the_gather_s_update_lets_go_builds_or_reseeds() {
+fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
     use crate::gathering::gather::Next;
     type Followed = (
         Result<(), GenieError>,
@@ -18774,7 +18774,7 @@ fn what_follows_the_gather_s_update_lets_go_builds_or_reseeds() {
 /// after a failed walk (case 3) at its end walks back to the Gather's point to search there
 /// (state 11).
 #[test]
-fn the_gather_s_update_ends_asks_again_and_walks_back() {
+fn the_gather_update_ends_asks_again_and_walks_back() {
     let set = |state, timer| {
         let mut t = foraging();
         let g = t
@@ -18923,7 +18923,7 @@ fn drop_again_with(held: Held) -> (BuildState, Option<ObjectId>, f32, i32, Vec<N
 /// for stone: the Build task's, 0); an empty builder walks back to its foundation (state 4); a
 /// load no drop site takes leaves no site and tells the unit AI (0x203).
 #[test]
-fn a_loaded_builder_s_drop_off_finds_its_town_centre() {
+fn loaded_builder_drop_off_finds_its_town_centre() {
     assert_eq!(
         drop_again_with(carrying(Some(AttributeId::numbered(17)), 6.0)),
         (
@@ -19017,7 +19017,7 @@ fn drop_site_sought(
 /// work on the searched action type always (an object of type 40 up), so the far centre wins.
 /// A drop site of a master the player does not hold fails.
 #[test]
-fn a_drop_site_search_from_a_unit_takes_the_nearest_it_reaches() {
+fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
     use crate::gathering::make::{MAKE, MakeAction};
     let keep = |_: &mut World| ();
     assert_eq!(
@@ -19141,7 +19141,7 @@ fn own_move(t: &mut World) -> OwnMoved {
 /// one tells 0x1f9 and goes. A target that
 /// left the point the walk goes to (more than half a tile) makes it tell 0x1fc.
 #[test]
-fn a_unit_s_own_move_to_walks_tells_its_end_and_lets_its_target_go() {
+fn unit_own_move_to_walks_tells_its_end_and_lets_its_target_go() {
     let to_bush = |state| MoveToAction {
         state,
         point: Position::ORIGIN,
@@ -19264,7 +19264,7 @@ fn flown(move_to: MoveTo, setup: impl FnOnce(&mut World)) -> Flown {
 /// AI (0x1f9 with the move action value); the bird stops and rests (state 2) for the flight's
 /// time left and the rest; a bird without movement state is not modelled.
 #[test]
-fn a_bird_s_failed_flight_tells_its_unit_ai_and_rests() {
+fn bird_failed_flight_tells_its_unit_ai_and_rests() {
     let (r, fly, heard) = flown(MoveTo::Failed, |_| ());
     assert_eq!(r, Ok(()));
     let fly = fly.unwrap();
@@ -19335,7 +19335,7 @@ fn explored(set: impl FnOnce(&mut crate::movement::explore::ExploreAction)) -> E
 /// the master's walking sprite, an Explore having no task; `0x140aa29e0`'s `set_state(4)` shows
 /// it before the motion step).
 #[test]
-fn an_explore_s_move_to_shows_the_master_s_walking_sprite_as_it_starts() {
+fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
     let mut t = forage_world();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
@@ -19449,7 +19449,7 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
 /// A hunter back from its drop-off without a deer (`hunt.target` -1, the deer it hunted let
 /// go): both deer seen by player 1, the hunter with a sight of 4, the mesh built. `setup` changes
 /// the hunter and its unit AI before [`Unit::hunt_after_drop`] runs.
-fn hunted_without_a_deer(
+fn hunted_without_deer(
     setup: impl FnOnce(&mut crate::objects::layers::Action, &mut UnitAi),
 ) -> World {
     let mut t = hunt_world();
@@ -19517,7 +19517,7 @@ fn hunted_without_a_deer(
     t
 }
 
-/// The hunt's state, target and drop site after [`hunted_without_a_deer`], and the two deer's
+/// The hunt's state, target and drop site after [`hunted_without_deer`], and the two deer's
 /// workers.
 fn hunt_after(t: &World) -> (Option<(HuntState, i32, i32)>, [i32; 2]) {
     let h = t
@@ -19546,15 +19546,15 @@ fn hunt_after(t: &World) -> (Option<(HuntState, i32, i32)>, [i32; 2]) {
 /// relation) finds the nearer deer, which the hunt takes and attacks (`FUN_140ac7a00`,
 /// `LAB_140ac9509`'s other way).
 #[test]
-fn a_hunter_without_its_deer_after_the_drop_takes_the_closest_one() {
-    let t = hunted_without_a_deer(|_, _| ());
+fn hunter_without_its_deer_after_the_drop_takes_the_closest_one() {
+    let t = hunted_without_deer(|_, _| ());
     assert_eq!(hunt_after(&t), (Some((HuntState::Attack, 500, -1)), [1, 0]));
 }
 
 /// A queued order on a target the world still holds ends the hunt after the drop, so the unit AI
 /// runs it; one on a target gone leaves the queue (`FUN_140c5de60`) and the search runs.
 #[test]
-fn a_hunter_with_a_queued_order_after_the_drop_ends_its_hunt() {
+fn hunter_with_queued_order_after_the_drop_ends_its_hunt() {
     let order = |target: i32| crate::unit_ai::QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Hunt,
@@ -19567,9 +19567,9 @@ fn a_hunter_with_a_queued_order_after_the_drop_ends_its_hunt() {
         ready: true,
         target_type: order_type(9),
     };
-    let held = hunted_without_a_deer(|_, ai| ai.orders = vec![order(501)]);
+    let held = hunted_without_deer(|_, ai| ai.orders = vec![order(501)]);
     assert_eq!(hunt_after(&held), (None, [0, 0]));
-    let gone = hunted_without_a_deer(|_, ai| ai.orders = vec![order(999)]);
+    let gone = hunted_without_deer(|_, ai| ai.orders = vec![order(999)]);
     assert_eq!(
         gone.parts
             .unit_ai
@@ -19588,9 +19588,9 @@ fn a_hunter_with_a_queued_order_after_the_drop_ends_its_hunt() {
 /// A hunt of class 10 searches nothing after the drop, and a wood search finds no tree: either
 /// walks back to its point to search again (`set_state(11)`).
 #[test]
-fn a_hunter_that_finds_nothing_after_the_drop_walks_to_its_point() {
+fn hunter_that_finds_nothing_after_the_drop_walks_to_its_point() {
     for class in [class::PREDATOR, class::TREE] {
-        let t = hunted_without_a_deer(|actions, _| {
+        let t = hunted_without_deer(|actions, _| {
             actions.list.hunt_mut().unwrap().target_class = Some(class);
         });
         assert_eq!(
@@ -19659,7 +19659,7 @@ fn done_at(t: &World, a: i32, b: i32) -> (Option<usize>, Option<usize>) {
 /// `set_state(2)`, `FUN_1411dbb70`: their slot 0xa0 before its own completion): the annex's
 /// completion reaches the world at once, its tracker part before the building's.
 #[test]
-fn a_building_s_own_completion_completes_its_annexes_first() {
+fn building_own_completion_completes_its_annexes_first() {
     let mut t = annexed_house();
     let k = t
         .parts
@@ -19701,7 +19701,7 @@ fn links_after_update(
 /// a house (the walls' branch) keeps its slots; a link to an object the world does not file
 /// stops the update.
 #[test]
-fn a_building_lets_its_links_past_state_6_go() {
+fn building_lets_its_links_past_state_6_go() {
     let (centre, annex) = (object_id(700), object_id(10030));
     let linked = |annex_state, centre_state| {
         let mut t = house_builder();
@@ -19828,7 +19828,7 @@ type BuildSearched = Result<((Option<ActionType>, Option<ObjectId>), Vec<NotifyK
 /// line of sight below the floor (the reach 4 tiles, short of the bushes), finds nothing: the
 /// Build waits without a target, lets the centre go and asks its unit AI for a search.
 #[test]
-fn a_builder_finds_more_work_around_the_building_it_finished() {
+fn builder_finds_more_work_around_the_building_it_finished() {
     use crate::gathering::gather::GATHER;
     let (t, found) = built_the_centre(|_| ());
     assert_eq!(found, Ok(((Some(GATHER), Some(object_id(600))), vec![])));
@@ -19912,7 +19912,7 @@ fn worked(t: &mut World, site: i32, dt: u32) -> Result<(), GenieError> {
 /// The first work on a desolid foundation starts its construction (`FUN_1411e5670`): its owner
 /// watches it once, within the builder's update, and the start's flag clears.
 #[test]
-fn a_builder_s_first_work_starts_the_site_its_owner_watches() {
+fn builder_first_work_starts_the_site_its_owner_watches() {
     let mut t = house_builder();
     assert_eq!(
         worked(&mut t, 10028, 50).map_err(|e| e.reason().to_owned()),
@@ -19931,7 +19931,7 @@ fn a_builder_s_first_work_starts_the_site_its_owner_watches() {
 /// (`FUN_1411cc430`'s recursion, [`World::work_building`] with the builder lent): the house gets
 /// the 2.5 seconds, its build points and its share of hit points, within the builder's update.
 #[test]
-fn a_builder_s_work_on_an_annex_goes_to_its_main_building() {
+fn builder_work_on_an_annex_goes_to_its_main_building() {
     let mut t = annexed_house();
     // the annex started: it clears no foundation under it (FUN_1411cd0d0) on the house's start
     site_mut(&mut t, object_id(10030)).desolid = false;
@@ -19953,7 +19953,7 @@ fn a_builder_s_work_on_an_annex_goes_to_its_main_building() {
 /// done one, its owner gains its paid cost (attributes 98 and 165, `World::built`); then the
 /// builder's work ends (`set_state(224)`), out of the builders.
 #[test]
-fn a_builder_s_completion_reaches_the_world_within_its_update() {
+fn builder_completion_reaches_the_world_within_its_update() {
     let mut t = house_builder();
     let h = t.players[1].objects.by_id_mut(object_id(10028)).unwrap();
     h.life.hp = HitPoints::new(549.0);
@@ -19993,7 +19993,7 @@ fn a_builder_s_completion_reaches_the_world_within_its_update() {
 /// A builder's completion of its foundation takes the foundation's annexes to state 2 where it
 /// runs, before the foundation's tracker part (`FUN_1411dbb70`).
 #[test]
-fn a_builder_s_completion_completes_the_foundation_s_annexes_where_it_runs() {
+fn builder_completion_completes_the_foundation_annexes_where_it_runs() {
     let mut t = annexed_house();
     let k = site_mut(&mut t, object_id(10028));
     (k.progress, k.desolid) = (Seconds::new(24.99), false);
@@ -20010,7 +20010,7 @@ fn a_builder_s_completion_completes_the_foundation_s_annexes_where_it_runs() {
 /// A building's `set_state` past 3 takes its annexes along where it runs (`FUN_1411dbb70`,
 /// [`Unit::annexes_follow`]): the annex holds the state within the building's update.
 #[test]
-fn a_building_s_later_state_reaches_its_annexes_where_it_runs() {
+fn building_later_state_reaches_its_annexes_where_it_runs() {
     let mut t = annexed_house();
     let i = t.players[1].objects.position_of(object_id(10028)).unwrap();
     let seen = in_update(&mut t, (PlayerId::new(1), i), 0, |unit, actions, c| {
@@ -20057,7 +20057,7 @@ fn completed_house(setup: fn(&mut World)) -> (World, Completed) {
 /// stays a foundation, and an annex outside the walls' branch (class 27, master 70) waits for
 /// its main building.
 #[test]
-fn a_foundation_whose_build_points_reached_its_build_time_completes() {
+fn foundation_whose_build_points_reached_its_build_time_completes() {
     let (t, r) = completed_house(|_| ());
     assert_eq!(r, (vec![(98, 25.0), (165, 25.0)], 1));
     let h = &t.players[1].objects[ListIndex::new(1)];
@@ -20089,7 +20089,7 @@ fn a_foundation_whose_build_points_reached_its_build_time_completes() {
 /// disappears when built is destroyed at once (state 7), and a castle's completion records its
 /// history event (castle built, the owner's id as data1).
 #[test]
-fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_leaves() {
+fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves() {
     let finish = |t: &mut World| {
         let k = site_mut(t, object_id(10028));
         k.progress = Seconds::of_master(k.build_time);
@@ -20146,7 +20146,7 @@ fn a_building_completing_in_its_own_update_leaves_what_a_builder_s_completion_le
 /// construction ([`Unit::foundation_died`], [`Construction::begin`]): its owner watches it at
 /// once, the foundation lent to the world within its own update, and the start's flag clears.
 #[test]
-fn a_dying_desolid_foundation_s_owner_watches_it_within_its_update() {
+fn dying_desolid_foundation_owner_watches_it_within_its_update() {
     let mut t = house_builder();
     for masters in &mut t.masters {
         let house = masters.get_mut(ids::HOUSE).unwrap();
@@ -20219,7 +20219,7 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieErr
 /// names, a unit inside whose raider countdown runs, and villagers inside repairing a damaged
 /// building.
 #[test]
-fn a_building_heals_its_garrison_each_whole_second() {
+fn building_heals_its_garrison_each_whole_second() {
     let reason = |r: Result<(f32, u32), GenieError>| r.unwrap_err().reason();
     assert_eq!(centre_seconds(|_| ()), Ok((12.0, 3000)));
     assert_eq!(
@@ -20282,7 +20282,7 @@ fn a_building_heals_its_garrison_each_whole_second() {
 ///
 /// [`walls_branch`]: crate::construction::building_update::walls_branch
 #[test]
-fn a_wall_or_a_house_counts_no_whole_seconds() {
+fn wall_or_house_counts_no_whole_seconds() {
     use crate::construction::building_update::walls_branch;
     let wall = |t: &mut World| {
         for masters in &mut t.masters {
@@ -20410,7 +20410,7 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
 /// (`0x140aa2100`: within 0.01), so it faces the house (6) in its first update, joins its
 /// repairers and repairs (7), the house gaining hit points.
 #[test]
-fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
+fn repairer_out_of_reach_fails_and_one_within_reach_repairs() {
     let mut t = repairing(Position::new(29.5, 89.5, 0.0));
     assert_eq!(
         repair_for(&mut t, 10),
@@ -20476,7 +20476,7 @@ fn a_repairer_out_of_reach_fails_and_one_within_reach_repairs() {
 /// the player's attributes): wood spent earlier in the same update is not there to pay with, so
 /// the house gains no hit points and the wood stays at 0.
 #[test]
-fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
+fn repair_pays_from_what_its_owner_holds_at_the_payment() {
     let mut t = repairing(Position::new(30.0, 89.2, 0.0));
     t.players[1].attributes.resize(300, Amount::ZERO);
     t.players[1].attributes[crate::construction::repair::BUILDING_REPAIR_COST] = Amount::new(1.0);
@@ -20522,7 +20522,7 @@ fn a_repair_pays_from_what_its_owner_holds_at_the_payment() {
 /// back, the house let go and out of its repairers, the unit AI told 0x1fa; an ally's house takes
 /// its hit points and its repairer at once, through the update's view ([`Others::get_mut`]).
 #[test]
-fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
+fn repair_pays_ends_at_full_hit_points_and_reaches_an_ally_house() {
     let near = Position::new(30.0, 89.2, 0.0);
     let mut t = repairing(near);
     t.players[1].attributes.resize(300, Amount::ZERO);
@@ -20697,7 +20697,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
 /// then itself, so both gain it; the repairer counts among the main building's repairers
 /// (`FUN_140ad9050`).
 #[test]
-fn a_repair_of_an_annex_repairs_its_main_building_and_counts_there() {
+fn repair_of_an_annex_repairs_its_main_building_and_counts_there() {
     let mut t = repairing(Position::new(30.0, 89.2, 0.0));
     let mut main = t.object_of(&t.players[1].objects[ListIndex::new(1)]);
     main.unit.id = object_id(10029);
@@ -20847,7 +20847,7 @@ fn more_repairers_repair_faster_but_not_in_proportion_and_pay_by_the_hit_point()
 /// search for more work finds nothing around a house (no drop-site entry), so the Build waits
 /// without a target (3), lets the house go and asks its unit AI for a search (0x202).
 #[test]
-fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
+fn builder_walks_to_its_house_builds_it_and_waits_after() {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
@@ -20962,7 +20962,7 @@ fn a_builder_walks_to_its_house_builds_it_and_waits_after() {
 ///
 /// [`BuildAction::update`]: crate::construction::build::BuildAction::update
 #[test]
-fn a_loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
+fn loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
@@ -21089,7 +21089,7 @@ fn finished_with(
 /// the same update its annex, here the town centre, holds no main building and the building's
 /// hit points, and the world's annex slots are clear.
 #[test]
-fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
+fn dying_building_lets_its_annexes_go_in_its_own_update() {
     use crate::objects::sprite::{Graphic, building_death};
     let mut t = house_builder();
     t.link_test_annex(object_id(700), object_id(10028));
@@ -21145,7 +21145,7 @@ fn a_dying_building_lets_its_annexes_go_in_its_own_update() {
 /// both within the update; a drop elsewhere sends the unit to the drop site with the order back
 /// to its target queued, and a move off a footprint gives it a `MoveTo` at once.
 #[test]
-fn the_unit_ai_s_orders_reach_the_unit_and_the_units_they_name() {
+fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
     use crate::gathering::gather::Next;
     use crate::unit_ai::Effect;
     // the calls run in the unit's step, and its top action right after them
@@ -21285,9 +21285,9 @@ fn the_unit_ai_s_orders_reach_the_unit_and_the_units_they_name() {
 /// An Enter's transport moves to the meeting point within the entering unit's update (slot
 /// 0x340, [`World::ship_move`], the unit lent to the world): the transport's `MoveTo` is there
 /// before the update ends; one the world does not hold cannot move. Its sprite is
-/// [`an_ai_move_replaces_a_done_attack_with_a_move_to_the_point`]'s.
+/// [`an_ai_move_replaces_done_attack_with_move_to_the_point`]'s.
 #[test]
-fn an_enter_s_transport_moves_to_the_meeting_point_where_the_unit_runs() {
+fn an_enter_transport_moves_to_the_meeting_point_where_the_unit_runs() {
     let mut t = house_builder();
     let mut ship = t.object_of(&t.players[1].objects[ListIndex::new(0)]);
     ship.unit.id = object_id(9176);
@@ -21374,7 +21374,7 @@ fn the_own_razings_count_where_the_hit_runs() {
 /// the planners after it ([`World::step_object`]'s `hand_changed_tiles`); a step that holds
 /// hands them on.
 #[test]
-fn a_step_that_fails_stops_what_follows_it() {
+fn step_that_fails_stops_what_follows_it() {
     use crate::map::spatial::Obstruction;
     use crate::objects::unit::Outcome;
     let record = Obstruction {
@@ -21413,7 +21413,7 @@ fn a_step_that_fails_stops_what_follows_it() {
 /// disappears when built is destroyed. A completed mule cart with nothing to find keeps its
 /// state ([`World::cart_search`], from its first part).
 #[test]
-fn a_completion_s_parts_reach_their_owner() {
+fn completion_parts_reach_their_owner() {
     use crate::construction::build::StackUnit;
     use crate::gathering::pasture::LIVESTOCK;
     use crate::technology::{TechDef, TechState};
@@ -21499,7 +21499,7 @@ fn a_completion_s_parts_reach_their_owner() {
 /// master's technology from state 3 (`FUN_141166ab0`'s scan over the owner's objects, the
 /// castle lent to the world). Another castle standing keeps the technology.
 #[test]
-fn a_built_building_s_death_reaches_its_owner_within_its_update() {
+fn built_building_death_reaches_its_owner_within_its_update() {
     use crate::technology::{TechDef, TechState};
     let died = |another: bool| {
         let mut t = enter_world(vec![], 5);
@@ -21563,7 +21563,7 @@ fn a_built_building_s_death_reaches_its_owner_within_its_update() {
 /// own update does (4 walking, 6 and 7 at the house, 224 at its completion, then idle), and
 /// the completion's stop before its unit AI resumes it in the same update: nothing freezes.
 #[test]
-fn a_builder_s_house_completes_in_the_world_s_update_and_its_unit_ai_resumes() {
+fn builder_house_completes_in_the_world_update_and_its_unit_ai_resumes() {
     let mut t = house_builder();
     t.pathing = Pathing::new(
         GridSize::new(120, 120),
@@ -21675,7 +21675,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             units: unit_list(v.clone()),
             target: Some(object_id(700)),
             point: Point::new(-1.0, -1.0),
-            q_id: crate::commands::QueueId::of_data(-1),
+            queue_id: crate::commands::QueueId::of_data(-1),
             through_ai: true,
             nearby: false,
             action: UnitOrderAction::of(action),
@@ -22067,7 +22067,7 @@ fn an_order_of_the_last_commanded_units_reads_what_the_last_run_order_left() {
 /// packet's as they are, with no last commanded units; any other's are the first 60, 500 for
 /// a computer, or its last commanded units, none before its first.
 #[test]
-fn an_order_s_units_are_capped_unless_its_comm_player_is_outside_the_world() {
+fn an_order_units_are_capped_unless_its_comm_player_is_outside_the_world() {
     use UnitList;
     let many = object_ids(0..600);
     let mut t = forage_world();
@@ -22110,7 +22110,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
         count: 1,
         buildings: tc.clone(),
         tech: TechId::of_data(22),
-        q_id: crate::commands::QueueId::of_data(-1),
+        queue_id: crate::commands::QueueId::of_data(-1),
         shift: false,
     };
     let queue = QueueCommand {
@@ -22143,7 +22143,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
                 count: 1,
                 buildings: tc.clone(),
                 tech: TechId::of_data(22),
-                q_id: crate::commands::QueueId::of_data(-1),
+                queue_id: crate::commands::QueueId::of_data(-1),
                 shift: false,
             }),
             PlayerId::new(1),
@@ -22230,7 +22230,7 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
 ///
 /// [`UnitSide::call_for_help`]: crate::unit_ai::UnitSide::call_for_help
 #[test]
-fn a_call_for_help_walks_the_lists_for_a_free_helper_in_reach() {
+fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
     use crate::unit_ai::UnitSide;
     use crate::vision::registry::Record;
     let idle = UnitAi {
@@ -22341,7 +22341,7 @@ fn explorer_hears(t: &mut World) -> String {
 /// which the path map holds unexplored, and searches from it: the explorer reaches it, so the AI
 /// takes the explorer's place and tasks the unit to it, and the tile becomes explored (0).
 #[test]
-fn a_computer_players_ai_tasks_its_explorer_to_the_unexplored_tile() {
+fn computer_players_ai_tasks_its_explorer_to_the_unexplored_tile() {
     let mut t = explorer_world(&[[28, 80]], vec![]);
     for masters in &mut t.masters {
         masters.get_mut(master_id(120)).unwrap().line_of_sight = Distance::new(4.0);
@@ -22361,7 +22361,7 @@ fn a_computer_players_ai_tasks_its_explorer_to_the_unexplored_tile() {
 
 /// With every tile explored the search finds none and the AI detasks the explorer.
 #[test]
-fn a_computer_players_ai_detasks_an_explorer_with_nothing_left_to_explore() {
+fn computer_players_ai_detasks_an_explorer_with_nothing_left_to_explore() {
     let mut t = explorer_world(&[], vec![]);
     let said = explorer_hears(&mut t);
     assert!(said.contains("detasks explorer"), "{said}");
@@ -22370,7 +22370,7 @@ fn a_computer_players_ai_detasks_an_explorer_with_nothing_left_to_explore() {
 /// A human player's owner hears nothing the simulation reads, and a notify of another
 /// kind is not the explore case.
 #[test]
-fn only_a_computer_players_explorer_notify_reaches_the_ai() {
+fn only_computer_players_explorer_notify_reaches_the_ai() {
     let mut human = explorer_world(&[[31, 89]], vec![]);
     human.players[1].computer = false;
     let before = human.ai.clone();
@@ -22409,7 +22409,7 @@ fn container_id(value: i32) -> ContainerId {
 /// ([`World::grow_unknown`]): 2 s at 0.8 tiles a second, 1.6 tiles; a master the world does not
 /// hold may be anywhere.
 #[test]
-fn a_frozen_unit_may_have_moved_its_master_s_speed() {
+fn frozen_unit_may_have_moved_its_master_speed() {
     let mut t = forage_world();
     let id = t.players[1].objects[ListIndex::new(0)].id;
     let master = t.players[1].objects[ListIndex::new(0)].life.master_id;
@@ -22435,7 +22435,7 @@ fn a_frozen_unit_may_have_moved_its_master_s_speed() {
 /// ([`World::sync_world`]): how the players stand to each other; after it the routines that
 /// change them write them.
 #[test]
-fn a_world_s_sync_fills_the_relations() {
+fn world_sync_fills_the_relations() {
     let mut t = forage_world();
     t.spatial.relations = ByPlayer::default();
     t.sync_world();

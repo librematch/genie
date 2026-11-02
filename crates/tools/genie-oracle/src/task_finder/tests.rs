@@ -104,7 +104,7 @@ fn an_annex_stands_for_its_main_building() {
 }
 
 #[test]
-fn the_actor_reads_its_player_s_attribute_95_and_civ() {
+fn the_actor_reads_its_player_attribute_95_and_civ() {
     let w = world(0);
     let actor = w.actor(object_id(10)).unwrap();
     assert_eq!(
@@ -118,7 +118,7 @@ fn the_actor_reads_its_player_s_attribute_95_and_civ() {
 /// Every live object of each player's section is in the finder's view by its id, with its
 /// player and its static part's values; a saved id of −1 names no object and fails.
 #[test]
-fn the_finder_s_objects_are_every_player_s_by_id() {
+fn the_finder_objects_are_every_player_by_id() {
     use crate::fixtures::{combat_object, gaia, header, human, static_mut};
     let mut deer = combat_object(3, 65);
     static_mut(&mut deer).hp = 7.0;

@@ -44,7 +44,7 @@ fn drop_sites_read_their_targets() {
 }
 
 #[test]
-fn a_maps_rollover_string_is_a_number_or_a_name() {
+fn maps_rollover_string_is_number_or_name() {
     let m: Maps = genie_json::from_str(
         r#"{"default_map_type": 13, "default_nomad_map_type": 33, "default_battle_royale_map_type": 145,
             "map_list": [{"data_name": "A", "name_string_id": 1, "rollover_string_id": 30110,
@@ -119,7 +119,7 @@ fn the_installed_tables_read_and_write_back_the_same_values() {
 }
 
 #[test]
-fn an_unknown_key_in_a_future_unit_or_building_is_refused() {
+fn an_unknown_key_in_future_unit_or_building_is_refused() {
     for text in [
         r#"{"Aztecs": {"Buildings": [{"ID": 1, "Name": "B", "Extra": 1}]}}"#,
         r#"{"Aztecs": {"Buildings": [{"ID": 1, "Name": "B", "Units": [{"ID": 2, "Name": "U", "Extra": 1}]}]}}"#,

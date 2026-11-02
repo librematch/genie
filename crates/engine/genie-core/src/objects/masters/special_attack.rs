@@ -46,7 +46,7 @@ mod tests {
 
     /// The data's values are the named ones, any other is kept.
     #[test]
-    fn a_special_attack_is_the_data_s_byte() {
+    fn special_attack_is_the_data_byte() {
         assert_eq!(SpecialAttack::of_data(0), SpecialAttack::NONE);
         assert_eq!(SpecialAttack::of_data(7).get(), 7);
         assert_eq!(SpecialAttack::NONE.to_string(), "0");

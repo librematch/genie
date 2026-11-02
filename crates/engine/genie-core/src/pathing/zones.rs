@@ -463,7 +463,7 @@ mod tests {
 
     /// A zone's byte is its number's low byte, which the byte compares read.
     #[test]
-    fn a_zone_s_byte_is_its_low_byte() {
+    fn zone_byte_is_its_low_byte() {
         let z = ZoneId::new(0x1ff);
         assert_eq!((z.get(), z.index(), z.byte()), (0x1ff, 0x1ff, 0xff));
         assert_eq!(UNREACHED.byte(), 0);
@@ -500,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn a_zone_near_a_tile_is_searched_column_by_column_within_the_reach() {
+    fn zone_near_tile_is_searched_column_by_column_within_the_reach() {
         // a 5 x 5 map: terrain 1 (impassable, zone 1) in column 4 and at (3, 0); the rest zone 0
         #[rustfmt::skip]
         let kinds = [
@@ -600,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    fn each_flood_caches_its_zone_s_tile_count_once() {
+    fn each_flood_caches_its_zone_tile_count_once() {
         let z = ZoneMap::new(
             GridSize::new(3, 3),
             &ids(&WALL),
@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[test]
-    fn a_map_wider_than_it_is_high_labels_the_square_of_its_height() {
+    fn map_wider_than_it_is_high_labels_the_square_of_its_height() {
         // 2 wide, 3 high: the game fills and scans rows over the width and columns over the
         // height, so tile (1, 2) keeps the 0 it was allocated with, and (0, 2), impassable beside
         // the passable patch above, is filled but never starts a patch: it keeps 0x200
@@ -656,7 +656,7 @@ mod tests {
     }
 
     #[test]
-    fn zones_touching_at_a_tile_or_a_corner_are_adjacent() {
+    fn zones_touching_at_tile_or_corner_are_adjacent() {
         let z = ZoneMap::new(
             GridSize::new(3, 3),
             &ids(&WALL),
@@ -696,7 +696,7 @@ mod tests {
     }
 
     #[test]
-    fn a_saved_map_keeps_its_counts_and_builds_its_adjacency() {
+    fn saved_map_keeps_its_counts_and_builds_its_adjacency() {
         let made = ZoneMap::new(
             GridSize::new(3, 3),
             &ids(&WALL),
@@ -746,7 +746,7 @@ mod tests {
     }
 
     #[test]
-    fn a_map_matches_a_query_whose_values_begin_with_its_pattern() {
+    fn map_matches_query_whose_values_begin_with_its_pattern() {
         let mut zones = Zones::default();
         let kinds = [0, 1, 1, 0];
         assert_eq!(
@@ -801,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    fn a_relabel_numbers_the_terrain_again_and_keeps_the_rest() {
+    fn relabel_numbers_the_terrain_again_and_keeps_the_rest() {
         let mut zones = Zones::default();
         let i = zones.find(
             GridSize::new(3, 3),

@@ -60,7 +60,7 @@ fn classify(c: FixedPoint, o: FixedRect, n: FixedRect) -> Option<(ShapeSide, Sha
     let [cx, cy] = c.get();
     let (mut lo, mut hi) = (ShapeSide::LowY, ShapeSide::LowY);
     let (mut collinear, mut found) = (false, false);
-    let mut by_n_y = false;
+    let mut by_new_y = false;
     if cx == o.x0() {
         lo = ShapeSide::LowX;
         if cx == n.x0() {
@@ -68,7 +68,7 @@ fn classify(c: FixedPoint, o: FixedRect, n: FixedRect) -> Option<(ShapeSide, Sha
             collinear = true;
             found = true;
         } else {
-            by_n_y = true;
+            by_new_y = true;
         }
     } else if cx == o.x1() {
         lo = ShapeSide::HighX;
@@ -77,7 +77,7 @@ fn classify(c: FixedPoint, o: FixedRect, n: FixedRect) -> Option<(ShapeSide, Sha
             collinear = true;
             found = true;
         } else {
-            by_n_y = true;
+            by_new_y = true;
         }
     } else if cx == n.x0() {
         hi = ShapeSide::LowX;
@@ -115,7 +115,7 @@ fn classify(c: FixedPoint, o: FixedRect, n: FixedRect) -> Option<(ShapeSide, Sha
             found = true;
         }
     }
-    if by_n_y {
+    if by_new_y {
         if cy == n.y0() {
             hi = ShapeSide::LowY;
             if cy == o.y0() {
@@ -402,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shape_is_rounded_to_even_units_and_listed_on_its_tiles() {
+    fn shape_is_rounded_to_even_units_and_listed_on_its_tiles() {
         let mut m = Mesh::new(8);
         let id = m.add(FixedRect::new(ONE + 1, ONE + 3, 2 * ONE + 1, 3 * ONE - 2));
         assert_eq!(id, ShapeId::new(0));
@@ -444,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn a_freed_slot_is_reused_last_in_first_out() {
+    fn freed_slot_is_reused_last_in_first_out() {
         let mut m = Mesh::new(16);
         let ids: Vec<ShapeId> = (0..4).map(|i| m.add(tile_box(2 * i, 0, 1, 1))).collect();
         m.remove(ids[1]);
@@ -461,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn a_replace_with_an_odd_box_always_moves_the_shape() {
+    fn replace_with_an_odd_box_always_moves_the_shape() {
         let mut m = Mesh::new(16);
         let a = m.add(tile_box(1, 1, 1, 1));
         assert_eq!(m.replace(a, tile_box(1, 1, 1, 1)), a);
