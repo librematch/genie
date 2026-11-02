@@ -80,6 +80,10 @@ data-oriented architect makes it.
     letter joins the next word), `mWaypoints` and `kDefaultWaitTime` become `waypoints` and
     `default_wait_time` (no member or constant prefix), `(int32_t*)mRules` becomes `rules` (no
     cast), `TribeInformationAIModule` becomes `TribeInformationAiModule`.
+  - The casing gate `scripts/c_case.py` (pre-commit and CI) checks the three rules on the
+    code of every `.rs` file: no acronym in capitals in a type or a variant, no single
+    letter before the last word of a snake or screaming name, no constant of an enum's own
+    type. A plural acronym (`IDs`) passes it; the review catches that.
 - Name a file, a folder and an item in plain English for what it does or holds:
   `pathing/short_path.rs`, not `mshortpather.rs` or `p2.rs`. Two names a letter apart
   (`reach.rs` beside `reached.rs`) are not allowed.

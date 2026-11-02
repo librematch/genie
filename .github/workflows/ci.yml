@@ -53,6 +53,8 @@ jobs:
       # scripts/lint_allows.py: no lint turned off where it was not before (.config/lint-allows.json,
       # FD-043's section L)
       - run: scripts/lint_allows.py
+      # scripts/c_case.py: every name follows RFC 430 (CODING_STYLE.md section 3, C-CASE)
+      - run: scripts/c_case.py
 
   readmes:
     name: Every genie-core folder has a current README
