@@ -348,38 +348,22 @@ impl World {
         Some((place.player(), u))
     }
 
-    /// [`World::object_mut`] with the object's construction to change beside it (none for an
-    /// object without one).
-    pub(crate) fn object_and_site_mut(
-        &mut self,
-        id: impl ObjectKey,
-    ) -> Option<(
-        &mut Unit,
-        Option<&mut crate::construction::build::Construction>,
-    )> {
-        let place = self.place(id)?;
-        let u = self.players.at_mut(place).ok()?;
-        let site = self
-            .parts
-            .building
-            .get_mut(u.id)
-            .and_then(|b| b.construction.as_mut());
-        Some((u, site))
-    }
-
-    /// [`World::object_mut`] with the object's building layer to read beside it
-    /// ([`crate::world::parts::Parts::building_of`]: [`Building::NONE`] where the table holds
-    /// none).
+    /// [`World::object_mut`] with the object's combat layer to change beside it, a new
+    /// object's put in where the table holds none ([`crate::world::parts::Parts::combat_mut`]).
     ///
-    /// [`Building::NONE`]: crate::objects::layers::Building::NONE
-    pub(crate) fn object_mut_and_layer(
+    /// # Errors
+    ///
+    /// The layer's.
+    pub(crate) fn object_and_combat_mut(
         &mut self,
         id: impl ObjectKey,
-    ) -> Option<(&mut Unit, &crate::objects::layers::Building)> {
-        let place = self.place(id)?;
-        let u = self.players.at_mut(place).ok()?;
-        let layer = self.parts.building_of(u.id);
-        Some((u, layer))
+    ) -> Result<Option<(&mut Unit, &mut crate::objects::layers::Combat)>, GenieError> {
+        let Some(place) = self.place(id) else {
+            return Ok(None);
+        };
+        let u = self.players.at_mut(place)?;
+        let combat = self.parts.combat_mut(u.id)?;
+        Ok(Some((u, combat)))
     }
 
     /// [`World::object_mut`] with the object's building layer to change beside it, put in where
@@ -442,8 +426,9 @@ impl World {
             player,
             state: u.life.state,
             held: u.life.held(),
-            hp: u.life.hp + u.combat.hp_powerup.room(),
-            max_hp: HitPoints::of_master(master.hit_points) + u.combat.hp_powerup.max,
+            hp: u.life.hp + self.parts.combat_of(u.id).hp_powerup.room(),
+            max_hp: HitPoints::of_master(master.hit_points)
+                + self.parts.combat_of(u.id).hp_powerup.max,
             attackable: u.attackable,
             pasture: u.pasture,
             top_action: u.top_action_kind(),
@@ -475,13 +460,13 @@ pub(crate) fn readiness(orders: &mut Vec<crate::unit_ai::QueuedOrder>, drop_read
 /// zeroes `+0xa34`, `+0xa50` and `+0x9f8`, empties the powerup map (`+0xa98`, count `+0xaa0`),
 /// sets `+0xa2c` to slot 0x1b8 × 0.05 and takes a sight powerup (`+0xad4`) off (slots 0x1d8,
 /// 0x1d0): none of them is held.
-const fn clear_powerups(unit: &mut Unit) {
-    unit.combat.attack_powerup = crate::combat::AttackPowerup::ZERO;
-    unit.combat.range_powerup = Distance::ZERO;
-    unit.combat.reload_powerup = Seconds::ZERO;
-    unit.combat.work_rate_powerup = WorkRate::ZERO;
-    unit.combat.hp_powerup.max = HitPoints::ZERO;
-    unit.combat.armor_powerups = ArmorPair::ZERO;
+const fn clear_powerups(combat: &mut crate::objects::layers::Combat) {
+    combat.attack_powerup = crate::combat::AttackPowerup::ZERO;
+    combat.range_powerup = Distance::ZERO;
+    combat.reload_powerup = Seconds::ZERO;
+    combat.work_rate_powerup = WorkRate::ZERO;
+    combat.hp_powerup.max = HitPoints::ZERO;
+    combat.armor_powerups = ArmorPair::ZERO;
 }
 
 /// `FUN_140c4da50`: the target of the first order in unit AI `ai`'s queue (`+0x20`, count

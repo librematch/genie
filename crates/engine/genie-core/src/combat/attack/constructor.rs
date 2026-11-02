@@ -185,7 +185,10 @@ impl Attack {
         let reads = unit.move_to_reads(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let mover = unit
             .body

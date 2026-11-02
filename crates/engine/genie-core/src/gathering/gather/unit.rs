@@ -111,7 +111,7 @@ impl Unit {
 
     /// What the Gather's `MoveTo` constructors read of this gatherer (`player`'s, whose masters
     /// are `every`): the sprites' table `graphics` with the defaults of its master and terrain
-    /// look, and what it carries now.
+    /// look `look`, and what it carries now.
     ///
     /// # Errors
     ///
@@ -120,13 +120,12 @@ impl Unit {
         &self,
         every: crate::objects::masters::MasterTables<'_>,
         player: PlayerId,
-        graphics: &'g crate::objects::Graphics,
+        (graphics, look): (
+            &'g crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
     ) -> Result<Walks<'g>, GenieError> {
-        let sprites = SpriteReads::of(
-            self.master(every, player)?,
-            self.combat.abilities.look.as_ref(),
-            graphics,
-        );
+        let sprites = SpriteReads::of(self.master(every, player)?, look, graphics);
         Ok(Walks::of(sprites, self))
     }
 
@@ -149,7 +148,7 @@ impl Unit {
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
         Ok(crate::gathering::gather::GatherReads {
-            work_rate: self.combat.work_rate_powerup + master.work_rate,
+            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: (task.productivity)
                 .and_then(|i| attributes.get(i.index()))
@@ -163,7 +162,10 @@ impl Unit {
                 standing: g(master.standing_sprite),
             },
             class: master.class,
-            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(
+                master,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
             master: self.life.master_id,
             stance: c
                 .w
@@ -277,7 +279,10 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let gather = self.actions.list.gather_mut().ok_or(NO_GATHER)?;
         gather.carry_to = None;

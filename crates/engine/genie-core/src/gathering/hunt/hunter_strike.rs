@@ -69,7 +69,7 @@ impl Unit {
         }
         let next = next?;
         // the retaliation's kill of the unit itself, which follows its step
-        if let Some(k) = self.hit_back(f.own, c.w.parts.unit_ai.get_mut(self.id))? {
+        if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
             file_kill(c, self, KillLeft::own(self.id, k))?;
         }
         match next {
@@ -101,9 +101,12 @@ impl Unit {
             .unwrap_or(Amount::new(1.0));
         let g = |id: Option<SpriteId>| id.and_then(|s| c.w.graphics.get(s).copied());
         Ok(HuntReads {
-            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(
+                master,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
             attack: AttackReads::of(
-                self,
+                c.w.parts.combat_of(self.id),
                 master,
                 (
                     crate::objects::masters::OwnerMasters::new(
@@ -115,7 +118,7 @@ impl Unit {
                 c.w.parts.unit_ai.get(self.id),
                 (owner.computer, c.w.world_time),
             ),
-            work_rate: self.combat.work_rate_powerup + master.work_rate,
+            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity,
             stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),

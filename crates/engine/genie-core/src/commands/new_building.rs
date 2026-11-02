@@ -258,6 +258,33 @@ impl World {
         let desolid = WholeSeconds::ZERO < made.build_time
             && !matches!(made.class, class::CLASS_51 | class::CLASS_54)
             && progress == Seconds::ZERO;
+        let combat = crate::objects::layers::Combat {
+            builders: crate::construction::BuilderCount::of_data(0),
+            work_rate_powerup: WorkRate::ZERO,
+            capture_flag: CaptureKind::NONE,
+            hp_powerup: HpPowerup::default(),
+            regen_timer: Seconds::ZERO,
+            regen_powerup: crate::objects::Regeneration::ZERO,
+            regen_stinger: crate::objects::Regeneration::ZERO,
+            attack_count: crate::combat::AttackCount::ZERO,
+            // the TRIBE combat setup (FUN_14121df60): the master's volley fire
+            firepower: player_master(&self.masters, player, master)
+                .map_or(crate::combat::Firepower::ZERO, |m| m.volley_fire),
+            next_volley: crate::combat::MissileCount::ZERO,
+            reload_worldtime: WorldTime::ZERO,
+            raider_countdown: crate::garrison::RaiderCountdown::NONE,
+            attack_timer: Seconds::ZERO,
+            abilities: crate::combat::abilities::Abilities::default(),
+            reload_stinger: Seconds::ZERO,
+            reload_powerup: Seconds::ZERO,
+            attack_powerup: crate::combat::AttackPowerup::ZERO,
+            range_powerup: Distance::ZERO,
+            armor_powerups: ArmorPair::ZERO,
+            armor_removed: ArmorPair::ZERO,
+            charge: Charge::ZERO,
+            charge_hit: false,
+            store: Vec::new(),
+        };
         let unit = Unit {
             id,
             footprint_waits: crate::construction::FootprintWaits::NONE,
@@ -272,33 +299,6 @@ impl World {
                 death_spawn: death.1,
                 master: death.2,
                 ..Lifecycle::default()
-            },
-            combat: crate::objects::layers::Combat {
-                builders: crate::construction::BuilderCount::of_data(0),
-                work_rate_powerup: WorkRate::ZERO,
-                capture_flag: CaptureKind::NONE,
-                hp_powerup: HpPowerup::default(),
-                regen_timer: Seconds::ZERO,
-                regen_powerup: crate::objects::Regeneration::ZERO,
-                regen_stinger: crate::objects::Regeneration::ZERO,
-                attack_count: crate::combat::AttackCount::ZERO,
-                // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-                firepower: player_master(&self.masters, player, master)
-                    .map_or(crate::combat::Firepower::ZERO, |m| m.volley_fire),
-                next_volley: crate::combat::MissileCount::ZERO,
-                reload_worldtime: WorldTime::ZERO,
-                raider_countdown: crate::garrison::RaiderCountdown::NONE,
-                attack_timer: Seconds::ZERO,
-                abilities: crate::combat::abilities::Abilities::default(),
-                reload_stinger: Seconds::ZERO,
-                reload_powerup: Seconds::ZERO,
-                attack_powerup: crate::combat::AttackPowerup::ZERO,
-                range_powerup: Distance::ZERO,
-                armor_powerups: ArmorPair::ZERO,
-                armor_removed: ArmorPair::ZERO,
-                charge: Charge::ZERO,
-                charge_hit: false,
-                store: Vec::new(),
             },
             actions: crate::objects::layers::ActionLayer {
                 list: ActionList::default(),
@@ -364,6 +364,7 @@ impl World {
         let parts = ObjectParts {
             unit_ai: ai,
             building: layer,
+            combat,
             ..ObjectParts::default()
         };
         let _ = self.push_live(player, Object { unit, parts })?;

@@ -1,7 +1,6 @@
 //! The slice set up from the header save ([`slice`]): the players' technologies, wonder
 //! times, ghosts, AI settings and history, and the garrisons' firepower.
 
-use genie_core::garrison::ContainerId;
 use genie_core::gathering::QueueCount;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
@@ -47,6 +46,7 @@ use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::vision::VisionBits;
 use genie_core::world::parts::ObjectParts;
+use genie_core::world::parts::Part;
 use genie_core::world::{Player, World};
 use genie_save::{Header, PlayerSection};
 
@@ -575,47 +575,81 @@ pub(super) fn saved_ghosts(
 /// (`FUN_14121ec90` sets the master's volley fire). A share the slice does not model leaves the
 /// building unmodelled.
 pub(super) fn garrison_firepower(turns: &mut World) {
-    for (p, player) in turns.players.iter_mut().enumerate() {
-        let Some(masters) = turns.masters.get(p) else {
+    for p in 0..turns.players.len() {
+        let entered = entered_shares(turns, p);
+        file_garrisons(turns, p, entered);
+    }
+}
+
+/// A unit inside a building, the building, and the unit's share of its volleys (none for a
+/// unit that is not of type 70 or a building whose master the table lacks).
+type Entered = (
+    ObjectId,
+    ObjectId,
+    Option<Result<genie_core::combat::Firepower, genie_core::GenieError>>,
+);
+
+/// Player `p`'s units inside a building of its own, in list order, each with its building and
+/// its share ([`garrison_firepower`]).
+fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
+    let (Some(masters), Some(player)) = (turns.masters.get(p), turns.players.get(p)) else {
+        return Vec::new();
+    };
+    let lists = || player.objects.iter().chain(&player.sleeping);
+    let mut entered = Vec::new();
+    for u in lists() {
+        let Some(building) = u.life.inside else {
             continue;
         };
-        let units: Vec<(ObjectId, ContainerId, MasterId, Seconds)> = player
-            .objects
-            .iter()
-            .chain(&player.sleeping)
-            .filter_map(|u| {
-                Some((
-                    u.id,
-                    u.life.inside?,
-                    u.life.master_id,
-                    u.combat.reload_powerup,
+        let Some(b) = lists().find(|b| b.id == building.id()) else {
+            continue;
+        };
+        let share = masters
+            .get(u.life.master_id)
+            .filter(|m| m.kind == genie_core::objects::masters::master_type::COMBAT)
+            .and_then(|me| {
+                let bm = masters.get(b.life.master_id)?;
+                let rate = genie_core::garrison::attack_rate(
+                    bm,
+                    masters,
+                    turns.parts.combat_of(b.id).reload_powerup,
+                );
+                Some(genie_core::garrison::share(
+                    me,
+                    masters,
+                    turns.parts.combat_of(u.id).reload_powerup,
+                    rate,
                 ))
-            })
-            .collect();
-        for (id, building, master, reload_powerup) in units {
-            let Some(b) = player
-                .objects
-                .iter_mut()
-                .chain(&mut player.sleeping)
-                .find(|u| u.id == building.id())
-            else {
-                continue;
-            };
-            b.garrison.push(id);
-            let Some(me) = masters
-                .get(master)
-                .filter(|m| m.kind == genie_core::objects::masters::master_type::COMBAT)
-            else {
-                continue;
-            };
-            let Some(bm) = masters.get(b.life.master_id) else {
-                continue;
-            };
-            let rate = genie_core::garrison::attack_rate(bm, masters, b.combat.reload_powerup);
-            match genie_core::garrison::share(me, masters, reload_powerup, rate) {
-                Ok(share) => b.combat.firepower += share,
-                Err(e) => b.actions.unmodelled_action = Some(e),
+            });
+        entered.push((b.id, u.id, share));
+    }
+    entered
+}
+
+/// Each building of player `p` lists the units `entered` inside it and adds their shares to
+/// its volleys; a share the slice does not model leaves the building unmodelled.
+fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
+    for (b, id, share) in entered {
+        let unmodelled = match share {
+            Some(Ok(share)) => {
+                let mut combat = turns.parts.combat_of(b).clone();
+                combat.firepower += share;
+                turns.set_part(b, Part::Combat(Box::new(combat))).err()
             }
+            Some(Err(e)) => Some(e),
+            None => None,
+        };
+        let Some(building) = turns.players.get_mut(p).and_then(|q| {
+            q.objects
+                .iter_mut()
+                .chain(&mut q.sleeping)
+                .find(|u| u.id == b)
+        }) else {
+            continue;
+        };
+        building.garrison.push(id);
+        if let Some(e) = unmodelled {
+            building.actions.unmodelled_action = Some(e);
         }
     }
 }

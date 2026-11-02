@@ -165,7 +165,7 @@ impl Unit {
             return Err(HANDS_LEFT);
         }
         let _ = self.change_owner(c, new)?;
-        self.combat.capture_flag = CaptureKind::NONE;
+        c.w.parts.combat_mut(self.id)?.capture_flag = CaptureKind::NONE;
         if let Some(s) = c.w.spatial.sight.as_mut().and_then(|v| v.seer_mut(self.id)) {
             s.capture = CaptureKind::NONE;
         }

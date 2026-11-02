@@ -246,9 +246,19 @@ impl World {
             gap: footprint_gap(unit.position(), builder.radius, position, site.radius),
             state: self.object_state(foundation),
         };
-        let task = BuildTask::of(task, builder.work_rate + unit.combat.work_rate_powerup);
+        let task = BuildTask::of(
+            task,
+            builder.work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
+        );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
-        let move_reads = MoveToReads::of(unit, builder, &self.graphics);
+        let move_reads = MoveToReads::of(
+            unit,
+            builder,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
+        );
         Ok((with, BuildAction::start(to, task, &move_reads)?))
     }
 
@@ -405,7 +415,7 @@ impl World {
             foundation.id(),
             1,
             &find,
-            &self.parts.building,
+            &self.parts,
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
@@ -413,7 +423,7 @@ impl World {
             foundation.id(),
             2,
             &find,
-            &self.parts.building,
+            &self.parts,
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
         )?
         .ok_or_else(|| gone.clone())?;
@@ -454,10 +464,20 @@ impl World {
             gap: footprint_gap(unit.position(), builder.radius, f_at, site.radius),
             state: Some(f.life.state),
         };
-        let move_reads = MoveToReads::of(unit, builder, &self.graphics);
+        let move_reads = MoveToReads::of(
+            unit,
+            builder,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
+        );
         let build = BuildAction::start(
             to,
-            BuildTask::of(&task, builder.work_rate + unit.combat.work_rate_powerup),
+            BuildTask::of(
+                &task,
+                builder.work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
+            ),
             &move_reads,
         )?;
         if let Some(m) = switch.map(|m| m.id) {

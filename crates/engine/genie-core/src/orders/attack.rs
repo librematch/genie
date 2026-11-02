@@ -51,7 +51,7 @@ impl World {
         let u = self.players.live(player, idx)?;
         let held = self.players.player(player)?;
         let reads = AttackReads::of(
-            u,
+            self.parts.combat_of(u.id),
             master,
             (
                 crate::objects::masters::OwnerMasters::new(
@@ -68,6 +68,7 @@ impl World {
                 u,
                 self.parts.unit_ai.contains(u.id),
                 self.parts.building_of(u.id),
+                self.parts.combat_of(u.id),
             ),
             master,
             &held.attributes,
@@ -157,7 +158,7 @@ impl World {
             .with("object", unit.id)
             .with("master", unit.life.master_id));
         }
-        unit.combat.attack_count = crate::combat::AttackCount::ZERO;
+        self.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
         crate::objects::sprite::new_sprite(
             &mut unit.sprite,
             unit.body.move_stats_mut(),
@@ -172,8 +173,21 @@ impl World {
             target_owner: aim.owner,
             ready,
         };
+        self.install_attack(player, idx, target, &cmd)
+    }
+
+    /// The Attack's start on object `idx` of `player` ([`Attack::command`] with `cmd`): the
+    /// start's notifies go to the unit AI, the Attack takes `target` as its second target too
+    /// (`FUN_140a7a190`) and goes on the action list, and the unit takes the target (slot 0x178).
+    fn install_attack(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        target: ObjectId,
+        cmd: &crate::combat::attack::AttackCommand<'_>,
+    ) -> Result<(), GenieError> {
         let (mut attack, posted) =
-            self.run_on_step(player, idx, |unit, c| Attack::command(c, unit, &cmd))?;
+            self.run_on_step(player, idx, |unit, c| Attack::command(c, unit, cmd))?;
         // the start's notifies go to the unit AI (the unit's slot 0x328 -> the AI's slot 0x38)
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
@@ -299,7 +313,10 @@ impl World {
         let walks = unit.move_walks(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
         else {

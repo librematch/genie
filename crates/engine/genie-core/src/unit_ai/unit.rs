@@ -146,7 +146,7 @@ impl Unit {
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
             ranged: master.is_some_and(|m| m.missile.master().is_some()),
-            firepower: self.combat.firepower,
+            firepower: c.w.parts.combat_of(self.id).firepower,
             capture: self.capture_kind(c),
             master: self.life.master_id,
             scenario: c.w.settings.game_mode.scenario(),
@@ -305,7 +305,7 @@ impl Unit {
             master,
             (player, computer),
             c.w.settings.game_mode.scenario(),
-            at.capture,
+            (at.capture, c.w.parts.combat_of(self.id).firepower),
         );
         self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
             f(ai, &at, side, computer, rng)
@@ -342,7 +342,7 @@ impl Unit {
             master,
             (player, computer),
             c.w.settings.game_mode.scenario(),
-            self.capture_kind(c),
+            (self.capture_kind(c), c.w.parts.combat_of(self.id).firepower),
         );
         self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
             f(ai, side, rng)
@@ -438,7 +438,7 @@ impl Unit {
             master,
             (player, computer),
             c.w.settings.game_mode.scenario(),
-            at.capture,
+            (at.capture, c.w.parts.combat_of(self.id).firepower),
         );
         self.with_side(
             c,

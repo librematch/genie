@@ -105,7 +105,11 @@ impl World {
         if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
             return Ok(());
         }
-        let rate = crate::garrison::attack_rate(master, masters, u.combat.reload_powerup);
+        let rate = crate::garrison::attack_rate(
+            master,
+            masters,
+            self.parts.combat_of(u.id).reload_powerup,
+        );
         if at_most_or_unordered(rate.get(), 0.0) {
             return Ok(());
         }
@@ -119,17 +123,18 @@ impl World {
                 shares.push(crate::garrison::share(
                     m,
                     self.masters.checked(q.index())?,
-                    unit.combat.reload_powerup,
+                    self.parts.combat_of(unit.id).reload_powerup,
                     rate,
                 )?);
             }
         }
-        let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
+        let _ = self.object(id).ok_or(OBJECT_GONE)?;
+        let combat = self.parts.combat_mut(id)?;
         for s in shares {
-            u.combat.firepower = if after {
-                s + u.combat.firepower
+            combat.firepower = if after {
+                s + combat.firepower
             } else {
-                u.combat.firepower - s
+                combat.firepower - s
             };
         }
         Ok(())

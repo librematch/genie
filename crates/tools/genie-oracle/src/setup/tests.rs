@@ -178,3 +178,32 @@ fn the_slice_takes_the_master_tables() {
     assert_eq!(turns.masters.len(), 2);
     assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
 }
+
+/// With the master table, a unit inside a building of its player is in the building's garrison
+/// list; a building whose master the player lacks takes no share, so its volleys stay.
+#[test]
+fn a_unit_inside_a_building_is_in_its_garrison() {
+    let table = MasterTable::of_master(
+        CivId::GAIA,
+        MasterId::of_data(83).unwrap(),
+        None,
+        FlyMode::of_data(0),
+    );
+    let mut inside = combat_object(11, 83);
+    crate::fixtures::static_mut(&mut inside).inside_obj = 10;
+    let save = header(vec![
+        gaia(Vec::new()),
+        human(vec![building_object(10, 12), inside]),
+    ]);
+    let turns = slice(&save, Some(&table));
+    let building = turns.players[1]
+        .objects
+        .iter()
+        .find(|u| u.id == object_id(10))
+        .unwrap();
+    assert_eq!(building.garrison, [object_id(11)]);
+    assert_eq!(
+        turns.parts.combat_of(object_id(10)).firepower,
+        genie_core::combat::Firepower::ZERO
+    );
+}

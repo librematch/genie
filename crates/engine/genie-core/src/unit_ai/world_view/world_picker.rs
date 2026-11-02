@@ -169,6 +169,7 @@ impl WorldPicker<'_> {
                 t,
                 self.parts.unit_ai.contains(t.id),
                 self.parts.building_of(t.id),
+                self.parts.combat_of(t.id),
             ),
             tm,
             ta,
@@ -181,6 +182,7 @@ impl WorldPicker<'_> {
                 f,
                 self.parts.unit_ai.contains(f.id),
                 self.parts.building_of(f.id),
+                self.parts.combat_of(f.id),
             ),
             fm,
             fa,
@@ -240,6 +242,7 @@ impl WorldPicker<'_> {
                 o,
                 self.parts.unit_ai.contains(o.id),
                 self.parts.building_of(o.id),
+                self.parts.combat_of(o.id),
             ),
             om,
             attributes,
@@ -257,6 +260,7 @@ impl WorldPicker<'_> {
                         t,
                         self.parts.unit_ai.contains(t.id),
                         self.parts.building_of(t.id),
+                        self.parts.combat_of(t.id),
                     ),
                     tm,
                     ta,
@@ -274,7 +278,7 @@ impl WorldPicker<'_> {
                 .and_then(|id| player_master(self.every.players, q, id))
                 .map(|m| &m.weapons[..]),
             charge_event: om.charge_event,
-            range_powerup: o.combat.range_powerup,
+            range_powerup: self.parts.combat_of(o.id).range_powerup,
         };
         let attack = crate::combat::damage::shown_attack(&v, &shown);
         let amount = crate::objects::masters::DamageAmount::new;
@@ -495,7 +499,8 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             reach: self.attacker.range_against()?,
             damage,
             hp: t.life.hp,
-            reload: me.combat.reload_stinger + (mm.reload - me.combat.reload_powerup),
+            reload: self.parts.combat_of(me.id).reload_stinger
+                + (mm.reload - self.parts.combat_of(me.id).reload_powerup),
             workable: self.converts(self.me, id, false)?,
             current: self.seeker.is_some_and(|s| s.target == Some(id)),
         })
@@ -519,7 +524,7 @@ impl crate::unit_ai::AttackPicker for WorldPicker<'_> {
             )
         });
         Ok(crate::objects::masters::DamageAmount::new(100)
-            <= armor.plus(t.combat.armor_powerups.pierce))
+            <= armor.plus(self.parts.combat_of(t.id).armor_powerups.pierce))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).

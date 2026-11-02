@@ -214,7 +214,7 @@ impl Unit {
                 .ok();
                 let graphic =
                     |id: Option<SpriteId>| id.and_then(|id| c.w.graphics.get(id).copied());
-                let look = self.combat.abilities.look.as_ref();
+                let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, false)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
                 let (walk, rng) = c.walk_and_sprites(&mut self.body, me)?;

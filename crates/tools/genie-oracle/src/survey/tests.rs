@@ -77,19 +77,21 @@ fn a_stopped_player_is_listed_and_compared_no_more() {
 /// the unsaved ones.
 #[test]
 fn the_scope_widens_the_compared_fields() {
-    let unit = |attack_count, idle_variant| Unit {
-        id: object_id(1),
-        combat: genie_core::objects::layers::Combat {
-            attack_count: genie_core::combat::AttackCount::of_data(attack_count),
+    let object = |attack_count, idle_variant| Object {
+        unit: Unit {
+            id: object_id(1),
+            idle_variant,
+            ..Unit::default()
+        },
+        parts: genie_core::world::parts::ObjectParts {
+            combat: genie_core::objects::layers::Combat {
+                attack_count: genie_core::combat::AttackCount::of_data(attack_count),
+                ..Default::default()
+            },
             ..Default::default()
         },
-        idle_variant,
-        ..Unit::default()
     };
-    let (slice, game) = (
-        [unit(1, 1)].map(Object::from),
-        [unit(0, 0)].map(Object::from),
-    );
+    let (slice, game) = ([object(1, 1)], [object(0, 0)]);
     let fields = |scope| -> Vec<String> {
         object_field_differences_in(&slice, &game, scope)
             .into_iter()
@@ -98,5 +100,6 @@ fn the_scope_widens_the_compared_fields() {
     };
     assert_eq!(fields(Scope::Saved), Vec::<String>::new());
     assert_eq!(fields(Scope::SavedWithGaps), ["combat.attack_count"]);
-    assert_eq!(fields(Scope::All), ["combat.attack_count", "idle_variant"]);
+    // the row's fields first, then its parts'
+    assert_eq!(fields(Scope::All), ["idle_variant", "combat.attack_count"]);
 }

@@ -7,6 +7,7 @@ use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
 use crate::objects::layers::Building;
+use crate::objects::layers::Combat;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::master_type::{BUILDING, RGE_COMBAT};
@@ -22,14 +23,14 @@ use crate::unit_ai::task_finder::Diplomacy;
 /// `spatial` holds it as unknown, or not at all), its place in its tile's list and a building's
 /// annexes (the world's links).
 pub(crate) fn victim_in(
-    (u, unit_ai, building): (&Unit, bool, &Building),
+    (u, unit_ai, building, combat): (&Unit, bool, &Building, &Combat),
     (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: crate::world::Mode680,
 ) -> Victim {
     let mut v = victim_of(
-        (u, unit_ai, building),
+        (u, unit_ai, building, combat),
         master,
         attributes,
         p,
@@ -46,13 +47,13 @@ pub(crate) fn victim_in(
 }
 
 /// What a hit reads of the object `u` of player `p` ([`Victim`]), whether it has a unit AI
-/// (`unit_ai`) and its building layer (`building`): its master's values and its own, its
+/// (`unit_ai`), its building layer (`building`) and its combat layer (`combat`): its master's values and its own, its
 /// player's elevation attributes, the terrain defense of its tile (`terrain`, the map's;
 /// 1 for an object inside another, which has no tile) and the game's setting `mode_680`. Its
 /// relations to an attacker (`allied`) and whether its place is a guess (`uncertain`) are the
 /// caller's. The slice holds neither its unit AI's alert mode and attackers nor its facing.
 pub(crate) fn victim_of(
-    (u, unit_ai, building): (&Unit, bool, &Building),
+    (u, unit_ai, building, combat): (&Unit, bool, &Building, &Combat),
     master: &Master,
     attributes: &[Amount],
     p: PlayerId,
@@ -124,9 +125,9 @@ pub(crate) fn victim_of(
             max_charge: master.max_charge,
             charge_target: master.charge_target,
             special_attack: master.special_attack,
-            charge: u.combat.charge,
-            charge_hit: u.combat.charge_hit,
-            attack_powerup: u.combat.attack_powerup,
+            charge: combat.charge,
+            charge_hit: combat.charge_hit,
+            attack_powerup: combat.attack_powerup,
             mode_680,
             player: p,
             kill_bonus_tasks: tasks(crate::objects::masters::action_type::LOOT),
@@ -154,9 +155,9 @@ pub(crate) fn victim_of(
             friendly_fire: master.friendly_fire,
             special_graphic: master.special_graphic,
             terrain: defense,
-            armor_powerups: u.combat.armor_powerups,
-            armor_removed: u.combat.armor_removed,
-            hp_powerup: u.combat.hp_powerup,
+            armor_powerups: combat.armor_powerups,
+            armor_removed: combat.armor_removed,
+            hp_powerup: combat.hp_powerup,
             kill_tasks: master.tasks.iter().any(|t| {
                 t.action_type == crate::combat::abilities::REMOVAL_REWARD
                     && 1e-7 < t.work_val1.get()

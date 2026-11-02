@@ -206,7 +206,7 @@ impl Attack {
             self.arms.fire_frame
         };
         set_attack_timer(
-            unit,
+            c.w.parts.combat_mut(unit.id)?,
             r.world_time,
             r.reload - Seconds::new(frame.as_f32() * sprite.graphic.frame_duration.get()),
         );
@@ -269,10 +269,11 @@ impl Attack {
         sprite: ActiveSprite,
     ) -> Result<(), GenieError> {
         let ranged = self.arms.missile.is_some();
+        let timer = c.w.parts.combat_of(unit.id).attack_timer;
         let mut g = c.w.attack_ground();
         match after_hit(
             ranged,
-            unit.combat.attack_timer,
+            timer,
             self.target.is_some(),
             self.arms.interrupt_frame,
             self.arms.fire_frame,

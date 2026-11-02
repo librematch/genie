@@ -81,9 +81,17 @@ pub struct ExploreMove<'a> {
 }
 
 impl<'a> ExploreMove<'a> {
-    /// What the `MoveTo` of `unit` of `master` reads, with the sprites' table `graphics`.
+    /// What the `MoveTo` of `unit` of `master` reads, with the sprites' table and the unit's
+    /// terrain look (`graphics`).
     #[must_use]
-    pub fn of(unit: &Unit, master: &Master, graphics: &'a crate::objects::Graphics) -> Self {
+    pub fn of(
+        unit: &Unit,
+        master: &Master,
+        graphics: (
+            &'a crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
+    ) -> Self {
         Self {
             reads: MoveToReads::of(unit, master, graphics),
             given: master.move_sprite,
@@ -576,7 +584,16 @@ impl Unit {
                 ),
                 given: None,
             },
-            |master| ExploreMove::of(self, master, &c.w.graphics),
+            |master| {
+                ExploreMove::of(
+                    self,
+                    master,
+                    (
+                        &c.w.graphics,
+                        c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                    ),
+                )
+            },
         )
     }
 

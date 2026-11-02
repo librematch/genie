@@ -94,7 +94,7 @@ impl World {
         if unit.undeletable
             || master.kind < DELETABLE_TYPE
             || UNDELETABLE.contains(&master.class)
-            || unit.combat.capture_flag == CaptureKind::AGAIN
+            || self.parts.combat_of(unit.id).capture_flag == CaptureKind::AGAIN
         {
             return Ok(());
         }
@@ -539,11 +539,12 @@ impl World {
         master: &Master,
     ) -> Result<(), GenieError> {
         let computer = self.players.player(owner)?.computer;
-        let (u, layer) = self
-            .object_mut_and_layer(id)
+        let annex_of = self.parts.building_of(id).annex_of;
+        let held = self
+            .object_and_combat_mut(id)?
             .ok_or(crate::construction::build::NOT_HELD)?;
         let death =
-            crate::objects::lifecycle::death_parts::built_death(u, layer, master, computer)?;
+            crate::objects::lifecycle::death_parts::built_death(held, annex_of, master, computer)?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?

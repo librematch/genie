@@ -21,6 +21,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
+use crate::world::Seconds;
 
 impl Attack {
     /// `set_state(6)` (case 6): with a target or a point (`+0x38` not −1, `UCOMISS`: a NaN one
@@ -126,7 +127,12 @@ impl Attack {
         };
         let mobile = MOVING <= f.own.kind && Speed::ZERO < speed;
         if !skip_ready && self.ready_at_once(t.position, near, mobile || r.volley_under_way) {
-            return self.face(unit, t.position, f, r);
+            return self.face(
+                unit,
+                (t.position, g.by_id.combat_of(unit.id).attack_timer),
+                f,
+                r,
+            );
         }
         if gap < self.min_range {
             if !self.sub_action {
@@ -152,7 +158,12 @@ impl Attack {
             return Ok(Readiness::Away(gap));
         }
         self.point = t.position;
-        self.face(unit, t.position, f, r)
+        self.face(
+            unit,
+            (t.position, g.by_id.combat_of(unit.id).attack_timer),
+            f,
+            r,
+        )
     }
 
     /// The target and its place on `map`.
@@ -194,14 +205,14 @@ impl Attack {
         Ok(Readiness::Waiting)
     }
 
-    /// readyToAttack's ready end (`0x140a801f2`): the unit faces its target at `to`
+    /// readyToAttack's ready end (`0x140a801f2`): the unit, its attack timer `attack_timer`, faces its target at `to`
     /// (`FUN_141162db0`, [`face_target`]; masters 1704 and 1706 skip it); one not facing it yet
     /// waits; one facing it swings once its attack timer ran out (slot 0x100, `FUN_141082d40`:
     /// `COMISS` with 0 then `SETBE`, so a NaN timer has run out).
     pub(super) fn face(
         &self,
         unit: &mut Unit,
-        to: Position,
+        (to, attack_timer): (Position, Seconds),
         f: &Fight,
         r: &AttackReads,
     ) -> Result<Readiness, GenieError> {
@@ -216,7 +227,7 @@ impl Attack {
             return Ok(Readiness::Waiting);
         }
         Ok(
-            if crate::math::fmath::at_most_or_unordered(unit.combat.attack_timer.get(), 0.0) {
+            if crate::math::fmath::at_most_or_unordered(attack_timer.get(), 0.0) {
                 Readiness::Ready
             } else {
                 Readiness::Waiting

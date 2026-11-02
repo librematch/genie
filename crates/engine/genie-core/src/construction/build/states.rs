@@ -49,9 +49,9 @@ impl BuildAction {
         by: i8,
     ) -> Result<(), GenieError> {
         if let Some(id) = c.w.counted_building(site)?
-            && let Some((u, site)) = c.w.object_and_site_mut(id)
+            && c.w.object(id).is_some()
         {
-            let n = u.repairers_mut(site);
+            let n = c.w.parts.repairers_mut(id)?;
             *n = n.changed_by(by);
         }
         Ok(())
@@ -71,7 +71,7 @@ impl BuildAction {
             .counted_building(site)?
             .and_then(|id| c.w.object(id))
             .map_or(crate::construction::BuilderCount::NONE, |(_, u)| {
-                u.repairers(c.w.parts.building_of(u.id).construction.as_ref())
+                c.w.parts.repairers_of(u.id)
             }))
     }
 

@@ -653,20 +653,15 @@ fn build(b: RgeAction) -> Action {
     }
 }
 
-/// A Build takes its task with the unit's work-rate powerup, its quiet `MoveTo` (its range,
-/// point, wait and sprite) and its site.
+/// A Build takes its task as the import's task gives it (the builder's powerup is the
+/// object's import's, its combat layer's), its quiet `MoveTo` (its range, point, wait and
+/// sprite) and its site.
 #[test]
 fn a_build_takes_its_task_move_to_and_site() {
     let mut b = base(4);
     b.target_id = 30;
     b.target2_id = 31;
-    let unit = Unit {
-        combat: genie_core::objects::layers::Combat {
-            work_rate_powerup: WorkRate::new(0.5),
-            ..Default::default()
-        },
-        ..Unit::default()
-    };
+    let unit = Unit::default();
     let objects = PlayerObjects::default();
     let walking = with_sub(b.clone(), MOVE_TO, move_to(4, 0.75));
     let a = import(&acting(BUILD, build(walking)), &objects, unit.clone())
@@ -688,7 +683,7 @@ fn a_build_takes_its_task_move_to_and_site() {
         )
     );
     assert!(a.added);
-    assert_eq!(a.task.work_rate.get().to_bits(), 2.5_f32.to_bits());
+    assert_eq!(a.task.work_rate.get().to_bits(), 2.0_f32.to_bits());
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(bits3(walk.point), bits3(Position::new(1.0, 2.0, 0.0)));
     assert_eq!(walk.wait.state, MoveWaitState::AskedAgain);

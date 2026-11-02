@@ -35,7 +35,13 @@ impl Unit {
         // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
         // a monastery's, wonder's or castle's count leaves, at least 0 left
         let computer = c.w.players.player(c.player)?.computer;
-        let death = built_death(self, c.w.parts.building_of(self.id), master, computer)?;
+        let (id, annex_of) = (self.id, c.w.parts.building_of(self.id).annex_of);
+        let death = built_death(
+            (self, c.w.parts.combat_mut(id)?),
+            annex_of,
+            master,
+            computer,
+        )?;
         c.w.players
             .player_mut(c.player)?
             .add_attributes(death.adds)?;
@@ -120,7 +126,7 @@ impl Unit {
         }
         // the static update's sprite after the death (0x14118ad50): a building's by its build
         // points (its destruction sprite unbuilt), any other combat object's slot 0x7a0's
-        let look = self.combat.abilities.look.as_ref();
+        let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
         let shown = if master.kind == BUILDING {
             let built =
                 c.w.parts
@@ -219,7 +225,7 @@ impl Unit {
             c.w.world_time,
         )?;
         if started {
-            self.combat.firepower = master.volley_fire;
+            c.w.parts.combat_mut(self.id)?.firepower = master.volley_fire;
             let (p, id) = (c.player, self.id);
             c.lend(self, |w| w.watch_started(p, id))?;
         }

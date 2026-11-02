@@ -1,4 +1,4 @@
-//! A hunter's search, its walk after a drop and its drop-off.
+//! A hunter's search and its walk after a drop.
 
 use crate::GenieError;
 use crate::combat::victims::victim;
@@ -284,7 +284,10 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
         else {
@@ -502,7 +505,10 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let hunt = self
             .actions
@@ -587,7 +593,10 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let by = self.releaser(c)?;
         let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), self.body.mover_mut())
@@ -649,44 +658,6 @@ impl Unit {
                 standing,
                 c.w.streams.get(Stream::Sprite),
             );
-        }
-        Ok(())
-    }
-
-    /// The hunt's `set_state(8)` after its gathering (`0x140ac60e0` case 8): a unit that carries
-    /// nothing goes back to state 3 (not modelled). Without a drop site, its master's drop sites
-    /// (`+0x7a0`; none when the first is −1) are searched among its player's objects, from the
-    /// unit by path ([`drop_site_search`] with the unit), else by distance from its place (without
-    /// it); none found is not modelled (notify 0x203, `set_state` 2). The drop site found is the
-    /// second target (`FUN_140a7a190`, which takes it: slot 0x178 after the update) and a quiet
-    /// `MoveTo` to it starts ([`HuntAction::set_drop`]).
-    ///
-    /// [`HuntAction::set_drop`]: crate::gathering::hunt::HuntAction::set_drop
-    /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
-    pub(crate) fn hunt_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let by_id = crate::world::index::ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.masters,
-            &c.w.parts,
-        );
-        let w = DropWorld {
-            masters: crate::objects::masters::OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.masters.of(c.player),
-            ),
-            spatial: &mut c.w.spatial,
-            zones: &mut c.w.zones,
-            pathing: &mut c.w.pathing,
-            object: c.w.streams.get(Stream::Object),
-            world_time: c.w.world_time,
-            computer: c.w.players.player(c.player)?.computer,
-            groups: &c.w.groups,
-        };
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.drop_off_in(w, others, &c.w.graphics, by_id)? {
-            let by = self.releaser(c)?;
-            crate::world::lets::take(c, self, site, by)?;
         }
         Ok(())
     }

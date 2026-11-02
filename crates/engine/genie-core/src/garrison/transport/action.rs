@@ -505,7 +505,7 @@ pub(crate) fn stand(
 
 impl<'a> Ship<'a> {
     /// What the Transport on `task` reads of `unit` of `master` on a map of `map` tiles, with the
-    /// sprites' table `graphics` ([`Ship::of`]).
+    /// sprites' table and the unit's terrain look (`graphics`, [`Ship::of`]).
     ///
     /// # Errors
     ///
@@ -514,7 +514,10 @@ impl<'a> Ship<'a> {
         unit: &Unit,
         master: &Master,
         map: GridSize,
-        graphics: &'a crate::objects::Graphics,
+        graphics: (
+            &'a crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
         task: Option<TaskId>,
     ) -> Result<Self, GenieError> {
         let walk = MoveToReads::of(unit, master, graphics);

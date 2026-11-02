@@ -122,10 +122,17 @@ impl World {
             for c in def.costs.iter().filter(|c| c.paid == CostPaid::BUILDING) {
                 // a cost entry of the building's own store names an attribute
                 let attribute = c.attribute.ok_or(crate::world::NO_ATTRIBUTE)?;
-                match building.combat.store.iter_mut().find(|s| s.0 == attribute) {
+                match self
+                    .parts
+                    .combat_mut(building.id)?
+                    .store
+                    .iter_mut()
+                    .find(|s| s.0 == attribute)
+                {
                     Some(s) => s.1 += Amount::new(c.amount.as_f32()),
-                    None => building
-                        .combat
+                    None => self
+                        .parts
+                        .combat_mut(building.id)?
                         .store
                         .push((attribute, Amount::new(c.amount.as_f32() + 0.0))),
                 }

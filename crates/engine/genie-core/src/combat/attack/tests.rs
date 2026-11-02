@@ -726,7 +726,7 @@ impl Rig {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                &parts.building,
+                (&parts.building, &parts.combat),
             ),
             map: spatial,
             sprite_rng: sprite,
@@ -747,6 +747,12 @@ impl Rig {
     /// The attacker to change.
     pub(crate) fn unit_mut(&mut self) -> &mut Unit {
         &mut self.t.players[1].objects[ListIndex::new(0)]
+    }
+
+    /// The attacker's combat layer, to change.
+    pub(crate) fn combat_mut(&mut self) -> &mut crate::objects::layers::Combat {
+        let id = self.unit().id;
+        self.t.parts.combat_mut(id).unwrap()
     }
 
     /// The attacker's unit AI.
@@ -1444,7 +1450,7 @@ fn ready_to_attack_s_at_once_test_and_its_nan_paths() {
             0.8,
             victim,
         );
-        rig.unit_mut().combat.attack_timer = Seconds::new(timer);
+        rig.combat_mut().attack_timer = Seconds::new(timer);
         let mut a = soldier_attack(7, range, 0.0, point);
         let r = rig
             .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip))
@@ -2254,7 +2260,7 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
             0.0,
             victim,
         );
-        rig.unit_mut().combat.attack_timer = Seconds::new(timer);
+        rig.combat_mut().attack_timer = Seconds::new(timer);
         rig.r.can_move = false;
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.arms.sprite = Some(attack_sprite);
@@ -2546,7 +2552,9 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
     swing_at(&mut t, &mut a, 5).unwrap();
     assert_eq!((a.pending, missiles(&t).len()), (false, 1));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].combat.attack_timer,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+            .attack_timer,
         Seconds::new(2.0 - 5.0 * 0.1)
     );
     let rest = 2.0 - 10.0 * 0.1;

@@ -153,15 +153,15 @@ impl World {
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
         let b = self.players.live_mut(player, container)?;
         if let Some(share) = share {
-            b.combat.firepower -= share;
+            self.parts.combat_mut(b.id)?.firepower -= share;
         }
         // the unit out of its list (`FUN_141197e10`)
         if let Some(k) = b.garrison.iter().position(|&g| g == id) {
             let _ = b.garrison.swap_remove(k);
         }
         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
-        if b.garrison.is_empty() || b.combat.firepower < bm.volley_fire {
-            b.combat.firepower = bm.volley_fire;
+        if b.garrison.is_empty() || self.parts.combat_of(b.id).firepower < bm.volley_fire {
+            self.parts.combat_mut(b.id)?.firepower = bm.volley_fire;
         }
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (b_at, b_radius) = (b.position(), bm.radius);
@@ -192,7 +192,7 @@ impl World {
         self.pathing.tiles_changed(self.spatial.take_changes());
         unit.life.inside = None;
         // a unit out of its container no longer counts down to its raid (`+0x9a0` 0)
-        unit.combat.raider_countdown = crate::garrison::RaiderCountdown::NONE;
+        self.parts.combat_mut(unit.id)?.raider_countdown = crate::garrison::RaiderCountdown::NONE;
         // the position setter's end: a place off where it last moved to is a move
         if let Some(m) = unit.body.mover_mut() {
             m.mark_move(at, world_time);
@@ -232,8 +232,13 @@ impl World {
         };
         let b = self.players.live(player, container)?;
         let unit = self.players.live(up, ui)?;
-        let rate = attack_rate(bm, own, b.combat.reload_powerup);
-        Ok(Some(share(made, theirs, unit.combat.reload_powerup, rate)?))
+        let rate = attack_rate(bm, own, self.parts.combat_of(b.id).reload_powerup);
+        Ok(Some(share(
+            made,
+            theirs,
+            self.parts.combat_of(unit.id).reload_powerup,
+            rate,
+        )?))
     }
 
     /// [`World::let_out`]'s end once the unit stands at its spot: the work given, the gather

@@ -813,8 +813,9 @@ fn an_attack_task_of_a_unit_that_cannot_move_goes_ready_in_reach() {
     ] {
         let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
-        t.parts.set_unit_ai(unit.id, None);
-        unit.combat.attack_timer = Seconds::new(timer);
+        let id = unit.id;
+        t.parts.set_unit_ai(id, None);
+        t.parts.combat_mut(id).unwrap().attack_timer = Seconds::new(timer);
         t.start_attack(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -1661,23 +1662,23 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         master(TROPHY, WholeSeconds::of_data(10)),
         master(master_id(1650), WholeSeconds::of_data(30)),
     ]);
-    let trophy = |state| {
-        Object::with_building(
-            Unit {
-                id: object_id(60),
-                combat: crate::objects::layers::Combat {
-                    firepower: crate::combat::Firepower::new(7.0),
-                    ..Default::default()
-                },
-                life: crate::objects::lifecycle::Lifecycle {
-                    master_id: TROPHY,
-                    state,
-                    hp: HitPoints::new(50.0),
-                    ..crate::objects::lifecycle::Lifecycle::default()
-                },
-                ..Unit::default()
+    let trophy = |state| Object {
+        unit: Unit {
+            id: object_id(60),
+            life: crate::objects::lifecycle::Lifecycle {
+                master_id: TROPHY,
+                state,
+                hp: HitPoints::new(50.0),
+                ..crate::objects::lifecycle::Lifecycle::default()
             },
-            crate::objects::layers::Building {
+            ..Unit::default()
+        },
+        parts: crate::world::parts::ObjectParts {
+            combat: crate::objects::layers::Combat {
+                firepower: crate::combat::Firepower::new(7.0),
+                ..Default::default()
+            },
+            building: crate::objects::layers::Building {
                 construction: Some(crate::construction::build::Construction {
                     progress: Seconds::new(10.0),
                     desolid: false,
@@ -1693,7 +1694,8 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
                 }),
                 ..Default::default()
             },
-        )
+            ..Default::default()
+        },
     };
     t.set_live_for_test(player_id(1), [trophy(ObjectState::Alive)]);
     t.transform_object(player_id(1), object_id(60), master_id(1650))
@@ -1706,7 +1708,10 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         Seconds::new(30.0)
     );
     // FUN_141225b70 in state 2: the volleys are the new master's volley fire
-    assert_eq!(unit.combat.firepower, crate::combat::Firepower::new(2.0));
+    assert_eq!(
+        t.parts.combat_of(unit.id).firepower,
+        crate::combat::Firepower::new(2.0)
+    );
     t.set_live_for_test(player_id(1), [trophy(ObjectState::Unfinished)]);
     t.transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
@@ -1719,7 +1724,9 @@ fn a_transformed_building_takes_its_new_master_s_build_time_in_state_2() {
         Seconds::new(10.0)
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].combat.firepower,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+            .firepower,
         crate::combat::Firepower::new(7.0)
     );
 }
@@ -2325,7 +2332,8 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
         graphics: &graphics,
         sprite: &mut rng,
     };
-    let switched = switch_master(&mut unit, &old, &next, world).unwrap();
+    let mut combat = crate::objects::layers::Combat::default();
+    let switched = switch_master((&mut unit, &mut combat), &old, &next, world).unwrap();
     assert!(switched.promoted);
     assert_eq!(
         (unit.life.master_id, unit.life.hp),
@@ -2339,15 +2347,23 @@ fn a_master_change_inside_a_building_keeps_to_its_record() {
     assert!(!spatial.tile_list(Tile::new(5, 5)).contains(&object_id(7)));
 }
 
+/// What [`switched_in_the_open`] gives: what the switch leaves to the owner, the unit with its
+/// combat layer, and its record.
+type InTheOpen = (
+    actions::Switched,
+    (Unit, crate::objects::layers::Combat),
+    crate::map::spatial::Placed,
+);
+
 /// Slot 0x90's unit part ([`switch_master`]) of `unit`, at (3.5, 3.5) in the open, from `old`
-/// to `next`, with the graphics `shown`: what it leaves to its owner, the unit after it and its
-/// record.
+/// to `next`, with the graphics `shown`: what it leaves to its owner, the unit after it with
+/// its combat layer and its record.
 fn switched_in_the_open(
     mut unit: Unit,
     old: &Master,
     next: &Master,
     shown: &[i16],
-) -> Result<(actions::Switched, Unit, crate::map::spatial::Placed), GenieError> {
+) -> Result<InTheOpen, GenieError> {
     let mut spatial = crate::map::spatial::Spatial::new(GridSize::new(10, 10));
     spatial.insert(
         unit.id,
@@ -2391,9 +2407,10 @@ fn switched_in_the_open(
         graphics: &graphics,
         sprite: &mut rng,
     };
-    let switched = switch_master(&mut unit, old, next, world)?;
+    let mut combat = crate::objects::layers::Combat::default();
+    let switched = switch_master((&mut unit, &mut combat), old, next, world)?;
     let record = spatial.get(unit.id).copied().unwrap();
-    Ok((switched, unit, record))
+    Ok((switched, (unit, combat), record))
 }
 
 /// The two masters of [`switched_in_the_open`]'s tests: 4 (40 hit points, standing sprite 10)
@@ -2469,7 +2486,8 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         )),
         ..unit(HitPoints::new(20.0), ObjectState::Alive)
     };
-    let (switched, u, record) = switched_in_the_open(showing, &old, &next, &[10, 11]).unwrap();
+    let (switched, (u, combat), record) =
+        switched_in_the_open(showing, &old, &next, &[10, 11]).unwrap();
     assert_eq!(
         switched.leaving,
         crate::test_ids::adds([
@@ -2484,7 +2502,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
     );
     assert!(switched.promoted);
     assert_eq!(
-        (u.life.master_id, u.life.hp, u.combat.firepower),
+        (u.life.master_id, u.life.hp, combat.firepower),
         (
             master_id(5),
             HitPoints::new(30.0),
@@ -2508,10 +2526,10 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         })
     );
     let hp = |hp| {
-        let (_, u, _) =
+        let (_, (u, combat), _) =
             switched_in_the_open(unit(hp, ObjectState::Unfinished), &old, &next, &[10, 11])
                 .unwrap();
-        (u.life.hp, u.combat.firepower)
+        (u.life.hp, combat.firepower)
     };
     assert_eq!(
         hp(HitPoints::new(50.0)),
@@ -2521,7 +2539,7 @@ fn a_master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_spri
         hp(HitPoints::new(0.5)),
         (HitPoints::new(1.0), crate::combat::Firepower::new(0.0))
     );
-    let (switched, u, record) = switched_in_the_open(
+    let (switched, (u, _), record) = switched_in_the_open(
         unit(HitPoints::new(20.0), ObjectState::Dying),
         &old,
         &next,
@@ -2581,27 +2599,24 @@ fn a_master_change_s_unmodelled_parts_fail() {
 /// hit points powerup and the reload stinger stay.
 #[test]
 fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
-    let mut unit = Unit {
-        combat: crate::objects::layers::Combat {
-            attack_powerup: crate::combat::AttackPowerup::new(2.0),
-            reload_powerup: Seconds::new(0.5),
-            reload_stinger: Seconds::new(0.25),
-            work_rate_powerup: WorkRate::new(0.15),
-            hp_powerup: HpPowerup {
-                taken: HitPoints::new(10.0),
-                max: HitPoints::new(20.0),
-            },
-            armor_powerups: ArmorPair::new(1, 2),
-            ..Default::default()
+    let mut combat = crate::objects::layers::Combat {
+        attack_powerup: crate::combat::AttackPowerup::new(2.0),
+        reload_powerup: Seconds::new(0.5),
+        reload_stinger: Seconds::new(0.25),
+        work_rate_powerup: WorkRate::new(0.15),
+        hp_powerup: HpPowerup {
+            taken: HitPoints::new(10.0),
+            max: HitPoints::new(20.0),
         },
-        ..Unit::default()
+        armor_powerups: ArmorPair::new(1, 2),
+        ..Default::default()
     };
-    clear_powerups(&mut unit);
+    clear_powerups(&mut combat);
     assert_eq!(
         (
-            unit.combat.attack_powerup,
-            unit.combat.reload_powerup,
-            unit.combat.work_rate_powerup
+            combat.attack_powerup,
+            combat.reload_powerup,
+            combat.work_rate_powerup
         ),
         (
             crate::combat::AttackPowerup::ZERO,
@@ -2610,7 +2625,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
         )
     );
     assert_eq!(
-        (unit.combat.hp_powerup, unit.combat.armor_powerups),
+        (combat.hp_powerup, combat.armor_powerups),
         (
             HpPowerup {
                 taken: HitPoints::new(10.0),
@@ -2619,7 +2634,7 @@ fn a_master_change_clears_the_powerups_but_the_hit_points_one() {
             ArmorPair::ZERO
         )
     );
-    assert_eq!(unit.combat.reload_stinger, Seconds::new(0.25));
+    assert_eq!(combat.reload_stinger, Seconds::new(0.25));
 }
 
 /// `FUN_140a97730`: an empty list and a `MoveTo` head take no move; an Artifact head takes

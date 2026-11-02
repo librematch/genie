@@ -1,4 +1,7 @@
-use crate::fixtures::{action_list, building_mut, building_object, combat_mut, combat_object};
+use crate::fixtures::{
+    action_list, building_mut, building_object, combat_master, combat_mut, combat_object,
+    with_masters,
+};
 use crate::masters::{DefaultAction, MasterTable};
 use crate::saved_unit::{annexes, object, unit};
 use crate::test_ids::object_id;
@@ -182,8 +185,65 @@ fn a_missile_without_its_action_keeps_flying() {
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());
     assert_eq!(
-        u.combat.attack_count,
+        o.parts.combat.attack_count,
         genie_core::combat::AttackCount::of_data(2)
+    );
+    assert_eq!(u.id, object_id(6));
+}
+
+/// A builder's Build takes its master's Build task with the builder's work-rate powerup (its
+/// combat layer's) added to the master's work rate.
+#[test]
+fn a_build_s_work_rate_takes_the_builder_s_powerup() {
+    use genie_core::objects::masters::action_type::BUILD;
+    use genie_save::generated::world::{Task, TaskList, TaskListEntry1, TribeActionBuild};
+    let mut master = combat_master(83);
+    let acting = &mut master
+        .tribe_master_combat_object
+        .as_deref_mut()
+        .expect("a combat master")
+        .rge_master_combat_object
+        .rge_master_action_object;
+    acting.work_rate = 2.0;
+    acting.tasks = Some(Box::new(TaskList {
+        list_num: 1,
+        list: vec![TaskListEntry1 {
+            task_type: 1,
+            task: Task {
+                action_type: BUILD.get(),
+                ..Task::default()
+            },
+        }],
+    }));
+    let mut builder = combat_object(5, 83);
+    let combat = combat_mut(&mut builder);
+    combat.work_rate_powerup = 0.5;
+    let build = Action {
+        tribe_action_build: Some(Box::new(TribeActionBuild {
+            rge_action: RgeAction {
+                state: 4,
+                target_id: 30,
+                target2_id: -1,
+                ..RgeAction::default()
+            },
+            added_to_num_builders: 1,
+        })),
+        ..Action::default()
+    };
+    combat.rge_combat_object.rge_action_object.actions = action_list(vec![(BUILD, build)]);
+    let o = object(
+        &builder,
+        &with_masters(vec![master]),
+        &[],
+        CivId::GAIA,
+        None,
+        PLAYERS,
+    );
+    let b = o.unit.actions.list.build().copied().unwrap();
+    assert_eq!(b.task.work_rate.get().to_bits(), 2.5_f32.to_bits());
+    assert_eq!(
+        o.parts.combat.work_rate_powerup.get().to_bits(),
+        0.5_f32.to_bits()
     );
 }
 

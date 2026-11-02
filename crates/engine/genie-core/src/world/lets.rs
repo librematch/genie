@@ -36,9 +36,27 @@ pub(crate) struct Lets<'l> {
     pub(crate) ais: &'l mut crate::world::parts::PartTable<crate::unit_ai::UnitAi>,
     /// The buildings' layers ([`crate::world::parts::Parts::building`]).
     pub(crate) buildings: &'l mut crate::world::parts::PartTable<crate::objects::layers::Building>,
+    /// The combat layers ([`crate::world::parts::Parts::combat`]).
+    pub(crate) combats: &'l mut crate::world::parts::PartTable<crate::objects::layers::Combat>,
     pub(crate) lines: &'l UnitLines,
     pub(crate) tracker: &'l mut Tracker,
     pub(crate) own_notifies: &'l mut Vec<(Notify, crate::objects::ObjectState)>,
+}
+
+/// A counted builder leaves the building `site` (`+0x9e8` one less): its construction's
+/// builders in `buildings`, or another object's repairers in its combat layer in `combats`.
+///
+/// # Errors
+///
+/// None (an unreachable error where a table lost the part it took).
+fn leave_site(
+    buildings: &mut crate::world::parts::PartTable<crate::objects::layers::Building>,
+    combats: &mut crate::world::parts::PartTable<crate::objects::layers::Combat>,
+    site: ObjectId,
+) -> Result<(), GenieError> {
+    let n = crate::world::parts::repairers_in(buildings, combats, site)?;
+    *n = n.left();
+    Ok(())
 }
 
 impl World {
@@ -95,6 +113,7 @@ impl World {
             ),
             ais: &mut self.parts.unit_ai,
             buildings: &mut self.parts.building,
+            combats: &mut self.parts.combat,
             lines: &self.lines,
             tracker,
             own_notifies,
@@ -363,14 +382,9 @@ impl Lets<'_> {
             };
             self.site_of(f, p, id)?
         };
-        let construction = self
-            .buildings
-            .get_mut(site)
-            .and_then(|b| b.construction.as_mut());
-        if let Some(u) = me.filter(|u| u.id == site) {
-            leave_site(u, construction);
-        } else if let Some((_, b)) = others.get_mut(site) {
-            leave_site(b, construction);
+        let held = me.is_some_and(|u| u.id == site) || others.get_mut(site).is_some();
+        if held {
+            leave_site(self.buildings, self.combats, site)?;
         }
         Ok(())
     }
@@ -400,10 +414,4 @@ impl Lets<'_> {
         };
         crate::unit_ai::task_finder::allied(relations, from, to, true)
     }
-}
-
-/// A counted builder leaves the building `b` with its construction `site` (`+0x9e8` one less).
-const fn leave_site(b: &mut Unit, site: Option<&mut crate::construction::build::Construction>) {
-    let n = b.repairers_mut(site);
-    *n = n.left();
 }

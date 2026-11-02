@@ -262,11 +262,13 @@ pub struct ObjectsRef<'a> {
     index: &'a ObjectIndex,
     masters: crate::objects::masters::MasterTables<'a>,
     buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
+    combats: &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
 }
 
 impl<'a> ObjectsRef<'a> {
     /// The objects of `players`, which the world's table `index` finds, with the players'
-    /// `masters` and the objects' `parts` (their own masters, their building layers).
+    /// `masters` and the objects' `parts` (their own masters, their building and combat
+    /// layers).
     #[must_use]
     pub const fn new(
         players: &'a [Player],
@@ -278,26 +280,37 @@ impl<'a> ObjectsRef<'a> {
             players,
             index,
             crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-            &parts.building,
+            (&parts.building, &parts.combat),
         )
     }
 
-    /// [`ObjectsRef::new`] of the two part tables it reads, for a caller that holds another
-    /// part table to change: the world's `masters` (the players' and the objects' own) and the
-    /// building layers `buildings`.
+    /// [`ObjectsRef::new`] of the part tables it reads, for a caller that holds another part
+    /// table to change: the world's `masters` (the players' and the objects' own), the building
+    /// layers `buildings` and the combat layers `combats`.
     #[must_use]
     pub const fn of_tables(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: crate::objects::masters::MasterTables<'a>,
-        buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
+        (buildings, combats): (
+            &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
+            &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
+        ),
     ) -> Self {
         Self {
             players,
             index,
             masters,
             buildings,
+            combats,
         }
+    }
+
+    /// Object `id`'s combat layer, an object out for its update's too: a new object's where
+    /// the table holds none ([`crate::world::parts::Parts::combat_of`]).
+    #[must_use]
+    pub fn combat_of(&self, id: ObjectId) -> &'a crate::objects::layers::Combat {
+        self.combats.of(id)
     }
 
     /// No objects: a test's walk that meets none by id.

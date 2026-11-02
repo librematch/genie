@@ -796,7 +796,7 @@ mod stack_tests {
         assert_eq!(
             (
                 unit(object_id(8768)).life.hp,
-                unit(object_id(8768)).combat.store.clone()
+                t.parts.combat_of(object_id(8768)).store.clone()
             ),
             (
                 HitPoints::new(2400.0 - lacked),

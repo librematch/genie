@@ -386,6 +386,11 @@ impl World {
         }
         // the combat setup's class counters (FUN_141226060)
         crate::objects::lifecycle::death_parts::count_class(&mut owner.attributes, made, 1.0);
+        let combat = crate::objects::layers::Combat {
+            // the TRIBE combat setup (FUN_14121df60): the master's volley fire
+            firepower: made.volley_fire,
+            ..Default::default()
+        };
         let unit = Unit {
             id,
             life: Lifecycle {
@@ -401,11 +406,6 @@ impl World {
                 goto_sleep: false,
                 master_id: master,
                 master: made.life,
-            },
-            combat: crate::objects::layers::Combat {
-                // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-                firepower: made.volley_fire,
-                ..Default::default()
             },
             // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
             // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
@@ -432,6 +432,7 @@ impl World {
         };
         let parts = ObjectParts {
             unit_ai: ai,
+            combat,
             ..ObjectParts::default()
         };
         let idx = self.push_live(p, Object { unit, parts })?;

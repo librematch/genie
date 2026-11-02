@@ -335,7 +335,7 @@ impl Unit {
                 continue;
             };
             let kind = u.master(c.w.master_tables(), c.player)?.kind;
-            if kind == COMBAT && u.combat.raider_countdown.runs() {
+            if kind == COMBAT && c.w.parts.combat_of(u.id).raider_countdown.runs() {
                 return Err(GenieError::unsupported(
                     "a unit inside whose raider_build_countdown runs (FUN_1411e7220)",
                 ));
@@ -360,7 +360,7 @@ impl Unit {
             }
             let (class, hit_points) = (m.class, m.hit_points);
             if HitPoints::ZERO < rate && u.life.hp < HitPoints::of_master(hit_points) {
-                u.heal(class, hit_points, rate)?;
+                u.heal(c.w.parts.combat_mut(u.id)?, class, hit_points, rate)?;
             }
         }
         if 0 < villagers
@@ -452,6 +452,7 @@ impl Unit {
                 self,
                 c.w.parts.unit_ai.contains(self.id),
                 c.w.parts.building_of(self.id),
+                c.w.parts.combat_of(self.id),
             ),
             master,
             &c.w.players.player(c.player)?.attributes,
@@ -475,7 +476,7 @@ impl Unit {
             }
         }
         c.blasted = blasted;
-        let _ = self.hit_back(own, c.w.parts.unit_ai.get_mut(self.id))?;
+        let _ = self.hit_back(own, c.w.parts.ai_and_combat_mut(self.id)?)?;
         Ok(())
     }
 

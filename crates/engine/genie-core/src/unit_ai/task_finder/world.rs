@@ -103,19 +103,19 @@ pub(crate) fn state_of(
 }
 
 /// What the task finder reads of object `id`, as `find` holds the objects (with their owners)
-/// and `every` the players' masters; an annex stands for its main building (`+0xbb8` of its
-/// layer in `buildings`), `steps` times (`World::task_target`'s reading). None when `find` does
-/// not hold it.
+/// and `every` the players' masters, `parts` the objects' parts; an annex stands for its main
+/// building (`+0xbb8` of its building layer), `steps` times (`World::task_target`'s reading).
+/// None when `find` does not hold it.
 pub(crate) fn task_target_with<'a>(
     id: ObjectId,
     steps: usize,
     find: &impl Fn(ObjectId) -> Option<(PlayerId, &'a Unit)>,
-    buildings: &PartTable<Building>,
+    parts: &crate::world::parts::Parts,
     every: crate::objects::masters::MasterTables<'a>,
 ) -> Result<Option<TaskTarget<'a>>, GenieError> {
     let mut id = id;
     for _ in 0..steps {
-        match find(id).and_then(|(_, u)| buildings.get(u.id)?.annex_of) {
+        match find(id).and_then(|(_, u)| parts.building_of(u.id).annex_of) {
             Some(main) => id = main.id(),
             None => break,
         }
@@ -130,8 +130,8 @@ pub(crate) fn task_target_with<'a>(
         player,
         state: u.life.state,
         held: u.life.held(),
-        hp: u.life.hp + u.combat.hp_powerup.room(),
-        max_hp: HitPoints::of_master(master.hit_points) + u.combat.hp_powerup.max,
+        hp: u.life.hp + parts.combat_of(u.id).hp_powerup.room(),
+        max_hp: HitPoints::of_master(master.hit_points) + parts.combat_of(u.id).hp_powerup.max,
         attackable: u.attackable,
         pasture: u.pasture,
         top_action: u.top_action_kind(),

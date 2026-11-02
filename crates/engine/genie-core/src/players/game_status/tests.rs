@@ -905,7 +905,7 @@ fn a_cancel_of_all_researches_gives_back_the_entry_s_three() {
     );
     let tc = &p.objects[ListIndex::new(0)];
     assert_eq!(
-        tc.combat.store,
+        t.parts.combat_of(tc.id).store,
         crate::test_ids::adds([(attribute::WOOD, 20.0)])
     );
     let production = t.parts.production.get(tc.id).unwrap();

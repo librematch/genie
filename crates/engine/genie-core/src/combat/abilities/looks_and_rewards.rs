@@ -152,8 +152,8 @@ impl World {
         if let Some(m) = unit.body.mover_mut() {
             m.factor = factor;
         }
-        unit.combat.abilities.attack_rate = rate;
-        unit.combat.abilities.look = look;
+        self.parts.combat_mut(unit.id)?.abilities.attack_rate = rate;
+        self.parts.combat_mut(unit.id)?.abilities.look = look;
         Ok(true)
     }
 }

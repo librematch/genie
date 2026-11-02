@@ -94,7 +94,7 @@ impl UnitView<'_, '_> {
         let visible = self.target_visible(&t, t_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
-        let look = unit.combat.abilities.look.as_ref();
+        let look = self.c.w.parts.combat_of(unit.id).abilities.look.as_ref();
         let arms = crate::combat::attack::arms_looking(
             master,
             look,
@@ -120,7 +120,7 @@ impl UnitView<'_, '_> {
             self.c.w.world_time,
         )?;
         // the constructor clears +0x900 for a target other than its own (none yet)
-        unit.combat.attack_count = crate::combat::AttackCount::ZERO;
+        self.c.w.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
         if unit.life.inside.is_some() {
             return self
                 .attack_from_inside(crate::combat::attack::Attack::own(target, &e, arms), by);
@@ -273,7 +273,7 @@ impl UnitView<'_, '_> {
             player: self.player,
         };
         if w.clears_count {
-            unit.combat.attack_count = crate::combat::AttackCount::ZERO;
+            self.c.w.parts.combat_mut(unit.id)?.attack_count = crate::combat::AttackCount::ZERO;
         }
         if let Some(old) = w.lets_go {
             self.release(old, by)?;
@@ -318,6 +318,7 @@ impl UnitView<'_, '_> {
                 t,
                 self.c.w.parts.unit_ai.contains(t.id),
                 self.c.w.parts.building_of(t.id),
+                self.c.w.parts.combat_of(t.id),
             ),
             (q, master, attributes),
             (self.player, &dip),
@@ -346,6 +347,7 @@ impl UnitView<'_, '_> {
                 unit,
                 self.c.w.parts.unit_ai.contains(unit.id),
                 self.c.w.parts.building_of(unit.id),
+                self.c.w.parts.combat_of(unit.id),
             ),
             master,
             &self.c.w.players.player(self.player)?.attributes,
@@ -354,7 +356,7 @@ impl UnitView<'_, '_> {
             self.c.w.mode_680,
         );
         let reads = AttackReads::of(
-            unit,
+            self.c.w.parts.combat_of(unit.id),
             master,
             (
                 crate::objects::masters::OwnerMasters::new(

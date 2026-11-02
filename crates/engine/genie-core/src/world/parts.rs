@@ -16,6 +16,7 @@ use crate::commands::GatherPoint;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::layers::Building;
+use crate::objects::layers::Combat;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
@@ -23,8 +24,11 @@ use crate::orders::town_bell::TownBell;
 use crate::production::Production;
 use crate::unit_ai::UnitAi;
 use crate::world::World;
-use genie_diff::{Diff, Differ};
+pub use crate::world::whole::{Object, ObjectParts, ObjectView};
 use std::borrow::Cow;
+
+#[cfg(test)]
+pub(crate) use crate::world::parts_fixtures::{no_own_masters, no_parts};
 
 /// One part's table: the parts packed in a dense vector in the order they came, each id's slot
 /// in a table by id. A removal moves the last part into the gap.
@@ -127,39 +131,20 @@ impl<T> PartTable<T> {
     }
 }
 
-/// No own masters: a test's master lookups without a world.
-#[cfg(test)]
-pub(crate) fn no_own_masters() -> &'static PartTable<Master> {
-    &no_parts().own_master
-}
-
-/// No parts: a test's reads by id without a world.
-#[cfg(test)]
-pub(crate) fn no_parts() -> &'static Parts {
-    static NONE: std::sync::LazyLock<Parts> = std::sync::LazyLock::new(Parts::default);
-    &NONE
-}
-
-#[cfg(test)]
-impl Parts {
-    /// A test's unit AI `ai` of object `id` (none removes it), a borrow apart from the lists.
-    pub(crate) fn set_unit_ai(&mut self, id: ObjectId, ai: Option<UnitAi>) {
-        match ai {
-            Some(ai) => {
-                let _ = self.unit_ai.insert(id, ai);
-            }
-            None => {
-                let _ = self.unit_ai.remove(id);
-            }
-        }
-    }
-}
-
 impl PartTable<Building> {
     /// Object `id`'s building layer: [`Building::NONE`] where the table holds none.
     #[must_use]
     pub fn of(&self, id: ObjectId) -> &Building {
         self.get(id).unwrap_or(&NO_BUILDING)
+    }
+}
+
+impl PartTable<Combat> {
+    /// Object `id`'s combat layer: a new object's ([`Combat::default`]) where the table holds
+    /// none.
+    #[must_use]
+    pub fn of(&self, id: ObjectId) -> &Combat {
+        self.get(id).unwrap_or(&NO_COMBAT)
     }
 }
 
@@ -189,100 +174,6 @@ impl World {
     /// Object `id`'s lent unit AI `ai` back in the world's table.
     pub(crate) fn return_unit_ai(&mut self, id: ObjectId, ai: UnitAi) {
         let _ = self.parts.unit_ai.insert(id, ai);
-    }
-
-    /// A test's world with the unit AIs `ais` of the objects it holds ([`World::set_part`]).
-    ///
-    /// # Panics
-    ///
-    /// An object the world does not hold.
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn with_ais(mut self, ais: impl IntoIterator<Item = (ObjectId, UnitAi)>) -> Self {
-        for (id, ai) in ais {
-            self.set_part(id, Part::UnitAi(Some(Box::new(ai))))
-                .expect("a unit AI of an object the world holds");
-        }
-        self
-    }
-
-    /// A test's live list of player `p`: `objects` with their parts; the old list's objects
-    /// leave the world with theirs.
-    ///
-    /// # Panics
-    ///
-    /// A player the world does not hold.
-    #[cfg(test)]
-    pub(crate) fn set_live_for_test(
-        &mut self,
-        p: crate::players::PlayerId,
-        objects: impl IntoIterator<Item = Object>,
-    ) {
-        let list = &mut self
-            .players
-            .get_mut(p.index())
-            .expect("a player the world holds")
-            .objects;
-        let old: Vec<ObjectId> = list.iter().map(|u| u.id).collect();
-        let mut units = Vec::new();
-        for id in old {
-            let _ = self.parts.take(id);
-        }
-        let mut parts = Vec::new();
-        for o in objects {
-            parts.push((o.unit.id, o.parts));
-            units.push(o.unit);
-        }
-        *list = units.into();
-        for (id, part) in parts {
-            self.parts.file(id, part);
-        }
-        self.reindex();
-    }
-
-    /// A test's objects `objects` apart: their units (a player's list) and their building
-    /// layers ([`World::with_buildings`]).
-    #[cfg(test)]
-    pub(crate) fn split_layers(
-        objects: impl IntoIterator<Item = Object>,
-    ) -> (Vec<Unit>, Vec<(ObjectId, Building)>) {
-        objects
-            .into_iter()
-            .map(|o| {
-                let id = o.unit.id;
-                (o.unit, (id, o.parts.building))
-            })
-            .unzip()
-    }
-
-    /// A test's world with the building layers `layers` set on the objects it holds.
-    ///
-    /// # Panics
-    ///
-    /// An object the world does not hold.
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn with_buildings(
-        mut self,
-        layers: impl IntoIterator<Item = (ObjectId, Building)>,
-    ) -> Self {
-        for (id, layer) in layers {
-            self.set_part(id, Part::Building(Box::new(layer)))
-                .expect("a building layer of an object the world holds");
-        }
-        self
-    }
-}
-
-/// A test's table of the parts it lists, in their order.
-#[cfg(test)]
-impl<T> FromIterator<(ObjectId, T)> for PartTable<T> {
-    fn from_iter<I: IntoIterator<Item = (ObjectId, T)>>(parts: I) -> Self {
-        let mut t = Self::default();
-        for (id, part) in parts {
-            let _ = t.insert(id, part);
-        }
-        t
     }
 }
 
@@ -324,128 +215,42 @@ pub struct Parts {
     /// [`Building::NONE`] ([`Parts::building_of`]); a write puts one in
     /// ([`Parts::building_mut`]), so the table may hold a layer equal to it.
     pub building: PartTable<Building>,
+    /// A combat object's layer (`RGE_Combat_Object` and `TRIBE_Combat_Object`, types 50 and up):
+    /// its attack's timers and counts, its volleys, its charge, its powerups and stingers, its
+    /// store. An object the table does not hold reads a new object's ([`Parts::combat_of`]); a
+    /// write puts one in ([`Parts::combat_mut`]), so the table may hold a layer equal to it.
+    pub combat: PartTable<Combat>,
 }
 
 /// The building layer of an object the table does not hold.
 static NO_BUILDING: Building = Building::NONE;
 
-/// One object's parts as a value, outside the world's tables: what it enters the world with and
-/// what a removal for good returns. Each part compares as the field it was on the object.
-#[derive(Clone, Debug, Default, PartialEq, Diff)]
-pub struct ObjectParts {
-    /// Its dead master ([`Parts::dead_master`]).
-    #[diff(gap = "the import does not read a saved dead master")]
-    pub dead_master: Option<Master>,
-    /// Its gather point ([`Parts::gather_point`]).
-    #[diff(path = "building.gather_point")]
-    pub gather_point: Option<GatherPoint>,
-    /// Its production lists ([`Parts::production`]).
-    #[diff(path = "building.production")]
-    pub production: Option<Production>,
-    /// Its missile's own fields ([`Parts::missile`]).
-    #[diff(path = "missile")]
-    pub missile: Option<Missile>,
-    /// Its own master ([`Parts::own_master`]).
-    #[diff(
-        gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
-    )]
-    pub own_master: Option<Master>,
-    /// Its town bell ([`Parts::town_bell`]), a new unit's where the table holds none.
-    #[diff(path = "combat.town_bell")]
-    pub town_bell: TownBell,
-    /// Its unit AI ([`Parts::unit_ai`]).
-    #[diff(path = "combat.ai")]
-    pub unit_ai: Option<UnitAi>,
-    /// Its building layer ([`Parts::building`]), [`Building::NONE`] where the table holds none.
-    #[diff(path = "building")]
-    pub building: Building,
-}
-
-/// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
-/// an object in and gives it back whole; a [`Unit`] alone is an object without parts.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Object {
-    /// Its row.
-    pub unit: Unit,
-    /// Its parts.
-    pub parts: ObjectParts,
-}
-
-impl Diff for Object {
-    /// As its view ([`ObjectView`]).
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        self.view().diff(&other.view(), d);
+/// Object `id`'s repairers or builders to change ([`Parts::repairers_of`]) in the tables
+/// `buildings` and `combats`: a building's construction's, else its combat layer's (a new
+/// object's put in where the table holds none).
+///
+/// # Errors
+///
+/// None (an unreachable error where a table lost the part it took).
+pub(in crate::world) fn repairers_in<'a>(
+    buildings: &'a mut PartTable<Building>,
+    combats: &'a mut PartTable<Combat>,
+    id: ObjectId,
+) -> Result<&'a mut crate::construction::BuilderCount, GenieError> {
+    if buildings.get(id).is_some_and(|b| b.construction.is_some()) {
+        return buildings
+            .get_mut(id)
+            .and_then(|b| b.construction.as_mut())
+            .map(|k| &mut k.builders)
+            .ok_or_else(|| {
+                GenieError::unreachable("a construction the table just held").with("object", id)
+            });
     }
+    Ok(&mut combats.get_or_insert_with(id, Combat::default)?.builders)
 }
 
-impl Object {
-    /// The object as a comparison reads it, its parts its own.
-    #[must_use]
-    pub fn view(&self) -> ObjectView<'_> {
-        self.into()
-    }
-}
-
-/// An object as a comparison reads it: its row and its parts, the parts lent by an [`Object`]
-/// (the game's save, imported) or copied out of the world's tables ([`World::object_view`]).
-#[derive(Clone, Debug)]
-pub struct ObjectView<'a> {
-    /// Its row.
-    pub unit: &'a Unit,
-    /// Its parts.
-    pub parts: Cow<'a, ObjectParts>,
-}
-
-impl Diff for ObjectView<'_> {
-    /// The row's fields, then the parts', each at the path it had on the object.
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        self.unit.diff(other.unit, d);
-        self.parts.as_ref().diff(other.parts.as_ref(), d);
-    }
-}
-
-impl<'a> From<&'a Object> for ObjectView<'a> {
-    fn from(o: &'a Object) -> Self {
-        ObjectView {
-            unit: &o.unit,
-            parts: Cow::Borrowed(&o.parts),
-        }
-    }
-}
-
-#[cfg(test)]
-impl Object {
-    /// A test's object: row `unit` with the unit AI `ai` (a unit AI, or an `Option` of one).
-    pub(crate) fn with_ai(unit: Unit, ai: impl Into<Option<UnitAi>>) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts {
-                unit_ai: ai.into(),
-                ..ObjectParts::default()
-            },
-        }
-    }
-
-    /// A test's object: row `unit` with the building layer `layer`.
-    pub(crate) fn with_building(unit: Unit, layer: Building) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts {
-                building: layer,
-                ..ObjectParts::default()
-            },
-        }
-    }
-}
-
-impl From<Unit> for Object {
-    fn from(unit: Unit) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts::default(),
-        }
-    }
-}
+/// The combat layer of an object the table does not hold: a new object's.
+static NO_COMBAT: std::sync::LazyLock<Combat> = std::sync::LazyLock::new(Combat::default);
 
 impl Parts {
     /// Object `id`'s parts filed in the tables (it enters the world).
@@ -459,6 +264,7 @@ impl Parts {
             town_bell,
             unit_ai,
             building,
+            combat,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -484,6 +290,9 @@ impl Parts {
         if building != Building::NONE {
             let _ = self.building.insert(id, building);
         }
+        if combat != Combat::default() {
+            let _ = self.combat.insert(id, combat);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -497,6 +306,7 @@ impl Parts {
             town_bell: self.town_bell.remove(id).unwrap_or_default(),
             unit_ai: self.unit_ai.remove(id),
             building: self.building.remove(id).unwrap_or_default(),
+            combat: self.combat.remove(id).unwrap_or_default(),
         }
     }
 
@@ -512,6 +322,7 @@ impl Parts {
             town_bell: self.town_bell.get(id).copied().unwrap_or_default(),
             unit_ai: self.unit_ai.get(id).cloned(),
             building: self.building_of(id).clone(),
+            combat: self.combat_of(id).clone(),
         }
     }
 
@@ -530,6 +341,59 @@ impl Parts {
     /// None (an unreachable error where the table lost the layer it took).
     pub(crate) fn building_mut(&mut self, id: ObjectId) -> Result<&mut Building, GenieError> {
         self.building.get_or_insert_with(id, || Building::NONE)
+    }
+
+    /// Object `id`'s combat layer: a new object's ([`Combat::default`]) where the table holds
+    /// none.
+    #[must_use]
+    pub fn combat_of(&self, id: ObjectId) -> &Combat {
+        self.combat.of(id)
+    }
+
+    /// Object `id`'s combat layer to change, a new object's put in where the table holds none.
+    /// The caller holds the object: its row is borrowed from the world's lists, which this
+    /// borrow leaves alone ([`World::set_part`] checks the id where no row is held).
+    ///
+    /// # Errors
+    ///
+    /// None (an unreachable error where the table lost the layer it took).
+    pub(crate) fn combat_mut(&mut self, id: ObjectId) -> Result<&mut Combat, GenieError> {
+        self.combat.get_or_insert_with(id, Combat::default)
+    }
+
+    /// Object `id`'s repairers or builders (`+0x9e8`, `num_builders`): a building's in its
+    /// construction, any other's in its combat layer.
+    #[must_use]
+    pub fn repairers_of(&self, id: ObjectId) -> crate::construction::BuilderCount {
+        self.building_of(id)
+            .construction
+            .map_or_else(|| self.combat_of(id).builders, |k| k.builders)
+    }
+
+    /// [`Parts::repairers_of`] to change ([`repairers_in`]).
+    ///
+    /// # Errors
+    ///
+    /// None (an unreachable error where a table lost the part it took).
+    pub(crate) fn repairers_mut(
+        &mut self,
+        id: ObjectId,
+    ) -> Result<&mut crate::construction::BuilderCount, GenieError> {
+        repairers_in(&mut self.building, &mut self.combat, id)
+    }
+
+    /// Object `id`'s unit AI (none without one) and its combat layer ([`Parts::combat_mut`]),
+    /// to change together.
+    ///
+    /// # Errors
+    ///
+    /// None (an unreachable error where the table lost the layer it took).
+    pub(crate) fn ai_and_combat_mut(
+        &mut self,
+        id: ObjectId,
+    ) -> Result<(Option<&mut UnitAi>, &mut Combat), GenieError> {
+        let combat = self.combat.get_or_insert_with(id, Combat::default)?;
+        Ok((self.unit_ai.get_mut(id), combat))
     }
 
     /// Object `id`'s town bell ([`Parts::town_bell`]): a new unit's where the table holds none.
@@ -570,6 +434,7 @@ impl Parts {
             .chain(self.town_bell.iter().map(|(id, _)| id))
             .chain(self.unit_ai.iter().map(|(id, _)| id))
             .chain(self.building.iter().map(|(id, _)| id))
+            .chain(self.combat.iter().map(|(id, _)| id))
     }
 }
 
@@ -592,6 +457,8 @@ pub enum Part {
     UnitAi(Option<Box<UnitAi>>),
     /// The building layer ([`Parts::building`]), boxed; [`Building::NONE`] leaves the table.
     Building(Box<Building>),
+    /// The combat layer ([`Parts::combat`]), boxed; a new object's leaves the table.
+    Combat(Box<Combat>),
 }
 
 impl World {
@@ -645,6 +512,12 @@ impl World {
             }
             Part::Building(b) => {
                 let _ = self.parts.building.insert(id, *b);
+            }
+            Part::Combat(b) if *b == Combat::default() => {
+                let _ = self.parts.combat.remove(id);
+            }
+            Part::Combat(b) => {
+                let _ = self.parts.combat.insert(id, *b);
             }
         }
         Ok(())
@@ -1091,6 +964,8 @@ mod tests {
             flying: true,
             step: crate::map::Offset::ZERO,
         });
+        b.parts.building.garrison_time = crate::world::WorldTime::from_millis(5);
+        b.parts.combat.armor_removed = crate::combat::damage::ArmorPair::new(1, 0);
         let paths = |scope| {
             differences(&a, &b, scope)
                 .into_iter()
@@ -1105,7 +980,9 @@ mod tests {
                 "building.production",
                 "missile",
                 "combat.town_bell.flag",
-                "combat.ai"
+                "combat.ai",
+                "building.garrison_time",
+                "combat.armor_removed.melee"
             ]
         );
         assert_eq!(
@@ -1118,7 +995,9 @@ mod tests {
                 "missile",
                 "own_master",
                 "combat.town_bell.flag",
-                "combat.ai"
+                "combat.ai",
+                "building.garrison_time",
+                "combat.armor_removed.melee"
             ]
         );
     }

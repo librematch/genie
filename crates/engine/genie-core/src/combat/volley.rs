@@ -46,20 +46,23 @@ use crate::world::step::Step;
 
 impl Unit {
     /// The unit's own part of its hit, written back: what a retaliation or reflected damage left
-    /// of its hit points and powerups, its charge and `+0x8a8`, the damage notify (500) a
-    /// retaliation posts to its unit AI (`ai`); a retaliation that killed it is the caller's (Gaia
+    /// of its hit points and powerups (its combat layer `combat`), its charge and `+0x8a8`, the
+    /// damage notify (500) a retaliation posts to its unit AI (`ai`); a retaliation that killed it is the caller's (Gaia
     /// taking a killed attacker is not modelled).
     pub(crate) fn hit_back(
         &mut self,
         own: Victim,
-        ai: Option<&mut crate::unit_ai::UnitAi>,
+        (ai, combat): (
+            Option<&mut crate::unit_ai::UnitAi>,
+            &mut crate::objects::layers::Combat,
+        ),
     ) -> Result<Option<crate::combat::damage::Kill>, GenieError> {
         self.life.hp = own.hp;
         if let Some(a) = own.armored.as_ref() {
-            self.combat.hp_powerup = a.hp_powerup;
+            combat.hp_powerup = a.hp_powerup;
         }
-        self.combat.charge = own.source.charge;
-        self.combat.charge_hit = own.source.charge_hit;
+        combat.charge = own.source.charge;
+        combat.charge_hit = own.source.charge_hit;
         if let Some(ai) = ai {
             for &(attacker, p) in &own.damaged {
                 let n = Notify {
@@ -130,45 +133,8 @@ impl Unit {
         let (first, extra) = if master.max_volley == MissileCount::ZERO {
             (true, 0)
         } else {
-            let count =
-                crate::combat::missile::volley_count(self.combat.firepower, master.max_volley);
-            let old = self.combat.next_volley;
-            let mut n = count - old.counted();
-            let VolleySpread {
-                x: x_spread,
-                y: y_spread,
-                ..
-            } = master.volley_spread;
-            let mut all = true;
-            if !master.combat_ability.contains(CombatAbility::FULL_VOLLEY) {
-                let k = if Distance::ZERO < x_spread || Distance::ZERO < y_spread {
-                    let draw = c.w.streams.get(Stream::Object).rand15() as i32;
-                    (draw * 2) / 0x7fff + 1
-                } else {
-                    1
-                };
-                if k < n {
-                    self.combat.next_volley = self.combat.next_volley.plus(k as u8);
-                    // an immediate 0.05
-                    self.combat.attack_timer = Seconds::new(0.05);
-                    n = k;
-                    all = false;
-                }
-            }
-            if all {
-                self.combat.next_volley = MissileCount::ZERO;
-                if notifies {
-                    self.post_own(
-                        &mut c.w.parts.unit_ai,
-                        NotifyKind::ACTION_EXECUTED,
-                        [600, -1, 0],
-                    )?;
-                }
-            }
-            (
-                old == MissileCount::ZERO,
-                if old == MissileCount::ZERO { n - 1 } else { n },
-            )
+            let full = master.combat_ability.contains(CombatAbility::FULL_VOLLEY);
+            self.volley_shots(c, (master.max_volley, master.volley_spread, full), notifies)?
         };
         if missile || 0 < extra {
             // a target of a player but Gaia: its player makes a flare (master 112, slot 0x1c0)
@@ -203,6 +169,62 @@ impl Unit {
         Ok(())
     }
 
+    /// The volley's shots of a master with a volley (`max_volley`, `spread`, `full`: its full
+    /// volley ability): the count its firepower gives less the shots already counted
+    /// (`+0x8f0`); without the full volley, a split of one or two (a draw where the volley
+    /// spreads) counts on and fires again after 0.05; a whole volley starts the count over and
+    /// tells masters 73 and 559's unit AIs the action executed (`notifies`). Returns whether
+    /// this is the volley's first shot and its extra missiles.
+    fn volley_shots(
+        &self,
+        c: &mut Step<'_>,
+        (max_volley, spread, full): (MissileCount, VolleySpread, bool),
+        notifies: bool,
+    ) -> Result<(bool, i32), GenieError> {
+        let count = crate::combat::missile::volley_count(
+            c.w.parts.combat_of(self.id).firepower,
+            max_volley,
+        );
+        let old = c.w.parts.combat_of(self.id).next_volley;
+        let mut n = count - old.counted();
+        let VolleySpread {
+            x: x_spread,
+            y: y_spread,
+            ..
+        } = spread;
+        let mut all = true;
+        if !full {
+            let k = if Distance::ZERO < x_spread || Distance::ZERO < y_spread {
+                let draw = c.w.streams.get(Stream::Object).rand15() as i32;
+                (draw * 2) / 0x7fff + 1
+            } else {
+                1
+            };
+            if k < n {
+                let combat = c.w.parts.combat_mut(self.id)?;
+                combat.next_volley = combat.next_volley.plus(k as u8);
+                // an immediate 0.05
+                combat.attack_timer = Seconds::new(0.05);
+                n = k;
+                all = false;
+            }
+        }
+        if all {
+            c.w.parts.combat_mut(self.id)?.next_volley = MissileCount::ZERO;
+            if notifies {
+                self.post_own(
+                    &mut c.w.parts.unit_ai,
+                    NotifyKind::ACTION_EXECUTED,
+                    [600, -1, 0],
+                )?;
+            }
+        }
+        Ok((
+            old == MissileCount::ZERO,
+            if old == MissileCount::ZERO { n - 1 } else { n },
+        ))
+    }
+
     /// `FUN_141081020`, a ranged unit's swing at its target (from its volley): its attack count
     /// (`+0x900`) rises; its master's missile (`missile_id`; a charge projectile, slot 0x2f8 with
     /// charge types 6 and 7, is not modelled) at its weapon offset turned by its facing
@@ -213,7 +235,8 @@ impl Unit {
     /// spare friends notifies (0x20f). Not held: the damaged flag of masters 83, 293, 122 and 216
     /// (`+0x683`).
     pub(crate) fn fire(&mut self, c: &mut Step<'_>, aimed: &Aimed) -> Result<(), GenieError> {
-        self.combat.attack_count = self.combat.attack_count.next();
+        let combat = c.w.parts.combat_mut(self.id)?;
+        combat.attack_count = combat.attack_count.next();
         let master = self.master(c.w.master_tables(), c.player)?;
         if master.charge_type.ranged() {
             return Err(GenieError::unsupported(
@@ -238,7 +261,7 @@ impl Unit {
                 spread: master.missed_spread,
                 class: master.class,
             },
-            attack_count: self.combat.attack_count,
+            attack_count: c.w.parts.combat_of(self.id).attack_count,
         };
         let (weapon_range, blast_level) = (master.weapon_range, master.blast_level);
         self.launch(c, aimed, &shot)?;
@@ -550,11 +573,6 @@ impl Unit {
                 master: made.life,
             },
             body: crate::objects::layers::Body::new(position, None, Some(mover)),
-            // its +0x900, the firing object's attack count when fired
-            combat: crate::objects::layers::Combat {
-                attack_count: self.combat.attack_count,
-                ..Default::default()
-            },
             actions: crate::objects::layers::ActionLayer {
                 list: ActionList::default().with_missile(Some(action)),
                 ..Default::default()
@@ -582,6 +600,11 @@ impl Unit {
             unit: missile,
             parts: crate::world::parts::ObjectParts {
                 missile: Some(own),
+                // its +0x900, the firing object's attack count when fired
+                combat: crate::objects::layers::Combat {
+                    attack_count: c.w.parts.combat_of(self.id).attack_count,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         };

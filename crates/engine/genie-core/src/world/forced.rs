@@ -284,6 +284,10 @@ impl World {
             id,
             crate::world::parts::Part::Building(Box::new(g.parts.building.clone())),
         )?;
+        self.set_part(
+            id,
+            crate::world::parts::Part::Combat(Box::new(g.parts.combat.clone())),
+        )?;
         let mut ai = g.parts.unit_ai.clone();
         keep_unsaved_ai(self.parts.unit_ai.get(id), ai.as_mut());
         self.set_part(id, crate::world::parts::Part::UnitAi(ai.map(Box::new)))?;

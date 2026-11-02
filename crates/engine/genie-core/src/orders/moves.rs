@@ -237,7 +237,7 @@ impl World {
     ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        let look = unit.combat.abilities.look.as_ref();
+        let look = self.parts.combat_of(unit.id).abilities.look.as_ref();
         Ok(crate::movement::move_to::point_sprite(master, look, false)
             .and_then(|id| self.graphics.get(id).copied()))
     }
@@ -254,6 +254,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let class = unit.master(self.master_tables(), player)?.class;
         let by = self.releaser(player, idx)?;
+        let id = self.players.live(player, idx)?.id;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let sails = self.players.live_mut(player, idx)?.ai_move_with(
             m,
@@ -264,7 +265,10 @@ impl World {
                     &self.parts.own_master,
                     self.masters.of(player),
                 ),
-                &self.graphics,
+                (
+                    &self.graphics,
+                    self.parts.combat_of(id).abilities.look.as_ref(),
+                ),
                 self.streams.get(Stream::Sprite),
             ),
         )?;

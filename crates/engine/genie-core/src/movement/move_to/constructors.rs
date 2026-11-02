@@ -87,12 +87,19 @@ impl WalkTo {
 
 impl<'g> MoveToReads<'g> {
     /// What a new `MoveTo` reads of `unit` of `master` (its own, or the one its task switches it
-    /// to), with the sprites' table `graphics`: an object without movement has no speed (a
-    /// static object's slot 0x208).
+    /// to), with the sprites' table `graphics` and the unit's terrain look `look` (its combat
+    /// layer's): an object without movement has no speed (a static object's slot 0x208).
     #[must_use]
-    pub fn of(unit: &Unit, master: &Master, graphics: &'g crate::objects::Graphics) -> Self {
+    pub fn of(
+        unit: &Unit,
+        master: &Master,
+        (graphics, look): (
+            &'g crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
+    ) -> Self {
         Self {
-            sprites: SpriteReads::of(master, unit.combat.abilities.look.as_ref(), graphics),
+            sprites: SpriteReads::of(master, look, graphics),
             state: unit.life.state,
             speed: unit.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
             at: unit.position(),
@@ -234,7 +241,8 @@ impl<'g> MoveToReads<'g> {
 
 impl Unit {
     /// What a new `MoveTo` reads of this unit ([`MoveToReads::of`] with its master), `player`'s, whose
-    /// masters are `every`, with the sprites' table `graphics`.
+    /// masters are `every`, with the sprites' table `graphics` and its terrain look `look` (its
+    /// combat layer's).
     ///
     /// # Errors
     ///
@@ -243,7 +251,10 @@ impl Unit {
         &self,
         every: crate::objects::masters::MasterTables<'_>,
         player: PlayerId,
-        graphics: &'g crate::objects::Graphics,
+        graphics: (
+            &'g crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
     ) -> Result<MoveToReads<'g>, GenieError> {
         Ok(MoveToReads::of(self, self.master(every, player)?, graphics))
     }

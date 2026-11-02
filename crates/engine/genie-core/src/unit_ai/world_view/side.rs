@@ -588,7 +588,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
         Ok(Some(crate::unit_ai::TargetFlags {
             owner: seen.owner,
             kind,
-            capture: u.combat.capture_flag,
+            capture: self.c.w.parts.combat_of(u.id).capture_flag,
             pasture: u.pasture,
             untargetable: u.untargetable,
             attackable: u.attackable,

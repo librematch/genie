@@ -42,7 +42,7 @@ hunts its own livestock can lead the animal toward the drop site first (state 10
 | [`sprites.rs`](sprites.rs) | The hunt's sprites: standing, walking and the task's; an asked drop-off and the kind of what a unit carries. |
 | [`start.rs`](start.rs) | The Hunt's start, its chase and retarget, a move's target and the walk to a point (states 11 and 15). |
 | [`tests.rs`](tests.rs) | Tests. |
-| [`unit.rs`](unit.rs) | A hunter's search, its walk after a drop and its drop-off. |
+| [`unit.rs`](unit.rs) | A hunter's search and its walk after a drop. |
 | [`update.rs`](update.rs) | One update (slot 6, `0x140ac7a00`), a target lost on the way and the attack on live livestock (state 12). |
 | [`walks.rs`](walks.rs) | The `MoveTo`s the Hunt's `set_state` makes (`0x140ac60e0`) and the update of its sub-action list (`FUN_140a992b0`). |
 <!-- /files -->

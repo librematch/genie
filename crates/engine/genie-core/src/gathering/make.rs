@@ -130,7 +130,7 @@ impl MakeAction {
             // `+0x18`: the state whose update reports the action done (`FUN_140a99e30` returns 1).
             MakeState::Done => return Ok(HeadCode::Deletes),
             MakeState::Making if Amount::ZERO < self.remaining || self.total <= Amount::ZERO => {
-                let rate = (master.work_rate + farm.combat.work_rate_powerup)
+                let rate = (master.work_rate + c.w.parts.combat_of(farm.id).work_rate_powerup)
                     * self.task.work_val1.get()
                     * c.dt.seconds();
                 let before = farm.life.amount;
@@ -361,8 +361,9 @@ mod tests {
     #[test]
     fn the_farm_s_powerup_adds_to_the_rate() {
         let mut t = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 0.0);
-        t.players[1].objects[ListIndex::new(0)]
-            .combat
+        t.parts
+            .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+            .unwrap()
             .work_rate_powerup = WorkRate::new(0.1);
         let (_, _, amount, _) = made(&mut t);
         assert_eq!(amount, (0.4f32 + 0.1) * 1.0 * 0.104);

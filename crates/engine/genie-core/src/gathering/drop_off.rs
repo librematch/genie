@@ -124,7 +124,10 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let gather = self
             .actions
@@ -227,10 +230,13 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let rate = crate::gathering::gather::StopRate {
-            work_rate: self.combat.work_rate_powerup + master.work_rate,
+            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: crate::gathering::gather::productivity_of(
                 self.actions.list.gather().and_then(|g| g.task.productivity),
@@ -388,7 +394,7 @@ impl Unit {
             .map_or(Position::ORIGIN, |s| s.position);
         let sprites = SpriteReads::of(
             self.master_in(c.masters)?,
-            self.combat.abilities.look.as_ref(),
+            by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
         );
         let walks = Walks::of(sprites, self);
@@ -441,7 +447,7 @@ impl Unit {
             .map_or(Position::ORIGIN, |s| s.position);
         let sprites = SpriteReads::of(
             self.master_in(c.masters)?,
-            self.combat.abilities.look.as_ref(),
+            by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
         );
         let walks = Walks::of(sprites, self);

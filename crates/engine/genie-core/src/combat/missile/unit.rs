@@ -385,6 +385,7 @@ impl Unit {
                 shooter,
                 parts.unit_ai.contains(shooter.id),
                 parts.building_of(shooter.id),
+                parts.combat_of(shooter.id),
             ),
             master,
             attributes,
@@ -411,7 +412,7 @@ impl Unit {
             )?;
         }
         if shooter
-            .hit_back(own, parts.unit_ai.get_mut(shooter.id))?
+            .hit_back(own, parts.ai_and_combat_mut(shooter.id)?)?
             .is_some()
         {
             return Err(GenieError::unsupported(
@@ -453,6 +454,7 @@ impl Unit {
                 self,
                 c.w.parts.unit_ai.contains(self.id),
                 c.w.parts.building_of(self.id),
+                c.w.parts.combat_of(self.id),
             ),
             master,
             &c.w.players.player(c.player)?.attributes,
@@ -475,7 +477,7 @@ impl Unit {
         let object = c.w.streams.get(Stream::Object);
         let struck = crate::combat::attack::strike(&mut own, victim, &mut c.blasted, hit, object)?;
         if self
-            .hit_back(own, c.w.parts.unit_ai.get_mut(self.id))?
+            .hit_back(own, c.w.parts.ai_and_combat_mut(self.id)?)?
             .is_some()
         {
             return Err(GenieError::unsupported("a retaliation killing a missile"));

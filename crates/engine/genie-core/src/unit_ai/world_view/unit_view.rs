@@ -166,7 +166,7 @@ impl UnitView<'_, '_> {
             Some(m),
             (owner, computer),
             self.attacker.scenario,
-            capture,
+            (capture, self.c.w.parts.combat_of(u.id).firepower),
         );
         let target_kind = match ai.current_target.and_then(find) {
             Some((q, o)) => Some(o.master(self.c.w.master_tables(), q)?.kind),

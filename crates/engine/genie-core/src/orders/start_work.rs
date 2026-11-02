@@ -243,7 +243,7 @@ impl World {
             players,
             index,
             masters,
-            &self.parts.building,
+            (&self.parts.building, &self.parts.combat),
         );
         let candidate = |spatial: &crate::map::spatial::Spatial,
                          id: ObjectId|

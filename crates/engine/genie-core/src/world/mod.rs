@@ -28,9 +28,12 @@ pub mod index;
 pub(crate) mod lets;
 pub(crate) mod others;
 pub mod parts;
+#[cfg(test)]
+mod parts_fixtures;
 pub(crate) mod player;
 pub(crate) mod slots;
 pub(crate) mod step;
+pub(crate) mod whole;
 
 use crate::GenieError;
 use crate::map::Distance;

@@ -46,6 +46,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`options.rs`](options.rs) | The game options' values: the game mode, the ages, the visibility, the resource level, the sub-mode's rules, the content mode and the treaty. |
 | [`others.rs`](others.rs) | The world's objects by id as an update reaches them (FD-045-D19, D28): `OthersRef` to read them (the owner's live list and the other players' lists), `Others` to change them while the unit AI runs, and the world's own lookups for the update itself, which holds the world (`World::locate`, `World::wake_sleeper`, `World::take_out_own`). |
 | [`parts.rs`](parts.rs) | The parts only some objects hold, each in a table by id on the world (FD-045-D51), so that an object's row holds only what every object has. |
+| [`parts_fixtures.rs`](parts_fixtures.rs) | A test's world with its parts: fixtures that file a test object's parts beside its row (`World::with_parts`, `World::split_layers`) and the whole objects tests push. |
 | [`play_state.rs`](play_state.rs) | The world's game state. |
 | [`player.rs`](player.rs) | A player (`Player`): its objects, attributes and formations, and the stop of its update. |
 | [`schedule.rs`](schedule.rs) | The world update as a declared schedule (FD-045-D13): its steps in the game's order, each with the game routine it ports, and the update that runs them with an observer. |
@@ -55,6 +56,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`step.rs`](step.rs) | What a tick's update of one object reads and writes (`Step`) and its walks. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tick.rs`](tick.rs) | An update's number. |
+| [`whole.rs`](whole.rs) | An object as one value (FD-045-D51): its row and its parts, as the world takes it in and gives it back whole, and the view a comparison reads (`ObjectView`). |
 | [`world_update.rs`](world_update.rs) | The world update's parts (`crate::world::schedule` runs them): the command phase, the moving objects, the players' relations and each player's objects' updates. |
 <!-- /files -->
 

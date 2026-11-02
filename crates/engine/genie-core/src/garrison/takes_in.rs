@@ -243,7 +243,10 @@ impl World {
                     continue;
                 }
                 let kind = u.master(self.master_tables(), p)?.kind;
-                if is_building && kind == COMBAT && u.combat.raider_countdown.is_set() {
+                if is_building
+                    && kind == COMBAT
+                    && self.parts.combat_of(u.id).raider_countdown.is_set()
+                {
                     return Err(GenieError::unsupported(
                         "a unit inside a building with its raider_build_countdown (+0xc2c)",
                     ));

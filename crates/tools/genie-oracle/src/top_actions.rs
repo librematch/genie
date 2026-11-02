@@ -357,7 +357,7 @@ fn import_fly(
     Ok(())
 }
 
-/// The Build (101): its task with the builder's powerup, its `MoveTo` and its site.
+/// The Build (101): its task (`work`: with the builder's powerup), its `MoveTo` and its site.
 fn import_build(
     saved: &Saved<'_>,
     work: &dyn Fn(i16) -> Result<BuildTask, GenieError>,
@@ -369,8 +369,7 @@ fn import_build(
         .move_to_sub(OTHER_SUB_ACTION)?
         .map(|s| saved_move_to(s, saved.graphics, true))
         .transpose()?;
-    let mut task = work(saved.s.master_obj)?;
-    task.work_rate += unit.combat.work_rate_powerup;
+    let task = work(saved.s.master_obj)?;
     unit.actions.list.set_build(Some(BuildAction {
         target: ObjectId::of_field(base.target_id),
         state: genie_core::construction::build::BuildState::of_byte(base.state)?,

@@ -344,7 +344,10 @@ impl Unit {
         let walks = self.move_walks(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         )?;
         let hunt = self.actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let mover = self.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;

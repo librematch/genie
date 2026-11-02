@@ -63,6 +63,7 @@ use self::ready_to_attack::in_range;
 use self::sprites::{NO_OBJECT_STREAM, set_attack_timer};
 pub use self::sprites::{SwingSprites, swing_sprites};
 pub(crate) use self::sprites::{face_target, reset_sprite, show_arrived, volleys};
+pub(crate) use self::unit::run_down_attack_timers;
 use self::update::squared_reach;
 use self::walks::move_reads;
 pub(crate) use self::walks::speed_of;
@@ -305,11 +306,11 @@ pub(crate) struct AttackReads {
 }
 
 impl AttackReads {
-    /// What the Attack of `unit` of `master` reads: its player's masters and the sprites' table
+    /// What the Attack of a unit of `master` with the combat layer `combat` reads: its player's masters and the sprites' table
     /// (`tables`), its unit AI `ai` (the unit's own, or the one running outside it), whether its
     /// owner is a computer player and the world's time (`now`).
     pub(crate) fn of(
-        unit: &Unit,
+        combat: &crate::objects::layers::Combat,
         master: &Master,
         (masters, graphics): (
             crate::objects::masters::OwnerMasters<'_>,
@@ -324,10 +325,10 @@ impl AttackReads {
                 .and_then(|s| graphics.get(s))
                 .copied(),
             volleys: masters.table.is_some_and(|m| volleys(master, m)),
-            reload: unit.combat.reload_stinger + (master.reload - unit.combat.reload_powerup),
+            reload: combat.reload_stinger + (master.reload - combat.reload_powerup),
             hit_chance: master.hit_chance,
-            armed: crate::combat::volley::armed(master, unit.combat.firepower),
-            swing_sprites: swing_sprites(unit.combat.abilities.look.as_ref(), master, graphics),
+            armed: crate::combat::volley::armed(master, combat.firepower),
+            swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             computer,
             world_time: now,
             can_move: ai
@@ -337,8 +338,8 @@ impl AttackReads {
             queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),
             ai_type: ai.map(|ai| ai.ai_type),
-            volley_under_way: unit.combat.next_volley != crate::combat::MissileCount::ZERO,
-            move_defaults: MoveDefaults::of(master, unit.combat.abilities.look.as_ref()),
+            volley_under_way: combat.next_volley != crate::combat::MissileCount::ZERO,
+            move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref()),
         }
     }
 }
@@ -459,7 +460,7 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                &parts.building,
+                (&parts.building, &parts.combat),
             ),
         }
     }

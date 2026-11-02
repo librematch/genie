@@ -102,11 +102,15 @@ impl crate::world::World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let (u, layer) = self.object_and_layer_mut(id)?.ok_or(NOT_HELD)?;
+        let (_, layer) = self.object_and_layer_mut(id)?.ok_or(NOT_HELD)?;
         let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         c.progress = Seconds::of_master(c.build_time);
         let mut gains = Vec::new();
-        hand_storage(master, &mut gains, Some(&mut u.combat.store));
+        hand_storage(
+            master,
+            &mut gains,
+            Some(&mut self.parts.combat_mut(id)?.store),
+        );
         self.players.player_mut(p)?.add_attributes(gains)
     }
 

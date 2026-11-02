@@ -32,8 +32,8 @@ impl crate::world::World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        for (kind, amount) in crate::objects::lifecycle::death_parts::storage_leaves(u, master) {
+        let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
+        for (kind, amount) in crate::objects::lifecycle::death_parts::storage_leaves(held, master) {
             self.players
                 .player_mut(owner)?
                 .add_attribute(kind, amount)?;
@@ -121,7 +121,7 @@ impl crate::world::World {
             &mut self.pathing,
             now,
         )? {
-            u.combat.firepower = volley;
+            self.parts.combat_mut(u.id)?.firepower = volley;
             self.watch_started(owner, id)?;
         }
         Ok(())

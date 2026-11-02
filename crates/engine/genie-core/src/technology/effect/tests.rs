@@ -482,6 +482,42 @@ fn attribute(kind: u8, a: i16, b: i16, c: i16, d: f32) -> EffectCommand {
     EffectCommand::of_data(kind, a, b, c, d).unwrap()
 }
 
+/// The combat object's slots on the total missiles (attribute 102, `FUN_1412163c0`,
+/// `FUN_1412167d0`, `FUN_141216970`): its volleys (`+0xa00`) take a set's value, add an add's and
+/// scale by a multiply's; an object the world lacks changes nothing.
+#[test]
+fn a_total_missiles_change_sets_adds_or_scales_the_volleys() {
+    use crate::objects::masters::attribute::TOTAL_MISSILES;
+    let player = Player {
+        objects: vec![unit_of(1, master_id(4), HitPoints::new(30.0))].into(),
+        ..Player::default()
+    };
+    let mut t = World::new(
+        WorldTime::ZERO,
+        crate::world::FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO],
+        vec![player],
+    );
+    t.masters = vec![Masters::new([combat(master_id(4), class::CLASS_6, 60)])];
+    let fire = |t: &World| t.parts.combat_of(object_id(1)).firepower.get();
+    for (change, v, after) in [
+        (Change::Set, 2.0, 2.0),
+        (Change::Add, 3.0, 5.0),
+        (Change::Multiply, 0.5, 2.5),
+    ] {
+        assert!(
+            t.change_object(object_id(1), change, v, TOTAL_MISSILES)
+                .unwrap()
+        );
+        assert_eq!(fire(&t).to_bits(), f32::to_bits(after), "{change:?}");
+    }
+    assert!(
+        !t.change_object(object_id(9), Change::Set, 1.0, TOTAL_MISSILES)
+            .unwrap()
+    );
+}
+
 /// `FUN_14165a400` (a master within the table, kind 0 with its id): only that master's
 /// objects and the master change; a master id the table holds no master at (a null slot)
 /// changes nothing, the class besides.
@@ -543,7 +579,6 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
 fn a_change_moves_the_shares_of_the_units_inside_a_building() {
     let mut tower = unit_of(10, master_id(79), HitPoints::new(1000.0));
     tower.garrison = vec![object_id(11)];
-    tower.combat.firepower = crate::combat::Firepower::new(2.0);
     let mut archer = unit_of(11, master_id(4), HitPoints::new(30.0));
     archer.life.inside = Some(ContainerId::new(object_id(10)));
     let player = Player {
@@ -556,7 +591,14 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_combats([(
+        object_id(10),
+        crate::objects::layers::Combat {
+            firepower: crate::combat::Firepower::new(2.0),
+            ..Default::default()
+        },
+    )]);
     let mut tower_master = combat(master_id(79), class::TOWER, 1020);
     tower_master.kind = master_type::BUILDING;
     tower_master.reload = Seconds::new(2.0);
@@ -579,7 +621,9 @@ fn a_change_moves_the_shares_of_the_units_inside_a_building() {
         [ClassAmount::new(3, 6)]
     );
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].combat.firepower,
+        t.parts
+            .combat_of(t.players[0].objects[ListIndex::new(0)].id)
+            .firepower,
         crate::combat::Firepower::new(2.0 - 0.8 + 1.2)
     );
 }

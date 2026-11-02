@@ -290,8 +290,8 @@ impl World {
                 player_master(&self.masters, p, old.id),
             );
         if master_type::COMBAT <= kind {
-            let u = self.object_at_mut(place)?;
-            u.combat.firepower += new.volley_fire - old.volley_fire;
+            let id = self.object_at_mut(place)?.id;
+            self.parts.combat_mut(id)?.firepower += new.volley_fire - old.volley_fire;
         }
         if master_type::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
             self.show_if(place, old.attack_sprite, new.attack_sprite)?;
@@ -498,7 +498,8 @@ impl World {
         {
             let more = (new.max_charge - old.max_charge).abs();
             if Charge::ZERO < more {
-                self.object_at_mut(place)?.combat.charge += more;
+                let id = self.object_at_mut(place)?.id;
+                self.parts.combat_mut(id)?.charge += more;
             }
         }
         self.object_at_mut(place)?.life.hp =
@@ -1102,7 +1103,6 @@ mod tests {
         );
         (v.life.attribute_type, v.life.amount) =
             (Some(AttributeId::numbered(17)), Amount::new(10.0));
-        v.combat.firepower = crate::combat::Firepower::new(1.0);
         let player = crate::world::Player {
             objects: vec![v].into(),
             attributes: vec![Amount::ZERO; 300],
@@ -1114,7 +1114,14 @@ mod tests {
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
-        );
+        )
+        .with_combats([(
+            object_id(10),
+            crate::objects::layers::Combat {
+                firepower: crate::combat::Firepower::new(1.0),
+                ..Default::default()
+            },
+        )]);
         t.masters = vec![Masters::new([old, new])];
         t.players[0].attributes[37] = Amount::new(1.0);
         t.upgrade_objects(
@@ -1127,7 +1134,11 @@ mod tests {
         .unwrap();
         let v = &t.players[0].objects[ListIndex::new(0)];
         assert_eq!(
-            (v.life.master_id, v.life.hp, v.combat.firepower),
+            (
+                v.life.master_id,
+                v.life.hp,
+                t.parts.combat_of(v.id).firepower
+            ),
             (
                 master_id(6),
                 HitPoints::new(50.0),
@@ -1772,7 +1783,11 @@ mod tests {
             t.upgrade_hit_points(Place::Live(PlayerId::new(0), ListIndex::new(0)), (old, new))
                 .unwrap();
             let u = &t.players[0].objects[ListIndex::new(0)];
-            (u.life.hp, u.sprite.map(|s| s.graphic.id), u.combat.charge)
+            (
+                u.life.hp,
+                u.sprite.map(|s| s.graphic.id),
+                t.parts.combat_of(u.id).charge,
+            )
         };
         assert_eq!(
             upgraded(&old, &new, 300),

@@ -107,7 +107,7 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                &parts.building,
+                (&parts.building, &parts.combat),
             ),
         };
         let beside = Beside {

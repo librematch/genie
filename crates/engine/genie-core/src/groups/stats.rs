@@ -628,7 +628,10 @@ mod tests {
         };
         charging(&mut t, 6, -1);
         assert_eq!(range(&t, Some(object_id(20))), Distance::new(1.0));
-        t.players[1].objects[ListIndex::new(0)].combat.charge = Charge::new(1.0);
+        t.parts
+            .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+            .unwrap()
+            .charge = Charge::new(1.0);
         assert_eq!(range(&t, Some(object_id(20))), Distance::new(3.0));
         assert_eq!(range(&t, None), Distance::new(1.0));
         charging(&mut t, 7, 1 << 5);

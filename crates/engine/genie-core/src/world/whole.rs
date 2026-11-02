@@ -1,0 +1,112 @@
+//! An object as one value (FD-045-D51): its row and its parts, as the world takes it in and
+//! gives it back whole, and the view a comparison reads ([`ObjectView`]).
+
+use crate::combat::missile::Missile;
+use crate::commands::GatherPoint;
+use crate::objects::layers::Building;
+use crate::objects::layers::Combat;
+use crate::objects::masters::Master;
+use crate::objects::unit::Unit;
+use crate::orders::town_bell::TownBell;
+use crate::production::Production;
+use crate::unit_ai::UnitAi;
+#[cfg(doc)]
+use crate::world::{World, parts::Parts};
+use genie_diff::{Diff, Differ};
+use std::borrow::Cow;
+
+/// One object's parts as a value, outside the world's tables: what it enters the world with and
+/// what a removal for good returns. Each part compares as the field it was on the object.
+#[derive(Clone, Debug, Default, PartialEq, Diff)]
+pub struct ObjectParts {
+    /// Its dead master ([`Parts::dead_master`]).
+    #[diff(gap = "the import does not read a saved dead master")]
+    pub dead_master: Option<Master>,
+    /// Its gather point ([`Parts::gather_point`]).
+    #[diff(path = "building.gather_point")]
+    pub gather_point: Option<GatherPoint>,
+    /// Its production lists ([`Parts::production`]).
+    #[diff(path = "building.production")]
+    pub production: Option<Production>,
+    /// Its missile's own fields ([`Parts::missile`]).
+    #[diff(path = "missile")]
+    pub missile: Option<Missile>,
+    /// Its own master ([`Parts::own_master`]).
+    #[diff(
+        gap = "the import does not read a saved own master; genie makes none for a foundation or a dying annex"
+    )]
+    pub own_master: Option<Master>,
+    /// Its town bell ([`Parts::town_bell`]), a new unit's where the table holds none.
+    #[diff(path = "combat.town_bell")]
+    pub town_bell: TownBell,
+    /// Its unit AI ([`Parts::unit_ai`]).
+    #[diff(path = "combat.ai")]
+    pub unit_ai: Option<UnitAi>,
+    /// Its building layer ([`Parts::building`]), [`Building::NONE`] where the table holds none.
+    #[diff(path = "building")]
+    pub building: Building,
+    /// Its combat layer ([`Parts::combat`]), a new object's where the table holds none.
+    #[diff(path = "combat")]
+    pub combat: Combat,
+}
+
+/// An object as one value: its row ([`Unit`], what the lists hold) and its parts. The world takes
+/// an object in and gives it back whole; a [`Unit`] alone is an object without parts.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Object {
+    /// Its row.
+    pub unit: Unit,
+    /// Its parts.
+    pub parts: ObjectParts,
+}
+
+impl Diff for Object {
+    /// As its view ([`ObjectView`]).
+    fn diff(&self, other: &Self, d: &mut Differ) {
+        self.view().diff(&other.view(), d);
+    }
+}
+
+impl Object {
+    /// The object as a comparison reads it, its parts its own.
+    #[must_use]
+    pub fn view(&self) -> ObjectView<'_> {
+        self.into()
+    }
+}
+
+/// An object as a comparison reads it: its row and its parts, the parts lent by an [`Object`]
+/// (the game's save, imported) or copied out of the world's tables ([`World::object_view`]).
+#[derive(Clone, Debug)]
+pub struct ObjectView<'a> {
+    /// Its row.
+    pub unit: &'a Unit,
+    /// Its parts.
+    pub parts: Cow<'a, ObjectParts>,
+}
+
+impl Diff for ObjectView<'_> {
+    /// The row's fields, then the parts', each at the path it had on the object.
+    fn diff(&self, other: &Self, d: &mut Differ) {
+        self.unit.diff(other.unit, d);
+        self.parts.as_ref().diff(other.parts.as_ref(), d);
+    }
+}
+
+impl<'a> From<&'a Object> for ObjectView<'a> {
+    fn from(o: &'a Object) -> Self {
+        ObjectView {
+            unit: &o.unit,
+            parts: Cow::Borrowed(&o.parts),
+        }
+    }
+}
+
+impl From<Unit> for Object {
+    fn from(unit: Unit) -> Self {
+        Self {
+            unit,
+            parts: ObjectParts::default(),
+        }
+    }
+}

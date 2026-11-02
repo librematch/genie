@@ -9,6 +9,7 @@ use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::Regeneration;
+use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
@@ -77,14 +78,14 @@ impl HpPowerup {
 /// assembly's order. A hero is a master whose `hero_flag` (`+0x8d9`) grants
 /// [`HeroFlags::REGENERATES`].
 #[must_use]
-pub(crate) fn regeneration_rate(master: &Master, unit: &Unit) -> Regeneration {
+pub(crate) fn regeneration_rate(master: &Master, combat: &Combat) -> Regeneration {
     let hero = master.hero_flag.grants(HeroFlags::REGENERATES);
     let bonus = if hero {
         HERO_REGENERATION
     } else {
         Regeneration::ZERO
     };
-    unit.combat.regen_stinger + (unit.combat.regen_powerup + (bonus + master.regeneration))
+    combat.regen_stinger + (combat.regen_powerup + (bonus + master.regeneration))
 }
 
 impl Unit {
@@ -93,6 +94,7 @@ impl Unit {
     /// heals (`FUN_141193b30`, [`crate::combat::damage::heal_hp`]).
     pub(crate) fn heal(
         &mut self,
+        combat: &mut Combat,
         class: ClassId,
         hit_points: MasterHitPoints,
         amount: HitPoints,
@@ -111,7 +113,7 @@ impl Unit {
         }
         let _ = crate::combat::damage::heal_hp(
             &mut self.life.hp,
-            &mut self.combat.hp_powerup,
+            &mut combat.hp_powerup,
             hit_points,
             amount,
         );
@@ -121,10 +123,10 @@ impl Unit {
     /// Slot 0xb8 of a combat object (`FUN_141203be0`): `amount` added up to its hit points with
     /// its powerups' room, an overflow taken off the powerup (`+0xa38`, never below 0; the hit
     /// point transforms of `FUN_141204450`, empty in the recordings, are not held).
-    pub(crate) fn gain_hp(&mut self, master: &Master, amount: HitPoints) {
+    pub(crate) fn gain_hp(&mut self, combat: &mut Combat, master: &Master, amount: HitPoints) {
         crate::combat::damage::gain_hp(
             &mut self.life.hp,
-            &mut self.combat.hp_powerup,
+            &mut combat.hp_powerup,
             master.hit_points,
             amount,
         );
@@ -136,8 +138,8 @@ impl Unit {
     /// (no update of the recordings fills either list): a dying object's kill credits of its
     /// active stingers (`+0xb58`, `+0x954`) and a surviving one's hit point transforms
     /// (`FUN_141204450`); [`crate::combat::damage::lose`] is the same loss on a hit's victim.
-    pub(crate) fn lose_hp(&mut self, master: &Master, d: HitPoints) {
-        let Some(d) = self.combat.hp_powerup.absorb(d) else {
+    pub(crate) fn lose_hp(&mut self, combat: &mut Combat, master: &Master, d: HitPoints) {
+        let Some(d) = combat.hp_powerup.absorb(d) else {
             return;
         };
         let floor = master.invulnerability.floor(master.hit_points);
@@ -161,9 +163,9 @@ impl Unit {
     /// come off (slot 0xb0, [`Unit::lose_hp`]) at most its hit points with its powerups' room
     /// (slot 0xc0). Then an object at its most (slot 0xc0 at least slot 200) has the armor its
     /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed).
-    pub(crate) fn regenerate(&mut self, master: &Master, dt_seconds: Seconds) {
+    pub(crate) fn regenerate(&mut self, combat: &mut Combat, master: &Master, dt_seconds: Seconds) {
         use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-        let rate = regeneration_rate(master, self).get();
+        let rate = regeneration_rate(master, combat).get();
         if below_or_unordered(self.life.hp.get(), REGENERATION_LEAST_HP)
             || self.life.state != ObjectState::Alive
         {
@@ -172,7 +174,7 @@ impl Unit {
         if !below_or_unordered(REGENERATION_EPSILON, rate.abs()) {
             return;
         }
-        let held = dt_seconds + self.combat.regen_timer;
+        let held = dt_seconds + combat.regen_timer;
         let per = (REGENERATION_MINUTE / rate).abs();
         let points = if below_or_unordered(REGENERATION_EPSILON, per.abs()) {
             held.get() / per
@@ -181,12 +183,12 @@ impl Unit {
         };
         let fraction = points % REGENERATION_POINT;
         let whole = points - fraction;
-        self.combat.regen_timer = Seconds::new(fraction * per);
+        combat.regen_timer = Seconds::new(fraction * per);
         if at_most_or_unordered(whole, 0.0) {
             return;
         }
-        let most = HitPoints::of_master(master.hit_points).get() + self.combat.hp_powerup.max.get();
-        let now = (self.combat.hp_powerup.room() + self.life.hp).get();
+        let most = HitPoints::of_master(master.hit_points).get() + combat.hp_powerup.max.get();
+        let now = (combat.hp_powerup.room() + self.life.hp).get();
         if at_most_or_unordered(rate, 0.0) {
             let amount = if at_most_or_unordered(whole, now) {
                 whole
@@ -194,7 +196,7 @@ impl Unit {
                 now
             };
             if !at_most_or_unordered(amount, 0.0) {
-                self.lose_hp(master, HitPoints::new(amount));
+                self.lose_hp(combat, master, HitPoints::new(amount));
             }
         } else {
             let left = most - now;
@@ -204,21 +206,21 @@ impl Unit {
                 left
             };
             if !at_most_or_unordered(amount, 0.0) {
-                self.gain_hp(master, HitPoints::new(amount));
+                self.gain_hp(combat, master, HitPoints::new(amount));
             }
         }
         // at its most hit points (slot 0xc0 at least slot 200, `COMISS`: a NaN is not) the
         // armor its charge's hits took (`+0x9e4`, `+0x9e6`) comes back
-        if most <= (self.combat.hp_powerup.room() + self.life.hp).get() {
-            self.combat.armor_removed = ArmorPair::ZERO;
+        if most <= (combat.hp_powerup.room() + self.life.hp).get() {
+            combat.armor_removed = ArmorPair::ZERO;
         }
     }
 
     /// `TRIBE_Combat_Object::update`'s hit point powerup check (after its abilities): a powerup
     /// (`+0xa38`) above its room (`+0xa3c`; `COMISS`/`JBE`, a NaN is not) comes off the hit points
     /// (`MAXSS` with 1: not below 1, a NaN becomes 1) and the powerup takes the room.
-    pub(crate) fn clamp_hp_powerup(&mut self) {
-        let p = self.combat.hp_powerup;
+    pub(crate) fn clamp_hp_powerup(&mut self, combat: &mut Combat) {
+        let p = combat.hp_powerup;
         if crate::math::fmath::at_most_or_unordered(p.taken.get(), p.max.get()) {
             return;
         }
@@ -226,7 +228,7 @@ impl Unit {
             self.life.hp.get() - p.room().get().abs(),
             HP_POWERUP_FLOOR,
         ));
-        self.combat.hp_powerup.taken = p.max;
+        combat.hp_powerup.taken = p.max;
     }
 }
 

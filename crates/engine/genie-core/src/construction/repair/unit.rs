@@ -77,7 +77,7 @@ impl Unit {
             counted_in,
             radius: own.radius,
             scenario: c.w.settings.game_mode.scenario(),
-            rate: self.combat.work_rate_powerup + own.work_rate,
+            rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.work_rate,
             waits: own.class == class::VILLAGER && !c.w.players.player(c.player)?.computer,
             stance: c
                 .w
@@ -90,39 +90,16 @@ impl Unit {
         })
     }
 
-    /// `+0x9e8` (`num_builders`): a building's in its construction `site` (its building
-    /// layer's), any other's its own.
-    pub(crate) const fn repairers(
-        &self,
-        site: Option<&crate::construction::build::Construction>,
-    ) -> crate::construction::BuilderCount {
-        match site {
-            Some(k) => k.builders,
-            None => self.combat.builders,
-        }
-    }
-
-    /// [`Unit::repairers`] to change.
-    pub(crate) const fn repairers_mut<'a>(
-        &'a mut self,
-        site: Option<&'a mut crate::construction::build::Construction>,
-    ) -> &'a mut crate::construction::BuilderCount {
-        match site {
-            Some(k) => &mut k.builders,
-            None => &mut self.combat.builders,
-        }
-    }
-
     /// What the attack tests read of the unit as an attacker ([`crate::unit_ai::Attacker`]) with
     /// a unit AI of type `ai_type`, its master `master`, its owner and the owner's type, the game
-    /// mode (a scenario's) and its `+0x924`.
+    /// mode (a scenario's), its `+0x924` and its missiles per volley (`+0xa00`).
     pub(crate) fn attacker_of(
         &self,
         ai_type: UnitAiType,
         master: Option<&Master>,
         (player, computer): (PlayerId, bool),
         scenario: bool,
-        capture: CaptureKind,
+        (capture, firepower): (CaptureKind, crate::combat::Firepower),
     ) -> crate::unit_ai::Attacker {
         crate::unit_ai::Attacker {
             ai_type,
@@ -149,7 +126,7 @@ impl Unit {
             radius: master.map_or(Footprint::ZERO, |m| m.radius),
             speed: self.body.mover().map_or(Speed::ZERO, |m| m.stats.speed),
             scenario,
-            firepower: self.combat.firepower,
+            firepower,
             capture,
         }
     }
@@ -256,10 +233,7 @@ fn repairee_of(
     } else {
         target
     };
-    let counted_in = held(counting).map(|(_, k)| {
-        let site = c.w.parts.building_of(k.id).construction.as_ref();
-        (counting, k.repairers(site))
-    });
+    let counted_in = held(counting).map(|(_, k)| (counting, c.w.parts.repairers_of(k.id)));
     Ok((Some(repairee), counted_in))
 }
 
@@ -330,7 +304,7 @@ pub(crate) fn repair_target(
         )),
     }?;
     c.w.players.player_mut(player)?.add_attributes(paid.adds)?;
-    repair_write_back(c.w, &set, &original);
+    repair_write_back(c.w, &set, &original)?;
     Ok((answer, kind))
 }
 
@@ -399,7 +373,7 @@ fn repaired(
         master: om.id,
         master_hp: om.hit_points,
         hp: o.life.hp,
-        hp_powerup: o.combat.hp_powerup,
+        hp_powerup: c.w.parts.combat_of(o.id).hp_powerup,
         main: if om.kind == BUILDING {
             c.w.parts.building_of(o.id).annex_of
         } else {
@@ -412,19 +386,24 @@ fn repaired(
 }
 
 /// The repair's changes to the objects it reached (`set` against `original`): each takes its
-/// hit points at once, any player's.
+/// hit points and hit point powerups at once, any player's.
+///
+/// # Errors
+///
+/// None (an unreachable error where a table lost the part it took).
 fn repair_write_back(
     w: &mut World,
     set: &[crate::construction::repair::Repaired],
     original: &[crate::construction::repair::Repaired],
-) {
+) -> Result<(), GenieError> {
     for (now, was) in set.iter().zip(original) {
         if now == was {
             continue;
         }
         if let Some((_, u)) = w.object_mut(now.id) {
             u.life.hp = now.hp;
-            u.combat.hp_powerup = now.hp_powerup;
+            w.parts.combat_mut(now.id)?.hp_powerup = now.hp_powerup;
         }
     }
+    Ok(())
 }

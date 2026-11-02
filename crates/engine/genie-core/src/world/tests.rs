@@ -238,10 +238,9 @@ fn site_mut(t: &mut World, id: ObjectId) -> &mut Construction {
         .unwrap()
 }
 
-/// Object `u`'s repairers ([`Unit::repairers`]), its construction's from the world's table.
+/// Object `u`'s repairers ([`crate::world::parts::Parts::repairers_of`]).
 fn repairers_of(t: &World, u: &Unit) -> u8 {
-    u.repairers(t.parts.building_of(u.id).construction.as_ref())
-        .get()
+    t.parts.repairers_of(u.id).get()
 }
 
 #[test]
@@ -2272,15 +2271,9 @@ fn slot_0x820_s_search_takes_the_own_task_else_the_first_master_of_the_swap_grou
     let t = sent_off_world(vec![]);
     let masters = &t.masters[1];
     let find = |id: ObjectId| t.object(id);
-    let site = task_target_with(
-        object_id(10028),
-        1,
-        &find,
-        &t.parts.building,
-        t.master_tables(),
-    )
-    .unwrap()
-    .unwrap();
+    let site = task_target_with(object_id(10028), 1, &find, &t.parts, t.master_tables())
+        .unwrap()
+        .unwrap();
     let world = TaskWorld {
         players: &t.players,
         drop_sites: &[],
@@ -2331,29 +2324,17 @@ fn a_task_target_reads_an_annex_as_its_main_building() {
         .annex_of = Some(MainBuildingId::new(object_id(10028)));
     let find = |id: ObjectId| t.object(id);
     let at = |steps| {
-        task_target_with(
-            object_id(9175),
-            steps,
-            &find,
-            &t.parts.building,
-            t.master_tables(),
-        )
-        .unwrap()
-        .map(|x| (x.id.get(), x.master.id.get(), x.state))
+        task_target_with(object_id(9175), steps, &find, &t.parts, t.master_tables())
+            .unwrap()
+            .map(|x| (x.id.get(), x.master.id.get(), x.state))
     };
     assert_eq!(at(0), Some((9175, 83, ObjectState::Alive)));
     assert_eq!(at(1), Some((10028, 70, ObjectState::Foundation)));
     assert_eq!(at(2), Some((10028, 70, ObjectState::Foundation)));
     assert!(
-        task_target_with(
-            object_id(77),
-            1,
-            &find,
-            &t.parts.building,
-            t.master_tables(),
-        )
-        .unwrap()
-        .is_none()
+        task_target_with(object_id(77), 1, &find, &t.parts, t.master_tables(),)
+            .unwrap()
+            .is_none()
     );
 }
 
@@ -4211,7 +4192,7 @@ fn an_order_on_a_target_and_the_rest_after_it_run_inside_the_one_update() {
         let v = &t.players[1].objects[ListIndex::new(0)];
         let ai = t.parts.unit_ai.get(v.id).unwrap();
         (
-            v.combat.regen_timer,
+            t.parts.combat_of(v.id).regen_timer,
             v.actions.list.build().map(|b| b.target),
             (
                 ai.order_priority.get(),
@@ -4750,7 +4731,7 @@ fn the_load_s_mesh_takes_the_shapes_of_the_standing_tall_objects() {
             ..Player::default()
         }],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     let master = |id, obstruction_class| Master {
         id,
         kind: BUILDING,
@@ -5952,10 +5933,9 @@ fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
     let mut t = lets_world();
     for id in [520, 521] {
         let u = t.object_mut(object_id(id)).unwrap().1;
-        (u.workers, u.combat.builders) = (
-            crate::objects::WorkerCount::of_data(2),
-            crate::construction::BuilderCount::of_data(3),
-        );
+        u.workers = crate::objects::WorkerCount::of_data(2);
+        t.parts.combat_mut(object_id(id)).unwrap().builders =
+            crate::construction::BuilderCount::of_data(3);
     }
     let own = in_update(
         &mut t,
@@ -5963,15 +5943,8 @@ fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
         50,
         |unit, c| {
             let by = unit.releaser(c)?;
-            let site =
-                c.w.parts
-                    .building
-                    .get_mut(unit.id)
-                    .and_then(|b| b.construction.as_mut());
-            (unit.workers, *unit.repairers_mut(site)) = (
-                crate::objects::WorkerCount::ONE,
-                crate::construction::BuilderCount::of_data(1),
-            );
+            unit.workers = crate::objects::WorkerCount::ONE;
+            *c.w.parts.repairers_mut(unit.id)? = crate::construction::BuilderCount::of_data(1);
             for id in [520, 521, 9999] {
                 release(c, unit, object_id(id), by)?;
             }
@@ -5980,14 +5953,18 @@ fn an_update_s_release_and_builder_leave_change_the_objects_at_once() {
             leave_builders(c, unit, object_id(530))?;
             leave_builders(c, unit, unit.id)?;
             torn_down(c, unit, (vec![object_id(521)], vec![(object_id(520), by)]))?;
-            let site = c.w.parts.building_of(unit.id).construction.as_ref();
-            Ok((unit.workers.get(), unit.repairers(site).get()))
+            Ok((unit.workers.get(), c.w.parts.repairers_of(unit.id).get()))
         },
     );
     assert_eq!(own, Ok((0, 0)));
     let tree = |t: &World, id| {
-        t.object(object_id(id))
-            .map(|(_, u)| (u.workers.get(), u.combat.builders.get(), u.life.goto_sleep))
+        t.object(object_id(id)).map(|(_, u)| {
+            (
+                u.workers.get(),
+                t.parts.combat_of(u.id).builders.get(),
+                u.life.goto_sleep,
+            )
+        })
     };
     assert_eq!(tree(&t, 520), Some((0, 1, true)));
     assert_eq!(tree(&t, 521), Some((1, 2, false)));
@@ -6028,12 +6005,12 @@ fn outside_an_update_the_lets_run_on_the_whole_world() {
         .object(object_id(521))
         .map(|(_, u)| (u.workers.get(), u.life.goto_sleep));
     assert_eq!(tree, Some((0, true)));
-    t.object_mut(object_id(520)).unwrap().1.combat.builders =
+    t.parts.combat_mut(object_id(520)).unwrap().builders =
         crate::construction::BuilderCount::of_data(2);
     t.leave_builders(object_id(530)).unwrap();
     assert_eq!(
         t.object(object_id(520))
-            .map(|(_, u)| u.combat.builders.get()),
+            .map(|(_, u)| t.parts.combat_of(u.id).builders.get()),
         Some(1)
     );
 }
@@ -6107,7 +6084,7 @@ fn a_side_s_own_release_tells_the_unit_ai_as_the_side_returns() {
                 None,
                 (PlayerId::new(1), false),
                 false,
-                CaptureKind::NONE,
+                (CaptureKind::NONE, crate::combat::Firepower::ZERO),
             );
             let inside = unit.with_side(
                 c,
@@ -6158,7 +6135,7 @@ fn a_step_s_own_notify_waits_for_the_unit_ai_s_side_to_return() {
                 None,
                 (PlayerId::new(1), false),
                 false,
-                CaptureKind::NONE,
+                (CaptureKind::NONE, crate::combat::Firepower::ZERO),
             );
             let inside = unit.with_side(
                 c,
@@ -6198,7 +6175,7 @@ fn the_ai_stream_is_the_unit_ai_s_while_its_side_runs() {
                 None,
                 (PlayerId::new(1), false),
                 false,
-                CaptureKind::NONE,
+                (CaptureKind::NONE, crate::combat::Firepower::ZERO),
             );
             unit.with_side(
                 c,
@@ -6436,7 +6413,7 @@ fn villager_side<R>(
             None,
             (PlayerId::new(1), false),
             false,
-            CaptureKind::NONE,
+            (CaptureKind::NONE, crate::combat::Firepower::ZERO),
         );
         let answer = unit.with_side(
             c,
@@ -8342,23 +8319,30 @@ fn a_unit_inside_heals_up_to_its_hit_points() {
         },
         ..Unit::default()
     };
-    v.heal(master.class, master.hit_points, HitPoints::new(0.1))
-        .unwrap();
+    let mut combat = crate::objects::layers::Combat::default();
+    v.heal(
+        &mut combat,
+        master.class,
+        master.hit_points,
+        HitPoints::new(0.1),
+    )
+    .unwrap();
     assert_eq!(v.life.hp, HitPoints::new(11.1));
     // a heal past the hit points stops at them, the powerup's room taking the rest
     v.life.hp = HitPoints::new(24.95);
-    v.combat.hp_powerup = HpPowerup {
+    combat.hp_powerup = HpPowerup {
         taken: HitPoints::new(1.0),
         max: HitPoints::new(2.0),
     };
-    v.heal(master.class, master.hit_points, HitPoints::new(0.1))
-        .unwrap();
+    v.heal(
+        &mut combat,
+        master.class,
+        master.hit_points,
+        HitPoints::new(0.1),
+    )
+    .unwrap();
     assert_eq!(
-        (
-            v.life.hp,
-            v.combat.hp_powerup.taken,
-            v.combat.hp_powerup.max
-        ),
+        (v.life.hp, combat.hp_powerup.taken, combat.hp_powerup.max),
         (
             HitPoints::new(24.95f32 + 0.1),
             HitPoints::new(1.0),
@@ -8368,11 +8352,16 @@ fn a_unit_inside_heals_up_to_its_hit_points() {
     // past them with the room: the overflow comes off the powerup, then a full unit holds
     // exactly its master's hit points
     v.life.hp = HitPoints::new(26.95);
-    v.heal(master.class, master.hit_points, HitPoints::new(0.1))
-        .unwrap();
+    v.heal(
+        &mut combat,
+        master.class,
+        master.hit_points,
+        HitPoints::new(0.1),
+    )
+    .unwrap();
     assert_eq!(v.life.hp, HitPoints::new(25.0));
     assert_eq!(
-        v.combat.hp_powerup.taken,
+        combat.hp_powerup.taken,
         HitPoints::new(1.0 - (26.95f32 + 0.1 - 27.0))
     );
     // a paid class heals at a cost: not modelled
@@ -8381,8 +8370,13 @@ fn a_unit_inside_heals_up_to_its_hit_points() {
         ..master
     };
     assert!(
-        v.heal(ship.class, ship.hit_points, HitPoints::new(0.1))
-            .is_err()
+        v.heal(
+            &mut combat,
+            ship.class,
+            ship.hit_points,
+            HitPoints::new(0.1)
+        )
+        .is_err()
     );
 }
 
@@ -8501,7 +8495,7 @@ fn only_a_standing_unlocked_transforming_gate_lets_an_ally_pass() {
         vec![Millis::ZERO; 2],
         vec![player(Vec::new()), player(split.0)],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     let master = |id: i16, class: ClassId, transform_unit: i16| Master {
         id: master_id(id),
         kind: BUILDING,
@@ -8879,7 +8873,7 @@ fn gate_world() -> World {
             },
         ],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     t.world_time = WorldTime::from_millis(400);
     t.masters = vec![
         Masters::default(),
@@ -10962,14 +10956,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
             vec![Millis::ZERO, Millis::ZERO, Millis::ZERO],
             vec![
                 Player {
-                    objects: vec![Unit {
-                        combat: crate::objects::layers::Combat {
-                            capture_flag: CaptureKind::BY_SIGHT,
-                            ..hands_unit(21712, master_id(4)).combat
-                        },
-                        ..hands_unit(21712, master_id(4))
-                    }]
-                    .into(),
+                    objects: vec![hands_unit(21712, master_id(4))].into(),
                     attributes: vec![Amount::ZERO; 300],
                     ..Player::default()
                 },
@@ -10990,6 +10977,13 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
                 },
             ],
         )
+        .with_combats([(
+            object_id(21712),
+            crate::objects::layers::Combat {
+                capture_flag: CaptureKind::BY_SIGHT,
+                ..Default::default()
+            },
+        )])
         .with_ais([(object_id(21712), hands_ai(21712))])
         .with_ais(live_ais(&[500]));
         t.settings.game_mode = GameMode::of_data(mode);
@@ -11012,7 +11006,7 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     let ids: Vec<ObjectId> = t.players[1].objects.iter().map(|u| u.id).collect();
     assert_eq!(ids, [object_id(500), object_id(21712)]);
     let archer = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!(archer.combat.capture_flag, CaptureKind::NONE);
+    assert_eq!(t.parts.combat_of(archer.id).capture_flag, CaptureKind::NONE);
     assert_eq!(
         t.parts.own_master.get(archer.id).map(|m| m.fog_visibility),
         Some(FogVisibility::VISIBLE)
@@ -11032,7 +11026,9 @@ fn a_gaia_archer_a_player_sees_goes_to_that_player() {
     let mut t = world(masters, false, 0);
     t.tick(Millis::new(100));
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].combat.capture_flag,
+        t.parts
+            .combat_of(t.players[0].objects[ListIndex::new(0)].id)
+            .capture_flag,
         CaptureKind::BY_SIGHT
     );
     assert_eq!(
@@ -11149,7 +11145,7 @@ fn teardown_world() -> World {
             },
         ],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     // no sprites: a MoveTo the masters make shows none
     let master = |id, kind, class| Master {
         id,
@@ -11324,35 +11320,35 @@ fn a_built_building_s_storage_leaves_its_owner_and_its_store() {
     };
     let mut u = Unit {
         id: object_id(1),
-        combat: crate::objects::layers::Combat {
-            store: vec![
-                (attribute::POPULATION, Amount::new(6.0)),
-                (AttributeId::numbered(12), Amount::new(4.0)),
-            ],
-            ..Default::default()
-        },
         ..Unit::default()
+    };
+    let mut combat = crate::objects::layers::Combat {
+        store: vec![
+            (attribute::POPULATION, Amount::new(6.0)),
+            (AttributeId::numbered(12), Amount::new(4.0)),
+        ],
+        ..Default::default()
     };
     u.life.attribute_type = Some(attribute::HEADROOM);
     u.life.amount = Amount::new(3.0);
-    let adds = storage_leaves(&mut u, &master);
+    let adds = storage_leaves((&mut u, &mut combat), &master);
     assert_eq!(
         adds,
         crate::test_ids::adds([(attribute::HEADROOM, -5.0), (attribute::HEADROOM, -3.0)])
     );
     assert_eq!(u.life.held(), carrying(None, 0.0));
     assert_eq!(
-        u.combat.store,
+        combat.store,
         crate::test_ids::adds([
             (attribute::POPULATION, 4.0),
             (AttributeId::numbered(12), 1.0)
         ])
     );
     // holding no population: the master's entries alone
-    let adds = storage_leaves(&mut u, &master);
+    let adds = storage_leaves((&mut u, &mut combat), &master);
     assert_eq!(adds, crate::test_ids::adds([(attribute::HEADROOM, -5.0)]));
     assert_eq!(
-        u.combat.store,
+        combat.store,
         crate::test_ids::adds([
             (attribute::POPULATION, 2.0),
             (AttributeId::numbered(12), -2.0)
@@ -12543,7 +12539,7 @@ fn a_gaia_building_with_the_artifact_s_unit_ai_changes_hands_whole() {
             },
         ],
     )
-    .with_buildings(split.1)
+    .with_parts(split.1)
     .with_ais([(
         object_id(7),
         UnitAi {
@@ -13444,7 +13440,7 @@ fn a_razed_building_s_write_back_reaches_its_annexes_history_and_counts() {
             player(two.0.into()),
         ],
     )
-    .with_buildings(one.1.into_iter().chain(two.1));
+    .with_parts(one.1.into_iter().chain(two.1));
     let castle = Master {
         id: ids::CASTLE,
         kind: BUILDING,
@@ -14385,7 +14381,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
             },
         ],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     t.masters = vec![
         Masters::new([]),
         Masters::new([gate(master_id(88)), gate(master_id(95))]),
@@ -14529,7 +14525,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             },
         ],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     t.link_test_annex(object_id(34602), object_id(34600));
     t.link_test_annex(object_id(34601), object_id(34600));
     t.masters = vec![
@@ -14632,29 +14628,33 @@ fn a_unit_regenerated_to_its_most_has_its_armor_back() {
         regeneration: crate::objects::Regeneration::new(20.0),
         ..Master::default()
     };
-    let unit = |hp| Unit {
-        id: object_id(1),
-        life: Lifecycle {
-            state: ObjectState::Alive,
-            hp,
-            ..Lifecycle::default()
-        },
-        combat: crate::objects::layers::Combat {
-            armor_removed: ArmorPair::new(2, 1),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let unit = |hp| {
+        (
+            Unit {
+                id: object_id(1),
+                life: Lifecycle {
+                    state: ObjectState::Alive,
+                    hp,
+                    ..Lifecycle::default()
+                },
+                ..Unit::default()
+            },
+            crate::objects::layers::Combat {
+                armor_removed: ArmorPair::new(2, 1),
+                ..Default::default()
+            },
+        )
     };
-    let mut healed = unit(HitPoints::new(53.0));
-    healed.regenerate(&berserk, Seconds::new(3.0));
+    let (mut healed, mut healed_combat) = unit(HitPoints::new(53.0));
+    healed.regenerate(&mut healed_combat, &berserk, Seconds::new(3.0));
     assert_eq!(
-        (healed.life.hp, healed.combat.armor_removed),
+        (healed.life.hp, healed_combat.armor_removed),
         (HitPoints::new(54.0), ArmorPair::ZERO)
     );
-    let mut hurt = unit(HitPoints::new(40.0));
-    hurt.regenerate(&berserk, Seconds::new(3.0));
+    let (mut hurt, mut hurt_combat) = unit(HitPoints::new(40.0));
+    hurt.regenerate(&mut hurt_combat, &berserk, Seconds::new(3.0));
     assert_eq!(
-        (hurt.life.hp, hurt.combat.armor_removed),
+        (hurt.life.hp, hurt_combat.armor_removed),
         (HitPoints::new(41.0), ArmorPair::new(2, 1))
     );
 }
@@ -14687,10 +14687,13 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     // 20 a minute: a point per 3 s; 2 s of dt plus 1.5 held is one point, the rest held back
     // (in f32: 3.5 / 3 less its whole point, times 3)
     let mut u = unit(HitPoints::new(30.0));
-    u.combat.regen_timer = Seconds::new(1.5);
-    u.regenerate(&berserk, Seconds::new(2.0));
+    let mut u_combat = crate::objects::layers::Combat {
+        regen_timer: Seconds::new(1.5),
+        ..Default::default()
+    };
+    u.regenerate(&mut u_combat, &berserk, Seconds::new(2.0));
     assert_eq!(
-        (u.life.hp, u.combat.regen_timer),
+        (u.life.hp, u_combat.regen_timer),
         (
             HitPoints::new(31.0),
             Seconds::new(((3.5f32 / 3.0) % 1.0) * 3.0)
@@ -14698,9 +14701,10 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     );
     // at the most nothing is added, and the time still runs
     let mut full = unit(HitPoints::new(54.0));
-    full.regenerate(&berserk, Seconds::new(3.0));
+    let mut full_combat = crate::objects::layers::Combat::default();
+    full.regenerate(&mut full_combat, &berserk, Seconds::new(3.0));
     assert_eq!(
-        (full.life.hp, full.combat.regen_timer),
+        (full.life.hp, full_combat.regen_timer),
         (HitPoints::new(54.0), Seconds::ZERO)
     );
     // a hero's 30 and the powerups: stinger + (powerup + (30 + master))
@@ -14708,11 +14712,13 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         hero_flag: HeroFlags::FULL_HERO,
         ..berserk.clone()
     };
-    let mut powered = unit(HitPoints::new(10.0));
-    powered.combat.regen_powerup = crate::objects::Regeneration::new(5.0);
-    powered.combat.regen_stinger = crate::objects::Regeneration::new(5.0);
+    let powered_combat = crate::objects::layers::Combat {
+        regen_powerup: crate::objects::Regeneration::new(5.0),
+        regen_stinger: crate::objects::Regeneration::new(5.0),
+        ..Default::default()
+    };
     assert_eq!(
-        regeneration_rate(&hero, &powered),
+        regeneration_rate(&hero, &powered_combat),
         crate::objects::Regeneration::new(60.0)
     );
     let not_hero = Master {
@@ -14720,7 +14726,7 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..berserk.clone()
     };
     assert_eq!(
-        regeneration_rate(&not_hero, &powered),
+        regeneration_rate(&not_hero, &powered_combat),
         crate::objects::Regeneration::new(30.0)
     );
     // a gate of Aftermath's: -1000 a minute takes 1 hit point per 0.06 s, at most what it has
@@ -14731,16 +14737,19 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..Master::default()
     };
     let mut g = unit(HitPoints::new(1650.0));
-    g.regenerate(&gate, Seconds::new(0.104));
+    let mut g_combat = crate::objects::layers::Combat::default();
+    g.regenerate(&mut g_combat, &gate, Seconds::new(0.104));
     assert_eq!(g.life.hp, HitPoints::new(1649.0));
     let mut low = unit(HitPoints::new(1.0));
-    low.regenerate(&gate, Seconds::new(1.0));
+    let mut low_combat = crate::objects::layers::Combat::default();
+    low.regenerate(&mut low_combat, &gate, Seconds::new(1.0));
     assert_eq!(low.life.hp, HitPoints::ZERO);
     // below 1 hit point or out of state 2: nothing
     let mut dead = unit(HitPoints::new(0.5));
-    dead.regenerate(&gate, Seconds::new(1.0));
+    let mut dead_combat = crate::objects::layers::Combat::default();
+    dead.regenerate(&mut dead_combat, &gate, Seconds::new(1.0));
     assert_eq!(
-        (dead.life.hp, dead.combat.regen_timer),
+        (dead.life.hp, dead_combat.regen_timer),
         (HitPoints::new(0.5), Seconds::ZERO)
     );
 }
@@ -14749,43 +14758,47 @@ fn a_unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
 /// the hit points, at least 1 left (`MAXSS`), and takes the room; at most the room, nothing.
 #[test]
 fn a_hit_point_powerup_above_its_room_comes_off_the_hit_points() {
-    let with = |hp, up, room| Unit {
-        life: Lifecycle {
-            hp: HitPoints::new(hp),
-            ..Lifecycle::default()
-        },
-        combat: crate::objects::layers::Combat {
-            hp_powerup: HpPowerup {
-                taken: HitPoints::new(up),
-                max: HitPoints::new(room),
+    let with = |hp, up, room| {
+        (
+            Unit {
+                life: Lifecycle {
+                    hp: HitPoints::new(hp),
+                    ..Lifecycle::default()
+                },
+                ..Unit::default()
             },
-            ..Default::default()
-        },
-        ..Unit::default()
+            crate::objects::layers::Combat {
+                hp_powerup: HpPowerup {
+                    taken: HitPoints::new(up),
+                    max: HitPoints::new(room),
+                },
+                ..Default::default()
+            },
+        )
     };
-    let mut u = with(100.0, 10.0, 4.0);
-    u.clamp_hp_powerup();
+    let (mut u, mut u_combat) = with(100.0, 10.0, 4.0);
+    u.clamp_hp_powerup(&mut u_combat);
     let at_room = HpPowerup {
         taken: HitPoints::new(4.0),
         max: HitPoints::new(4.0),
     };
     assert_eq!(
-        (u.life.hp, u.combat.hp_powerup),
+        (u.life.hp, u_combat.hp_powerup),
         (HitPoints::new(94.0), at_room)
     );
-    let mut low = with(3.0, 10.0, 4.0);
-    low.clamp_hp_powerup();
+    let (mut low, mut low_combat) = with(3.0, 10.0, 4.0);
+    low.clamp_hp_powerup(&mut low_combat);
     assert_eq!(
-        (low.life.hp, low.combat.hp_powerup),
+        (low.life.hp, low_combat.hp_powerup),
         (HitPoints::new(1.0), at_room)
     );
-    let mut nan = with(f32::NAN, 10.0, 4.0);
-    nan.clamp_hp_powerup();
+    let (mut nan, mut nan_combat) = with(f32::NAN, 10.0, 4.0);
+    nan.clamp_hp_powerup(&mut nan_combat);
     assert_eq!(nan.life.hp, HitPoints::new(1.0));
-    let mut kept = with(100.0, 4.0, 4.0);
-    kept.clamp_hp_powerup();
+    let (mut kept, mut kept_combat) = with(100.0, 4.0, 4.0);
+    kept.clamp_hp_powerup(&mut kept_combat);
     assert_eq!(
-        (kept.life.hp, kept.combat.hp_powerup),
+        (kept.life.hp, kept_combat.hp_powerup),
         (HitPoints::new(100.0), at_room)
     );
 }
@@ -14794,9 +14807,12 @@ fn a_hit_point_powerup_above_its_room_comes_off_the_hit_points() {
 /// (`+0x87c`), which a terrain look sets ([`crate::combat::abilities`]).
 #[test]
 fn the_attack_timer_runs_down_at_the_object_s_rate() {
-    let unit = Unit {
-        id: object_id(1),
-        combat: crate::objects::layers::Combat {
+    let unit = Object::with_combat(
+        Unit {
+            id: object_id(1),
+            ..Unit::default()
+        },
+        crate::objects::layers::Combat {
             attack_timer: Seconds::new(1.0),
             abilities: crate::combat::abilities::Abilities {
                 attack_rate: 0.5,
@@ -14804,22 +14820,25 @@ fn the_attack_timer_runs_down_at_the_object_s_rate() {
             },
             ..Default::default()
         },
-        ..Unit::default()
-    };
+    );
+    let (units, parts) = World::split_layers([unit]);
     let mut t = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![Player {
-            objects: vec![unit].into(),
+            objects: units.into(),
             ..Player::default()
         }],
-    );
+    )
+    .with_parts(parts);
     stock_masters(&mut t);
     t.tick(Millis::new(100));
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)].combat.attack_timer,
+        t.parts
+            .combat_of(t.players[0].objects[ListIndex::new(0)].id)
+            .attack_timer,
         Seconds::new(1.0 - 0.1 * 0.5)
     );
 }
@@ -14909,7 +14928,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
             ..Player::default()
         }],
     )
-    .with_buildings(split.1);
+    .with_parts(split.1);
     t.masters = vec![Masters::new([barracks])];
     t.graphics = [
         (SpriteId::named(207), g(SpriteId::named(207))),
@@ -15017,7 +15036,7 @@ fn ai_move_of(
         (&mut releases, &mut leaves, by),
         (
             OwnerMasters::new(no_own_masters(), Some(&masters)),
-            &graphics,
+            (&graphics, None),
             &mut rng,
         ),
     )?;
@@ -15270,7 +15289,7 @@ fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
             AI_POINT,
             PlayerId::new(1),
             OwnerMasters::new(no_own_masters(), None),
-            &none
+            (&none, None)
         ),
         Ok(PointMove::Declined)
     );
@@ -15559,27 +15578,33 @@ fn scout_attack_on(
     let mut rng = Well512::default();
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.stats.speed = Speed::new(1.2);
-    let unit = Unit {
-        id: object_id(123),
-        body: crate::objects::layers::Body::new(Position::new(10.0, 10.0, 0.0), None, Some(walker)),
-        sprite: Some(crate::objects::sprite::ActiveSprite::start(
-            standing, &mut rng,
-        )),
-        combat: crate::objects::layers::Combat {
+    let unit = Object::with_combat(
+        Unit {
+            id: object_id(123),
+            body: crate::objects::layers::Body::new(
+                Position::new(10.0, 10.0, 0.0),
+                None,
+                Some(walker),
+            ),
+            sprite: Some(crate::objects::sprite::ActiveSprite::start(
+                standing, &mut rng,
+            )),
+            actions: crate::objects::layers::ActionLayer {
+                list: ActionList::default().with_attack(own.copied()),
+                ..Default::default()
+            },
+            life: Lifecycle {
+                master_id: ids::ID_448,
+                inside: inside.map(ContainerId::new),
+                ..Lifecycle::default()
+            },
+            ..Unit::default()
+        },
+        crate::objects::layers::Combat {
             attack_timer: Seconds::new(timer),
             ..Default::default()
         },
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_attack(own.copied()),
-            ..Default::default()
-        },
-        life: Lifecycle {
-            master_id: ids::ID_448,
-            inside: inside.map(ContainerId::new),
-            ..Lifecycle::default()
-        },
-        ..Unit::default()
-    };
+    );
     let ai = UnitAi {
         stance: UnitStance::STAND_GROUND,
         current_order: None,
@@ -15590,7 +15615,7 @@ fn scout_attack_on(
     let (attacked, t) = on_side(
         (
             gaia,
-            vec![unit.into()],
+            vec![unit],
             crate::players::tracker::Tracker::default(),
         ),
         (spatial, every, graphics),
@@ -15695,27 +15720,33 @@ fn attack_by(
     let mut rng = Well512::default();
     let mut walker = crate::gathering::hunt::tests::walker();
     walker.stats.speed = Speed::new(1.2);
-    let unit = Unit {
-        id: object_id(123),
-        body: crate::objects::layers::Body::new(Position::new(10.0, 10.0, 0.0), None, Some(walker)),
-        sprite: Some(crate::objects::sprite::ActiveSprite::start(
-            standing, &mut rng,
-        )),
-        combat: crate::objects::layers::Combat {
+    let unit = Object::with_combat(
+        Unit {
+            id: object_id(123),
+            body: crate::objects::layers::Body::new(
+                Position::new(10.0, 10.0, 0.0),
+                None,
+                Some(walker),
+            ),
+            sprite: Some(crate::objects::sprite::ActiveSprite::start(
+                standing, &mut rng,
+            )),
+            actions: crate::objects::layers::ActionLayer {
+                list: ActionList::default().with_attack(own),
+                ..Default::default()
+            },
+            life: Lifecycle {
+                master_id: attacker_master,
+                inside,
+                ..Lifecycle::default()
+            },
+            ..Unit::default()
+        },
+        crate::objects::layers::Combat {
             attack_timer: Seconds::new(timer),
             ..Default::default()
         },
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_attack(own),
-            ..Default::default()
-        },
-        life: Lifecycle {
-            master_id: attacker_master,
-            inside,
-            ..Lifecycle::default()
-        },
-        ..Unit::default()
-    };
+    );
     let ai = UnitAi {
         stance: UnitStance::STAND_GROUND,
         current_order: None,
@@ -15732,7 +15763,7 @@ fn attack_by(
         crate::players::tracker::key(every.get(1), &lines, attacker_master),
     );
     let ((attacked, adds), t) = on_side(
-        (gaia, vec![unit.into()], tracker),
+        (gaia, vec![unit], tracker),
         (spatial, every, graphics),
         crate::groups::UnitGroups::default(),
         |side| {
@@ -17216,6 +17247,9 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
         master_id(4),
         Point::new(10.0, 10.0),
     );
+    let archer_id = t.players[1].objects[ListIndex::new(0)].id;
+    t.parts.combat_mut(archer_id).unwrap().firepower =
+        crate::combat::Firepower::new(f32::from(max_volley));
     let archer = &mut t.players[1].objects[ListIndex::new(0)];
     if let Some(m) = archer.body.mover_mut() {
         m.sprite_facets = Some(crate::objects::facing::SpriteFacets {
@@ -17223,7 +17257,6 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
             turns: false,
         });
     }
-    archer.combat.firepower = crate::combat::Firepower::new(f32::from(max_volley));
     let mut attack = own_attack(50, -1, AttackState::Ready);
     attack.range = Distance::new(4.0);
     attack.arms.missile = Some(master_id(363));
@@ -17470,8 +17503,9 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
         t.tick(Millis::new(100));
     }
     let first = missiles(&t);
-    let fired = t.players[1].objects[ListIndex::new(0)]
-        .combat
+    let fired = t
+        .parts
+        .combat_of(t.players[1].objects[ListIndex::new(0)].id)
         .next_volley
         .get();
     assert!((1..3).contains(&fired), "{fired}");
@@ -17487,12 +17521,16 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
     t.tick(Millis::new(100));
     t.tick(Millis::new(100));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].combat.next_volley,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+            .next_volley,
         crate::combat::MissileCount::of_data(fired)
     );
     t.tick(Millis::new(100));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].combat.next_volley,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+            .next_volley,
         crate::combat::MissileCount::of_data(0)
     );
     let mut one = archer_world(100, 3, 0.0);
@@ -17502,7 +17540,9 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
     assert_eq!(
         (
             missiles(&one).len(),
-            one.players[1].objects[ListIndex::new(0)].combat.next_volley
+            one.parts
+                .combat_of(one.players[1].objects[ListIndex::new(0)].id)
+                .next_volley
         ),
         (1, crate::combat::MissileCount::of_data(1))
     );
@@ -17510,12 +17550,12 @@ fn a_volley_fires_its_missiles_over_swings_scattered_by_its_spread() {
     let counts: Vec<crate::combat::AttackCount> = one.players[1].objects.as_slice()[1..]
         .iter()
         .filter(|u| one.parts.missile.contains(u.id))
-        .map(|u| u.combat.attack_count)
+        .map(|u| one.parts.combat_of(u.id).attack_count)
         .collect();
     assert_eq!(
         counts,
-        [one.players[1].objects[ListIndex::new(0)]
-            .combat
+        [one.parts
+            .combat_of(one.players[1].objects[ListIndex::new(0)].id)
             .attack_count]
     );
     assert_ne!(counts, [crate::combat::AttackCount::ZERO]);
@@ -17544,8 +17584,9 @@ fn a_volley_s_own_missiles_hit_without_the_shooter() {
     for _ in 0..6 {
         t.tick(Millis::new(100));
     }
-    let fired = t.players[1].objects[ListIndex::new(0)]
-        .combat
+    let fired = t
+        .parts
+        .combat_of(t.players[1].objects[ListIndex::new(0)].id)
         .next_volley
         .get();
     let first = missiles(&t);
@@ -19577,10 +19618,11 @@ fn a_building_heals_its_garrison_each_whole_second() {
         "a building whose master attribute 255 names (FUN_1411c39b0)"
     );
     assert_eq!(
-        reason(centre_seconds(|t| t.players[1].objects
-            [ListIndex::new(0)]
-        .combat
-        .raider_countdown =
+        reason(centre_seconds(|t| t
+            .parts
+            .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+            .unwrap()
+            .raider_countdown =
             crate::garrison::RaiderCountdown::of_data(1))),
         "a unit inside whose raider_build_countdown runs (FUN_1411e7220)"
     );
@@ -19900,7 +19942,9 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     );
     let mut t = repairing(near);
     let house = &mut t.players[1].objects[ListIndex::new(1)];
-    (house.life.hp, house.combat.armor_removed) = (HitPoints::new(549.0), ArmorPair::new(3, 4));
+    house.life.hp = HitPoints::new(549.0);
+    let house_id = house.id;
+    t.parts.combat_mut(house_id).unwrap().armor_removed = ArmorPair::new(3, 4);
     let states = repair_for(&mut t, 100);
     assert_eq!(
         states,
@@ -19916,7 +19960,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
     assert_eq!(
         (
             house.life.hp,
-            house.combat.armor_removed,
+            t.parts.combat_of(house.id).armor_removed,
             repairers_of(&t, house),
             house.workers
         ),
@@ -19946,7 +19990,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         let mut house = t.remove_live(PlayerId::new(1), ListIndex::new(1)).unwrap();
         (
             house.unit.life.hp,
-            house.unit.combat.armor_removed,
+            house.parts.combat.armor_removed,
             house.unit.workers,
         ) = (hp, ArmorPair::new(3, 4), crate::objects::WorkerCount::ZERO);
         let _ = t.push_live(PlayerId::new(0), house).unwrap();
@@ -19968,7 +20012,7 @@ fn a_repair_pays_ends_at_full_hit_points_and_reaches_an_ally_s_house() {
         (
             states,
             h.life.hp.get(),
-            h.combat.armor_removed,
+            t.parts.combat_of(h.id).armor_removed,
             repairers_of(&t, h),
             h.workers.get(),
         )

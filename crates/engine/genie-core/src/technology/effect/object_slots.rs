@@ -253,22 +253,28 @@ impl World {
         match (attribute, change) {
             (a::HERO_STATUS, Change::Set | Change::Add) => Ok(()),
             (a::MAXIMUM_CHARGE, _) => {
-                let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                u.combat.charge = charge_after(u.combat.charge, master.max_charge, change, v);
+                let _ = self.object(id).ok_or(OBJECT_GONE)?;
+                let combat = self.parts.combat_mut(id)?;
+                combat.charge = charge_after(combat.charge, master.max_charge, change, v);
                 Ok(())
             }
-            (a::TOTAL_MISSILES, _) => {
-                let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
-                u.combat.firepower = match change {
-                    Change::Set => Firepower::new(v),
-                    Change::Add => Firepower::new(v) + u.combat.firepower,
-                    Change::Multiply => Firepower::new(v * u.combat.firepower.get()),
-                };
-                Ok(())
-            }
+            (a::TOTAL_MISSILES, _) => self.change_firepower(id, change, v),
             (a::POPULATION, Change::Set) => self.population_storage(p, master, v),
             _ => self.change_static(p, id, master, change, v, attribute),
         }
+    }
+
+    /// [`World::change_combat`]'s volleys (`+0xa00`) of object `id`: a set takes `v`, an add
+    /// adds it, a multiply scales them.
+    fn change_firepower(&mut self, id: ObjectId, change: Change, v: f32) -> Result<(), GenieError> {
+        let _ = self.object(id).ok_or(OBJECT_GONE)?;
+        let combat = self.parts.combat_mut(id)?;
+        combat.firepower = match change {
+            Change::Set => Firepower::new(v),
+            Change::Add => Firepower::new(v) + combat.firepower,
+            Change::Multiply => Firepower::new(v * combat.firepower.get()),
+        };
+        Ok(())
     }
 
     /// `FUN_1412163c0`'s population (110): for each of the master's three storage entries (`+0x60a`

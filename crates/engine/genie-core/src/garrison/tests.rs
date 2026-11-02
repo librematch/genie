@@ -1781,7 +1781,8 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     ));
     let tc = &mut t.players[1].objects[ListIndex::new(0)];
     tc.place_for_test(Position::new(10.0, 10.0, 0.0));
-    tc.combat.firepower = Firepower::new(1.0);
+    let id = tc.id;
+    t.parts.combat_mut(id).unwrap().firepower = Firepower::new(1.0);
     t.spatial.insert(
         object_id(100),
         crate::map::spatial::Placed {
@@ -2077,14 +2078,19 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         ..crate::orders::town_bell::BackToWork::NONE
     };
     // the building's last unit inside: the volleys go back to the master's volley fire
-    t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(2.0);
+    t.parts
+        .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
+        .firepower = Firepower::new(2.0);
     t.go_back_to_work(player_id(1), &object_ids([100])).unwrap();
     let v = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(v.life.inside, None);
     assert!(!t.parts.town_bell_of(v.id).flag);
     assert_eq!(t.players[1].objects[ListIndex::new(0)].garrison.len(), 0);
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].combat.firepower,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+            .firepower,
         Firepower::new(1.0)
     );
     assert!(t.spatial.get_known(object_id(2000)).unwrap().is_some());
@@ -2096,14 +2102,17 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut bell = t.parts.town_bell_of(object_id(2000));
     bell.work.point = Point::new(4.5, 4.5);
     t.parts.set_town_bell(object_id(2000), bell);
-    t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(f32::NAN);
+    t.parts
+        .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
+        .firepower = Firepower::new(f32::NAN);
     assert!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(2000))
             .unwrap()
     );
     assert!(
-        t.players[1].objects[ListIndex::new(0)]
-            .combat
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
             .firepower
             .get()
             .is_nan()
@@ -2112,7 +2121,10 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         t.players[1].objects[ListIndex::new(0)].garrison,
         [object_id(1000)]
     );
-    t.players[1].objects[ListIndex::new(0)].combat.firepower = Firepower::new(0.5);
+    t.parts
+        .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
+        .firepower = Firepower::new(0.5);
     let mut bell = t.parts.town_bell_of(object_id(1000));
     bell.work.point = Point::new(4.5, 15.5);
     t.parts.set_town_bell(object_id(1000), bell);
@@ -2121,7 +2133,9 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
             .unwrap()
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].combat.firepower,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+            .firepower,
         Firepower::new(1.0)
     );
     // a unit not a villager stays inside
@@ -3746,7 +3760,10 @@ fn a_unit_on_the_map_let_out_moves_beside_the_building() {
     let mut t = let_out_world();
     let tc_at = t.players[1].objects[ListIndex::new(0)].position();
     walker(&mut t, PlayerId::new(1), 1000, VILLAGER, tc_at.ground());
-    let firepower = t.players[1].objects[ListIndex::new(0)].combat.firepower;
+    let firepower = t
+        .parts
+        .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+        .firepower;
     assert_eq!(
         t.let_out(
             PlayerId::new(1),
@@ -3764,7 +3781,10 @@ fn a_unit_on_the_map_let_out_moves_beside_the_building() {
         v.position()
     );
     let tc = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!((tc.garrison.len(), tc.combat.firepower), (0, firepower));
+    assert_eq!(
+        (tc.garrison.len(), t.parts.combat_of(tc.id).firepower),
+        (0, firepower)
+    );
 }
 
 #[test]
@@ -3791,17 +3811,19 @@ fn a_buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     }
     assert_eq!(t.garrisoned(object_id(100)), Ok(InsideCount::new(3)));
     // a raider inside a building: its +0xc2c share is not kept
-    t.object_mut(object_id(1000))
+    t.parts
+        .combat_mut(object_id(1000))
         .unwrap()
-        .1
-        .combat
         .raider_countdown = RaiderCountdown::of_data(20);
     assert!(t.garrisoned(object_id(100)).is_err());
     // a transport has no +0xc2c term
     let mut u = unit(3000, VILLAGER, HitPoints::new(25.0));
     u.life.inside = Some(ContainerId::new(object_id(200)));
-    u.combat.raider_countdown = RaiderCountdown::of_data(20);
     let _ = t.push_live(PlayerId::new(1), u).unwrap();
+    t.parts
+        .combat_mut(object_id(3000))
+        .unwrap()
+        .raider_countdown = RaiderCountdown::of_data(20);
     assert_eq!(t.garrisoned(object_id(200)), Ok(InsideCount::ONE));
 }
 

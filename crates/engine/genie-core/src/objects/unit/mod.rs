@@ -52,11 +52,6 @@ pub struct Unit {
     ///
     /// [`ActionLayer`]: crate::objects::layers::ActionLayer
     pub actions: crate::objects::layers::ActionLayer,
-    /// Its combat layer (`RGE_Combat_Object`, `TRIBE_Combat_Object`, [`Combat`]): the game's
-    /// defaults on an object below type 50.
-    ///
-    /// [`Combat`]: crate::objects::layers::Combat
-    pub combat: crate::objects::layers::Combat,
     /// `+0x68a`, `unit_attackable_flag`.
     pub attackable: bool,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes the

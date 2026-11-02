@@ -139,10 +139,17 @@ impl World {
         };
         let build_task = crate::construction::build::BuildTask::of(
             task,
-            builder.work_rate + unit.combat.work_rate_powerup,
+            builder.work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
-        let move_reads = crate::movement::move_to::MoveToReads::of(unit, builder, &self.graphics);
+        let move_reads = crate::movement::move_to::MoveToReads::of(
+            unit,
+            builder,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
+        );
         let build = crate::construction::build::BuildAction::start(to, build_task, &move_reads)?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
@@ -191,7 +198,14 @@ impl World {
         let class = tm.class;
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        let move_reads = crate::movement::move_to::MoveToReads::of(unit, master, &self.graphics);
+        let move_reads = crate::movement::move_to::MoveToReads::of(
+            unit,
+            master,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
+        );
         let to = move_reads
             .walk_to(self, Some(target))?
             .ok_or(REPAIR_TARGET_GONE)?;
@@ -362,7 +376,10 @@ impl World {
             let move_reads = crate::movement::move_to::MoveToReads::of(
                 unit,
                 unit.master(self.master_tables(), player)?,
-                &self.graphics,
+                (
+                    &self.graphics,
+                    self.parts.combat_of(unit.id).abilities.look.as_ref(),
+                ),
             );
             let to = move_reads
                 .walk_to(self, Some(target))?
@@ -455,7 +472,14 @@ impl World {
             state: t_state,
         };
         // set_state(4)'s MoveTo to the foundation (FUN_140aa0df0), made before the borrows below
-        let move_reads = crate::movement::move_to::MoveToReads::of(unit, builder, &self.graphics);
+        let move_reads = crate::movement::move_to::MoveToReads::of(
+            unit,
+            builder,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
+        );
         let walk = old.task.walk(&move_reads, Some(to))?;
         if old.target != Some(target) {
             // the task finder took the new target below state 3, which slot 0x68 keeps

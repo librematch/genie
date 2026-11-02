@@ -108,7 +108,7 @@ impl UnitView<'_, '_> {
                 target,
                 1,
                 &find,
-                &self.c.w.parts.building,
+                &self.c.w.parts,
                 crate::objects::masters::MasterTables::new(
                     &self.c.w.masters,
                     &self.c.w.parts.own_master,
@@ -118,7 +118,7 @@ impl UnitView<'_, '_> {
                 target,
                 2,
                 &find,
-                &self.c.w.parts.building,
+                &self.c.w.parts,
                 crate::objects::masters::MasterTables::new(
                     &self.c.w.masters,
                     &self.c.w.parts.own_master,

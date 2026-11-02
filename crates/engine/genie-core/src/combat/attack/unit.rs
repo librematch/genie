@@ -9,6 +9,7 @@ use crate::combat::victims::{KillLeft, file_kill, victim, victim_of};
 use crate::combat::volley::armed;
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
@@ -49,7 +50,7 @@ impl Unit {
     /// disarm posts to the unit AI; codes 1 and 3 delete it.
     fn attack_lost_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        let armed = armed(master, self.combat.firepower);
+        let armed = armed(master, c.w.parts.combat_of(self.id).firepower);
         let master_class = master.class;
         let walking = self
             .actions
@@ -89,7 +90,7 @@ impl Unit {
                 .get(c.player.index())
                 .is_some_and(|q| q.computer);
         let r = AttackReads::of(
-            self,
+            c.w.parts.combat_of(self.id),
             master,
             (
                 crate::objects::masters::OwnerMasters::new(
@@ -129,7 +130,7 @@ impl Unit {
                 .get(c.player.index())
                 .is_some_and(|q| q.computer);
         let r = AttackReads::of(
-            self,
+            c.w.parts.combat_of(self.id),
             master,
             (
                 crate::objects::masters::OwnerMasters::new(
@@ -153,34 +154,33 @@ impl Unit {
         }
         let code = code?;
         // the retaliation's kill of the unit itself, which follows its step
-        if let Some(k) = self.hit_back(f.own, c.w.parts.unit_ai.get_mut(self.id))? {
+        if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
             file_kill(c, self, KillLeft::own(self.id, k))?;
         }
         Ok(HeadCode::of(code))
     }
 }
 
-impl Unit {
-    /// `RGE_Combat_Object::update`'s timers (`0x14107dfb0`, before the actions): the attack timer
-    /// runs down, and a reload world time that passed ends the volley under way.
-    pub(crate) fn run_down_attack_timers(&mut self, c: &Step<'_>) {
-        // RGE_Combat_Object::update (0x14107dfb0): the attack timer runs down by dt times
-        // `+0x87c` (a terrain look's rate, [`crate::combat::abilities`])
-        if Seconds::ZERO < self.combat.attack_timer {
-            self.combat.attack_timer -= c.dt.seconds() * self.combat.abilities.attack_rate;
-            if self.combat.attack_timer < Seconds::ZERO {
-                self.combat.attack_timer = Seconds::ZERO;
-            }
-        }
-        // then a reload world time past ends the volley under way (`+0xa04`) and is none
-        if self.combat.reload_worldtime != WorldTime::ZERO
-            && self.combat.reload_worldtime < c.w.world_time
-        {
-            self.combat.next_volley = crate::combat::MissileCount::ZERO;
-            self.combat.reload_worldtime = WorldTime::ZERO;
+/// `RGE_Combat_Object::update`'s timers (`0x14107dfb0`, before the actions) on an object's
+/// combat layer `combat`, `dt` the world's step and `now` its time: the attack timer runs down,
+/// and a reload world time that passed ends the volley under way.
+pub(crate) fn run_down_attack_timers(combat: &mut Combat, dt: Seconds, now: WorldTime) {
+    // RGE_Combat_Object::update (0x14107dfb0): the attack timer runs down by dt times
+    // `+0x87c` (a terrain look's rate, [`crate::combat::abilities`])
+    if Seconds::ZERO < combat.attack_timer {
+        combat.attack_timer -= dt * combat.abilities.attack_rate;
+        if combat.attack_timer < Seconds::ZERO {
+            combat.attack_timer = Seconds::ZERO;
         }
     }
+    // then a reload world time past ends the volley under way (`+0xa04`) and is none
+    if combat.reload_worldtime != WorldTime::ZERO && combat.reload_worldtime < now {
+        combat.next_volley = crate::combat::MissileCount::ZERO;
+        combat.reload_worldtime = WorldTime::ZERO;
+    }
+}
 
+impl Unit {
     /// The hunter or the attacker as a combat object, which its hits read and change: none for a
     /// unit without a Hunt or an Attack, or without its master.
     pub(crate) fn own_victim(&self, c: &Step<'_>) -> Result<Option<Victim>, GenieError> {
@@ -194,6 +194,7 @@ impl Unit {
                 self,
                 c.w.parts.unit_ai.contains(self.id),
                 c.w.parts.building_of(self.id),
+                c.w.parts.combat_of(self.id),
             ),
             master,
             &c.w.players.player(c.player)?.attributes,

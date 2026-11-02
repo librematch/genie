@@ -368,7 +368,10 @@ impl World {
         let reads = MoveToReads::of(
             unit,
             unit.master(self.master_tables(), player)?,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         );
         let meeting = Meeting {
             spatial: &mut self.spatial,

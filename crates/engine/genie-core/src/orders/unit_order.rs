@@ -57,7 +57,10 @@ impl World {
         let reads = unit.move_to_reads(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let to = reads
             .walk_to(self, Some(target))?

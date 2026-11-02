@@ -48,7 +48,10 @@ impl Unit {
         self.gate_update(c)?;
         self.complete_on_update(c)?;
         self.building_seconds(c)?;
-        self.run_down_attack_timers(c);
+        // a new object's combat layer (none in the table) has no timer to run down
+        if let Some(combat) = c.w.parts.combat.get_mut(self.id) {
+            crate::combat::attack::run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
+        }
         self.motion_step(c)?;
         let leaves = self.life_step(c)?;
         self.animate(c);

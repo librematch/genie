@@ -7,6 +7,7 @@ use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Building;
+use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -180,7 +181,8 @@ pub(crate) struct BuiltDeath {
     pub(crate) building: BuildingDeath,
 }
 
-/// [`BuiltDeath`] of the building `u` of `master`: the monastery (104), the wonder (276) and the
+/// [`BuiltDeath`] of the building `u` of `master` with its combat layer `combat` (its store)
+/// and its main building `annex_of` (an annex's): the monastery (104), the wonder (276) and the
 /// castle (82) count one less in attributes 52, 42 and 134 (slot 0xf8 with −1, then slot 0xf0
 /// with 0 below 0); its master's technology (`+0x98c`) goes when no other building of the master
 /// stands ([`World::withdraw_tech`]). A foundation terrain stays. Not modelled: a computer
@@ -194,8 +196,8 @@ pub(crate) struct BuiltDeath {
 ///
 /// [`World::withdraw_tech`]: crate::world::World::withdraw_tech
 pub(crate) fn built_death(
-    u: &mut Unit,
-    layer: &Building,
+    (u, combat): (&mut Unit, &mut Combat),
+    annex_of: Option<crate::construction::MainBuildingId>,
     master: &Master,
     computer: bool,
 ) -> Result<BuiltDeath, GenieError> {
@@ -207,13 +209,13 @@ pub(crate) fn built_death(
             "a dying building of a computer player, with a pasture or units inside",
         ));
     }
-    let adds = storage_leaves(u, master);
+    let adds = storage_leaves((u, combat), master);
     if building.foundation_terrain == Some(RESTORED_FOUNDATION) {
         return Err(GenieError::unsupported(
             "a dying building of foundation terrain 28 (its terrain 1, FUN_1411ce250)",
         ));
     }
-    let unlink = (layer.annex_of.is_none() && u.life.inside.is_none()).then_some(u.position());
+    let unlink = (annex_of.is_none() && u.life.inside.is_none()).then_some(u.position());
     let count = match master.id {
         MONASTERY => Some(MONASTERIES),
         WONDER => Some(WONDERS),
@@ -234,7 +236,10 @@ pub(crate) fn built_death(
 /// negated), then the population it holds itself (`+0x308` 4: the amount leaves, and it holds
 /// nothing after, `FUN_14119d310` with −1 and 0); then each entry of mode 16 leaves its own store
 /// ([`Combat::store`](crate::objects::layers::Combat::store)) when the store holds its attribute.
-pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId, Amount)> {
+pub(crate) fn storage_leaves(
+    (u, combat): (&mut Unit, &mut Combat),
+    master: &Master,
+) -> Vec<(AttributeId, Amount)> {
     let mut adds = Vec::new();
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
@@ -254,7 +259,7 @@ pub(crate) fn storage_leaves(u: &mut Unit, master: &Master) -> Vec<(AttributeId,
         if let Some(kind) = kind
             && Amount::ZERO < amount
             && flag & 0x10 != 0
-            && let Some(e) = u.combat.store.iter_mut().find(|e| e.0 == kind)
+            && let Some(e) = combat.store.iter_mut().find(|e| e.0 == kind)
         {
             e.1 -= amount;
         }

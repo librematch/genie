@@ -445,7 +445,7 @@ impl World {
             tm.class,
             tm.kind,
         );
-        Ok(works && Charge::new(1.0) <= u.combat.charge)
+        Ok(works && Charge::new(1.0) <= self.parts.combat_of(u.id).charge)
     }
 }
 

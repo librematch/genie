@@ -61,6 +61,15 @@ fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), Gen
     )
 }
 
+/// The repairer shows its master's standing sprite ([`Unit::show_standing`]).
+fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> Result<(), GenieError> {
+    repairer.show_standing(
+        crate::objects::masters::OwnerMasters::new(&c.w.parts.own_master, c.w.masters.of(c.player)),
+        &c.w.graphics,
+        c.w.streams.get(Stream::Sprite),
+    )
+}
+
 /// Slot 0x68 of the repairer: sprite `id` shows (the master's standing one for none, `standing`),
 /// its node in the unit's movement state.
 fn show(
@@ -403,9 +412,9 @@ impl RepairAction {
         match answer {
             RepairOutcome::Full => {
                 if COMBAT <= kind
-                    && let Some((_, u)) = c.w.object_mut(self.target)
+                    && let Some(id) = c.w.object(self.target).map(|(_, u)| u.id)
                 {
-                    u.combat.armor_removed = ArmorPair::ZERO;
+                    c.w.parts.combat_mut(id)?.armor_removed = ArmorPair::ZERO;
                 }
                 self.set_state(c, repairer, RepairState::Done, reads)
             }
@@ -418,14 +427,19 @@ impl RepairAction {
     }
 
     /// The repairers of the object `FUN_140ad9050` counts them in (`+0x9e8`) change by `by` at
-    /// once; nothing without one.
-    fn count(c: &mut Step<'_>, reads: &RepairReads, by: i8) {
+    /// once; nothing without one, or once the world no longer holds it.
+    ///
+    /// # Errors
+    ///
+    /// None (an unreachable error where a table lost the part it took).
+    fn count(c: &mut Step<'_>, reads: &RepairReads, by: i8) -> Result<(), GenieError> {
         if let Some((id, _)) = reads.counted_in
-            && let Some((u, site)) = c.w.object_and_site_mut(id)
+            && c.w.object(id).is_some()
         {
-            let n = u.repairers_mut(site);
+            let n = c.w.parts.repairers_mut(id)?;
             *n = n.changed_by(by);
         }
+        Ok(())
     }
 
     /// Slot 0x68 with none (`FUN_140ada470`): a counted action leaves its target's repairers
@@ -438,7 +452,7 @@ impl RepairAction {
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
         if self.counted {
-            Self::count(c, reads, -1);
+            Self::count(c, reads, -1)?;
             self.counted = false;
         }
         let target = self.target.take();
@@ -466,7 +480,7 @@ impl RepairAction {
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
         if self.counted {
-            Self::count(c, reads, -1);
+            Self::count(c, reads, -1)?;
             self.counted = false;
         }
         if self.move_to.take().is_some()
@@ -485,24 +499,8 @@ impl RepairAction {
         repairer: &mut Unit,
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
-        let standing = |c: &mut Step<'_>, repairer: &mut Unit| {
-            repairer.show_standing(
-                crate::objects::masters::OwnerMasters::new(
-                    &c.w.parts.own_master,
-                    c.w.masters.of(c.player),
-                ),
-                &c.w.graphics,
-                c.w.streams.get(Stream::Sprite),
-            )
-        };
         match self.state {
-            RepairState::Done => {
-                self.drop_target(c, repairer, reads)?;
-                if !self.quiet {
-                    notify(c, repairer, NotifyKind::ACTION_COMPLETED)?;
-                }
-                standing(c, repairer)?;
-            }
+            RepairState::Done => self.enter_done(c, repairer, reads)?,
             RepairState::Halted => standing(c, repairer)?,
             RepairState::Idle => {
                 notify(c, repairer, NotifyKind::REQUIRES_SEARCH)?;
@@ -518,7 +516,7 @@ impl RepairAction {
             RepairState::Work => {
                 show(c, repairer, self.task.proceeding, reads.standing)?;
                 if reads.counted_in.is_some() {
-                    Self::count(c, reads, 1);
+                    Self::count(c, reads, 1)?;
                     self.counted = true;
                 }
             }
@@ -529,14 +527,39 @@ impl RepairAction {
                     return Err(SHIP_REPAIR);
                 }
             }
-            RepairState::WalkPoint => {
-                let move_reads =
-                    repairer.move_to_reads(c.w.master_tables(), c.player, &c.w.graphics)?;
-                self.move_to = self.to_point(self.point, &move_reads)?;
-            }
+            RepairState::WalkPoint => self.enter_walk_point(c, repairer)?,
             // 13 has no case in set_state
             RepairState::Failed => {}
         }
+        Ok(())
+    }
+
+    /// `set_state(1)`'s case: the target goes, a loud repair tells its unit AI it completed,
+    /// and the repairer shows its standing sprite.
+    fn enter_done(
+        &mut self,
+        c: &mut Step<'_>,
+        repairer: &mut Unit,
+        reads: &RepairReads,
+    ) -> Result<(), GenieError> {
+        self.drop_target(c, repairer, reads)?;
+        if !self.quiet {
+            notify(c, repairer, NotifyKind::ACTION_COMPLETED)?;
+        }
+        standing(c, repairer)
+    }
+
+    /// `set_state(11)`'s case: the `MoveTo` to the action's point starts.
+    fn enter_walk_point(&mut self, c: &Step<'_>, repairer: &Unit) -> Result<(), GenieError> {
+        let move_reads = repairer.move_to_reads(
+            c.w.master_tables(),
+            c.player,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
+            ),
+        )?;
+        self.move_to = self.to_point(self.point, &move_reads)?;
         Ok(())
     }
 
@@ -556,7 +579,14 @@ impl RepairAction {
         if let Some(t) = reads.target {
             self.point = t.position;
         }
-        let move_reads = repairer.move_to_reads(c.w.master_tables(), c.player, &c.w.graphics)?;
+        let move_reads = repairer.move_to_reads(
+            c.w.master_tables(),
+            c.player,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
+            ),
+        )?;
         let to = move_reads.walk_to(c.w, self.target)?;
         self.move_to = self.walk(&move_reads, to)?;
         Ok(())

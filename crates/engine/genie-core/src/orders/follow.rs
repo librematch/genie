@@ -503,6 +503,7 @@ impl World {
         point: Position,
     ) -> Result<bool, GenieError> {
         let by = self.releaser(player, idx)?;
+        let id = self.players.live(player, idx)?.id;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
             point,
             player,
@@ -510,7 +511,10 @@ impl World {
                 &self.parts.own_master,
                 self.masters.of(player),
             ),
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(id).abilities.look.as_ref(),
+            ),
         )? {
             crate::movement::ai_moves::PointMove::Declined => return Ok(false),
             crate::movement::ai_moves::PointMove::Taken(released) => (released, None),

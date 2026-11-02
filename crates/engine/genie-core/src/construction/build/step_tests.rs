@@ -323,8 +323,11 @@ const SEARCH: (NotifyKind, [i32; 3]) = (
 /// The house's builders, workers and state.
 fn house(t: &World) -> (u8, i32, ObjectState) {
     let u = t.players[1].objects.by_id(HOUSE).unwrap();
-    let site = t.parts.building_of(HOUSE).construction.as_ref();
-    (u.repairers(site).get(), u.workers.get(), u.life.state)
+    (
+        t.parts.repairers_of(HOUSE).get(),
+        u.workers.get(),
+        u.life.state,
+    )
 }
 
 /// A copy of player 1's object `id` with its parts, to put in under another id.

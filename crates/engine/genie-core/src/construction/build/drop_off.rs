@@ -110,14 +110,14 @@ impl BuildAction {
                 id.id(),
                 1,
                 &find,
-                &c.w.parts.building,
+                &c.w.parts,
                 every,
             )?,
             crate::unit_ai::task_finder::world::task_target_with(
                 id.id(),
                 2,
                 &find,
-                &c.w.parts.building,
+                &c.w.parts,
                 every,
             )?,
         ) {
@@ -204,7 +204,10 @@ impl BuildAction {
         let move_reads = builder.move_to_reads(
             crate::objects::masters::MasterTables::new(&c.w.masters, &c.w.parts.own_master),
             c.player,
-            &c.w.graphics,
+            (
+                &c.w.graphics,
+                c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+            ),
         )?;
         let to = move_reads
             .walk_to(c.w, Some(id.id()))?

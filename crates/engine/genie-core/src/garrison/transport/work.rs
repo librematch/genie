@@ -160,7 +160,16 @@ impl crate::world::World {
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
-            Ship::of_unit(unit, master, self.spatial.map, &self.graphics, task)?
+            Ship::of_unit(
+                unit,
+                master,
+                self.spatial.map,
+                (
+                    &self.graphics,
+                    self.parts.combat_of(unit.id).abilities.look.as_ref(),
+                ),
+                task,
+            )?
         };
         let restriction = self
             .players

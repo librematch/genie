@@ -136,7 +136,10 @@ impl Unit {
                 .unit_ai
                 .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
-            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(
+                master,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
         })
     }
 
@@ -205,7 +208,10 @@ impl Unit {
         let reads = crate::garrison::transport::TransportReads {
             radius: master.radius,
             restriction: master.terrain_restriction,
-            defaults: MoveDefaults::of(master, self.combat.abilities.look.as_ref()),
+            defaults: MoveDefaults::of(
+                master,
+                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+            ),
             given,
             standing: master
                 .standing_sprite
@@ -227,9 +233,12 @@ impl Unit {
         &mut self,
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
-        (masters, graphics, sprite_rng): (
+        (masters, (graphics, look), sprite_rng): (
             crate::objects::masters::OwnerMasters<'_>,
-            &crate::objects::Graphics,
+            (
+                &crate::objects::Graphics,
+                Option<&crate::combat::abilities::Look>,
+            ),
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
@@ -240,8 +249,13 @@ impl Unit {
             .transport()
             .ok_or(GenieError::unreachable("a sail without its Transport"))?
             .task;
-        let ship =
-            crate::garrison::transport::Ship::of_unit(self, master, spatial.map, graphics, task)?;
+        let ship = crate::garrison::transport::Ship::of_unit(
+            self,
+            master,
+            spatial.map,
+            (graphics, look),
+            task,
+        )?;
         let restriction = master.terrain_restriction;
         let mut shore = crate::garrison::transport::MapShore::new(
             spatial,
@@ -472,7 +486,7 @@ impl Unit {
         let (at, state, reload) = (
             building.position(),
             building.life.state,
-            building.combat.reload_powerup,
+            c.w.parts.combat_of(building.id).reload_powerup,
         );
         self.body.base_mut().go_inside(id, at, &mut c.w.spatial);
         c.w.pathing.removed(id);
@@ -518,13 +532,19 @@ impl Unit {
         let firepower = if me.kind == COMBAT {
             let own = c.w.masters.of(bp).unwrap_or(masters);
             let rate = crate::garrison::attack_rate(bm, own, reload);
-            crate::garrison::share(me, masters, self.combat.reload_powerup, rate)?
+            crate::garrison::share(
+                me,
+                masters,
+                c.w.parts.combat_of(self.id).reload_powerup,
+                rate,
+            )?
         } else {
             crate::combat::Firepower::ZERO
         };
         if let Some((_, b)) = c.w.object_mut(target) {
-            b.combat.firepower += firepower;
             b.garrison.push(self.id);
+            let id = b.id;
+            c.w.parts.combat_mut(id)?.firepower += firepower;
         }
         Ok(())
     }

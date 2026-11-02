@@ -670,13 +670,7 @@ fn a_builder_told_to_build_its_foundation_again_starts_over() {
 /// table (and Gaia's): the work and the completion on the world.
 fn site_world(spatial: Spatial, masters: Vec<Master>, objects: Vec<Object>) -> World {
     let ms = crate::objects::masters::Masters::new(masters);
-    let (units, layers): (Vec<Unit>, Vec<_>) = objects
-        .into_iter()
-        .map(|o| {
-            let id = o.unit.id;
-            (o.unit, (id, o.parts.building))
-        })
-        .unzip();
+    let (units, parts) = World::split_layers(objects);
     let mut t = World::new(
         WorldTime::ZERO,
         crate::world::FrameSeed::of_data(1),
@@ -691,7 +685,7 @@ fn site_world(spatial: Spatial, masters: Vec<Master>, objects: Vec<Object>) -> W
             },
         ],
     )
-    .with_buildings(layers);
+    .with_parts(parts);
     t.spatial = spatial;
     t.masters = vec![ms.clone(), ms];
     t
@@ -1089,13 +1083,12 @@ fn the_work_starts_the_desolid_annexes_first() {
         t.work_building(object_id(10028), Seconds::new(0.021)),
         Ok(true)
     );
-    let u = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
     let site = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
     let post = site(object_id(10029));
     assert!(!post.desolid);
     assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
     assert_eq!(
-        u(object_id(10029)).combat.firepower,
+        t.parts.combat_of(object_id(10029)).firepower,
         crate::combat::Firepower::new(2.0)
     );
     assert!(
@@ -1106,7 +1099,10 @@ fn the_work_starts_the_desolid_annexes_first() {
             .is_some()
     );
     assert_eq!(
-        (site(object_id(10030)), u(object_id(10030)).combat.firepower),
+        (
+            site(object_id(10030)),
+            t.parts.combat_of(object_id(10030)).firepower
+        ),
         (foundation(false), crate::combat::Firepower::new(0.0))
     );
     assert!(!site(object_id(10028)).desolid);

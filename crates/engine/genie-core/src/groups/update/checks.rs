@@ -493,7 +493,7 @@ impl World {
         }
         // the slots of a combat object read its terrain look ([`crate::objects::sprite::standing`]); a
         // trade cart's goods are passed above
-        let look = u.combat.abilities.look.as_ref();
+        let look = self.parts.combat_of(u.id).abilities.look.as_ref();
         let sprite = match shown {
             Shown::Standing => crate::objects::sprite::standing(master, look, false),
             Shown::Walking => crate::objects::sprite::walking(master, look, false),

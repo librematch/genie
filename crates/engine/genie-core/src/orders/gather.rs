@@ -92,7 +92,7 @@ impl World {
         // capacity and the task's productivity attribute (none: 1.0)
         let productivity = unit.actions.list.gather().and_then(|g| g.task.productivity);
         let rate = crate::gathering::gather::StopRate {
-            work_rate: unit.combat.work_rate_powerup + me.work_rate,
+            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
             productivity: crate::gathering::gather::productivity_of(
                 productivity,
@@ -103,7 +103,10 @@ impl World {
         let walks = unit.move_walks(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let unit = self.players.live_mut(player, idx)?;
         let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
@@ -187,7 +190,10 @@ impl World {
         let walks = unit.move_walks(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let unit = self.players.live_mut(player, idx)?;
         let (Some(gather), Some(mover)) = (unit.actions.list.gather_mut(), unit.body.mover_mut())
@@ -256,7 +262,10 @@ impl World {
         let walks = unit.move_walks(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let my_pasture = unit.my_pasture;
         let (Some(hunt), Some(mover)) = (unit.actions.list.hunt_mut(), unit.body.mover_mut())
@@ -367,7 +376,7 @@ impl World {
         // the constructor's time per stop: the gatherer's work rate (its master's plus its
         // powerup, slot 0x6e8), capacity and productivity attribute (none: 1.0)
         let rate = crate::gathering::gather::StopRate {
-            work_rate: unit.combat.work_rate_powerup + me.work_rate,
+            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
             productivity: crate::gathering::gather::productivity_of(
                 task.productivity,
@@ -404,7 +413,10 @@ impl World {
         let walks = unit.move_walks(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let mover = unit
             .body
@@ -590,7 +602,10 @@ impl World {
         let walks = unit.move_walks(
             crate::objects::masters::MasterTables::new(&self.masters, &self.parts.own_master),
             player,
-            &self.graphics,
+            (
+                &self.graphics,
+                self.parts.combat_of(unit.id).abilities.look.as_ref(),
+            ),
         )?;
         let mover = unit.body.mover_mut().ok_or(crate::world::HUNTER_UNMOVING)?;
         let mut held = unit.life.held();

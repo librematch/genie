@@ -392,8 +392,11 @@ fn sprite_of(t: &crate::world::World) -> Option<SpriteId> {
 /// The house's hit points, repairers and holders (its slot 0x180 count).
 fn the_house(t: &crate::world::World) -> (f32, u8, i32) {
     let h = t.object(object_id(10028)).unwrap().1;
-    let site = t.parts.building_of(h.id).construction.as_ref();
-    (h.life.hp.get(), h.repairers(site).get(), h.workers.get())
+    (
+        h.life.hp.get(),
+        t.parts.repairers_of(h.id).get(),
+        h.workers.get(),
+    )
 }
 
 /// The sprite its `MoveTo` shows: the task's moving sprite, else the default of its
@@ -697,12 +700,16 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         )
     );
     let h = &mut t.players[1].objects[ListIndex::new(1)];
-    (h.life.hp, h.combat.armor_removed) = (HitPoints::new(549.99), ArmorPair::new(3, 4));
+    h.life.hp = HitPoints::new(549.99);
+    let id = h.id;
+    t.parts.combat_mut(id).unwrap().armor_removed = ArmorPair::new(3, 4);
     assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
     assert_eq!(repair_of(&t).state, RepairState::Done);
     assert_eq!(the_house(&t), (550.0, 0, 0));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(1)].combat.armor_removed,
+        t.parts
+            .combat_of(t.players[1].objects[ListIndex::new(1)].id)
+            .armor_removed,
         ArmorPair::ZERO
     );
     assert_eq!(heard(&t), [crate::unit_ai::NotifyKind::ACTION_COMPLETED]);

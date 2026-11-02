@@ -49,7 +49,10 @@ impl Unit {
                     &c.w.parts.own_master,
                     c.w.masters.of(c.player),
                 ),
-                &c.w.graphics,
+                (
+                    &c.w.graphics,
+                    c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                ),
                 sprite_rng,
             ),
         )?;
@@ -64,7 +67,10 @@ impl Unit {
                         &c.w.parts.own_master,
                         c.w.masters.of(c.player),
                     ),
-                    &c.w.graphics,
+                    (
+                        &c.w.graphics,
+                        c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                    ),
                     sprite_rng,
                 ),
             )?;
@@ -99,9 +105,12 @@ impl Unit {
             &mut Vec<ObjectId>,
             Releaser,
         ),
-        (masters, graphics, sprite_rng): (
+        (masters, (graphics, look), sprite_rng): (
             crate::objects::masters::OwnerMasters<'_>,
-            &crate::objects::Graphics,
+            (
+                &crate::objects::Graphics,
+                Option<&crate::combat::abilities::Look>,
+            ),
             &mut Well512,
         ),
     ) -> Result<bool, GenieError> {
@@ -120,7 +129,7 @@ impl Unit {
         {
             return Ok(false);
         }
-        match self.head_takes_point(m.point, player, masters, graphics)? {
+        match self.head_takes_point(m.point, player, masters, (graphics, look))? {
             PointMove::Taken(released) => {
                 if let Some(t) = released {
                     releases.push((t, by));
@@ -139,7 +148,6 @@ impl Unit {
         }
         self.clear_own_actions(releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
-        let look = self.combat.abilities.look.as_ref();
         let sprite = ai_sprite(master, m.walk)
             .or_else(|| point_sprite(master, look, false))
             .and_then(|id| graphics.get(id).copied());
@@ -174,7 +182,10 @@ impl Unit {
         point: Position,
         player: PlayerId,
         masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: &crate::objects::Graphics,
+        graphics: (
+            &crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
     ) -> Result<PointMove, GenieError> {
         if self.actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
@@ -224,13 +235,12 @@ impl Unit {
     fn point_sprites<'g>(
         &self,
         masters: crate::objects::masters::OwnerMasters<'_>,
-        graphics: &'g crate::objects::Graphics,
+        (graphics, look): (
+            &'g crate::objects::Graphics,
+            Option<&crate::combat::abilities::Look>,
+        ),
     ) -> Result<SpriteReads<'g>, GenieError> {
-        Ok(SpriteReads::of(
-            self.master_in(masters)?,
-            self.combat.abilities.look.as_ref(),
-            graphics,
-        ))
+        Ok(SpriteReads::of(self.master_in(masters)?, look, graphics))
     }
 
     /// The Artifact's slot 0x40 (its slot 8 with the point, [`Artifact::take_point`]): its

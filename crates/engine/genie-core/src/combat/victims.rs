@@ -50,6 +50,7 @@ impl World {
                 u,
                 self.parts.unit_ai.contains(u.id),
                 self.parts.building_of(u.id),
+                self.parts.combat_of(u.id),
             ),
             (p, master, &self.players.player(p)?.attributes),
             (attacker, &world),
@@ -232,6 +233,7 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
             u,
             c.w.parts.unit_ai.contains(u.id),
             c.w.parts.building_of(u.id),
+            c.w.parts.combat_of(u.id),
         ),
         (p, master, attributes),
         (c.player, &sides),
@@ -282,17 +284,18 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
     if let Some(m) = u.life.master.as_mut() {
         m.decay = v.decay;
     }
-    if let Some(a) = v.armored.as_ref() {
-        u.combat.hp_powerup = a.hp_powerup;
-    }
-    // a shield spends its charge
-    u.combat.charge = v.source.charge;
     let struck = v.building.as_ref().filter(|b| b.struck);
     if let Some(b) = struck {
         u.damaged_lately = b.damaged_lately;
     }
-    // the damage notify (500) to its unit AI
     let state = u.life.state;
+    let combat = c.w.parts.combat_mut(v.id)?;
+    if let Some(a) = v.armored.as_ref() {
+        combat.hp_powerup = a.hp_powerup;
+    }
+    // a shield spends its charge
+    combat.charge = v.source.charge;
+    // the damage notify (500) to its unit AI
     if let Some(ai) = c.w.parts.unit_ai.get_mut(v.id) {
         for &(attacker, p) in &damaged {
             let n = Notify {

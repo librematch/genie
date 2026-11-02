@@ -142,7 +142,8 @@ impl World {
             return Ok(());
         }
         let master = master.clone();
-        self.players.live_mut(p, i)?.regenerate(&master, dt_seconds);
+        let u = self.players.live_mut(p, i)?;
+        u.regenerate(self.parts.combat_mut(u.id)?, &master, dt_seconds);
         Ok(())
     }
 
@@ -165,7 +166,8 @@ impl World {
             COMBAT | BUILDING
         );
         if combat {
-            self.players.live_mut(p, i)?.clamp_hp_powerup();
+            let u = self.players.live_mut(p, i)?;
+            u.clamp_hp_powerup(self.parts.combat_mut(u.id)?);
         }
         Ok(())
     }

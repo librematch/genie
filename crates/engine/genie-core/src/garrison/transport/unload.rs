@@ -61,7 +61,16 @@ impl crate::world::World {
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
-            Ship::of_unit(unit, master, self.spatial.map, &self.graphics, task)?
+            Ship::of_unit(
+                unit,
+                master,
+                self.spatial.map,
+                (
+                    &self.graphics,
+                    self.parts.combat_of(unit.id).abilities.look.as_ref(),
+                ),
+                task,
+            )?
         };
         let restriction = self
             .players
@@ -104,6 +113,7 @@ impl crate::world::World {
         point: Position,
     ) -> Result<(), GenieError> {
         let rng = self.streams.get(crate::math::rng::Stream::Sprite);
+        let id = self.players.live(p, i)?.id;
         self.players.live_mut(p, i)?.transport_sail(
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
@@ -112,7 +122,10 @@ impl crate::world::World {
                     &self.parts.own_master,
                     self.masters.of(p),
                 ),
-                &self.graphics,
+                (
+                    &self.graphics,
+                    self.parts.combat_of(id).abilities.look.as_ref(),
+                ),
                 rng,
             ),
         )
@@ -190,7 +203,16 @@ impl crate::world::World {
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
-            Ship::of_unit(unit, master, self.spatial.map, &self.graphics, t.task)?
+            Ship::of_unit(
+                unit,
+                master,
+                self.spatial.map,
+                (
+                    &self.graphics,
+                    self.parts.combat_of(unit.id).abilities.look.as_ref(),
+                ),
+                t.task,
+            )?
         };
         let mut changes = Vec::new();
         if count == 0 {

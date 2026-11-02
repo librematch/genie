@@ -322,7 +322,8 @@ impl World {
             sprite: self.streams.get(Stream::Sprite),
         };
         let unit = self.players.live_mut(player, idx)?;
-        let switched = switch_master(unit, &old, &next, world)?;
+        let combat = self.parts.combat_mut(unit.id)?;
+        let switched = switch_master((unit, combat), &old, &next, world)?;
         let owner = self.players.player_mut(player)?;
         for &(kind, amount) in &switched.leaving {
             owner.add_attribute(kind, amount)?;
@@ -360,8 +361,8 @@ pub(crate) struct Switched {
     pub(crate) coming: Vec<(AttributeId, Amount)>,
 }
 
-/// Slot 0x90's unit part (`FUN_141225b70` with 0) of a master change from `old` to `next`, its
-/// action list cleared by the caller: in a state below 3 (`FUN_1411a6a70`) the old master's
+/// Slot 0x90's unit part (`FUN_141225b70` with 0) of a master change from `old` to `next` of
+/// `unit` with its combat layer `combat`, its action list cleared by the caller: in a state below 3 (`FUN_1411a6a70`) the old master's
 /// storage leaves its player's attributes and the new one's comes in (`FUN_1411a56c0`, flag 2:
 /// the owner's, [`Switched`]), its hit points keep their share of the new master's (whole, at
 /// least 1), its sight goes and the new master's comes (slots 0x1d8, 0x1d0), its place and
@@ -376,7 +377,7 @@ pub(crate) struct Switched {
 /// A change of its damage sprites, a moving unit's new master that does not move and a standing
 /// sprite the data file lacks.
 pub(crate) fn switch_master(
-    unit: &mut Unit,
+    (unit, combat): (&mut Unit, &mut crate::objects::layers::Combat),
     old: &Master,
     next: &Master,
     world: SwitchWorld<'_>,
@@ -487,11 +488,11 @@ pub(crate) fn switch_master(
             }
         }
     }
-    clear_powerups(unit);
+    clear_powerups(combat);
     // in state 2 the volleys (`+0xa00`) are the new master's volley fire, the shares of the
     // units inside dropped
     if unit.life.state == ObjectState::Alive {
-        unit.combat.firepower = next.volley_fire;
+        combat.firepower = next.volley_fire;
     }
     Ok(switched)
 }
