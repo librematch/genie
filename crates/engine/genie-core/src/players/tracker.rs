@@ -909,7 +909,7 @@ mod tests {
                             kind: ObstructionType::NONE,
                             class: ObstructionClass::NONE,
                         },
-                        snow: false,
+                        snow: crate::map::Snow::None,
                         sprite_override: false,
                     }),
                     ..Default::default()

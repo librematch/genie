@@ -172,8 +172,12 @@ fn row(
         Err(e) => (BuildingLists::default(), Err(e)),
     };
     let gather_read = gather_point(object).map(|_| ());
+    let (construction, construction_read) = match construction(object, s, objects) {
+        Ok(c) => (c, Ok(())),
+        Err(e) => (None, Err(e)),
+    };
     let building = Building {
-        construction: construction(object, s, objects),
+        construction,
         annex_of: object
             .tribe_building_object
             .as_deref()
@@ -391,6 +395,7 @@ fn row(
     let unread = life_read
         .and(ai_read)
         .and(lists_read)
+        .and(construction_read)
         .and(gather_read)
         .and(imported)
         .and(production)
@@ -538,14 +543,24 @@ pub(super) const OTHER_SUB_ACTION: GenieError =
 /// A saved building's construction: its `build_pts`, `desolid_flag` and `num_builders`, its
 /// master's hit points (the sixth `readTemp`), build time (the first train location's) and
 /// obstruction kind and class. None for an object that is not a building.
+///
+/// # Errors
+///
+/// A snow flag that is not the game's (above 2).
 pub(super) fn construction(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
-) -> Option<genie_core::construction::build::Construction> {
-    let b = object.tribe_building_object.as_deref()?;
-    let m = objects.master(s.master_obj)?;
-    let ms = m.static_part()?;
+) -> Result<Option<genie_core::construction::build::Construction>, GenieError> {
+    let Some(b) = object.tribe_building_object.as_deref() else {
+        return Ok(None);
+    };
+    let Some(m) = objects.master(s.master_obj) else {
+        return Ok(None);
+    };
+    let Some(ms) = m.static_part() else {
+        return Ok(None);
+    };
     let build_time = m
         .tribe_master_building_object
         .as_deref()
@@ -553,7 +568,7 @@ pub(super) fn construction(
         .or(m.tribe_master_combat_object.as_deref())
         .and_then(|c| c.train_location.first())
         .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-    Some(genie_core::construction::build::Construction {
+    Ok(Some(genie_core::construction::build::Construction {
         progress: Seconds::new(b.build_pts),
         desolid: b.desolid_flag != 0,
         builders: BuilderCount::of_data(b.tribe_combat_object.num_builders),
@@ -563,9 +578,9 @@ pub(super) fn construction(
             kind: ObstructionType::from(ms.obstruction_type),
             class: ObstructionClass::from(ms.obstruction_class),
         },
-        snow: b.snow_flag != 0,
+        snow: genie_core::map::Snow::of_byte(b.snow_flag)?,
         sprite_override: s.sprite_override_id != -1,
-    })
+    }))
 }
 
 #[cfg(test)]

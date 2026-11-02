@@ -82,12 +82,12 @@ pub(super) fn lay_foundation(
         "a completion without the map's terrain",
     ))?;
     let (x, y) = (placed.position.x(), placed.position.y());
-    if !c.snow
+    if c.snow == crate::map::Snow::None
         && 0 <= x as i32
         && 0 <= y as i32
         && terrain.snow_under(Tile::new(x as i32, y as i32))?
     {
-        c.snow = true;
+        c.snow = crate::map::Snow::Completed;
     }
     if let Some(foundation) = building.foundation_terrain {
         let laid = if stack_master == Some(PASTURE_MANGROVE) {

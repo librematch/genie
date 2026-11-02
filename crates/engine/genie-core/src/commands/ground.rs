@@ -222,7 +222,7 @@ impl World {
             position,
             clearance: m.clearance,
             terrain: laid,
-            snow: false,
+            snow: crate::map::Snow::None,
             master,
             class: m.class,
             terrain_bonus: m.terrain_bonus,

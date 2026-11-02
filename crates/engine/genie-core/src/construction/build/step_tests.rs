@@ -123,7 +123,7 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     }
 }

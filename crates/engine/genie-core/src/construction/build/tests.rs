@@ -363,7 +363,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
             kind: ObstructionType::NONE,
             class: ObstructionClass::NONE,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let part = |[amount, resource, near]: [f32; 3], c: &Construction| {
@@ -668,7 +668,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let mut b = BuildAction {
@@ -874,7 +874,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let house = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
@@ -890,7 +890,11 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let c = t.parts.building_of(h.id).construction.unwrap();
     assert_eq!(
         (h.life.state, c.progress, c.snow),
-        (ObjectState::Alive, Seconds::new(25.0), true)
+        (
+            ObjectState::Alive,
+            Seconds::new(25.0),
+            crate::map::Snow::Completed
+        )
     );
     let a = &t.players[1].attributes;
     assert_eq!(
@@ -947,7 +951,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
                 kind: ObstructionType::TYPE_2,
                 class: ObstructionClass::UNIT,
             },
-            snow: false,
+            snow: crate::map::Snow::None,
             sprite_override: false,
         };
         let mut h = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
@@ -1040,7 +1044,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let site = foundation_at(10028, house().position, life, c);
@@ -1100,7 +1104,7 @@ fn the_work_starts_the_desolid_annexes_first() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let life = |master_id| Lifecycle {
@@ -1194,7 +1198,7 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let mut mover = crate::gathering::hunt::tests::walker();
@@ -1226,7 +1230,7 @@ fn an_annex_work_goes_to_its_main_building() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let run = |main: Construction, amount: f32| {

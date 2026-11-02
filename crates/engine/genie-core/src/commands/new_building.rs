@@ -214,14 +214,7 @@ impl World {
             crate::math::conversions::cvttss2si(y),
         );
         let terrain = self.spatial.terrain.as_ref();
-        // masters 50 and 1889 on snow keep their snow (+0xc61 2)
-        let snow = matches!(master, FARM | PASTURE_1889)
-            && -1 < tx
-            && -1 < ty
-            && terrain
-                .map(|t| t.snow_under(Tile::new(tx, ty)))
-                .transpose()?
-                .unwrap_or(false);
+        let snow = constructed_snow(master, (tx, ty), terrain)?;
         // +0xcd0 (FUN_141188db0): mangrove or rice terrain under its place
         let rice = terrain.is_some_and(|t| {
             t.kind(Tile::new(tx, ty))
@@ -452,5 +445,75 @@ impl World {
             }
         }
         Ok(())
+    }
+}
+
+/// The snow flag the building constructor (`FUN_1411de5f0`) gives a building of `master` on
+/// tile (`tx`, `ty`): a farm or a pasture (masters 50 and 1889) made on snow keeps it (2,
+/// [`crate::map::Snow::Kept`]); any other building, or one off the map or without its terrain,
+/// none.
+///
+/// # Errors
+///
+/// A tile the terrain does not hold.
+fn constructed_snow(
+    master: MasterId,
+    (tx, ty): (i32, i32),
+    terrain: Option<&crate::map::terrain::Terrain>,
+) -> Result<crate::map::Snow, GenieError> {
+    let on_snow = matches!(master, FARM | PASTURE_1889)
+        && -1 < tx
+        && -1 < ty
+        && terrain
+            .map(|t| t.snow_under(Tile::new(tx, ty)))
+            .transpose()?
+            .unwrap_or(false);
+    Ok(if on_snow {
+        crate::map::Snow::Kept
+    } else {
+        crate::map::Snow::None
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::map::Snow;
+    use crate::map::terrain::{Terrain, TerrainKind, TileTerrain};
+    use crate::map::{GridSize, TerrainFlags};
+    use crate::objects::masters::ids;
+
+    /// A farm and a pasture 1889 on snow keep it (2); a house there, a farm off the map or on a
+    /// map without its terrain, and a farm on grass have none.
+    #[test]
+    fn constructor_keeps_snow_under_farm_and_pasture_only() {
+        // tile (0, 0) snow (terrain 32), tile (1, 0) grass (9)
+        let mut kinds = vec![
+            TerrainKind {
+                shown: true,
+                flags: TerrainFlags::LAND,
+                ..TerrainKind::default()
+            };
+            40
+        ];
+        kinds[32].flags = TerrainFlags::LAND | TerrainFlags::SNOW;
+        let terrain = Terrain::new(
+            GridSize::new(2, 1),
+            vec![
+                TileTerrain::of_save(32, 255, -1),
+                TileTerrain::of_save(9, 255, -1),
+            ],
+            kinds,
+            Vec::new(),
+        );
+        let snow = |master, tile| super::constructed_snow(master, tile, Some(&terrain)).unwrap();
+        assert_eq!(snow(ids::FARM, (0, 0)), Snow::Kept);
+        assert_eq!(snow(ids::PASTURE_1889, (0, 0)), Snow::Kept);
+        assert_eq!(snow(ids::HOUSE, (0, 0)), Snow::None);
+        assert_eq!(snow(ids::FARM, (1, 0)), Snow::None);
+        assert_eq!(snow(ids::FARM, (-1, 0)), Snow::None);
+        assert_eq!(
+            super::constructed_snow(ids::FARM, (0, 0), None).unwrap(),
+            Snow::None
+        );
     }
 }

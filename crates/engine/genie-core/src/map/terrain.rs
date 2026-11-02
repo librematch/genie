@@ -211,7 +211,7 @@ pub struct Foundation {
     /// The foundation terrain, the master's `+0x988` byte.
     pub terrain: TerrainId,
     /// The building's `snow_flag` (`+0xc61`).
-    pub snow: bool,
+    pub snow: crate::map::Snow,
     /// The master's id and class, its `defense_terrain_bonus` (`+0x820`).
     pub master: MasterId,
     /// The master's class.
@@ -533,7 +533,7 @@ impl Terrain {
             f.master == TOWN_CENTRE && (tx == x0 || tx == x0 + 1) && (ty == y0 + 2 || ty == y0 + 3)
         };
         let (mut wanted, mut kind, mut layer) = (f.terrain, f.terrain, None);
-        if f.terrain == FOUNDATION && f.snow {
+        if f.terrain == FOUNDATION && f.snow.on_snow() {
             (wanted, kind, layer) = (SNOW_SKIPPED, SNOW_FOUNDATION, Some(SNOW_LAYER));
         }
         let bonus = f
@@ -810,7 +810,7 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: FOUNDATION,
-            snow: true,
+            snow: crate::map::Snow::Completed,
             master: ids::HOUSE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::of_data(4),
@@ -840,7 +840,7 @@ mod tests {
             position: Position::new(2.0, 2.0, 0.0),
             clearance: Footprint::new(2.0, 2.0),
             terrain: FOUNDATION,
-            snow: false,
+            snow: crate::map::Snow::None,
             master: TOWN_CENTRE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::of_data(4),
@@ -866,7 +866,7 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: FOUNDATION,
-            snow: false,
+            snow: crate::map::Snow::None,
             master: ids::HOUSE,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::NONE,
@@ -886,7 +886,7 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: TerrainId::named(29),
-            snow: false,
+            snow: crate::map::Snow::None,
             master: ids::FARM,
             class: class::FARM,
             terrain_bonus: RestrictionField::NONE,
@@ -914,7 +914,7 @@ mod tests {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
             terrain: TerrainId::named(14),
-            snow: false,
+            snow: crate::map::Snow::None,
             master,
             class: class::BUILDING,
             terrain_bonus: RestrictionField::NONE,

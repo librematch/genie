@@ -356,7 +356,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -1715,7 +1715,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: false,
+                    snow: crate::map::Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()
@@ -3035,7 +3035,7 @@ fn builder_leaves_the_main_building_of_an_annex() {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     };
     let building = |id, annex_of| {
@@ -3258,7 +3258,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: false,
+                    snow: crate::map::Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()

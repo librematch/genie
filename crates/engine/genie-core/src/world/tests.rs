@@ -2251,7 +2251,7 @@ pub(crate) fn sent_off_world(orders: Vec<crate::unit_ai::QueuedOrder>) -> World 
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -4833,7 +4833,7 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: false,
+                    snow: crate::map::Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()
@@ -11498,7 +11498,7 @@ fn teardown_world() -> World {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -11916,7 +11916,7 @@ fn deaths_world() -> World {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -12977,7 +12977,7 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -14830,7 +14830,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: false,
+                    snow: crate::map::Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()
@@ -14967,7 +14967,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
                         kind: ObstructionType::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
-                    snow: false,
+                    snow: crate::map::Snow::None,
                     sprite_override: false,
                 }),
                 ..Default::default()
@@ -15395,7 +15395,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::NONE,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()
@@ -19931,7 +19931,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
             kind: ObstructionType::TYPE_2,
             class: ObstructionClass::UNIT,
         },
-        snow: false,
+        snow: crate::map::Snow::None,
         sprite_override: false,
     });
     setup(&mut t);

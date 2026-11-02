@@ -160,11 +160,12 @@ pub struct Construction {
     pub build_time: WholeSeconds,
     /// The record its start adds: its master's obstruction kind and class.
     pub record: Obstruction,
-    /// `+0xc61`, `snow_flag`: it was completed on snow (its decal is not held).
+    /// `+0xc61`, `snow_flag` ([`crate::map::Snow`]): it stands on snow, completed there or kept
+    /// as a farm's or a pasture's (its decal is not held).
     #[diff(
-        gap = "the teardowns' clearing (FUN_1411d5600, FUN_1411ad250) is not ported; the game's flag has three values"
+        gap = "the death's and the teardowns' clearing (FUN_1411dbb70 at 0x1411dda85, FUN_1411d5600, FUN_1411ad250) is not ported"
     )]
-    pub snow: bool,
+    pub snow: crate::map::Snow,
     /// `+0x788`, `sprite_override_id`, is not −1.
     pub sprite_override: bool,
 }
@@ -615,7 +616,7 @@ mod stack_tests {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()

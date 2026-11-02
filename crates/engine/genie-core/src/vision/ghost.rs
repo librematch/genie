@@ -1351,7 +1351,7 @@ mod tests {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             });
         t.build_watched().unwrap();

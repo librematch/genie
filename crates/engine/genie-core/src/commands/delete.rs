@@ -635,7 +635,7 @@ mod tests {
                     kind: ObstructionType::TYPE_2,
                     class: ObstructionClass::NONE,
                 },
-                snow: false,
+                snow: crate::map::Snow::None,
                 sprite_override: false,
             }),
             ..Default::default()

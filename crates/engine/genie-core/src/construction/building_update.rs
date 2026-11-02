@@ -223,7 +223,7 @@ impl Unit {
             position: self.position(),
             clearance: m.clearance,
             terrain,
-            snow: false,
+            snow: crate::map::Snow::None,
             master: m.id,
             class: m.class,
             terrain_bonus: m.terrain_bonus,
