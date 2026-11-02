@@ -9,6 +9,7 @@ use std::slice::Iter as SliceIter;
 /// by the id (the `.dat`'s ids are 0 and up), walked in the ids' order. Two tables are equal
 /// when they hold the same sprites and graphics, as two maps are.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Graphics {
     /// The graphics by sprite id.
     by_id: Vec<Option<Graphic>>,

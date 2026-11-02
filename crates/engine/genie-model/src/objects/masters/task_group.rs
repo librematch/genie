@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// a unit of a master of a group switches to another master of the same group whose task list has a
 /// task for the target. 0 is none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskGroup(u8);
 
 impl TaskGroup {

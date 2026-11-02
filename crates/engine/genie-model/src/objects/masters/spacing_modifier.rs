@@ -3,6 +3,7 @@
 /// A master's spacing modifier (`+0x8b8`, `mSpacingModifier`; the `.dat`'s "flank attack
 /// modifier"): with its radius on x the unit's radius in a group's formation (`FUN_141025920`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpacingModifier(f32);
 
 impl SpacingModifier {

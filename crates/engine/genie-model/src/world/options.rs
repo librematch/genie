@@ -70,6 +70,7 @@ impl GameMode {
 /// An age option (`mStartingAge`, `+0x3c`, and `mEndingAge`, `+0x40`), and a tech tree unit's
 /// age: 0 the mode's default, 2 Feudal, 3 Castle, 4 Imperial, 5 post-Imperial, 6.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Age(i32);
 
 impl Age {

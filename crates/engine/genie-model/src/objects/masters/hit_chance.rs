@@ -4,6 +4,7 @@
 /// shots that hit, which a missile's aim (`FUN_140a9c600`'s draw) and a strike's Object-stream
 /// draw test. A short the effects set, add to and scale; every value is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitChance(i16);
 
 impl HitChance {

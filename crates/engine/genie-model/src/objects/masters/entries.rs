@@ -4,6 +4,7 @@
 /// The damage sprite entry the attributes 91, 156 and 157 change (`+0x731`,
 /// `mDamageSpriteEntryMod`, a byte): an index into the damage sprites, 0xff with none left.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageGraphicEntry(u8);
 
 impl DamageGraphicEntry {
@@ -34,6 +35,7 @@ impl DamageGraphicEntry {
 
 /// The train location entry the attributes 42, 43, 58 and 101 change (`+0x940`,
 /// `mTrainLocationEntryMod`, a signed short): an index into the train locations, −1 with none.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TrainLocationEntry(i16);
 

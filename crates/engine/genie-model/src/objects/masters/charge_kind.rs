@@ -5,6 +5,7 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's charge type (`charge_type`, `+0x922`): what its charge (`+0x9e0`) does. Every short
 /// the data or an effect leaves is kept; the values the game tests are named.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ChargeKind(i16);
 
 impl ChargeKind {

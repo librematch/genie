@@ -59,6 +59,7 @@ impl Diff for BlastLevel {
 /// A master's blast defence (`area_effect_object_level`): the blast levels that reach it
 /// ([`BlastLevel::reaches`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, CopyGetters)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BlastDefense(
     /// Its byte, as the master holds it.
     #[getset(get_copy = "pub")]

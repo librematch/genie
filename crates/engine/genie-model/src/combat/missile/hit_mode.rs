@@ -5,6 +5,7 @@
 /// miss turns it into mode 1, which hits another player's objects too. Mode 2 strikes its
 /// target on landing as mode 0 does; its hits on the way are not modelled.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitMode(u8);
 
 impl HitMode {

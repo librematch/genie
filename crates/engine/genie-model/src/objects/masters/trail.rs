@@ -7,6 +7,7 @@ use std::ops::{AddAssign, MulAssign};
 /// A moving master's trail (`obj_trail_id`, `obj_trail_options`, `obj_trail_spacing`; the
 /// `.dat`'s tracking unit, its mode and density).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Trail {
     /// `+0x75e`: the master it leaves behind.
     pub unit: MasterField,
@@ -18,6 +19,7 @@ pub struct Trail {
 
 /// A trail's mode (`obj_trail_options`, `+0x760`, a byte), which no modelled routine reads.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TrailMode(u8);
 
 impl TrailMode {
@@ -42,6 +44,7 @@ impl TrailMode {
 
 /// A trail's density (`obj_trail_spacing`, `+0x764`, a float), which no modelled routine reads.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TrailDensity(f32);
 
 impl TrailDensity {

@@ -131,6 +131,7 @@ impl genie_diff::Diff for Millis {
 /// (a short: a master's `+0x898` train locations, its build time): every short is kept, and
 /// [`Seconds::of_master`] is the game's conversion.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WholeSeconds(i16);
 
 impl WholeSeconds {
@@ -166,6 +167,7 @@ impl genie_diff::Diff for WholeSeconds {
 /// 1000), the timers that count it down or up, the masters' times. Each operator is the one
 /// `f32` operation the game does; a comparison is `f32`'s (a NaN compares false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Seconds(f32);
 
 impl Seconds {

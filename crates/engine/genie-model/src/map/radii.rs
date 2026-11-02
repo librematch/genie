@@ -6,6 +6,7 @@
 /// `radius_x`, `radius_y`, `radius_z`, `+0x5d8`..`+0x5e0`). Each is half the object's size along
 /// its axis.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Radii(
     /// Its x, y and z.
     [f32; 3],
@@ -81,6 +82,7 @@ impl genie_diff::Diff for Radii {
 /// `radius_x` and `radius_y`, `+0x5d8`, `+0x5dc`). The area it covers is its place plus and minus
 /// them.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Footprint(
     /// Its x and y.
     [f32; 2],

@@ -33,6 +33,7 @@ impl QueueButton {
 /// A train or research location's button (`buttonLocationID`, a byte of the `.dat` or of a
 /// technology change): 0 for none. Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LocationButton(u8);
 
 impl LocationButton {

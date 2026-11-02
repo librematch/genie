@@ -8,6 +8,7 @@ use std::ops::{AddAssign, MulAssign};
 /// (`friendly_fire_damage`, `+0x868`) and its blast deals (`area_damage`, `+0x834`). Each
 /// operator is the one `f32` operation the game does; every value is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageShare(f32);
 
 impl DamageShare {

@@ -7,6 +7,7 @@ use std::ops::{Add, Neg, Rem, Sub};
 /// master's fire and interrupt frames and the frame a BUILD command chose. Each operator is the
 /// game's 16-bit one; every value is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Frame(i16);
 
 impl Frame {

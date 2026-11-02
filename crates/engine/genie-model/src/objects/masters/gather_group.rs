@@ -12,6 +12,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// (`genie_core::gathering::gather_search::gather_group`). The `.dat` may hold others, so the
 /// group is a newtype with named constants.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GatherGroup(u8);
 
 impl GatherGroup {

@@ -4,6 +4,7 @@
 /// the shared research (0x20) and the type a disable command makes available instead (0x21);
 /// every other value is a type the simulation does not tell apart.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechKind(i16);
 
 impl TechKind {

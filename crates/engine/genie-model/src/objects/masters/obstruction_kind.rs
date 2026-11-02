@@ -9,6 +9,7 @@ use std::fmt::{Display, Error, Formatter};
 /// simulation does not tell apart, so the type is a newtype: the named ones are those its tests
 /// name.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ObstructionKind(u8);
 
 impl ObstructionKind {

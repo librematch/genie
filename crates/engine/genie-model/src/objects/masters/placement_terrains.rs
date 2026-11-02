@@ -7,6 +7,7 @@ use genie_diff::Diff;
 /// `placement_terrain`, each none for −1): the terrains it must stand beside and the terrains it
 /// must stand on (`genie_core::production::spawn::placement_terrains`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlacementTerrains {
     /// The side terrains (`+0x5f2`, `+0x5f4`).
     pub beside: [Option<TerrainId>; 2],

@@ -8,6 +8,7 @@ use std::fmt::{Display, Error, Formatter};
 /// (`genie_core::map::terrain::Terrain::terrains`). A master holds its terrains as shorts, −1 for
 /// none ([`TerrainId::of_data`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TerrainId(u8);
 
 impl TerrainId {

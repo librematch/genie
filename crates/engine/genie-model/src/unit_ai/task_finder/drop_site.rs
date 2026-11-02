@@ -11,6 +11,7 @@ use crate::players::attribute::AttributeId;
 /// the workers it serves (their class, −1 any, or else a list of their masters), the civs it is
 /// for (empty: all) and the resource kinds it takes.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DropSite {
     /// The building's master.
     pub building: MasterId,
@@ -35,6 +36,7 @@ pub struct DropSite {
 
 /// A drop site's target (`FUN_140fdf480`'s record of 0x14 bytes; each −1 when its key is missing).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DropTarget {
     /// `object_group`: the class of the objects.
     pub class: ClassId,

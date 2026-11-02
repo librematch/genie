@@ -7,6 +7,7 @@ use genie_diff::Diff;
 /// (`+0x934`, `+0x938`, `+0x93c`): what its effects add to a conversion's shortest and longest
 /// time and to its chance.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ConversionAdjust {
     /// `mMinConversionTimeAdj` (`+0x934`, "Min Conversion Time Modifier").
     pub min_time: f32,

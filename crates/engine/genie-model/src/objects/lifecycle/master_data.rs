@@ -6,6 +6,7 @@ use genie_diff::Diff;
 /// What the dead-object steps read from an object's master that the header save does not hold;
 /// they come from the `.dat`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterData {
     /// Master `+0x620`: how much of the held attribute a dead object loses per second.
     pub decay: AmountRate,

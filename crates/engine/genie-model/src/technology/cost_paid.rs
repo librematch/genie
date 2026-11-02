@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// player's attribute, 2 from the building (`FUN_141204310`). Every byte is kept; any but 0 is
 /// paid.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostPaid(u8);
 
 impl CostPaid {

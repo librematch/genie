@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// names): the dot its objects draw on the minimap. The simulation only keeps it; every byte is
 /// kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MinimapMode(u8);
 
 impl MinimapMode {

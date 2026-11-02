@@ -8,6 +8,7 @@ use crate::objects::masters::DamageAmount;
 /// class. The simulation's tests name melee (4), pierce (3) and the classes the garrison's
 /// firepower sums (31, 38); every other value is a class the tests do not tell apart.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageClass(i16);
 
 impl DamageClass {
@@ -42,6 +43,7 @@ impl genie_diff::Diff for DamageClass {
 
 /// One armor or attack entry (`+0x808` and `+0x818`, 4 bytes each): its class and amount.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClassAmount {
     /// The class.
     pub class: DamageClass,

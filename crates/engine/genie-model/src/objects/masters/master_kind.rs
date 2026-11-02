@@ -13,6 +13,7 @@ use std::fmt::{Display, Error, Formatter};
 /// is a type, and the named ones are values of the type (the reasoning of
 /// [`crate::objects::masters::ClassId`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterKind(
     /// Its value, as the `.dat` and the save hold it.
     u8,

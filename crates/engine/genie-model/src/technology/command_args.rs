@@ -8,6 +8,7 @@ use crate::technology::TechId;
 /// byte, or kind 8's mode through its map): 0 sets, 2 scales by the amount less 1 (rounded half
 /// away from 1), any other adds. Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ChangeMode(u8);
 
 impl ChangeMode {
@@ -34,6 +35,7 @@ impl ChangeMode {
 /// What a technology change (kind 8, `FUN_1415c3f20`'s `0x6f` case) changes: its second
 /// argument. The cost modes (0 to 3, `0x4000` to `0x4003`, `0xd` to `0x11`) and the research
 /// time modes (−1 to −3) map to a [`ChangeMode`]; the others name a field. Every short is kept.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ModifyMode(i16);
 
@@ -67,6 +69,7 @@ impl ModifyMode {
 /// The location a technology change (kind 8) changes: its third argument, below 1 every
 /// location, else the entry at that index (past the technology's locations a new one, a copy of
 /// the last with no building). Every short is kept.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ModifyLocation(i16);
 
@@ -93,6 +96,7 @@ impl ModifyLocation {
 /// The technology a disable command (`'f'`) names: its amount as CVTTSS2SI gives it. −1 disables
 /// none; the shared kind's test (`FUN_1413d1020`) reads the whole number, the disabling
 /// (`FUN_1413cdb00`) its low 16 bits, a negative one every technology.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DisabledTech(i32);
 

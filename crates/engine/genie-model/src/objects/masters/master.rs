@@ -129,6 +129,7 @@ impl Master {
 /// What a building's completion (`FUN_1411dbb70` with 2) reads of its master, the `.dat`'s type
 /// 80 values.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuildingMaster {
     /// `+0x980`, `adjacent_mode`: walls and gates join their neighbours (`FUN_1411ce890`).
     pub adjacent_mode: AdjacentMode,
@@ -168,6 +169,7 @@ pub struct BuildingMaster {
 
 /// The master values the task finder and the work command read.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Master {
     /// The master's id.
     pub id: MasterId,
@@ -467,6 +469,7 @@ pub struct Master {
 
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's
 /// `train_location`).
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
 pub struct TrainLocation {
     /// `+0x0`, `trainLocationID`: the master that makes it.
@@ -480,6 +483,7 @@ pub struct TrainLocation {
 }
 
 /// What a combat master shows of its values (`+0x856`, `+0x858`, `+0x854`, `+0x8b0`).
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Shown {
     /// `+0x856`, `orig_weapon`.
@@ -494,6 +498,7 @@ pub struct Shown {
 
 /// A player's masters by id.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Masters {
     pub(super) by_id: Vec<Option<Master>>,
 }

@@ -5,6 +5,7 @@
 /// master has the upgraded master's id; any other walks the objects and gives them masters
 /// of their own.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UpgradeMode(i16);
 
 impl UpgradeMode {

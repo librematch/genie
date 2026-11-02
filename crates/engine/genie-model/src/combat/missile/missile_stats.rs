@@ -17,6 +17,7 @@ use genie_diff::Diff;
 /// (`+0x5d8`..`+0x5e0`) and the `.dat`'s `fly_mode` (`+0x608`: 0 holds it on the ground, 1 above
 /// it, `FUN_141193a10`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MissileStats {
     /// `projectile_type` (`+0x880`).
     pub projectile_kind: ProjectileKind,

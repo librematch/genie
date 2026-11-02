@@ -13,6 +13,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// holds is a type, and the named ones are values of the type. A field or a filter that holds −1
 /// for none or any is `Option<ActionKind>`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ActionKind(
     /// Its value, as the `.dat`, the save and a checkpoint hold it.
     i16,

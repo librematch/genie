@@ -7,6 +7,7 @@ use crate::map::TerrainId;
 /// is for the terrain its low 16 bits equal ([`TaskTerrain::is`]); a terrain look task reads it as
 /// a flag mask (`genie_core::combat::abilities::terrain_mask`), a negative one too.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskTerrain(i16);
 
 impl Default for TaskTerrain {

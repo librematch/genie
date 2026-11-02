@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// the ground's (`FUN_141193a10`, `genie_core::combat::missile::grounded`). Every byte is kept; one
 /// not named keeps its height.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlyMode(u8);
 
 impl FlyMode {

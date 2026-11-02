@@ -32,6 +32,8 @@ pub mod movement;
 pub mod objects;
 pub mod players;
 pub mod production;
+#[cfg(feature = "schema")]
+mod schema;
 pub mod technology;
 #[cfg(test)]
 mod test_ids;

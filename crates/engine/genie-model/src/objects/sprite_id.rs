@@ -7,6 +7,7 @@ use std::fmt::{Display, Error, Formatter};
 /// fields name and the world's sprite table holds ([`Model::graphics`](crate::model::Model::graphics)). The
 /// game's −1 (or any id below 0) is none, which an `Option` holds ([`SpriteId::of_data`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpriteId(i16);
 
 impl SpriteId {

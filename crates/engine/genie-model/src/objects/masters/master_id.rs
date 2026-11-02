@@ -9,6 +9,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// ([`crate::objects::masters::Master::id`]), so 0 or more. A field that holds −1 for none
 /// holds `Option<MasterId>` ([`MasterId::of_field`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterId(
     /// Its value, the master's place in a player's masters.
     #[getset(get_copy = "pub")]

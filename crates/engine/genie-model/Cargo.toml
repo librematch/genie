@@ -19,6 +19,12 @@ genie-math = { path = "../genie-math" }
 getset.workspace = true
 # the bit sets the game tests bit by bit (a master's flags)
 bitflags.workspace = true
+# the types' JSON Schema, which genie-nickel writes as Nickel contracts (FD-046-D15)
+schemars = { workspace = true, optional = true }
+
+[features]
+# the JSON Schema of the model's types (FD-046-D15)
+schema = ["dep:schemars", "genie-math/schema"]
 
 [lints]
 workspace = true

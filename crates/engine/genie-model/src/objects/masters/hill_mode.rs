@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// in the placement test (`genie_core::production::spawn`'s hill test, `FUN_141123f80`). Every byte
 /// is kept; one not named takes any tile.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HillMode(u8);
 
 impl HillMode {

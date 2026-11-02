@@ -3,6 +3,7 @@
 /// A train location's hotkey (`hotkeyID`, `+0x8`, an int of the `.dat`), which no modelled
 /// routine reads. Every int is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HotkeyId(i32);
 
 impl HotkeyId {

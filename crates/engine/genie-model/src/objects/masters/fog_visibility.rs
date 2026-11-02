@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// goes on against an object of any but [`FogVisibility::INVISIBLE`] in the fog. Every byte is
 /// kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FogVisibility(u8);
 
 impl FogVisibility {

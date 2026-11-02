@@ -5,6 +5,7 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's selection effect (`+0x684`, the `.dat`'s `selection_effect`; openage's names): its
 /// hit point bar and outline when selected. The simulation only keeps it; every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SelectionEffect(u8);
 
 impl SelectionEffect {

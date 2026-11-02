@@ -49,6 +49,7 @@ const CLASS_UNITS: Range<i16> = 900..1000;
 
 /// Which players a block of the base's kinds reaches.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Party {
     /// The player itself (0 to 8).
     Own,
@@ -79,6 +80,7 @@ impl Party {
 /// The masters a cost command changes (`FUN_1415c1f70`'s `unit`): a master by its id, or every
 /// master of a class (a `unit` of 900 to 999 names class `unit − 900`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CostUnits {
     /// The master of this id.
     Master(MasterId),
@@ -101,6 +103,7 @@ impl CostUnits {
 /// What a cost command does with the cost slot of its resource (`FUN_1415c1f70`'s `how`, the
 /// amount as CVTTSS2SI gives it).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CostEdit {
     /// −2: the first slot that takes the resource empties in its place.
     Remove,
@@ -119,6 +122,7 @@ impl CostEdit {
     }
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 /// How a resource command changes the resource (its second argument's low byte: 0 sets, any
 /// other adds).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -130,6 +134,7 @@ pub enum ResourceChange {
 }
 
 /// The objects' kinds (200 to 206), which the slice does not run but for the masters of their
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 /// own it holds none of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ObjectsKind {
@@ -143,6 +148,7 @@ pub enum ObjectsKind {
 
 /// One command of an effect, by its kind. The base's kinds name the [`Party`] they reach.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EffectCommand {
     /// Kinds 0, 4 and 5 of a block: the masters' attribute `attribute` (the third argument's low
     /// byte) set, added to or multiplied by `amount`, on master `master` or class `class` (each

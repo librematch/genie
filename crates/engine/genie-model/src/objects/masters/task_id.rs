@@ -9,6 +9,7 @@ use getset::CopyGetters;
 /// in the current data ([`TaskId::of_task`]). A field that holds −1 for none holds
 /// `Option<TaskId>` ([`TaskId::of_field`], which rejects any other negative value).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, CopyGetters)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskId(
     /// Its value, as the task list holds it.
     #[getset(get_copy = "pub")]

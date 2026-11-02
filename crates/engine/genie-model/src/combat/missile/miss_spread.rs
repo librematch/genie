@@ -5,6 +5,7 @@ use std::ops::{AddAssign, MulAssign};
 /// How far a missed missile strays per tile of the way (a master's `missed_missile_spread`,
 /// `+0x860`, the attribute "Attack Dispersion"), which a miss multiplies its gap by.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MissSpread(f32);
 
 impl MissSpread {

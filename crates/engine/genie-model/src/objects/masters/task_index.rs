@@ -3,6 +3,7 @@
 /// A place in a master's task list (`default_task`, `+0x790`), which `FUN_14109e0c0` takes the
 /// list's entry at; the data's −1 is none, and no negative one names a place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskIndex(u16);
 
 impl TaskIndex {

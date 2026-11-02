@@ -10,6 +10,7 @@ use genie_diff::Diff;
 
 /// What the clock reads of a sprite (the `.dat` graphic, memory `+0x8`..`+0x1a`).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Graphic {
     /// The graphic's id.
     pub id: SpriteId,

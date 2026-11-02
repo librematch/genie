@@ -11,6 +11,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// apart), so the class is a newtype with named constants, not an enum: any class the data
 /// holds is a class, and the named ones are values of the type.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClassId(
     /// Its value, as the `.dat` and the obfuscated build's decoded short hold it.
     i16,

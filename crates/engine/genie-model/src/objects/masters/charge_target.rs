@@ -4,6 +4,7 @@
 /// works on (`FUN_1412623d0`); every bit (−1) works on every object, none (0) on every object but
 /// buildings. Every short is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ChargeTarget(i16);
 
 impl ChargeTarget {

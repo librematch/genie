@@ -56,6 +56,17 @@ jobs:
       # scripts/c_case.py: every name follows RFC 430 (CODING_STYLE.md section 3, C-CASE)
       - run: scripts/c_case.py
 
+  contracts:
+    name: The model's Nickel contracts are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # contracts/genie.ncl, written from genie-model's types by genie-nickel's contracts binary
+      # (FD-046-D15); `just contracts` regenerates it
+      - run: cargo run --locked -q -p genie-nickel --bin contracts -- --check
+
   readmes:
     name: Every genie-core folder has a current README
     runs-on: ubuntu-latest
@@ -111,6 +122,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # The engine core must stay compilable to WebAssembly. Add every new engine crate here.
       - run: cargo build --locked -p genie-error -p genie-diff -p genie-math -p genie-model -p genie-import -p genie-core -p genie-command-codec -p genie-oracle --target wasm32-unknown-unknown
+      # Nickel's evaluator, which the build layer and the mods run in the browser too (FD-046-D13)
+      - run: cargo build --locked -p genie-nickel --target wasm32-unknown-unknown
 
   docs:
     name: Docs

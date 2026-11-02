@@ -9,6 +9,7 @@ use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 /// points ([`MasterHitPoints`], [`HitPoints::of_master`]). Each operator is the one `f32` operation
 /// the game does, in its order; a comparison is `f32`'s (a NaN compares false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitPoints(f32);
 
 impl HitPoints {
@@ -39,6 +40,7 @@ impl HitPoints {
 /// (capped at 32767 where the game caps them). Every short is kept; [`HitPoints::of_master`] is
 /// the game's conversion.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterHitPoints(i16);
 
 impl MasterHitPoints {

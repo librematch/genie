@@ -239,7 +239,7 @@ mod tests {
         assert!(v.head(4).is_err());
         v.tail_mut(1).unwrap()[0] = 7;
         assert_eq!(v, [9, 7, 3]);
-        assert_eq!(v.tail_mut(3).unwrap(), []);
+        assert_eq!(v.tail_mut(3).unwrap(), [0_i32; 0]);
         let e = v.tail_mut(4).unwrap_err();
         assert_eq!(e.context().collect::<Vec<_>>(), [("start", "4")]);
     }

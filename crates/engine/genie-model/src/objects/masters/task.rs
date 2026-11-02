@@ -18,6 +18,7 @@ use genie_diff::Diff;
 /// One task of a master's task list (`RGE_Task`), with the memory offsets the task finder reads
 /// (the save's names; the `.dat`'s in brackets where they differ).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Task {
     /// `+0xa`.
     pub id: TaskId,

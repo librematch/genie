@@ -8,6 +8,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// A technology's id (the `.dat`'s technology index, the place in a player's technologies), 0
 /// or more. A field that holds −1 for none holds `Option<TechId>` ([`TechId::of_field`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechId(
     /// Its value, the technology's place in the tree.
     #[getset(get_copy = "pub")]

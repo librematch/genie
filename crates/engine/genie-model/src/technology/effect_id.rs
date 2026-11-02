@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// a player's effect override (`+0x62`) hold it, −1 for none. Every short is kept.
 /// The default is 0, as a zeroed record holds it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EffectId(i16);
 
 impl EffectId {

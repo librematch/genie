@@ -7,6 +7,7 @@ use std::ops::{Add, AddAssign, MulAssign};
 /// stinger, and a hero's bonus. A negative rate takes hit points. Each operator is the one
 /// `f32` operation the game does; every value is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Regeneration(f32);
 
 impl Regeneration {

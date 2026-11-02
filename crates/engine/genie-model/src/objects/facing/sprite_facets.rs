@@ -6,6 +6,7 @@ use genie_diff::Diff;
 /// What the facing routines read of the current sprite: its facets and whether its sequence
 /// flags have bit 1 (`+0x1a`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpriteFacets {
     /// How many facets.
     pub count: FacetCount,

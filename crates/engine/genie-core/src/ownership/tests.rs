@@ -84,7 +84,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieErro
 fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     let (o, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
     assert_eq!(o.parts.actions.list.move_to().copied(), None);
-    assert_eq!(released, []);
+    assert_eq!(released, [0_i32; 0]);
     let m = o.parts.mover().unwrap();
     assert_eq!(m.animated.speed, Speed::new(0.0));
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.0);

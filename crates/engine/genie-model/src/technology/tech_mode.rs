@@ -4,6 +4,7 @@
 /// one, 2 to 34 a rule, a mode or a starting age, a negative one its opposite
 /// ([`crate::world::settings::Settings::tech_mode_allows`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechMode(i16);
 
 impl TechMode {

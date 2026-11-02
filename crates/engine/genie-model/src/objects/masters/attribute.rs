@@ -9,6 +9,7 @@ use std::fmt::{Display, Error, Formatter};
 /// any other is a number the data holds, which each master type's setter passes to its base's
 /// and the last one ignores.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterAttribute(
     /// Its number in the game's attribute list.
     #[getset(get_copy = "pub")]

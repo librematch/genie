@@ -11,6 +11,7 @@ use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};
 /// speed over a span of seconds is a [`Distance`]. A comparison is `f32`'s (a NaN compares
 /// false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Speed(f32);
 
 impl Speed {

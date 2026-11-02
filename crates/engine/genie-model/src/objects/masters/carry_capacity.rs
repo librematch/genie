@@ -4,6 +4,7 @@
 /// carries, a short the effects set, add to and scale (capped where the game caps them). Every
 /// short is kept; `Amount::of_master` is the game's conversion.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CarryCapacity(i16);
 
 impl CarryCapacity {

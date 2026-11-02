@@ -8,6 +8,7 @@ use genie_diff::Diff;
 /// (`+0x8c8`..`+0x8d0`, the `.dat`'s projectile spawning area): how far a volley's missiles
 /// scatter across and along the shot, and how far forward they start.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct VolleySpread {
     /// `volley_x_spread` (`+0x8c8`, the attribute "Spawning Area Width").
     pub x: Distance,

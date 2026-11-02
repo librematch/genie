@@ -17,6 +17,7 @@ pub const LINES: usize = 200;
 
 /// A unit line's id (`LineID`, an int): −399 and the 199 after it index table 2.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LineId(i32);
 
 impl LineId {
@@ -59,6 +60,7 @@ pub struct UnitLine {
 
 /// A master's entry of table 1 (12 bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LineEntry {
     /// `+0`: the master after it in its chain (none for the last, the game's −1).
     pub next: Option<MasterId>,
@@ -80,6 +82,7 @@ impl LineEntry {
 /// The two tables and the identifiers' list (`DAT_143f15808`: each line's identifiers with its
 /// id). Empty, as the game's when the file is missing, until [`UnitLines::build`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UnitLines {
     /// Table 1, by master id.
     pub entries: Vec<LineEntry>,

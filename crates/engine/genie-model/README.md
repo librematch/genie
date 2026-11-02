@@ -13,6 +13,10 @@ paths until the components regroup them.
 them, and a write copies only the table it changes (`Arc::make_mut`), so every game and every
 mod's variant starts from the stock tables without copying them (FD-046-D04).
 
+The `schema` feature derives each model type's JSON Schema (schemars), from which genie-nickel
+writes the Nickel contracts `contracts/genie.ncl` (FD-046-D15). A bit set's schema is bitflags'
+text form, its flag names joined by ` | `.
+
 ## Licence
 
 [AGPL-3.0-only](https://github.com/librematch/genie/blob/main/LICENSE-AGPL-3.0)

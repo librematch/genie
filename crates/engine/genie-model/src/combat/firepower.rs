@@ -8,6 +8,7 @@ use std::ops::{Add, AddAssign, MulAssign, Sub, SubAssign};
 /// of the units inside it). Each operator is the one `f32` operation the game does; every value
 /// is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Firepower(f32);
 
 impl Firepower {
@@ -75,6 +76,7 @@ impl genie_diff::Diff for Firepower {
 /// A count of missiles (a byte): a master's most in a volley (`max_attacks_in_volley`,
 /// `+0x8c4`, which the effects set, add to and scale) and those of the volley under way an
 /// object fired already (`next_volley`, `+0xa04`). Every byte is kept.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MissileCount(u8);
 

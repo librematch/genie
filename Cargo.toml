@@ -28,6 +28,7 @@ members = [
   "crates/engine/genie-math",
   "crates/engine/genie-model",
   "crates/engine/genie-import",
+  "crates/engine/genie-nickel",
   "crates/tools/genie-oracle",
   "crates/tools/genie-swiss-knife",
 ]
@@ -57,6 +58,10 @@ arrayvec = "0.7.2"
 binrw = { version = "0.15", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+# the model types' JSON Schema, which genie-nickel writes as Nickel contracts (FD-046-D15)
+schemars = "1.2"
+# the model's schema hash, a part of the model cache's key (FD-046-D18)
+sha2 = "0.10"
 indexmap = { version = "2", features = ["serde"] }
 rayon = "1"
 # the engine's spans and events (genie-core::trace); without the proc-macro attributes

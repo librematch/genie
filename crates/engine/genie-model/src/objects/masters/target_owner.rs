@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// it is for, as the task's test on a target reads it (`FUN_1411a8620`). Every byte is kept;
 /// one not named here is for anyone's.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TargetOwner(u8);
 
 impl TargetOwner {

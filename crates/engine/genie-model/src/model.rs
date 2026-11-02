@@ -18,6 +18,7 @@ use std::sync::Arc;
 /// The game's data a world plays on (FD-046-D02, D04): each table shared between worlds until
 /// its first write (`Arc::make_mut`), so forks and parallel instances hold one stock model.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Model {
     /// Per player, the masters (the game's per-player copies), which BUILD reads; a player
     /// without them stops at its own BUILD.

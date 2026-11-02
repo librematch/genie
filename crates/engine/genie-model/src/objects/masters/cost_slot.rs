@@ -12,6 +12,7 @@ pub const COST_SLOTS: usize = 3;
 /// empty slot holds attribute −1 (none); the readers pass over it, and the slots after it keep
 /// their places (the queue's gold slot, the upgrade effect's removal and addition).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostSlot {
     /// The attribute it costs, none for an empty slot (−1).
     pub attribute: Option<AttributeId>,

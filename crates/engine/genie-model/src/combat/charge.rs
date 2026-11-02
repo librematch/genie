@@ -10,6 +10,7 @@ use std::ops::{AddAssign, Mul, MulAssign, Sub, SubAssign};
 /// itself to the hit's attack. Each operator is the one `f32` operation the game does, in its
 /// order; a comparison is `f32`'s (a NaN compares false).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Charge(f32);
 
 impl Charge {
@@ -80,6 +81,7 @@ impl genie_diff::Diff for Charge {
 /// How fast a charge fills, its points per second as the game's `f32` holds them (a master's
 /// `recharge_rate`); over [`Seconds`] it is a [`Charge`]. Each operator is the one `f32`
 /// operation the game does, in its order.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct ChargeRate(f32);
 

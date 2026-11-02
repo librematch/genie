@@ -4,6 +4,7 @@
 /// 0x158) or multiply (2, slot 0x160); the masters' slots 0x18, 0x20, 0x28 and the objects' slots
 /// 0x78, 0x80, 0x88 follow it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Change {
     /// The attribute takes the amount.
     Set,

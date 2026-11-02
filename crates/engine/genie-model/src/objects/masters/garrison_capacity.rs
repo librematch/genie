@@ -4,6 +4,7 @@
 /// units an object of it holds; a building of any takes a gather point (`FUN_140e7e9a0`). Every
 /// byte the data or an effect leaves is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GarrisonCapacity(u8);
 
 impl GarrisonCapacity {

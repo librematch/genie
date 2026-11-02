@@ -7,6 +7,7 @@ use genie_diff::Diff;
 /// One damage sprite of a master (`+0x638`'s entries; the save's `damage_sprite`). A new entry
 /// (the default) has no sprite and zero bytes (the game zeroes its 16 bytes).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageGraphic {
     /// `+0x0`, the sprite (`tempId`, −1 for none).
     pub sprite: Option<SpriteId>,
@@ -19,6 +20,7 @@ pub struct DamageGraphic {
 /// A hit point share in whole per cent (a byte): a damage sprite's `damage_percent` (`+0x8`),
 /// below which share it shows, and an object's damage share (`+0xd`) the sprites follow.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HpPercent(u8);
 
 impl HpPercent {
@@ -47,6 +49,7 @@ impl HpPercent {
 /// How a damage sprite is applied (its `flag`, `+0x9`, the `.dat`'s `apply_mode`): placed,
 /// scattered (two Object-stream draws) or shown as the object's sprite.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageSpriteMode(u8);
 
 impl DamageSpriteMode {

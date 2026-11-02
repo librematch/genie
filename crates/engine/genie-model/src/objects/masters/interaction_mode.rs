@@ -6,6 +6,7 @@ use std::fmt::{Display, Error, Formatter};
 /// openage's names): whether a player may select its objects and give them orders. The simulation
 /// only keeps it; every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InteractionMode(u8);
 
 impl InteractionMode {

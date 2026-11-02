@@ -6,6 +6,7 @@
 /// and its `work_val2` the seconds between; a task whose `work_val1` is at most 0 is no target's
 /// (the task finder). Every value is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkValue(f32);
 
 impl WorkValue {

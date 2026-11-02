@@ -12,6 +12,7 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// The simulation names the ones it tells apart (below); any other is a number the data holds
 /// ([`AttributeId::numbered`]). A field that holds −1 for none is `Option<AttributeId>`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AttributeId(
     /// Its value, the attribute's place in the player's attributes.
     #[getset(get_copy = "pub")]

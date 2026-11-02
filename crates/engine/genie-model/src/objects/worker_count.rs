@@ -5,6 +5,7 @@
 /// them (a drop site's target's `worker_num`, a search's argument, [`WorkerCount::NO_CAP`]
 /// for none). Every value is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkerCount(i32);
 
 impl WorkerCount {

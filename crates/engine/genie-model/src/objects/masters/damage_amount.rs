@@ -7,6 +7,7 @@ use crate::math::conversions::cvttss2si;
 /// its charge's hits took off it. A signed short, which the armor slots add and subtract
 /// wrapping and the damage reads as a float.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageAmount(i16);
 
 impl DamageAmount {

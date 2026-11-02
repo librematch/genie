@@ -8,6 +8,7 @@ use std::fmt::{Display, Error, Formatter};
 /// values an object of it reads (`genie_core::map::terrain::Terrain::restriction_mask`, the
 /// pathing's planners). A field holds −1 for none.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RestrictionId(u16);
 
 impl RestrictionId {

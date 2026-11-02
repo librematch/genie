@@ -1,0 +1,26 @@
+[package]
+name = "genie-nickel"
+version = "0.1.0"
+description = "Nickel into the genie engine's model: the build layer's evaluation, the f32 rounding from exact rationals and the model's contracts"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository.workspace = true
+
+[dependencies]
+genie-error = { path = "../../base/genie-error" }
+# the model's types, whose JSON Schema the contracts are written from (FD-046-D15)
+genie-model = { path = "../genie-model", features = ["schema"] }
+# the Nickel evaluator's stable interface (MIT, FD-046-D13)
+nickel-lang = "2.2"
+# the exact rationals' integers, for the one rounding to f32 (FD-046-D16)
+num-bigint = "0.4"
+serde.workspace = true
+# the model types' JSON Schema (FD-046-D15)
+schemars.workspace = true
+# the schema's JSON, which the contracts walk
+serde_json.workspace = true
+# the schema hash, a part of the model cache's key (FD-046-D18)
+sha2.workspace = true
+
+[lints]
+workspace = true

@@ -7,6 +7,7 @@ use std::fmt::{Display, Error, Formatter};
 /// tile's class (`genie_core::map::terrain::terrain_class`); bit 7 of the word is a temporary
 /// record's.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TerrainMask(u8);
 
 impl TerrainMask {

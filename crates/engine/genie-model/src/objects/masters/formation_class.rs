@@ -5,6 +5,7 @@
 /// 6 the first). 0 keeps a unit out of the groups an order's splitter forms (`FUN_140fd76d0`).
 /// Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FormationClass(u8);
 
 impl FormationClass {

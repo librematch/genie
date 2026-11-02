@@ -4,6 +4,7 @@
 /// cost, a research's cost adjustment (`+0x6`) and a cost override's amount (`+0x42`). The
 /// arithmetic on it is the game's 16-bit one.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostAmount(i16);
 
 impl CostAmount {

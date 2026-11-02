@@ -8,6 +8,7 @@ use std::fmt::{Display, Error, Formatter};
 /// the numbers (`state < 3` alive or not yet built, `7 <= state` on its way out), so the states
 /// keep their order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ObjectState {
     /// 0: placed but not built, a foundation; it updates as an alive object does.
     Foundation = 0,

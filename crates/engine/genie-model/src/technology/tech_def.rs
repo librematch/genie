@@ -16,6 +16,7 @@ use crate::world::WholeSeconds;
 /// How a group of the game's `linkedTechs.json` links its technologies: the `+4` byte of the
 /// record the game settings' table (`FUN_140f39f40`) holds for each of them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Linked {
     /// `MutuallyExclusive` (0).
     MutuallyExclusive,
@@ -40,6 +41,7 @@ impl Linked {
 
 /// One cost entry of a technology in the `.dat`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Cost {
     /// The attribute it takes, none for −1.
     pub attribute: Option<AttributeId>,
@@ -50,6 +52,7 @@ pub struct Cost {
 }
 
 /// A technology of the `.dat` as the tech tree holds it (its 0x88-byte record).
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TechDef {
     /// `+0x2a`, `+0x30`, `+0x36`: the cost entries' attributes, amounts and paid flags.
