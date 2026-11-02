@@ -12,13 +12,8 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
 use crate::objects::masters::Master;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::CASTLE;
-use crate::objects::masters::ids::MONASTERY;
-use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::{OwnerMasters, cost_entries};
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
@@ -30,6 +25,7 @@ use crate::players::attribute::CASTLES;
 use crate::players::attribute::MONASTERIES;
 use crate::players::attribute::WONDERS;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
@@ -147,6 +143,7 @@ pub(crate) fn combat_dies(
 pub(crate) fn refund_of(
     master: &Master,
     main: Option<MainBuildingId>,
+    roles: &Roles,
 ) -> Vec<(AttributeId, Amount)> {
     let mut cost = 0.0f32;
     for (_, amount, paid) in cost_entries(&master.cost) {
@@ -166,7 +163,10 @@ pub(crate) fn refund_of(
     // The masters whose death lowers a count of their owner's (`FUN_1411dbb70`, raw `0x6104`,
     // `0x61b0`, `0x60ee`): the monastery's ([`MONASTERY`]) in attribute 52, the wonder's in 42,
     // the castle's in 134.
-    if matches!(master.id, CASTLE | WONDER) {
+    if roles
+        .of_master(master.id)
+        .intersects(MasterRoles::CASTLE | MasterRoles::WONDER)
+    {
         return vec![(attribute::TOTAL_VALUE, Amount::new(cost))];
     }
     vec![
@@ -206,6 +206,7 @@ pub(crate) fn built_death(
     annex_of: Option<MainBuildingId>,
     master: &Master,
     player_type: PlayerType,
+    roles: &Roles,
 ) -> Result<BuiltDeath, GenieError> {
     let building = master.building.ok_or(GenieError::unsupported(
         "a dying building of a master without its building part",
@@ -226,11 +227,17 @@ pub(crate) fn built_death(
         ));
     }
     let unlink = (annex_of.is_none() && u.life.inside.is_none()).then_some(u.position());
-    let count = match master.id {
-        MONASTERY => Some(MONASTERIES),
-        WONDER => Some(WONDERS),
-        CASTLE => Some(CASTLES),
-        _ => None,
+    let count = {
+        let held = roles.of_master(master.id);
+        if held.contains(MasterRoles::MONASTERY) {
+            Some(MONASTERIES)
+        } else if held.contains(MasterRoles::WONDER) {
+            Some(WONDERS)
+        } else if held.contains(MasterRoles::CASTLE) {
+            Some(CASTLES)
+        } else {
+            None
+        }
     };
     let tech = building.tech.map(|t| (master.id, t));
     Ok(BuiltDeath {
@@ -299,9 +306,6 @@ pub(crate) fn clear_look_of(
     })
 }
 
-/// The masters whose objects count in attribute 235 besides 40 (`FUN_141226060`).
-pub(crate) const MILITARY_235: [MasterId; 2] = [ids::ID_1663, ids::ID_1697];
-
 /// `FUN_141226060`: a combat object (type 70 and up) of `master` counts `by` (1 or -1) in its
 /// player's `attributes` by its class: a military class (0, 6, 12, 13, 18, 22 to 24, 26, 28, 35,
 /// 36, 43 to 47, 50, 51, 53 to 57) in attribute 40, masters 1663 and 1697 also in 235; a
@@ -321,7 +325,10 @@ pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32, r
         .contains(ClassRoles::MILITARY_COUNT)
     {
         add(40);
-        if MILITARY_235.contains(&master.id) {
+        if roles
+            .of_master(master.id)
+            .contains(MasterRoles::MILITARY_235)
+        {
             add(235);
         }
         return;

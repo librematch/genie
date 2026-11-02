@@ -6,8 +6,7 @@ use crate::gathering::both_food;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::update::QUIET_CODE;
 use crate::gathering::gather::{
-    DROP_REACH, GatherAction, GatherReads, LAST_BIT, Next, REGATHERED, REMAINDER, SPECIAL_TARGETS,
-    WAIT_SHIFT,
+    DROP_REACH, GatherAction, GatherReads, LAST_BIT, Next, REMAINDER, WAIT_SHIFT,
 };
 use crate::gathering::hunt::Dropped;
 use crate::gathering::hunt::{DropOff, resource_kind};
@@ -15,13 +14,13 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
-use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -47,7 +46,10 @@ impl GatherAction {
                 "a gather's set_state 6 on another player's farm (FUN_141185360)",
             ));
         }
-        if SPECIAL_TARGETS.contains(&target.master_id) {
+        if roles
+            .of_master(target.master_id)
+            .contains(MasterRoles::DEAD_FARM_SITE)
+        {
             return Err(GenieError::unsupported(
                 "a gather's set_state 6 on master 357 or 1188",
             ));
@@ -55,7 +57,10 @@ impl GatherAction {
         if target.state < ObjectState::Alive {
             return Ok(Next::Build);
         }
-        if matches!(target.master_id, PASTURE_MANGROVE | PASTURE) {
+        if roles
+            .of_master(target.master_id)
+            .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE)
+        {
             return Err(GenieError::unsupported(
                 "a gather's set_state 6 on master 1893 or 1897",
             ));
@@ -152,7 +157,10 @@ impl GatherAction {
             c.give_load(attribute::FOOD, sold)?;
             return Ok(Next::Stay);
         }
-        let empty = target.amount <= Amount::ZERO && !REGATHERED.contains(&target.master_id);
+        let empty = target.amount <= Amount::ZERO
+            && !roles
+                .of_master(target.master_id)
+                .contains(MasterRoles::REGATHERED);
         Ok(if over < REMAINDER || empty {
             Next::Drop
         } else {

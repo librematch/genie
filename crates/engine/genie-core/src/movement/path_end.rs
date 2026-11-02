@@ -24,18 +24,18 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
 use crate::movement::WaypointIndex;
 use crate::movement::{
-    Avoided, EPSILON, LONG_PATH_MOVER, LongWalker, Me, Mover, PUSHED, PathAsk, PathData, Planning,
-    REACH_NEAR, REACH_SHORT, ShortAsk, USER_WAYPOINT_MIDDLE, WIDE_RANGE, footprint_gap,
-    footprint_gap_squared, lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
+    Avoided, EPSILON, LongWalker, Me, Mover, PUSHED, PathAsk, PathData, Planning, REACH_NEAR,
+    REACH_SHORT, ShortAsk, USER_WAYPOINT_MIDDLE, WIDE_RANGE, footprint_gap, footprint_gap_squared,
+    lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
 };
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::ID_45;
 use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches};
 use crate::pathing::tile_path::{Path, Request};
 use crate::players::PlayerId;
 use crate::players::PlayerSet;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::{GenieError, math::fmath};
 
 /// What a reach test asks of the unit ([`Mover::reach_test`]'s arguments after the world).
@@ -102,7 +102,8 @@ impl Mover {
         let placed = target_placed(world, target)?;
         let target_radius = placed.map_or(0.0, |t| t.radius.x());
         let bonus = placed.is_some_and(|t| {
-            t.master == ID_45 || roles.of_class(t.class).contains(ClassRoles::WIDE_REACH)
+            roles.of_master(t.master).contains(MasterRoles::DOCK)
+                || roles.of_class(t.class).contains(ClassRoles::WIDE_REACH)
         });
         let mut path = Path::default();
         if let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) {
@@ -169,7 +170,10 @@ impl Mover {
             position: at,
             radius: ground,
             mask: self.stats.restriction_mask,
-            moves: self.stats.speed != Speed::ZERO || master == LONG_PATH_MOVER,
+            moves: self.stats.speed != Speed::ZERO
+                || roles
+                    .of_master(master)
+                    .contains(MasterRoles::LONG_PATH_MOVER),
             ignore_units: &self.ignore_units,
             group_units: plan.groups.group_units(me.group),
         };
@@ -184,7 +188,10 @@ impl Mover {
             to: Tile::new(cvttss2si(to.x()), cvttss2si(to.y())),
             range,
             target: long_target,
-            moves: self.stats.speed != Speed::ZERO || master == LONG_PATH_MOVER,
+            moves: self.stats.speed != Speed::ZERO
+                || roles
+                    .of_master(master)
+                    .contains(MasterRoles::LONG_PATH_MOVER),
             mask: self.stats.restriction_mask,
             player_type: plan.player_type,
             lowered,

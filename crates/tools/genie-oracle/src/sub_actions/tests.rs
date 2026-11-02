@@ -1,6 +1,7 @@
 use crate::fixtures::{action_list, building_mut, building_object, combat_object, static_mut};
 use crate::masters::{DefaultAction, MasterTable};
 use crate::sub_actions::{DefaultStart, default_task, gather_point, production, saved_attack};
+use crate::test_ids::VILLAGER_MALE;
 use crate::test_ids::object_id;
 use genie_core::combat::AttackTargetId;
 use genie_core::combat::attack::ATTACK;
@@ -17,7 +18,6 @@ use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
-use genie_core::objects::masters::ids::VILLAGER_MALE;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::Amount;
 use genie_core::players::CivId;

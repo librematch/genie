@@ -24,12 +24,13 @@ use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::TechMode;
-use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER};
+use crate::technology::effect::ATTRIBUTE_39;
 use crate::technology::{EffectCommand, ObjectsKind, Party};
 use crate::technology::{Location, TechDef, TechKind, TechState, factors};
 use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::sync::Arc;
 
@@ -462,7 +463,13 @@ impl World {
         if player_master(&self.model.masters, p, master).is_none() {
             return Ok(());
         }
-        if enable == 1 && master == MODE_TESTED_MASTER {
+        if enable == 1
+            && self
+                .model
+                .roles
+                .of_master(master)
+                .contains(MasterRoles::MODE_TESTED)
+        {
             // game mode 11 never enables it; any other asks a settings flag (their `+0x18`'s
             // `+0x7c`, bit 1, FUN_141324b60), which is not held
             if self.settings.game_mode == GameMode::SUDDEN_DEATH {

@@ -13,7 +13,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids;
 use crate::players::PlayerId;
 use crate::world::WholeSeconds;
 use crate::world::slots::CheckedIndex;
@@ -218,12 +217,13 @@ impl World {
         master: MasterId,
         position: Position,
     ) -> Result<(), GenieError> {
-        /// The farms and the terrain their foundations lay (`0x1d`, `0x41`).
-        const LAID: [(MasterId, TerrainId); 2] = [
-            (ids::FARM, TerrainId::named(29)),
-            (ids::ID_1187, TerrainId::named(65)),
+        let s = self.model.slots.master;
+        // the farms and the terrain their foundations lay (`0x1d`, `0x41`)
+        let farms = [
+            (s.farm, TerrainId::named(29)),
+            (s.rice_farm, TerrainId::named(65)),
         ];
-        let Some(&(_, laid)) = LAID.iter().find(|(m, _)| *m == master) else {
+        let Some(&(_, laid)) = farms.iter().find(|(m, _)| *m == master) else {
             return Ok(());
         };
         let m = self.master(player, master)?;

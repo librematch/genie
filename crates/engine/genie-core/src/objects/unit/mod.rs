@@ -7,7 +7,6 @@ use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::WONDER;
 use crate::players::PlayerId;
 use crate::world::WorldTime;
 use genie_diff::Diff;
@@ -25,6 +24,8 @@ use crate::objects::{DamagedTimer, WorkerCount};
 use crate::ownership::capture::Captured;
 use crate::pathing::Pathing;
 use crate::world::OBJECT_MASTER;
+use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 mod death;
@@ -153,8 +154,9 @@ impl Unit {
         at: Position,
         moving: bool,
         places: (&mut Spatial, Option<&mut Pathing>),
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        self.place.new_position(self.id, at, moving, places)
+        self.place.new_position(self.id, at, moving, places, roles)
     }
 
     /// A test's fixture puts the object at `at` without the world's index, which the test sets
@@ -206,8 +208,11 @@ pub(crate) fn object_master<'a>(
 
 /// `RGE_Action_Object::update` (`0x14106ac90`): the action list of an object past state 2 goes
 /// (`FUN_140a98620`), the Wonder's (master 276, `0x61b0` raw) only past state 5.
-pub(crate) fn loses_actions(life: &Lifecycle) -> bool {
-    let last = if matches!(life.master_id, WONDER) {
+pub(crate) fn loses_actions(life: &Lifecycle, roles: &Roles) -> bool {
+    let last = if roles
+        .of_master(life.master_id)
+        .contains(MasterRoles::WONDER)
+    {
         ObjectState::Dead
     } else {
         ObjectState::Alive

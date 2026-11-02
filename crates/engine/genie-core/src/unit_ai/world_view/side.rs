@@ -46,9 +46,9 @@ use crate::unit_ai::{
     UnitSeen, UnitSide, helper_answers,
 };
 use crate::unit_ai::{Search, UnitAi};
-use crate::world::PETARD;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use std::mem::{swap, take};
@@ -127,8 +127,7 @@ impl UnitSide for UnitView<'_, '_> {
     fn call_for_help(&mut self, attacker: ObjectId) -> Result<(), GenieError> {
         /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
-        /// The siege tower master (`FUN_141194f10`'s 0x451).
-        const SIEGE_TOWER: MasterId = MasterId::named(0x451);
+
         /// `AskForHelp`'s reach (`DAT_142ecccc4`): the squared footprint gap of 3 tiles.
         const HELP_REACH: DistanceSquared = DistanceSquared::new(UNIT_AI_HELP_REACH);
         let roles = &self.c.w.model.roles.clone();
@@ -163,7 +162,7 @@ impl UnitSide for UnitView<'_, '_> {
             }
             let m = u.master(self.c.w.master_tables(), owner)?;
             let no_help = NO_HELP_CLASSES.contains(m.class);
-            if no_help || m.id == SIEGE_TOWER {
+            if no_help || roles.of_master(m.id).contains(MasterRoles::SIEGE_TOWER) {
                 continue;
             }
             if !gaia_attacker && roles.of_class(m.class).contains(ClassRoles::VILLAGER) {
@@ -404,7 +403,8 @@ impl UnitSide for UnitView<'_, '_> {
             let m = player_master(every, p.player, p.master).ok_or(GenieError::unsupported(
                 "a found object of a master the slice does not have",
             ))?;
-            Ok(p.master == PETARD || m.object_flags.contains(ObjectFlags::SCOUT))
+            Ok(roles.of_master(p.master).contains(MasterRoles::PETARD)
+                || m.object_flags.contains(ObjectFlags::SCOUT))
         };
         // a farm's workers (`+0x644`) and its pasture (`+0x790`)
         let farm = |id: ObjectId| others.get(id).map(|u| (u.workers, u.pasture));
@@ -503,12 +503,15 @@ impl UnitSide for UnitView<'_, '_> {
         ai: &UnitAi,
         rng: &mut Well512,
     ) -> Result<Option<Tile>, GenieError> {
-        let tc = town_centre(owner_view(
-            &self.c.w.players,
-            &self.c.w.index,
-            self.c.player,
-            self.new_owner,
-        )?)?;
+        let tc = town_centre(
+            owner_view(
+                &self.c.w.players,
+                &self.c.w.index,
+                self.c.player,
+                self.new_owner,
+            )?,
+            self.c.w.model.slots.master,
+        )?;
         let (at, player_type) = (self.unit.position(), self.player_type);
         // the search about the town centre only while the player has no scout map
         let scout_map = self.c.w.spatial.scout_map(self.player).is_some();

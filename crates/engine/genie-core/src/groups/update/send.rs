@@ -174,7 +174,7 @@ impl World {
             .world_object(id)
             .zip(self.world_object(target))
             .ok_or_else(|| member_gone(id))?;
-        let master = self.master(t.player(), t.master_id())?;
+        let master = self.master(t.player(), t.master_id(self.model.slots))?;
         if master.kind != MasterKind::BUILDING
             || !self
                 .model
@@ -212,7 +212,7 @@ impl World {
         unit: WorldObject<'_>,
         target: WorldObject<'_>,
     ) -> Result<bool, GenieError> {
-        let master = self.master(unit.player(), unit.master_id())?;
+        let master = self.master(unit.player(), unit.master_id(self.model.slots))?;
         if !COMBAT_KINDS.contains(&master.kind) {
             return Ok(false);
         }

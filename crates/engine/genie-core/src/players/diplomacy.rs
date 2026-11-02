@@ -21,7 +21,6 @@ use crate::math::image::diplomacy::NO_POINT as DIPLOMACY_NO_POINT;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::MARKET;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::Stance;
@@ -30,6 +29,7 @@ use crate::players::UnitRelation;
 use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The reveal of a player's units of a kind to the others (its attribute 204 not 0,
@@ -186,7 +186,12 @@ impl World {
             return Ok(());
         }
         if relation == Relation::ALLY {
-            if master_id == MARKET {
+            if self
+                .model
+                .roles
+                .of_master(master_id)
+                .contains(MasterRoles::MARKET)
+            {
                 self.market_tells(p, id, q, position)?;
             }
             return Ok(());

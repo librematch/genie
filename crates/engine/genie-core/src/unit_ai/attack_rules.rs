@@ -22,7 +22,6 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
-use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
@@ -34,6 +33,7 @@ use crate::unit_ai::{
     SOLDIER_AI, Seeker, TOWER_AI, Target,
 };
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
@@ -70,21 +70,6 @@ pub struct Convertee {
 
 /// The faith a priest's conversion asks unless `any` (`DAT_14330ebcc`).
 pub(super) const FULL_FAITH: Amount = Amount::new(UNIT_AI_FULL_FAITH);
-/// The town centres a priest never converts (109, 618 to 621), the relic cart's master 159, the
-/// farms and fish trap (50, 1187, 199).
-pub(super) const NEVER_CONVERTED: [MasterId; 9] = [
-    ids::TOWN_CENTRE,
-    ids::TOWN_CENTRE_618,
-    ids::TOWN_CENTRE_619,
-    ids::TOWN_CENTRE_620,
-    ids::TOWN_CENTRE_621,
-    ids::ARTIFACT_CART,
-    ids::FARM,
-    ids::ID_1187,
-    ids::FISH_TRAP,
-];
-/// The priest master that converts only boats (53).
-pub(super) const BOAT_CONVERTER: MasterId = ids::FISH_PERCH;
 
 /// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert object
 /// `t` (None: one the world does not hold), with `any` its faith not asked. Never for class 43, nor
@@ -116,7 +101,10 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool, roles: &
     {
         return false;
     }
-    if p.master == BOAT_CONVERTER {
+    if roles
+        .of_master(p.master)
+        .contains(MasterRoles::BOAT_CONVERTER)
+    {
         return roles.of_class(t.class).intersects(
             ClassRoles::TRADE_BOAT
                 | ClassRoles::TRANSPORT
@@ -125,7 +113,9 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool, roles: &
                 | ClassRoles::BOARDING_SHIP,
         );
     }
-    if NEVER_CONVERTED.contains(&t.master)
+    if roles
+        .of_master(t.master)
+        .contains(MasterRoles::NEVER_CONVERTED)
         || roles
             .of_class(t.class)
             .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::FLAG)
@@ -310,13 +300,6 @@ pub fn siege_attacks_neutral(
             .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 
-/// The rams (masters 35, 422, 548 and 1258, raw `0x60bf`, `0x6242`, `0x62c0`, `0x6586`), which
-/// by attack priority 0 attack only [`RAM_TARGETS`].
-pub(super) const RAM_MASTERS: [MasterId; 4] = [ids::ID_35, ids::ID_422, ids::ID_548, ids::ID_1258];
-
-/// The siege masters whose current building target decides by attack priority alone (1744,
-/// 1746, raw `0x676c`, `0x676e`).
-pub(super) const SIEGE_BUILDING_MASTERS: [MasterId; 2] = [ids::ID_1744, ids::ID_1746];
 /// A Gaia target lets the siege unit's range grow by this (`DAT_142eb4838`).
 pub(super) const GAIA_TARGET_REACH: Distance = Distance::new(UNIT_AI_GAIA_TARGET_REACH);
 
@@ -467,7 +450,10 @@ pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
 pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles) -> bool {
     let priority = me.attack_priority;
     if priority == AttackPriority::PRIORITY_0 {
-        if RAM_MASTERS.contains(&me.master) {
+        if roles
+            .of_master(me.master)
+            .contains(MasterRoles::RAM_TARGETS_ONLY)
+        {
             return roles.of_class(t.class).contains(ClassRoles::RAM_TARGET);
         }
         if roles
@@ -479,7 +465,9 @@ pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles
                 .contains(ClassRoles::TREBUCHET_TARGET);
         }
     }
-    if SIEGE_BUILDING_MASTERS.contains(&me.master)
+    if roles
+        .of_master(me.master)
+        .contains(MasterRoles::BUILDING_BY_PRIORITY)
         && s.target.is_some()
         && s.target_kind == Some(MasterKind::BUILDING)
     {

@@ -29,10 +29,10 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::objects::masters::MasterId;
 use crate::objects::{AnimateState, Frame};
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use genie_diff::Diff;
 
@@ -311,19 +311,22 @@ impl ActiveSprite {
     }
 }
 
-const TRADE_TARGET: MasterId = MasterId::named(0x54);
-
 /// `FUN_1412028a0`: the carrying sprite (`+0x58`) of the master's first trade task (action type
 /// 0x6f on master 0x54), None without one.
 #[must_use]
-pub fn trade_sprite(master: &Master) -> Option<SpriteId> {
+pub fn trade_sprite(master: &Master, roles: &Roles) -> Option<SpriteId> {
     master
         .tasks
         .iter()
         // A trade cart's class (`FUN_14106a940`, decoded 0x13).
         // The trade task whose carrying sprite a trade cart with goods shows (`FUN_1412028a0`: action
         // type 0x6f, `object_id` 0x54).
-        .find(|t| t.action_kind == ActionKind::TRADE && t.object_id == Some(TRADE_TARGET))
+        .find(|t| {
+            t.action_kind == ActionKind::TRADE
+                && roles
+                    .of_some_master(t.object_id)
+                    .contains(MasterRoles::TRADE_TARGET)
+        })
         .and_then(|t| t.sprites.carrying)
 }
 
@@ -348,7 +351,7 @@ pub fn standing(
     roles: &Roles,
 ) -> Option<SpriteId> {
     if loaded_cart(master, goods, roles) {
-        return trade_sprite(master);
+        return trade_sprite(master, roles);
     }
     look.map_or_else(|| master.standing_sprite, |l| l.standing)
 }
@@ -363,7 +366,7 @@ pub fn walking(
     roles: &Roles,
 ) -> Option<SpriteId> {
     if loaded_cart(master, goods, roles) {
-        return trade_sprite(master);
+        return trade_sprite(master, roles);
     }
     look.map_or_else(|| master.move_sprite, |l| l.walking)
 }

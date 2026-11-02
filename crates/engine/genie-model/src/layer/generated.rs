@@ -3,6 +3,7 @@
 //! slots and the tuning groups of build 158041's symbol table.
 
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterId;
 use bitflags::bitflags;
 use serde::Deserialize;
 use serde::Serialize;
@@ -240,6 +241,200 @@ bitflags! {
     /// exe tests the id for.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct MasterRoles: u128 {
+        /// Master 1744, the `.dat`'s `ARELE`.
+        const ARMORED_ELEPHANT = 1 << 0;
+        /// Master 35, the random-map scripts' `BATTERING_RAM`.
+        const BATTERING_RAM = 1 << 1;
+        /// Master 1258, the `.dat`'s `BTRAM`.
+        const BATTERING_RAM_1258 = 1 << 2;
+        /// The priest master that converts only boats (53).
+        const BOAT_CONVERTER = 1 << 3;
+        /// A computer player's unit of these masters passes no boat over: the castle, 45, the town centre.
+        const BOAT_HUNTER = 1 << 4;
+        /// The builder (`0x76`) the train locations name for every villager.
+        const BUILDER = 1 << 5;
+        /// The rams (masters 35, 422, 548 and 1258): their blast reaches only buildings and their target.
+        const BUILDINGS_ONLY_BLAST = 1 << 6;
+        /// The siege masters whose current building target decides by attack priority alone (1744, 1746, raw `0x676c`, `0x676e`).
+        const BUILDING_BY_PRIORITY = 1 << 7;
+        /// Master 422, the random-map scripts' `CAPPED_RAM`.
+        const CAPPED_RAM = 1 << 8;
+        /// The castle (`0x52`), whose death lowers its owner's attribute 134 (`FUN_1411dbb70`).
+        const CASTLE = 1 << 9;
+        /// Master 73, the random-map scripts' `CHU_KO_NU`.
+        const CHU_KO_NU = 1 << 10;
+        /// The master whose footprint sight is a circle (`FUN_141192560`: id 112).
+        const CIRCLE_SIGHT = 1 << 11;
+        /// A target of one of these masters takes the class list only (`FUN_14100c6c0`).
+        const CLASS_LIST_ONLY = 1 << 12;
+        /// The flag masters (`FUN_140fde270`: 274, 1689 and 1785), which the footprint clearing leaves alone unless their master has height.
+        const CLEARING_FLAG = 1 << 13;
+        /// The pastures, whose workers and livestock `ClosestObject` counts (`FUN_140c488b0`, raw `0x6801`, `0x6805`).
+        const COUNTED_PASTURE = 1 << 14;
+        /// Master 357, the `.dat`'s `FARM_D`.
+        const DEAD_FARM = 1 << 15;
+        /// Masters the constructor and `set_state(6)` treat apart (357 and 1188, `FUN_140a8b140`).
+        const DEAD_FARM_SITE = 1 << 16;
+        /// Master 1898, the `.dat`'s `PASTURE_D`.
+        const DEAD_PASTURE = 1 << 17;
+        /// Master 1894, the `.dat`'s `PASTURE_D (MANGROVE)`.
+        const DEAD_PASTURE_MANGROVE = 1 << 18;
+        /// Master 1188, the `.dat`'s `RFARM_D`.
+        const DEAD_RICE_FARM = 1 << 19;
+        /// The masters whose units blast about themselves below 1 hit point (`TRIBE_Combat_Object::update`, `0x141208440`): the demolition ships 527 and 528, the demolition raft 1104 and the incendiary raft and ships 2133 to 2135.
+        const DEATH_BLAST = 1 << 20;
+        /// The master whose unit takes no defend order (slot 0x230's case 0x2bd: raw `0x611c`).
+        const DEFENDLESS = 1 << 21;
+        /// The masters whose soldier is defensive (`FUN_140c12300`, raw `0x62ab`, `0x62ac`, `0x64ec`).
+        const DEFENSIVE_SOLDIER = 1 << 22;
+        /// Master 1104, the `.dat`'s `SDGAL`.
+        const DEMOLITION_RAFT = 1 << 23;
+        /// Master 527, the random-map scripts' `DEMOLITION_SHIP`.
+        const DEMOLITION_SHIP = 1 << 24;
+        /// The dock (`.dat` DOCK), whose footprint a reach test gives more range (raw `0x60c9`, `FUN_140fa0370`).
+        const DOCK = 1 << 25;
+        /// The building masters `FUN_140fde180` counts as drop sites besides the drop-site table's: 562, 584 and 621 (`0x232` plus the bits of `0x800000000400001`), 68, 1808, 50, 1187 and 199.
+        const DROP_SITE = 1 << 26;
+        /// Master 559, the random-map scripts' `ELITE_CHU_KO_NU`.
+        const ELITE_CHU_KO_NU = 1 << 27;
+        /// Master 6 (raw `0x60a2`): a target of it takes the group's class list only (`FUN_14100c6c0`).
+        const ELITE_SKIRMISHER = 1 << 28;
+        /// The farm (`0x32`): a mill's queue buys it, and BUILD places it as the rice farm on mangrove or rice farm terrain.
+        const FARM = 1 << 29;
+        /// The gatherers whose gather without a target waits for another farm (`set_state(0xf3)`, `0x140a8e1d0`'s cases 3, 5 and 6: masters 259, 214, 1891 and 1892).
+        const FARM_WAITER = 1 << 30;
+        /// The fish trap (raw `0x6163`), which only the fishing ships gather from.
+        const FISH_TRAP = 1 << 31;
+        /// Master 1263, the `.dat`'s `FCAMEL`.
+        const FLAMING_CAMEL = 1 << 32;
+        /// Master 1663 (`0x67f`), whose upgrades move the tracker's list of the master they replace.
+        const FLEMISH_MILITIA = 1 << 33;
+        /// Master 1697 (`0x6a1`), likewise.
+        const FLEMISH_MILITIA_FEMALE = 1 << 34;
+        /// Master 528, the random-map scripts' `HEAVY_DEMOLITION_SHIP`.
+        const HEAVY_DEMOLITION_SHIP = 1 << 35;
+        /// Master 2135, the `.dat`'s `Heavy Incendiary Ship`.
+        const HEAVY_INCENDIARY_SHIP = 1 << 36;
+        /// Master 814, the random-map scripts' `HORSE`.
+        const HORSE = 1 << 37;
+        /// The house (`0x46`), whose update takes the walls' branch.
+        const HOUSE = 1 << 38;
+        /// The master whose idle soldier does nothing (`FUN_140c20db0`, raw `0x635e`).
+        const IDLES_STILL = 1 << 39;
+        /// Master 2133, the `.dat`'s `Incendiary Raft`.
+        const INCENDIARY_RAFT = 1 << 40;
+        /// Master 2134, between 2133 and 2135 of the self-destructing attackers.
+        const INCENDIARY_SHIP = 1 << 41;
+        /// Master 1715, the `.dat`'s `JADWIGA`.
+        const JADWIGA = 1 << 42;
+        /// The king (`0x1b2`).
+        const KING = 1 << 43;
+        /// The king's master that the branch passes over (raw `0x635c`).
+        const KING_UNLED = 1 << 44;
+        /// The light cavalry (`.dat` LTCAV, raw `0x62be`), which the task finder treats apart.
+        const LIGHT_CAVALRY = 1 << 45;
+        /// The master the long pather lets move without a speed (`FUN_140f9eb70`, raw id `0x2a`).
+        const LONG_PATH_MOVER = 1 << 46;
+        /// The market (raw `0x60f0`), whose own trade units the work command never retakes and whose sight the AI players' market lists follow.
+        const MARKET = 1 << 47;
+        /// The masters whose objects count in attribute 235 besides 40 (`FUN_141226060`).
+        const MILITARY_235 = 1 << 48;
+        /// Master 775, the random-map scripts' `MISSIONARY`.
+        const MISSIONARY = 1 << 49;
+        /// The master whose enabling first asks the game's mode (`0x26d`, `FUN_1416665b0`); Sudden Death (11) never enables it.
+        const MODE_TESTED = 1 << 50;
+        /// The monastery (raw `0x6104`), whose relics give goods every second and whose death lowers its owner's attribute 52 (`FUN_1411dbb70`).
+        const MONASTERY = 1 << 51;
+        /// Master 826, the random-map scripts' `MONUMENT`.
+        const MONUMENT = 1 << 52;
+        /// The masters whose units attack by priority 0 without the moving rule: the rams, the siege masters 1744 and 1746, 420 and 691.
+        const MOVING_RULE_EXEMPT = 1 << 53;
+        /// The mule cart (`.dat` MULECART, class 3, `0x710`, raw `0x67ac`), which answers the town bell besides the villagers and which a building's watch leaves out.
+        const MULE_CART = 1 << 54;
+        /// The town centres a priest never converts (109, 618 to 621), the relic cart's master 159, the farms and fish trap (50, 1187, 199).
+        const NEVER_CONVERTED = 1 << 55;
+        /// The master and class whose packed state (top action 124 or 125) attacks nothing (raw `0x6109`; class 54).
+        const PACKED_PEACEFUL = 1 << 56;
+        /// The pasture (`.dat` `PASTURE`, 1897), which a gather and a hunt treat apart with `PASTURE_MANGROVE`.
+        const PASTURE = 1 << 57;
+        /// The pasture master (`0x761`) whose foundation keeps its snow and whose stack unit depends on the rice terrain under it.
+        const PASTURE_1889 = 1 << 58;
+        /// The mangrove pasture (`.dat` `PASTURE_MANGROVE`, `0x765`): a completed building's stack unit on mangrove or rice terrain, and a pasture a gather and a hunt treat apart.
+        const PASTURE_MANGROVE = 1 << 59;
+        /// A soldier never attacks with this master (raw `0x6258`).
+        const PEACEFUL_SOLDIER = 1 << 60;
+        /// Master 440, the random-map scripts' `PETARD`.
+        const PETARD = 1 << 61;
+        /// Master 2172, the `.dat`'s `Port 1`.
+        const PORT = 1 << 62;
+        /// The masters whose swings post no executed action (`0x60e5`, `0x62cb` raw).
+        const QUIET_SWING = 1 << 63;
+        /// The rams (masters 35, 422, 548 and 1258, raw `0x60bf`, `0x6242`, `0x62c0`, `0x6586`), which by attack priority 0 attack only `RAM_TARGETS`.
+        const RAM_TARGETS_ONLY = 1 << 64;
+        /// The masters of the refill's second first-pass list (`FUN_14100c6c0`).
+        const REFILL_LISTED = 1 << 65;
+        /// The masters a gatherer may gather from while they hold nothing (the combat object's slot 0x2b8, `FUN_141216390`: the farm, the rice farm and master 45).
+        const REGATHERED = 1 << 66;
+        /// The relic (`0x11d`).
+        const RELIC = 1 << 67;
+        /// Master 1187, the `.dat`'s `RFARM`.
+        const RICE_FARM = 1 << 68;
+        /// The scout cavalry (`.dat` SCOUT, raw `0x625c`), which the task finder treats apart.
+        const SCOUT_CAVALRY = 1 << 69;
+        /// The site masters whose search starts from their footprint in any zone.
+        const SEARCH_FROM_FOOTPRINT = 1 << 70;
+        /// Master 1746, the `.dat`'s `EARELE`.
+        const SIEGE_ELEPHANT = 1 << 71;
+        /// Master 548, the random-map scripts' `SIEGE_RAM`.
+        const SIEGE_RAM = 1 << 72;
+        /// The siege tower (`.dat` SIEGTWR, raw `0x64ed`), which the task finder treats apart.
+        const SIEGE_TOWER = 1 << 73;
+        /// Master 7 (raw `0x60a3`), as `ELITE_SKIRMISHER`.
+        const SKIRMISHER = 1 << 74;
+        /// The farms whose gather goes in stops under the game's farm setting, and whose time per stop each update renews: the farm and the rice farm (the constructor's and the update's masters).
+        const STOP_FARM = 1 << 75;
+        /// The missile master whose miss strays by its attack count's share (`0x62ac` raw; the game tests master 527, `0x62ab`, first, which keeps all of it as any other).
+        const STRAYING_MISS = 1 << 76;
+        /// Master 1822, the `.dat`'s `TAMAR`.
+        const TAMAR = 1 << 77;
+        /// The originals whose ghost's leaving changes the local player's terrain (`FUN_141090ad0`).
+        const TERRAIN_ORIGINAL = 1 << 78;
+        /// Master 854, the random-map scripts' `TORCH_CONVERTING`.
+        const TORCH_CONVERTING = 1 << 79;
+        /// The masters a tower never attacks (`FUN_140c1a760`, raw `0x60ce`, `0x653f`).
+        const TOWER_SPARED = 1 << 80;
+        /// The town centre (raw `0x6109`).
+        const TOWN_CENTRE = 1 << 81;
+        /// A town centre (`0x26d`): a delete also tells the world's `+0x820`, a builder may place it and its availability counts the town centres standing.
+        const TOWN_CENTRE_621 = 1 << 82;
+        /// The master a trade task must name for its carrying sprite (`FUN_1412028a0`: action type 0x6f on master 0x54, the market).
+        const TRADE_TARGET = 1 << 83;
+        /// The trophy master `TRANSFORM_OBJECT` changes ("Trophy None") and the trophies it may take.
+        const TRANSFORMED_TROPHY = 1 << 84;
+        /// The fishing ships' masters (`FUN_1411945a0`: 13, 2356, 2171).
+        const TRAPPER = 1 << 85;
+        /// The gatherers that wait so on a target of the farm class (masters 13, 2356 and 2171, the raw `0x60a9`, `0x69d0`, `0x6917` of the same cases).
+        const TRAP_WAITER = 1 << 86;
+        /// Master 42, the random-map scripts' `TREBUCHET`.
+        const TREBUCHET = 1 << 87;
+        /// Master 331, the random-map scripts' `TREBUCHET_PACKED`.
+        const TREBUCHET_PACKED = 1 << 88;
+        /// The masters whose exhaustion the update does not check (`FUN_140a99e30`: the master id, not 0x765 and not 0x769): the pastures.
+        const UNEXHAUSTED = 1 << 89;
+        /// The buildings a stop leaves alone (`FUN_1411e6290`).
+        const UNSTOPPED = 1 << 90;
+        /// The masters readyToAttack does not turn to face their target (`0x6744`, `0x6746` raw).
+        const UNTURNED_ATTACKER = 1 << 91;
+        /// Master 1810, the `.dat`'s `SVMBAS`, which a queue order names for a villager of either sex: the queue takes the male villager, then draws the sex (`World::queue_at`).
+        const VILLAGER_ANY = 1 << 92;
+        /// The female villager (`0x125`).
+        const VILLAGER_FEMALE = 1 << 93;
+        /// The male villager (`0x53`): the master QUEUE draws a sex for, and the one the generic villager (`0x712`) becomes first (`FUN_1411cbc40`).
+        const VILLAGER_MALE = 1 << 94;
+        /// Master 1811, the `.dat`'s `WARRIORPRIEST`.
+        const WARRIOR_PRIEST = 1 << 95;
+        /// The Wonder (`0x114`, raw `0x61b0`), whose death lowers its owner's attribute 42 (`FUN_1411dbb70`) and whose construction rate the player's attribute raises at most to `DAT_142ed66b4`.
+        const WONDER = 1 << 96;
     }
 }
 
@@ -290,7 +485,64 @@ pub struct ClassSlots {
 /// The master ids the engine names, one field each.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct MasterSlots {}
+pub struct MasterSlots {
+    /// The farm (`0x32`): a mill's queue buys it, and BUILD places it as the rice farm on mangrove or rice farm terrain.
+    pub farm: MasterId,
+    /// The mill (`0x44`), whose livestock makes food (the tracker's list `FUN_14104f960`).
+    pub mill: MasterId,
+    /// The castle (`0x52`), whose death lowers its owner's attribute 134 (`FUN_1411dbb70`).
+    pub castle: MasterId,
+    /// The male villager (`0x53`): the master QUEUE draws a sex for, and the one the generic villager (`0x712`) becomes first (`FUN_1411cbc40`).
+    pub villager_male: MasterId,
+    /// The market (raw `0x60f0`), whose own trade units the work command never retakes and whose sight the AI players' market lists follow.
+    pub market: MasterId,
+    /// The town centre (raw `0x6109`).
+    pub town_centre: MasterId,
+    /// Master 112, the `.dat`'s `FLARE`.
+    pub flare: MasterId,
+    /// The builder (`0x76`) the train locations name for every villager.
+    pub builder: MasterId,
+    /// Master 156, the `.dat`'s `VMREP`.
+    pub villager_repairer_male: MasterId,
+    /// The fish trap (raw `0x6163`), which only the fishing ships gather from.
+    pub fish_trap: MasterId,
+    /// The building of the content mode 1 (`0xd1`) that stands for the castle (`FUN_140fe0ec0`).
+    pub castle_mode_1: MasterId,
+    /// Master 222, the `.dat`'s `VFREP`.
+    pub villager_repairer_female: MasterId,
+    /// Master 243, the `.dat`'s `DOPL`.
+    pub doppelganger: MasterId,
+    /// Master 274, the `.dat`'s `FLARE2`.
+    pub flare_2: MasterId,
+    /// The female villager (`0x125`).
+    pub villager_female: MasterId,
+    /// The king (`0x1b2`).
+    pub king: MasterId,
+    /// A town centre (`0x1bc`), whose tracker list the town centre counts read after 109's.
+    pub town_centre_444: MasterId,
+    /// Master 535, the `.dat`'s `BDGAL`.
+    pub boarding_galley: MasterId,
+    /// A town centre (`0x26d`): a delete also tells the world's `+0x820`, a builder may place it and its availability counts the town centres standing.
+    pub town_centre_621: MasterId,
+    /// Master 697, the `.dat`'s `FLARE4`.
+    pub flare_4: MasterId,
+    /// Master 1187, the `.dat`'s `RFARM`.
+    pub rice_farm: MasterId,
+    /// Master 1647, the `.dat`'s `TDWS4`.
+    pub market_1647: MasterId,
+    /// The mule cart (`.dat` MULECART, class 3, `0x710`, raw `0x67ac`), which answers the town bell besides the villagers and which a building's watch leaves out.
+    pub mule_cart: MasterId,
+    /// The pasture master (`0x761`) whose foundation keeps its snow and whose stack unit depends on the rice terrain under it.
+    pub pasture_1889: MasterId,
+    /// The mangrove pasture (`.dat` `PASTURE_MANGROVE`, `0x765`): a completed building's stack unit on mangrove or rice terrain, and a pasture a gather and a hunt treat apart.
+    pub pasture_mangrove: MasterId,
+    /// The pasture (`.dat` `PASTURE`, 1897), which a gather and a hunt treat apart with `PASTURE_MANGROVE`.
+    pub pasture: MasterId,
+    /// Master 1899, the `.dat`'s `Argali (Pasture)`.
+    pub pasture_argali: MasterId,
+    /// Master 1900, the `.dat`'s `Ibex (Pasture)`.
+    pub pasture_ibex: MasterId,
+}
 
 /// The tech ids the engine names, one field each.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

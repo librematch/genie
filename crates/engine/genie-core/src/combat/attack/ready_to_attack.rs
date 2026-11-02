@@ -4,8 +4,8 @@
 use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{
-    Attack, AttackReads, Fight, Ground, HALF, MASTER_1704, MASTER_1706, NO_RANGE, NONE, Readiness,
-    SHORT_RANGE_GAP, TARGET_GONE, face_target, move_reads,
+    Attack, AttackReads, Fight, Ground, HALF, NO_RANGE, NONE, Readiness, SHORT_RANGE_GAP,
+    TARGET_GONE, face_target, move_reads,
 };
 use crate::map::Distance;
 use crate::map::Position;
@@ -27,6 +27,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 impl Attack {
@@ -135,6 +136,7 @@ impl Attack {
                 (t.position, g.by_id.combat_of(unit.id).attack_timer),
                 f,
                 r,
+                roles,
             );
         }
         if gap < self.min_range {
@@ -174,6 +176,7 @@ impl Attack {
             (t.position, g.by_id.combat_of(unit.id).attack_timer),
             f,
             r,
+            roles,
         )
     }
 
@@ -228,9 +231,12 @@ impl Attack {
         (to, attack_timer): (Position, Seconds),
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<Readiness, GenieError> {
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
-        if !matches!(f.own.master_id, MASTER_1704 | MASTER_1706)
+        if !roles
+            .of_master(f.own.master_id)
+            .contains(MasterRoles::UNTURNED_ATTACKER)
             && !face_target(mover, at, to, r.world_time)?
         {
             return Ok(Readiness::Waiting);

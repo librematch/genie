@@ -25,7 +25,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -44,6 +43,7 @@ use crate::unit_ai::{
 };
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// A unit AI's search (`FUN_140c63e20`) as the idle checks run it: it queries its player's
@@ -289,9 +289,6 @@ impl Seeker {
     }
 }
 
-/// The masters a tower never attacks (`FUN_140c1a760`, raw `0x60ce`, `0x653f`).
-pub(super) const TOWER_SPARED: [MasterId; 2] = [ids::FARM, ids::ID_1187];
-
 /// Slot 0xa0 of `me`'s unit AI with 0, `CanAttack`: whether it may attack `t`, by type: the
 /// hunted animal's (`FUN_140c18d00`) while its action list holds an Attack (type 9) or a type 7
 /// (slot 0x538); the predator's ([`predator_may_attack`]), the lion's ([`lion_may_attack`]) and
@@ -372,7 +369,9 @@ pub fn tower_can_attack(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool
         return Ok(false);
     }
     if (t.kind == MasterKind::BUILDING && t.desolid)
-        || TOWER_SPARED.contains(&t.master)
+        || roles
+            .of_master(t.master)
+            .contains(MasterRoles::TOWER_SPARED)
         || me.state <= ObjectState::Unfinished
     {
         return Ok(false);
@@ -399,11 +398,6 @@ pub fn tower_can_attack(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool
 /// An attacker without a missile is armed with a firepower above this (`FUN_14120ea30`,
 /// `DAT_14330eb8c`).
 pub(super) const ARMED_FIREPOWER: Firepower = Firepower::new(UNIT_AI_ARMED_FIREPOWER);
-/// A soldier never attacks with this master (raw `0x6258`).
-pub(super) const SOLDIER_NEVER: MasterId = ids::TOWN_CENTRE_444;
-/// The master and class whose packed state (top action 124 or 125) attacks nothing (raw
-/// `0x6109`; class 54).
-pub(super) const PACKED_MASTER: MasterId = ids::TOWN_CENTRE;
 
 /// The soldier's range against a target grows by this for its stance checks
 /// (`DAT_142e7f384`).
@@ -508,14 +502,18 @@ pub(super) fn never_attacks(me: &Attacker, roles: &Roles) -> bool {
     if roles
         .of_some_class(me.class)
         .contains(ClassRoles::PACKED_TREBUCHET)
-        || me.master == SOLDIER_NEVER
+        || roles
+            .of_master(me.master)
+            .contains(MasterRoles::PEACEFUL_SOLDIER)
     {
         return true;
     }
     (roles
         .of_some_class(me.class)
         .contains(ClassRoles::PACKED_ATTACKS_NOTHING)
-        || me.master == PACKED_MASTER)
+        || roles
+            .of_master(me.master)
+            .contains(MasterRoles::PACKED_PEACEFUL))
         && matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK))
 }
 

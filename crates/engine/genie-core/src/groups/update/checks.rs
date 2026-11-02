@@ -31,7 +31,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids::MONASTERY;
 use crate::objects::sprite::{new_sprite, running, standing, walking};
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
@@ -42,6 +41,7 @@ use crate::world::Unread;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
@@ -227,8 +227,12 @@ impl World {
         a: WorldObject<'_>,
         b: WorldObject<'_>,
     ) -> Result<DistanceSquared, GenieError> {
-        let ra = self.master(a.player(), a.master_id())?.radius;
-        let rb = self.master(b.player(), b.master_id())?.radius;
+        let ra = self
+            .master(a.player(), a.master_id(self.model.slots))?
+            .radius;
+        let rb = self
+            .master(b.player(), b.master_id(self.model.slots))?
+            .radius;
         Ok(movement_footprint_gap_squared(
             a.position(),
             ra,
@@ -248,8 +252,12 @@ impl World {
         a: WorldObject<'_>,
         b: WorldObject<'_>,
     ) -> Result<Distance, GenieError> {
-        let ra = self.master(a.player(), a.master_id())?.radius;
-        let rb = self.master(b.player(), b.master_id())?.radius;
+        let ra = self
+            .master(a.player(), a.master_id(self.model.slots))?
+            .radius;
+        let rb = self
+            .master(b.player(), b.master_id(self.model.slots))?
+            .radius;
         Ok(movement_footprint_gap(a.position(), ra, b.position(), rb))
     }
 
@@ -316,7 +324,10 @@ impl World {
                 Some(t) => self
                     .model
                     .roles
-                    .of_class(self.master(t.player(), t.master_id())?.class)
+                    .of_class(
+                        self.master(t.player(), t.master_id(self.model.slots))?
+                            .class,
+                    )
                     .contains(ClassRoles::RELIC),
                 None => false,
             };
@@ -345,9 +356,12 @@ impl World {
             };
             let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
             let delivers = self.has_task(owner, u.life.master_id, RELIC_DELIVERY_ACTION)?;
-            let monastery = self
-                .world_object(ai.current_target)
-                .is_some_and(|t| t.master_id() == MONASTERY);
+            let monastery = self.world_object(ai.current_target).is_some_and(|t| {
+                self.model
+                    .roles
+                    .of_master(t.master_id(self.model.slots))
+                    .contains(MasterRoles::MONASTERY)
+            });
             if g.current_command == DELIVER_RELIC
                 && (ai.current_order == Some(OrderKind::OnTarget)
                     || ai.current_action == Some(AiAction::OnTarget))
@@ -394,7 +408,7 @@ impl World {
         object: WorldObject<'_>,
         player: PlayerId,
     ) -> Result<bool, GenieError> {
-        let master = self.master(object.player(), object.master_id())?;
+        let master = self.master(object.player(), object.master_id(self.model.slots))?;
         let (x, y) = (object.position().x(), object.position().y());
         let (x, y) = (cvttss2si(x), cvttss2si(y));
         if master.fog_visibility == FogVisibility::INVISIBLE {

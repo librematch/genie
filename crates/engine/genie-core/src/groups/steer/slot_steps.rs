@@ -17,9 +17,7 @@ use crate::math::fmath::{BVector, at_most_or_unordered, below_or_unordered};
 use crate::math::rng::Stream;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
-use crate::movement::{
-    LONG_PATH_MOVER, LongWalker, Mover, Planning, long_path_for, short_path_for,
-};
+use crate::movement::{LongWalker, Mover, Planning, long_path_for, short_path_for};
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
 use crate::objects::facing::SpriteFacets;
@@ -29,6 +27,7 @@ use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
+use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 impl World {
@@ -142,7 +141,12 @@ impl World {
                 position: u.position(),
                 radius: mover.stats.radius.ground(),
                 mask: mover.stats.restriction_mask,
-                moves: mover.stats.speed != Speed::ZERO || u.life.master_id == LONG_PATH_MOVER,
+                moves: mover.stats.speed != Speed::ZERO
+                    || self
+                        .model
+                        .roles
+                        .of_master(u.life.master_id)
+                        .contains(MasterRoles::LONG_PATH_MOVER),
                 ignore_units: &mover.ignore_units,
                 group_units: self.groups.group_units(u.group.id),
             };
@@ -365,6 +369,7 @@ impl World {
             id,
             at,
             (&mut self.spatial, Some(&mut self.pathing)),
+            &self.model.roles,
         )?;
         if !id.is_recyclable()
             // The types of action objects (`RGE_Action_Object`) and of buildings (`TRIBE_Building_Object`).

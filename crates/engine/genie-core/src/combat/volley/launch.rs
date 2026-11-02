@@ -185,6 +185,7 @@ impl Unit {
                 made.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
+                roles,
             )?;
         }
         let held = static_storage(c.w.players.player_mut(c.player)?, &made.storage)?;

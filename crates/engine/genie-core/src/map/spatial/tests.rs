@@ -9,8 +9,6 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::FISH_TRAP;
 use crate::ownership::CaptureKind;
 use crate::players::ByPlayer;
 use crate::players::Relation;
@@ -19,6 +17,8 @@ use crate::players::relations;
 use crate::test_ids::class_id;
 use crate::test_ids::{master_id, object_id};
 use crate::testing::class;
+use crate::testing::ids;
+use crate::testing::ids::FISH_TRAP;
 use crate::testing::roles;
 use crate::unit_ai::{Memory, NoAttack};
 use crate::vision::VisionBits;
@@ -73,7 +73,7 @@ fn the_record_cells_answer_as_the_full_scan_does() {
         match next() % 7 {
             0 | 1 => s.insert(object_id(id), placed(position, r, kind)),
             2 | 3 => s
-                .set_position(object_id(id), position.with_height(0.0))
+                .set_position(object_id(id), position.with_height(0.0), &roles())
                 .unwrap(),
             4 => {
                 let here = s
@@ -1174,7 +1174,7 @@ fn unit_counts_on_the_tile_its_centre_is_on_and_marks_nothing() {
     s.insert(object_id(9177), villager(1.9, 1.0));
     assert_eq!(s.tiles().objects(Tile::new(1, 1)), Some(1));
     assert_eq!(s.tiles().word(Tile::new(1, 1)), Some(4));
-    s.set_position(object_id(9177), Position::new(2.05, 1.0, 0.0))
+    s.set_position(object_id(9177), Position::new(2.05, 1.0, 0.0), &roles())
         .unwrap();
     assert_eq!(
         (
@@ -1201,7 +1201,7 @@ fn tile_list_keeps_the_game_order() {
     );
     assert_eq!(s.tile_place(object_id(9173)), 2);
     // the leaving object's slot goes to the last
-    s.set_position(object_id(9171), Position::new(2.1, 1.0, 0.0))
+    s.set_position(object_id(9171), Position::new(2.1, 1.0, 0.0), &roles())
         .unwrap();
     assert_eq!(
         s.tiles().list(Tile::new(1, 1)),
@@ -1212,14 +1212,14 @@ fn tile_list_keeps_the_game_order() {
         (0, 0)
     );
     // a move within the tile and a master change keep the slot
-    s.set_position(object_id(9173), Position::new(1.2, 1.0, 0.0))
+    s.set_position(object_id(9173), Position::new(1.2, 1.0, 0.0), &roles())
         .unwrap();
     s.change_master(object_id(9173), villager(1.2, 1.0));
     assert_eq!(
         s.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029)]
     );
-    s.set_position(object_id(9171), Position::new(1.0, 1.0, 0.0))
+    s.set_position(object_id(9171), Position::new(1.0, 1.0, 0.0), &roles())
         .unwrap();
     assert_eq!(
         s.tiles().list(Tile::new(1, 1)),
@@ -2465,25 +2465,42 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         ..Searcher::default()
     };
     let (farm, trap) = (farm_of(ids::FARM), farm_of(FISH_TRAP));
-    assert!(farm_kept(object_id(1), &farm, filter, farmer, &look).unwrap());
-    assert!(!farm_kept(object_id(1), &farm, filter, trapper, &look).unwrap());
-    assert!(farm_kept(object_id(1), &trap, filter, trapper, &look).unwrap());
-    assert!(!farm_kept(object_id(1), &trap, filter, farmer, &look).unwrap());
-    assert!(!farm_kept(object_id(2), &farm, filter, farmer, &look).unwrap());
+    assert!(farm_kept(object_id(1), &farm, filter, farmer, &look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(1), &farm, filter, trapper, &look, &roles()).unwrap());
+    assert!(farm_kept(object_id(1), &trap, filter, trapper, &look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(1), &trap, filter, farmer, &look, &roles()).unwrap());
+    assert!(!farm_kept(object_id(2), &farm, filter, farmer, &look, &roles()).unwrap());
     let asked = Filter {
         master: Some(master_id(50)),
         ..filter
     };
-    assert!(farm_kept(object_id(2), &farm, asked, Searcher::default(), &look).unwrap());
-    assert!(!farm_kept(object_id(3), &farm, filter, farmer, &look).unwrap());
+    assert!(
+        farm_kept(
+            object_id(2),
+            &farm,
+            asked,
+            Searcher::default(),
+            &look,
+            &roles()
+        )
+        .unwrap()
+    );
+    assert!(!farm_kept(object_id(3), &farm, filter, farmer, &look, &roles()).unwrap());
     assert_eq!(
-        farm_kept(object_id(1), &farm_of(PASTURES[0]), filter, farmer, &look)
-            .unwrap_err()
-            .reason(),
+        farm_kept(
+            object_id(1),
+            &farm_of(ids::PASTURE_MANGROVE),
+            filter,
+            farmer,
+            &look,
+            &roles()
+        )
+        .unwrap_err()
+        .reason(),
         "ClosestObject over pastures (their workers and livestock)"
     );
     assert_eq!(
-        farm_kept(object_id(4), &farm, filter, farmer, &look)
+        farm_kept(object_id(4), &farm, filter, farmer, &look, &roles())
             .unwrap_err()
             .reason(),
         "a found farm the slice does not hold"

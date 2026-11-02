@@ -22,7 +22,7 @@ use crate::objects::release::Releaser;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
-use crate::orders::{TROPHIES, TROPHY, clear_powerups, damage_share};
+use crate::orders::{TROPHIES, clear_powerups, damage_share};
 use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -37,6 +37,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
@@ -184,7 +185,13 @@ impl World {
             return Ok(());
         }
         let unit = &self.players.live(p, idx)?;
-        if unit.life.master_id != TROPHY || !TROPHIES.contains(&master.get()) {
+        if !self
+            .model
+            .roles
+            .of_master(unit.life.master_id)
+            .contains(MasterRoles::TRANSFORMED_TROPHY)
+            || !TROPHIES.contains(&master.get())
+        {
             return Ok(());
         }
         self.transform_building(p, idx, master)
@@ -470,9 +477,14 @@ pub(crate) fn switch_master(
                     o.class = next.obstruction_class;
                 }
                 world.pathing.removed(id);
-                world
-                    .spatial
-                    .sight_master(id, next.radius, next.class, new, next.line_of_sight)?;
+                world.spatial.sight_master(
+                    id,
+                    next.radius,
+                    next.class,
+                    new,
+                    next.line_of_sight,
+                    roles,
+                )?;
                 world.spatial.change_master(id, placed);
                 world.pathing.moved(id, &placed, moving);
             }

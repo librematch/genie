@@ -18,7 +18,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::orders::object_gone;
 use crate::orders::{HERD_MOST, NO_POINT};
 use crate::players::Amount;
@@ -30,6 +29,7 @@ use crate::world::WALKER_UNMOVING;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -58,7 +58,12 @@ impl World {
         ))?;
         let target_master = t.master(self.master_tables(), tp)?;
         let to_building = livestock && target_master.kind == MasterKind::BUILDING;
-        let to_town_centre = livestock && target_master.id == TOWN_CENTRE;
+        let to_town_centre = livestock
+            && self
+                .model
+                .roles
+                .of_master(target_master.id)
+                .contains(MasterRoles::TOWN_CENTRE);
         let at = self
             .spatial
             .get(target)

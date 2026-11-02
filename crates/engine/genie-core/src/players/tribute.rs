@@ -6,7 +6,6 @@ use crate::GenieError;
 use crate::commands::ResourceWord;
 use crate::math::fmath::maxss;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::TributeFee;
@@ -14,10 +13,6 @@ use crate::players::attribute;
 use crate::players::tracker::ListKey;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
-
-/// The masters one of which a player needs to pay tribute (`FUN_1416259e0`: its tracker's count
-/// of the market, 84, or of 1647 above 0).
-const MARKETS: [MasterId; 2] = [ids::MARKET, ids::MARKET_1647];
 
 /// One of a tribute's four entries: the attribute (`+0x24`..), its amount (`+0x04`..) and the
 /// fee (`+0x14`..), a share of the amount.
@@ -54,9 +49,9 @@ pub fn settle(have: Amount, gift: Gift) -> (Amount, Amount) {
 }
 
 impl World {
-    /// `FUN_1416259e0`: player `p` may pay tribute, its tracker counting a market or a 1647
-    /// (`FUN_140b26630`: a master the player has, `FUN_141659d20`, else none; the count of its
-    /// done list, `FUN_14104eea0`).
+    /// `FUN_1416259e0`: player `p` may pay tribute, its tracker counting a market or a 1647 above
+    /// 0 (the build's `market` and `market_1647`; `FUN_140b26630`: a master the player has,
+    /// `FUN_141659d20`, else none; the count of its done list, `FUN_14104eea0`).
     #[must_use]
     pub fn pays_tribute(&self, p: PlayerId) -> bool {
         let has = |m: MasterId| {
@@ -65,7 +60,8 @@ impl World {
                 .get(p.index())
                 .is_some_and(|ms| ms.get(m).is_some())
         };
-        MARKETS.iter().any(|&m| {
+        let s = self.model.slots.master;
+        [s.market, s.market_1647].iter().any(|&m| {
             has(m)
                 && self
                     .players
@@ -130,7 +126,6 @@ impl World {
 mod tests {
     use super::*;
     use crate::objects::masters::MasterKind;
-    use crate::objects::masters::ids;
     use crate::objects::masters::{Master, Masters};
     #[cfg(test)]
     use crate::players::PlayerType;
@@ -141,6 +136,7 @@ mod tests {
     #[cfg(test)]
     use crate::test_ids::{amounts, attributes};
     use crate::testing::class;
+    use crate::testing::ids;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;

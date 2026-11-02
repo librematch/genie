@@ -485,7 +485,6 @@ mod tests {
     use crate::objects::masters::CostSlot;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
-    use crate::objects::masters::ids;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     #[cfg(test)]
@@ -498,6 +497,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::opt_master;
     use crate::test_ids::tech_id;
+    use crate::testing::ids;
 
     fn unit(master: MasterId, count: i16, food: f32) -> Entry {
         Entry {

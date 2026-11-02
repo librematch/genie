@@ -7,19 +7,18 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids::BUILDER;
-use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{
-    AGES, TOWN_CENTRES, TreeMaster, TreeQuery, TreeTech, full_tree_civ, get,
+    AGES, TreeMaster, TreeQuery, TreeTech, full_tree_civ, get, town_centres,
 };
 use crate::technology::ResearchState;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 
 impl World {
     /// `FUN_141658970`: player `p`'s first built town centre (state 2) among the ids its tracker
@@ -28,7 +27,7 @@ impl World {
     #[must_use]
     pub fn first_town_centre(&self, p: PlayerId) -> Option<ObjectId> {
         let tracker = &self.players.get(p.index())?.tracker;
-        TOWN_CENTRES
+        town_centres(self.model.slots.master)
             .iter()
             .flat_map(|&k| tracker.list(ListKey::master(k)).iter().copied().flatten())
             .find(|&id| {
@@ -44,7 +43,7 @@ impl World {
     pub fn town_centre_at(&self, p: PlayerId, n: usize) -> Option<ObjectId> {
         let tracker = &self.players.get(p.index())?.tracker;
         // a queued unit's place (−1) names no object the world holds
-        TOWN_CENTRES
+        town_centres(self.model.slots.master)
             .iter()
             .flat_map(|&k| tracker.list(ListKey::master(k)).iter().copied().flatten())
             .filter(|&id| self.object(id).is_some())
@@ -60,8 +59,9 @@ impl World {
             return 0;
         };
         let tracker = &player.tracker;
-        let pending = tracker.list(ListKey::master(TOWN_CENTRES[0]).pending());
-        TOWN_CENTRES
+        let pending =
+            tracker.list(ListKey::master(town_centres(self.model.slots.master)[0]).pending());
+        town_centres(self.model.slots.master)
             .iter()
             .flat_map(|&k| tracker.list(ListKey::master(k)).iter())
             .chain(pending)
@@ -101,12 +101,17 @@ impl World {
         // The wonder's master (`0x61b0` raw, `0x14163bb68`).
         // The builder's master (`FUN_141625a20`'s 0x76).
         // The town centre a builder may place (`FUN_141625a20`'s 0x26d).
-        if building == BUILDER {
+        if self
+            .model
+            .roles
+            .of_master(building)
+            .contains(MasterRoles::BUILDER)
+        {
             let Some(player) = self.players.get(p.index()) else {
                 return 0;
             };
             let a = &player.attributes;
-            let centre = masters.get(TOWN_CENTRE_621);
+            let centre = masters.get(self.model.slots.master.town_centre_621);
             if get(a, attribute::NO_TOWN_CENTRE) == Amount::ZERO
                 && centre.is_some_and(|c| !c.disabled && !c.available)
                 && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT).get()
@@ -191,9 +196,14 @@ impl World {
                 }
             }
         }
-        if building == BUILDER {
+        if self
+            .model
+            .roles
+            .of_master(building)
+            .contains(MasterRoles::BUILDER)
+        {
             let a = &player.attributes;
-            let centre = masters.get(TOWN_CENTRE_621);
+            let centre = masters.get(self.model.slots.master.town_centre_621);
             if get(a, attribute::NO_TOWN_CENTRE) == Amount::ZERO
                 && centre.is_some_and(|c| !c.disabled && c.available)
                 && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT).get()

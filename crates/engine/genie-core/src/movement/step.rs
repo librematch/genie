@@ -35,6 +35,7 @@ use crate::production::spawn::START_RIGHT_Z;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::{GenieError, math::fmath};
 
 /// [`Mover::level_gaps`]'s measure: the target with its place (none for a level without one or
@@ -239,8 +240,9 @@ impl Mover {
         id: ObjectId,
         at: Position,
         places: (&mut Spatial, Option<&mut Pathing>),
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        place.new_position(id, at, self.is_moving(), places)
+        place.new_position(id, at, self.is_moving(), places, roles)
     }
 
     /// The position setter (slot 11 -> `FUN_141161950` -> `0x1411a58b0`): a unit that can move

@@ -59,12 +59,12 @@ use crate::objects::masters::FlyMode;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterField;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TaskTerrain;
-use crate::objects::masters::{MasterId, ids};
 use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -92,6 +92,7 @@ use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::test_ids::unit_list;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
@@ -1177,14 +1178,14 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
     assert!(garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
-        MASTER_1811,
+        ids::WARRIOR_PRIEST,
         true,
         &roles()
     ));
     assert!(!garrison_type_takes(
         GarrisonKinds::INFANTRY,
         class::CLASS_6,
-        MASTER_1811,
+        ids::WARRIOR_PRIEST,
         true,
         &roles()
     ));

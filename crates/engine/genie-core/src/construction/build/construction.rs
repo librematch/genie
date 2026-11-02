@@ -17,10 +17,6 @@ use crate::objects::ObjectId;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::CASTLE;
-use crate::objects::masters::ids::MONASTERY;
-use crate::objects::masters::ids::PASTURE_MANGROVE;
-use crate::objects::masters::ids::WONDER;
 use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::attribute;
@@ -36,6 +32,7 @@ use crate::world::Millis;
 use crate::world::Mode680;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// The completion's storage ([`crate::world::World::complete_building`]): its master's entries of modes 4, 8 and 64 go to its
@@ -73,12 +70,16 @@ pub(super) fn hand_storage(
 pub(super) fn foundation_laid(
     building: &BuildingMaster,
     stack_master: Option<MasterId>,
+    roles: &Roles,
 ) -> Option<TerrainId> {
     /// The terrain the pasture master 1889's stack unit on mangrove or rice terrain lays
     /// (`0x3f`).
     const RICE_PASTURE_TERRAIN: TerrainId = TerrainId::named(0x3f);
     building.foundation_terrain.map(|foundation| {
-        if stack_master == Some(PASTURE_MANGROVE) {
+        if roles
+            .of_some_master(stack_master)
+            .contains(MasterRoles::PASTURE_MANGROVE)
+        {
             RICE_PASTURE_TERRAIN
         } else {
             foundation
@@ -141,28 +142,35 @@ pub(super) fn completion_counts(
     building: &BuildingMaster,
     main: bool,
     attributes: &mut Vec<(AttributeId, Amount)>,
+    roles: &Roles,
 ) -> Option<EventKind> {
     // the castle's and the wonder's history event (0x1411dd094), the counts (slot 0xf8 with
     // 1.0, 0x14330eb8c)
-    let history = match master.id {
-        CASTLE => Some(EventKind::CASTLE_BUILT),
-        // The Wonder's master (`0x114`), whose construction rate the player's attribute raises at most to
-        // `DAT_142ed66b4`.
-        WONDER => Some(EventKind::WONDER_BUILT),
-        _ => None,
+    let history = {
+        let held = roles.of_master(master.id);
+        if held.contains(MasterRoles::CASTLE) {
+            Some(EventKind::CASTLE_BUILT)
+        } else if held.contains(MasterRoles::WONDER) {
+            Some(EventKind::WONDER_BUILT)
+        } else {
+            None
+        }
     };
-    match master.id {
-        // The monastery (master 104, `0x6104` raw), whose relics give goods every second.
-        MONASTERY => attributes.push((MONASTERIES, Amount::new(1.0))),
-        WONDER => attributes.extend([
-            (WONDERS, Amount::new(1.0)),
-            (WONDERS_BUILT, Amount::new(1.0)),
-        ]),
-        CASTLE => attributes.extend([
-            (CASTLES, Amount::new(1.0)),
-            (CASTLES_BUILT, Amount::new(1.0)),
-        ]),
-        _ => {}
+    {
+        let held = roles.of_master(master.id);
+        if held.contains(MasterRoles::MONASTERY) {
+            attributes.push((MONASTERIES, Amount::new(1.0)));
+        } else if held.contains(MasterRoles::WONDER) {
+            attributes.extend([
+                (WONDERS, Amount::new(1.0)),
+                (WONDERS_BUILT, Amount::new(1.0)),
+            ]);
+        } else if held.contains(MasterRoles::CASTLE) {
+            attributes.extend([
+                (CASTLES, Amount::new(1.0)),
+                (CASTLES_BUILT, Amount::new(1.0)),
+            ]);
+        }
     }
     // its paid cost: the cost entries of a resource flagged paid (`+0x880`), summed as shorts
     let paid: i32 = master
@@ -172,7 +180,10 @@ pub(super) fn completion_counts(
         .filter(|&(_, _, paid)| paid)
         .map(|(_, amount, _)| i32::from(amount.get()))
         .sum();
-    if matches!(master.id, CASTLE | WONDER) {
+    if roles
+        .of_master(master.id)
+        .intersects(MasterRoles::CASTLE | MasterRoles::WONDER)
+    {
         attributes.push((CASTLE_WONDER_COST, Amount::new(paid as f32)));
     } else if !main && building.stack_unit.is_none() {
         attributes.push((attribute::TOTAL_VALUE, Amount::new(paid as f32)));
@@ -226,6 +237,7 @@ impl Construction {
         world: &mut Spatial,
         pathing: &mut Pathing,
         now: WorldTime,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         if !c.desolid {
             return Ok(false);
@@ -234,7 +246,7 @@ impl Construction {
         c.desolid = false;
         c.progress = Seconds::new(f32::from_bits(STARTED));
         if let Some(v) = world.sight.as_mut() {
-            v.construction_started(id, placed.position, placed.radius)?;
+            v.construction_started(id, placed.position, placed.radius, roles)?;
         }
         // a master of obstruction kind 0 or 12, or of class 0, gets no record (FUN_141056460)
         if c.record.recorded() {

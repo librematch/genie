@@ -23,21 +23,15 @@ use crate::objects::ObjectState;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::MASTER_1808;
 use crate::players::PlayerId;
 use crate::players::PlayerSet;
 use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::collections::HashMap;
 
-/// The ghosts' master in every player's list (`player+0x28`'s entry 243, "DOPL").
-pub const GHOST_MASTER: MasterId = ids::DOPPELGANGER;
-
-/// The originals whose ghost's leaving changes the local player's terrain (`FUN_141090ad0`).
-const TERRAIN_ORIGINALS: [MasterId; 2] = [ids::ID_357, ids::ID_1188];
 /// The type from which an object's entry and its ghost follow its footprint's UMV entry
 /// (`FUN_141090430`, `FUN_14108f9b0`: master type above 0x31).
 const MASKED_KIND: MasterKind = MasterKind::RGE_COMBAT;
@@ -244,7 +238,7 @@ impl World {
             && !self.parts.building_of(u.id).construction.is_some_and(|c| c.desolid)
             // The master a building's watch leaves out (`FUN_1411cc980`).
             && (!annex || self.model.roles.of_class(m.class).contains(ClassRoles::GATE))
-            && m.id != MASTER_1808,
+            && !self.model.roles.of_master(m.id).contains(MasterRoles::MULE_CART),
         )
     }
 
@@ -390,7 +384,9 @@ impl World {
         at: Position,
         original: Original,
     ) -> Result<(), GenieError> {
-        let recyclable = self.master(viewer, GHOST_MASTER)?.recyclable;
+        let recyclable = self
+            .master(viewer, self.model.slots.master.doppelganger)?
+            .recyclable;
         let kind = self.master(original.owner, original.master)?.kind;
         let umv = self
             .spatial
@@ -410,7 +406,7 @@ impl World {
                 self.recycling.next_id = id.predecessor();
                 id
             }
-            None => self.take_object_id(viewer, GHOST_MASTER),
+            None => self.take_object_id(viewer, self.model.slots.master.doppelganger),
         };
         let gone = ObjectState::Undead < original.state;
         let mut ghost = Ghost {
@@ -490,15 +486,21 @@ impl World {
             let leaves = self.update_ghost(p, k)?;
             if leaves {
                 let g = self.players.player_mut(p)?.ghosts.swap_remove(k);
-                if g.original_master
-                    .is_some_and(|m| TERRAIN_ORIGINALS.contains(&m))
-                {
+                if g.original_master.is_some_and(|m| {
+                    self.model
+                        .roles
+                        .of_master(m)
+                        .contains(MasterRoles::TERRAIN_ORIGINAL)
+                }) {
                     return Err(GenieError::unsupported(
                         "a farm's ghost leaving (the local player's terrain, FUN_141092190)",
                     ));
                 }
                 self.spatial.remove_ghost(g.id, g.position);
-                if self.master(p, GHOST_MASTER)?.recyclable {
+                if self
+                    .master(p, self.model.slots.master.doppelganger)?
+                    .recyclable
+                {
                     self.recycling.ghosts.push(g.id);
                 }
                 continue;
@@ -695,8 +697,6 @@ mod tests {
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::ids;
-    use crate::objects::masters::ids::HOUSE;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
     use crate::ownership::CaptureKind;
@@ -705,6 +705,9 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::ids;
+    use crate::testing::ids::HOUSE;
+    use crate::testing::ids::MASTER_1808;
     #[cfg(test)]
     use crate::vision::own_masks;
     #[cfg(test)]
@@ -728,7 +731,7 @@ mod tests {
     fn masters(recyclable: bool) -> Masters {
         Masters::new([
             Master {
-                id: GHOST_MASTER,
+                id: ids::DOPPELGANGER,
                 // The type of a ghost (`+0xf`).
                 kind: MasterKind::DOPPELGANGER,
                 recyclable,

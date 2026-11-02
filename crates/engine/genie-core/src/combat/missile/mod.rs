@@ -58,8 +58,8 @@ use crate::math::image::missile::{
     VOLLEY_REACH_MARGIN as MISSILE_VOLLEY_REACH_MARGIN, VOLLEY_SCALE as MISSILE_VOLLEY_SCALE,
 };
 use crate::movement::Acceleration;
-use crate::objects::masters::ids;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// The missile action's type, which word 9 adds when it is the top action.
@@ -265,10 +265,6 @@ pub fn volley_reach(radius: Footprint, range: Distance) -> Distance {
     )
 }
 
-/// The missile master whose miss strays by its attack count's share (`0x62ac` raw; the game
-/// tests master 527, `0x62ab`, first, which keeps all of it as any other).
-const MASTER_528: MasterId = ids::ID_528;
-
 /// What the aim reads of the firing object (`+0x28`, else the missile): its master's
 /// `base_hit_chance` (`+0x83e`) and `missed_missile_spread` (`+0x860`), its class and the
 /// target's master's radius on x and class for the class-54 rule.
@@ -350,7 +346,12 @@ pub fn aim(
         // the missile's attack count (`+0x900`, its firer's when fired): master 528 strays by its
         // share, 527 and the others by all of it
         // DIVSS hands on a NaN distance quieted, which it is already: its bits stay on any host
-        if AttackCount::ZERO < attack_count && master_id == MASTER_528 && !gap.is_nan() {
+        if AttackCount::ZERO < attack_count
+            && roles
+                .of_master(master_id)
+                .contains(MasterRoles::STRAYING_MISS)
+            && !gap.is_nan()
+        {
             gap /= attack_count.as_f32();
         }
         let gap = gap + 0.0;
@@ -518,10 +519,10 @@ mod tests {
     use crate::combat::Firepower;
     use crate::combat::MissileCount;
     use crate::combat::missile::MissileState;
-    use crate::objects::masters::ids;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::roles;
     #[cfg(test)]
     use std::iter::once;

@@ -380,7 +380,12 @@ impl Unit {
         let (x, y) = (self.position().x(), self.position().y());
         let at = Position::new(x, y, HEIGHT);
         let moving = c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving);
-        self.new_position(at, moving, (&mut c.w.spatial, Some(&mut c.w.pathing)))?;
+        self.new_position(
+            at,
+            moving,
+            (&mut c.w.spatial, Some(&mut c.w.pathing)),
+            &c.w.model.roles,
+        )?;
         if let Some(m) = c.w.parts.mover_mut(self.id) {
             m.mark_move(at, c.w.world_time);
         }

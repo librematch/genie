@@ -178,6 +178,7 @@ impl Unit {
             self.id,
             at,
             (&mut c.w.spatial, Some(&mut c.w.pathing)),
+            roles,
         )?;
         if stats.projectile_kind.meets_on_the_way() {
             let fired = Fired {
@@ -631,7 +632,8 @@ impl Unit {
             self.life.hp = HitPoints::ZERO;
             self.life.goto_sleep = false;
             self.life.state = ObjectState::Removed;
-            c.w.spatial.sight_state(self.id, ObjectState::Removed)?;
+            c.w.spatial
+                .sight_state(self.id, ObjectState::Removed, &c.w.model.roles)?;
             if before < ObjectState::DyingSprite {
                 let master = self.master(
                     MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),

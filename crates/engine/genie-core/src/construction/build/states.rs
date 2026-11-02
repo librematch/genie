@@ -4,14 +4,12 @@
 
 use crate::GenieError;
 use crate::construction::build::BuildState;
-use crate::construction::build::{BuildAction, BuildReads, FISHING_SHIPS, drop_done_orders};
+use crate::construction::build::{BuildAction, BuildReads, drop_done_orders};
 use crate::gathering::DropSiteId;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -27,6 +25,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
 use crate::orders::Work;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
@@ -194,17 +193,24 @@ impl BuildAction {
         // LAB_140ab09af: a villager works the farm it built (FUN_141194b20, FUN_141195750), a
         // fishing ship its fish trap (FUN_141194640, FUN_1411945a0): its unit AI drops its build
         // orders (FUN_140c5e020 with 0x2be), then slot 0x7e8 on the building
-        let farm =
-            roles.of_class(master.class).contains(ClassRoles::FARM) && master.id != FISH_TRAP;
+        let farm = roles.of_class(master.class).contains(ClassRoles::FARM)
+            && !roles.of_master(master.id).contains(MasterRoles::FISH_TRAP);
         let works_it = (farm
             && roles
                 .of_some_class(reads.class)
                 .contains(ClassRoles::VILLAGER))
-            || (master.id == FISH_TRAP && FISHING_SHIPS.contains(&builder.life.master_id));
+            || (roles.of_master(master.id).contains(MasterRoles::FISH_TRAP)
+                && roles
+                    .of_master(builder.life.master_id)
+                    .contains(MasterRoles::TRAPPER));
         // a pasture is a farm to the test, so a villager works it as any farm; another builder
         // works it when its livestock's workers (slot 0x780, FUN_1411c5dd0) are its owner's
         // attribute 290
-        if !works_it && matches!(master.id, ids::PASTURE_MANGROVE | ids::PASTURE) {
+        if !works_it
+            && roles
+                .of_master(master.id)
+                .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE)
+        {
             return Err(GenieError::unsupported(
                 "the end of a Build on a pasture (its animals, slot 0x780)",
             ));

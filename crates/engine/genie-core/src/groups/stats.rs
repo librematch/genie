@@ -265,7 +265,8 @@ impl World {
                         FormationUnit::of(u.master(self.master_tables(), p)?).radius
                     }
                     WorldObject::Ghost(p, _) => {
-                        FormationUnit::of(self.master(p, object.master_id())?).radius
+                        FormationUnit::of(self.master(p, object.master_id(self.model.slots))?)
+                            .radius
                     }
                 };
                 if k == 0 || widest < radius {
@@ -370,7 +371,9 @@ impl World {
                     continue;
                 }
                 if list == UnitRelation::NEUTRAL {
-                    let class = self.master(object.player(), object.master_id())?.class;
+                    let class = self
+                        .master(object.player(), object.master_id(self.model.slots))?
+                        .class;
                     if !type_attacks_neutral(ai_type, attack_priority, class, &self.model.roles) {
                         continue;
                     }
@@ -403,7 +406,7 @@ impl World {
         object: WorldObject<'_>,
         target: Option<WorldObject<'_>>,
     ) -> Result<Distance, GenieError> {
-        let master = self.master(object.player(), object.master_id())?;
+        let master = self.master(object.player(), object.master_id(self.model.slots))?;
         if !COMBAT_KINDS.contains(&master.kind) {
             return Ok(Distance::ZERO);
         }
@@ -606,11 +609,12 @@ mod tests {
     use crate::objects::masters::ChargeTarget;
     use crate::objects::masters::ClassId;
     use crate::objects::masters::FormationClass;
+    use crate::objects::masters::MasterId;
     use crate::objects::masters::{Master, Masters};
-    use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
     use crate::players::PlayerId;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::vision::VisionBits;
     use crate::world::Millis;
     use crate::world::WorldTime;

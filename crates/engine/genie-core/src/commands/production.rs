@@ -13,7 +13,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::cost_entries;
-use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::{Masters, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::NO_QUEUE;
@@ -32,10 +31,11 @@ use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::index::Place;
+use crate::world::layer::MasterRoles;
 use crate::world::player::Player;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
-use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, VILLAGER_ANY, World, villager};
+use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, World, villager};
 
 impl World {
     /// QUEUE, the player's part (`FUN_141614450`) after the packet's check of its buildings
@@ -338,16 +338,36 @@ impl World {
         tech: Option<TechId>,
         button: QueueButton,
     ) -> Result<bool, GenieError> {
-        let mut master = if unit == Some(VILLAGER_ANY) {
-            Some(VILLAGER_MALE)
+        let mut master = if self
+            .model
+            .roles
+            .of_some_master(unit)
+            .contains(MasterRoles::VILLAGER_ANY)
+        {
+            Some(self.model.slots.master.villager_male)
         } else {
             unit
         };
         let mut count = count;
-        if master == Some(VILLAGER_MALE) {
-            master = Some(villager(self.streams.get(Stream::Action).raw64()));
+        if self
+            .model
+            .roles
+            .of_some_master(master)
+            .contains(MasterRoles::VILLAGER_MALE)
+        {
+            master = Some(villager(
+                self.streams.get(Stream::Action).raw64(),
+                self.model.slots.master,
+            ));
             if 0 < count.wrapping_sub(1) as i16 {
-                let _ = self.queue_at(player, i, Some(VILLAGER_MALE), count - 1, None, button)?;
+                let _ = self.queue_at(
+                    player,
+                    i,
+                    Some(self.model.slots.master.villager_male),
+                    count - 1,
+                    None,
+                    button,
+                )?;
             }
             count = 1;
         }

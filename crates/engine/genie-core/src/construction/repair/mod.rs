@@ -28,6 +28,7 @@ use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::players::PlayerId;
 use crate::world::Seconds;
+use crate::world::layer::MasterSlots;
 use genie_diff::Diff;
 
 mod action;
@@ -49,7 +50,6 @@ use crate::math::image::repair::{
     MOVING_REACH as REPAIR_MOVING_REACH, ONE as REPAIR_ONE, REACH as REPAIR_REACH,
 };
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::ids;
 use crate::unit_ai::UnitStance;
 
 /// The Repair action's type, which word 9 adds, and its tasks' action type.
@@ -69,11 +69,18 @@ const ONE: f32 = REPAIR_ONE;
 
 /// The masters a unit of task swap group 1 or 2 (`+0x7b8`) becomes for a repair command (slot
 /// 0x378): its player's master table's entries at `+0x4e0` and `+0x6f0`, the repairers 156
-/// and 222, when the player has them.
-pub const REPAIRERS: [(TaskGroup, MasterId); 2] = [
-    (TaskGroup::MALE_VILLAGERS, ids::VILLAGER_REPAIRER_MALE),
-    (TaskGroup::FEMALE_VILLAGERS, ids::VILLAGER_REPAIRER_FEMALE),
-];
+/// and 222 (the build's `villager_repairer_male` and `villager_repairer_female`), when the
+/// player has them.
+#[must_use]
+pub const fn repairers(masters: MasterSlots) -> [(TaskGroup, MasterId); 2] {
+    [
+        (TaskGroup::MALE_VILLAGERS, masters.villager_repairer_male),
+        (
+            TaskGroup::FEMALE_VILLAGERS,
+            masters.villager_repairer_female,
+        ),
+    ]
+}
 /// The repair of a ship (its meeting point, `FUN_140ad9120`), which is not modelled.
 pub const SHIP_REPAIR: GenieError =
     GenieError::unsupported("the task finder's repair (106) of a ship (FUN_140ad9120)");

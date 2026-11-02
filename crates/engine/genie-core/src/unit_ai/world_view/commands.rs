@@ -1,7 +1,7 @@
 //! The repair and enter commands of the unit AI and the auto scout's area.
 
 use crate::GenieError;
-use crate::construction::repair::{REPAIR, REPAIRERS};
+use crate::construction::repair::{REPAIR, repairers};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -17,7 +17,6 @@ use crate::movement::{Me, Mover, Planning};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::ids;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
 use crate::ownership::artifact::ARTIFACT_TYPE;
@@ -25,6 +24,7 @@ use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::ai_module::SearchArea;
+use crate::players::world_player::town_centres;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
@@ -32,6 +32,7 @@ use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{EnterOrder, RepairOrder, UnitView};
 use crate::world::UNIT_AI_MASTER;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::MasterSlots;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
@@ -41,7 +42,7 @@ impl UnitView<'_, '_> {
     /// The unit's repair command (slot 0x378, `FUN_141217c00`, forced) on `target`: an object the
     /// world (`FUN_1415417a0`) does not hold is 0. A Repair on top takes it (its slot 0x48,
     /// `FUN_140adb480`): 1. Else a unit of task swap group 1 or 2 switches to its player's
-    /// repairer ([`crate::construction::repair::REPAIRERS`], slot 0x90 with 0), and its slot 0x820 with the
+    /// repairer ([`crate::construction::repair::repairers`], slot 0x90 with 0), and its slot 0x820 with the
     /// repair's action type (`0x6a`) and the switch ([`task_search`] on the target and its main
     /// building, the new master's list first) finds a task: a new Repair on it
     /// (`FUN_140ad7fa0`) replaces the unit's actions (slot 0x808): 1; none: 0. The switches and
@@ -97,7 +98,7 @@ impl UnitView<'_, '_> {
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
         let own = unit.master(self.c.w.master_tables(), self.player)?;
-        let switch = REPAIRERS
+        let switch = repairers(self.c.w.model.slots.master)
             .iter()
             .find(|&&(group, _)| group == own.task_by_group)
             .and_then(|&(_, id)| masters.get(id));
@@ -364,21 +365,24 @@ impl UnitView<'_, '_> {
 /// `DAT_14330eb8c`).
 pub(crate) const LOS_MARGIN: Distance = Distance::new(EXPLORE_LOS_MARGIN);
 
-/// The masters of a town centre (`FUN_1416597e0`: 109, then 444).
-pub(crate) const TOWN_CENTRES: [MasterId; 2] = [ids::TOWN_CENTRE, ids::TOWN_CENTRE_444];
-
 /// `FUN_1416597e0` with 0: the player's first town centre, by the player's index of objects by
-/// master (`player+0x18`, `FUN_14104f560`: those of master 109, then 444), as its tile. The
-/// index's order within a master is not held: two objects of the first master found are not
-/// modelled.
-pub(crate) fn town_centre(units: OthersRef<'_>) -> Result<Option<Tile>, GenieError> {
-    Ok(town_centre_unit(units)?
+/// master (`player+0x18`, `FUN_14104f560`: those of master 109, then 444, [`town_centres`]), as
+/// its tile. The index's order within a master is not held: two objects of the first master
+/// found are not modelled.
+pub(crate) fn town_centre(
+    units: OthersRef<'_>,
+    masters: MasterSlots,
+) -> Result<Option<Tile>, GenieError> {
+    Ok(town_centre_unit(units, masters)?
         .map(|u| Tile::new(u.position().x() as i32, u.position().y() as i32)))
 }
 
 /// [`town_centre`] as the object.
-pub(crate) fn town_centre_unit(units: OthersRef<'_>) -> Result<Option<&Unit>, GenieError> {
-    for master in TOWN_CENTRES {
+pub(crate) fn town_centre_unit(
+    units: OthersRef<'_>,
+    masters: MasterSlots,
+) -> Result<Option<&Unit>, GenieError> {
+    for master in town_centres(masters) {
         let mut found = units.own_iter().filter(|u| u.life.master_id == master);
         let Some(first) = found.next() else { continue };
         if found.next().is_some() {

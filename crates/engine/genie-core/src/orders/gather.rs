@@ -20,8 +20,6 @@ use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids::PASTURE;
-use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{ClassId, Master, MasterTables, Task};
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
@@ -33,6 +31,7 @@ use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 use crate::world::{ATTACKER_UNPLACED, TARGET_UNPLACED};
 
@@ -574,7 +573,11 @@ impl World {
                 };
                 let main_master = main.master(self.master_tables(), mp)?.id;
                 if (main.life.state < ObjectState::Alive
-                    || matches!(main_master, PASTURE_MANGROVE | PASTURE))
+                    || self
+                        .model
+                        .roles
+                        .of_master(main_master)
+                        .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE))
                     && mp == player
                 {
                     return Err(GenieError::unsupported(

@@ -38,7 +38,6 @@
 use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
@@ -62,6 +61,7 @@ use crate::technology::TechId;
 use crate::world::Mode680;
 #[cfg(test)]
 use crate::world::World;
+use crate::world::layer::MasterSlots;
 
 /// One second (`DAT_14330eb8c`): the loop's step.
 const SECOND: f32 = WORLD_PLAYER_SECOND;
@@ -74,8 +74,12 @@ const LIVESTOCK_SCALE: f32 = WORLD_PLAYER_LIVESTOCK_SCALE;
 /// Until this world time (ms) the scout map takes only the explored tiles the player sees.
 const EARLY_SCOUTING_MS: WorldTime = WorldTime::from_millis(5000);
 
-/// The town centres' masters (`FUN_141658970`'s and `FUN_141658a30`'s keys 0x6d and 0x1bc).
-const TOWN_CENTRES: [MasterId; 2] = [ids::TOWN_CENTRE, ids::TOWN_CENTRE_444];
+/// The town centres' masters (`FUN_141658970`'s, `FUN_141658a30`'s and `FUN_1416597e0`'s keys
+/// 0x6d and 0x1bc) in the order the counts read their lists: the build's `town_centre`, then
+/// `town_centre_444`.
+pub(crate) const fn town_centres(masters: MasterSlots) -> [MasterId; 2] {
+    [masters.town_centre, masters.town_centre_444]
+}
 /// The classes that never keep their player (`0x48000800`: other 11, walls 27, flags 30).
 const UNKEPT_LOW: ClassMask = ClassMask::new(0x4800_0800, 31);
 /// The classes that never keep their player (`0x140204a000384006`: 1, 2, 14, 19, 20, 21, 37,

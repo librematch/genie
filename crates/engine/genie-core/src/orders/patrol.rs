@@ -237,7 +237,7 @@ impl World {
         let Some(t) = self.world_object(target) else {
             return Ok(true);
         };
-        let tm = self.master(t.player(), t.master_id())?;
+        let tm = self.master(t.player(), t.master_id(self.model.slots))?;
         let gap = footprint_gap_squared(unit.position(), master.radius, t.position(), tm.radius);
         Ok(master.line_of_sight.squared() < gap)
     }

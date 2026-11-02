@@ -27,10 +27,9 @@ use crate::math::image::terrain::{INSIDE as TERRAIN_INSIDE, TILE as TERRAIN_TILE
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::RestrictionField;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::world::Mode680;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use std::mem::swap;
@@ -504,7 +503,9 @@ impl Terrain {
         // and fourth rows
         let gap = |tx: i32, ty: i32| {
             // The town centre's master (109), whose foundation terrain leaves its gap (`FUN_1411ddd90`).
-            f.master == TOWN_CENTRE && (tx == x0 || tx == x0 + 1) && (ty == y0 + 2 || ty == y0 + 3)
+            roles.of_master(f.master).contains(MasterRoles::TOWN_CENTRE)
+                && (tx == x0 || tx == x0 + 1)
+                && (ty == y0 + 2 || ty == y0 + 3)
         };
         let (mut wanted, mut kind, mut layer) = (f.terrain, f.terrain, None);
         if f.terrain == FOUNDATION && f.snow.on_snow() {
@@ -523,7 +524,9 @@ impl Terrain {
         // a farm's terrain, masters 357 and 1188 (taken as farms, `DAT_143f69454` 0 leaving
         // nothing deferred), or a building of class 14 always goes into the terrain
         let into_terrain = is_farm_terrain(wanted)
-            || matches!(f.master, ids::ID_357 | ids::ID_1188)
+            || roles
+                .of_master(f.master)
+                .intersects(MasterRoles::DEAD_FARM | MasterRoles::DEAD_RICE_FARM)
             || roles
                 .of_class(f.class)
                 .contains(ClassRoles::FOUNDATION_TERRAIN);
@@ -567,6 +570,8 @@ mod tests {
     use crate::objects::masters::RestrictionField;
     use crate::test_ids::master_id;
     use crate::testing::class;
+    use crate::testing::ids;
+    use crate::testing::ids::TOWN_CENTRE;
     use crate::testing::roles;
 
     /// Terrains of ids `k`.

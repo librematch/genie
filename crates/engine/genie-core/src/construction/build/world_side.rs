@@ -127,7 +127,15 @@ impl World {
         let Some(c) = layer.construction.as_mut() else {
             return Ok(());
         };
-        if Construction::begin(id, c, mover, &mut self.spatial, &mut self.pathing, now)? {
+        if Construction::begin(
+            id,
+            c,
+            mover,
+            &mut self.spatial,
+            &mut self.pathing,
+            now,
+            &self.model.roles,
+        )? {
             self.parts.combat_mut(u.id)?.firepower = volley;
             self.watch_started(owner, id)?;
         }

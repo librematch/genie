@@ -25,12 +25,12 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The formation categories a group keeps its units by (`FUN_141007ba0`, `FUN_14100c6c0`).
@@ -40,11 +40,6 @@ const CATEGORIES: [FormationCategory; 6] = FormationCategory::EACH;
 const SPECIAL_MOST: usize = 4;
 /// What each of the refill's two first-pass lists holds (`auStack_68`, `auStack_58`).
 const FIRST_PASS_MOST: usize = 3;
-/// The masters of the refill's second first-pass list (`FUN_14100c6c0`).
-const LISTED_MASTERS: [MasterId; 4] = [ids::ID_329, ids::ID_330, ids::ID_282, ids::ID_556];
-
-/// A target of one of these masters takes the class list only (`FUN_14100c6c0`).
-const CLASS_LIST_MASTERS: [MasterId; 2] = [ids::ID_6, ids::ID_7];
 
 /// The task whose range adds the player's attribute 280 (`FUN_1415cd0d0` with the filter `0x68`).
 const CONVERSION_TASK: ActionKind = ActionKind::named(0x68);
@@ -246,7 +241,7 @@ impl World {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let target_master = self.master(t.player(), t.master_id())?;
+        let target_master = self.master(t.player(), t.master_id(self.model.slots))?;
         let master = u.master(self.master_tables(), p)?;
         let gap = footprint_gap_squared(
             u.position(),
@@ -329,7 +324,7 @@ impl World {
             let Some(obj) = self.world_object(m.id) else {
                 continue;
             };
-            let master = self.master(obj.player(), obj.master_id())?;
+            let master = self.master(obj.player(), obj.master_id(self.model.slots))?;
             if by_class.len() < FIRST_PASS_MOST
                 && self
                     .model
@@ -339,11 +334,19 @@ impl World {
             {
                 by_class.push(m.id);
             }
-            if by_master.len() < FIRST_PASS_MOST && LISTED_MASTERS.contains(&master.id) {
+            if by_master.len() < FIRST_PASS_MOST
+                && self
+                    .model
+                    .roles
+                    .of_master(master.id)
+                    .contains(MasterRoles::REFILL_LISTED)
+            {
                 by_master.push(m.id);
             }
         }
-        let target_class = self.master(t.player(), t.master_id())?.class;
+        let target_class = self
+            .master(t.player(), t.master_id(self.model.slots))?
+            .class;
         let mut list: Vec<ObjectId> = Vec::new();
         if self
             .model
@@ -353,7 +356,12 @@ impl World {
         {
             take_into(&mut list, &by_master, limit);
             take_into(&mut list, &by_class, limit);
-        } else if CLASS_LIST_MASTERS.contains(&t.master_id()) {
+        } else if self
+            .model
+            .roles
+            .of_master(t.master_id(self.model.slots))
+            .contains(MasterRoles::CLASS_LIST_ONLY)
+        {
             take_into(&mut list, &by_class, limit);
         } else if self
             .model
@@ -435,7 +443,7 @@ impl World {
         if !master.charge_kind.ranged() {
             return Ok(false);
         }
-        let tm = self.master(target.player(), target.master_id())?;
+        let tm = self.master(target.player(), target.master_id(self.model.slots))?;
         let works = charge_works(
             master.charge_target,
             master.charge_kind,

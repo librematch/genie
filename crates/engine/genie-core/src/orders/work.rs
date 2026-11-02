@@ -28,7 +28,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::ids::MARKET;
 use crate::objects::masters::work_master;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{ATTACK_TASK, Work};
@@ -43,6 +42,7 @@ use crate::unit_ai::task_finder::{Actor, enabled};
 use crate::unit_ai::task_finder::{TaskOn, find_task};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
@@ -382,7 +382,13 @@ impl World {
         (target, point, clears): (ObjectId, Position, bool),
     ) -> Result<(), GenieError> {
         let t = self.task_target(target, 0)?;
-        if t.master.id == MARKET && t.player == player {
+        if self
+            .model
+            .roles
+            .of_master(t.master.id)
+            .contains(MasterRoles::MARKET)
+            && t.player == player
+        {
             return Err(GenieError::unsupported(
                 "a hunt sent to its player's master 84",
             ));
@@ -414,7 +420,13 @@ impl World {
         (target, point, clears): (ObjectId, Position, bool),
     ) -> Result<bool, GenieError> {
         let t = self.task_target(target, 0)?;
-        if t.master.id == MARKET && t.player == player {
+        if self
+            .model
+            .roles
+            .of_master(t.master.id)
+            .contains(MasterRoles::MARKET)
+            && t.player == player
+        {
             return Err(GenieError::unsupported(
                 "a gather sent to its player's master 84",
             ));

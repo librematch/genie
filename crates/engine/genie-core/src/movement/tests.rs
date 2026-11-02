@@ -27,8 +27,6 @@ use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::ID_45;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
@@ -42,6 +40,8 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::testing::class;
+use crate::testing::ids;
+use crate::testing::ids::ID_45;
 use crate::testing::roles;
 use crate::unit_ai::UnitStance;
 use crate::vision::visibility::Visibility;
@@ -1206,22 +1206,29 @@ fn the_orientation_speed_and_pause_slots() {
 /// master 45, is the long pather's.
 #[test]
 fn far_waypoint_or_target_of_master_45_takes_the_long_pather() {
-    assert!(far_waypoint(Distance::new(1.0), None) && !far_waypoint(Distance::new(0.5), None));
+    assert!(
+        far_waypoint(Distance::new(1.0), None, &roles())
+            && !far_waypoint(Distance::new(0.5), None, &roles())
+    );
     assert!(far_waypoint(
         Distance::ZERO,
-        Some((Distance::new(1.0), master_id(4)))
+        Some((Distance::new(1.0), master_id(4))),
+        &roles()
     ));
     assert!(!far_waypoint(
         Distance::new(30.0),
-        Some((Distance::new(0.5), master_id(4)))
+        Some((Distance::new(0.5), master_id(4))),
+        &roles()
     ));
     assert!(far_waypoint(
         Distance::new(30.0),
-        Some((Distance::new(0.5), ID_45))
+        Some((Distance::new(0.5), ID_45)),
+        &roles()
     ));
     assert!(!far_waypoint(
         Distance::new(30.0),
-        Some((Distance::new(f32::NAN), master_id(4)))
+        Some((Distance::new(f32::NAN), master_id(4))),
+        &roles()
     ));
 }
 
@@ -2288,7 +2295,7 @@ fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) 
         None,
         (WorldTime::ZERO, None),
     );
-    m.new_position(&mut place, object_id(9177), at, (world, None))
+    m.new_position(&mut place, object_id(9177), at, (world, None), &roles())
         .unwrap();
     let motion = m
         .motion(

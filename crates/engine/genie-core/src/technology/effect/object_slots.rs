@@ -29,6 +29,7 @@ use crate::technology::effect::{Change, OBJECT_GONE};
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
+use crate::vision::visibility::LosSight;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::World;
@@ -226,14 +227,12 @@ impl World {
                 placed.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
+                &self.model.roles,
             )?;
             let _ = sight.sight_on_los(
                 id,
-                placed.position,
-                placed.radius,
-                SightShape::Circle,
-                los,
-                SightCentre::Tile,
+                LosSight::tile_circle(placed.position, placed.radius, los),
+                &self.model.roles,
             )?;
         }
         Ok(())

@@ -24,7 +24,6 @@ use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::HitChance;
-use crate::objects::masters::ids;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
 use crate::unit_ai::NotifyKind;
@@ -34,6 +33,7 @@ use crate::combat::AttackTargetId;
 use crate::objects::layers::Action;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 use crate::{GenieError, combat::damage};
@@ -243,14 +243,13 @@ impl Attack {
                 roles,
             )?;
         } else {
-            if matches!(
-                f.own.master_id,
-                ids::ID_527
-                    | ids::ID_528
-                    | ids::ID_1104
-                    | ids::ID_2133
-                    | ids::ID_2134
-                    | ids::ID_2135
+            if roles.of_master(f.own.master_id).intersects(
+                MasterRoles::DEMOLITION_SHIP
+                    | MasterRoles::HEAVY_DEMOLITION_SHIP
+                    | MasterRoles::DEMOLITION_RAFT
+                    | MasterRoles::INCENDIARY_RAFT
+                    | MasterRoles::INCENDIARY_SHIP
+                    | MasterRoles::HEAVY_INCENDIARY_SHIP,
             ) {
                 return Err(GenieError::unsupported(
                     "a self-destructing attacker's hit (masters 527, 528, 1104, 2133..2135)",

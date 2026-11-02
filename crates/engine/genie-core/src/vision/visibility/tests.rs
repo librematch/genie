@@ -8,6 +8,8 @@ use crate::ownership::CaptureKind;
 use crate::players::PlayerType;
 use crate::test_ids::object_id;
 use crate::testing::class;
+use crate::testing::ids;
+use crate::testing::roles;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
@@ -260,6 +262,7 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
             Footprint::new(0.2, 0.2),
             SightShape::Circle,
             SightCentre::Tile,
+            &roles(),
         )
         .unwrap();
     let tile = |x: i32, y: i32| (y * 120 + x) as usize;
@@ -270,6 +273,7 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
         Footprint::new(0.2, 0.2),
         (PlayerId::new(1), 3.0),
         true,
+        &roles(),
     )
     .unwrap();
     assert_eq!(v.maps[0].counts[tile(12, 10)], 0);
@@ -283,6 +287,7 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
         Footprint::new(0.2, 0.2),
         (PlayerId::new(2), 4.0),
         false,
+        &roles(),
     )
     .unwrap();
     assert_eq!(v.maps[1].counts[tile(13, 10)], 1);
@@ -534,6 +539,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
             r,
             SightShape::Circle,
             SightCentre::Tile,
+            &roles(),
         )
         .unwrap();
     let before = v.maps[1].counts.clone();
@@ -542,6 +548,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         Position::new(5.5, 5.5, 0.0),
         Position::new(5.9, 5.2, 0.0),
         r,
+        &roles(),
     )
     .unwrap();
     assert_eq!(v.maps[1].counts, before, "the same tile");
@@ -550,6 +557,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         Position::new(5.9, 5.2, 0.0),
         Position::new(6.1, 5.2, 0.0),
         r,
+        &roles(),
     )
     .unwrap();
     assert_eq!(v.maps[1].counts[v.index(Tile::new(8, 5))], 1);
@@ -559,6 +567,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         Position::new(6.1, 5.2, 0.0),
         r,
         ObjectState::Dying,
+        &roles(),
     )
     .unwrap();
     let seen: Vec<_> = (0..120 * 120)
@@ -578,6 +587,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         Position::new(6.1, 5.2, 0.0),
         r,
         ObjectState::Removed,
+        &roles(),
     )
     .unwrap();
     assert!(v.maps[1].counts.iter().all(|&c| c <= 0));
@@ -729,8 +739,15 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
     v.add_seer(object_id(9), site);
     let (at, r) = (Position::new(10.0, 10.0, 0.0), Footprint::new(1.0, 1.0));
     assert_eq!(
-        v.sight_on(object_id(9), at, r, SightShape::Circle, SightCentre::Tile)
-            .unwrap(),
+        v.sight_on(
+            object_id(9),
+            at,
+            r,
+            SightShape::Circle,
+            SightCentre::Tile,
+            &roles()
+        )
+        .unwrap(),
         TileCount::ZERO,
         "not started"
     );
@@ -740,10 +757,12 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
         r,
         SightShape::Footprint,
         SightCentre::Tile,
+        &roles(),
     )
     .unwrap();
     assert!(v.maps[2].counts.iter().all(|&c| c == -1));
-    v.construction_started(object_id(9), at, r).unwrap();
+    v.construction_started(object_id(9), at, r, &roles())
+        .unwrap();
     let seen = |v: &Visibility| (0..120 * 120).filter(|&i| 0 < v.maps[2].counts[i]).count();
     assert_eq!(seen(&v), 4);
     v.seer_mut(object_id(9))
@@ -758,10 +777,18 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
         r,
         SightShape::Footprint,
         SightCentre::Tile,
+        &roles(),
     )
     .unwrap();
     let _ = v
-        .sight_on(object_id(9), at, r, SightShape::Circle, SightCentre::Tile)
+        .sight_on(
+            object_id(9),
+            at,
+            r,
+            SightShape::Circle,
+            SightCentre::Tile,
+            &roles(),
+        )
         .unwrap();
     // the table of a tile corner: at LOS 2 a 4 by 4 square around the corner
     assert_eq!(seen(&v), 16);
@@ -807,4 +834,20 @@ fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
         vec![(PlayerId::new(1), Tile::new(10, 10))]
     );
     assert_eq!(v.take_ai_tiles(), vec![]);
+}
+
+#[test]
+fn tile_circle_sight_is_circle_centred_on_seer_tile() {
+    let (at, radius) = (Position::new(10.5, 10.5, 0.0), Footprint::new(0.5, 0.5));
+    let sight = LosSight::tile_circle(at, radius, SightTiles::new(3));
+    assert_eq!(
+        sight,
+        LosSight {
+            position: at,
+            radius,
+            shape: SightShape::Circle,
+            los: SightTiles::new(3),
+            centre: SightCentre::Tile,
+        }
+    );
 }

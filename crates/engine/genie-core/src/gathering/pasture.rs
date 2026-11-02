@@ -22,17 +22,21 @@ use crate::objects::SpriteFlags;
 use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::players::PlayerId;
 use crate::players::attribute::{PASTURE_FOOD, PASTURE_LIVESTOCK, PASTURE_WORKERS};
 use crate::technology::Attributes;
 use crate::world::World;
+use crate::world::layer::MasterSlots;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
 /// The livestock a pasture holds (`DAT_143f51db0`, which the static constructor `FUN_140174900`
-/// fills): the Argali and the Ibex (Pasture).
-pub const LIVESTOCK: [MasterId; 2] = [ids::PASTURE_ARGALI, ids::PASTURE_IBEX];
+/// fills), in the table's order a draw picks from: the Argali and the Ibex (Pasture), the
+/// build's `pasture_argali` and `pasture_ibex`.
+#[must_use]
+pub const fn livestock(masters: MasterSlots) -> [MasterId; 2] {
+    [masters.pasture_argali, masters.pasture_ibex]
+}
 
 /// The edges lie this far inside the pasture's ground radius (`DAT_142e7f384`).
 const INSET: Distance = Distance::new(PASTURE_INSET);
@@ -113,7 +117,8 @@ impl World {
         let map = self.spatial.map;
         let mut made = 0;
         while made < count && !points.is_empty() {
-            let kind = *LIVESTOCK.checked(draw_below(self, LIVESTOCK.len()))?;
+            let kinds = livestock(self.model.slots.master);
+            let kind = *kinds.checked(draw_below(self, kinds.len()))?;
             let mut i = draw_below(self, points.len());
             loop {
                 let (x, y) = {
@@ -257,12 +262,13 @@ impl World {
         Ok(())
     }
 
-    /// Whether the objects on `tile` (its list, `+0x28`) hold a livestock master ([`LIVESTOCK`])
+    /// Whether the objects on `tile` (its list, `+0x28`) hold a livestock master ([`livestock`])
     /// of the pasture `pasture` (`+0x790`). A ghost on it is not of a pasture.
     fn holds_livestock_of(&self, pasture: PastureId, tile: Tile) -> bool {
+        let kinds = livestock(self.model.slots.master);
         self.spatial.tile_list(tile).iter().any(|&o| {
             self.object(o).is_some_and(|(_, u)| {
-                u.pasture == Some(pasture) && LIVESTOCK.contains(&u.life.master_id)
+                u.pasture == Some(pasture) && kinds.contains(&u.life.master_id)
             })
         })
     }

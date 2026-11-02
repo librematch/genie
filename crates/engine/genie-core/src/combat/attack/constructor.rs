@@ -7,8 +7,8 @@ use crate::combat::abilities::Look;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::TARGET_GONE;
 use crate::combat::attack::{
-    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, LEASH_SLACK,
-    MASTER_1704, MASTER_1706, NONE, Posted, Posts, face_target,
+    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, LEASH_SLACK, NONE,
+    Posted, Posts, face_target,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -42,6 +42,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
@@ -113,6 +114,7 @@ impl Attack {
             mover,
             &mut posted,
             reads,
+            roles,
         )?;
         if begun.ready {
             return Err(GenieError::unsupported(
@@ -169,6 +171,7 @@ impl Attack {
             mover,
             &mut posted,
             reads,
+            roles,
         )?;
         Ok((attack, begun, posted))
     }
@@ -294,6 +297,7 @@ impl Attack {
         mover: &mut Mover,
         posted: &mut Vec<(NotifyKind, [i32; 3])>,
         reads: &MoveToReads<'_>,
+        roles: &Roles,
     ) -> Result<Begun, GenieError> {
         let movable = e.speed != Speed::ZERO && e.can_move;
         let mut failed_first = false;
@@ -325,7 +329,10 @@ impl Attack {
             }
         } else {
             self.point = e.target_position;
-            if !matches!(e.master, MASTER_1704 | MASTER_1706) {
+            if !roles
+                .of_master(e.master)
+                .contains(MasterRoles::UNTURNED_ATTACKER)
+            {
                 let _ = face_target(mover, e.position, e.target_position, e.world_time)?;
             }
             ready_end = true;

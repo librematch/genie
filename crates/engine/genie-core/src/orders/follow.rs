@@ -405,7 +405,7 @@ impl World {
         let (tp, t) = self.object(target).ok_or(TARGET_LACKING)?;
         let target_state = t.life.state;
         let target_master = t.master(self.master_tables(), tp)?.id;
-        if holds_object(livestock, target_master, target_state) {
+        if holds_object(livestock, target_master, target_state, &self.model.roles) {
             self.take(target, self.releaser(player, idx)?)?;
         }
         self.clear_actions(player, idx)?;
@@ -447,6 +447,7 @@ impl World {
             (target, target_state),
             range,
             (sprite, livestock),
+            &self.model.roles,
         )?;
         if move_to.shows_standing() {
             unit.shows_standing_sprite(

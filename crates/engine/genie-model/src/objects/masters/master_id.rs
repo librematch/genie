@@ -36,7 +36,7 @@ impl MasterId {
     /// The value a field takes for none.
     const NONE: i16 = -1;
 
-    /// A master the code names, in a constant: only [`crate::objects::masters::ids`] makes them.
+    /// A master by its `.dat` id: a test's, or a slot of the build layer's generated fixture.
     ///
     /// # Panics
     ///

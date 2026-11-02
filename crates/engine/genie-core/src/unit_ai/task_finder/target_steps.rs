@@ -11,7 +11,6 @@ use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Task};
 use crate::orders::GARRISON;
 use crate::players::Amount;
@@ -23,6 +22,7 @@ use crate::unit_ai::task_finder::TaskTarget;
 use crate::unit_ai::task_finder::first;
 use crate::unit_ai::task_finder::wanted;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// The task finder's steps on a `target` (`LAB_1412795f5` to `LAB_1412796b4`): the drop-off
@@ -47,7 +47,10 @@ pub(super) fn on_target<'m>(
     {
         return Ok(Finding::Answer(build_task(list, t, filter)));
     }
-    if t.master.id == ids::FISH_TRAP {
+    if roles
+        .of_master(t.master.id)
+        .contains(MasterRoles::FISH_TRAP)
+    {
         return Err(GenieError::unsupported("the task finder on master 199"));
     }
     // LAB_141279cfa -> LAB_1412796b4: garrisoning, repairing, task 0x6f
@@ -58,7 +61,7 @@ pub(super) fn on_target<'m>(
     if let Finding::Answer(task) = repair_finding(list, actor, t, filter, dip, roles) {
         return Ok(Finding::Answer(task));
     }
-    if let Some(task) = trade_task(list, t, filter) {
+    if let Some(task) = trade_task(list, t, filter, roles) {
         return Ok(Finding::Answer(Some(task)));
     }
     // a garrison into the target without a task for it ends the finder before its tail, after
@@ -77,9 +80,11 @@ fn trade_task<'m>(
     list: &'m Master,
     t: &TaskTarget<'_>,
     filter: Option<ActionKind>,
+    roles: &Roles,
 ) -> Option<&'m Task> {
-    let trades =
-        t.state < ObjectState::Dying && (t.master.id == ids::ID_45 || t.master.id == ids::MARKET);
+    let trades = t.state < ObjectState::Dying
+        && (roles.of_master(t.master.id).contains(MasterRoles::DOCK)
+            || roles.of_master(t.master.id).contains(MasterRoles::MARKET));
     trades
         .then(|| {
             first(list, |task| {

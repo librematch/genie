@@ -7,7 +7,6 @@ use crate::map::spatial::TileSight;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::fmath::log;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -49,7 +48,7 @@ impl World {
             .players
             .player(p)?
             .tracker
-            .list(ListKey::master(ids::MILL))
+            .list(ListKey::master(self.model.slots.master.mill))
         {
             let Some((owner, unit)) = self.object(id) else {
                 continue;

@@ -3,8 +3,8 @@
 
 use crate::combat::Charge;
 use crate::combat::damage::{
-    Attacker, CONE, Kill, MINUS_CONE, RAMS, Victim, WIDE_CONE, armor_damage, bonus_damage,
-    charge_hit, elevation_factor, facing_offset, kill_bonus, lose, shield, take,
+    Attacker, CONE, Kill, MINUS_CONE, Victim, WIDE_CONE, armor_damage, bonus_damage, charge_hit,
+    elevation_factor, facing_offset, kill_bonus, lose, shield, take,
 };
 use crate::combat::missile::ShooterId;
 use crate::construction::build::NOT_HELD;
@@ -22,6 +22,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
@@ -264,7 +265,12 @@ pub(super) fn blast_one(
         return Ok(());
     }
     let t = &mut **targets.checked_mut(i)?;
-    if RAMS.contains(&a.master_id) && t.kind != MasterKind::BUILDING && !is_main {
+    if roles
+        .of_master(a.master_id)
+        .contains(MasterRoles::BUILDINGS_ONLY_BLAST)
+        && t.kind != MasterKind::BUILDING
+        && !is_main
+    {
         return Ok(());
     }
     let Some(d2) = blast_distance2(t, b.center, b.r.get()) else {

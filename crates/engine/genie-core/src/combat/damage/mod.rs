@@ -80,7 +80,6 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::ids;
 use crate::objects::masters::{
     ClassAmount, DamageAmount, DamageShare, InvulnerabilityLevel, RestrictionField, Task,
 };
@@ -134,9 +133,6 @@ const CONE: f32 = DAMAGE_CONE;
 const MINUS_CONE: f32 = DAMAGE_MINUS_CONE;
 const WIDE_CONE: f32 = DAMAGE_WIDE_CONE;
 
-/// The rams (masters 35, 422, 548 and 1258): their blast reaches only buildings and their
-/// target.
-const RAMS: [MasterId; 4] = [ids::ID_35, ids::ID_422, ids::ID_548, ids::ID_1258];
 /// 1 (`DAT_14330eb8c`, read into `XMM9` at `0x1411cec8e`): a building's least hit, the hit
 /// points below which a hit razes a building or kills a unit, and what each razing count adds.
 const ONE: f32 = DAMAGE_ONE;

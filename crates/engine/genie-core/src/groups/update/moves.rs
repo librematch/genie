@@ -73,7 +73,7 @@ impl World {
                             .lead_object(&g.motion)
                             .ok_or_else(|| member_gone(g.motion.lead))?;
                         let sight = self
-                            .master(leader.player(), leader.master_id())?
+                            .master(leader.player(), leader.master_id(self.model.slots))?
                             .line_of_sight;
                         let range = sight * FOLLOW_SHARE;
                         let d = sub(from, moved);

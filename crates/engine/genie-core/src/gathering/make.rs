@@ -13,7 +13,6 @@ use crate::GenieError;
 use crate::objects::HitPoints;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
@@ -31,14 +30,10 @@ pub const MAKE: ActionKind = ActionKind::named(21);
 
 pub use crate::gathering::make_state::MakeState;
 use crate::objects::layers::Action;
-use crate::objects::masters::ids;
 use crate::world::NO_ATTRIBUTE;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-
-/// The masters whose exhaustion the update does not check (`FUN_140a99e30`: the master id, not
-/// 0x765 and not 0x769): the pastures.
-pub const UNEXHAUSTED: [MasterId; 2] = [ids::PASTURE_MANGROVE, ids::PASTURE];
 
 /// `RGE_Action_Make`: its state (`+0x18`), the food still to make (`+0x44`, the base's
 /// `mTimer`), the food it makes in all (`+0x68`, the save's `work_timer`) and its task (`+0x48`).
@@ -150,7 +145,7 @@ impl MakeAction {
                 self.remaining -= farm.life.amount - before;
             }
             MakeState::Making
-                if !UNEXHAUSTED.contains(&master.id)
+                if !roles.of_master(master.id).contains(MasterRoles::UNEXHAUSTED)
                     && farm.life.amount <= Amount::ZERO
                     // The first master type whose slot 0xd8 is `FUN_141211340` (70, `TRIBE_Combat_Object`, and 80);
                     // below it slot 0xd8 is `FUN_14118f580` itself.
@@ -190,10 +185,10 @@ mod tests {
     use crate::objects::ObjectState;
     use crate::objects::WorkRate;
     use crate::objects::masters::CarryCapacity;
+    use crate::objects::masters::MasterId;
     use crate::objects::masters::MasterKind;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
-    use crate::objects::masters::ids;
     use crate::objects::masters::{Master, Masters};
     use crate::players::PlayerId;
     use crate::players::attribute;
@@ -201,6 +196,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::roles;
     #[cfg(test)]
     use crate::world::FrameSeed;

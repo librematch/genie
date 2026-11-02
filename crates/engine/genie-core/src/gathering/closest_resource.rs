@@ -15,9 +15,7 @@ use crate::movement::Planning;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::GatherGroup;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectState, WorkerCount};
@@ -28,6 +26,8 @@ use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{Foreign, UnitView};
 use crate::unit_ai::{Gatherable, NO_POINT, ResourceSearch};
 use crate::world::index::ObjectsRef;
+use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -70,10 +70,10 @@ pub(crate) fn closest_resource_of(
     (kind, cap, site): (GatherGroup, WorkerCount, Option<DropSiteId>),
     (current, min_state, point): (Option<ObjectId>, ObjectState, Point),
     by_id: ObjectsRef<'_>,
+    roles: &Roles,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
-    /// The site masters whose search starts from their footprint in any zone.
-    const DOCKS: [MasterId; 2] = [ids::ID_45, ids::ID_2172];
+
     let site = match site.filter(|&s| c.spatial.get(s).is_some()) {
         None => None,
         Some(site) => {
@@ -87,23 +87,26 @@ pub(crate) fn closest_resource_of(
                 "a resource search's drop site the slice does not hold",
             ))?;
             let m = s.master(c.every, sp)?;
-            let footprint = DOCKS.contains(&m.id) || {
-                let restriction = mover
-                    .ok_or(GenieError::unsupported(
-                        "a resource search without movement state",
-                    ))?
-                    .stats
-                    .restriction;
-                let terrain = c.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
-                    "the map's zones without its terrain",
-                ))?;
-                let values = terrain
-                    .restriction(restriction)
-                    .ok_or(UNKNOWN_RESTRICTION)?;
-                let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
-                let zone = |p: Position| zones.zone(Tile::new(p.x() as i32, p.y() as i32));
-                zone(s.position()) == zone(unit.position())
-            };
+            let footprint = roles
+                .of_master(m.id)
+                .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
+                || {
+                    let restriction = mover
+                        .ok_or(GenieError::unsupported(
+                            "a resource search without movement state",
+                        ))?
+                        .stats
+                        .restriction;
+                    let terrain = c.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
+                        "the map's zones without its terrain",
+                    ))?;
+                    let values = terrain
+                        .restriction(restriction)
+                        .ok_or(UNKNOWN_RESTRICTION)?;
+                    let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
+                    let zone = |p: Position| zones.zone(Tile::new(p.x() as i32, p.y() as i32));
+                    zone(s.position()) == zone(unit.position())
+                };
             Some(gather_search::SearchSite {
                 position: s.position(),
                 radius: m.radius,
@@ -262,6 +265,7 @@ impl UnitView<'_, '_> {
             (search.kind, search.cap, search.site),
             (search.current, search.min_state, search.point),
             by_id,
+            &self.c.w.model.roles,
         )?;
         let Some(id) = id else {
             return Ok(None);
@@ -352,6 +356,7 @@ impl Unit {
             (kind, cap, site),
             search,
             by_id,
+            &c.w.model.roles,
         )
         .map(|(id, _)| id)
     }

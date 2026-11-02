@@ -23,7 +23,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
-use crate::objects::masters::ids::RELIC;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::{
@@ -31,6 +30,7 @@ use crate::production::spawn::{
 };
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// An object near a candidate, as the placement test and the blocker test read it.
@@ -93,7 +93,7 @@ impl Near {
         if self.kind == MasterKind::BUILDING
             || (roles.of_class(self.class).contains(ClassRoles::TREE)
                 && ObjectState::Alive < self.state)
-            || self.master == RELIC
+            || roles.of_master(self.master).contains(MasterRoles::RELIC)
         {
             return true;
         }

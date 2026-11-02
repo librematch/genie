@@ -38,7 +38,6 @@ pub mod hero_flags;
 pub mod hill_mode;
 pub mod hit_chance;
 pub mod id_field;
-pub mod ids;
 pub mod interaction_mode;
 pub mod interface_kind;
 pub mod invulnerability;

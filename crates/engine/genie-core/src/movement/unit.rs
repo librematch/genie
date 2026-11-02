@@ -83,6 +83,7 @@ impl Unit {
                     self.id,
                     at,
                     (&mut c.w.spatial, Some(&mut c.w.pathing)),
+                    roles,
                 )?;
             }
             // RGE_Moving_Object::update: a unit that moves animates at its speed (+0x7b8)

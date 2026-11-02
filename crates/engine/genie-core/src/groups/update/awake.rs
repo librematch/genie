@@ -388,7 +388,7 @@ impl World {
                 let Some(object) = self.world_object(slot.unit_id) else {
                     continue;
                 };
-                let master = self.master(object.player(), object.master_id())?;
+                let master = self.master(object.player(), object.master_id(self.model.slots))?;
                 let reach = weapon_range(master);
                 if range > reach.get() {
                     range = reach.get();

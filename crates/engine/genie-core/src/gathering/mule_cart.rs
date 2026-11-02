@@ -186,6 +186,7 @@ impl World {
                         &self.parts,
                         &self.model.roles,
                     ),
+                    &self.model.roles,
                 )?;
                 if let Some(f) = f {
                     found.push(f);

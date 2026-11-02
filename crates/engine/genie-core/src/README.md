@@ -39,7 +39,7 @@ Start with these files:
 | [`players/`](players/) | The players beside their objects: their game status (playing, won, lost), diplomacy, tribute, treason, the market, their history, their object trackers, and the world player's own update. |
 | [`production/`](production/) | Training units and researching technologies: a building's production queue, the actions that work it off, and a trained unit's spawn. |
 | [`technology/`](technology/) | Technologies and upgrades: the players' technologies, a research's effects and an object's upgrade to another master. |
-| [`testing/`](testing/) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes the tests name. |
+| [`testing/`](testing/) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes and masters the tests name. |
 | [`unit_ai/`](unit_ai/) | The unit AI (`UnitAIModule`): what a unit decides by itself. |
 | [`vision/`](vision/) | What each player sees: the visible maps its objects' sight keeps, the vision masks that share sight among allies, the objects-in-sight registry, the fog's ghosts and the newly explored tiles. |
 | [`world/`](world/) | The world: its state and its tick. |

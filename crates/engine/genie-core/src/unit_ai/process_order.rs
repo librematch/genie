@@ -15,11 +15,12 @@ use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
-    CIVILIAN, DEFENDLESS_MASTER, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI,
-    Surroundings, UnitAi, UnitCommand, UnitSeen, UnitSide, order_move,
+    CIVILIAN, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI, Surroundings, UnitAi,
+    UnitCommand, UnitSeen, UnitSide, order_move,
 };
 use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 impl UnitAi {
@@ -182,7 +183,7 @@ impl UnitAi {
         Ok(match (o.order, o.target) {
             (OrderKind::Attack, Some(t)) => self.attack_slot(t, true, at, side, ai)?,
             (OrderKind::Defend, target) => {
-                if at.master == DEFENDLESS_MASTER {
+                if roles.of_master(at.master).contains(MasterRoles::DEFENDLESS) {
                     return Ok(false);
                 }
                 match target {

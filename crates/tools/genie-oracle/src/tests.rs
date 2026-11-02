@@ -1,10 +1,11 @@
 use super::*;
 use crate::test_ids::object_id;
+use crate::test_ids::{VILLAGER_FEMALE, VILLAGER_MALE};
 use genie_core::objects::ActionState;
 use genie_core::objects::HitPoints;
 use genie_core::objects::actions::ActionList;
 use genie_core::objects::layers::Action;
-use genie_core::objects::masters::{MasterId, ids};
+use genie_core::objects::masters::MasterId;
 use genie_core::ownership::artifact::Artifact;
 use genie_core::ownership::artifact::ArtifactState;
 use genie_core::production::QueueButton;
@@ -32,7 +33,7 @@ fn building_production_state_comes_before_its_top_action_s() {
         action: Some(Making::Unit(MakeObj {
             state: MakeObjState::Making,
             paid: true,
-            master: Some(ids::VILLAGER_MALE),
+            master: Some(VILLAGER_MALE),
             progress: Seconds::new(0.5),
             unique_id: -1,
             button: QueueButton::of_data(0),
@@ -83,8 +84,8 @@ fn differences_name_the_object_its_master_and_the_field() {
         u
     };
     let slice = [
-        unit(object_id(1), ids::VILLAGER_MALE, HitPoints::new(25.0)),
-        unit(object_id(2), ids::VILLAGER_MALE, HitPoints::new(25.0)),
+        unit(object_id(1), VILLAGER_MALE, HitPoints::new(25.0)),
+        unit(object_id(2), VILLAGER_MALE, HitPoints::new(25.0)),
         unit(
             object_id(4),
             MasterId::try_from(4).unwrap(),
@@ -92,8 +93,8 @@ fn differences_name_the_object_its_master_and_the_field() {
         ),
     ];
     let game = [
-        unit(object_id(1), ids::VILLAGER_MALE, HitPoints::new(25.0)),
-        unit(object_id(2), ids::VILLAGER_FEMALE, HitPoints::new(24.0)),
+        unit(object_id(1), VILLAGER_MALE, HitPoints::new(25.0)),
+        unit(object_id(2), VILLAGER_FEMALE, HitPoints::new(24.0)),
         unit(
             object_id(3),
             MasterId::try_from(59).unwrap(),

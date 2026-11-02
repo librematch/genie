@@ -72,7 +72,6 @@ use genie_model::objects::masters::hero_flags;
 use genie_model::objects::masters::hill_mode;
 use genie_model::objects::masters::hit_chance;
 use genie_model::objects::masters::id_field;
-pub use genie_model::objects::masters::ids;
 use genie_model::objects::masters::interaction_mode;
 use genie_model::objects::masters::interface_kind;
 use genie_model::objects::masters::invulnerability;

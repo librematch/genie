@@ -17,6 +17,7 @@ use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::test_ids::{attack_category, category_of};
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::roles;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};

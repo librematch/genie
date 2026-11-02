@@ -17,8 +17,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids::PASTURE;
-use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
@@ -35,6 +33,7 @@ use crate::unit_ai::{AiMove, Issuer, Notify, OrderPriority, OrderTargetType, Que
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).
@@ -469,7 +468,11 @@ impl World {
             .of_class(master.class)
             .contains(ClassRoles::VILLAGER)
             && target.master.kind == MasterKind::BUILDING
-            && matches!(target.master.id, PASTURE_MANGROVE | PASTURE);
+            && self
+                .model
+                .roles
+                .of_master(target.master.id)
+                .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE);
         if !pasture {
             return Ok(PastureAfter::Tends(None));
         }

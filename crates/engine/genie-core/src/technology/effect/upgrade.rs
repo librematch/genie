@@ -16,7 +16,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::cost_resource;
-use crate::objects::masters::ids::{self, RELIC, VILLAGER_FEMALE, VILLAGER_MALE};
 use crate::objects::masters::player_master;
 use crate::objects::unit::Unit;
 use crate::ownership::change::DEAD_COPY_TYPES;
@@ -27,6 +26,7 @@ use crate::technology::{CostEdit, CostUnits, ObjectsKind};
 use crate::world::Player;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::MasterRoles;
 use crate::world::parts::Part;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::sync::Arc;
@@ -194,7 +194,12 @@ impl World {
         from: MasterId,
         to: MasterId,
     ) -> Result<(), GenieError> {
-        if matches!(to, ids::ID_1663 | ids::ID_1697) {
+        if self
+            .model
+            .roles
+            .of_master(to)
+            .intersects(MasterRoles::FLEMISH_MILITIA | MasterRoles::FLEMISH_MILITIA_FEMALE)
+        {
             self.track_move_all(p, from, to)?;
         }
         Ok(())
@@ -283,14 +288,19 @@ impl World {
                 return Ok(());
             }
             for _ in 0..count {
-                let made = if master == VILLAGER_MALE {
+                let made = if self
+                    .model
+                    .roles
+                    .of_master(master)
+                    .contains(MasterRoles::VILLAGER_MALE)
+                {
                     let r = self.streams.get(Stream::Player).rand15() as i32;
                     if 49 < r % 100 {
                         // The male and female villagers' masters.
                         // The relic's master, which the world counts.
-                        VILLAGER_FEMALE
+                        self.model.slots.master.villager_female
                     } else {
-                        VILLAGER_MALE
+                        self.model.slots.master.villager_male
                     }
                 } else {
                     master
@@ -317,7 +327,12 @@ impl World {
                     };
                     let _ = self.let_out(bp, bi, new, Point::new(-1.0, -1.0), (None, false))?;
                 }
-                if master == RELIC {
+                if self
+                    .model
+                    .roles
+                    .of_master(master)
+                    .contains(MasterRoles::RELIC)
+                {
                     self.spawned_relics = self.spawned_relics.plus_one();
                 }
             }

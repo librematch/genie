@@ -542,12 +542,12 @@ mod tests {
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::ids;
     use crate::objects::masters::{BuildingMaster, Master};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::roles;
     #[cfg(test)]
     use crate::world::FrameSeed;

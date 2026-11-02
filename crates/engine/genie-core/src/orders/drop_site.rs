@@ -17,7 +17,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids;
 use crate::orders::Dispatch;
 use crate::orders::object_gone;
 use crate::orders::{HUNTED_LOADS, NO_POINT, Work, nearest_table_site};
@@ -34,6 +33,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -109,15 +109,14 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let seeks = master.kind < MasterKind::COMBAT
-            || (!master
-                .drop_sites
-                .iter()
-                .any(|&d| d == ids::ID_45 || d == ids::ID_2172)
-                && !self
-                    .model
-                    .roles
-                    .of_class(master.class)
-                    .intersects(ClassRoles::FISHING_SHIP | ClassRoles::TRADE_BOAT));
+            || (!master.drop_sites.iter().any(|&d| {
+                self.model.roles.of_master(d).contains(MasterRoles::DOCK)
+                    || self.model.roles.of_master(d).contains(MasterRoles::PORT)
+            }) && !self
+                .model
+                .roles
+                .of_class(master.class)
+                .intersects(ClassRoles::FISHING_SHIP | ClassRoles::TRADE_BOAT));
         let masters = self.model.masters.of(p).ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;

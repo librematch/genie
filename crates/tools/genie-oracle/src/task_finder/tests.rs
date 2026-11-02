@@ -2,6 +2,7 @@ use crate::fixtures::{gaia, header, human, recording};
 use crate::masters::MasterTable;
 use crate::setup::layer;
 use crate::task_finder::{FinderObject, FinderWorld, finder_objects, finder_world};
+use crate::test_ids::VILLAGER_MALE;
 use crate::test_ids::object_id;
 use genie_core::gathering::gather::GATHER;
 use genie_core::map::Position;
@@ -9,7 +10,6 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
 use genie_core::objects::lifecycle::Held;
-use genie_core::objects::masters::ids;
 use genie_core::objects::masters::{Master, Masters};
 use genie_core::players::Amount;
 use genie_core::players::CivId;
@@ -25,7 +25,7 @@ use std::sync::Arc;
 fn object(annex_of: Option<ObjectId>) -> FinderObject {
     FinderObject {
         player: PlayerId::new(1),
-        master: ids::VILLAGER_MALE,
+        master: VILLAGER_MALE,
         state: ObjectState::Alive,
         held: Held {
             kind: Some(attribute::FOOD),
@@ -44,7 +44,7 @@ fn object(annex_of: Option<ObjectId>) -> FinderObject {
 /// Gaia and two players: player 1's relation to player 2 is `relation`.
 fn world(relation: u8) -> FinderWorld {
     let master = Master {
-        id: ids::VILLAGER_MALE,
+        id: VILLAGER_MALE,
         ..Master::default()
     };
     FinderWorld {

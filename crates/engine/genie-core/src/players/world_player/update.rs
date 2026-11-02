@@ -4,8 +4,6 @@
 use crate::GenieError;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::ObjectState;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::WONDER;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -19,6 +17,7 @@ use crate::players::world_player::{
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -154,7 +153,7 @@ impl World {
                 .players
                 .player(p)?
                 .tracker
-                .list(ListKey::master(ids::KING))
+                .list(ListKey::master(self.model.slots.master.king))
                 .is_empty();
         if !stays || kingless {
             self.set_status(p, GameStatus::LOST)?;
@@ -224,7 +223,11 @@ impl World {
         {
             return Ok(true);
         }
-        Ok(master.id == WONDER
+        Ok(self
+            .model
+            .roles
+            .of_master(master.id)
+            .contains(MasterRoles::WONDER)
             && state != ObjectState::Foundation
             && self.settings.game_mode.scenario())
     }

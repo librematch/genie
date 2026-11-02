@@ -111,7 +111,7 @@ impl UnitView<'_, '_> {
                 .info
                 .explorer
                 .is_some_and(|e| e == id || view.find(e).is_some());
-            let centre = match town_centre_unit(view)? {
+            let centre = match town_centre_unit(view, self.c.w.model.slots.master)? {
                 Some(u) => {
                     let sight = u
                         .master(self.c.w.master_tables(), self.player)?

@@ -31,9 +31,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::HOUSE;
-use crate::objects::masters::ids::MONASTERY;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -44,6 +41,7 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -58,7 +56,8 @@ use std::mem::take;
 /// whole seconds, and an annex of it completes as well ([`Unit::complete_on_update`]).
 pub(crate) fn walls_branch(master: &Master, roles: &Roles) -> bool {
     // The house's master id (`0x46`), whose update takes the walls' branch ([`walls_branch`]).
-    roles.of_class(master.class).contains(ClassRoles::WALL) || master.id == HOUSE
+    roles.of_class(master.class).contains(ClassRoles::WALL)
+        || roles.of_master(master.id).contains(MasterRoles::HOUSE)
 }
 
 impl Unit {
@@ -234,6 +233,7 @@ impl Unit {
             (c.w.parts.building_of(self.id).rice, foundation),
             cons.progress,
             cons.build_time,
+            roles,
         ) else {
             return Ok(());
         };
@@ -369,7 +369,9 @@ impl Unit {
         if self.damaged_lately.running() {
             self.damaged_lately = self.damaged_lately.tick();
         }
-        if master_id == MONASTERY && c.w.parts.building_of(self.id).relics != Relics::NONE {
+        if roles.of_master(master_id).contains(MasterRoles::MONASTERY)
+            && c.w.parts.building_of(self.id).relics != Relics::NONE
+        {
             return Err(GenieError::unsupported(
                 "a monastery's relics' goods (its seconds)",
             ));
@@ -550,6 +552,7 @@ pub(crate) fn farm_stage_terrain(
     (rice, foundation): (bool, Option<TerrainId>),
     progress: Seconds,
     build_time: WholeSeconds,
+    roles: &Roles,
 ) -> Option<TerrainId> {
     /// The stages over the build time (`DAT_142eb1c98`).
     const STAGES: f32 = FARM_STAGES;
@@ -559,30 +562,23 @@ pub(crate) fn farm_stage_terrain(
     const RICE_STAGE: u8 = 65;
     let stage =
         (((progress.get() * STAGES) / Seconds::of_master(build_time).get()) as i32 as u8).min(2);
-    let stage_byte = match master {
-        ids::FARM => FIRST_STAGE + stage,
-        ids::ID_1187 | ids::PASTURE_1889 if rice => RICE_STAGE + stage,
-        // none is the short −1, whose low byte is 255
-        ids::ID_1187 | ids::PASTURE_1889 => foundation
-            .map_or(0xff, TerrainId::get)
-            .wrapping_add(2)
-            .wrapping_add(stage),
-        _ => return None,
+    let stage_byte = {
+        let held = roles.of_master(master);
+        if held.contains(MasterRoles::FARM) {
+            FIRST_STAGE + stage
+        } else if held.intersects(MasterRoles::RICE_FARM | MasterRoles::PASTURE_1889) && (rice) {
+            RICE_STAGE + stage
+        } else if held.intersects(MasterRoles::RICE_FARM | MasterRoles::PASTURE_1889) {
+            foundation
+                .map_or(0xff, TerrainId::get)
+                .wrapping_add(2)
+                .wrapping_add(stage)
+        } else {
+            return None;
+        }
     };
     Some(TerrainId::named(stage_byte))
 }
-
-/// The masters whose units blast about themselves below 1 hit point
-/// (`TRIBE_Combat_Object::update`, `0x141208440`): the demolition ships 527 and 528, the
-/// demolition raft 1104 and the incendiary raft and ships 2133 to 2135.
-pub(crate) const DEATH_BLAST_MASTERS: [MasterId; 6] = [
-    ids::ID_527,
-    ids::ID_528,
-    ids::ID_1104,
-    ids::ID_2133,
-    ids::ID_2134,
-    ids::ID_2135,
-];
 
 /// The hit points below which they blast (`DAT_14330eb8c`; `COMISS`, a NaN does not).
 pub(crate) const DEATH_BLAST_HP: f32 = TURN_DEATH_BLAST_HP;
@@ -596,7 +592,9 @@ pub(crate) fn blasts_at_death(master: &Master, life: &Lifecycle, roles: &Roles) 
     MasterKind::COMBAT <= master.kind
         && life.hp < HitPoints::new(DEATH_BLAST_HP)
         && life.state == ObjectState::Alive
-        && (DEATH_BLAST_MASTERS.contains(&master.id)
+        && (roles
+            .of_master(master.id)
+            .contains(MasterRoles::DEATH_BLAST)
             || roles
                 .of_class(master.class)
                 .contains(ClassRoles::DEATH_BLAST))

@@ -24,7 +24,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::VolleySpread;
-use crate::objects::masters::ids;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::PlayerId;
@@ -34,6 +33,7 @@ use crate::unit_ai::UnitAi;
 use crate::world::ARMED_FIREPOWER;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
@@ -101,9 +101,13 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.model.masters.of(c.player),
         )?;
-        if (matches!(
-            master.id,
-            ids::ID_527 | ids::ID_528 | ids::ID_1104 | ids::ID_2133 | ids::ID_2134 | ids::ID_2135
+        if (roles.of_master(master.id).intersects(
+            MasterRoles::DEMOLITION_SHIP
+                | MasterRoles::HEAVY_DEMOLITION_SHIP
+                | MasterRoles::DEMOLITION_RAFT
+                | MasterRoles::INCENDIARY_RAFT
+                | MasterRoles::INCENDIARY_SHIP
+                | MasterRoles::HEAVY_INCENDIARY_SHIP,
         ) || roles
             .of_class(master.class)
             .intersects(ClassRoles::PETARD | ClassRoles::LAND_MINE))
@@ -120,7 +124,9 @@ impl Unit {
         }
         let missile = master.missile.master().is_some();
         // what the rest reads of the master, before the notify changes the unit
-        let notifies = matches!(master.id, ids::ID_73 | ids::ID_559);
+        let notifies = roles
+            .of_master(master.id)
+            .intersects(MasterRoles::CHU_KO_NU | MasterRoles::ELITE_CHU_KO_NU);
         let (
             trebuchet,
             VolleySpread {
@@ -268,7 +274,10 @@ impl Unit {
         };
         let (weapon_range, blast_level) = (master.weapon_range, master.blast_level);
         self.launch(c, aimed, &shot, roles)?;
-        if !matches!(self.life.master_id, ids::ID_73 | ids::ID_559) {
+        if !roles
+            .of_master(self.life.master_id)
+            .intersects(MasterRoles::CHU_KO_NU | MasterRoles::ELITE_CHU_KO_NU)
+        {
             self.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_EXECUTED,
@@ -339,7 +348,10 @@ impl Unit {
                 ));
             }
         };
-        if matches!(made.id, ids::ID_527 | ids::ID_528) {
+        if roles
+            .of_master(made.id)
+            .intersects(MasterRoles::DEMOLITION_SHIP | MasterRoles::HEAVY_DEMOLITION_SHIP)
+        {
             return Err(GenieError::unsupported(
                 "a volley's extra missile of master 527 or 528 (its attack count)",
             ));
@@ -360,7 +372,10 @@ impl Unit {
             attack_count: AttackCount::ZERO,
         };
         self.launch(c, aimed, &shot, roles)?;
-        if !matches!(self.life.master_id, ids::ID_73 | ids::ID_559) {
+        if !roles
+            .of_master(self.life.master_id)
+            .intersects(MasterRoles::CHU_KO_NU | MasterRoles::ELITE_CHU_KO_NU)
+        {
             self.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_EXECUTED,

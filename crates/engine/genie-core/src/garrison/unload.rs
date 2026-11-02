@@ -14,7 +14,6 @@ use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::MASTER_1808;
 use crate::orders::object_gone;
 use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
@@ -32,6 +31,7 @@ use crate::unit_ai::{Issuer, NotifyKind, OrderPriority, OrderTargetType, QueuedO
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// UNLOAD's point without one (`DAT_14330ec20`).
@@ -390,7 +390,11 @@ impl World {
                         .roles
                         .of_class(m.class)
                         .contains(ClassRoles::VILLAGER)
-                        || m.id == MASTER_1808)
+                        || self
+                            .model
+                            .roles
+                            .of_master(m.id)
+                            .contains(MasterRoles::MULE_CART))
                 {
                     let _ = self.back_to_work(Some((p, idx)), inside)?;
                 }

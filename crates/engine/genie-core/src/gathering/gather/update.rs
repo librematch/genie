@@ -6,8 +6,7 @@ use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
-    GatherAction, GatherReads, Next, REGATHERED, SEARCH_WAIT, STOP_FARMS, StopRate, WAIT_GAP,
-    WAIT_WORKERS, waits_for_farm,
+    GatherAction, GatherReads, Next, SEARCH_WAIT, StopRate, WAIT_GAP, WAIT_WORKERS, waits_for_farm,
 };
 use crate::gathering::hunt::asked_drop_off;
 use crate::gathering::hunt::walk_sprite;
@@ -22,13 +21,13 @@ use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::WorkerCount;
-use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
@@ -102,10 +101,11 @@ impl GatherAction {
         roles: &Roles,
     ) -> Result<Next, GenieError> {
         // a farm's time per stop follows the gatherer's work rate, every update
-        if target
-            .as_deref()
-            .is_some_and(|t| STOP_FARMS.contains(&t.master_id))
-        {
+        if target.as_deref().is_some_and(|t| {
+            roles
+                .of_master(t.master_id)
+                .contains(MasterRoles::STOP_FARM)
+        }) {
             self.time_per_stop = StopRate {
                 work_rate: r.work_rate,
                 capacity: r.capacity,
@@ -207,7 +207,13 @@ impl GatherAction {
             let to = self.walk_to(target, Distance::ZERO);
             self.set_walk(to, target.radius, mover, rng, &walks)?;
         } else {
-            let radius = if STOP_FARMS.contains(&target.master_id) {
+            let radius = if c
+                .w
+                .model
+                .roles
+                .of_master(target.master_id)
+                .contains(MasterRoles::STOP_FARM)
+            {
                 0.0
             } else {
                 target.radius.x()
@@ -234,7 +240,10 @@ impl GatherAction {
             if target.state < ObjectState::Alive {
                 return self.begin_search(c, unit, r);
             }
-            if matches!(target.master_id, PASTURE_MANGROVE | PASTURE) {
+            if roles
+                .of_master(target.master_id)
+                .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE)
+            {
                 return Err(GenieError::unsupported(
                     "a gather facing a pasture (its animals, slot 0x780)",
                 ));
@@ -248,7 +257,11 @@ impl GatherAction {
         if !face_target(mover, at, target.position, c.w.world_time)? {
             return Ok(Next::Stay);
         }
-        if Amount::ZERO < target.amount || REGATHERED.contains(&target.master_id) {
+        if Amount::ZERO < target.amount
+            || roles
+                .of_master(target.master_id)
+                .contains(MasterRoles::REGATHERED)
+        {
             self.set_work(c, unit, r);
             self.time_at_stop = Seconds::ZERO;
             return Ok(Next::Stay);

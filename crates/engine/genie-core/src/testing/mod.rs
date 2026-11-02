@@ -1,8 +1,10 @@
 //! What genie-core's tests build their game data from: each build's layer as the generated
-//! fixture states it (FD-046-D08), so a test needs no Nickel, and the classes the tests name.
+//! fixture states it (FD-046-D08), so a test needs no Nickel, and the classes and masters the
+//! tests name.
 
 pub mod build_158041;
 pub mod class;
+pub mod ids;
 
 use crate::testing::build_158041::build_158041;
 use crate::world::layer::Roles;

@@ -8,11 +8,9 @@
 use crate::GenieError;
 use crate::commands::GameSub;
 use crate::gathering::QueueCount;
-use crate::gathering::farm_queue::PASTURE;
 use crate::map::Distance;
 use crate::map::WholeDistance;
 use crate::math::image::turn::TREASON_COST as TURN_TREASON_COST;
-use crate::objects::masters::ids::FARM;
 use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerId;
@@ -219,16 +217,16 @@ impl World {
         let count = QueueCount::of_data(i32::from(g.a));
         match g.sub {
             GameSub::FARM_QUEUE => {
-                let _ = self.queue_farms(p, count, FARM)?;
+                let _ = self.queue_farms(p, count, self.model.slots.master.farm)?;
             }
             GameSub::PASTURE_QUEUE => {
-                let _ = self.queue_farms(p, count, PASTURE)?;
+                let _ = self.queue_farms(p, count, self.model.slots.master.pasture_1889)?;
             }
             GameSub::FARM_UNQUEUE => {
-                let _ = self.unqueue_farms(p, count, FARM)?;
+                let _ = self.unqueue_farms(p, count, self.model.slots.master.farm)?;
             }
             GameSub::PASTURE_UNQUEUE => {
-                let _ = self.unqueue_farms(p, count, PASTURE)?;
+                let _ = self.unqueue_farms(p, count, self.model.slots.master.pasture_1889)?;
             }
             GameSub::AUTO_FARM_QUEUE => {
                 let owner = self.players.player_mut(p)?;
@@ -304,8 +302,6 @@ const TREASON_COST: Amount = Amount::new(TURN_TREASON_COST);
 mod tests {
     use super::*;
     use crate::gathering::QueueCount;
-    use crate::objects::masters::ids::CASTLE;
-    use crate::objects::masters::ids::FISH_TRAP;
     use crate::players::Amount;
     use crate::players::Posture;
     use crate::players::attribute;
@@ -315,6 +311,10 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
     use crate::testing::class;
+    use crate::testing::ids::CASTLE;
+    use crate::testing::ids::FARM;
+    use crate::testing::ids::FISH_TRAP;
+    use crate::testing::ids::PASTURE_1889;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -423,7 +423,7 @@ mod tests {
         ]);
         let masters = Masters::new([
             costing(FARM, 60),
-            costing(PASTURE, 100),
+            costing(PASTURE_1889, 100),
             costing(FISH_TRAP, 100),
         ]);
         t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(masters)];

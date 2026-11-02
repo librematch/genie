@@ -80,13 +80,13 @@ use crate::objects::masters::DamageAmount;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::ids;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_of;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::roles;
 use std::f32::consts::FRAC_PI_2;
 
@@ -2176,7 +2176,7 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
         assert_eq!(hit(&b, passed), Ok(HitPoints::new(14.0)));
     }
     let ram = blast(Attacker {
-        master_id: RAMS[0],
+        master_id: ids::ID_35,
         ..b.a
     });
     assert_eq!(hit(&ram, enemy.clone()), Ok(HitPoints::new(14.0)));

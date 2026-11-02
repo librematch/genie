@@ -7,10 +7,11 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::objects::Frame;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::HOUSE;
 use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
 /// BUILD (0x66, `FUN_140e7a400`): the player places a foundation of `master` at `position` (state
@@ -74,7 +75,8 @@ impl BuildCommand {
             return Ok(());
         }
         let (id, position) = w.found(player, master, Position::new(x, y, 0.0))?;
-        let sprite_override = self.sprite_override_of(w.players.player(player)?.civ);
+        let sprite_override =
+            self.sprite_override_of(w.players.player(player)?.civ, &w.model.roles);
         if let Some((_, layer)) = w.object_and_layer_mut(id)? {
             if let Some(c) = layer.construction.as_mut() {
                 c.sprite_override = sprite_override != SpriteOverride::NONE;
@@ -94,9 +96,12 @@ impl BuildCommand {
     /// The sprite override the handler gives the foundation (`FUN_141189e70`): the packet's
     /// `+0x18` for a house (master 70) of civ 12 when it is 0x2c9 to 0x2ce, else −1.
     #[must_use]
-    pub fn sprite_override_of(&self, civ: CivId) -> SpriteOverride {
+    pub fn sprite_override_of(&self, civ: CivId, roles: &Roles) -> SpriteOverride {
         const CIV: CivId = CivId::new(0xc);
-        if self.sprite_override.kept() && self.master == HOUSE && civ == CIV {
+        if self.sprite_override.kept()
+            && roles.of_master(self.master).contains(MasterRoles::HOUSE)
+            && civ == CIV
+        {
             self.sprite_override
         } else {
             SpriteOverride::NONE

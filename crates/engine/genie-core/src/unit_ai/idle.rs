@@ -17,12 +17,13 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     ARTIFACT_AI, AttackAsk, BOAR_AI, CIVILIAN, ENEMY_SIGHTING_GAP, FISHING_AI, FISHING_CARED,
     Found, Memory, Pick, SHIP_EVADE_REACH, SIEGE_AI, SIEGE_CARED, SIEGE_TOWER_AI, SOLDIER_AI,
-    SOLDIER_CARED, SOLDIER_IDLE_MASTER, Search, Seeker, Surroundings, TOWER_AI, TOWER_CARED,
-    TRADE_AI, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, UnitSide, attack_search_radius,
-    civilian_search_radius, computer_idle_check, search_radius,
+    SOLDIER_CARED, Search, Seeker, Surroundings, TOWER_AI, TOWER_CARED, TRADE_AI, TRADE_CART_CARED,
+    TRADE_SHIP_CARED, UnitAi, UnitSide, attack_search_radius, civilian_search_radius,
+    computer_idle_check, search_radius,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 
 impl UnitAi {
     /// processIdle, slot 72 (`+0x240`) of each factory type's vtable: the hunted animal's
@@ -351,7 +352,11 @@ impl UnitAi {
                 .no_attack_idle(at, player_type, side, ai)
                 .map(|()| false);
         }
-        if at.master == SOLDIER_IDLE_MASTER {
+        if at
+            .roles
+            .of_master(at.master)
+            .contains(MasterRoles::IDLES_STILL)
+        {
             return Ok(false);
         }
         // its target: with retargeting on, its top action's within its range (slot 400, slot

@@ -306,8 +306,8 @@ impl World {
         if g.formation_locked_type == Some(FormationKind::FLANKED)
             && let Some(lead) = self.lead_object(m).filter(WorldObject::moves)
         {
-            let master = self.master(lead.player(), lead.master_id())?;
-            let mask = self.master_mask(lead.player(), lead.master_id())?;
+            let master = self.master(lead.player(), lead.master_id(self.model.slots))?;
+            let mask = self.master_mask(lead.player(), lead.master_id(self.model.slots))?;
             let members: Vec<ObjectId> = g.members.iter().map(|mb| mb.id).collect();
             if self.spatial.point_clear_among(
                 lead.id(),

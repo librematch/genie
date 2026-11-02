@@ -33,13 +33,13 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
@@ -188,7 +188,11 @@ impl World {
                     .roles
                     .of_class(class)
                     .contains(ClassRoles::FISHING_SHIP)
-                    || m.id == FISH_TRAP)
+                    || self
+                        .model
+                        .roles
+                        .of_master(m.id)
+                        .contains(MasterRoles::FISH_TRAP))
             {
                 return Ok(Some(id));
             }

@@ -5,8 +5,6 @@ use crate::GenieError;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ListIndex;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::VILLAGER_FEMALE;
-use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -25,6 +23,7 @@ use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use crate::world::{GameMode, NO_ATTRIBUTE};
 
@@ -295,7 +294,18 @@ impl World {
             }
             // The villager's masters, whose two sexes a cancel of five counts as one kind
             // (`FUN_1411d66b0`, `FUN_1411d61e0`).
-            if master != kind && master != Some(VILLAGER_MALE) && master != Some(VILLAGER_FEMALE) {
+            if master != kind
+                && !self
+                    .model
+                    .roles
+                    .of_some_master(master)
+                    .contains(MasterRoles::VILLAGER_MALE)
+                && !self
+                    .model
+                    .roles
+                    .of_some_master(master)
+                    .contains(MasterRoles::VILLAGER_FEMALE)
+            {
                 return Ok(());
             }
             let take = if left <= slot.count { left } else { slot.count };
@@ -390,7 +400,17 @@ impl World {
         if QueuedUnits::ZERO < queue.slots.checked(i)?.count {
             return Ok(());
         }
-        let villager = |m: Option<MasterId>| m == Some(VILLAGER_MALE) || m == Some(VILLAGER_FEMALE);
+        let villager = |m: Option<MasterId>| {
+            self.model
+                .roles
+                .of_some_master(m)
+                .contains(MasterRoles::VILLAGER_MALE)
+                || self
+                    .model
+                    .roles
+                    .of_some_master(m)
+                    .contains(MasterRoles::VILLAGER_FEMALE)
+        };
         // the game reads the next slot before the move; it matters for the first entry alone
         let pair = tech.is_none()
             && i == 0

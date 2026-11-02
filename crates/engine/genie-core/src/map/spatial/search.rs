@@ -8,9 +8,8 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::{
-    AttackField, CLOSEST_RANGE, ClosestChecks, FarmLook, Filter, PASTURES, Placed, QUERY_HITS,
-    Reach, RecordId, SEARCH_REUSE_SQUARED, Spatial, TRAPPERS, players_seen, record_meets_segment,
-    tile_record_id,
+    AttackField, CLOSEST_RANGE, ClosestChecks, FarmLook, Filter, Placed, QUERY_HITS, Reach,
+    RecordId, SEARCH_REUSE_SQUARED, Spatial, players_seen, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::math::conversions::cvttss2si;
@@ -18,7 +17,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::ids::FISH_TRAP;
 use crate::players::PlayerId;
 use crate::players::UnitRelations;
 use crate::players::{ByRelation, QueryRelation, UnitRelation};
@@ -31,6 +29,7 @@ use crate::vision::registry::VisibleQuery;
 use crate::vision::visibility::Seer;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use std::fmt::{Debug, Error, Formatter};
 
@@ -106,7 +105,12 @@ impl Spatial {
     /// through the object's place setter ([`crate::objects::layers::Static::new_position`]),
     /// which moves the object with it (FD-045-D15); a tool that asks a query from another place
     /// moves the index alone.
-    pub fn set_position(&mut self, id: ObjectId, position: Position) -> Result<(), GenieError> {
+    pub fn set_position(
+        &mut self,
+        id: ObjectId,
+        position: Position,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         if let Some(p) = self.objects.get_mut(id) {
             let from = p.position;
             p.position = position;
@@ -125,7 +129,7 @@ impl Spatial {
                 return Ok(());
             };
             if let Some(v) = self.sight.as_mut() {
-                v.moved(id, from, position, p.radius)?;
+                v.moved(id, from, position, p.radius, roles)?;
                 v.registry_moved(id, p.class, from, position);
             }
         }
@@ -397,7 +401,7 @@ impl Spatial {
             class_10: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::PREDATOR)),
             // The villagers' class, which gathers from farms (`FUN_141195750`).
             farmer: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER)),
-            trapper: at.is_some_and(|m| TRAPPERS.contains(&m.master)),
+            trapper: at.is_some_and(|m| roles.of_master(m.master).contains(MasterRoles::TRAPPER)),
         };
         let spared = filter.spared.map(QueryRelation::list);
         let mut best: Option<(ObjectId, f32)> = None;
@@ -539,7 +543,7 @@ pub(super) fn closest_kept(
     if roles
         .of_some_class(filter.group)
         .contains(ClassRoles::CLOSEST_PASTURE)
-        && !farm_kept(id, p, filter, searcher, farm)?
+        && !farm_kept(id, p, filter, searcher, farm, roles)?
     {
         return Ok(false);
     }
@@ -565,6 +569,7 @@ pub(super) fn farm_kept(
     filter: Filter,
     searcher: Searcher,
     farm: &FarmLook<'_>,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
     let (workers, parent) = farm(id).ok_or(GenieError::unsupported(
         "a found farm the slice does not hold",
@@ -572,7 +577,10 @@ pub(super) fn farm_kept(
     if parent.is_some() {
         return Ok(false);
     }
-    if PASTURES.contains(&p.master) {
+    if roles
+        .of_master(p.master)
+        .contains(MasterRoles::COUNTED_PASTURE)
+    {
         return Err(GenieError::unsupported(
             "ClosestObject over pastures (their workers and livestock)",
         ));
@@ -582,10 +590,10 @@ pub(super) fn farm_kept(
             return Ok(false);
         }
         // The fish trap (raw `0x6163`), which only the fishing ships gather from (`FUN_1411945a0`).
-        if !searcher.trapper && p.master == FISH_TRAP {
+        if !searcher.trapper && roles.of_master(p.master).contains(MasterRoles::FISH_TRAP) {
             return Ok(false);
         }
-        if !searcher.farmer && p.master != FISH_TRAP {
+        if !searcher.farmer && !roles.of_master(p.master).contains(MasterRoles::FISH_TRAP) {
             return Ok(false);
         }
     }

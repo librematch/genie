@@ -22,8 +22,6 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::MASTER_1808;
-use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::orders::Dispatch;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
@@ -36,6 +34,7 @@ use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
@@ -255,7 +254,12 @@ impl World {
         // The master that answers the bell besides the villagers (`0x710`).
         // The villagers' class.
         // The units' least type (`0x46`) and the buildings' (`'P'`).
-        if t.life.master_id != TOWN_CENTRE {
+        if !self
+            .model
+            .roles
+            .of_master(t.life.master_id)
+            .contains(MasterRoles::TOWN_CENTRE)
+        {
             return Ok(());
         }
         let (at, radius) = self.ground(tc)?;
@@ -288,7 +292,12 @@ impl World {
                 .contains(ClassRoles::VILLAGER)
                 && kind == MasterKind::COMBAT
                 && near(self)?)
-                || (master == MASTER_1808 && near(self)?)
+                || (self
+                    .model
+                    .roles
+                    .of_master(master)
+                    .contains(MasterRoles::MULE_CART)
+                    && near(self)?)
             {
                 units.push(id);
             } else if kind == MasterKind::BUILDING && takes_villagers && near(self)? {
@@ -323,7 +332,12 @@ impl World {
         let Some((_, t)) = self.object(tc) else {
             return Ok(());
         };
-        if t.life.master_id != TOWN_CENTRE {
+        if !self
+            .model
+            .roles
+            .of_master(t.life.master_id)
+            .contains(MasterRoles::TOWN_CENTRE)
+        {
             return Ok(());
         }
         let (at, radius) = self.ground(tc)?;
@@ -426,7 +440,11 @@ impl World {
                     .roles
                     .of_class(um.class)
                     .contains(ClassRoles::VILLAGER)
-                    || um.id == MASTER_1808)
+                    || self
+                        .model
+                        .roles
+                        .of_master(um.id)
+                        .contains(MasterRoles::MULE_CART))
             {
                 let _ = self.back_to_work(Some((owner, idx)), inside)?;
             }
@@ -440,7 +458,7 @@ impl World {
     fn workers_back(&mut self, owner: PlayerId) -> Result<(), GenieError> {
         let tracker = &self.players.player(owner)?.tracker;
         let mut ids = tracker.class_list(self.model.slots.class.villager).to_vec();
-        ids.extend_from_slice(tracker.list(ListKey::master(MASTER_1808)));
+        ids.extend_from_slice(tracker.list(ListKey::master(self.model.slots.master.mule_cart)));
         // a queued unit's place (−1) names no object
         for id in ids.into_iter().flatten() {
             // the tracker's keepers follow every object its player gains and loses: the world
@@ -527,7 +545,11 @@ impl World {
             .roles
             .of_class(master.class)
             .contains(ClassRoles::VILLAGER)
-            || master.id == MASTER_1808)
+            || self
+                .model
+                .roles
+                .of_master(master.id)
+                .contains(MasterRoles::MULE_CART))
         {
             return Ok(());
         }

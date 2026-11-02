@@ -13,14 +13,15 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids::PASTURE_1889;
-use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{BuildingMaster, Master};
 use crate::players::PlayerId;
 use crate::players::diplomacy::REVEAL_UNITS;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::slots::PlayerSlots;
 use genie_model::model::Model;
 
@@ -84,7 +85,8 @@ impl World {
         if building.disappears_when_built {
             u.life.hp = HitPoints::ZERO;
         }
-        self.spatial.sight_state(id, ObjectState::Alive)?;
+        self.spatial
+            .sight_state(id, ObjectState::Alive, &self.model.roles)?;
         if let Some(tech) = building.tech {
             self.research_built(p, tech)?;
         }
@@ -141,7 +143,7 @@ impl World {
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
             && let Some(v) = self.spatial.sight.as_mut()
         {
-            v.construction_completed(id, placed.position, placed.radius)?;
+            v.construction_completed(id, placed.position, placed.radius, &self.model.roles)?;
         }
         let place = self.place(id).ok_or(NOT_HELD)?;
         let Self {
@@ -195,9 +197,10 @@ impl World {
             v.unlink_building(placed.position, master.radius)?;
         }
         let stack = StackUnit {
-            master: stack_master(master, building, rice).ok_or(GenieError::unreachable(
-                "a completed stack unit without a master",
-            ))?,
+            master: stack_master(master, building, rice, &self.model.roles, self.model.slots)
+                .ok_or(GenieError::unreachable(
+                    "a completed stack unit without a master",
+                ))?,
             at: placed.position,
             hp_lost: HitPoints::of_master(master.hit_points) - hp,
         };
@@ -234,7 +237,11 @@ impl World {
         let layer = parts.building_mut(u.id)?;
         let (main, rice) = (layer.annex_of.is_some(), layer.rice);
         let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
-        let laid = foundation_laid(building, stack_master(master, building, rice));
+        let laid = foundation_laid(
+            building,
+            stack_master(master, building, rice, &self.model.roles, self.model.slots),
+            &self.model.roles,
+        );
         lay_foundation(
             c,
             spatial,
@@ -245,7 +252,7 @@ impl World {
             &self.model.roles,
         )?;
         let mut counts = Vec::new();
-        let history = completion_counts(master, building, main, &mut counts);
+        let history = completion_counts(master, building, main, &mut counts, &self.model.roles);
         if let Some(kind) = history {
             let now = self.world_time;
             self.players
@@ -259,13 +266,24 @@ impl World {
 
 /// The master a completed building's stack unit takes (`+0x986`): [`PASTURE_MANGROVE`] for master
 /// 1889 on mangrove or rice terrain (`rice`, `+0xcd0`), else its own.
-fn stack_master(master: &Master, building: &BuildingMaster, rice: bool) -> Option<MasterId> {
+fn stack_master(
+    master: &Master,
+    building: &BuildingMaster,
+    rice: bool,
+    roles: &Roles,
+    slots: Slots,
+) -> Option<MasterId> {
     // The buildings' master type (80).
     // The masters and the class the end of the work treats apart: 621 and 1889 among the
     // foundations, class 39 among the builders, 1893 and 1897 (`id - 0x765 & !4 == 0`), the fish
     // trap 199 and farms (class 49, `FUN_141194b20`).
-    if master.id == PASTURE_1889 && building.stack_unit.is_some() && rice {
-        Some(PASTURE_MANGROVE)
+    if roles
+        .of_master(master.id)
+        .contains(MasterRoles::PASTURE_1889)
+        && building.stack_unit.is_some()
+        && rice
+    {
+        Some(slots.master.pasture_mangrove)
     } else {
         building.stack_unit
     }

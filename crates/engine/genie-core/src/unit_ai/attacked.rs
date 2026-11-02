@@ -11,7 +11,6 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::WONDER;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
@@ -29,6 +28,7 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 impl UnitAi {
@@ -260,7 +260,7 @@ impl UnitAi {
     ) -> Result<u32, GenieError> {
         let roles = &at.roles;
         let attacker_id = attacker.id;
-        if target.master == WONDER
+        if roles.of_master(target.master).contains(MasterRoles::WONDER)
             || (roles.of_class(target.class).contains(ClassRoles::TOWER)
                 && roles.of_class(attacker.class).contains(ClassRoles::TOWER))
             || attacker.kind == MasterKind::MISSILE

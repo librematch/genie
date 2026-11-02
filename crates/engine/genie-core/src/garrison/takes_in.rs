@@ -14,8 +14,6 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::{Task, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
@@ -24,6 +22,7 @@ use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// `FUN_1411205e0`: whether a master's class (`+0x410`, the short `MOVSX` widens) has one of
@@ -36,14 +35,6 @@ pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
         .and_then(|c| CLASS_FLAGS.get(c))
         .is_some_and(|&f| ClassFlags::from_bits_retain(f).intersects(flags))
 }
-
-/// The unit masters whose own rules `FUN_14120eb10` keeps apart from their class's (the game
-/// compares their ids, + 0x609c).
-pub(super) const MASTER_1263: MasterId = ids::FLAMING_CAMEL;
-pub(super) const MASTER_775: MasterId = ids::MISSIONARY;
-pub(super) const MASTER_1715: MasterId = ids::JADWIGA;
-pub(super) const MASTER_1811: MasterId = ids::WARRIOR_PRIEST;
-pub(super) const MASTER_1822: MasterId = ids::TAMAR;
 
 /// Whether `garrison_type` (a building master's `+0x9bc`) takes in a unit of `class` and master
 /// `id` (the switch of `FUN_14120eb10` on the class, [`GarrisonKinds`]'s bits; infantry not of
@@ -82,7 +73,9 @@ pub fn garrison_type_takes(
                 | ClassRoles::SPEARMAN
                 | ClassRoles::RAIDER,
         ) {
-            id != MASTER_1263 && id != MASTER_1811 && bit(GarrisonKinds::INFANTRY)
+            !roles.of_master(id).contains(MasterRoles::FLAMING_CAMEL)
+                && !roles.of_master(id).contains(MasterRoles::WARRIOR_PRIEST)
+                && bit(GarrisonKinds::INFANTRY)
         } else if held.intersects(
             ClassRoles::CAVALRY
                 | ClassRoles::CAVALRY_CANNON
@@ -101,16 +94,26 @@ pub fn garrison_type_takes(
         } else if held.intersects(ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC)
             || (held.contains(ClassRoles::RELIC) && with_42)
         {
-            id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(GarrisonKinds::MONKS)
+            !roles.of_master(id).contains(MasterRoles::MISSIONARY)
+                && !roles.of_master(id).contains(MasterRoles::JADWIGA)
+                && !roles.of_master(id).contains(MasterRoles::TAMAR)
+                && bit(GarrisonKinds::MONKS)
         } else if held.contains(ClassRoles::LIVESTOCK) {
             bit(GarrisonKinds::HERDABLES)
         } else {
             false
         }
     };
-    let as_cavalry = matches!(id, MASTER_1263 | MASTER_775 | MASTER_1715 | MASTER_1822)
-        && bit(GarrisonKinds::CAVALRY);
-    let as_monk = matches!(id, MASTER_1811 | MASTER_1808) && bit(GarrisonKinds::MONKS);
+    let as_cavalry = roles.of_master(id).intersects(
+        MasterRoles::FLAMING_CAMEL
+            | MasterRoles::MISSIONARY
+            | MasterRoles::JADWIGA
+            | MasterRoles::TAMAR,
+    ) && bit(GarrisonKinds::CAVALRY);
+    let as_monk = roles
+        .of_master(id)
+        .intersects(MasterRoles::WARRIOR_PRIEST | MasterRoles::MULE_CART)
+        && bit(GarrisonKinds::MONKS);
     by_class || as_cavalry || as_monk
 }
 

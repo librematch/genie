@@ -7,13 +7,13 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::masters::ids::MARKET;
 use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -108,7 +108,12 @@ impl World {
             return Ok(false);
         };
         // The market (`0x60f0` raw), whose own trade units the work command never retakes.
-        let market = tp == p && t.master(self.master_tables(), tp)?.id == MARKET;
+        let market = tp == p
+            && self
+                .model
+                .roles
+                .of_master(t.master(self.master_tables(), tp)?.id)
+                .contains(MasterRoles::MARKET);
         let class = self
             .players
             .live(p, i)?

@@ -28,7 +28,6 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::ID_45;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::world::Seconds;
@@ -100,7 +99,6 @@ use crate::math::image::movement::{
 #[cfg(test)]
 use crate::math::rng::Well512;
 use crate::objects::facing::SpriteFacets;
-use crate::objects::masters::ids;
 #[cfg(test)]
 use crate::pathing::hull_path::HullPather;
 #[cfg(test)]
@@ -110,6 +108,7 @@ use crate::pathing::{Pathing, PlanBudget};
 use crate::world::WALKER_UNMOVING;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 pub use genie_model::movement::{Turning, turn_rate, turning};
 
@@ -307,8 +306,6 @@ const REACH_SHORT: f32 = MOVEMENT_REACH_SHORT;
 /// A point whose squared gap to the unit's footprint is below this is not reached when the
 /// short pather did not reach it (`FUN_140fa0370`, `DAT_14330eb8c`).
 const REACH_NEAR: DistanceSquared = DistanceSquared::new(MOVEMENT_REACH_NEAR);
-/// The master the long pather lets move without a speed (`FUN_140f9eb70`, raw id `0x2a`).
-pub(crate) const LONG_PATH_MOVER: MasterId = ids::ID_42;
 
 const WIDE_RANGE: Distance = Distance::new(MOVEMENT_WIDE_RANGE);
 /// A long path's stretch is checked for walls with the unit's radius times this
@@ -488,12 +485,12 @@ impl PathData {
 /// tile or more without a target; with one (its own gap, `FUN_14118f680`, and its master), its
 /// gap a tile or more (`COMISS`/`JNC` at 0x141152f0e: a NaN is near) or its master 45 however
 /// near.
-fn far_waypoint(way: Distance, target: Option<(Distance, MasterId)>) -> bool {
+fn far_waypoint(way: Distance, target: Option<(Distance, MasterId)>, roles: &Roles) -> bool {
     let way = way.get();
     target.map_or(CLOSE <= way, |(gap, master)| {
         // A target of this master (raw `0x60c9`) or class gives the tile planner of a reach test this
         // much more range (`FUN_140fa0370`, `DAT_142eb1c98`).
-        CLOSE <= gap.get() || master == ID_45
+        CLOSE <= gap.get() || roles.of_master(master).contains(MasterRoles::DOCK)
     })
 }
 

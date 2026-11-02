@@ -10,8 +10,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::PASTURE_1889;
-use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{Master, MasterTables, player_master};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -33,6 +31,7 @@ use crate::unit_ai::{Inbox, UnitAi};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::parts::Part;
 use crate::world::player::Player;
@@ -237,6 +236,7 @@ impl World {
                 p.radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
+                &self.model.roles,
             )?;
         }
         Ok(())
@@ -256,6 +256,7 @@ impl World {
                 p.radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
+                &self.model.roles,
             )?;
         }
         Ok(())
@@ -381,8 +382,14 @@ impl World {
     ) -> Result<(), GenieError> {
         let building = master.building.as_ref();
         if let Some(stack) = building.and_then(|b| b.stack_unit) {
-            let stack = if master.id == PASTURE_1889 && rice {
-                PASTURE_MANGROVE
+            let stack = if self
+                .model
+                .roles
+                .of_master(master.id)
+                .contains(MasterRoles::PASTURE_1889)
+                && rice
+            {
+                self.model.slots.master.pasture_mangrove
             } else {
                 stack
             };
@@ -565,7 +572,7 @@ pub(crate) fn change_hands(
     }
     let los = own.line_of_sight;
     let sees = u.life.state == ObjectState::Alive && u.life.inside.is_none();
-    spatial.change_owner(u.id, new, los, sees)?;
+    spatial.change_owner(u.id, new, los, sees, roles)?;
     if let Some(a) = actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }

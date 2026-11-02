@@ -19,11 +19,11 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::ids::WONDER;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
@@ -346,7 +346,13 @@ impl BuildAction {
         let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
         let mut rate = self.task.work_rate * self.task.work_value * c.dt.seconds();
         let mut factor = c.w.players.player(c.player)?.construction_rate().get();
-        if site.life.master_id == WONDER && WONDER_RATE < factor {
+        if c.w
+            .model
+            .roles
+            .of_master(site.life.master_id)
+            .contains(MasterRoles::WONDER)
+            && WONDER_RATE < factor
+        {
             factor = WONDER_RATE;
         }
         if 0.0 < factor {

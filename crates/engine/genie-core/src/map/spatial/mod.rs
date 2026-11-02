@@ -62,8 +62,6 @@ use crate::math::image::spatial::{
     CLOSEST_RANGE as SPATIAL_CLOSEST_RANGE, SEARCH_REUSE_SQUARED as SPATIAL_SEARCH_REUSE_SQUARED,
 };
 use crate::movement::explore::InfluenceMap;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 #[cfg(test)]
 use crate::objects::unit::TAKEN_OUT;
 use crate::objects::{IdTable, WorkerCount};
@@ -174,16 +172,6 @@ fn players_seen(found: &ByRelation<Vec<Record>>) -> u32 {
     }
     seen[1..].iter().map(|&s| u32::from(s)).sum()
 }
-
-/// The pastures, whose workers and livestock `ClosestObject` counts (`FUN_140c488b0`, raw
-/// `0x6801`, `0x6805`).
-const PASTURES: [MasterId; 2] = [PASTURE_MANGROVE, PASTURE];
-/// The fishing ships' masters (`FUN_1411945a0`: 13, 2356, 2171).
-const TRAPPERS: [MasterId; 3] = [
-    ids::FISHING_SHIP,
-    ids::ANTIQUITY_FISHING_SHIP,
-    ids::OYSTERING_SHIP,
-];
 
 /// What the walk reads of a moving object it meets: whether it moves (its velocity, `+0x868`, is
 /// not 0: slot 0x5c8, `FUN_1411583d0`), its last move time (`+0x870`, slot 0x5e8) and its current

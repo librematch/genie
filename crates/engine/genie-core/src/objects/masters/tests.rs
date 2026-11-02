@@ -49,6 +49,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::{class_of, opt_master};
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::unit_ai::UnitAiType;

@@ -446,11 +446,12 @@ mod tests {
     use crate::objects::ListIndex;
     use crate::objects::ObjectId;
     use crate::objects::masters::FormationClass;
+    use crate::objects::masters::MasterId;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::{Master, Masters};
-    use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
     use crate::players::PlayerId;
+    use crate::testing::ids;
     use crate::world::Millis;
     use crate::world::Seconds;
     use crate::world::WorldTime;

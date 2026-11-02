@@ -23,8 +23,8 @@ use crate::objects::WorkRate;
 use crate::objects::lifecycle::death_parts::FarmBonus;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskId;
-use crate::objects::masters::{MasterId, ids};
 use crate::players::Amount;
 use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
@@ -83,6 +83,7 @@ use crate::pathing::Pathing;
 use crate::players::PlayerId;
 use crate::world::NO_ATTRIBUTE;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// A builder within this of its foundation's footprint has reached it (`DAT_142eb5690`).
@@ -276,7 +277,9 @@ impl Completion<'_> {
                 part.attributes.push((attribute, amount));
             }
             // the game mode is not the editor's (4) in a game
-            part.pasture = matches!(master.id, ids::PASTURE_MANGROVE | ids::PASTURE);
+            part.pasture = roles
+                .of_master(master.id)
+                .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE);
         }
         part.cart = self.ai && master.tasks.iter().any(|t| t.action_kind == CART_TASK);
         Ok(part)
@@ -432,13 +435,6 @@ pub(crate) struct BuildReads {
     pub(crate) by: Releaser,
 }
 
-/// The fishing ships that work the fish traps they build (`FUN_1411945a0`: 13, 2356, 2171).
-const FISHING_SHIPS: [MasterId; 3] = [
-    MasterId::named(13),
-    MasterId::named(2356),
-    MasterId::named(2171),
-];
-
 /// A second builder works at a third of the rate of the first (`DAT_142ed66b0`).
 const EXTRA_BUILDER: f32 = BUILD_EXTRA_BUILDER;
 /// The progress a started foundation holds before its first work (`0x2edbe6ff`, about 1e-10).
@@ -493,6 +489,7 @@ mod stack_tests {
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::unit_ai::UnitAiType;
     use crate::world::Millis;
     use crate::world::WorldTime;

@@ -2,7 +2,7 @@
 //! (`FUN_141084230`) and the blast so far.
 
 use crate::combat::Charge;
-use crate::combat::attack::{DRAW_SCALE, QUIET_SWINGS};
+use crate::combat::attack::DRAW_SCALE;
 use crate::combat::damage::Victim;
 use crate::combat::missile::StrikeResult;
 use crate::construction::build::NOT_HELD;
@@ -18,6 +18,7 @@ use crate::objects::masters::ChargeKind;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterKind;
 use crate::world::Seconds;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::{GenieError, combat::damage};
 
@@ -136,7 +137,10 @@ pub(crate) fn strike(
         }
         return Ok(struck);
     }
-    if !QUIET_SWINGS.contains(&own.master_id) {
+    if !roles
+        .of_master(own.master_id)
+        .contains(MasterRoles::QUIET_SWING)
+    {
         struck.executed = Some(victim.id);
     }
     let draw = object_rng.raw64();

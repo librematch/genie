@@ -169,10 +169,11 @@ impl Unit {
             return Ok(());
         }
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
-            c.w.spatial.sight_state(self.id, ObjectState::Dying)?;
+            c.w.spatial
+                .sight_state(self.id, ObjectState::Dying, &c.w.model.roles)?;
         }
         if after != ObjectState::Dying {
-            c.w.spatial.sight_state(self.id, after)?;
+            c.w.spatial.sight_state(self.id, after, &c.w.model.roles)?;
         }
         if before < ObjectState::DyingSprite && ObjectState::Undead < after {
             let master = self.master(

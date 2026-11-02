@@ -47,8 +47,6 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::VILLAGER_FEMALE;
-use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -58,6 +56,7 @@ pub(crate) use crate::world::player::NO_ATTRIBUTE;
 pub use crate::world::player::{AiSettings, Formations, Player};
 use genie_diff::Diff;
 pub use genie_model::layer;
+use genie_model::layer::MasterSlots;
 pub use genie_model::model::Model;
 
 mod after_step;
@@ -96,7 +95,6 @@ use crate::math::image::turn::{
     TREE_SEARCH_WITHIN as TURN_TREE_SEARCH_WITHIN,
 };
 use crate::objects::RelicCount;
-use crate::objects::masters::ids;
 use crate::pathing::zones::Zones;
 use crate::players::Team;
 use crate::players::ai_module::AiModules;
@@ -183,9 +181,6 @@ pub(crate) const BLOCKS_RESEARCH: [ActionKind; 3] =
 /// The first master type whose slot 0x128 (a work at an object) does something: the action
 /// objects' (`FUN_14106c590`) and up; below it `FUN_141071bd0` returns at once.
 pub(crate) const STATIC_TYPES_END: MasterKind = MasterKind::ACTION;
-/// The masters whose restrictions the world's load gives planners (`World::load_world`'s two
-/// calls of `FUN_140f7d310`: Gaia's entries `+0x298` and `+0x10b8`).
-const PLANNED_MASTERS: [MasterId; 2] = [VILLAGER_MALE, ids::BOARDING_GALLEY];
 
 /// The foundation terrain a building's death covers with terrain 1 (`FUN_1411dbb70`: `0x1c`).
 pub(crate) const RESTORED_FOUNDATION: TerrainId = TerrainId::named(28);
@@ -201,27 +196,12 @@ pub(crate) struct BuildingDeath {
     pub(crate) tech: Option<(MasterId, TechId)>,
 }
 
-pub(crate) const RICE_FARM: MasterId = ids::ID_1187;
-pub(crate) const VILLAGER_ANY: MasterId = MasterId::named(0x712);
 /// The attribute naming a building master that changes the terrain around its buildings
 /// (`FUN_1411c39b0`, the player's attribute 255).
 pub(crate) const BUILDING_TERRAIN: usize = 255;
 /// A building at most this share of its hit points lets its garrison out (`DAT_142eae8d0`).
 pub(crate) const EJECT_SHARE: f32 = TURN_EJECT_SHARE;
-/// The petard (master 440, `0x6254` raw), which a class-10 searcher passes (`FUN_140c488b0`).
-pub(crate) const PETARD: MasterId = ids::PETARD;
-/// The building masters `FUN_140fde180` counts as drop sites besides the drop-site table's:
-/// 562, 584 and 621 (`0x232` plus the bits of `0x800000000400001`), 68, 1808, 50, 1187 and 199.
-pub(crate) const DROP_SITE_MASTERS: [MasterId; 8] = [
-    ids::LUMBER_CAMP,
-    ids::MINING_CAMP,
-    ids::TOWN_CENTRE_621,
-    ids::MILL,
-    ids::MASTER_1808,
-    ids::FARM,
-    ids::ID_1187,
-    ids::FISH_TRAP,
-];
+
 /// A building's queue holds at most 15 units (`FUN_1411cbc40`).
 pub(crate) const QUEUE_LIMIT: usize = 15;
 /// A computer player's QUEUE fills a building's queue to at most 2 (`FUN_141614450`).
@@ -241,16 +221,13 @@ pub(crate) const SPEED_EPSILON: f32 = TURN_SPEED_EPSILON;
 pub(crate) const ARMED_FIREPOWER: Firepower = Firepower::new(TURN_ARMED_FIREPOWER);
 
 /// A queued villager's master: male when the 64-bit Action draw times 100 (wrapping) is below 50
-/// modulo 100.
-pub(crate) const fn villager(draw: u64) -> MasterId {
+/// modulo 100 (`FUN_1411cbc40`: the build's `villager_male`, 0x53, else its `villager_female`,
+/// 0x125).
+pub(crate) const fn villager(draw: u64, masters: MasterSlots) -> MasterId {
     if draw.wrapping_mul(100) % 100 < 50 {
-        // The villager master QUEUE draws a sex for (`0x53`), and the generic villager id that becomes
-        // 0x53 first (`0x712`), both in `FUN_1411cbc40`.
-        // The farm, which BUILD places as the rice farm on mangrove or rice farm terrain.
-        VILLAGER_MALE
+        masters.villager_male
     } else {
-        // The female villager master (`0x125`).
-        VILLAGER_FEMALE
+        masters.villager_female
     }
 }
 

@@ -408,7 +408,7 @@ impl Unit {
             .contains(ClassRoles::LIVESTOCK);
         let master = c.w.spatial.get_known(target)?.ok_or(TARGET_LACKING)?.master;
         let by = self.releaser(c)?;
-        if holds_object(livestock, master, state) {
+        if holds_object(livestock, master, state, roles) {
             take(c, self, target, by, roles)?;
         }
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
@@ -436,6 +436,7 @@ impl Unit {
             (target, state),
             range,
             (sprite, livestock),
+            roles,
         )?;
         if move_to.shows_standing() {
             self.shows_standing_sprite(

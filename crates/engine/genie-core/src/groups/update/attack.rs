@@ -125,7 +125,7 @@ impl World {
             let (nearest, gap) = self.nearest_member(group, target)?;
             if let Some(member) = nearest.and_then(|m| self.world_object(m)) {
                 let sight = self
-                    .master(member.player(), member.master_id())?
+                    .master(member.player(), member.master_id(self.model.slots))?
                     .line_of_sight;
                 if range <= sight {
                     range = sight;
@@ -232,7 +232,7 @@ impl World {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let master = self.master(t.player(), t.master_id())?;
+        let master = self.master(t.player(), t.master_id(self.model.slots))?;
         let moves = match t {
             WorldObject::Unit(_, u, _) => self.parts.mover_of(u.id).is_some_and(Mover::is_moving),
             WorldObject::Ghost(..) => false,
@@ -364,7 +364,9 @@ impl World {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let radius = self.master(t.player(), t.master_id())?.radius;
+        let radius = self
+            .master(t.player(), t.master_id(self.model.slots))?
+            .radius;
         let at = t.position().ground();
         let g = self.groups.held_mut(group)?;
         if g.motion.moving() {

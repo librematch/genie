@@ -25,7 +25,6 @@ use crate::objects::masters::Task;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::allied;
-use crate::vision::ghost::GHOST_MASTER;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
@@ -261,7 +260,7 @@ impl World {
         }
         for (q, player) in PlayerId::each(self.players.len()).zip(&self.players) {
             if let Some(g) = player.ghosts.iter().find(|g| g.id == id) {
-                let m = self.master(q, GHOST_MASTER)?;
+                let m = self.master(q, self.model.slots.master.doppelganger)?;
                 return Ok(Some(Bystander {
                     id,
                     player: q,

@@ -13,8 +13,9 @@ use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
-use crate::vision::ghost::{GHOST_MASTER, Ghost};
+use crate::vision::ghost::Ghost;
 use crate::world::World;
+use crate::world::layer::Slots;
 
 /// An object of the world's id table (`FUN_1415417a0`, `BaseWorld::object`): the objects of
 /// every player's live, sleeping and doppelganger lists, which the player's add and removal
@@ -39,11 +40,11 @@ impl WorldObject<'_> {
         }
     }
 
-    /// Its master's id (`+0xa0`'s): a ghost's is its player's [`crate::vision::ghost::GHOST_MASTER`].
-    pub(crate) const fn master_id(&self) -> MasterId {
+    /// Its master's id (`+0xa0`'s): a ghost's is the build's `doppelganger`.
+    pub(crate) const fn master_id(&self, slots: Slots) -> MasterId {
         match *self {
             Self::Unit(_, u, _) => u.life.master_id,
-            Self::Ghost(..) => GHOST_MASTER,
+            Self::Ghost(..) => slots.master.doppelganger,
         }
     }
 

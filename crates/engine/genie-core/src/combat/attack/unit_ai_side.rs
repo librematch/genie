@@ -21,8 +21,6 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::ids::VILLAGER_FEMALE;
-use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::release::Releaser;
@@ -416,9 +414,9 @@ impl UnitView<'_, '_> {
         let swap = if master.task_by_group == TaskGroup::MALE_VILLAGERS {
             // The villagers a villager's attack command switches to by its task swap group (its player's
             // master table's entries at `+0x298` and `+0x928`).
-            VILLAGER_MALE
+            self.c.w.model.slots.master.villager_male
         } else {
-            VILLAGER_FEMALE
+            self.c.w.model.slots.master.villager_female
         };
         player_master(&self.c.w.model.masters, self.player, swap)
     }

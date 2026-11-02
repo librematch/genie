@@ -21,7 +21,6 @@ use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
-use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -31,6 +30,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
@@ -215,7 +215,12 @@ impl World {
     fn delete_building(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
         let master = unit.master(self.master_tables(), owner)?;
-        if master.id == TOWN_CENTRE_621 {
+        if self
+            .model
+            .roles
+            .of_master(master.id)
+            .contains(MasterRoles::TOWN_CENTRE_621)
+        {
             self.clear_treaty_zones()?;
         }
         self.remove_building(owner, id)
@@ -294,7 +299,13 @@ impl World {
             if state == ObjectState::Alive {
                 self.storage_leaves(owner, id, &master)?;
             }
-            if master.id == TOWN_CENTRE_621 && !self.has_town_centre(owner) {
+            if self
+                .model
+                .roles
+                .of_master(master.id)
+                .contains(MasterRoles::TOWN_CENTRE_621)
+                && !self.has_town_centre(owner)
+            {
                 self.clear_treaty_zones()?;
             }
         }
@@ -454,7 +465,7 @@ impl World {
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
         if new == ObjectState::Dying && state == ObjectState::Alive {
-            for (kind, amount) in refund_of(master, main) {
+            for (kind, amount) in refund_of(master, main, &self.model.roles) {
                 let player = self.players.player_mut(owner)?;
                 player.take_at_least_zero(kind, amount)?;
             }
@@ -494,7 +505,7 @@ impl World {
         if old < ObjectState::DyingSprite && ObjectState::Undead < new {
             forget_resource(&mut self.spatial, Some(master), id, position)?;
         }
-        self.spatial.sight_state(id, new)?;
+        self.spatial.sight_state(id, new, &self.model.roles)?;
         if old < ObjectState::Removed && new == ObjectState::Removed {
             self.leave_storage(owner, master, |flag| flag == 32)?;
         }
@@ -540,8 +551,9 @@ impl World {
     ) -> Result<(), GenieError> {
         let player_type = self.players.player(owner)?.kind;
         let annex_of = self.parts.building_of(id).annex_of;
+        let roles = self.model.roles.clone();
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
-        let death = built_death(held, annex_of, master, player_type)?;
+        let death = built_death(held, annex_of, master, player_type, &roles)?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?
@@ -602,7 +614,6 @@ mod tests {
     use crate::objects::layers::Building;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::ids;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
     use crate::players::attribute;
@@ -611,6 +622,8 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
     use crate::testing::class;
+    use crate::testing::ids;
+    use crate::testing::ids::TOWN_CENTRE_621;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
@@ -825,11 +838,11 @@ mod clearing_tests {
     use crate::objects::masters::BuildableOn;
     #[cfg(test)]
     use crate::objects::masters::BuildingMaster;
+    use crate::objects::masters::MasterId;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
-    use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
     use crate::players::attribute::{self, AttributeId};
     use crate::test_ids::costs;
@@ -838,6 +851,8 @@ mod clearing_tests {
     #[cfg(test)]
     use crate::test_ids::{adds, amounts};
     use crate::testing::class;
+    use crate::testing::ids;
+    use crate::testing::roles;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -1168,7 +1183,7 @@ mod clearing_tests {
             ..Master::default()
         };
         assert_eq!(
-            refund_of(&unit, None),
+            refund_of(&unit, None, &roles()),
             adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::UNITS_VALUE, 70.0)
@@ -1180,14 +1195,14 @@ mod clearing_tests {
             ..unit
         };
         assert_eq!(
-            refund_of(&house, None),
+            refund_of(&house, None, &roles()),
             adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::BUILDINGS_VALUE, 70.0)
             ])
         );
         assert_eq!(
-            refund_of(&house, Some(MainBuildingId::new(object_id(9)))),
+            refund_of(&house, Some(MainBuildingId::new(object_id(9))), &roles()),
             []
         );
         let castle = Master {
@@ -1195,7 +1210,7 @@ mod clearing_tests {
             ..house
         };
         assert_eq!(
-            refund_of(&castle, None),
+            refund_of(&castle, None, &roles()),
             adds([(attribute::TOTAL_VALUE, 70.0)])
         );
     }

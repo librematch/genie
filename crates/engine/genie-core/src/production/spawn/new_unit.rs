@@ -18,7 +18,6 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::ids::MONASTERY;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
@@ -50,6 +49,7 @@ use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 
 impl World {
     /// `FUN_140ad0240`: the unit of `master` spawns beside the building at `i`. The spawn point
@@ -222,7 +222,12 @@ impl World {
                     .contains(ClassRoles::RELIC)
             })
         };
-        let keeps = tm == MONASTERY && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
+        let keeps = self
+            .model
+            .roles
+            .of_master(tm)
+            .contains(MasterRoles::MONASTERY)
+            && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
         let target_master = self.master(tp, tm)?;
         if !keeps
             && MasterKind::COMBAT <= target_master.kind
@@ -401,6 +406,7 @@ impl World {
                 made.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
+                &self.model.roles,
             )?;
         }
         if let Some(e) = self.take_sight_unsupported() {

@@ -26,7 +26,6 @@ use self::object_slots::{POPULATION, RESOURCE_19, charge_after};
 use crate::GenieError;
 #[cfg(test)]
 use crate::math::rng::Stream;
-use crate::objects::masters::MasterId;
 #[cfg(test)]
 use crate::technology::EffectCommand;
 #[cfg(test)]
@@ -38,8 +37,6 @@ const OBJECT_GONE: GenieError =
 
 /// The attribute the dependents' update sets to 1 when none of them is left (`+0x138`).
 const ATTRIBUTE_39: usize = 39;
-/// The master whose enabling first asks the game's mode (`0x26d`, `FUN_1416665b0`); Sudden Death
-/// (11) never enables it.
-const MODE_TESTED_MASTER: MasterId = MasterId::named(0x26d);
+
 #[cfg(test)]
 mod tests;

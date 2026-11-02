@@ -6,9 +6,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, UnitRelation};
@@ -20,25 +18,11 @@ use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use std::mem::take;
 
-/// The masters whose units attack by priority 0 without the moving rule: the rams, the siege
-/// masters 1744 and 1746, 420 and 691.
-pub(super) const PRIORITY_0_MASTERS: [MasterId; 8] = [
-    ids::ID_35,
-    ids::ID_422,
-    ids::ID_548,
-    ids::ID_1258,
-    ids::ID_1744,
-    ids::ID_1746,
-    ids::CANNON_GALLEON,
-    ids::ELITE_CANNON_GALLEON,
-];
-/// A computer player's unit of these masters passes no boat over: the castle, 45, the town
-/// centre.
-pub(super) const BOAT_HUNTERS: [MasterId; 3] = [ids::CASTLE, ids::ID_45, ids::TOWN_CENTRE];
 /// The gap of a closest gate or wall not found yet.
 const NO_GAP: Distance = Distance::new(-1.0);
 /// The moving targets past which the current target and the closest moving one answer.
@@ -127,7 +111,9 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles
         return false;
     }
     let boat_free = roles.of_some_class(me.class).contains(ClassRoles::TOWER)
-        || BOAT_HUNTERS.contains(&me.master)
+        || roles
+            .of_master(me.master)
+            .contains(MasterRoles::BOAT_HUNTER)
         || !roles.of_class(t.class).contains(ClassRoles::BOAT);
     let is_boat = me
         .class
@@ -481,7 +467,9 @@ fn rank_entries(
     st.score(&me.weights, me.targeting, &mut |id| world.armored(id))?;
     let ranked = me.attack_priority == AttackPriority::PRIORITY_1
         || (me.attack_priority == AttackPriority::PRIORITY_0
-            && !PRIORITY_0_MASTERS.contains(&me.master));
+            && !roles
+                .of_master(me.master)
+                .contains(MasterRoles::MOVING_RULE_EXEMPT));
     st.rank(&mut |e| {
         if !e.fixed || e.category == Some(AttackCategory::SIEGE) {
             return Ok(i32::from(ranked) << 2);

@@ -314,7 +314,6 @@ mod tests {
     use crate::objects::masters::TaskId;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
-    use crate::objects::masters::ids;
     use crate::pathing::Pathing;
     use crate::pathing::zones::ZoneMap;
     use crate::players::PlayerId;
@@ -322,6 +321,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::world::WorldTime;
     #[cfg(test)]
     use crate::world::parts::{Object, no_own_masters};

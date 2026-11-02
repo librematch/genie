@@ -36,6 +36,7 @@ use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
+use crate::vision::visibility::LosSight;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -292,14 +293,12 @@ impl World {
                 placed.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
+                &self.model.roles,
             )?;
             let _ = sight.sight_on_los(
                 id,
-                placed.position,
-                placed.radius,
-                SightShape::Circle,
-                SightTiles::of(los),
-                SightCentre::Tile,
+                LosSight::tile_circle(placed.position, placed.radius, SightTiles::of(los)),
+                &self.model.roles,
             )?;
             if let Some(s) = sight.seer_mut(id) {
                 s.los = los;
@@ -592,12 +591,12 @@ mod tests {
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ChargeKind;
     use crate::objects::masters::DamageSpriteMode;
+    use crate::objects::masters::MasterId;
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
     use crate::objects::masters::{BuildingMaster, DamageGraphic, Masters};
-    use crate::objects::masters::{MasterId, ids};
     #[cfg(test)]
     use crate::objects::sprite::ActiveSprite;
     use crate::objects::sprite::Graphic;
@@ -617,6 +616,7 @@ mod tests {
     use crate::test_ids::opt_master;
     use crate::test_ids::task_id;
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::roles;
     use crate::vision::TileCount;
     use crate::vision::VisionBits;

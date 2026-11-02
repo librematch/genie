@@ -41,8 +41,6 @@ pub use self::raider_countdown::RaiderCountdown;
 pub use self::scope::{GarrisonScope, ShelterReach};
 use self::shelter::LEAST_HP_SHARE;
 pub(crate) use self::shelter::Shelters;
-#[cfg(test)]
-use self::takes_in::MASTER_1811;
 use self::takes_in::has_garrison_task;
 pub use self::takes_in::{class_has_flags, garrison_type_takes, is_garrison_task};
 use self::unload::NO_POINT;

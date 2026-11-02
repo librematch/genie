@@ -30,8 +30,6 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::WONDER;
 use crate::objects::masters::{Master, Task};
 use crate::orders::Dispatch;
 use crate::ownership::CaptureKind;
@@ -50,6 +48,8 @@ use crate::test_ids::order_type;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::testing::class;
+use crate::testing::ids;
+use crate::testing::ids::WONDER;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::unit_ai::AiCommand;
@@ -5250,7 +5250,7 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
         UnitStance::AGGRESSIVE
     );
     // the demolition ships defend
-    for master in DEFENSIVE_MASTERS {
+    for master in [ids::ID_527, ids::ID_528, ids::ID_1104] {
         assert_eq!(
             stance(&|n| {
                 n.master = master;
@@ -8246,7 +8246,7 @@ fn human_player_king_idle_check_only_caps() {
     );
     // a computer player's king of master 704, or one with an order, does nothing either
     let unled = Surroundings {
-        master: KING_UNLED,
+        master: ids::SHAH,
         ..at.clone()
     };
     assert_eq!(
@@ -9737,7 +9737,7 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
         )
     };
     let (mut u, mut at) = patroller(0);
-    at.master = SOLDIER_IDLE_MASTER;
+    at.master = ids::SABOTEUR;
     let mut s = side(77);
     assert_eq!(idle(&mut u, &at, &mut s, PlayerType::HUMAN), Ok(false));
     assert_eq!(s.attacks, []);
@@ -12521,7 +12521,7 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
     );
     // master 128 takes no defend order
     let at = Surroundings {
-        master: DEFENDLESS_MASTER,
+        master: ids::TRADE_CART,
         roles: roles(),
         slots: slots(),
         ..Surroundings::default()

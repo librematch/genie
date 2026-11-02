@@ -29,7 +29,7 @@ use crate::world::parts::Parts;
 use crate::world::player::Player;
 use crate::world::settings::Settings;
 use crate::world::{FrameSeed, Mode680, PlayState, Tick};
-use crate::world::{HISTORY_PERIOD, PLANNED_MASTERS, Recycling, World};
+use crate::world::{HISTORY_PERIOD, Recycling, World};
 use genie_model::layer::BuildLayer;
 use genie_model::model::Model;
 
@@ -93,10 +93,12 @@ impl World {
 
 impl World {
     /// `World::load_world`'s planners (`FUN_140f7d310`): the restrictions of Gaia's masters 83
-    /// (the villager's) and 535 (the galley's), each unless one of the same values has one; any
+    /// (the villager's) and 535 (the galley's: the build's `villager_male` and `boarding_galley`,
+    /// Gaia's entries `+0x298` and `+0x10b8`), each unless one of the same values has one; any
     /// other restriction finds none (its units walk without the tile pathfinder).
     pub fn register_planners(&mut self) {
-        for master in PLANNED_MASTERS {
+        let s = self.model.slots.master;
+        for master in [s.villager_male, s.boarding_galley] {
             if let Some(r) = self
                 .model
                 .masters

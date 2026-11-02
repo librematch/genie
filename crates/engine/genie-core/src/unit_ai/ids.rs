@@ -19,7 +19,6 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerType;
 use crate::players::Posture;
@@ -32,6 +31,7 @@ use crate::unit_ai::{
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// What slot 73 does for a factory type.
@@ -121,8 +121,6 @@ pub(super) const NO_ANIM_SPEED: GenieError =
 pub(super) const INVALID_POINT: f32 = UNIT_AI_INVALID_POINT;
 /// What the defend order adds to its desired distance before it follows (`DAT_14330eb8c`, 1).
 pub(super) const DEFEND_SLACK: f32 = UNIT_AI_DEFEND_SLACK;
-/// The master whose unit takes no defend order (slot 0x230's case 0x2bd: raw `0x611c`).
-pub(super) const DEFENDLESS_MASTER: MasterId = ids::TRADE_CART;
 
 /// An order on an object run without the unit AI's update (its surroundings and side), as
 /// [`UnitAi::take_order_now`] runs one.
@@ -160,8 +158,7 @@ pub(super) const HUNTED_SIGHT_GROWTH: Distance = Distance::new(1.0);
 /// What an idle check lowers the unit's last human order time to (`FUN_140fe0d10`), and below
 /// which the moving object's update counts it down.
 pub const HUMAN_ORDER_CAP: WorldTime = WorldTime::from_millis(5000);
-/// The master whose idle soldier does nothing (`FUN_140c20db0`, raw `0x635e`).
-pub(super) const SOLDIER_IDLE_MASTER: MasterId = ids::SABOTEUR;
+
 /// The lion's idle timeout (`FUN_140c1fb70`, as its constructor `FUN_140c11bd0`).
 pub(super) const LION_IDLE_TIMEOUT: Millis = Millis::new(6000);
 /// The lion's idle timeout once its attack completed (`FUN_140c266f0`).
@@ -172,8 +169,6 @@ pub(super) const LION_SIGHT_SHARE: f32 = UNIT_AI_LION_SIGHT_SHARE;
 /// Finding no villager outside mode 1 it attacks within its line of sight over this
 /// (`FUN_140c1fb70`, `DAT_142eb1c98`).
 pub(super) const LION_SIGHT_DIVISOR: f32 = UNIT_AI_LION_SIGHT_DIVISOR;
-/// The king's master that the branch passes over (raw `0x635c`).
-pub(super) const KING_UNLED: MasterId = ids::SHAH;
 
 /// The walk back's gap and range (`FUN_140c5e7d0`: `DAT_14330eb8c`, 1.0, whose image role in
 /// the unit AI's table is [`RUN_ONE`]'s).
@@ -243,10 +238,13 @@ pub fn factory_type(
     combat_level: CombatLevel,
     roles: &Roles,
 ) -> Option<UnitAiType> {
-    match master {
-        ids::ID_1105 => return Some(UnitAiType::SIEGE_TOWER),
-        ids::ID_1744 | ids::ID_1746 => return Some(UnitAiType::SIEGE),
-        _ => {}
+    {
+        let held = roles.of_master(master);
+        if held.contains(MasterRoles::SIEGE_TOWER) {
+            return Some(UnitAiType::SIEGE_TOWER);
+        } else if held.intersects(MasterRoles::ARMORED_ELEPHANT | MasterRoles::SIEGE_ELEPHANT) {
+            return Some(UnitAiType::SIEGE);
+        }
     }
     Some({
         let held = roles.of_class(class);
@@ -391,8 +389,6 @@ pub(super) const SOLDIER_IDLE_TIMEOUT: Millis = Millis::new(500);
 pub(super) const COMPUTER_SOLDIER_IDLE_TIMEOUT: Millis = Millis::new(1500);
 /// The siege unit's idle timeout (`FUN_140c12040`'s `FUN_140c41bc0` with 1000).
 pub(super) const SIEGE_IDLE_TIMEOUT: Millis = Millis::new(1000);
-/// The masters whose soldier is defensive (`FUN_140c12300`, raw `0x62ab`, `0x62ac`, `0x64ec`).
-pub(super) const DEFENSIVE_MASTERS: [MasterId; 3] = [ids::ID_527, ids::ID_528, ids::ID_1104];
 
 /// The soldier's stance (`+0x1a9`) its constructor (`FUN_140c12300`) gives a new object: 2 (stand
 /// ground) to a human player's object of a master with object flag 0x10 that is its own copy
@@ -409,7 +405,11 @@ pub(super) fn soldier_stance(new: &NewObject, roles: &Roles) -> UnitStance {
     {
         return UnitStance::STAND_GROUND;
     }
-    if !new.player_type.is_computer() && DEFENSIVE_MASTERS.contains(&new.master) {
+    if !new.player_type.is_computer()
+        && roles
+            .of_master(new.master)
+            .contains(MasterRoles::DEFENSIVE_SOLDIER)
+    {
         return UnitStance::DEFENSIVE;
     }
     if !new.player_type.is_computer() && roles.of_class(new.class).contains(ClassRoles::NO_ATTACK) {

@@ -27,8 +27,18 @@ use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
+
+/// Where and when a unit moved inside the motion step ([`Mover::moved_to`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Moved {
+    /// Its new place.
+    pub(super) at: Position,
+    /// The world's time of the move.
+    pub(super) now: WorldTime,
+}
 
 impl Mover {
     /// The waypoint the level walks to was reached (`LAB_14115136c`, the level's bit 0): with
@@ -54,7 +64,7 @@ impl Mover {
         let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
         if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
-            self.take_waypoint_place(place, me, world, pathing, now)?;
+            self.take_waypoint_place(place, me, world, pathing, now, roles)?;
         }
         let level = self.paths.walked_mut()?;
         level.flags &= !LevelFlags::REACHED;
@@ -147,13 +157,14 @@ impl Mover {
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
         now: WorldTime,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let level = self.paths.walked()?;
         if level.waypoint.within(level.points.len()) {
             let p = level.point(level.waypoint);
             let at = self.set_position(p.position(), world.map);
             let at = self.grounded(at, world.terrain.as_ref());
-            self.moved_to(place, me, at, world, pathing, now)?;
+            self.moved_to(place, me, Moved { at, now }, world, pathing, roles)?;
         }
         self.paths.walked_mut()?.flags &= !LevelFlags::AT_WAYPOINT;
         Ok(())
@@ -484,13 +495,13 @@ impl Mover {
         &mut self,
         place: &mut Static,
         me: &Me,
-        at: Position,
+        Moved { at, now }: Moved,
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
-        now: WorldTime,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.mark_move(at, now);
-        self.new_position(place, me.id, at, (world, pathing))?;
+        self.new_position(place, me.id, at, (world, pathing), roles)?;
         Ok(())
     }
 

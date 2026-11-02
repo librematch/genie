@@ -370,6 +370,7 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
+        let roles = by_id.roles();
         if !(LONG_PATHER && (w.trade_cart || SHORT_REACH < w.distance.get())) {
             return Ok(None);
         }
@@ -380,6 +381,7 @@ impl Mover {
                 let gap = footprint_gap(at, ground_radius, t.position, t.radius);
                 (gap, t.master)
             }),
+            roles,
         );
         if !far {
             return Ok(None);

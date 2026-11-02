@@ -1,7 +1,7 @@
-//! The master ids (`i16`, [`crate::objects::masters::Master::id`]): the one definition of the
-//! masters the engine names, by the `.dat`'s unit id. The obfuscated build stores an id as its
-//! value plus `0x609c`; the values here are the decoded ones. A master the engine tests by id
-//! without a known name is `ID_n` or `MASTER_n`.
+//! The masters genie-core's tests name: build 158041's `.dat` ids, as the tests' objects carry
+//! them, by the names the engine's constants had. The engine names no master (FD-046-D46): it
+//! asks the build layer's roles and slots. The obfuscated build stores an id as its value plus
+//! `0x609c`; the values here are the decoded ones.
 
 use crate::objects::masters::MasterId;
 

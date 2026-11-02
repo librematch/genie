@@ -11,11 +11,11 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::NO_RELATIONS;
 use crate::unit_ai::task_finder::allied;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
@@ -43,7 +43,10 @@ impl Unit {
             ))?;
         let target_master = t.master(c.w.master_tables(), owner)?;
         let relations = c.w.spatial.relations.get(c.player).unwrap_or(&NO_RELATIONS);
-        if matches!(t.life.master_id, PASTURE_MANGROVE | PASTURE) {
+        if roles
+            .of_master(t.life.master_id)
+            .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE)
+        {
             return Err(GenieError::unsupported(
                 "a hunt finding a farm (FUN_1411c7670)",
             ));

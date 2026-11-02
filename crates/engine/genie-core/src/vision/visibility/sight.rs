@@ -11,13 +11,14 @@ use crate::map::TileRect;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::MARKET;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
-use crate::vision::visibility::{CIRCLE_MASTER, EDGE, Seer, Visibility, tile_of};
+use crate::vision::visibility::{EDGE, Seer, Visibility, tile_of};
+use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
 /// An object's own sight, as the base class explores it ([`Visibility::base_sight_on`]'s
@@ -40,6 +41,52 @@ pub(super) struct SightOn {
     pub(super) centre: SightCentre,
 }
 
+/// The sight of a line of sight of its own (slots 0x1d0 and 0x1d8 with their fourth argument
+/// not −1, [`Visibility::sight_on_los`] and [`Visibility::sight_off_los`]): the seer's place,
+/// its master's radii, the shape, the line of sight and the centre asked for.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LosSight {
+    /// The seer's place (x, y, z).
+    pub position: Position,
+    /// Its master's radii (x, y).
+    pub radius: Footprint,
+    /// What it explores: a circle of the line of sight or the footprint.
+    pub shape: SightShape,
+    /// The line of sight.
+    pub los: SightTiles,
+    /// Where the circle is centred.
+    pub centre: SightCentre,
+}
+
+impl LosSight {
+    /// A circle of line of sight `los` centred on the seer's tile, the sight every caller of
+    /// its own line of sight asks for (a garrison's inside sight, a line of sight's upgrade).
+    #[must_use]
+    pub const fn tile_circle(position: Position, radius: Footprint, los: SightTiles) -> Self {
+        Self {
+            position,
+            radius,
+            shape: SightShape::Circle,
+            los,
+            centre: SightCentre::Tile,
+        }
+    }
+}
+
+/// A seer's master change ([`Visibility::master_changed`]): the new master and its line of
+/// sight, and the old and the new master's radii.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MasterChange {
+    /// The new master.
+    pub master: MasterId,
+    /// Its line of sight.
+    pub los: Distance,
+    /// The old master's radii (x, y).
+    pub old_radius: Footprint,
+    /// The new master's radii (x, y).
+    pub new_radius: Footprint,
+}
+
 impl Visibility {
     /// Slot 0x1d0: the object's sight comes, on its owner's map, of `shape`: a circle of its line
     /// of sight centred at `centre`, or its footprint (`FUN_141192560`; a building's
@@ -51,11 +98,22 @@ impl Visibility {
         radius: Footprint,
         shape: SightShape,
         centre: SightCentre,
+        roles: &Roles,
     ) -> Result<TileCount, GenieError> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
-        self.sight_on_los(id, position, radius, shape, SightTiles::of(s.los), centre)
+        self.sight_on_los(
+            id,
+            LosSight {
+                position,
+                radius,
+                shape,
+                los: SightTiles::of(s.los),
+                centre,
+            },
+            roles,
+        )
     }
 
     /// Slot 0x1d0 with a line of sight of its own (its fourth argument not −1): a building takes
@@ -63,12 +121,16 @@ impl Visibility {
     pub fn sight_on_los(
         &mut self,
         id: ObjectId,
-        position: Position,
-        radius: Footprint,
-        shape: SightShape,
-        los: SightTiles,
-        centre: SightCentre,
+        sight: LosSight,
+        roles: &Roles,
     ) -> Result<TileCount, GenieError> {
+        let LosSight {
+            position,
+            radius,
+            shape,
+            los,
+            centre,
+        } = sight;
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
@@ -84,7 +146,7 @@ impl Visibility {
             }
             Some(_) => {
                 // The master whose sight the AI players' market lists follow (`FUN_1411d0190`: id 84).
-                if s.master == MARKET
+                if roles.of_master(s.master).contains(MasterRoles::MARKET)
                     && !self
                         .player_types
                         .get(s.player.index())
@@ -99,19 +161,26 @@ impl Visibility {
             }
             None => (shape, centre),
         };
-        self.base_sight_on(SightOn {
-            id,
-            seer: s,
-            position,
-            radius,
-            shape,
-            line_of_sight: los,
-            centre,
-        })
+        self.base_sight_on(
+            SightOn {
+                id,
+                seer: s,
+                position,
+                radius,
+                shape,
+                line_of_sight: los,
+                centre,
+            },
+            roles,
+        )
     }
 
     /// `FUN_141192560`.
-    pub(super) fn base_sight_on(&mut self, on: SightOn) -> Result<TileCount, GenieError> {
+    pub(super) fn base_sight_on(
+        &mut self,
+        on: SightOn,
+        roles: &Roles,
+    ) -> Result<TileCount, GenieError> {
         let SightOn {
             id,
             seer: s,
@@ -121,7 +190,10 @@ impl Visibility {
             line_of_sight: los,
             centre,
         } = on;
-        let shape = if s.master == CIRCLE_MASTER {
+        let shape = if roles
+            .of_master(s.master)
+            .contains(MasterRoles::CIRCLE_SIGHT)
+        {
             SightShape::Circle
         } else {
             shape
@@ -162,11 +234,22 @@ impl Visibility {
         radius: Footprint,
         shape: SightShape,
         centre: SightCentre,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
-        self.sight_off_los(id, position, radius, shape, SightTiles::of(s.los), centre)?;
+        self.sight_off_los(
+            id,
+            LosSight {
+                position,
+                radius,
+                shape,
+                los: SightTiles::of(s.los),
+                centre,
+            },
+            roles,
+        )?;
         Ok(())
     }
 
@@ -175,12 +258,16 @@ impl Visibility {
     pub fn sight_off_los(
         &mut self,
         id: ObjectId,
-        position: Position,
-        radius: Footprint,
-        shape: SightShape,
-        los: SightTiles,
-        centre: SightCentre,
+        sight: LosSight,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
+        let LosSight {
+            position,
+            radius,
+            shape,
+            los,
+            centre,
+        } = sight;
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
@@ -195,7 +282,10 @@ impl Visibility {
             Some(_) => Self::building_centre(radius, centre),
             None => centre,
         };
-        let shape = if s.master == CIRCLE_MASTER {
+        let shape = if roles
+            .of_master(s.master)
+            .contains(MasterRoles::CIRCLE_SIGHT)
+        {
             SightShape::Circle
         } else {
             shape
@@ -232,6 +322,7 @@ impl Visibility {
         from: Position,
         to: Position,
         radius: Footprint,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let tile = |p: Position| {
             [
@@ -242,13 +333,20 @@ impl Visibility {
         if tile(from) == tile(to) {
             return Ok(());
         }
-        self.sight_off(id, from, radius, SightShape::Circle, SightCentre::Tile)?;
+        self.sight_off(
+            id,
+            from,
+            radius,
+            SightShape::Circle,
+            SightCentre::Tile,
+            roles,
+        )?;
         if self
             .seers
             .get(id)
             .is_some_and(|s| s.state == ObjectState::Alive)
         {
-            let _ = self.sight_on(id, to, radius, SightShape::Circle, SightCentre::Tile)?;
+            let _ = self.sight_on(id, to, radius, SightShape::Circle, SightCentre::Tile, roles)?;
         }
         Ok(())
     }
@@ -261,6 +359,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         new: ObjectState,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(old) = self.seers.get(id).map(|s| s.state) else {
             return Ok(());
@@ -271,7 +370,14 @@ impl Visibility {
         let master_sees = self.seers.get(id).is_some_and(|s| Distance::ZERO < s.los);
         if old == ObjectState::Alive && (ObjectState::Alive < new || new == ObjectState::Foundation)
         {
-            self.sight_off(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
+            self.sight_off(
+                id,
+                position,
+                radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+                roles,
+            )?;
             if master_sees {
                 let _ = self.sight_on(
                     id,
@@ -279,6 +385,7 @@ impl Visibility {
                     radius,
                     SightShape::Footprint,
                     SightCentre::Tile,
+                    roles,
                 )?;
             }
         }
@@ -289,6 +396,7 @@ impl Visibility {
                 radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
+                roles,
             )?;
         }
         if let Some(s) = self.seers.get_mut(id) {
@@ -303,17 +411,22 @@ impl Visibility {
         &mut self,
         id: ObjectId,
         position: Position,
-        old_radius: Footprint,
-        new_radius: Footprint,
-        master: MasterId,
-        los: Distance,
+        change: MasterChange,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
+        let MasterChange {
+            master,
+            los,
+            old_radius,
+            new_radius,
+        } = change;
         self.sight_off(
             id,
             position,
             old_radius,
             SightShape::Circle,
             SightCentre::Tile,
+            roles,
         )?;
         if let Some(s) = self.seers.get_mut(id) {
             s.master = master;
@@ -325,6 +438,7 @@ impl Visibility {
             new_radius,
             SightShape::Circle,
             SightCentre::Tile,
+            roles,
         )?;
         Ok(())
     }

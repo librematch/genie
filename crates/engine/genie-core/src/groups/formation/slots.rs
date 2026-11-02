@@ -55,7 +55,7 @@ impl World {
         let Some(object) = object else {
             return Ok(FormationCategory::ANY);
         };
-        let master = self.master(object.player(), object.master_id())?;
+        let master = self.master(object.player(), object.master_id(self.model.slots))?;
         Ok(
             sub_formation(master.kind, master.hero_flag, master.formation_category)
                 .unwrap_or(FormationCategory::ANY),
@@ -88,8 +88,10 @@ impl World {
                 continue;
             }
             if !sub_category.is_none()
-                && UnitType::of(self.master(object.player(), object.master_id())?.id)
-                    != sub_category
+                && UnitType::of(
+                    self.master(object.player(), object.master_id(self.model.slots))?
+                        .id,
+                ) != sub_category
             {
                 continue;
             }
@@ -259,7 +261,7 @@ impl World {
                 continue;
             }
             let category = self.unit_category(Some(object))?;
-            let master = UnitType::of(object.master_id());
+            let master = UnitType::of(object.master_id(self.model.slots));
             let at = object.moved_vector();
             for (j, slot) in formation.slots.iter().enumerate() {
                 let mut skip = slot.transformed == 0 || slot.active == 0;
@@ -334,8 +336,10 @@ impl World {
                     continue;
                 }
                 if !sub_category.is_none()
-                    && UnitType::of(self.master(object.player(), object.master_id())?.id)
-                        != sub_category
+                    && UnitType::of(
+                        self.master(object.player(), object.master_id(self.model.slots))?
+                            .id,
+                    ) != sub_category
                 {
                     continue;
                 }

@@ -34,10 +34,11 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
+use crate::world::World;
+use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
-use crate::world::{DROP_SITE_MASTERS, World};
 
 impl Unit {
     /// The Build's update ([`BuildAction::update`]) with what it reads as it starts
@@ -279,7 +280,12 @@ fn drop_site_master(c: &Step<'_>, built: Option<MasterId>) -> Result<bool, Genie
     let Some(m) = built else {
         return Ok(false);
     };
-    if DROP_SITE_MASTERS.contains(&m) {
+    if c.w
+        .model
+        .roles
+        .of_master(m)
+        .contains(MasterRoles::DROP_SITE)
+    {
         return Ok(true);
     }
     let civ = c.w.players.player(c.player)?.civ;

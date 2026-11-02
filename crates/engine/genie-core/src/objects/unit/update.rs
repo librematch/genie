@@ -277,7 +277,7 @@ impl Unit {
         {
             return Err(e);
         }
-        if loses_actions(&self.life) {
+        if loses_actions(&self.life, &c.w.model.roles) {
             let by = self.releaser(c)?;
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.clear_own_actions(

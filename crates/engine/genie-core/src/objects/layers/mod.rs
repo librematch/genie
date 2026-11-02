@@ -27,6 +27,7 @@ pub use self::combat::Combat;
 pub use self::default_task::{DefaultTask, UnreadDefault, Unstartable, default_start};
 pub use self::motion::{Animated, Motion, MotionMut};
 use crate::map::spatial::Placed;
+use crate::world::layer::Roles;
 
 /// `RGE_Static_Object`'s place (FD-045-D15): x, y, z (`+0x3c8`, `+0x4c8`, `+0x5a8`, obfuscated in
 /// the game's memory). Every object has it, below its other layers. Only its setter
@@ -63,9 +64,10 @@ impl Static {
         at: Position,
         moving: bool,
         (world, pathing): (&mut Spatial, Option<&mut Pathing>),
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.position = at;
-        world.set_position(id, at)?;
+        world.set_position(id, at, roles)?;
         if let (Some(pathing), Some(p)) = (pathing, world.get(id)) {
             pathing.moved(id, p, moving);
         }
@@ -122,10 +124,11 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::ids;
     use crate::players::PlayerId;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::ids;
+    use crate::testing::roles;
 
     /// A small map with object 7 indexed at `at`.
     fn indexed(at: Position) -> Spatial {
@@ -160,6 +163,7 @@ mod tests {
                 Position::new(2.5, 1.25, 0.0),
                 true,
                 (&mut world, None),
+                &roles(),
             )
             .unwrap();
         assert_eq!(place.position(), Position::new(2.5, 1.25, 0.0));

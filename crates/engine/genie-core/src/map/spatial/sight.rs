@@ -23,6 +23,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
 use crate::vision::own_masks;
+use crate::vision::visibility::MasterChange;
 use crate::vision::visibility::Visibility;
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::index::ObjectsRef;
@@ -196,6 +197,7 @@ impl Spatial {
         new: PlayerId,
         los: Distance,
         sees: bool,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(p) = self.objects.get_mut(id) else {
             return Err(GenieError::unsupported(
@@ -205,7 +207,7 @@ impl Spatial {
         p.player = new;
         let (position, radius) = (p.position, p.radius);
         if let Some(v) = self.sight.as_mut() {
-            v.owner_changed(id, position, radius, (new, los.get()), sees)?;
+            v.owner_changed(id, position, radius, (new, los.get()), sees, roles)?;
         }
         Ok(())
     }
@@ -407,9 +409,14 @@ impl Spatial {
     }
 
     /// The object's `set_state` to `state` ([`Visibility::state_changed`]).
-    pub fn sight_state(&mut self, id: ObjectId, state: ObjectState) -> Result<(), GenieError> {
+    pub fn sight_state(
+        &mut self,
+        id: ObjectId,
+        state: ObjectState,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
-            v.state_changed(id, p.position, p.radius, state)?;
+            v.state_changed(id, p.position, p.radius, state, roles)?;
         }
         Ok(())
     }
@@ -425,9 +432,16 @@ impl Spatial {
         class: ClassId,
         master: MasterId,
         los: Distance,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
-            v.master_changed(id, p.position, p.radius, radius, master, los)?;
+            let change = MasterChange {
+                master,
+                los,
+                old_radius: p.radius,
+                new_radius: radius,
+            };
+            v.master_changed(id, p.position, change, roles)?;
             v.registry_master(
                 id,
                 p.player,

@@ -422,9 +422,9 @@ mod tests {
     use crate::map::RestrictionId;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ids;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::ids;
 
     /// A short path's result keeps the game's code, and the tests its readers make by code:
     /// `result < 2` reaches, 1 and 2 lead on, 3 and 4 fail.

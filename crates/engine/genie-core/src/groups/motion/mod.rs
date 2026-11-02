@@ -43,9 +43,10 @@ use crate::math::image::group::{
     PULL_SHARE as GROUP_PULL_SHARE, SHORT_LENGTH as GROUP_SHORT_LENGTH,
     SHORT_REACH as GROUP_SHORT_REACH,
 };
-use crate::movement::{LONG_PATH_MOVER, PlanTries};
+use crate::movement::PlanTries;
 #[cfg(test)]
 use crate::movement::{PathData, Planning};
+use crate::world::layer::MasterRoles;
 
 /// A move or a turn below this counts as none (`DAT_142eb0c60`).
 const EPSILON: f32 = GROUP_EPSILON;
@@ -282,7 +283,12 @@ impl World {
             walker: mover.walker(id),
             position: u.position(),
             radius: mover.stats.radius.ground(),
-            moves: mover.stats.speed != Speed::ZERO || u.life.master_id == LONG_PATH_MOVER,
+            moves: mover.stats.speed != Speed::ZERO
+                || self
+                    .model
+                    .roles
+                    .of_master(u.life.master_id)
+                    .contains(MasterRoles::LONG_PATH_MOVER),
             solid: mover.stats.radius.sized(),
             ignore_units: mover.ignore_units.clone(),
             player: p,

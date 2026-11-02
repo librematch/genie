@@ -26,7 +26,6 @@ use crate::objects::Voice;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::objects::sprite::Graphic;
 use crate::players::AmountRate;
 use crate::players::PlayerType;
@@ -35,6 +34,7 @@ use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::object_id;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
 

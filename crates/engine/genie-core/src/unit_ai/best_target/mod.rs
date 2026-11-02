@@ -18,8 +18,8 @@ use self::world_view::ORDER_WINDOW;
 pub use self::world_view::{Ask, Battlefield, Searcher, Thing};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ids;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// `FUN_140c4c8e0`: the attack category of an object of master `master` and class `class`, by
@@ -36,7 +36,10 @@ pub fn category(master: MasterId, class: ClassId, roles: &Roles) -> Option<Attac
                 | ClassRoles::CAVALRY_ARCHER
                 | ClassRoles::ARCHERY_CANNON,
         ) {
-            if matches!(master, ids::ID_6 | ids::ID_7) {
+            if roles
+                .of_master(master)
+                .intersects(MasterRoles::ELITE_SKIRMISHER | MasterRoles::SKIRMISHER)
+            {
                 Some(AttackCategory::named(4))
             } else {
                 Some(AttackCategory::named(3))
@@ -70,7 +73,10 @@ pub fn category(master: MasterId, class: ClassId, roles: &Roles) -> Option<Attac
                 | ClassRoles::RAIDER
                 | ClassRoles::CAVALRY_RAIDER,
         ) {
-            if matches!(master, ids::ID_1744 | ids::ID_1746) {
+            if roles
+                .of_master(master)
+                .intersects(MasterRoles::ARMORED_ELEPHANT | MasterRoles::SIEGE_ELEPHANT)
+            {
                 Some(AttackCategory::named(5))
             } else {
                 Some(AttackCategory::named(1))
@@ -78,9 +84,11 @@ pub fn category(master: MasterId, class: ClassId, roles: &Roles) -> Option<Attac
         } else if held
             .intersects(ClassRoles::SIEGE | ClassRoles::UNPACKED_TREBUCHET | ClassRoles::SCORPION)
         {
-            if matches!(
-                master,
-                ids::ID_35 | ids::ID_422 | ids::ID_548 | ids::ID_1258
+            if roles.of_master(master).intersects(
+                MasterRoles::BATTERING_RAM
+                    | MasterRoles::CAPPED_RAM
+                    | MasterRoles::SIEGE_RAM
+                    | MasterRoles::BATTERING_RAM_1258,
             ) {
                 Some(AttackCategory::named(5))
             } else {

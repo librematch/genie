@@ -6,8 +6,7 @@ use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::update::{QUIET_CODE, UNMOVING};
 use crate::gathering::gather::{
-    FARM_WAIT_TIME, FARM_WAITERS, GatherAction, GatherReads, NO_GATHER_POINT, Next, SEARCH_WAIT,
-    STOP_FARMS, TRAP_WAITERS, Walks,
+    FARM_WAIT_TIME, GatherAction, GatherReads, NO_GATHER_POINT, Next, SEARCH_WAIT, Walks,
 };
 use crate::map::Distance;
 use crate::map::Position;
@@ -27,6 +26,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
@@ -35,10 +35,10 @@ use crate::world::step::Step;
 /// masters, and the fishing ships' on a farm-class target (a fish trap).
 #[must_use]
 pub fn waits_for_farm(master: MasterId, target_class: Option<ClassId>, roles: &Roles) -> bool {
-    FARM_WAITERS.contains(&master)
+    roles.of_master(master).contains(MasterRoles::FARM_WAITER)
         // The farm class, whose gather the slice does not model yet.
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
-        || (TRAP_WAITERS.contains(&master) && roles.of_some_class(target_class).contains(ClassRoles::FARM))
+        || (roles.of_master(master).contains(MasterRoles::TRAP_WAITER) && roles.of_some_class(target_class).contains(ClassRoles::FARM))
 }
 
 impl GatherAction {
@@ -180,7 +180,10 @@ impl GatherAction {
             return Ok(Next::Stay);
         }
         let radius = target.map_or(0.0, |t| {
-            if STOP_FARMS.contains(&t.master_id) {
+            if roles
+                .of_master(t.master_id)
+                .contains(MasterRoles::STOP_FARM)
+            {
                 0.0
             } else {
                 t.radius.x()

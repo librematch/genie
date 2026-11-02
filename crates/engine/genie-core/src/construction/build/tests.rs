@@ -1182,6 +1182,7 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
         &mut world,
         &mut Pathing::default(),
         WorldTime::from_millis(8280),
+        &roles(),
     );
     assert_eq!(started, Ok(true));
     assert_eq!(mover.last_move, WorldTime::from_millis(8281));
@@ -1272,5 +1273,6 @@ use crate::objects::masters::BuildingMaster;
 use crate::objects::sprite::Graphic;
 use crate::players::history::{EntryKind, Population};
 use crate::test_ids::adds;
+use crate::testing::ids;
 use crate::testing::roles;
 use crate::world::FrameSeed;

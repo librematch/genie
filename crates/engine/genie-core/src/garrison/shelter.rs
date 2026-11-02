@@ -24,7 +24,6 @@ use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
 use crate::orders::object_gone;
@@ -37,6 +36,7 @@ use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
@@ -184,7 +184,12 @@ impl World {
             {
                 units.push(id);
             }
-            if m.id == MASTER_1808 {
+            if self
+                .model
+                .roles
+                .of_master(m.id)
+                .contains(MasterRoles::MULE_CART)
+            {
                 units.push(id);
             }
         }

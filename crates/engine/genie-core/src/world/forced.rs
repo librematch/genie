@@ -21,6 +21,7 @@ use crate::unit_ai::UnitAi;
 use crate::vision::VisionBits;
 use crate::vision::visibility::VisibleMap;
 use crate::world::World;
+use crate::world::layer::Roles;
 use crate::world::parts::{Object, Part};
 use crate::world::slots::PlayerSlots;
 use crate::world::{FrameSeed, PlayState};
@@ -298,7 +299,8 @@ impl World {
         keep_unsaved(unit, &mut forced);
         let before = unit.life.state;
         if forced.position() != unit.position() {
-            self.spatial.set_position(id, forced.position())?;
+            self.spatial
+                .set_position(id, forced.position(), &self.model.roles)?;
         }
         self.follow_state(p, &forced, before)?;
         self.spatial.unfreeze(id);
@@ -327,7 +329,7 @@ impl World {
         if state == before {
             return Ok(());
         }
-        sight_follows(&mut self.spatial, id, (before, state))?;
+        sight_follows(&mut self.spatial, id, (before, state), &self.model.roles)?;
         if before < ObjectState::DyingSprite && ObjectState::Undead < state {
             let master = forced.master(
                 MasterTables::new(&self.model.masters, &self.parts.own_master),
@@ -349,12 +351,13 @@ fn sight_follows(
     spatial: &mut Spatial,
     id: ObjectId,
     (before, state): (ObjectState, ObjectState),
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     if before <= ObjectState::Alive && ObjectState::Dying <= state {
-        spatial.sight_state(id, ObjectState::Dying)?;
+        spatial.sight_state(id, ObjectState::Dying, roles)?;
     }
     if state != ObjectState::Dying {
-        spatial.sight_state(id, state)?;
+        spatial.sight_state(id, state, roles)?;
     }
     Ok(())
 }
@@ -390,7 +393,6 @@ mod tests {
     use crate::objects::layers::Motion;
     #[cfg(test)]
     use crate::objects::lifecycle::Lifecycle;
-    use crate::objects::masters::ids;
     use crate::players::game_status::GameStatus;
     #[cfg(test)]
     use crate::production::Production;
@@ -398,6 +400,8 @@ mod tests {
     use crate::test_ids::object_id;
     #[cfg(test)]
     use crate::test_ids::{master_id, tech_id};
+    use crate::testing::ids;
+    use crate::testing::roles;
     #[cfg(test)]
     use crate::unit_ai::Hunted;
     use crate::world::parts::Object;
@@ -427,12 +431,30 @@ mod tests {
         let state = |s: &Spatial| s.sight.as_ref().and_then(|v| v.seer(id)).map(|s| s.state);
         let mut s = world();
         assert_eq!(state(&s), Some(ObjectState::Alive));
-        sight_follows(&mut s, id, (ObjectState::Alive, ObjectState::Dying)).unwrap();
+        sight_follows(
+            &mut s,
+            id,
+            (ObjectState::Alive, ObjectState::Dying),
+            &roles(),
+        )
+        .unwrap();
         assert_eq!(state(&s), Some(ObjectState::Dying));
-        sight_follows(&mut s, id, (ObjectState::Dying, ObjectState::Removed)).unwrap();
+        sight_follows(
+            &mut s,
+            id,
+            (ObjectState::Dying, ObjectState::Removed),
+            &roles(),
+        )
+        .unwrap();
         assert_eq!(state(&s), Some(ObjectState::Removed));
         let mut s = world();
-        sight_follows(&mut s, id, (ObjectState::Alive, ObjectState::DyingSprite)).unwrap();
+        sight_follows(
+            &mut s,
+            id,
+            (ObjectState::Alive, ObjectState::DyingSprite),
+            &roles(),
+        )
+        .unwrap();
         assert_eq!(state(&s), Some(ObjectState::DyingSprite));
     }
 

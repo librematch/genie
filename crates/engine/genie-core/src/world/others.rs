@@ -520,9 +520,9 @@ impl World {
 mod tests {
     use super::*;
     use crate::objects::HitPoints;
-    use crate::objects::masters::ids;
     use crate::players::tracker::ListKey;
     use crate::test_ids::object_id;
+    use crate::testing::ids;
     use crate::testing::roles;
 
     fn unit(id: i32) -> Unit {

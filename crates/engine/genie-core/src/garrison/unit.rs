@@ -31,7 +31,6 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -54,9 +53,11 @@ use crate::vision::SightShape;
 use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
+use crate::vision::visibility::LosSight;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -498,6 +499,7 @@ impl Unit {
                 placed.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
+                roles,
             )?;
         }
         let (bp, building) = c.w.object(target).ok_or(GenieError::unreachable(
@@ -602,11 +604,8 @@ impl Unit {
         if bm.kind == MasterKind::BUILDING {
             let _ = v.sight_on_los(
                 target.id(),
-                at,
-                radius,
-                SightShape::Circle,
-                INSIDE_SIGHT,
-                SightCentre::Tile,
+                LosSight::tile_circle(at, radius, INSIDE_SIGHT),
+                &c.w.model.roles,
             )?;
         }
         Ok(())
@@ -627,7 +626,9 @@ impl Unit {
         (me, bm): (&Master, &Master),
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        if !roles.of_class(me.class).contains(ClassRoles::VILLAGER) && me.id != MASTER_1808 {
+        if !roles.of_class(me.class).contains(ClassRoles::VILLAGER)
+            && !roles.of_master(me.id).contains(MasterRoles::MULE_CART)
+        {
             return Ok(());
         }
         if !bell.flag {

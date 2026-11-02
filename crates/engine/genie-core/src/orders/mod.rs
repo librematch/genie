@@ -84,7 +84,6 @@ use crate::math::image::order::{
 use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::objects::layers::{Building, Combat};
-use crate::objects::masters::ids;
 use crate::players::CivId;
 use crate::players::tracker::Tracker;
 use crate::unit_ai::task_finder::{DropSite, table_drop_buildings};
@@ -265,8 +264,6 @@ pub(crate) const HUNT_TARGET_GONE: GenieError =
 pub(crate) const NO_HUNT_TASK: GenieError =
     GenieError::unsupported("a hunt command without a task");
 
-/// The trophy master `TRANSFORM_OBJECT` changes ("Trophy None") and the trophies it may take.
-const TROPHY: MasterId = ids::TROPHY_NONE;
 const TROPHIES: RangeInclusive<i16> = 1650..=1653;
 /// A patrol's waypoint counts when it is this far from the last one on x or y
 /// (`FUN_14161b970`, `DAT_14330eb8c`), or this far the other way (`DAT_14330ec20`).

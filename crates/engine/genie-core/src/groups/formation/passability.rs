@@ -200,7 +200,7 @@ impl World {
             let Some(unit) = self.world_object(formation.slots.checked(u)?.unit_id) else {
                 continue;
             };
-            let unit_mask = self.master_mask(unit.player(), unit.master_id())?;
+            let unit_mask = self.master_mask(unit.player(), unit.master_id(self.model.slots))?;
             let unit_at = unit.position();
             let gx = cvttss2si(unit_at.x() - ox as f32);
             let gy = cvttss2si(unit_at.y() - oz as f32);
@@ -285,7 +285,7 @@ impl World {
         let Some(tester) = tester else {
             return Ok(());
         };
-        let mask = self.master_mask(tester.player(), tester.master_id())?;
+        let mask = self.master_mask(tester.player(), tester.master_id(self.model.slots))?;
         let stands = |at: BVector| {
             let t = slot_tile(at);
             self.spatial.standable(t, mask)

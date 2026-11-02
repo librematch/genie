@@ -23,6 +23,7 @@ use crate::math::image::build::{
     CLEARING_REACH as BUILD_CLEARING_REACH, STUMP_HP as BUILD_STUMP_HP,
 };
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// What the footprint clearing (`FUN_1415c3620`) reads of the new building: its owner
@@ -83,13 +84,6 @@ pub struct Cleared {
     pub record_goes: bool,
 }
 
-/// The flag masters (`FUN_140fde270`: 274, 1689 and 1785), which the footprint clearing leaves
-/// alone unless their master has height.
-pub(super) const FLAG_MASTERS: [MasterId; 3] = [
-    MasterId::named(0x112),
-    MasterId::named(0x699),
-    MasterId::named(0x6f9),
-];
 /// The tiles the footprint clearing scans each way of the building's place (`DAT_142eb0f48`).
 pub(crate) const CLEARING_REACH: f32 = BUILD_CLEARING_REACH;
 /// The hit points a tree at most has that the builder's clearing takes (`DAT_14330eb8c`).
@@ -234,7 +228,11 @@ pub(super) fn clearing_takes(
         return Ok(None);
     }
     // COMISS 0 against the height, JNC: a flag master of height 0 or less stays
-    if FLAG_MASTERS.contains(&o.master) && !below_or_unordered(0.0, seen.height.get()) {
+    if roles
+        .of_master(o.master)
+        .contains(MasterRoles::CLEARING_FLAG)
+        && !below_or_unordered(0.0, seen.height.get())
+    {
         return Ok(None);
     }
     // the destroy's death part (FUN_14121cc40 below state 3) drops the record and sets +0x686

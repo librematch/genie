@@ -13,28 +13,33 @@ use crate::objects::masters::HillMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::cost_entries;
-use crate::objects::masters::ids::FARM;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::{BuildSite, WorldMap, build_placement};
+use crate::world::World;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
-use crate::world::{RICE_FARM, World};
 
 impl World {
     /// BUILD's first step (`FUN_140e7a400`): a farm (master 50) whose point's tile (truncated) is
     /// mangrove shallows or forest (terrains 54, 55, `FUN_1413fc100`) or a rice farm's (63 to 67,
     /// `FUN_1413fc220`) is a rice farm (1187); a point off the map keeps the farm.
     pub(crate) fn farm_on_rice_terrain(&self, master: MasterId, position: Position) -> MasterId {
-        if master != FARM {
+        if !self
+            .model
+            .roles
+            .of_master(master)
+            .contains(MasterRoles::FARM)
+        {
             return master;
         }
         let tile = Tile::new(position.x() as i32, position.y() as i32);
         let terrain = self.spatial.terrain.as_ref().and_then(|t| t.kind(tile));
         if terrain.is_some_and(is_rice_terrain) {
-            RICE_FARM
+            self.model.slots.master.rice_farm
         } else {
             master
         }

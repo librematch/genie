@@ -4,6 +4,7 @@ use genie_core::groups::GroupId;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::ClassId;
+use genie_core::objects::masters::MasterId;
 
 /// The object id `value` (not −1).
 pub(crate) const fn object_id(value: i32) -> ObjectId {
@@ -33,3 +34,8 @@ pub(crate) const fn action_type(value: i16) -> ActionKind {
 pub(crate) fn class_id(value: i16) -> ClassId {
     ClassId::try_from(value).expect("a test's class is 0 or more")
 }
+
+/// Build 158041's male villager (master 83), the tests' unit.
+pub(crate) const VILLAGER_MALE: MasterId = MasterId::named(83);
+/// Build 158041's female villager (master 293).
+pub(crate) const VILLAGER_FEMALE: MasterId = MasterId::named(293);

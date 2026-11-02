@@ -4,10 +4,10 @@ use crate::GenieError;
 use crate::construction::repair::REPAIR;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::ids;
 use crate::objects::masters::{Master, MasterId, Masters, Task};
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::parts::PartTable;
@@ -131,16 +131,15 @@ pub fn work_master<'m>(
             // a gather task for a point has no target: the game reads none there, as the
             // finder gives a point only a task for its terrain, never a gather one
             let listed = on.target.filter(|t| {
-                matches!(
-                    t.master.id,
-                    ids::FARM
-                        | ids::ID_357
-                        | ids::ID_1187
-                        | ids::ID_1188
-                        | ids::PASTURE_MANGROVE
-                        | ids::ID_1894
-                        | ids::PASTURE
-                        | ids::ID_1898
+                roles.of_master(t.master.id).intersects(
+                    MasterRoles::FARM
+                        | MasterRoles::DEAD_FARM
+                        | MasterRoles::RICE_FARM
+                        | MasterRoles::DEAD_RICE_FARM
+                        | MasterRoles::PASTURE_MANGROVE
+                        | MasterRoles::DEAD_PASTURE_MANGROVE
+                        | MasterRoles::PASTURE
+                        | MasterRoles::DEAD_PASTURE,
                 )
             });
             let Some(target) = listed.filter(|t| {

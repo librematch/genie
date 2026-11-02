@@ -11,7 +11,6 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::ids;
 use crate::objects::sprite::new_sprite;
 use crate::orders::{lock_gate, set_stance};
 use crate::players::PlayerId;
@@ -22,6 +21,7 @@ use crate::unit_ai::{Issuer, OrderPriority, UnitStance};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -74,7 +74,11 @@ impl World {
                     .roles
                     .of_class(master.class)
                     .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-                    || matches!(master.id, ids::ID_42 | ids::ID_331))
+                    || self
+                        .model
+                        .roles
+                        .of_master(master.id)
+                        .intersects(MasterRoles::TREBUCHET | MasterRoles::TREBUCHET_PACKED))
             {
                 continue;
             }

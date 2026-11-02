@@ -428,12 +428,12 @@ pub trait Attributes {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objects::masters::ids;
     use crate::players::attribute;
     use crate::production::LocationButton;
     #[cfg(test)]
     use crate::test_ids::amounts;
     use crate::test_ids::master_id;
+    use crate::testing::ids;
     use crate::world::WholeSeconds;
 
     /// Loom (22) as player 2 of MarvinBlue/426048731 holds it before its RESEARCH in 3842.

@@ -82,7 +82,6 @@ use crate::math::image::attack::{
 #[cfg(test)]
 use crate::movement::Mover;
 use crate::objects::layers::Combat;
-use crate::objects::masters::ids;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 #[cfg(test)]
 use crate::objects::sprite::ActiveSprite;
@@ -509,13 +508,6 @@ const SHORT_RANGE_GAP: Distance = Distance::new(ATTACK_SHORT_RANGE_GAP);
 /// readyToAttack's leash of stance 1 lets a target this much past the range from the unit AI's
 /// `state_position` (`DAT_14330ebb8`, read by `ADDSS` at `0x140a80051`).
 const LEASH_SLACK: Distance = Distance::new(ATTACK_LEASH_SLACK);
-
-/// The masters readyToAttack does not turn to face their target (`0x6744`, `0x6746` raw).
-const MASTER_1704: MasterId = ids::HUSSITE_WAGON;
-const MASTER_1706: MasterId = ids::ELITE_HUSSITE_WAGON;
-
-/// The masters whose swings post no executed action (`0x60e5`, `0x62cb` raw).
-const QUIET_SWINGS: [MasterId; 2] = [ids::ID_73, ids::ID_559];
 
 /// An Attack in a state that walks to its target object, without one.
 const ATTACK_WITHOUT_TARGET: GenieError =

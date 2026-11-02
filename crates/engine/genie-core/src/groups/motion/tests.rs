@@ -17,12 +17,12 @@ use crate::objects::actions::ActionList;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::ids;
 use crate::pathing::DelayCount;
 use crate::pathing::PlanCap;
 use crate::pathing::PlanCount;
 use crate::test_ids::object_id;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::world::Millis;
 use crate::world::WorldTime;
 

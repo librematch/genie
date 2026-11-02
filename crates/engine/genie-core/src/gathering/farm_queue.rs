@@ -21,9 +21,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::ids::FARM;
-use crate::objects::masters::ids::FISH_TRAP;
-use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -33,12 +30,11 @@ use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_type;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// A queue takes a purchase only below this count (`0x28`).
 pub const QUEUE_LIMIT: QueueCount = QueueCount::of_data(40);
-/// The pasture a mill's queue buys (`0x761`, GAME 0x15 and 0x16).
-pub const PASTURE: MasterId = MasterId::named(0x761);
 
 /// A reseeding gatherer's farm spot of none (`DAT_14330ec20`, −1.0, read at `0x140a8aa9e`).
 const NO_FARM: f32 = FARM_QUEUE_NO_FARM;
@@ -76,7 +72,12 @@ impl World {
     ) -> Result<bool, GenieError> {
         // The fish trap (master 199, its master table's `+0x638`).
         // The farm a mill's queue buys (`0x32`, GAME 0xd and 0xe).
-        self.buy_ahead(p, count, FISH_TRAP, Queue::FishTraps)
+        self.buy_ahead(
+            p,
+            count,
+            self.model.slots.master.fish_trap,
+            Queue::FishTraps,
+        )
     }
 
     /// `FUN_141630f10`: player `p` takes back `count` of master `master` from its mill's queue
@@ -97,7 +98,12 @@ impl World {
         p: PlayerId,
         count: QueueCount,
     ) -> Result<bool, GenieError> {
-        self.give_back(p, count, FISH_TRAP, Queue::FishTraps)
+        self.give_back(
+            p,
+            count,
+            self.model.slots.master.fish_trap,
+            Queue::FishTraps,
+        )
     }
 
     /// The purchase of `FUN_141617130` and `FUN_141616540`: with `count` above 0 and the queue
@@ -200,7 +206,12 @@ impl World {
         // which reseeds fish traps.
         // The town centre (621, `0x26d`), whose availability also counts the town centres standing
         // against attribute 218 (`FUN_141663f80`).
-        if base == Some(TOWN_CENTRE_621) {
+        if self
+            .model
+            .roles
+            .of_some_master(base)
+            .contains(MasterRoles::TOWN_CENTRE_621)
+        {
             let limit = self
                 .players
                 .player(p)?
@@ -221,7 +232,10 @@ impl World {
     ///
     /// A player the world does not hold.
     pub fn reseed_master(&self, p: PlayerId) -> Result<Option<MasterId>, GenieError> {
-        for m in [FARM, PASTURE] {
+        for m in [
+            self.model.slots.master.farm,
+            self.model.slots.master.pasture_1889,
+        ] {
             if self.can_make(p, m)?
                 && player_master(&self.model.masters, p, m).is_some_and(|m| {
                     self.model
@@ -344,7 +358,11 @@ impl World {
             {
                 return Ok(None);
             }
-            (FISH_TRAP, owner.auto_fishtrap_queue, Queue::FishTraps)
+            (
+                self.model.slots.master.fish_trap,
+                owner.auto_fishtrap_queue,
+                Queue::FishTraps,
+            )
         } else {
             let Some(master) = self.reseed_master(p)? else {
                 return Ok(None);
@@ -443,7 +461,6 @@ mod tests {
     use crate::objects::masters::Master;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
-    use crate::objects::masters::ids;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::test_ids::costs;
@@ -452,6 +469,11 @@ mod tests {
     #[cfg(test)]
     use crate::test_ids::{amounts, attributes};
     use crate::testing::class;
+    use crate::testing::ids;
+    use crate::testing::ids::FARM;
+    use crate::testing::ids::FISH_TRAP;
+    use crate::testing::ids::PASTURE_1889;
+    use crate::testing::ids::TOWN_CENTRE_621;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -486,7 +508,7 @@ mod tests {
         let masters = Masters::new([
             master(FARM, &[(attribute::WOOD, 60, true)]),
             master(
-                PASTURE,
+                PASTURE_1889,
                 &[(attribute::WOOD, 100, true), (attribute::FOOD, 50, false)],
             ),
             master(FISH_TRAP, &[(attribute::WOOD, 100, true)]),
@@ -523,14 +545,14 @@ mod tests {
         let mut t = world(1000.0);
         t.players[1].attributes[0] = Amount::new(99.0);
         assert!(
-            t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE)
+            t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE_1889)
                 .unwrap()
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(1));
         assert_eq!(t.players[1].resources(), amounts([99.0, 900.0, 0.0, 0.0]));
         t.players[1].attributes[0] = Amount::new(100.0);
         assert!(
-            t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE)
+            t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE_1889)
                 .unwrap()
         );
         assert_eq!(t.players[1].resources(), amounts([100.0, 700.0, 0.0, 0.0]));
@@ -604,7 +626,7 @@ mod tests {
         let mut t = world(0.0);
         t.model.masters[1] = Arc::new(Masters::new([
             building(FARM, class::FARM, FARM, true, -1),
-            building(PASTURE, class::FARM, master_id(300), false, -1),
+            building(PASTURE_1889, class::FARM, master_id(300), false, -1),
             building(master_id(300), class::BUILDING, master_id(300), true, 301),
             building(master_id(301), class::BUILDING, master_id(302), false, -1),
             building(master_id(302), class::BUILDING, master_id(302), true, -1),
@@ -612,7 +634,7 @@ mod tests {
         ]));
         assert!(t.can_make(PlayerId::new(1), FARM).unwrap());
         // the pasture's base 300 heads 301, whose base 302 is available
-        assert!(t.can_make(PlayerId::new(1), PASTURE).unwrap());
+        assert!(t.can_make(PlayerId::new(1), PASTURE_1889).unwrap());
         assert!(!t.can_make(PlayerId::new(1), ids::ID_1187).unwrap());
         assert!(!t.can_make(PlayerId::new(1), master_id(303)).unwrap());
         t.model.masters[1] = Arc::new(Masters::new([building(FARM, class::FARM, FARM, false, -1)]));
@@ -644,15 +666,21 @@ mod tests {
         let masters = |farm: bool, pasture: bool, class: ClassId| {
             Masters::new([
                 building(FARM, class, FARM, farm, -1),
-                building(PASTURE, class::FARM, PASTURE, pasture, -1),
+                building(PASTURE_1889, class::FARM, PASTURE_1889, pasture, -1),
             ])
         };
         t.model.masters[1] = Arc::new(masters(true, true, class::FARM));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(FARM));
         t.model.masters[1] = Arc::new(masters(false, true, class::FARM));
-        assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(PASTURE));
+        assert_eq!(
+            t.reseed_master(PlayerId::new(1)).unwrap(),
+            Some(PASTURE_1889)
+        );
         t.model.masters[1] = Arc::new(masters(true, true, class::BUILDING));
-        assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(PASTURE));
+        assert_eq!(
+            t.reseed_master(PlayerId::new(1)).unwrap(),
+            Some(PASTURE_1889)
+        );
         t.model.masters[1] = Arc::new(masters(false, false, class::FARM));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), None);
     }
@@ -674,7 +702,7 @@ mod tests {
         );
         t.players[1].farm_queue = QueueCount::of_data(2);
         assert!(
-            t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(1), PASTURE)
+            t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(1), PASTURE_1889)
                 .unwrap()
         );
         assert_eq!(t.players[1].resources(), amounts([0.0, 280.0, 0.0, 0.0]));

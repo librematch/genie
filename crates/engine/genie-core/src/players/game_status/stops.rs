@@ -26,12 +26,13 @@ use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
-use crate::players::game_status::{KEEPING_TYPES, UNSTOPPED_BUILDINGS};
+use crate::players::game_status::KEEPING_TYPES;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::StopOrder;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// A halt of a top action finds the unit without that action.
@@ -79,7 +80,12 @@ impl World {
                 .of_class(class)
                 .contains(ClassRoles::BUILDING)
             {
-                if !UNSTOPPED_BUILDINGS.contains(&id) {
+                if !self
+                    .model
+                    .roles
+                    .of_master(id)
+                    .contains(MasterRoles::UNSTOPPED)
+                {
                     self.object_stop(p, idx)?;
                 }
                 self.cancel_queue(p, idx)?;

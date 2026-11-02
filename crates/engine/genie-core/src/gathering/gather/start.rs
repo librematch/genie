@@ -7,8 +7,8 @@ use crate::gathering::FarmStops;
 use crate::gathering::StopIndex;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
-    DEFAULT_PRODUCTIVITY, FARM_STOPS, GatherAction, GatherReads, Resource, SPECIAL_TARGETS,
-    STOP_CENTRE, STOP_DRAWS, STOP_FARMS, Walks,
+    DEFAULT_PRODUCTIVITY, FARM_STOPS, GatherAction, GatherReads, Resource, STOP_CENTRE, STOP_DRAWS,
+    Walks,
 };
 use crate::gathering::hunt::HuntTask;
 use crate::gathering::{GatherTargetId, both_food};
@@ -24,7 +24,6 @@ use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::ids;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
 use crate::objects::sprite::new_sprite;
@@ -35,6 +34,7 @@ use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
@@ -173,7 +173,9 @@ impl GatherAction {
         roles: &Roles,
     ) -> Result<Self, GenieError> {
         let farm = if roles.of_class(target.class).contains(ClassRoles::FARM)
-            || SPECIAL_TARGETS.contains(&target.master)
+            || roles
+                .of_master(target.master)
+                .contains(MasterRoles::DEAD_FARM_SITE)
         {
             target.position.ground()
         } else {
@@ -181,7 +183,9 @@ impl GatherAction {
         };
         let (stops, time_per_stop) = if farm_stops
             && roles.of_class(target.class).contains(ClassRoles::FARM)
-            && STOP_FARMS.contains(&target.master)
+            && roles
+                .of_master(target.master)
+                .contains(MasterRoles::STOP_FARM)
         {
             (FARM_STOPS, rate.time_per_stop(task.work_value, FARM_STOPS))
         } else {
@@ -258,7 +262,10 @@ impl GatherAction {
             .contains(ClassRoles::FARM)
             && WorkerCount::ONE < target.workers.plus(1)
         {
-            let radius = if STOP_FARMS.contains(&target.master) {
+            let radius = if roles
+                .of_master(target.master)
+                .contains(MasterRoles::STOP_FARM)
+            {
                 0.0
             } else {
                 target.radius.x()
@@ -340,18 +347,27 @@ impl GatherAction {
         self.point = target.position;
         self.target_class = target.class.or_none();
         if farm_stops {
-            if STOP_FARMS.contains(&target.master) {
+            if roles
+                .of_master(target.master)
+                .contains(MasterRoles::STOP_FARM)
+            {
                 self.farm = target.position.ground();
                 self.stops = FARM_STOPS;
                 self.current_stop = StopIndex::FIRST;
                 self.time_per_stop = rate.time_per_stop(self.task.work_value, FARM_STOPS);
                 self.time_at_stop = Seconds::ZERO;
-            } else if target.master == ids::FISH_TRAP {
+            } else if roles
+                .of_master(target.master)
+                .contains(MasterRoles::FISH_TRAP)
+            {
                 self.farm = target.position.ground();
             }
         }
         if roles.of_class(target.class).contains(ClassRoles::FARM) && WorkerCount::ONE < workers {
-            let radius = if STOP_FARMS.contains(&target.master) {
+            let radius = if roles
+                .of_master(target.master)
+                .contains(MasterRoles::STOP_FARM)
+            {
                 0.0
             } else {
                 target.radius.x()

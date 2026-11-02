@@ -14,11 +14,12 @@ use crate::players::QueryRelation;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
     BOAR_WANDER, EVADE_REACH, Effect, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH,
-    HUNTED_STEP, KING_UNLED, LION_CARED, LION_IDLE_TIMEOUT, LION_SIGHT_DIVISOR, LION_SIGHT_SHARE,
-    Memory, Pick, Search, Surroundings, UnitAi, UnitSide, point_gap_squared,
+    HUNTED_STEP, LION_CARED, LION_IDLE_TIMEOUT, LION_SIGHT_DIVISOR, LION_SIGHT_SHARE, Memory, Pick,
+    Search, Surroundings, UnitAi, UnitSide, point_gap_squared,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use std::cmp::Ordering;
 
 impl UnitAi {
@@ -154,7 +155,7 @@ impl UnitAi {
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
         if roles.of_some_class(at.class).contains(ClassRoles::KING) {
-            let led = at.master != KING_UNLED
+            let led = !roles.of_master(at.master).contains(MasterRoles::KING_UNLED)
                 && !at.garrisoned
                 && self.current_order.is_none()
                 && player_type.is_computer();

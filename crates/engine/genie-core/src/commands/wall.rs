@@ -28,7 +28,6 @@ use crate::math::image::wall::{HALF as WALL_HALF, MAP_MARGIN as WALL_MAP_MARGIN,
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::{MasterId, player_master};
 use crate::orders::readiness;
 use crate::players::PlayerId;
@@ -422,7 +421,7 @@ impl World {
                 .find(|t| t.action_kind == ActionKind::BUILD)
                 .is_some_and(|t| t.object_id == Some(building)));
         }
-        Ok(trained_at.contains(&BUILDER) || trained_at.contains(&m.id))
+        Ok(trained_at.contains(&self.model.slots.master.builder) || trained_at.contains(&m.id))
     }
 }
 

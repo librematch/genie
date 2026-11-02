@@ -19,14 +19,14 @@ use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::movement::{
-    AfterRequest, EPSILON, Goal, LONG_PATH_GROW, LONG_PATH_MOVER, LongWalker, Me, Mover, Planning,
-    RANGE_FLOOR, SHORT_REACH, cut_path, footprint_gap, ground, long_path_for, may_plan,
-    point_or_zero,
+    AfterRequest, EPSILON, Goal, LONG_PATH_GROW, LongWalker, Me, Mover, Planning, RANGE_FLOOR,
+    SHORT_REACH, cut_path, footprint_gap, ground, long_path_for, may_plan, point_or_zero,
 };
 use crate::objects::ObjectId;
 use crate::pathing::tile_path::Path;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 
 /// What the long pather is asked for a far waypoint ([`Mover::long_plan`]'s arguments after the
 /// planning state).
@@ -252,6 +252,7 @@ impl Mover {
         path: &mut Path,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
+        let roles = by_id.roles();
         let LongAsk {
             waypoint,
             way,
@@ -264,7 +265,10 @@ impl Mover {
             position: at,
             radius: self.stats.radius.ground(),
             mask: self.stats.restriction_mask,
-            moves: self.stats.speed != Speed::ZERO || master == Some(LONG_PATH_MOVER),
+            moves: self.stats.speed != Speed::ZERO
+                || roles
+                    .of_some_master(master)
+                    .contains(MasterRoles::LONG_PATH_MOVER),
             ignore_units: &self.ignore_units,
             group_units: plan.groups.group_units(me.group),
         };

@@ -37,9 +37,6 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
-use crate::objects::masters::ids;
-use crate::objects::masters::ids::FARM;
-use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -57,6 +54,8 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
+use crate::world::layer::Roles;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 use crate::world::{Gate, World};
@@ -235,7 +234,7 @@ impl World {
         let (x, y) = (position.x(), position.y());
         let (tx, ty) = (cvttss2si(x), cvttss2si(y));
         let terrain = self.spatial.terrain.as_ref();
-        let snow = constructed_snow(master, (tx, ty), terrain)?;
+        let snow = constructed_snow(master, (tx, ty), terrain, &self.model.roles)?;
         // +0xcd0 (FUN_141188db0): mangrove or rice terrain under its place
         let rice = terrain.is_some_and(|t| t.kind(Tile::new(tx, ty)).is_some_and(is_rice_terrain));
         let foundation = !self
@@ -243,7 +242,11 @@ impl World {
             .roles
             .of_class(made.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-            && !matches!(master, ids::ID_357 | ids::ID_1188)
+            && !self
+                .model
+                .roles
+                .of_master(master)
+                .intersects(MasterRoles::DEAD_FARM | MasterRoles::DEAD_RICE_FARM)
             && building.head_unit.is_none();
         let hp = if foundation && WholeSeconds::ZERO < made.build_time {
             1.0
@@ -488,8 +491,11 @@ fn constructed_snow(
     master: MasterId,
     (tx, ty): (i32, i32),
     terrain: Option<&Terrain>,
+    roles: &Roles,
 ) -> Result<Snow, GenieError> {
-    let on_snow = matches!(master, FARM | PASTURE_1889)
+    let on_snow = roles
+        .of_master(master)
+        .intersects(MasterRoles::FARM | MasterRoles::PASTURE_1889)
         && -1 < tx
         && -1 < ty
         && terrain
@@ -504,7 +510,8 @@ mod tests {
     use crate::map::Snow;
     use crate::map::terrain::{Terrain, TerrainKind, TileTerrain};
     use crate::map::{GridSize, TerrainFlags};
-    use crate::objects::masters::ids;
+    use crate::testing::ids;
+    use crate::testing::roles;
 
     /// A farm and a pasture 1889 on snow keep it (2); a house there, a farm off the map or on a
     /// map without its terrain, and a farm on grass have none.
@@ -529,14 +536,15 @@ mod tests {
             kinds,
             Vec::new(),
         );
-        let snow = |master, tile| super::constructed_snow(master, tile, Some(&terrain)).unwrap();
+        let snow =
+            |master, tile| super::constructed_snow(master, tile, Some(&terrain), &roles()).unwrap();
         assert_eq!(snow(ids::FARM, (0, 0)), Snow::Kept);
         assert_eq!(snow(ids::PASTURE_1889, (0, 0)), Snow::Kept);
         assert_eq!(snow(ids::HOUSE, (0, 0)), Snow::None);
         assert_eq!(snow(ids::FARM, (1, 0)), Snow::None);
         assert_eq!(snow(ids::FARM, (-1, 0)), Snow::None);
         assert_eq!(
-            super::constructed_snow(ids::FARM, (0, 0), None).unwrap(),
+            super::constructed_snow(ids::FARM, (0, 0), None, &roles()).unwrap(),
             Snow::None
         );
     }

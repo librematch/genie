@@ -33,11 +33,11 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::GarrisonCapacity;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::ids;
 use crate::objects::masters::{BuildingMaster, Task};
 use crate::objects::masters::{CostSlot, Master, Masters};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -67,12 +67,15 @@ use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::{amounts, opt_master};
 use crate::testing::class;
+use crate::testing::ids;
+use crate::testing::roles;
 use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::VisionMasks;
+use crate::vision::visibility::LosSight;
 use crate::vision::visibility::{Seer, Visibility, VisibleMap};
 use crate::world::Millis;
 use crate::world::Player;
@@ -906,6 +909,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             radius,
             SightShape::Circle,
             SightCentre::Tile,
+            &roles(),
         );
         t.spatial.sight = Some(v);
         t.spatial.insert(
@@ -936,15 +940,17 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             Footprint::new(0.5, 0.5),
             SightShape::Circle,
             SightCentre::Tile,
+            &roles(),
         )
         .unwrap();
         let _ = v.sight_on_los(
             object_id(1),
-            Position::new(10.5, 10.5, 0.0),
-            Footprint::new(0.5, 0.5),
-            SightShape::Circle,
-            SightTiles::new(los),
-            SightCentre::Tile,
+            LosSight::tile_circle(
+                Position::new(10.5, 10.5, 0.0),
+                Footprint::new(0.5, 0.5),
+                SightTiles::new(los),
+            ),
+            &roles(),
         );
         sight(&t)
     };

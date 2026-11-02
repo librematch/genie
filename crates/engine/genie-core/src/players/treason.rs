@@ -9,21 +9,15 @@ use crate::GenieError;
 use crate::math::image::treason::{
     TREASON_COST as TREASON_TREASON_COST, TREASON_DISCOUNT_COST as TREASON_TREASON_DISCOUNT_COST,
 };
-use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::CASTLE;
-use crate::objects::masters::ids::KING;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
 use crate::players::tracker::ListKey;
 use crate::unit_ai::task_finder::allied;
 use crate::world::World;
+use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
-/// The building of the content mode 1 (`0xd1`) that stands for the castle (`FUN_140fe0ec0`).
-const CASTLE_MODE_1: MasterId = MasterId::named(0xd1);
-/// The flare each ally gets at a king (`0x2b9`).
-const FLARE4: MasterId = MasterId::named(0x2b9);
 /// The gold ([`attribute::GOLD`]) the treason costs: 400 (`DAT_142eb5bd4`, read at `0x141620446`),
 /// 200 (`DAT_142eb0f54`, read at `0x1416204d5`) with attribute 197 above 0.
 const TREASON_COST: f32 = TREASON_TREASON_COST;
@@ -37,9 +31,9 @@ impl World {
     #[must_use]
     pub fn has_treason_building(&self, p: PlayerId) -> bool {
         let castle = if self.mode_680.is_one() {
-            CASTLE_MODE_1
+            self.model.slots.master.castle_mode_1
         } else {
-            CASTLE
+            self.model.slots.master.castle
         };
         self.model
             .masters
@@ -96,7 +90,12 @@ impl World {
                 .objects
                 .iter()
                 // The king (`0x1b2`), whom the treason reveals.
-                .find(|u| u.life.master_id == KING)
+                .find(|u| {
+                    self.model
+                        .roles
+                        .of_master(u.life.master_id)
+                        .contains(MasterRoles::KING)
+                })
             else {
                 continue;
             };
@@ -106,7 +105,7 @@ impl World {
             };
             for j in PlayerId::each(n).skip(1) {
                 if allied(&self.players.player(p)?.relations, p, j, false) {
-                    self.remains(j, FLARE4, at, None)?;
+                    self.remains(j, self.model.slots.master.flare_4, at, None)?;
                     self.made_new_object(j)?;
                 }
             }
@@ -132,6 +131,9 @@ mod tests {
     #[cfg(test)]
     use crate::players::relation_row;
     use crate::test_ids::object_id;
+    use crate::testing::ids;
+    use crate::testing::ids::CASTLE;
+    use crate::testing::ids::KING;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::WorldTime;
@@ -200,7 +202,7 @@ mod tests {
     /// The flare's master (697, animated, no hit points) for every player.
     fn with_flares(t: &mut World) {
         let flare = Master {
-            id: FLARE4,
+            id: ids::FLARE_4,
             kind: MasterKind::ANIMATED,
             standing_sprite: None,
             ..Master::default()
@@ -245,7 +247,7 @@ mod tests {
             t.players[p]
                 .objects
                 .iter()
-                .filter(|u| u.life.master_id == FLARE4)
+                .filter(|u| u.life.master_id == ids::FLARE_4)
                 .map(|u| (u.id.get(), u.position()))
                 .collect()
         };

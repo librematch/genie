@@ -25,12 +25,12 @@ use crate::objects::Voice;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, standing, walking};
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
 use crate::world::WALKER_UNMOVING;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use genie_diff::Diff;
 
@@ -82,9 +82,10 @@ const TOWN_CENTRE_OFFSET: f32 = ARTIFACT_TOWN_CENTRE_OFFSET;
 /// and no `MoveTo` holds a target in state 7 or later (`FUN_140a7a230`); any other target is
 /// held, and a `MoveTo` of its own (not quiet) takes it (slot 0x178).
 #[must_use]
-pub fn holds_object(livestock: bool, master: MasterId, state: ObjectState) -> bool {
+pub fn holds_object(livestock: bool, master: MasterId, state: ObjectState, roles: &Roles) -> bool {
     // The town centre's master (`FUN_140aa0df0`'s `0x6109` raw), to which livestock walks beside.
-    !(livestock && matches!(master, TOWN_CENTRE)) && state < ObjectState::Removed
+    !(livestock && roles.of_master(master).contains(MasterRoles::TOWN_CENTRE))
+        && state < ObjectState::Removed
 }
 
 /// What one update of a [`MoveToAction`] did.
@@ -268,16 +269,17 @@ impl MoveToAction {
         (target, state): (ObjectId, ObjectState),
         range: Distance,
         (sprite, livestock): (Option<Graphic>, bool),
+        roles: &Roles,
     ) -> Result<Self, GenieError> {
         let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
         let at = t.position;
-        let goal = if livestock && t.master == TOWN_CENTRE {
+        let goal = if livestock && roles.of_master(t.master).contains(MasterRoles::TOWN_CENTRE) {
             Position::new(
                 at.x() - TOWN_CENTRE_OFFSET,
                 at.y() - TOWN_CENTRE_OFFSET,
                 at.z(),
             )
-        } else if holds_object(livestock, t.master, state) {
+        } else if holds_object(livestock, t.master, state, roles) {
             return Self::to_target(world, me, mover, target, range, sprite);
         } else {
             at
@@ -529,6 +531,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
+    use crate::testing::ids::TOWN_CENTRE;
     use crate::testing::roles;
 
     /// A sprite `id` whose speed factor is `factor`, looped.
@@ -922,6 +925,7 @@ mod tests {
                 target,
                 Distance::ZERO,
                 (None, livestock),
+                &roles(),
             )
             .unwrap()
         };

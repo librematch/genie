@@ -52,6 +52,7 @@ use genie_model::layer::generated::WaitSolidifyTuning;
 use genie_model::layer::generated::WallTuning;
 use genie_model::layer::generated::WorldPlayerTuning;
 use genie_model::objects::masters::ClassId;
+use genie_model::objects::masters::MasterId;
 
 /// Build 158041's layer.
 #[must_use]
@@ -66,7 +67,36 @@ pub fn build_158041() -> BuildLayer {
                 farm: ClassId::named(49),
                 livestock: ClassId::named(58),
             },
-            master: MasterSlots {},
+            master: MasterSlots {
+                farm: MasterId::named(50),
+                mill: MasterId::named(68),
+                castle: MasterId::named(82),
+                villager_male: MasterId::named(83),
+                market: MasterId::named(84),
+                town_centre: MasterId::named(109),
+                flare: MasterId::named(112),
+                builder: MasterId::named(118),
+                villager_repairer_male: MasterId::named(156),
+                fish_trap: MasterId::named(199),
+                castle_mode_1: MasterId::named(209),
+                villager_repairer_female: MasterId::named(222),
+                doppelganger: MasterId::named(243),
+                flare_2: MasterId::named(274),
+                villager_female: MasterId::named(293),
+                king: MasterId::named(434),
+                town_centre_444: MasterId::named(444),
+                boarding_galley: MasterId::named(535),
+                town_centre_621: MasterId::named(621),
+                flare_4: MasterId::named(697),
+                rice_farm: MasterId::named(1187),
+                market_1647: MasterId::named(1647),
+                mule_cart: MasterId::named(1808),
+                pasture_1889: MasterId::named(1889),
+                pasture_mangrove: MasterId::named(1893),
+                pasture: MasterId::named(1897),
+                pasture_argali: MasterId::named(1899),
+                pasture_ibex: MasterId::named(1900),
+            },
             tech: TechSlots {},
             attribute: AttributeSlots {},
         },
@@ -626,7 +656,240 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
 ];
 
 /// The master roles by id.
-const MASTER_ROLES: [(usize, MasterRoles); 0] = [];
+const MASTER_ROLES: [(usize, MasterRoles); 90] = [
+    (
+        6,
+        MasterRoles::CLASS_LIST_ONLY.union(MasterRoles::ELITE_SKIRMISHER),
+    ),
+    (
+        7,
+        MasterRoles::CLASS_LIST_ONLY.union(MasterRoles::SKIRMISHER),
+    ),
+    (13, MasterRoles::TRAPPER.union(MasterRoles::TRAP_WAITER)),
+    (
+        35,
+        MasterRoles::BATTERING_RAM
+            .union(MasterRoles::BUILDINGS_ONLY_BLAST)
+            .union(MasterRoles::MOVING_RULE_EXEMPT)
+            .union(MasterRoles::RAM_TARGETS_ONLY),
+    ),
+    (
+        42,
+        MasterRoles::LONG_PATH_MOVER.union(MasterRoles::TREBUCHET),
+    ),
+    (
+        45,
+        MasterRoles::BOAT_HUNTER
+            .union(MasterRoles::DOCK)
+            .union(MasterRoles::REGATHERED)
+            .union(MasterRoles::SEARCH_FROM_FOOTPRINT),
+    ),
+    (
+        50,
+        MasterRoles::DROP_SITE
+            .union(MasterRoles::FARM)
+            .union(MasterRoles::NEVER_CONVERTED)
+            .union(MasterRoles::REGATHERED)
+            .union(MasterRoles::STOP_FARM)
+            .union(MasterRoles::TOWER_SPARED)
+            .union(MasterRoles::UNSTOPPED),
+    ),
+    (53, MasterRoles::BOAT_CONVERTER),
+    (68, MasterRoles::DROP_SITE),
+    (70, MasterRoles::HOUSE),
+    (73, MasterRoles::CHU_KO_NU.union(MasterRoles::QUIET_SWING)),
+    (82, MasterRoles::BOAT_HUNTER.union(MasterRoles::CASTLE)),
+    (83, MasterRoles::VILLAGER_MALE),
+    (84, MasterRoles::MARKET.union(MasterRoles::TRADE_TARGET)),
+    (104, MasterRoles::MONASTERY),
+    (
+        109,
+        MasterRoles::BOAT_HUNTER
+            .union(MasterRoles::NEVER_CONVERTED)
+            .union(MasterRoles::PACKED_PEACEFUL)
+            .union(MasterRoles::TOWN_CENTRE),
+    ),
+    (112, MasterRoles::CIRCLE_SIGHT),
+    (118, MasterRoles::BUILDER),
+    (128, MasterRoles::DEFENDLESS),
+    (159, MasterRoles::NEVER_CONVERTED),
+    (
+        199,
+        MasterRoles::DROP_SITE
+            .union(MasterRoles::FISH_TRAP)
+            .union(MasterRoles::NEVER_CONVERTED)
+            .union(MasterRoles::UNSTOPPED),
+    ),
+    (214, MasterRoles::FARM_WAITER),
+    (259, MasterRoles::FARM_WAITER),
+    (274, MasterRoles::CLEARING_FLAG),
+    (276, MasterRoles::UNSTOPPED.union(MasterRoles::WONDER)),
+    (282, MasterRoles::REFILL_LISTED),
+    (285, MasterRoles::RELIC),
+    (293, MasterRoles::VILLAGER_FEMALE),
+    (329, MasterRoles::REFILL_LISTED),
+    (330, MasterRoles::REFILL_LISTED),
+    (331, MasterRoles::TREBUCHET_PACKED),
+    (
+        357,
+        MasterRoles::DEAD_FARM
+            .union(MasterRoles::DEAD_FARM_SITE)
+            .union(MasterRoles::TERRAIN_ORIGINAL),
+    ),
+    (420, MasterRoles::MOVING_RULE_EXEMPT),
+    (
+        422,
+        MasterRoles::BUILDINGS_ONLY_BLAST
+            .union(MasterRoles::CAPPED_RAM)
+            .union(MasterRoles::MOVING_RULE_EXEMPT)
+            .union(MasterRoles::RAM_TARGETS_ONLY),
+    ),
+    (434, MasterRoles::KING),
+    (440, MasterRoles::PETARD),
+    (444, MasterRoles::PEACEFUL_SOLDIER),
+    (448, MasterRoles::SCOUT_CAVALRY),
+    (
+        527,
+        MasterRoles::DEATH_BLAST
+            .union(MasterRoles::DEFENSIVE_SOLDIER)
+            .union(MasterRoles::DEMOLITION_SHIP),
+    ),
+    (
+        528,
+        MasterRoles::DEATH_BLAST
+            .union(MasterRoles::DEFENSIVE_SOLDIER)
+            .union(MasterRoles::HEAVY_DEMOLITION_SHIP)
+            .union(MasterRoles::STRAYING_MISS),
+    ),
+    (546, MasterRoles::LIGHT_CAVALRY),
+    (
+        548,
+        MasterRoles::BUILDINGS_ONLY_BLAST
+            .union(MasterRoles::MOVING_RULE_EXEMPT)
+            .union(MasterRoles::RAM_TARGETS_ONLY)
+            .union(MasterRoles::SIEGE_RAM),
+    ),
+    (556, MasterRoles::REFILL_LISTED),
+    (
+        559,
+        MasterRoles::ELITE_CHU_KO_NU.union(MasterRoles::QUIET_SWING),
+    ),
+    (562, MasterRoles::DROP_SITE),
+    (584, MasterRoles::DROP_SITE),
+    (618, MasterRoles::NEVER_CONVERTED),
+    (619, MasterRoles::NEVER_CONVERTED),
+    (620, MasterRoles::NEVER_CONVERTED),
+    (
+        621,
+        MasterRoles::DROP_SITE
+            .union(MasterRoles::MODE_TESTED)
+            .union(MasterRoles::NEVER_CONVERTED)
+            .union(MasterRoles::TOWN_CENTRE_621),
+    ),
+    (691, MasterRoles::MOVING_RULE_EXEMPT),
+    (704, MasterRoles::KING_UNLED),
+    (706, MasterRoles::IDLES_STILL),
+    (775, MasterRoles::MISSIONARY),
+    (814, MasterRoles::HORSE),
+    (826, MasterRoles::MONUMENT),
+    (854, MasterRoles::TORCH_CONVERTING),
+    (
+        1104,
+        MasterRoles::DEATH_BLAST
+            .union(MasterRoles::DEFENSIVE_SOLDIER)
+            .union(MasterRoles::DEMOLITION_RAFT),
+    ),
+    (1105, MasterRoles::SIEGE_TOWER),
+    (
+        1187,
+        MasterRoles::DROP_SITE
+            .union(MasterRoles::NEVER_CONVERTED)
+            .union(MasterRoles::REGATHERED)
+            .union(MasterRoles::RICE_FARM)
+            .union(MasterRoles::STOP_FARM)
+            .union(MasterRoles::TOWER_SPARED)
+            .union(MasterRoles::UNSTOPPED),
+    ),
+    (
+        1188,
+        MasterRoles::DEAD_FARM_SITE
+            .union(MasterRoles::DEAD_RICE_FARM)
+            .union(MasterRoles::TERRAIN_ORIGINAL),
+    ),
+    (
+        1258,
+        MasterRoles::BATTERING_RAM_1258
+            .union(MasterRoles::BUILDINGS_ONLY_BLAST)
+            .union(MasterRoles::MOVING_RULE_EXEMPT)
+            .union(MasterRoles::RAM_TARGETS_ONLY),
+    ),
+    (1263, MasterRoles::FLAMING_CAMEL),
+    (1649, MasterRoles::TRANSFORMED_TROPHY),
+    (
+        1663,
+        MasterRoles::FLEMISH_MILITIA.union(MasterRoles::MILITARY_235),
+    ),
+    (1689, MasterRoles::CLEARING_FLAG),
+    (
+        1697,
+        MasterRoles::FLEMISH_MILITIA_FEMALE.union(MasterRoles::MILITARY_235),
+    ),
+    (1704, MasterRoles::UNTURNED_ATTACKER),
+    (1706, MasterRoles::UNTURNED_ATTACKER),
+    (1715, MasterRoles::JADWIGA),
+    (
+        1744,
+        MasterRoles::ARMORED_ELEPHANT
+            .union(MasterRoles::BUILDING_BY_PRIORITY)
+            .union(MasterRoles::MOVING_RULE_EXEMPT),
+    ),
+    (
+        1746,
+        MasterRoles::BUILDING_BY_PRIORITY
+            .union(MasterRoles::MOVING_RULE_EXEMPT)
+            .union(MasterRoles::SIEGE_ELEPHANT),
+    ),
+    (1785, MasterRoles::CLEARING_FLAG),
+    (1808, MasterRoles::DROP_SITE.union(MasterRoles::MULE_CART)),
+    (1810, MasterRoles::VILLAGER_ANY),
+    (1811, MasterRoles::WARRIOR_PRIEST),
+    (1822, MasterRoles::TAMAR),
+    (1889, MasterRoles::PASTURE_1889),
+    (1891, MasterRoles::FARM_WAITER),
+    (1892, MasterRoles::FARM_WAITER),
+    (
+        1893,
+        MasterRoles::COUNTED_PASTURE
+            .union(MasterRoles::PASTURE_MANGROVE)
+            .union(MasterRoles::UNEXHAUSTED),
+    ),
+    (1894, MasterRoles::DEAD_PASTURE_MANGROVE),
+    (
+        1897,
+        MasterRoles::COUNTED_PASTURE
+            .union(MasterRoles::PASTURE)
+            .union(MasterRoles::UNEXHAUSTED),
+    ),
+    (1898, MasterRoles::DEAD_PASTURE),
+    (
+        2133,
+        MasterRoles::DEATH_BLAST.union(MasterRoles::INCENDIARY_RAFT),
+    ),
+    (
+        2134,
+        MasterRoles::DEATH_BLAST.union(MasterRoles::INCENDIARY_SHIP),
+    ),
+    (
+        2135,
+        MasterRoles::DEATH_BLAST.union(MasterRoles::HEAVY_INCENDIARY_SHIP),
+    ),
+    (2171, MasterRoles::TRAPPER.union(MasterRoles::TRAP_WAITER)),
+    (
+        2172,
+        MasterRoles::PORT.union(MasterRoles::SEARCH_FROM_FOOTPRINT),
+    ),
+    (2356, MasterRoles::TRAPPER.union(MasterRoles::TRAP_WAITER)),
+];
 
 /// The tech roles by id.
 const TECH_ROLES: [(usize, TechRoles); 0] = [];

@@ -22,13 +22,12 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::ids::CASTLE;
-use crate::objects::masters::ids::WONDER;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
 use crate::players::history::EventKind;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use std::mem::replace;
 
@@ -194,10 +193,15 @@ pub(super) fn take_building(
     let b = t.building.get_or_insert_with(Building::default);
     if t.player != PlayerId::GAIA && ONE > t.hp.get() {
         let (ap, q) = (src.player, t.player);
-        let event = match t.master_id {
-            CASTLE => Some(EventKind::CASTLE_DESTROYED),
-            WONDER => Some(EventKind::WONDER_DESTROYED),
-            _ => None,
+        let event = {
+            let held = roles.of_master(t.master_id);
+            if held.contains(MasterRoles::CASTLE) {
+                Some(EventKind::CASTLE_DESTROYED)
+            } else if held.contains(MasterRoles::WONDER) {
+                Some(EventKind::WONDER_DESTROYED)
+            } else {
+                None
+            }
         };
         let mut adds = Vec::new();
         if b.main.is_none() && !roles.of_class(t.class).contains(ClassRoles::WALL) {

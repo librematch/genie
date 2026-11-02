@@ -13,8 +13,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::ids::PASTURE_1889;
-use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::attribute;
@@ -24,6 +22,7 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
@@ -155,7 +154,12 @@ impl BuildAction {
         let player_type = c.w.players.player(c.player)?.kind;
         let site = Self::site_unit(c, reads)?;
         let pasture = match site {
-            Some(u) => u.master(c.w.master_tables(), c.player)?.id == PASTURE_1889,
+            Some(u) => {
+                c.w.model
+                    .roles
+                    .of_master(u.master(c.w.master_tables(), c.player)?.id)
+                    .contains(MasterRoles::PASTURE_1889)
+            }
             None => false,
         };
         let built = site.is_some_and(|u| u.life.state != ObjectState::Foundation);
@@ -220,8 +224,10 @@ impl BuildAction {
             return Ok(());
         }
         let master = site.master(c.w.master_tables(), c.player)?;
-        let special =
-            master.id == TOWN_CENTRE_621 || roles.of_class(master.class).contains(ClassRoles::GATE);
+        let special = roles
+            .of_master(master.id)
+            .contains(MasterRoles::TOWN_CENTRE_621)
+            || roles.of_class(master.class).contains(ClassRoles::GATE);
         let unbuilt =
             c.w.parts
                 .building_of(site.id)

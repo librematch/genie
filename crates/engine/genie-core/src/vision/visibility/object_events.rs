@@ -17,6 +17,7 @@ use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Visibility;
+use crate::world::layer::Roles;
 use crate::world::player::Player;
 
 /// An object update past the registry check finds the registry gone.
@@ -219,19 +220,34 @@ impl Visibility {
         radius: Footprint,
         (new, los): (PlayerId, f32),
         sees: bool,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if !self.seers.contains_key(id) {
             return Ok(());
         }
         if sees {
-            self.sight_off(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
+            self.sight_off(
+                id,
+                position,
+                radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+                roles,
+            )?;
         }
         if let Some(s) = self.seers.get_mut(id) {
             s.player = new;
             s.los = Distance::new(los);
         }
         if sees {
-            let _ = self.sight_on(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
+            let _ = self.sight_on(
+                id,
+                position,
+                radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+                roles,
+            )?;
         }
         Ok(())
     }
@@ -244,6 +260,7 @@ impl Visibility {
         id: ObjectId,
         position: Position,
         radius: Footprint,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) else {
             return Ok(());
@@ -258,8 +275,16 @@ impl Visibility {
             radius,
             SightShape::Footprint,
             SightCentre::Tile,
+            roles,
         )?;
-        let _ = self.sight_on(id, position, radius, SightShape::Circle, SightCentre::Tile)?;
+        let _ = self.sight_on(
+            id,
+            position,
+            radius,
+            SightShape::Circle,
+            SightCentre::Tile,
+            roles,
+        )?;
         Ok(())
     }
 
@@ -270,6 +295,7 @@ impl Visibility {
         id: ObjectId,
         position: Position,
         radius: Footprint,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) {
             b.started = true;
@@ -280,6 +306,7 @@ impl Visibility {
             radius,
             SightShape::Footprint,
             SightCentre::Tile,
+            roles,
         )?;
         let _ = self.link_building(position, radius)?;
         Ok(())

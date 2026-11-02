@@ -60,7 +60,6 @@ use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::ids;
 use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
@@ -84,6 +83,7 @@ use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
@@ -1708,14 +1708,14 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         ..Master::default()
     };
     t.model.masters[1] = Arc::new(Masters::new([
-        master(TROPHY, WholeSeconds::of_data(10)),
+        master(ids::TROPHY_NONE, WholeSeconds::of_data(10)),
         master(master_id(1650), WholeSeconds::of_data(30)),
     ]));
     let trophy = |state| Object {
         unit: Unit {
             id: object_id(60),
             life: Lifecycle {
-                master_id: TROPHY,
+                master_id: ids::TROPHY_NONE,
                 state,
                 hp: HitPoints::new(50.0),
                 ..Lifecycle::default()
@@ -2891,7 +2891,7 @@ fn guard_gives_its_units_the_defend_order_at_once() {
         let mut t = followers();
         t.players[2].objects[ListIndex::new(0)].place_for_test(Position::new(x, 20.0, 0.0));
         t.spatial
-            .set_position(object_id(30), Position::new(x, 20.0, 0.0))
+            .set_position(object_id(30), Position::new(x, 20.0, 0.0), &roles())
             .unwrap();
         t.guard(PlayerId::new(1), &object_ids([11]), object_id(30))
             .unwrap();

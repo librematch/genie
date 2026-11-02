@@ -13,8 +13,6 @@
 //! 158041: the rebuild `FUN_141552df0`; the attribute setter `FUN_141616820` (attributes 50, 183).
 
 use crate::GenieError;
-use crate::objects::masters::MasterId;
-use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
@@ -35,8 +33,8 @@ pub use self::sight_shape::{SightCentre, SightShape};
 pub use self::sight_tiles::SightTiles;
 pub use self::tile_count::TileCount;
 pub use self::vision_bits::{VisionBits, VisionMasks};
-use crate::objects::masters::ids;
 use crate::players::Relation;
+use crate::world::layer::MasterRoles;
 
 /// The attribute whose change turns the allied vision on (`FUN_141616820`'s case 0x32).
 pub const REVEAL_ALLY: usize = 50;
@@ -46,7 +44,7 @@ pub const REVEAL_ALL: usize = 183;
 /// master 697 (FLARE4, slot 0x1c0) at each of their town centres (master 109, `FUN_141165d30`),
 /// each player's once, recorded in `mTCFlared` ([`crate::world::Player::tc_flared`]).
 const REVEAL_CENTRES: usize = 209;
-const FLARE4: MasterId = ids::FLARE_4;
+
 /// The attributes that add a scenario's masks of visible and explored players, not modelled.
 const SHARED_MASKS: [usize; 2] = [285, 286];
 
@@ -118,7 +116,12 @@ impl World {
                             .objects
                             .iter()
                             // The town centre the reveal finds (`0x6d`) and the flare it makes there (`0x2b9`).
-                            .filter(|u| u.life.master_id == TOWN_CENTRE)
+                            .filter(|u| {
+                                self.model
+                                    .roles
+                                    .of_master(u.life.master_id)
+                                    .contains(MasterRoles::TOWN_CENTRE)
+                            })
                             .map(|u| (p, q, u.position())),
                     );
                 }
@@ -135,7 +138,7 @@ impl World {
         // the flares (slot 0x1c0 with master 697, [`World::remains`]), in the players' order, each
         // town centre in its owner's list order; each flared player is recorded
         for (p, q, at) in flares {
-            self.remains(p, FLARE4, at, None)?;
+            self.remains(p, self.model.slots.master.flare_4, at, None)?;
             self.made_new_object(p)?;
             let flared = &mut self.players.player_mut(p)?.tc_flared;
             if flared.len() <= q.index() {
@@ -166,6 +169,8 @@ mod tests {
     #[cfg(test)]
     use crate::players::relation_row;
     use crate::test_ids::object_id;
+    use crate::testing::ids;
+    use crate::testing::ids::TOWN_CENTRE;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -291,7 +296,7 @@ mod tests {
         let mut t = teams();
         t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
         let flare = Master {
-            id: FLARE4,
+            id: ids::FLARE_4,
             kind: MasterKind::ANIMATED,
             standing_sprite: None,
             ..Master::default()
@@ -305,7 +310,7 @@ mod tests {
             t.players[2]
                 .objects
                 .iter()
-                .filter(|u| u.life.master_id == FLARE4)
+                .filter(|u| u.life.master_id == ids::FLARE_4)
                 .map(|u| (u.id.get(), u.position()))
                 .collect()
         };

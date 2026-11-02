@@ -30,7 +30,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::TargetOwner;
-use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Task};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -46,6 +45,7 @@ pub(crate) mod world;
 pub use self::drop_site::DropSite;
 pub use self::drop_site::DropTarget;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 
@@ -327,7 +327,7 @@ fn garrison_task<'m>(
         && t.state == ObjectState::Alive
         // A building's master type (`'P'`).
         && t.master.kind == MasterKind::BUILDING
-        && (list.kind == MasterKind::COMBAT || list.id == ids::MASTER_1808)
+        && (list.kind == MasterKind::COMBAT || roles.of_master(list.id).contains(MasterRoles::MULE_CART))
         && t.master.garrison.holds()
     {
         let garrison_type = t
@@ -424,13 +424,16 @@ fn finder_head<'m>(
         && target.is_some_and(|t| {
             t.state == ObjectState::Alive
                 && t.player == actor.player
-                && t.master.id == ids::TOWN_CENTRE
+                && roles
+                    .of_master(t.master.id)
+                    .contains(MasterRoles::TOWN_CENTRE)
         })
         && let Some(task) = first(list, |task| task.action_kind == ActionKind::ACTION_135)
     {
         return Ok(Finding::Answer(Some(task)));
     }
-    let monk_master = own.id == ids::ID_448 || own.id == ids::ID_546;
+    let monk_master = roles.of_master(own.id).contains(MasterRoles::SCOUT_CAVALRY)
+        || roles.of_master(own.id).contains(MasterRoles::LIGHT_CAVALRY);
     if actor.attribute_95 == Amount::new(2.0)
         && monk_master
         && target.is_some_and(|t| {
@@ -514,7 +517,9 @@ fn finder_tail<'m>(
     }
     let mut inside = false;
     if let Some(t) = target {
-        if roles.of_class(own.class).contains(ClassRoles::SIEGE) && own.id == ids::ID_1105 {
+        if roles.of_class(own.class).contains(ClassRoles::SIEGE)
+            && roles.of_master(own.id).contains(MasterRoles::SIEGE_TOWER)
+        {
             return Err(GenieError::unsupported("the task finder for master 1105"));
         }
         // LAB_14127ba9e: a list with task 13 takes it, under that filter alone, for an own,
@@ -574,6 +579,7 @@ mod tests {
     #[cfg(test)]
     use crate::test_ids::{class_of, opt_master};
     use crate::testing::class;
+    use crate::testing::ids;
     use crate::testing::roles;
     use crate::testing::slots;
     use crate::unit_ai::task_finder::target_steps::{

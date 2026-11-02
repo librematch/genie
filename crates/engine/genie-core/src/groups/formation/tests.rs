@@ -31,7 +31,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
@@ -42,8 +41,9 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::testing::class;
+use crate::testing::ids;
 use crate::vision::VisionBits;
-use crate::vision::ghost::{GHOST_MASTER, Ghost};
+use crate::vision::ghost::Ghost;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -259,7 +259,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
                 ..Master::default()
             },
             Master {
-                id: GHOST_MASTER,
+                id: ids::DOPPELGANGER,
                 kind: MasterKind::DOPPELGANGER,
                 formation_category: FormationClass::of_data(1),
                 ..Master::default()
@@ -674,7 +674,7 @@ fn the_passability_tests_with_the_world_object_of_the_lead_id() {
         ));
         for masters in &mut t.model.masters {
             let ghost = Master {
-                id: GHOST_MASTER,
+                id: ids::DOPPELGANGER,
                 kind: MasterKind::DOPPELGANGER,
                 terrain_restriction: Some(RestrictionId::named(1)),
                 ..Master::default()

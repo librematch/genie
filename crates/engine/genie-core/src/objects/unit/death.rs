@@ -46,6 +46,7 @@ impl Unit {
             annex_of,
             master,
             player_type,
+            &c.w.model.roles,
         )?;
         c.w.players
             .player_mut(c.player)?
@@ -126,7 +127,7 @@ impl Unit {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
             // 165), each at least 0 (slots 0xf8, then 0xf0 with 0)
             let owner = c.w.players.player_mut(c.player)?;
-            for (kind, cost) in refund_of(master, c.w.parts.building_of(self.id).annex_of) {
+            for (kind, cost) in refund_of(master, c.w.parts.building_of(self.id).annex_of, roles) {
                 owner.take_at_least_zero(kind, cost)?;
             }
         }
@@ -237,6 +238,7 @@ impl Unit {
             &mut c.w.spatial,
             &mut c.w.pathing,
             c.w.world_time,
+            roles,
         )?;
         if started {
             c.w.parts.combat_mut(self.id)?.firepower = master.volley_fire;

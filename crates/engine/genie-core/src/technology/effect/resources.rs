@@ -4,9 +4,7 @@
 use crate::GenieError;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -30,10 +28,6 @@ pub(super) const SPREAD_ATTRIBUTE: AttributeId = AttributeId::numbered(0xc4);
 pub(super) const EFFECT_FUNCTION: AttributeId = AttributeId::numbered(0x21);
 /// The attribute giving the exponent the farms' food grows by (31, `FUN_141615270`).
 pub(super) const FARM_EXPONENT: AttributeId = AttributeId::numbered(31);
-/// The masters whose objects' food a farm-food change grows (`DAT_142f925d0`'s keys: 50, 1187,
-/// 1897, 1893), in that order.
-pub(super) const FARMS: [MasterId; 4] =
-    [ids::FARM, ids::ID_1187, ids::PASTURE, ids::PASTURE_MANGROVE];
 
 impl World {
     /// Slot 0x1b0 (`FUN_141620c70`) of player `p` on resource `attribute` with `amount`: every
@@ -202,8 +196,9 @@ impl World {
 
     /// `FUN_141615270` after player `p`'s change of the farms' food (from `before`, by `amount`):
     /// with attribute 31 at least 0 (`COMISS`, `JC`: not a NaN), each object the tracker files
-    /// under the farm masters ([`FARMS`], their done objects, in that order,
-    /// [`World::tracked_key`]) from type 40 on with an action (its Make) has the food still to make (`+0x44`) grow: with `held` its food
+    /// under the farm masters (`DAT_142f925d0`'s keys: the build's `farm`, `rice_farm`,
+    /// `pasture` and `pasture_mangrove`, 50, 1187, 1897 and 1893; their done objects, in that
+    /// order, [`World::tracked_key`]) from type 40 on with an action (its Make) has the food still to make (`+0x44`) grow: with `held` its food
     /// (`+0x310`) and `f = held + still to make`, it takes `(f / before)^exponent × amount + f −
     /// held` (`powf`, here libm's).
     pub(super) fn farm_food(
@@ -217,7 +212,8 @@ impl World {
             return Ok(());
         }
         let mut ids = Vec::new();
-        for farm in FARMS {
+        let s = self.model.slots.master;
+        for farm in [s.farm, s.rice_farm, s.pasture, s.pasture_mangrove] {
             ids.extend(self.tracked_key(p, farm)?);
         }
         for id in ids {

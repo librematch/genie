@@ -22,7 +22,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::ids;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::objects::{Facet, FacetCount};
@@ -178,7 +177,14 @@ impl World {
                     kind: made.kind,
                 },
             );
-            let _ = v.sight_on(id, at, made.radius, SightShape::Circle, SightCentre::Tile)?;
+            let _ = v.sight_on(
+                id,
+                at,
+                made.radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+                &self.model.roles,
+            )?;
         }
         Ok(())
     }
@@ -356,15 +362,13 @@ impl World {
         point: Point,
         players: u8,
     ) -> Result<(), GenieError> {
-        /// The flare's master (`0x112`, FLARE2).
-        const FLARE: MasterId = ids::FLARE_2;
         if self.players.len() < usize::from(players) {
             return Ok(());
         }
         let at = self.spatial.get(target).map(|p| p.position);
         let at = at.unwrap_or_else(|| point.with_height(0.0));
         for p in PlayerId::each(usize::from(players)).skip(1) {
-            self.remains(p, FLARE, at, None)?;
+            self.remains(p, self.model.slots.master.flare_2, at, None)?;
             self.made_new_object(p)?;
         }
         Ok(())
@@ -384,10 +388,8 @@ impl World {
         at: Position,
         doubled: bool,
     ) -> Result<(), GenieError> {
-        /// The flare a hit leaves (`0x70`, FLARE).
-        const HIT_FLARE: MasterId = ids::FLARE;
         let before = self.players.player(p)?.objects.next_place();
-        self.remains(p, HIT_FLARE, at, None)?;
+        self.remains(p, self.model.slots.master.flare, at, None)?;
         self.made_new_object(p)?;
         if doubled && let Some(f) = self.players.player_mut(p)?.objects.get_mut(before) {
             f.life.amount += f.life.amount;

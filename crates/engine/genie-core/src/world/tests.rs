@@ -144,7 +144,6 @@ use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskIndex;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::VolleySpread;
-use crate::objects::masters::ids;
 use crate::objects::masters::{
     BuildingMaster, DamageShare, Task, TrainLocation, WorkValue, player_master,
 };
@@ -210,6 +209,9 @@ use crate::test_ids::tech_id;
 use crate::test_ids::unit_list;
 use crate::test_ids::{adds as test_ids_adds, amounts, attributes};
 use crate::testing::class;
+use crate::testing::ids;
+use crate::testing::ids::VILLAGER_FEMALE;
+use crate::testing::ids::VILLAGER_MALE;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::static_roles;
@@ -1040,7 +1042,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
 /// of the food, no unit targets it, and the pasture lists it.
 #[test]
 fn completed_pasture_puts_its_livestock_on_its_edges() {
-    use crate::gathering::pasture::{LIVESTOCK, edge_points};
+    use crate::gathering::pasture::{edge_points, livestock};
     let mut t = pasture_game(
         Position::new(20.0, 20.0, 0.0),
         3.0,
@@ -1052,7 +1054,7 @@ fn completed_pasture_puts_its_livestock_on_its_edges() {
     let mut tiles = Vec::new();
     let mut expected = Vec::new();
     for _ in 0..3 {
-        let kind = LIVESTOCK[e.rand15() as usize % 2];
+        let kind = livestock(slots().master)[e.rand15() as usize % 2];
         let mut i = e.rand15() as usize % points.len();
         let tile = |p: Point| (p.x() as i32, p.y() as i32);
         while tiles.contains(&tile(points[i])) {
@@ -1141,14 +1143,14 @@ fn pasture_puts_one_animal_tile_on_the_map() {
 /// livestock asked draws nothing; the food is the pasture's over the count (DIVSS).
 #[test]
 fn pasture_counts_each_attempt_and_shares_its_food() {
-    use crate::gathering::pasture::{LIVESTOCK, edge_points};
+    use crate::gathering::pasture::{edge_points, livestock};
     let mut t = pasture_game(Position::new(20.0, 20.0, 0.0), 3.0, &[master_id(1899)]);
     t.streams.get(Stream::Object).set_seed(7);
     let mut e = t.streams.get(Stream::Object).clone();
     let mut points = edge_points(Position::new(20.0, 20.0, 0.0), Distance::new(2.0));
     let mut expected = Vec::new();
     for _ in 0..3 {
-        let kind = LIVESTOCK[e.rand15() as usize % 2];
+        let kind = livestock(slots().master)[e.rand15() as usize % 2];
         let i = e.rand15() as usize % points.len();
         let tile = |p: Point| (p.x() as i32, p.y() as i32);
         assert!(
@@ -4696,7 +4698,7 @@ fn footprint_world() -> World {
     );
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(30.0, 88.5, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(30.0, 88.5, 0.0))
+        .set_position(object_id(9175), Position::new(30.0, 88.5, 0.0), &roles())
         .unwrap();
     t
 }
@@ -5396,7 +5398,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
         (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
         v.place_for_test(Position::new(22.3, 89.5, 0.0));
         t.spatial
-            .set_position(object_id(9175), Position::new(22.3, 89.5, 0.0))
+            .set_position(object_id(9175), Position::new(22.3, 89.5, 0.0), &roles())
             .unwrap();
         t.model.drop_sites = Arc::new(vec![DropSite {
             building: ids::TOWN_CENTRE,
@@ -5673,7 +5675,7 @@ fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(held));
         v.place_for_test(Position::new(31.9, 89.5, 0.0));
         t.spatial
-            .set_position(object_id(9175), Position::new(31.9, 89.5, 0.0))
+            .set_position(object_id(9175), Position::new(31.9, 89.5, 0.0), &roles())
             .unwrap();
         t
     };
@@ -5740,7 +5742,7 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
     (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
     v.place_for_test(Position::new(31.9, 89.5, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(31.9, 89.5, 0.0))
+        .set_position(object_id(9175), Position::new(31.9, 89.5, 0.0), &roles())
         .unwrap();
     let left = in_update(
         &mut t,
@@ -5939,7 +5941,7 @@ fn hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_near_one() {
     let mut t = shepherd_world(22.6);
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(23.2, 89.5, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(23.2, 89.5, 0.0))
+        .set_position(object_id(9175), Position::new(23.2, 89.5, 0.0), &roles())
         .unwrap();
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
     let h = t
@@ -6895,7 +6897,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
     // the villager out of reach, so that it walks
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(20.0, 80.0, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(20.0, 80.0, 0.0))
+        .set_position(object_id(9175), Position::new(20.0, 80.0, 0.0), &roles())
         .unwrap();
     assert_eq!(
         t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(4242), true),
@@ -10706,6 +10708,7 @@ pub(crate) fn hands_world(
         Footprint::new(0.2, 0.2),
         SightShape::Circle,
         SightCentre::Tile,
+        &roles(),
     );
     s.sight = Some(v);
     s.insert(
@@ -12897,10 +12900,22 @@ fn only_the_wonder_keeps_its_actions_past_state_2() {
         master_id,
         ..Lifecycle::default()
     };
-    assert!(!loses_actions(&life(VILLAGER_MALE, ObjectState::Alive)));
-    assert!(loses_actions(&life(VILLAGER_MALE, ObjectState::Dying)));
-    assert!(!loses_actions(&life(ids::WONDER, ObjectState::Dead)));
-    assert!(loses_actions(&life(ids::WONDER, ObjectState::Undead)));
+    assert!(!loses_actions(
+        &life(VILLAGER_MALE, ObjectState::Alive),
+        &roles()
+    ));
+    assert!(loses_actions(
+        &life(VILLAGER_MALE, ObjectState::Dying),
+        &roles()
+    ));
+    assert!(!loses_actions(
+        &life(ids::WONDER, ObjectState::Dead),
+        &roles()
+    ));
+    assert!(loses_actions(
+        &life(ids::WONDER, ObjectState::Undead),
+        &roles()
+    ));
 }
 
 /// The Artifact's move to an object (slot 8 with an object, `FUN_140aaca30`): the old target
@@ -17578,7 +17593,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::FARM,
             (false, Some(TerrainId::named(7))),
             Seconds::ZERO,
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(29))
     );
@@ -17587,7 +17603,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::FARM,
             (false, Some(TerrainId::named(7))),
             Seconds::new(7.5),
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(30))
     );
@@ -17596,7 +17613,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::FARM,
             (false, Some(TerrainId::named(7))),
             Seconds::new(15.0),
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(31))
     );
@@ -17605,7 +17623,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::ID_1187,
             (true, Some(TerrainId::named(63))),
             Seconds::new(5.0),
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(66))
     );
@@ -17614,7 +17633,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::ID_1187,
             (false, Some(TerrainId::named(63))),
             Seconds::ZERO,
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(65))
     );
@@ -17623,7 +17643,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::PASTURE_1889,
             (false, Some(TerrainId::named(117))),
             Seconds::new(15.0),
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(121))
     );
@@ -17632,7 +17653,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::PASTURE_1889,
             (false, None),
             Seconds::ZERO,
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         Some(TerrainId::named(1))
     );
@@ -17641,7 +17663,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             ids::HOUSE,
             (false, None),
             Seconds::ZERO,
-            WholeSeconds::of_data(15)
+            WholeSeconds::of_data(15),
+            &roles()
         ),
         None
     );
@@ -17708,7 +17731,9 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
             velocity: BVector::ZERO,
             acceleration: BVector::ZERO,
         });
-        t.spatial.set_position(object_id(9175), at).unwrap();
+        t.spatial
+            .set_position(object_id(9175), at, &roles())
+            .unwrap();
     };
     place(&mut t, Position::new(30.0, 91.0, 0.0));
     assert_eq!(
@@ -19393,7 +19418,7 @@ fn unit_own_move_to_walks_tells_its_end_and_lets_its_target_go() {
     );
     // the bush moves two tiles off the point the walk goes to
     t.spatial
-        .set_position(object_id(600), Position::new(32.5, 91.5, 0.0))
+        .set_position(object_id(600), Position::new(32.5, 91.5, 0.0), &roles())
         .unwrap();
     let (r, _, heard, _) = own_move(&mut t);
     assert_eq!(r, Ok(()));
@@ -21667,7 +21692,7 @@ fn step_that_fails_stops_what_follows_it() {
 #[test]
 fn completion_parts_reach_their_owner() {
     use crate::construction::build::StackUnit;
-    use crate::gathering::pasture::LIVESTOCK;
+    use crate::gathering::pasture::livestock;
     use crate::technology::{TechDef, TechState};
     let made = |t: &World| -> Vec<(i32, i16, Position)> {
         t.players[1].objects.as_slice()[1..]
@@ -21675,7 +21700,11 @@ fn completion_parts_reach_their_owner() {
             .map(|u| (u.id.get(), u.life.master_id.get(), u.position()))
             .collect()
     };
-    let mut t = pasture_game(Position::new(60.0, 60.0, 0.0), 2.0, &LIVESTOCK);
+    let mut t = pasture_game(
+        Position::new(60.0, 60.0, 0.0),
+        2.0,
+        &livestock(slots().master),
+    );
     assert_eq!(
         t.setup_pasture(PlayerId::new(1), PastureId::new(object_id(50))),
         Ok(())
@@ -21687,7 +21716,11 @@ fn completion_parts_reach_their_owner() {
             (101, 1899, Position::new(59.4, 58.5, 0.0))
         ]
     );
-    let mut t = pasture_game(Position::new(60.0, 60.0, 0.0), 2.0, &LIVESTOCK);
+    let mut t = pasture_game(
+        Position::new(60.0, 60.0, 0.0),
+        2.0,
+        &livestock(slots().master),
+    );
     let stack = StackUnit {
         master: master_id(1899),
         at: Position::new(60.0, 60.0, 0.0),

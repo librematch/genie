@@ -33,7 +33,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ids;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
@@ -49,10 +48,13 @@ mod object_events;
 mod sight;
 
 pub use self::object_events::sight_taker;
+pub use self::sight::LosSight;
+pub use self::sight::MasterChange;
 use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::image::visibility::EDGE as VISIBILITY_EDGE;
 use crate::objects::{IdTable, ObjectState};
 use crate::world::layer::ClassRoles;
+use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use std::mem::take;
 
@@ -67,9 +69,6 @@ const STEP: [i32; 16] = [0, 1, 2, 3, 4, 5, 6, 7, -8, -7, -6, -5, -4, -3, -2, -1]
 
 /// The cap of a tile's count (`explore_terrain`).
 const MOST: i16 = 0x7ffe;
-
-/// The master whose footprint sight is a circle (`FUN_141192560`: id 112).
-const CIRCLE_MASTER: MasterId = ids::FLARE;
 
 /// `DAT_142eb99cc`: a footprint's high edge, less this, is its last tile.
 const EDGE: f32 = VISIBILITY_EDGE;
@@ -279,12 +278,14 @@ pub fn capture_kind(
     let mut kind = CaptureKind::NONE;
     if (player == PlayerId::GAIA
         && !roles.of_class(class).contains(ClassRoles::GAIA_KEPT)
-        && master != ids::ID_826)
-        || master == ids::ID_854
+        && !roles.of_master(master).contains(MasterRoles::MONUMENT))
+        || roles
+            .of_master(master)
+            .contains(MasterRoles::TORCH_CONVERTING)
     {
         kind = CaptureKind::BY_SIGHT;
     }
-    if player == PlayerId::GAIA && master == ids::ID_814 {
+    if player == PlayerId::GAIA && roles.of_master(master).contains(MasterRoles::HORSE) {
         kind = CaptureKind::BY_SIGHT;
     }
     if roles.of_class(class).contains(ClassRoles::LIVESTOCK)
