@@ -360,8 +360,11 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
     assert_eq!(hunt.state.bare(), HuntState::Attack { attack: None });
     let attack = hunt.state.attack().copied().unwrap();
     assert_eq!(
-        (attack.state, attack.move_to.map(|m| m.state)),
-        (AttackState::Move, Some(MoveTo::Start))
+        (
+            attack.state.bare(),
+            attack.state.move_to().copied().map(|m| m.state)
+        ),
+        (AttackState::Move { move_to: None }, Some(MoveTo::Start))
     );
     // the first MoveTo's teardown stopped the unit
     let v = mover.velocity.unwrap();
@@ -433,13 +436,13 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         (
             hunt.target,
             hunt.state.bare(),
-            attack.state,
-            attack.move_to.map(|m| m.state)
+            attack.state.bare(),
+            attack.state.move_to().copied().map(|m| m.state)
         ),
         (
             Some(object_id(9366)),
             HuntState::Attack { attack: None },
-            AttackState::Move,
+            AttackState::Move { move_to: None },
             Some(MoveTo::Arrived)
         )
     );

@@ -87,32 +87,37 @@ impl Attack {
             gap,
             state: None,
         };
-        self.move_to =
-            reads.to_object(to, self.range, self.given_sprite(), self.on_target_moved)?;
+        let move_to = reads.to_object(to, self.range, self.given_sprite(), self.on_target_moved)?;
+        self.state = AttackState::Move { move_to };
         self.timer = Seconds::ZERO;
-        Ok(self.move_to.is_some_and(|m| m.arrived()))
+        Ok(move_to.is_some_and(|m| m.arrived()))
     }
 
     /// The `MoveTo` to a point of states 5 and 11 (`FUN_140aa0d30` to where the target was seen,
     /// `+0xa4`..`+0xac`, with the Attack's walking sprite, quiet, its `+0x61` the Attack's), as
     /// the action list adds and starts it ([`MoveToReads::to_point`]): state 5 walks within the
     /// range, state 11 onto the point. The point's gap is far, so state 3, or 13 for a unit
-    /// without speed. None for a unit whose state is 3 or more. The timer is 0.
+    /// without speed. None for a unit whose state is 3 or more. The timer is 0. `walk` makes
+    /// the state of the walk (5 or 11).
     ///
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub(super) fn walk_to_seen(&mut self, reads: &MoveToReads<'_>) -> Result<(), GenieError> {
-        let range = if self.state == AttackState::GotoPoint {
+    pub(super) fn walk_to_seen(
+        &mut self,
+        walk: fn(Option<MoveToAction>) -> AttackState,
+        reads: &MoveToReads<'_>,
+    ) -> Result<(), GenieError> {
+        let range = if matches!(walk(None), AttackState::GotoPoint { .. }) {
             Distance::ZERO
         } else {
             self.range
         };
-        let walk = reads.to_point(self.seen, range, self.given_sprite())?;
-        self.move_to = walk.map(|m| MoveToAction {
+        let to = reads.to_point(self.seen, range, self.given_sprite())?;
+        self.state = walk(to.map(|m| MoveToAction {
             on_target_moved: self.on_target_moved,
             ..m
-        });
+        }));
         self.timer = Seconds::ZERO;
         Ok(())
     }
@@ -135,13 +140,17 @@ impl Attack {
         r: &AttackReads,
         gives_up: GiveUp,
     ) -> Result<UpdateCode, GenieError> {
-        let state = self.move_to.as_ref().map(|m| m.state);
+        let state = self.state.move_to().map(|m| m.state);
         let how = ListUpdate {
             gives_up,
             otherwise: r.standing,
             ..ListUpdate::default()
         };
-        let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
+        let code = match self.state.walk_mut() {
+            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            // a state that does not walk has no sub-action: its list's update is the empty one's
+            None => update_sub_actions(&mut None, c, unit, me, how)?,
+        };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
             unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }
@@ -155,7 +164,7 @@ impl Attack {
     ///
     /// A unit that does not move.
     pub(super) fn delete_move_to(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
-        if self.move_to.take().is_some() {
+        if self.state.take_move_to().is_some() {
             mover.ok_or(crate::world::ATTACKER_UNMOVING)?.stop()?;
         }
         Ok(())

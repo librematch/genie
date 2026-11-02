@@ -469,7 +469,6 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
         min_range: Distance::ZERO,
         point: Position::ORIGIN,
         seen: Position::ORIGIN,
-        move_to: None,
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
@@ -490,7 +489,7 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
     for (state, free) in [
         (AttackState::Killed, false),
         (AttackState::Failed, true),
-        (AttackState::Move, false),
+        (AttackState::Move { move_to: None }, false),
     ] {
         t.parts
             .actions

@@ -217,7 +217,8 @@ fn import_artifact(
             state: genie_core::ownership::artifact::ArtifactState::of_byte(base.state)?,
             timer: Seconds::new(base.timer),
             gaia: saved.s.owner == 0,
-            move_to,
+            sub: move_to
+                .map(|move_to| genie_core::ownership::artifact::ArtifactSub::Walk { move_to }),
             goal: if base.target_id == -1 {
                 move_to.and_then(|_| target_point(base))
             } else {
@@ -225,7 +226,6 @@ fn import_artifact(
                 (base.target_x != -1.0).then_some(saved.point())
             },
             target: ObjectId::of_field(base.target_id),
-            enter: None,
             moving,
         }));
     Ok(())

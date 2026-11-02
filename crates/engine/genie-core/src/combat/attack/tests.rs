@@ -13,7 +13,9 @@ use crate::movement::Me;
 use crate::movement::MoveAlgorithm;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
-use crate::movement::move_to::{GiveUp, MoveDefaults, MoveTo, MoveToReads, MoveWait, SpriteReads};
+use crate::movement::move_to::{
+    GiveUp, MoveDefaults, MoveTo, MoveToAction, MoveToReads, MoveWait, SpriteReads,
+};
 use crate::objects::ActionState;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
@@ -142,7 +144,6 @@ pub(crate) fn own_attack(target: i32, state: AttackState, range: Distance) -> At
         min_range: Distance::ZERO,
         point: Position::new(NONE, NONE, NONE),
         seen: Position::new(NONE, NONE, NONE),
-        move_to: None,
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
@@ -175,8 +176,8 @@ fn stop_ends_the_attack_and_the_unit_stands() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
     };
-    let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
-    a.move_to = Some(walking(MoveTo::Moving));
+    let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
+    *a.state.walk_mut().unwrap() = Some(walking(MoveTo::Moving));
     a.arms.idle_sprite = Some(stand);
     let mut motion = Motion::Moving(crate::gathering::hunt::tests::walker());
     motion.lent().set_anim_speed(Speed::new(0.5));
@@ -186,7 +187,7 @@ fn stop_ends_the_attack_and_the_unit_stands() {
     assert_eq!(
         (
             a.state,
-            a.move_to,
+            a.state.move_to().copied(),
             ObjectId::field(a.target),
             motion.animated().speed
         ),
@@ -229,11 +230,11 @@ const LION: Wielder = Wielder {
 fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
     let deer = mark(7, 13.0);
     for state in [
-        AttackState::Move,
-        AttackState::GotoSeen,
+        AttackState::Move { move_to: None },
+        AttackState::GotoSeen { move_to: None },
         AttackState::Ready,
         AttackState::Swing,
-        AttackState::GotoPoint,
+        AttackState::GotoPoint { move_to: None },
     ] {
         let mut a = own_attack(7, state, Distance::ZERO);
         let w = a.work(Some(deer), None, &LION, |_| panic!("no range test"));
@@ -1237,27 +1238,27 @@ fn an_attack_on_target_out_of_sight_fails() {
         a.arms.idle_sprite = Some(STANDING);
         a
     };
-    let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
+    let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     let got = run(&mut a, class::CLASS_6, Some(UnitAiType::SOLDIER), true);
     assert_eq!(got, (Ok(UpdateCode::FAILED), true, true, false, failed));
     assert_eq!((a.target, a.state), (None, AttackState::Failed));
-    let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
+    let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     assert!(run(&mut a, class::PREDATOR, Some(BOAR_AI), false).3);
-    let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
+    let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     let lion = run(&mut a, class::PREDATOR, Some(LION_AI), false);
     assert_eq!((lion.2, lion.3, lion.4), (true, false, vec![]));
-    let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
+    let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     let alone = run(&mut a, class::PREDATOR, None, true);
     assert_eq!((alone.0, alone.3), (Ok(UpdateCode::FAILED), false));
     let mut a = Attack {
         sub_action: true,
-        ..own_attack(77, AttackState::Move, Distance::new(1.0))
+        ..own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0))
     };
     assert_eq!(
         run(&mut a, class::CLASS_6, Some(UnitAiType::SOLDIER), true),
         (Ok(UpdateCode::FAILED), false, false, false, vec![])
     );
-    let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
+    let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     assert!(
         run(&mut a, class::PREDATOR, Some(UnitAiType::SOLDIER), true)
             .0
@@ -1290,11 +1291,17 @@ fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
         let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         if fails {
-            assert_eq!(a.state, AttackState::Failed);
+            assert_eq!(a.state.bare(), AttackState::Failed);
         } else {
             assert_eq!(
-                (a.state, a.move_to.map(|m| (m.point, m.state))),
-                (AttackState::GotoSeen, Some((at, MoveTo::Start)))
+                (
+                    a.state.bare(),
+                    a.state.move_to().copied().map(|m| (m.point, m.state))
+                ),
+                (
+                    AttackState::GotoSeen { move_to: None },
+                    Some((at, MoveTo::Start))
+                )
             );
         }
     }
@@ -1341,7 +1348,8 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
         rig.r.ai_order = AiOrder::Order(OrderKind::Attack);
         rig.f.own.source.weapon_range = Distance::new(3.0);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, seen_at);
-        (a.state, a.seen, a.move_to) = (state, seen_at, Some(walking(MoveTo::Moving)));
+        (a.state, a.seen) = (state, seen_at);
+        *a.state.walk_mut().unwrap() = Some(walking(MoveTo::Moving));
         let code = rig
             .run(20, |c, u, actions, f, r| {
                 a.update(c, u, actions, me(1, AttackState::Ready), f, r)
@@ -1349,30 +1357,38 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
             .unwrap();
         (code, a)
     };
-    let (code, a) = run(AttackState::Move, false);
+    let (code, a) = run(AttackState::Move { move_to: None }, false);
     assert_eq!(
         (
             code,
-            a.state,
+            a.state.bare(),
             a.seen,
-            a.move_to.map(|m| (m.point, m.state)),
+            a.state.move_to().copied().map(|m| (m.point, m.state)),
             a.range
         ),
         (
             UpdateCode::UNDER_WAY,
-            AttackState::GotoSeen,
+            AttackState::GotoSeen { move_to: None },
             now_at,
             Some((now_at, MoveTo::Start)),
             Distance::new(3.0)
         )
     );
-    for state in [AttackState::GotoSeen, AttackState::GotoPoint] {
+    for state in [
+        AttackState::GotoSeen { move_to: None },
+        AttackState::GotoPoint { move_to: None },
+    ] {
         let (code, a) = run(state, true);
         assert_eq!(
-            (code, a.state, a.move_to.map(|m| m.state), a.range),
+            (
+                code,
+                a.state.bare(),
+                a.state.move_to().copied().map(|m| m.state),
+                a.range
+            ),
             (
                 UpdateCode::UNDER_WAY,
-                AttackState::Move,
+                AttackState::Move { move_to: None },
                 Some(MoveTo::Start),
                 Distance::new(3.0)
             ),
@@ -1402,7 +1418,8 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         rig.r.computer = computer;
         rig.f.own.source.weapon_range = Distance::new(4.0);
         let mut a = soldier_attack(7, range, 0.0, at);
-        (a.state, a.seen, a.move_to) = (state, at, Some(walking(MoveTo::Arrived)));
+        (a.state, a.seen) = (state, at);
+        *a.state.walk_mut().unwrap() = Some(walking(MoveTo::Arrived));
         let code = rig
             .run(20, |c, u, actions, f, r| {
                 a.update(c, u, actions, me(1, AttackState::Ready), f, r)
@@ -1411,39 +1428,52 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         let let_go = rig.workers(7, PlayerId::new(2)) == Some(0);
         (code, a, rig.posted(), let_go)
     };
-    let (code, a, _, _) = run(AttackState::GotoSeen, true, Distance::new(2.0), false);
+    let (code, a, _, _) = run(
+        AttackState::GotoSeen { move_to: None },
+        true,
+        Distance::new(2.0),
+        false,
+    );
     assert_eq!(code, UpdateCode::UNDER_WAY);
     assert!(
-        !matches!(a.state, AttackState::GotoSeen | AttackState::Failed),
+        !matches!(
+            a.state.bare(),
+            AttackState::GotoSeen { .. } | AttackState::Failed
+        ),
         "{}",
-        a.state
+        a.state.bare()
     );
-    let (code, a, posted, _) = run(AttackState::GotoSeen, false, Distance::new(1.0), false);
+    let (code, a, posted, _) = run(
+        AttackState::GotoSeen { move_to: None },
+        false,
+        Distance::new(1.0),
+        false,
+    );
     assert_eq!(
         (
             code,
-            a.state,
-            a.move_to.map(|m| (m.point, m.state)),
+            a.state.bare(),
+            a.state.move_to().copied().map(|m| (m.point, m.state)),
             a.range,
             posted
         ),
         (
             UpdateCode::UNDER_WAY,
-            AttackState::GotoPoint,
+            AttackState::GotoPoint { move_to: None },
             Some((at, MoveTo::Start)),
             Distance::new(4.0),
             vec![]
         )
     );
     for (state, range, computer) in [
-        (AttackState::GotoSeen, 0.9, false),
-        (AttackState::GotoSeen, f32::NAN, false),
-        (AttackState::GotoSeen, 2.0, true),
-        (AttackState::GotoPoint, 2.0, false),
+        (AttackState::GotoSeen { move_to: None }, 0.9, false),
+        (AttackState::GotoSeen { move_to: None }, f32::NAN, false),
+        (AttackState::GotoSeen { move_to: None }, 2.0, true),
+        (AttackState::GotoPoint { move_to: None }, 2.0, false),
     ] {
         let (code, a, posted, let_go) = run(state, false, Distance::new(range), computer);
         assert_eq!(
-            (code, a.state, a.target, let_go, posted),
+            (code, a.state.bare(), a.target, let_go, posted),
             (
                 UpdateCode::FAILED,
                 AttackState::Failed,
@@ -1805,7 +1835,6 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
         min_range: Distance::ZERO,
         point: Position::new(NONE, NONE, NONE),
         seen: Position::new(NONE, NONE, NONE),
-        move_to: None,
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
@@ -2024,7 +2053,7 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
             c.attack.point.get().map(f32::to_bits),
             e.target_position.get().map(f32::to_bits)
         );
-        assert_eq!(c.attack.move_to, None);
+        assert_eq!(c.attack.state.move_to().copied(), None);
     }
     let away = start(engaged(
         Distance::new(3.0),
@@ -2069,10 +2098,13 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
         )
         .unwrap();
         assert_eq!(
-            (c.attack.state, c.ready, c.failed),
-            (AttackState::Move, false, false)
+            (c.attack.state.bare(), c.ready, c.failed),
+            (AttackState::Move { move_to: None }, false, false)
         );
-        assert_eq!(c.attack.move_to.map(|m| m.state), Some(MoveTo::Start));
+        assert_eq!(
+            c.attack.state.move_to().copied().map(|m| m.state),
+            Some(MoveTo::Start)
+        );
         (
             c.failed_first,
             c.posted,
@@ -2707,7 +2739,7 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         a.arms.interrupt_frame = interrupt;
         rig.run(100, |c, u, _, f, r| a.swing_after_hit(c, u, f, r, sprite))
             .unwrap();
-        (a.state, rig.mover().animated.speed)
+        (a.state.bare(), rig.mover().animated.speed)
     };
     assert_eq!(
         after(
@@ -2727,7 +2759,7 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
             Seconds::ZERO
         )
         .0,
-        AttackState::GotoSeen
+        AttackState::GotoSeen { move_to: None }
     );
     assert_eq!(
         after(
@@ -2750,7 +2782,7 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
             looped,
             Seconds::new(0.5)
         ),
-        (AttackState::GotoSeen, Speed::new(1.0))
+        (AttackState::GotoSeen { move_to: None }, Speed::new(1.0))
     );
 }
 
@@ -2780,12 +2812,12 @@ fn an_attack_move_to_starts_running_or_arrives_in_range() {
     let start = |range| {
         let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().animated.speed = Speed::new(1.0);
-        let mut a = own_attack(10028, AttackState::Move, range);
+        let mut a = own_attack(10028, AttackState::Move { move_to: None }, range);
         let wait = MoveWait {
             state: MoveWaitState::Waiting,
             ..MoveWait::NEW
         };
-        a.move_to = Some(MoveToAction {
+        *a.state.walk_mut().unwrap() = Some(MoveToAction {
             range,
             sprite: Some(walking),
             ..walk_to_house(MoveTo::Start, wait)
@@ -2793,13 +2825,19 @@ fn an_attack_move_to_starts_running_or_arrives_in_range() {
         a.arms.idle_sprite = Some(STANDING);
         let code = rig
             .run(100, |c, u, _, _, r| {
-                a.update_list(c, u, me(9177, AttackState::Move), r, GiveUp::default())
+                a.update_list(
+                    c,
+                    u,
+                    me(9177, AttackState::Move { move_to: None }),
+                    r,
+                    GiveUp::default(),
+                )
             })
             .unwrap();
         let m = rig.mover();
         (
             code,
-            a.move_to.map(|m| (m.state, m.wait.state)),
+            a.state.move_to().copied().map(|m| (m.state, m.wait.state)),
             rig.sprite(),
             m.animated.speed,
             m.stats.speed,
@@ -2835,13 +2873,13 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
     let at = Position::new(12.0, 10.0, 0.0);
     let table = Graphics::from([(STANDING.id, STANDING)]);
     let made = |gap, speed, state, mode| {
-        let mut a = own_attack(7, AttackState::Move, Distance::new(2.0));
+        let mut a = own_attack(7, AttackState::Move { move_to: None }, Distance::new(2.0));
         a.arms.move_sprite = Some(STANDING);
         a.on_target_moved = mode;
         a.timer = Seconds::new(5.0);
         let reads = walking_reads(&table, MoveDefaults::default(), state, speed);
         let arrived = a.walk_to_target(at, gap, &reads).unwrap();
-        (arrived, a.timer, a.move_to)
+        (arrived, a.timer, a.state.move_to().copied())
     };
     let (arrived, timer, m) = made(
         Distance::new(1.0),
@@ -2894,7 +2932,7 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
         TargetMoved::Follows,
     );
     assert_eq!((arrived, m), (false, None));
-    let mut none = own_attack(-1, AttackState::Move, Distance::new(2.0));
+    let mut none = own_attack(-1, AttackState::Move { move_to: None }, Distance::new(2.0));
     let reads = walking_reads(&table, MoveDefaults::default(), ObjectState::Alive, 1.0);
     assert!(none.walk_to_target(at, Distance::new(1.0), &reads).is_err());
     // without a sprite of its own the constructor's default is taken
@@ -2903,12 +2941,23 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
         object: Some(STANDING.id),
     };
     let reads = walking_reads(&table, defaults, ObjectState::Alive, 1.0);
-    let mut bare = own_attack(7, AttackState::Move, Distance::new(2.0));
+    let mut bare = own_attack(7, AttackState::Move { move_to: None }, Distance::new(2.0));
     let _ = bare.walk_to_target(at, Distance::new(1.0), &reads).unwrap();
-    assert_eq!(bare.move_to.and_then(|m| m.sprite), Some(STANDING));
-    let mut seen = own_attack(7, AttackState::GotoSeen, Distance::new(2.0));
-    seen.walk_to_seen(&reads).unwrap();
-    assert_eq!(seen.move_to.and_then(|m| m.sprite), Some(STANDING));
+    assert_eq!(
+        bare.state.move_to().copied().and_then(|m| m.sprite),
+        Some(STANDING)
+    );
+    let mut seen = own_attack(
+        7,
+        AttackState::GotoSeen { move_to: None },
+        Distance::new(2.0),
+    );
+    seen.walk_to_seen(|move_to| AttackState::GotoSeen { move_to }, &reads)
+        .unwrap();
+    assert_eq!(
+        seen.state.move_to().copied().and_then(|m| m.sprite),
+        Some(STANDING)
+    );
 }
 
 /// `set_state(5)` and `(11)`'s `MoveTo` to where the target was seen ([`Attack::walk_to_seen`]):
@@ -2922,34 +2971,63 @@ fn an_attack_move_to_where_it_saw_the_target_walks_within_its_range_or_onto_it()
         a.seen = seen;
         a.timer = Seconds::new(5.0);
         let reads = walking_reads(&NO_GRAPHICS, MoveDefaults::default(), unit_state, speed);
-        a.walk_to_seen(&reads).unwrap();
+        // the walk the state makes: onto the point in state 11, else within the range
+        let walk: fn(Option<MoveToAction>) -> AttackState =
+            if matches!(state, AttackState::GotoPoint { .. }) {
+                |move_to| AttackState::GotoPoint { move_to }
+            } else {
+                |move_to| AttackState::GotoSeen { move_to }
+            };
+        a.walk_to_seen(walk, &reads).unwrap();
         (
             a.timer,
-            a.move_to
+            a.state
+                .move_to()
+                .copied()
                 .map(|m| (m.state, m.point, m.range, ObjectId::field(m.target))),
         )
     };
     assert_eq!(
-        made(AttackState::GotoSeen, 1.0, ObjectState::Alive),
+        made(
+            AttackState::GotoSeen { move_to: None },
+            1.0,
+            ObjectState::Alive
+        ),
         (
             Seconds::ZERO,
             Some((MoveTo::Start, seen, Distance::new(3.0), -1))
         )
     );
     assert_eq!(
-        made(AttackState::GotoPoint, 1.0, ObjectState::Alive),
+        made(
+            AttackState::GotoPoint { move_to: None },
+            1.0,
+            ObjectState::Alive
+        ),
         (
             Seconds::ZERO,
             Some((MoveTo::Start, seen, Distance::ZERO, -1))
         )
     );
     assert_eq!(
-        made(AttackState::GotoSeen, 0.0, ObjectState::Alive)
-            .1
-            .map(|m| m.0),
+        made(
+            AttackState::GotoSeen { move_to: None },
+            0.0,
+            ObjectState::Alive
+        )
+        .1
+        .map(|m| m.0),
         Some(MoveTo::Failed)
     );
-    assert_eq!(made(AttackState::GotoSeen, 1.0, ObjectState::Dying).1, None);
+    assert_eq!(
+        made(
+            AttackState::GotoSeen { move_to: None },
+            1.0,
+            ObjectState::Dying
+        )
+        .1,
+        None
+    );
 }
 
 /// State 4's update ([`Attack::walk`]) on the house 10028 out of reach: a walking `MoveTo`
@@ -2961,20 +3039,24 @@ fn an_attack_move_to_where_it_saw_the_target_walks_within_its_range_or_onto_it()
 fn an_attack_walk_walks_waits_arrives_or_fails() {
     let walked = |move_to: Option<MoveTo>, timer: f32| {
         let mut rig = Rig::on_the_path(Victim::default());
-        let mut a = own_attack(10028, AttackState::Move, Distance::new(0.1));
+        let mut a = own_attack(
+            10028,
+            AttackState::Move { move_to: None },
+            Distance::new(0.1),
+        );
         a.arms.idle_sprite = Some(STANDING);
         let wait = MoveWait {
             state: MoveWaitState::Waiting,
             timer: Seconds::new(timer),
             delay: Seconds::new(0.15),
         };
-        a.move_to = move_to.map(|state| walk_to_house(state, wait));
+        *a.state.walk_mut().unwrap() = move_to.map(|state| walk_to_house(state, wait));
         let code = rig
             .run(100, |c, u, _, f, r| {
                 a.walk(
                     c,
                     u,
-                    me(9177, AttackState::Move),
+                    me(9177, AttackState::Move { move_to: None }),
                     f,
                     r,
                     (HOUSE, Footprint::new(1.0, 1.0)),
@@ -2990,37 +3072,49 @@ fn an_attack_walk_walks_waits_arrives_or_fails() {
     };
     let (code, a, posted, _) = walked(Some(MoveTo::Moving), 0.0);
     assert_eq!(
-        (code, a.move_to.map(|m| m.state), a.state, posted),
+        (
+            code,
+            a.state.move_to().copied().map(|m| m.state),
+            a.state.bare(),
+            posted
+        ),
         (
             Ok(UpdateCode::UNDER_WAY),
             Some(MoveTo::Moving),
-            AttackState::Move,
+            AttackState::Move { move_to: None },
             vec![]
         )
     );
     let (_, a, ..) = walked(Some(MoveTo::Waiting), 0.0);
     assert_eq!(
-        a.move_to.map(|m| (m.state, m.wait.timer)),
+        a.state.move_to().copied().map(|m| (m.state, m.wait.timer)),
         Some((MoveTo::Waiting, Seconds::new(0.1)))
     );
     let (_, a, ..) = walked(Some(MoveTo::Waiting), 0.1);
     assert_eq!(
-        a.move_to.map(|m| (m.state, m.wait.timer)),
+        a.state.move_to().copied().map(|m| (m.state, m.wait.timer)),
         Some((MoveTo::Start, Seconds::ZERO))
     );
     let (code, a, _, stopped) = walked(Some(MoveTo::Arrived), 0.0);
     assert_eq!(
-        (code, a.state, stopped),
-        (Ok(UpdateCode::UNDER_WAY), AttackState::GotoSeen, true)
+        (code, a.state.bare(), stopped),
+        (
+            Ok(UpdateCode::UNDER_WAY),
+            AttackState::GotoSeen { move_to: None },
+            true
+        )
     );
     let (code, a, _, _) = walked(None, 0.0);
     assert_eq!(
-        (code, a.state),
-        (Ok(UpdateCode::UNDER_WAY), AttackState::GotoSeen)
+        (code, a.state.bare()),
+        (
+            Ok(UpdateCode::UNDER_WAY),
+            AttackState::GotoSeen { move_to: None }
+        )
     );
     let (code, a, posted, _) = walked(Some(MoveTo::Failed), 0.0);
     assert_eq!(
-        (code, a.state, posted),
+        (code, a.state.bare(), posted),
         (
             Ok(UpdateCode::FAILED),
             AttackState::Failed,
@@ -3037,22 +3131,37 @@ fn an_attack_walk_walks_waits_arrives_or_fails() {
 fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
     let gone = |state: MoveTo, sub_action: bool| {
         let mut rig = Rig::on_the_path(Victim::default());
-        let mut a = own_attack(-1, AttackState::GotoSeen, Distance::new(1.0));
+        let mut a = own_attack(
+            -1,
+            AttackState::GotoSeen { move_to: None },
+            Distance::new(1.0),
+        );
         a.arms.idle_sprite = Some(STANDING);
         a.sub_action = sub_action;
-        a.move_to = Some(walk_to_house(state, MoveWait::default()));
+        *a.state.walk_mut().unwrap() = Some(walk_to_house(state, MoveWait::default()));
         let code = rig
             .run(100, |c, u, _, _, r| {
-                a.update_gone(c, u, me(9177, AttackState::Move), r, class::CLASS_6)
+                a.update_gone(
+                    c,
+                    u,
+                    me(9177, AttackState::Move { move_to: None }),
+                    r,
+                    class::CLASS_6,
+                )
             })
             .unwrap();
-        (code, a.state, a.move_to.map(|m| m.state), rig.posted())
+        (
+            code,
+            a.state.bare(),
+            a.state.move_to().copied().map(|m| m.state),
+            rig.posted(),
+        )
     };
     assert_eq!(
         gone(MoveTo::Moving, false),
         (
             UpdateCode::UNDER_WAY,
-            AttackState::GotoSeen,
+            AttackState::GotoSeen { move_to: None },
             Some(MoveTo::Moving),
             vec![]
         )
@@ -3179,32 +3288,50 @@ fn an_attack_on_moved_target_follows_waits_or_fails() {
             .unwrap();
         (code, a)
     };
-    let (code, a) = run(AttackState::GotoSeen, true, PlayerId::new(1));
+    let (code, a) = run(
+        AttackState::GotoSeen { move_to: None },
+        true,
+        PlayerId::new(1),
+    );
     assert_eq!(
-        (code, a.state, a.seen),
+        (code, a.state.bare(), a.seen),
         (
             Some(UpdateCode::UNDER_WAY),
-            AttackState::Move,
+            AttackState::Move { move_to: None },
             Position::new(13.0, 10.0, 0.0)
         )
     );
-    let (code, a) = run(AttackState::Move, true, PlayerId::new(1));
+    let (code, a) = run(AttackState::Move { move_to: None }, true, PlayerId::new(1));
     assert_eq!(
-        (code, a.state, a.seen),
-        (None, AttackState::Move, Position::new(13.0, 10.0, 0.0))
+        (code, a.state.bare(), a.seen),
+        (
+            None,
+            AttackState::Move { move_to: None },
+            Position::new(13.0, 10.0, 0.0)
+        )
     );
-    let (code, a) = run(AttackState::Move, false, PlayerId::new(0));
+    let (code, a) = run(AttackState::Move { move_to: None }, false, PlayerId::new(0));
     assert_eq!(
-        (code, a.state),
+        (code, a.state.bare()),
         (Some(UpdateCode::FAILED), AttackState::Failed)
     );
-    let (code, a) = run(AttackState::Move, false, PlayerId::new(1));
+    let (code, a) = run(AttackState::Move { move_to: None }, false, PlayerId::new(1));
     assert_eq!(
-        (code, a.state),
-        (Some(UpdateCode::UNDER_WAY), AttackState::GotoSeen)
+        (code, a.state.bare()),
+        (
+            Some(UpdateCode::UNDER_WAY),
+            AttackState::GotoSeen { move_to: None }
+        )
     );
-    let (code, a) = run(AttackState::GotoSeen, false, PlayerId::new(1));
-    assert_eq!((code, a.state), (None, AttackState::GotoSeen));
+    let (code, a) = run(
+        AttackState::GotoSeen { move_to: None },
+        false,
+        PlayerId::new(1),
+    );
+    assert_eq!(
+        (code, a.state.bare()),
+        (None, AttackState::GotoSeen { move_to: None })
+    );
 }
 
 /// The update's ends before the state's step: a live target the unit's player counts as its
@@ -3219,7 +3346,7 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
         Position::new(11.0, 10.0, 0.0),
     );
     let run = |set: fn(&mut Rig)| {
-        let (mut rig, mut a) = on_target(live, true, (AttackState::Move, false));
+        let (mut rig, mut a) = on_target(live, true, (AttackState::Move { move_to: None }, false));
         set(&mut rig);
         let code = rig
             .run(20, |c, u, _, f, r| a.ends_early(c, u, f, r, true))
@@ -3256,7 +3383,10 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
         )
     );
     let ((code, posted), a) = run(|_| {});
-    assert_eq!((code, a.state, posted), (None, AttackState::Move, vec![]));
+    assert_eq!(
+        (code, a.state, posted),
+        (None, AttackState::Move { move_to: None }, vec![])
+    );
 }
 
 /// State 6's step: ready in reach swings; ready on a dead tree ends with 5; a target out of
@@ -3276,7 +3406,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
     a.arms.sprite = Some(STANDING);
     let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
-        (code, a.state),
+        (code, a.state.bare()),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Swing)
     );
     let (mut rig, mut a) = on_target(
@@ -3290,7 +3420,10 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, false),
     );
     let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, false));
-    assert_eq!((code, a.state), (Ok(UpdateCode::CODE_5), AttackState::Done));
+    assert_eq!(
+        (code, a.state.bare()),
+        (Ok(UpdateCode::CODE_5), AttackState::Done)
+    );
     let (mut rig, mut a) = on_target(
         (
             PlayerId::new(0),
@@ -3304,8 +3437,11 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
     a.point = Position::from([NONE; 3]);
     let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
-        (code, a.state),
-        (Ok(UpdateCode::UNDER_WAY), AttackState::Move)
+        (code, a.state.bare()),
+        (
+            Ok(UpdateCode::UNDER_WAY),
+            AttackState::Move { move_to: None }
+        )
     );
 }
 
@@ -3387,8 +3523,8 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
             rig.posted(),
             forgot,
             rig.workers(7, PlayerId::new(2)),
-            a.state,
-            a.move_to.map(|m| (m.state, m.point)),
+            a.state.bare(),
+            a.state.move_to().copied().map(|m| (m.state, m.point)),
         )
     };
     let order = AiOrder::Order(OrderKind::Attack);
@@ -3404,7 +3540,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
                 Ok(UpdateCode::CODE_5),
                 waits.clone(),
                 Some(0),
-                AttackState::GotoSeen,
+                AttackState::GotoSeen { move_to: None },
                 seen
             )
         );

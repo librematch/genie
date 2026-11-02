@@ -256,7 +256,7 @@ impl World {
                     let actions = self.parts.actions.of_mut(id)?;
                     let e = actions.list.take_enter();
                     if let (Some(e), Some(art)) = (e, actions.list.artifact_mut()) {
-                        art.enter = Some(e);
+                        art.sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter: e });
                     }
                 }
                 entered.map(|()| None)

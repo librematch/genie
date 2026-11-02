@@ -119,7 +119,9 @@ fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
 #[test]
 fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     let artifact = || Artifact {
-        move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
+        sub: Some(crate::ownership::artifact::ArtifactSub::Walk {
+            move_to: MoveToAction::sub_in(MoveTo::Moving),
+        }),
         goal: Some(Position::new(32.5, 89.5, 0.0)),
         target: Some(object_id(600)),
         ..Artifact::new(false, None)
@@ -133,7 +135,7 @@ fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     let (o, released) = stopped(t, class::LIVESTOCK).unwrap();
     let a = o.parts.actions.list.artifact().copied().unwrap();
     assert_eq!(
-        (a.move_to, a.goal, a.target, a.state),
+        (a.move_to().copied(), a.goal, a.target, a.state),
         (
             None,
             None,

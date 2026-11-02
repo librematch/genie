@@ -20,10 +20,9 @@ fn building_production_state_comes_before_its_top_action_s() {
         state: ArtifactState::Wait,
         timer: Seconds::ZERO,
         gaia: false,
-        move_to: None,
+        sub: None,
         goal: None,
         target: None,
-        enter: None,
         moving: None,
     };
     let making = genie_core::production::Production {

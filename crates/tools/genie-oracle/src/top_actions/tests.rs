@@ -360,7 +360,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .copied()
         .unwrap();
     assert_eq!(
-        (a.state, a.target, a.move_to, a.goal),
+        (a.state, a.target, a.move_to().copied(), a.goal),
         (ArtifactState::Wait, None, None, None)
     );
     assert!(a.gaia);
@@ -376,7 +376,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .artifact()
     .copied()
     .unwrap();
-    let walk = a.move_to.unwrap();
+    let walk = a.move_to().copied().unwrap();
     assert_eq!((walk.state, walk.quiet), (MoveTo::Moving, true));
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(4.0, 2.0, 0.0))));
     assert!(
@@ -403,7 +403,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .copied()
     .unwrap();
     assert_eq!(
-        a.move_to.map(|m| m.walks_to()),
+        a.move_to().copied().map(|m| m.walks_to()),
         Some(Goal::Target(object_id(9)))
     );
     // the target's place is its goal however near the origin; an unset place (-1) is none
@@ -440,7 +440,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .unwrap();
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
     // a move to the point: its MoveTo is not quiet, its AI hears the end
-    assert_eq!(a.move_to.map(|m| m.quiet), Some(false));
+    assert_eq!(a.move_to().copied().map(|m| m.quiet), Some(false));
     assert_eq!(
         imported(
             ARTIFACT_TYPE,
@@ -1306,7 +1306,10 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
         (rest.to_bits(), rest.to_bits())
     );
     assert_eq!(swing(AttackState::Swing, true, &master(2.5)), (0, 0));
-    assert_eq!(swing(AttackState::Move, false, &master(2.5)), (0, 0));
+    assert_eq!(
+        swing(AttackState::Move { move_to: None }, false, &master(2.5)),
+        (0, 0)
+    );
     let short = 0.5_f32 - 10.0 * 0.1_f32;
     assert_eq!(
         swing(AttackState::Swing, false, &master(0.5)),
@@ -1319,7 +1322,7 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
             hunt(with_sub(
                 base(HuntState::Walk { move_to: None }.get()),
                 ATTACK,
-                attack(AttackState::Move.get(), 4, false),
+                attack(AttackState::Move { move_to: None }.get(), 4, false),
             )),
         ),
         &master(2.5),

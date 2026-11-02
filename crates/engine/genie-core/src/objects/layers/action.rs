@@ -101,8 +101,8 @@ impl Action {
             })
         };
         match self.list.head()? {
-            actions::Action::Artifact(a) => walking(a.move_to.map(|m| m.state)).or_else(|| {
-                a.enter.map(|e| TopAction {
+            actions::Action::Artifact(a) => walking(a.move_to().map(|m| m.state)).or_else(|| {
+                a.enter().map(|e| TopAction {
                     kind: crate::garrison::ENTER,
                     state: ActionState::new(e.state.get()),
                 })
@@ -119,7 +119,7 @@ impl Action {
             actions::Action::Repair(r) => walking(r.state.move_to().map(|m| m.state)),
             actions::Action::Fly(f) => walking(f.state.move_to().map(|m| m.state)),
             actions::Action::Gather(g) => walking(g.state.move_to().map(|m| m.state)),
-            actions::Action::Attack(a) => walking(a.move_to.map(|m| m.state)),
+            actions::Action::Attack(a) => walking(a.state.move_to().map(|m| m.state)),
             actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
             actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),
             actions::Action::Transport(t) => walking(t.state.move_to().map(|m| m.state)),

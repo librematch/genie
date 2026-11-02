@@ -94,8 +94,9 @@ pub(super) fn saved_sprite(
 }
 
 /// A saved Attack sub-action (type 9, `FUN_140a7c880`): its target, state, timer, ranges, point,
-/// the target's last place (`+0xa4`..), a hit still to land (`+0x9e`), its `MoveTo` (in states 5
-/// and 11 with that `MoveTo`'s point), and its sprites
+/// the target's last place (`+0xa4`..), a hit still to land (`+0x9e`), its `MoveTo` (in its walk's
+/// state: in states 5 and 11 with that `MoveTo`'s point; in another state the import's error),
+/// and its sprites
 /// and frames. The load restores the sprites at `+0x70`, `+0x80` and `+0x88` from the second to
 /// fourth saved ids (the first goes to `+0x68`); the second attack sprite (`+0x78`) and the
 /// swing's times (`+0xb0`, `+0xb4`) are not saved, and a loaded Attack starts without them.
@@ -131,7 +132,7 @@ pub(super) fn saved_attack(
     Ok(genie_core::combat::attack::Attack {
         target: ObjectId::of_field(b.target_id),
         target2: ObjectId::of_field(b.target2_id),
-        state: genie_core::combat::attack::AttackState::of_byte(b.state)?,
+        state: genie_core::combat::attack::AttackState::of_byte(b.state, move_to)?,
         timer: Seconds::new(b.timer),
         range: Distance::new(a.range),
         min_range: Distance::new(a.min_range),
@@ -141,7 +142,6 @@ pub(super) fn saved_attack(
             a.last_target_position_y,
             a.last_target_position_z,
         ),
-        move_to,
         pending: a.need_to_attack != 0,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,

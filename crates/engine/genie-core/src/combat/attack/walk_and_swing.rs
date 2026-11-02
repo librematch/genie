@@ -64,7 +64,7 @@ impl Attack {
             0 => self.within_reach(c, unit, f, r, (target, radius)),
             1 | 2 => {
                 self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
-                if self.state != AttackState::Move {
+                if !matches!(self.state, AttackState::Move { .. }) {
                     return self.arrived_at_seen(c, unit, f, r, target);
                 }
                 self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
@@ -109,7 +109,8 @@ impl Attack {
         c: &mut Step<'_>,
         unit: &mut Unit,
     ) -> Result<UpdateCode, GenieError> {
-        self.move_to = None;
+        // the list deleted the MoveTo: no stop
+        self.state = self.state.bare();
         self.finish_in(
             AttackState::Failed,
             unit,

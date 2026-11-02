@@ -16,6 +16,7 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
+use crate::movement::move_to::MoveToAction;
 use crate::movement::{Me, footprint_gap};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -115,7 +116,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         rng: &mut Well512,
     ) -> Result<Option<(NotifyKind, [i32; 3])>, GenieError> {
-        if self.move_to.is_some() {
+        if self.state.move_to().is_some() {
             return Err(GenieError::unsupported("a building's Attack with a MoveTo"));
         }
         motion.set_anim_speed(Speed::new(1.0));
@@ -175,9 +176,9 @@ impl Attack {
             }
             // case 3 (state 4) walks the MoveTo to the target, cases 4 and 10 (states 5 and
             // 11) to where it was seen
-            AttackState::Move | AttackState::GotoSeen | AttackState::GotoPoint => {
-                self.walk(c, unit, me, f, r, (t.position, t.radius))
-            }
+            AttackState::Move { .. }
+            | AttackState::GotoSeen { .. }
+            | AttackState::GotoPoint { .. } => self.walk(c, unit, me, f, r, (t.position, t.radius)),
             AttackState::Ready => self.ready_step(c, unit, f, r, alive),
             AttackState::Swing => self.swing(c, unit, actions, f, r),
             AttackState::Killed => self.killed_step(c, unit),
@@ -256,7 +257,12 @@ impl Attack {
         // ([`Attack::out_of_sight`])
         self.seen = t.position;
         let seen = sees(&c.w.spatial, f, t.position)?;
-        if seen && matches!(self.state, AttackState::GotoSeen | AttackState::GotoPoint) {
+        if seen
+            && matches!(
+                self.state,
+                AttackState::GotoSeen { .. } | AttackState::GotoPoint { .. }
+            )
+        {
             let ground =
                 c.w.parts
                     .mover_of(unit.id)
@@ -266,7 +272,12 @@ impl Attack {
             self.follow(unit, &mut c.w.attack_ground(unit.id), r, f, gap)?;
             return Ok(Some(UpdateCode::UNDER_WAY));
         }
-        if !seen && matches!(self.state, AttackState::Move | AttackState::GotoSeen) {
+        if !seen
+            && matches!(
+                self.state,
+                AttackState::Move { .. } | AttackState::GotoSeen { .. }
+            )
+        {
             let gives_up = match r.ai_order {
                 AiOrder::Absent => false,
                 AiOrder::Idle => true,
@@ -275,7 +286,7 @@ impl Attack {
             if f.own.player == PlayerId::new(0) || gives_up {
                 return self.out_of_sight(c, unit, f, r).map(Some);
             }
-            if self.state != AttackState::GotoSeen {
+            if !matches!(self.state, AttackState::GotoSeen { .. }) {
                 self.wait_at_seen(unit, c.w.parts.motion_mut(unit.id), f, r, &c.w.graphics)?;
                 return Ok(Some(UpdateCode::UNDER_WAY));
             }
@@ -427,13 +438,18 @@ impl Attack {
         r: &AttackReads,
         graphics: &crate::objects::Graphics,
     ) -> Result<(), GenieError> {
-        self.enter(AttackState::GotoSeen, motion.reborrow())?;
+        self.enter(AttackState::GotoSeen { move_to: None }, motion.reborrow())?;
         self.range = f.own.source.weapon_range;
-        self.goto_point((unit, motion.mover()), r, graphics)
+        self.goto_point(
+            |move_to| AttackState::GotoSeen { move_to },
+            (unit, motion.mover()),
+            r,
+            graphics,
+        )
     }
 
-    /// The `MoveTo` to a point of states 5 and 11 ([`Attack::walk_to_seen`]) of `unit` with its
-    /// mover: its start
+    /// The `MoveTo` to a point of states 5 and 11 ([`Attack::walk_to_seen`], the walk `walk`
+    /// makes) of `unit` with its mover: its start
     /// finds no target object to be near (`FUN_14118f680` answers `FLT_MAX`), so a unit with a
     /// top speed (`UCOMISS`: not 0) asks for a path (state 3), any other fails (state 13).
     ///
@@ -442,11 +458,12 @@ impl Attack {
     /// A unit that does not move.
     pub(super) fn goto_point(
         &mut self,
+        walk: fn(Option<MoveToAction>) -> AttackState,
         unit: (&Unit, Option<&Mover>),
         r: &AttackReads,
         graphics: &crate::objects::Graphics,
     ) -> Result<(), GenieError> {
-        self.walk_to_seen(&move_reads(unit, r, graphics)?)
+        self.walk_to_seen(walk, &move_reads(unit, r, graphics)?)
     }
 
     /// States 5 and 11 once their `MoveTo` arrived (cases 4 and 10, its update 1 or 2): a target
@@ -468,14 +485,22 @@ impl Attack {
             self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
             return Ok(UpdateCode::UNDER_WAY);
         }
-        if self.state == AttackState::GotoSeen
+        if matches!(self.state, AttackState::GotoSeen { .. })
             && f.own.player != PlayerId::new(0)
             && SEEN_RANGE <= self.range.get()
             && !r.computer
         {
-            self.enter(AttackState::GotoPoint, c.w.parts.motion_mut(unit.id))?;
+            self.enter(
+                AttackState::GotoPoint { move_to: None },
+                c.w.parts.motion_mut(unit.id),
+            )?;
             self.range = f.own.source.weapon_range;
-            self.goto_point((unit, c.w.parts.mover_of(unit.id)), r, &c.w.graphics)?;
+            self.goto_point(
+                |move_to| AttackState::GotoPoint { move_to },
+                (unit, c.w.parts.mover_of(unit.id)),
+                r,
+                &c.w.graphics,
+            )?;
             return Ok(UpdateCode::UNDER_WAY);
         }
         let target = self.target.take();

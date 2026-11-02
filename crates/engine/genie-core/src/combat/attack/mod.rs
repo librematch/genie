@@ -20,7 +20,7 @@ use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
-use crate::movement::move_to::{MoveDefaults, MoveToAction, TargetMoved};
+use crate::movement::move_to::{MoveDefaults, TargetMoved};
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ActionType;
@@ -136,7 +136,7 @@ pub struct Attack {
     /// The second target (`+0x28`, its id at `+0x34`): the work command's Attack takes its
     /// target as this too (`FUN_140a7a190`, slot 0x178), −1 for none.
     pub target2: Option<ObjectId>,
-    /// The action state (`+0x18`).
+    /// The action state (`+0x18`), with its walk's quiet `MoveTo` ([`AttackState`]).
     pub state: AttackState,
     /// `+0x44`: seconds in the state, the update adds dt.
     pub timer: Seconds,
@@ -148,9 +148,6 @@ pub struct Attack {
     pub point: Position,
     /// `+0xa4`..`+0xac`: where it last saw its target.
     pub seen: Position,
-    /// The `MoveTo` sub-action (quiet) of states 4, 5 and 11: to the target within the attack's
-    /// range, to where it saw its target within it, or onto that point.
-    pub move_to: Option<MoveToAction>,
     /// `+0x9e`: a hit is still to land in this swing.
     pub pending: bool,
     /// `+0xb0` and `+0xb4`: the time of a swing past its sprite's length; a melee swing counts

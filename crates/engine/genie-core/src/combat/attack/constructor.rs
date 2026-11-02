@@ -47,7 +47,6 @@ impl Attack {
             min_range: e.min_range,
             point: Position::from([NONE; 3]),
             seen: e.target_position,
-            move_to: None,
             pending: false,
             swing: Seconds::ZERO,
             rest: Seconds::ZERO,
@@ -278,9 +277,9 @@ impl Attack {
         let mut ready_end = false;
         if target_owner != PlayerId::GAIA && !visible {
             if e.stance == UnitStance::AGGRESSIVE && Speed::ZERO < e.speed && e.can_move {
-                self.state = AttackState::GotoSeen;
+                self.state = AttackState::GotoSeen { move_to: None };
                 self.range = e.range;
-                self.walk_to_seen(reads)?;
+                self.walk_to_seen(|move_to| AttackState::GotoSeen { move_to }, reads)?;
             } else {
                 failed_first = true;
             }

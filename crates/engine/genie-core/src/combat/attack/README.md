@@ -32,7 +32,7 @@ The damage of the hit is in `combat/damage/`.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`attack_state.rs`](attack_state.rs) | An Attack's state: the steps of its update between the start and the end. |
+| [`attack_state.rs`](attack_state.rs) | An Attack's state: the steps of its update between the start and the end, each walk with its `MoveTo`. |
 | [`constructor.rs`](constructor.rs) | The Attack's constructor (`FUN_140a7c210`) and its start (slot 5): its sprites and frames and what it reads of its unit and its target. |
 | [`hits.rs`](hits.rs) | A hit: where it comes from (`Hit`), what the swing does after it, the strike (`FUN_141084230`) and the blast so far. |
 | [`mod.rs`](mod.rs) | The Attack action (`RGE_Action_Attack`, type 9, vtable `0x142ed47a8`) of a melee unit: a hunting villager's sub-action on a tree or on its livestock (`crate::gathering::hunt`). |

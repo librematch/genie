@@ -335,11 +335,14 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     )
     .unwrap();
     assert_eq!(
-        (a.target, a.state),
-        (Some(object_id(700)), AttackState::GotoSeen)
+        (a.target, a.state.bare()),
+        (
+            Some(object_id(700)),
+            AttackState::GotoSeen { move_to: None }
+        )
     );
     // the MoveTo is quiet and holds its own state, point and range
-    let m = a.move_to.unwrap();
+    let m = a.state.move_to().copied().unwrap();
     assert_eq!(
         (m.state, m.point.x(), m.point.y(), m.quiet),
         (MoveTo::Moving, 3.0, 4.0, true)
@@ -347,6 +350,19 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     assert_eq!(a.range.get().to_bits(), 5.0_f32.to_bits());
     let plain = saved_attack(&attack(2, vec![]), Some(&graphics)).unwrap();
     assert_eq!(plain.state, AttackState::Killed);
+    // a MoveTo belongs to a walk: in any other state it is no state of the game
+    let stray = saved_attack(
+        &attack(6, vec![(genie_core::movement::move_to::MOVE_TO, move_to())]),
+        Some(&graphics),
+    )
+    .unwrap_err();
+    assert_eq!(
+        (stray.kind(), stray.reason()),
+        (
+            genie_core::ErrorKind::InvalidInput,
+            "a MoveTo of an Attack that does not walk"
+        )
+    );
     assert!(
         saved_attack(
             &attack(

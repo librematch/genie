@@ -535,7 +535,9 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         layer.top_sub_action()
     };
     let mut artifact = crate::ownership::artifact::Artifact::new(false, None);
-    artifact.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
+    artifact.sub = Some(crate::ownership::artifact::ArtifactSub::Walk {
+        move_to: MoveToAction::sub_in(MoveTo::Moving),
+    });
     assert_eq!(of(Action::Artifact(artifact)), walking);
     let mut enter = crate::garrison::EnterAction::new(
         ContainerId::new(object_id(7)),
@@ -545,8 +547,8 @@ fn every_kind_of_top_action_shows_its_sub_action() {
             crate::objects::masters::class::NO_CLASS,
         ),
     );
-    artifact.move_to = None;
-    artifact.enter = Some(enter);
+    artifact.sub = None;
+    artifact.sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter });
     assert_eq!(
         of(Action::Artifact(artifact)),
         Some(TopAction {
@@ -565,9 +567,12 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
     };
     assert_eq!(of(Action::Fly(fly)), walking);
-    let mut attack =
-        crate::combat::attack::tests::own_attack(7, AttackState::Move, Distance::new(0.5));
-    attack.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
+    let mut attack = crate::combat::attack::tests::own_attack(
+        7,
+        AttackState::Move { move_to: None },
+        Distance::new(0.5),
+    );
+    *attack.state.walk_mut().unwrap() = Some(MoveToAction::sub_in(MoveTo::Moving));
     assert_eq!(of(Action::Attack(attack)), walking);
     let (mut explore, _) = crate::movement::explore::ExploreAction::new(
         Position::new(1.0, 2.0, 0.0),

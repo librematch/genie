@@ -677,7 +677,9 @@ impl crate::objects::layers::Action {
     /// The unit's new Enter: its own action, or with `sub` the sub-action of its Artifact on top.
     pub(crate) fn place_enter(&mut self, action: crate::garrison::EnterAction, sub: bool) {
         match self.list.artifact_mut().filter(|_| sub) {
-            Some(art) => art.enter = Some(action),
+            Some(art) => {
+                art.sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter: action });
+            }
             None => self.list.set_enter(Some(action)),
         }
     }

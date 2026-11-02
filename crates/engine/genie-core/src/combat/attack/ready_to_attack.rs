@@ -65,7 +65,7 @@ impl Attack {
         f: &Fight,
         gap: Distance,
     ) -> Result<(), GenieError> {
-        self.enter(AttackState::Move, g.motion.reborrow())?;
+        self.enter(AttackState::Move { move_to: None }, g.motion.reborrow())?;
         let reads = move_reads((unit, g.motion.mover()), r, g.graphics)?;
         if self.moving(f.own.source.weapon_range, f.victim.position, gap, &reads)? {
             self.arrived_sprite(unit, g.motion.reborrow(), g.sprite_rng)?;

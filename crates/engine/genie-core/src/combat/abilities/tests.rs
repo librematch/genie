@@ -819,7 +819,6 @@ fn keshik(t: &mut World) {
         min_range: Distance::ZERO,
         point: Position::new(-1.0, -1.0, -1.0),
         seen: Position::new(-1.0, -1.0, -1.0),
-        move_to: None,
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,

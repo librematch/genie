@@ -5557,11 +5557,11 @@ fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
             h.state
                 .attack()
                 .copied()
-                .map(|a| (a.state, a.move_to.map(|m| m.state)))
+                .map(|a| (a.state.bare(), a.state.move_to().copied().map(|m| m.state)))
         ),
         (
             HuntState::Attack { attack: None },
-            Some((AttackState::Move, Some(MoveTo::Moving)))
+            Some((AttackState::Move { move_to: None }, Some(MoveTo::Moving)))
         )
     );
     assert!(t.parts.mover_of(v.id).is_some_and(|m| !m.paths.is_empty()));
@@ -6996,7 +6996,8 @@ fn livestock_enter_command_becomes_its_artifact_sub_action() {
         .artifact()
         .copied()
         .unwrap()
-        .enter;
+        .enter()
+        .copied();
     assert!(
         sub.is_some_and(|e| e.target == Some(ContainerId::new(object_id(10028))))
             || v.life.inside == Some(ContainerId::new(object_id(10028))),
@@ -7115,7 +7116,7 @@ fn livestock_second_enter_command_stops_the_walk_and_lets_the_old_enter_target_g
         .list
         .artifact_mut()
         .unwrap()
-        .enter = Some(walking);
+        .sub = Some(crate::ownership::artifact::ArtifactSub::Enter { enter: walking });
     t.parts.mover_mut(v.id).unwrap().velocity = Some(crate::movement::Velocity {
         velocity: BVector::new(0.0, 0.0, 0.7),
         acceleration: BVector::new(0.0, 0.0, f32::MAX),
@@ -11548,11 +11549,13 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
         .set_artifact(Some(Artifact {
             target: Some(object_id(9149)),
             goal: Some(Position::new(20.0, 20.0, 0.0)),
-            move_to: Some(MoveToAction {
-                point: Position::ORIGIN,
-                target: Some(object_id(9149)),
-                range: Distance::new(1.0),
-                ..MoveToAction::sub_in(MoveTo::Moving)
+            sub: Some(crate::ownership::artifact::ArtifactSub::Walk {
+                move_to: MoveToAction {
+                    point: Position::ORIGIN,
+                    target: Some(object_id(9149)),
+                    range: Distance::new(1.0),
+                    ..MoveToAction::sub_in(MoveTo::Moving)
+                },
             }),
             ..Artifact::new(false, None)
         }));
@@ -15448,7 +15451,6 @@ fn own_attack(target: i32, target2: i32, state: AttackState) -> crate::combat::a
         min_range: Distance::ZERO,
         point: Position::new(-1.0, -1.0, -1.0),
         seen: Position::ORIGIN,
-        move_to: None,
         pending: false,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
@@ -16556,7 +16558,7 @@ fn ask_for_help_asks_only_an_idle_helper_that_may_attack() {
     // an action of its own makes it busy
     assert!(!helper_free(
         idle,
-        Some(&own_attack(50, -1, AttackState::Move))
+        Some(&own_attack(50, -1, AttackState::Move { move_to: None }))
     ));
 }
 
@@ -16608,7 +16610,7 @@ fn helper_in_group_answers_only_while_its_group_patrols() {
         PlayerId::new(1),
         in_group(
             Some(group_id(7)),
-            Some(&own_attack(50, -1, AttackState::Move))
+            Some(&own_attack(50, -1, AttackState::Move { move_to: None }))
         ),
         &groups
     ));
@@ -16651,7 +16653,12 @@ fn an_attack_command_on_its_own_attack_target_asks_that_attack_again() {
             Position::new(10.5, 10.0, 0.0)
         )
     );
-    let (o, attacked, _) = scout_attack_on(0.0, None, Some(&own(AttackState::Move)), true);
+    let (o, attacked, _) = scout_attack_on(
+        0.0,
+        None,
+        Some(&own(AttackState::Move { move_to: None })),
+        true,
+    );
     assert!(attacked.attacks);
     assert_eq!(
         o.parts.actions.list.attack().map(|a| a.seen),
@@ -17614,10 +17621,8 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
         .list
         .artifact_mut()
         .unwrap();
-    if let Some(m) = art
-        .enter
-        .as_mut()
-        .and_then(|e| e.state.walk_mut().and_then(Option::as_mut))
+    if let Some(crate::ownership::artifact::ArtifactSub::Enter { enter }) = &mut art.sub
+        && let Some(m) = enter.state.walk_mut().and_then(Option::as_mut)
     {
         m.state = MoveTo::Arrived;
     }

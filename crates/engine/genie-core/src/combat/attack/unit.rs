@@ -58,10 +58,12 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player)?;
         let armed = armed(master, c.w.parts.combat_of(self.id).firepower);
         let master_class = master.class;
-        let walking = actions
-            .list
-            .attack()
-            .is_some_and(|a| matches!(a.state, AttackState::GotoSeen | AttackState::GotoPoint));
+        let walking = actions.list.attack().is_some_and(|a| {
+            matches!(
+                a.state,
+                AttackState::GotoSeen { .. } | AttackState::GotoPoint { .. }
+            )
+        });
         if walking && armed {
             return self.attack_walks_unseen(actions, c, me, master_class);
         }

@@ -62,10 +62,10 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
     ) -> Result<bool, GenieError> {
-        if self.move_to.take().is_some() {
+        if self.state.take_move_to().is_some() {
             mover.stop()?;
         }
-        self.state = AttackState::Move;
+        self.state = AttackState::Move { move_to: None };
         self.moving(e.range, e.target_position, e.gap, reads)
     }
 
@@ -90,7 +90,7 @@ impl Attack {
     /// The teardown of the sub-actions (`FUN_140a73fc0` on the action list): a `MoveTo` stops the
     /// unit.
     pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
@@ -105,7 +105,7 @@ impl Attack {
         state: AttackState,
         mut motion: MotionMut<'_>,
     ) -> Result<(), GenieError> {
-        if self.move_to.take().is_some() {
+        if self.state.take_move_to().is_some() {
             motion
                 .mover_mut()
                 .ok_or(crate::world::ATTACKER_UNMOVING)?
@@ -271,7 +271,7 @@ impl Attack {
         sprite: &mut Option<ActiveSprite>,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        if self.move_to.take().is_some() {
+        if self.state.take_move_to().is_some() {
             motion
                 .mover_mut()
                 .ok_or(crate::world::ATTACKER_UNMOVING)?

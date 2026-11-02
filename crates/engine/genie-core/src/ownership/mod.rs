@@ -4,6 +4,7 @@
 
 pub mod artifact;
 mod artifact_state;
+mod artifact_sub;
 pub(crate) mod capture;
 mod capture_kind;
 pub(crate) mod change;

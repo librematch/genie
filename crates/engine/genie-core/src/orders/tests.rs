@@ -612,12 +612,12 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
         .expect("the soldier's Attack");
     assert_eq!(
         (
-            attack.state,
-            attack.move_to.map(|m| m.state),
+            attack.state.bare(),
+            attack.state.move_to().copied().map(|m| m.state),
             attack.target2
         ),
         (
-            crate::combat::attack::AttackState::Move,
+            crate::combat::attack::AttackState::Move { move_to: None },
             Some(crate::movement::move_to::MoveTo::Arrived),
             Some(object_id(50))
         )
@@ -5182,7 +5182,12 @@ fn an_attack_task_start_ends_where_the_start_does() {
         )
         .unwrap();
         let unit = &t.players[1].objects[ListIndex::new(0)];
-        let state = t.parts.actions_of(unit.id).list.attack().map(|a| a.state);
+        let state = t
+            .parts
+            .actions_of(unit.id)
+            .list
+            .attack()
+            .map(|a| a.state.bare());
         let notifies = t.parts.unit_ai.get(unit.id).map(|ai| ai.notifies.len());
         let sprite = unit.sprite.map(|s| s.graphic.id);
         (state, t.parts.anim_speed_of(unit.id), sprite, notifies)
@@ -5192,7 +5197,10 @@ fn an_attack_task_start_ends_where_the_start_does() {
     let (far, _, _, far_notifies) = started(true, 30.0);
     assert_eq!(
         (far, far_notifies),
-        (Some(AttackState::Move), near_notifies.map(|n| n + 1))
+        (
+            Some(AttackState::Move { move_to: None }),
+            near_notifies.map(|n| n + 1)
+        )
     );
     assert_ne!(near, None);
     let (failed, speed, sprite, _) = started(false, 30.0);
