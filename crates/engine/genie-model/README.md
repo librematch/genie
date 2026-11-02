@@ -17,6 +17,13 @@ The `schema` feature derives each model type's JSON Schema (schemars), from whic
 writes the Nickel contracts `contracts/genie.ncl` (FD-046-D15). A bit set's schema is bitflags'
 text form, its flag names joined by ` | `.
 
+`layer` holds the build layer (FD-046-D08, D32): what the build's executable hardcodes about
+ids, their roles (`Roles`, one role set per id of each space) and the slots, and its tuning
+values (`Tuning`, a group per port module). Its role sets, slots and groups are generated from
+the build's symbol table (`layer/generated.rs`, `just layer`); a model takes a layer with
+`Model::with_layer`. genie-nickel loads it from `builds/<build>.ncl`, and genie-core's tests
+build it from the generated fixture `testing/build_<build>.rs`.
+
 ## Licence
 
 [AGPL-3.0-only](https://github.com/librematch/genie/blob/main/LICENSE-AGPL-3.0)

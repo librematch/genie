@@ -3,6 +3,10 @@
 //! graphics. Each table is shared between worlds until its first write (`Arc::make_mut`), so
 //! forks and parallel instances hold one stock model.
 
+use crate::layer::BuildLayer;
+use crate::layer::Roles;
+use crate::layer::generated::Slots;
+use crate::layer::generated::Tuning;
 use crate::objects::Graphics;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::Masters;
@@ -40,6 +44,26 @@ pub struct Model {
     /// The game's tech tree table and its civilisations' unique units, which the defeat check's
     /// count of the units a building will train reads.
     pub tech_tree: Arc<TechTree>,
+    /// The roles of the ids, the build layer's (FD-046-D04, D08).
+    pub roles: Roles,
+    /// The ids the engine names by role, the build layer's.
+    pub slots: Slots,
+    /// The tuning values, the build layer's (D32).
+    pub tuning: Arc<Tuning>,
+}
+
+impl Model {
+    /// The model with the build layer's roles, slots and tuning values (D09's step 2); its
+    /// tables stay.
+    #[must_use]
+    pub fn with_layer(self, layer: &BuildLayer) -> Self {
+        Self {
+            roles: layer.roles.clone(),
+            slots: layer.slots,
+            tuning: Arc::new(layer.tuning.clone()),
+            ..self
+        }
+    }
 }
 
 #[cfg(test)]

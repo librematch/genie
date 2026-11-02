@@ -1,10 +1,12 @@
 //! Nickel into the genie engine's model (FD-046): a source evaluated ([`evaluate`]), each number
 //! read as the exact rational Nickel holds and rounded once to its field's float type
 //! ([`round`]), and a serde deserializer over the evaluated value ([`de::from_expr`]); the
-//! model's contracts, written from its types' JSON Schema ([`contracts`]).
+//! model's contracts, written from its types' JSON Schema ([`contracts`]); the build layers
+//! from their sources ([`layer::build_layer`]).
 
 pub mod contracts;
 pub mod de;
+pub mod layer;
 pub mod round;
 
 use genie_error::GenieError;

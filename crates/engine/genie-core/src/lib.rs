@@ -52,6 +52,8 @@ pub mod production;
 pub mod technology;
 #[cfg(test)]
 mod test_ids;
+#[cfg(test)]
+pub mod testing;
 pub mod trace;
 pub mod unit_ai;
 pub mod vision;

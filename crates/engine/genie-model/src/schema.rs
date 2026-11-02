@@ -4,6 +4,10 @@
 
 use crate::combat::missile::SmartMode;
 use crate::combat::missile::VanishMode;
+use crate::layer::generated::AttributeRoles;
+use crate::layer::generated::ClassRoles;
+use crate::layer::generated::MasterRoles;
+use crate::layer::generated::TechRoles;
 use crate::movement::MoveAlgorithm;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::BlastLevel;
@@ -12,6 +16,7 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::TaskFlags;
+use bitflags::Flags;
 use schemars::JsonSchema;
 use schemars::Schema;
 use schemars::SchemaGenerator;
@@ -51,3 +56,23 @@ bit_set_schemas!(
     TaskFlags,
     VanishMode,
 );
+
+/// Each role set's schema: one role's name, which a role table lists per id (FD-046-D08).
+macro_rules! role_set_schemas {
+    ($($set:ident),* $(,)?) => {
+        $(
+            impl JsonSchema for $set {
+                fn schema_name() -> Cow<'static, str> {
+                    Cow::Borrowed(stringify!($set))
+                }
+
+                fn json_schema(_: &mut SchemaGenerator) -> Schema {
+                    let names: Vec<&str> = <$set as Flags>::FLAGS.iter().map(|f| f.name()).collect();
+                    json_schema!({ "type": "string", "enum": names })
+                }
+            }
+        )*
+    };
+}
+
+role_set_schemas!(AttributeRoles, ClassRoles, MasterRoles, TechRoles);

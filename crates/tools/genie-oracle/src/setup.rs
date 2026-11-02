@@ -1,6 +1,7 @@
 //! The slice set up from the header save ([`slice`]): the players' technologies, wonder
 //! times, ghosts, AI settings and history, and the garrisons' firepower.
 
+use genie_core::GenieError;
 use genie_core::gathering::QueueCount;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
@@ -31,7 +32,10 @@ use genie_core::world::Seconds;
 use genie_core::world::Tick;
 use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
+use genie_model::layer::BuildLayer;
+use genie_nickel::layer::build_layer;
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 mod player_parts;
 
@@ -78,7 +82,7 @@ use std::mem::take;
 /// # Errors
 ///
 /// A saved state that names none.
-pub(super) fn tech_state(t: &TechPlayerTree) -> Result<TechState, genie_core::GenieError> {
+pub(super) fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
     let o = |j: usize| {
         t.cost_override
             .get(j)
@@ -116,6 +120,12 @@ pub(super) fn tech_state(t: &TechPlayerTree) -> Result<TechState, genie_core::Ge
             .collect(),
     })
 }
+
+/// The build genie-oracle's import reads, its saves' and its `.dat`'s: its layer applies.
+const LAYER_BUILD: u32 = 158_041;
+
+/// The build layer, evaluated once from its Nickel source (FD-046-D08, D09's step 2).
+static LAYER: LazyLock<Result<BuildLayer, GenieError>> = LazyLock::new(|| build_layer(LAYER_BUILD));
 
 /// The slice set up from the header save: every player's live objects in their saved order, and
 /// `BaseWorld`'s fields before the map, the frame seed (`mCurrentFrameRandomSeed`, world+0x7d0) and
@@ -438,6 +448,10 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             effects: Arc::new(table.effects.clone()),
             ..Model::default()
         };
+        match &*LAYER {
+            Ok(layer) => turns.model = take(&mut turns.model).with_layer(layer),
+            Err(e) => stop_all(&mut turns, e),
+        }
         // the players' unit masters (type 70), Gaia's left out
         let all = || {
             turns
@@ -490,7 +504,7 @@ fn file_parts(turns: &mut World, parts: Vec<(ObjectId, ObjectParts)>) {
 }
 
 /// Every player stops on `e`, which the slice does not model of the save.
-fn stop_all(turns: &mut World, e: &genie_core::GenieError) {
+fn stop_all(turns: &mut World, e: &GenieError) {
     for p in &mut turns.players {
         let _ = p
             .unsupported
@@ -553,9 +567,7 @@ pub const fn settings(o: &GameOptions) -> Settings {
     }
 }
 
-pub(super) fn saved_ghosts(
-    section: &PlayerSection<'_>,
-) -> Result<Vec<Ghost>, genie_core::GenieError> {
+pub(super) fn saved_ghosts(section: &PlayerSection<'_>) -> Result<Vec<Ghost>, GenieError> {
     section
         .objects()
         .doppleganger_objects
@@ -604,11 +616,7 @@ pub(super) fn garrison_firepower(turns: &mut World) {
 
 /// A unit inside a building, the building, and the unit's share of its volleys (none for a
 /// unit that is not of type 70 or a building whose master the table lacks).
-type Entered = (
-    ObjectId,
-    ObjectId,
-    Option<Result<Firepower, genie_core::GenieError>>,
-);
+type Entered = (ObjectId, ObjectId, Option<Result<Firepower, GenieError>>);
 
 /// Player `p`'s units inside a building of its own, in list order, each with its building and
 /// its share ([`garrison_firepower`]).

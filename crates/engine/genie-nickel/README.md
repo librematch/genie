@@ -16,6 +16,10 @@ bounded integer a predicate. The binary `contracts` writes them to `contracts/ge
 drift from the engine's types (FD-046-D15). `schema_hash` is their SHA-256, a part of the model
 cache's key (D18).
 
+`layer::build_layer` evaluates a build's layer from its source `builds/<build>.ncl` (FD-046-D08),
+which `just layer` generates from the build's symbol table. Its test holds the evaluated layer
+equal to the Rust fixture genie-core's tests build, and the source within the contracts.
+
 ## Licence
 
 [AGPL-3.0-only](https://github.com/librematch/genie/blob/main/LICENSE-AGPL-3.0)

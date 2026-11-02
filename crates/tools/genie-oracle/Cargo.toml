@@ -15,6 +15,10 @@ genie-core = { path = "../../engine/genie-core" }
 genie-dat = { version = "0.1.0", path = "../../formats/genie-dat" }
 # the .dat, save and table importers (FD-046-D26)
 genie-import = { path = "../../engine/genie-import" }
+# the build layer from its Nickel source (FD-046-D08)
+genie-nickel = { path = "../../engine/genie-nickel" }
+# the build layer's type
+genie-model = { path = "../../engine/genie-model" }
 genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
 genie-rec = { version = "0.1.1", path = "../../formats/genie-rec" }
 genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
