@@ -3396,15 +3396,15 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
         (
             g.target,
             g.carry_to,
-            g.state,
+            g.state.bare(),
             g.point,
-            g.move_to.map(|m| m.range),
+            g.state.move_to().copied().map(|m| m.range),
             g.task.id
         ),
         (
             Some(object_id(600)),
             None,
-            GatherState::Walk,
+            GatherState::Walk { move_to: None },
             Position::new(32.5, 89.5, 0.0),
             Some(Distance::new(0.25)),
             TaskId::test(2)
@@ -3446,10 +3446,10 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
         .copied()
         .unwrap();
     assert_eq!(
-        (g.target, g.state, g.point),
+        (g.target, g.state.bare(), g.point),
         (
             Some(object_id(601)),
-            GatherState::Walk,
+            GatherState::Walk { move_to: None },
             Position::new(36.5, 89.5, 0.0)
         )
     );
@@ -3517,8 +3517,12 @@ fn the_unit_ai_gather_command_starts_gather_or_retargets_its_own() {
     assert_eq!(v.life.master_id, master_id(120));
     let g = t.parts.actions_of(v.id).list.gather().copied().unwrap();
     assert_eq!(
-        (g.target, g.state, g.task.id),
-        (Some(object_id(600)), GatherState::Walk, TaskId::test(2))
+        (g.target, g.state.bare(), g.task.id),
+        (
+            Some(object_id(600)),
+            GatherState::Walk { move_to: None },
+            TaskId::test(2)
+        )
     );
     assert_eq!(
         t.parts.unit_ai.get(v.id).map(|ai| ai.current_order),
@@ -3577,7 +3581,7 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
         let v = &t.players[1].objects[ListIndex::new(0)];
         let g = t.parts.actions_of(v.id).list.gather().copied().unwrap();
         (
-            (g.target, g.carry_to, g.state, g.point),
+            (g.target, g.carry_to, g.state.bare(), g.point),
             v.life.held(),
             t.players[1].objects[ListIndex::new(2)].workers,
         )
@@ -3586,7 +3590,7 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
         (
             None,
             Some(DropSiteId::new(object_id(700))),
-            GatherState::Drop,
+            GatherState::Drop { move_to: None },
             Position::from([-1.0; 3]),
         ),
         carrying(Some(AttributeId::numbered(17)), 6.0),
@@ -3731,11 +3735,17 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
         (
             g.target,
             g.carry_to,
-            g.state,
+            g.state.bare(),
             g.point,
-            g.move_to.and_then(|m| m.goal())
+            g.state.move_to().copied().and_then(|m| m.goal())
         ),
-        (None, None, GatherState::Moved, point, Some(point))
+        (
+            None,
+            None,
+            GatherState::Moved { move_to: None },
+            point,
+            Some(point)
+        )
     );
     assert_eq!(
         (
@@ -3767,11 +3777,11 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
         .copied()
         .unwrap();
     assert_eq!(
-        (g.target, g.carry_to, g.state, g.point),
+        (g.target, g.carry_to, g.state.bare(), g.point),
         (
             None,
             Some(DropSiteId::new(object_id(700))),
-            GatherState::Drop,
+            GatherState::Drop { move_to: None },
             Position::from([-1.0; 3])
         )
     );
@@ -3837,8 +3847,11 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
         .copied()
         .expect("a Gather to the drop site");
     assert_eq!(
-        (g.carry_to, g.state),
-        (Some(DropSiteId::new(object_id(700))), GatherState::Drop)
+        (g.carry_to, g.state.bare()),
+        (
+            Some(DropSiteId::new(object_id(700))),
+            GatherState::Drop { move_to: None }
+        )
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,
@@ -3860,8 +3873,11 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| (g.carry_to, g.state)),
-        Some((Some(DropSiteId::new(object_id(700))), GatherState::Drop))
+            .map(|g| (g.carry_to, g.state.bare())),
+        Some((
+            Some(DropSiteId::new(object_id(700))),
+            GatherState::Drop { move_to: None }
+        ))
     );
     // no centre standing (state 2): no drop site, no table entry for berries by class
     let mut t = world;
@@ -4122,8 +4138,8 @@ fn the_unit_ai_moves_and_works_apply_in_order() {
             .actions_of(v.id)
             .list
             .gather()
-            .map(|g| (g.target, g.state)),
-        Some((Some(object_id(601)), GatherState::Walk))
+            .map(|g| (g.target, g.state.bare())),
+        Some((Some(object_id(601)), GatherState::Walk { move_to: None }))
     );
     assert_eq!(t.parts.actions_of(v.id).list.move_to().copied(), None);
     // a unit that does not move cannot be moved to an object
@@ -15597,10 +15613,23 @@ fn an_ai_move_hands_the_point_to_the_gather() {
     );
     let g = actions.list.gather().copied().expect("the Gather stays");
     assert_eq!(
-        (g.state, g.target, g.point, g.move_to.and_then(|m| m.goal())),
-        (GatherState::Moved, None, AI_POINT, Some(AI_POINT))
+        (
+            g.state.bare(),
+            g.target,
+            g.point,
+            g.state.move_to().copied().and_then(|m| m.goal())
+        ),
+        (
+            GatherState::Moved { move_to: None },
+            None,
+            AI_POINT,
+            Some(AI_POINT)
+        )
     );
-    assert_eq!(g.move_to.map(|m| m.state), Some(MoveTo::Start));
+    assert_eq!(
+        g.state.move_to().copied().map(|m| m.state),
+        Some(MoveTo::Start)
+    );
     assert_eq!(actions.list.move_to().copied(), None);
 }
 
@@ -16928,7 +16957,7 @@ fn reseed_world() -> World {
         productivity: Amount::new(1.0),
     };
     let gather = crate::gathering::gather::GatherAction {
-        state: GatherState::ReseedWalk,
+        state: GatherState::ReseedWalk { move_to: None },
         target: None,
         worked: true,
         ..crate::gathering::gather::GatherAction::new(task, &farm, false, rate).unwrap()
@@ -18388,14 +18417,14 @@ fn forage_until(t: &mut World, n: usize, stop: impl Fn(&World) -> bool) {
 #[test]
 fn forager_fills_up_carries_its_berries_home_and_comes_back() {
     let mut t = foraging();
-    let mut states = vec![GatherState::Walk];
+    let mut states = vec![GatherState::Walk { move_to: None }];
     for _ in 0..1200 {
         forage_until(&mut t, 1, |_| false);
         let v = &t.players[1].objects[ListIndex::new(0)];
         let g = t.parts.actions_of(v.id).list.gather().copied().unwrap();
-        if states.last() != Some(&g.state) {
-            states.push(g.state);
-            if g.state == GatherState::Drop {
+        if states.last() != Some(&g.state.bare()) {
+            states.push(g.state.bare());
+            if matches!(g.state, GatherState::Drop { .. }) {
                 assert_eq!(
                     v.life.held(),
                     carrying(Some(AttributeId::numbered(17)), 10.0)
@@ -18410,11 +18439,11 @@ fn forager_fills_up_carries_its_berries_home_and_comes_back() {
     assert_eq!(
         states,
         [
-            GatherState::Walk,
+            GatherState::Walk { move_to: None },
             GatherState::Face,
             GatherState::Work,
-            GatherState::Drop,
-            GatherState::Walk,
+            GatherState::Drop { move_to: None },
+            GatherState::Walk { move_to: None },
             GatherState::Face,
             GatherState::Work
         ]
@@ -18513,8 +18542,8 @@ fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
                 .actions_of(t.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
-                .map(|g| g.state)
-                == Some(GatherState::Drop)
+                .map(|g| g.state.bare())
+                == Some(GatherState::Drop { move_to: None })
         };
         forage_until(&mut t, 800, carries);
         let _ = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
@@ -18524,8 +18553,8 @@ fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
                 .actions_of(t.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
-                .map(|g| g.state)
-                != Some(GatherState::Drop)
+                .map(|g| g.state.bare())
+                != Some(GatherState::Drop { move_to: None })
         };
         forage_until(&mut t, 400, dropped);
         assert_eq!(t.players[1].attributes[0], Amount::new(10.0));
@@ -18533,13 +18562,16 @@ fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| (g.state, g.target))
+            .map(|g| (g.state.bare(), g.target))
     };
     assert_eq!(
         carrying(true),
-        Some((GatherState::Walk, Some(object_id(601))))
+        Some((GatherState::Walk { move_to: None }, Some(object_id(601))))
     );
-    assert_eq!(carrying(false), Some((GatherState::WalkBack, None)));
+    assert_eq!(
+        carrying(false),
+        Some((GatherState::WalkBack { move_to: None }, None))
+    );
 }
 
 /// [`foraging`] up to the forager's drop at its town centre without a target (bush 600 gone
@@ -18551,8 +18583,8 @@ fn dropped_without_bush(setup: impl FnOnce(&mut World)) -> World {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| g.state)
-            == Some(GatherState::Drop)
+            .map(|g| g.state.bare())
+            == Some(GatherState::Drop { move_to: None })
     };
     forage_until(&mut t, 800, carries);
     let _ = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
@@ -18563,8 +18595,8 @@ fn dropped_without_bush(setup: impl FnOnce(&mut World)) -> World {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| g.state)
-            != Some(GatherState::Drop)
+            .map(|g| g.state.bare())
+            != Some(GatherState::Drop { move_to: None })
     };
     forage_until(&mut t, 400, dropped);
     assert_eq!(t.players[1].attributes[0], Amount::new(10.0));
@@ -18596,7 +18628,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
         .copied()
         .unwrap();
     assert_eq!(
-        (g.state, g.target, g.carry_to, g.point),
+        (g.state.bare(), g.target, g.carry_to, g.point),
         (GatherState::Idle, None, None, Position::from([-1.0; 3]))
     );
     assert_eq!(
@@ -18843,15 +18875,15 @@ fn the_gather_update_ends_asks_again_and_walks_back() {
         .abs()
             < 1e-6
     );
-    let mut t = set(GatherState::Walk, Seconds::new(-0.02));
+    let mut t = set(GatherState::Walk { move_to: None }, Seconds::new(-0.02));
     gather_step(&mut t).unwrap();
     assert_eq!(
         t.parts
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| g.state),
-        Some(GatherState::WalkBack)
+            .map(|g| g.state.bare()),
+        Some(GatherState::WalkBack { move_to: None })
     );
 }
 
@@ -21183,7 +21215,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
                     .unwrap()
                     .find(object_id(600))
                     .map(|(_, b)| b.workers.get());
-                let gather = actions.list.gather().map(|g| (g.target, g.state));
+                let gather = actions.list.gather().map(|g| (g.target, g.state.bare()));
                 let build = actions.list.build().map(|b| b.target);
                 Ok((bush, gather, build))
             },
@@ -21206,11 +21238,11 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
                 .actions_of(gatherer.id)
                 .list
                 .gather()
-                .map(|g| (g.target, g.state))
+                .map(|g| (g.target, g.state.bare()))
         ),
         (
             Some(crate::gathering::gather::GATHER),
-            Some((Some(object_id(600)), GatherState::Walk))
+            Some((Some(object_id(600)), GatherState::Walk { move_to: None }))
         )
     );
     assert_eq!(

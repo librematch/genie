@@ -117,7 +117,7 @@ impl Action {
             actions::Action::Build(b) => walking(b.state.move_to().map(|m| m.state)),
             actions::Action::Repair(r) => walking(r.state.move_to().map(|m| m.state)),
             actions::Action::Fly(f) => walking(f.state.move_to().map(|m| m.state)),
-            actions::Action::Gather(g) => walking(g.move_to.map(|m| m.state)),
+            actions::Action::Gather(g) => walking(g.state.move_to().map(|m| m.state)),
             actions::Action::Attack(a) => walking(a.move_to.map(|m| m.state)),
             actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
             actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),

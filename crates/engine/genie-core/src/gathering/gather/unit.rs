@@ -57,7 +57,10 @@ impl Unit {
         self.gather_check_targets(actions, c, by)?;
         let gather = *actions.list.gather().ok_or(NO_GATHER)?;
         let reads = self.gather_reads(c, &gather)?;
-        if gather.state == crate::gathering::gather::GatherState::Drop {
+        if matches!(
+            gather.state,
+            crate::gathering::gather::GatherState::Drop { .. }
+        ) {
             return self.gather_drop_update(actions, c, me, gather, &reads, by);
         }
         self.gather_work_update(actions, c, me, gather, &reads, by)

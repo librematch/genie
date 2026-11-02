@@ -196,7 +196,6 @@ impl GatherAction {
             worked: false,
             farm,
             gather_at: Point::from([-1.0; 2]),
-            move_to: None,
         })
     }
 
@@ -304,8 +303,12 @@ impl GatherAction {
         self.worked = false;
         if Some(target.id) == self.target {
             match self.state {
-                GatherState::Face | GatherState::Work | GatherState::Moved => return Ok(true),
-                GatherState::Walk | GatherState::WalkBack if computer => return Ok(true),
+                GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
+                    return Ok(true);
+                }
+                GatherState::Walk { .. } | GatherState::WalkBack { .. } if computer => {
+                    return Ok(true);
+                }
                 _ => {}
             }
         }
@@ -373,7 +376,7 @@ impl GatherAction {
     ) -> Result<(), GenieError> {
         let position = to.at;
         self.tear_down(Some(mover))?;
-        self.state = GatherState::Walk;
+        self.state = GatherState::Walk { move_to: None };
         self.timer = Seconds::ZERO;
         if self.target.is_none() {
             return Err(GenieError::unsupported(
@@ -392,7 +395,7 @@ impl GatherAction {
         } else {
             self.move_to_object(to, mover, walks)?
         };
-        self.move_to = walk;
+        self.state = GatherState::Walk { move_to: walk };
         Ok(())
     }
 
@@ -412,7 +415,7 @@ impl GatherAction {
         walks: &Walks<'_>,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
-        self.state = GatherState::Drop;
+        self.state = GatherState::Drop { move_to: None };
         self.current_stop = StopIndex::FIRST;
         if self.carry_to.is_none() {
             return Err(GenieError::unsupported(
@@ -425,7 +428,8 @@ impl GatherAction {
             gap,
             state: None,
         };
-        self.move_to = self.move_to_object(to, mover, walks)?;
+        let move_to = self.move_to_object(to, mover, walks)?;
+        self.state = GatherState::Drop { move_to };
         Ok(())
     }
 
@@ -452,7 +456,7 @@ impl GatherAction {
         match target.filter(|t| t.player == player && t.drop_site && Amount::ZERO < held) {
             Some(t)
                 if Some(t.id) == self.carry_to.map(DropSiteId::id)
-                    && self.state == GatherState::Drop =>
+                    && matches!(self.state, GatherState::Drop { .. }) =>
             {
                 Ok(())
             }
@@ -479,7 +483,7 @@ impl GatherAction {
     /// A sprite the table lacks.
     pub fn set_moved(&mut self, mover: &mut Mover, walks: &Walks<'_>) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
-        self.state = GatherState::Moved;
+        self.state = GatherState::Moved { move_to: None };
         self.timer = Seconds::ZERO;
         if self.target.is_some() {
             return Err(GenieError::unsupported(
@@ -487,7 +491,8 @@ impl GatherAction {
             ));
         }
         let range = self.task.range;
-        self.move_to = self.move_to_point(self.point, range, TargetMoved::Follows, mover, walks)?;
+        let move_to = self.move_to_point(self.point, range, TargetMoved::Follows, mover, walks)?;
+        self.state = GatherState::Moved { move_to };
         Ok(())
     }
 

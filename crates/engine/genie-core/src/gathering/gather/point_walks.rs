@@ -13,7 +13,7 @@ use crate::gathering::gather::{
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::Well512;
-use crate::movement::move_to::TargetMoved;
+use crate::movement::move_to::{MoveToAction, TargetMoved};
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -68,7 +68,12 @@ impl GatherAction {
         mover: &mut Mover,
         walks: &Walks<'_>,
     ) -> Result<(), GenieError> {
-        self.walk_to_point(GatherState::WalkBack, radius, mover, walks)
+        self.walk_to_point(
+            |move_to| GatherState::WalkBack { move_to },
+            radius,
+            mover,
+            walks,
+        )
     }
 
     /// `set_state(0xf2)` (`0x140a8cd40` case 0xf2): the point takes `mGatherX`, `mGatherY`
@@ -88,24 +93,30 @@ impl GatherAction {
         if x != NO_GATHER_POINT {
             self.point = self.point.with_x(x).with_y(y);
         }
-        self.walk_to_point(GatherState::ReseedWalk, radius, mover, walks)
+        self.walk_to_point(
+            |move_to| GatherState::ReseedWalk { move_to },
+            radius,
+            mover,
+            walks,
+        )
     }
 
-    /// `set_state` in `state` 11 or 0xf2 (case 0xb's walk): the sub-actions go, the timer
-    /// clears and a quiet `MoveTo` to the point within `radius` plus the task's range starts
-    /// ([`GatherAction::move_to_point`], `+0x61` left 0).
+    /// `set_state` in the walk `walk` makes, 11 or 0xf2 (case 0xb's walk): the sub-actions go,
+    /// the timer clears and a quiet `MoveTo` to the point within `radius` plus the task's range
+    /// starts ([`GatherAction::move_to_point`], `+0x61` left 0).
     pub(super) fn walk_to_point(
         &mut self,
-        state: GatherState,
+        walk: fn(Option<MoveToAction>) -> GatherState,
         radius: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
-        self.state = state;
+        self.state = walk(None);
         self.timer = Seconds::ZERO;
         let range = radius + self.task.range;
-        self.move_to = self.move_to_point(self.point, range, TargetMoved::Follows, mover, walks)?;
+        let move_to = self.move_to_point(self.point, range, TargetMoved::Follows, mover, walks)?;
+        self.state = walk(move_to);
         Ok(())
     }
 

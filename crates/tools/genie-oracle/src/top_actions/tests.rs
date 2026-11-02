@@ -926,12 +926,12 @@ fn gather_takes_its_stops_and_move_to() {
             TaskId::of_task(0)
         )
     );
-    assert!(g.worked && g.move_to.is_none());
+    assert!(g.worked && g.state.move_to().copied().is_none());
     assert_eq!(g.farm.x().to_bits(), 3.0_f32.to_bits());
     let g = imported(
         GATHER,
         gather(with_sub(
-            base(GatherState::Walk.get()),
+            base(GatherState::Walk { move_to: None }.get()),
             MOVE_TO,
             move_to(4, 0.75),
         )),
@@ -943,7 +943,7 @@ fn gather_takes_its_stops_and_move_to() {
     .unwrap();
     assert!(!g.worked);
     // every MoveTo of the Gather is quiet; one without a target walks to its point
-    let walk = g.move_to.unwrap();
+    let walk = g.state.move_to().copied().unwrap();
     assert_eq!((walk.state, walk.quiet), (MoveTo::Moving, true));
     assert!(
         matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
@@ -956,7 +956,7 @@ fn gather_takes_its_stops_and_move_to() {
         imported(
             GATHER,
             gather(with_sub(
-                base(GatherState::Walk.get()),
+                base(GatherState::Walk { move_to: None }.get()),
                 genie_core::movement::explore::EXPLORE,
                 explore(base(3))
             ))
@@ -967,6 +967,16 @@ fn gather_takes_its_stops_and_move_to() {
     assert_eq!(
         imported(GATHER, gather(base(99))).unwrap_err(),
         GenieError::unsupported("a saved Gather in a state the slice does not model")
+    );
+    // a MoveTo belongs to a walk: in any other state it is no state of the game
+    let working = with_sub(base(GatherState::Work.get()), MOVE_TO, move_to(4, 0.5));
+    let stray = imported(GATHER, gather(working)).unwrap_err();
+    assert_eq!(
+        (stray.kind(), stray.reason()),
+        (
+            genie_core::ErrorKind::InvalidInput,
+            "a MoveTo of a Gather that does not walk"
+        )
     );
     assert_eq!(
         imported(GATHER, explore(base(GatherState::Work.get()))).unwrap_err(),

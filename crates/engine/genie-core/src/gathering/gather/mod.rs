@@ -21,7 +21,7 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
-use crate::movement::move_to::{MoveDefaults, MoveToAction};
+use crate::movement::move_to::MoveDefaults;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkRate;
@@ -152,10 +152,6 @@ pub struct GatherAction {
     /// `+0x8c`, `+0x90`: `mGatherX`, `mGatherY`, where the gathering started (−1 while the
     /// game's farm setting holds them, [`GatherReads::farm_stops`]).
     pub gather_at: Point,
-    /// The sub-action of states 4, 8, 11, 15 and 0xf2: the quiet `MoveTo` (the one component,
-    /// [`MoveToAction`]) to the target, the drop site or a point, which `set_state` makes
-    /// ([`GatherAction::set_walk`], [`GatherAction::set_drop`], [`GatherAction::walk_back`]).
-    pub move_to: Option<MoveToAction>,
 }
 
 /// What the gather reads of its target when it takes it.

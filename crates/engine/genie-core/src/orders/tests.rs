@@ -4854,10 +4854,10 @@ fn gather_takes_farm_but_no_other_building() {
         .copied()
         .unwrap();
     assert_eq!(
-        (g.target, g.state, g.point),
+        (g.target, g.state.bare(), g.point),
         (
             Some(object_id(800)),
-            GatherState::Walk,
+            GatherState::Walk { move_to: None },
             Position::new(26.5, 89.5, 0.0)
         )
     );
@@ -5027,8 +5027,11 @@ fn drop_off_order_takes_gather_to_its_site_or_posts_the_other_load() {
         .copied()
         .expect("the Gather");
     assert_eq!(
-        (g.carry_to, g.state),
-        (Some(DropSiteId::new(object_id(700))), GatherState::Drop)
+        (g.carry_to, g.state.bare()),
+        (
+            Some(DropSiteId::new(object_id(700))),
+            GatherState::Drop { move_to: None }
+        )
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(2)].workers,
@@ -5074,8 +5077,11 @@ fn drop_off_order_takes_gather_to_its_site_or_posts_the_other_load() {
             .actions_of(v.id)
             .list
             .gather()
-            .map(|g| (g.carry_to, g.state)),
-        Some((Some(DropSiteId::new(object_id(700))), GatherState::Drop))
+            .map(|g| (g.carry_to, g.state.bare())),
+        Some((
+            Some(DropSiteId::new(object_id(700))),
+            GatherState::Drop { move_to: None }
+        ))
     );
     assert_eq!(t.parts.unit_ai.get(v.id).map(|ai| ai.orders.len()), Some(1));
 }
@@ -5470,8 +5476,8 @@ fn work_command_factory_starts_the_task_action() {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| (g.target, g.state)),
-        Some((Some(object_id(600)), GatherState::Walk))
+            .map(|g| (g.target, g.state.bare())),
+        Some((Some(object_id(600)), GatherState::Walk { move_to: None }))
     );
     let unknown = Task {
         action_type: ActionType::named(0x55),

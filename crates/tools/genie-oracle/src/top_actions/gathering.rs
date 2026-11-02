@@ -165,27 +165,36 @@ pub(super) fn import_gather(
         .ok_or(GenieError::unsupported(
             "a saved Gather without its own part",
         ))?;
-    let state = GatherState::of_byte(base.state)
-        .ok()
-        .filter(|s| {
-            matches!(
-                s,
-                GatherState::Walk
-                    | GatherState::Face
-                    | GatherState::Work
-                    | GatherState::Drop
-                    | GatherState::Done
-                    | GatherState::Idle
-                    | GatherState::Moved
-                    | GatherState::Search
-                    | GatherState::WalkBack
-            )
-        })
-        .ok_or(GenieError::unsupported(
+    // the states the slice models
+    if !GatherState::of_byte(base.state, None).is_ok_and(|s| {
+        matches!(
+            s,
+            GatherState::Walk { .. }
+                | GatherState::Face
+                | GatherState::Work
+                | GatherState::Drop { .. }
+                | GatherState::Done
+                | GatherState::Idle
+                | GatherState::Moved { .. }
+                | GatherState::Search
+                | GatherState::WalkBack { .. }
+        )
+    }) {
+        return Err(GenieError::unsupported(
             "a saved Gather in a state the slice does not model",
-        ))?;
+        ));
+    }
+    // every MoveTo of the Gather is quiet (`FUN_140a7a170` with 1): to the target, the drop
+    // site or a point
+    let walk = saved
+        .move_to_sub(GenieError::unsupported(
+            "a saved Gather with another sub-action",
+        ))?
+        .map(|sub| saved_move_to(sub, saved.graphics, true))
+        .transpose()?;
+    let state = GatherState::of_byte(base.state, walk)?;
     let task = hunt_task(&saved.task(task_at)?);
-    let mut gather = GatherAction {
+    let gather = GatherAction {
         target: ObjectId::of_field(base.target_id),
         carry_to: DropSiteId::of_field(base.target2_id),
         state,
@@ -202,16 +211,7 @@ pub(super) fn import_gather(
         worked: state == GatherState::Work,
         farm: Point::new(part.farm_x, part.farm_y),
         gather_at: Point::new(part.gather_x, part.gather_y),
-        move_to: None,
     };
-    // every MoveTo of the Gather is quiet (`FUN_140a7a170` with 1): to the target, the drop
-    // site or a point
-    gather.move_to = saved
-        .move_to_sub(GenieError::unsupported(
-            "a saved Gather with another sub-action",
-        ))?
-        .map(|sub| saved_move_to(sub, saved.graphics, true))
-        .transpose()?;
     actions.list.set_gather(Some(gather));
     Ok(())
 }

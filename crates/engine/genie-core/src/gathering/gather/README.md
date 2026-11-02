@@ -24,7 +24,7 @@ point on the farm for each stop.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
-| [`gather_state.rs`](gather_state.rs) | A Gather's state: the steps of its update from the walk to the drop. |
+| [`gather_state.rs`](gather_state.rs) | A Gather's state: the steps of its update from the walk to the drop, each walk with its `MoveTo`. |
 | [`mod.rs`](mod.rs) | The Gather action (`RGE_Action_Gather`, type 5, vtable `0x142ed4f28`): a forager sent to a resource walks to it (state 4, a quiet `MoveTo`), faces it (6), gathers (7), takes the load to a drop site (8) and walks back to the resource (4). |
 | [`point_walks.rs`](point_walks.rs) | The walks to a point and the waits: back to search (state 11), back to reseed (0xf2), for a farm (0xf3), the search (3) and a move's walk (15). |
 | [`start.rs`](start.rs) | The Gather's constructor and start, its retarget, the walk, the drop and a move's target, the idle and the halt; a farm's stops and their productivity. |

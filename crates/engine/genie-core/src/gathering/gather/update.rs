@@ -61,7 +61,7 @@ impl GatherAction {
     ///
     /// The unit's stop that the motion step does not model.
     pub fn tear_down(&mut self, mover: Option<&mut Mover>) -> Result<(), GenieError> {
-        if self.move_to.take().is_some()
+        if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
             m.stop()?;
@@ -113,10 +113,10 @@ impl GatherAction {
         match self.state {
             GatherState::Done => return Ok(Next::Done),
             GatherState::Idle => return Ok(Next::Stay),
-            GatherState::Moved => return self.update_moved(c, unit, me, r),
-            GatherState::WalkBack => return self.update_walk_back(c, unit, me, r),
+            GatherState::Moved { .. } => return self.update_moved(c, unit, me, r),
+            GatherState::WalkBack { .. } => return self.update_walk_back(c, unit, me, r),
             GatherState::FarmWait => return self.update_farm_wait(c, unit, target.as_deref(), r),
-            GatherState::ReseedWalk => {
+            GatherState::ReseedWalk { .. } => {
                 return self.update_reseed_walk(c, unit, me, target.as_deref(), r);
             }
             GatherState::Search => return Ok(self.update_search(dt)),
@@ -126,10 +126,10 @@ impl GatherAction {
             return self.update_without_target(c, unit, r);
         };
         match self.state {
-            GatherState::Walk if self.timer < Seconds::ZERO => {
+            GatherState::Walk { .. } if self.timer < Seconds::ZERO => {
                 self.update_walk_wait(c, unit, target, dt, r)
             }
-            GatherState::Walk => self.update_walk(c, unit, me, target, r),
+            GatherState::Walk { .. } => self.update_walk(c, unit, me, target, r),
             GatherState::Face => self.update_face(c, unit, target, r),
             GatherState::Work => self.update_work(c, unit, target, r),
             _ => Err(GenieError::unsupported(
@@ -162,7 +162,7 @@ impl GatherAction {
     ) -> Result<Next, GenieError> {
         if !matches!(
             self.state,
-            GatherState::Walk | GatherState::Face | GatherState::Work
+            GatherState::Walk { .. } | GatherState::Face | GatherState::Work
         ) {
             return Err(GenieError::unsupported(
                 "a Gather action in a state the slice does not model",
@@ -353,7 +353,7 @@ impl GatherAction {
         r: &GatherReads,
     ) -> Result<UpdateCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
-        let state = self.move_to.as_ref().map(|m| m.state);
+        let state = self.state.move_to().map(|m| m.state);
         // the computer player's test is not held: its villagers would fail at once
         let how = ListUpdate {
             gives_up: GiveUp {
@@ -362,7 +362,11 @@ impl GatherAction {
             },
             ..ListUpdate::default()
         };
-        let code = update_sub_actions(&mut self.move_to, c, unit, me, how)?;
+        let code = match self.state.walk_mut() {
+            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            // a state that does not walk has no sub-action: its list's update is the empty one's
+            None => update_sub_actions(&mut None, c, unit, me, how)?,
+        };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
             unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
         }
