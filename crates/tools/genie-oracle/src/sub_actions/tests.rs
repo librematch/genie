@@ -4,6 +4,7 @@ use crate::sub_actions::{DefaultStart, default_task, gather_point, production, s
 use crate::test_ids::object_id;
 use genie_core::combat::attack::AttackState;
 use genie_core::movement::move_to::MoveTo;
+use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
@@ -195,7 +196,7 @@ fn livestock() -> genie_save::Object {
     combat_object(5, 83)
 }
 
-fn start(table: &MasterTable) -> Result<Option<DefaultStart>, genie_core::GenieError> {
+fn start(table: &MasterTable) -> Result<Option<DefaultStart>, Unstartable> {
     let mut object = livestock();
     let s = static_mut(&mut object).clone();
     default_task(
@@ -237,8 +238,15 @@ fn the_default_task_starts_what_the_table_names() {
         ))),
         Ok(None)
     ));
-    assert!(start(&table(DefaultAction::Type(genie_core::garrison::ENTER))).is_err());
-    assert!(start(&table(DefaultAction::NoSuchTask)).is_err());
+    let enter = genie_core::garrison::ENTER;
+    assert!(matches!(
+        start(&table(DefaultAction::Type(enter))),
+        Err(Unstartable::Unported(t)) if t == enter
+    ));
+    assert!(matches!(
+        start(&table(DefaultAction::NoSuchTask)),
+        Err(Unstartable::Unread(UnreadDefault::NoSuchTask))
+    ));
     // a bird's Fly reads its master's default task as it starts, not at the load
     let fly = genie_core::movement::fly::FLY;
     assert!(matches!(
@@ -246,7 +254,10 @@ fn the_default_task_starts_what_the_table_names() {
         Ok(Some(DefaultStart::Fly))
     ));
     // a master the table does not have
-    assert!(start(&MasterTable::default()).is_err());
+    assert!(matches!(
+        start(&MasterTable::default()),
+        Err(Unstartable::Unread(UnreadDefault::NotInTable))
+    ));
 }
 
 /// Only action objects have a default task; without a table it is unknown.
@@ -267,7 +278,10 @@ fn a_static_object_has_no_default_task() {
     ));
     let object = livestock();
     let s = object.static_part().unwrap().clone();
-    assert!(default_task(&object, &s, &objects, CivId::GAIA, None).is_err());
+    assert!(matches!(
+        default_task(&object, &s, &objects, CivId::GAIA, None),
+        Err(Unstartable::Unread(UnreadDefault::NoMasterTable))
+    ));
 }
 
 /// An Attack (type 9) of range 5 in state `state`, its sub-actions `subs`.

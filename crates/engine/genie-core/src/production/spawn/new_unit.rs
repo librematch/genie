@@ -417,9 +417,14 @@ impl World {
         let parts = ObjectParts {
             actions: crate::objects::layers::Action {
                 // livestock's default task, the Artifact, starts once its action list is empty
-                default_artifact: made
+                default_task: if made
                     .default_task()
-                    .is_some_and(|t| t.action_type == crate::ownership::artifact::ARTIFACT_TYPE),
+                    .is_some_and(|t| t.action_type == crate::ownership::artifact::ARTIFACT_TYPE)
+                {
+                    crate::objects::layers::DefaultTask::Artifact
+                } else {
+                    crate::objects::layers::DefaultTask::Nothing
+                },
                 ..Default::default()
             },
             unit_ai: ai,

@@ -5,7 +5,6 @@
 //! ([`Master::follow`]). The values are game data: the player's masters in the save, with the
 //! `.dat`'s values for what the save does not carry.
 
-use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
 use crate::map::Distance;
@@ -175,21 +174,19 @@ impl Master {
         self.tasks.get(self.default_task?.index())
     }
 
-    /// What a new object of this master starts once its action list is empty in state 2
-    /// (`RGE_Action_Object::update`, slot 0x7f0): a Make ([`crate::gathering::make`]: true), or the
-    /// default task's action the slice does not model; nothing for a type the factory makes no
-    /// action of.
+    /// What a new building of this master starts once its action list is empty in state 2
+    /// (`RGE_Action_Object::update`, slot 0x7f0): a Make ([`crate::gathering::make`]), or a start
+    /// the slice cannot make of another type the factory makes; nothing for a type the factory
+    /// makes no action of.
     #[must_use]
-    pub fn default_start(&self) -> (bool, Option<GenieError>) {
+    pub fn default_start(&self) -> crate::objects::layers::DefaultTask {
+        use crate::objects::layers::{DefaultTask, Unstartable};
         match self.default_task() {
-            Some(t) if t.action_type == crate::gathering::make::MAKE => (true, None),
-            Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_type) => (
-                false,
-                Some(GenieError::unsupported(
-                    "a new object's default task other than a Make",
-                )),
-            ),
-            _ => (false, None),
+            Some(t) if t.action_type == crate::gathering::make::MAKE => DefaultTask::Make,
+            Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_type) => {
+                DefaultTask::Fails(Unstartable::Unported(t.action_type))
+            }
+            _ => DefaultTask::Nothing,
         }
     }
 

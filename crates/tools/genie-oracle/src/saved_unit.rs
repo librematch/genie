@@ -355,6 +355,7 @@ fn row(
         ..Unit::default()
     };
     let mut actions = genie_core::objects::layers::Action::default();
+    let default = default_task(object, s, objects, civ, masters);
     let imported = if saved {
         saved_actions(
             object,
@@ -375,27 +376,16 @@ fn row(
     } else {
         // an object without actions in a save: its default task's action (an Artifact exists
         // from the load on; a Fly starts in its first update)
-        default_task(object, s, objects, civ, masters).map(|d| match d {
-            Some(DefaultStart::Artifact(a)) => actions.list.set_artifact(Some(*a)),
-            Some(DefaultStart::Fly) => actions.default_fly = true,
-            Some(DefaultStart::Make) => actions.default_make = true,
-            None => {}
-        })
-    };
-    // what the default task starts once the action list empties: nothing, a Fly, the Artifact
-    // again or something not modelled
-    actions.default_task = match default_task(object, s, objects, civ, masters) {
-        Ok(None | Some(DefaultStart::Fly | DefaultStart::Make)) => None,
-        Ok(Some(DefaultStart::Artifact(_))) => {
-            actions.default_artifact = true;
-            None
+        match &default {
+            Ok(Some(DefaultStart::Artifact(a))) => {
+                actions.list.set_artifact(Some(**a));
+                Ok(())
+            }
+            Ok(_) => Ok(()),
+            Err(f) => Err(f.error()),
         }
-        Err(e) => Some(e),
     };
-    if saved {
-        // a saved object's Fly is its saved action's: none starts again (it never ends)
-        actions.default_fly = false;
-    }
+    actions.default_task = default_start(default, saved);
     let production = production(object).map(|_| ());
     let (mover, moving) = match mover(object, s, objects, paths, civ, masters) {
         Ok(m) => (m, Ok(())),
@@ -421,6 +411,25 @@ fn row(
             ..ObjectParts::default()
         },
     )
+}
+
+/// What the default task `default` of an object (`saved`: its save holds its actions) starts
+/// once its action list empties: nothing, a Fly or a Make before its first update, the Artifact
+/// again, or a start the slice cannot make. A saved object's Fly is its saved action's: none
+/// starts again (it never ends); a saved Make started.
+fn default_start(
+    default: Result<Option<DefaultStart>, genie_core::objects::layers::Unstartable>,
+    saved: bool,
+) -> genie_core::objects::layers::DefaultTask {
+    use genie_core::objects::layers::DefaultTask;
+    match default {
+        Ok(None) => DefaultTask::Nothing,
+        Ok(Some(DefaultStart::Fly | DefaultStart::Make)) if saved => DefaultTask::Nothing,
+        Ok(Some(DefaultStart::Fly)) => DefaultTask::Fly,
+        Ok(Some(DefaultStart::Make)) => DefaultTask::Make,
+        Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
+        Err(f) => DefaultTask::Fails(f),
+    }
 }
 
 /// A saved building's lists of objects (none for another object).

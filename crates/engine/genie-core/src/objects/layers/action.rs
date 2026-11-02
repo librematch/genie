@@ -8,6 +8,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::actions;
 use crate::objects::actions::ActionList;
+use crate::objects::layers::DefaultTask;
 use crate::objects::masters::ActionType;
 use crate::world::checkpoint::TopAction;
 use genie_diff::Diff;
@@ -23,24 +24,9 @@ pub struct Action {
     /// step; the slice does not model it, so that update stops the player.
     #[diff(unsaved, eq)]
     pub unmodelled_action: Option<GenieError>,
-    /// What its master's default task would start once its action list is empty, when the
-    /// slice does not model it (None: nothing, as a wild animal's Explore).
-    #[diff(unsaved, eq)]
-    pub default_task: Option<GenieError>,
-    /// Its master's default task is a Fly, which starts once its action list is empty (a bird at
-    /// a game's start, before its first update) with the task its master holds then. Not
-    /// saved: a load from the header sets it, a load of a later save (the Fly saved) does not.
-    #[diff(unsaved)]
-    pub default_fly: bool,
-    /// Its master's default task is a Make, which starts once its action list is empty in
-    /// state 2 (a farm or fish trap before its first update as a built building), with the task
-    /// its master holds then.
-    pub default_make: bool,
-    /// Its master's default task is the Artifact action (livestock), which starts again once its
-    /// action list is empty in state 2 (an animal out of a building whose Artifact went), its
-    /// first update in the next tick, as a Fly's.
-    #[diff(gap = "the import reads the shared master's default task, not an own master's")]
-    pub default_artifact: bool,
+    /// What its master's default task starts once its action list is empty in state 2
+    /// ([`DefaultTask`]).
+    pub default_task: DefaultTask,
 }
 
 impl Action {

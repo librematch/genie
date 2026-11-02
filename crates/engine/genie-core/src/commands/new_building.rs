@@ -156,8 +156,10 @@ impl World {
         let position = self.on_ground(player, master, position);
         let id = self.take_object_id(player, master);
         // what its first update as a built building starts (slot 0x7f0)
-        let (default_make, default_task) = player_master(&self.masters, player, master)
-            .map_or((false, None), Master::default_start);
+        let default_task = player_master(&self.masters, player, master).map_or(
+            crate::objects::layers::DefaultTask::Nothing,
+            Master::default_start,
+        );
         let ai = unit_ai
             .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
             .map(|(t, new)| {
@@ -353,9 +355,6 @@ impl World {
                 list: ActionList::default(),
                 unmodelled_action: None,
                 default_task,
-                default_fly: false,
-                default_make,
-                default_artifact: false,
             },
             unit_ai: ai,
             building: layer,

@@ -18,11 +18,13 @@ use genie_diff::Diff;
 mod action;
 mod building;
 mod combat;
+mod default_task;
 mod motion;
 
 pub use self::action::Action;
 pub use self::building::Building;
 pub use self::combat::Combat;
+pub use self::default_task::{DefaultTask, UnreadDefault, Unstartable};
 pub use self::motion::{Animated, Motion, MotionMut};
 
 /// `RGE_Static_Object`'s place (FD-045-D15): x, y, z (`+0x3c8`, `+0x4c8`, `+0x5a8`, obfuscated in

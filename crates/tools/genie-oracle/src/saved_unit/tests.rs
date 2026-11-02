@@ -96,8 +96,11 @@ fn livestock_starts_with_its_artifact() {
         PLAYERS,
     );
     assert_eq!(u.unit.id, object_id(5));
-    assert!(u.parts.actions.list.artifact().is_some() && u.parts.actions.default_artifact);
-    assert!(u.parts.actions.default_task.is_none());
+    assert!(u.parts.actions.list.artifact().is_some());
+    assert_eq!(
+        u.parts.actions.default_task,
+        genie_core::objects::layers::DefaultTask::Artifact
+    );
     // a combat object's mover needs its master, which this save does not hold
     assert!(u.parts.actions.unmodelled_action.is_some());
 }
@@ -113,7 +116,14 @@ fn without_a_table_the_default_task_is_reported() {
         None,
         PLAYERS,
     );
-    assert!(u.parts.actions.default_task.is_some());
+    assert_eq!(
+        u.parts.actions.default_task,
+        genie_core::objects::layers::DefaultTask::Fails(
+            genie_core::objects::layers::Unstartable::Unread(
+                genie_core::objects::layers::UnreadDefault::NoMasterTable
+            )
+        )
+    );
     assert!(u.parts.actions.list.artifact().is_none());
 }
 
@@ -141,7 +151,10 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         PLAYERS,
     );
     assert!(u.parts.actions.unmodelled_action.is_some());
-    assert!(!u.parts.actions.default_fly);
+    assert_ne!(
+        u.parts.actions.default_task,
+        genie_core::objects::layers::DefaultTask::Fly
+    );
 }
 
 /// A missile without its action (it met its target) flies on with its own fields.

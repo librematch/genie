@@ -401,7 +401,8 @@ fn an_object_inside_another_runs_its_inside_update() {
     assert_eq!(unit.position(), at);
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     unit.life.inside = None;
-    t.parts.actions.of_mut(unit.id).unwrap().default_artifact = true;
+    t.parts.actions.of_mut(unit.id).unwrap().default_task =
+        crate::objects::layers::DefaultTask::Artifact;
     assert_eq!(
         in_update(
             &mut t,

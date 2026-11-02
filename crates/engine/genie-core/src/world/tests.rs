@@ -8173,7 +8173,7 @@ fn livestock_without_actions_starts_its_artifact_again() {
             ..Unit::default()
         },
         crate::objects::layers::Action {
-            default_artifact: true,
+            default_task: crate::objects::layers::DefaultTask::Artifact,
             ..Default::default()
         },
     );
@@ -8455,7 +8455,7 @@ fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
             ..Unit::default()
         },
         crate::objects::layers::Action {
-            default_make: true,
+            default_task: crate::objects::layers::DefaultTask::Make,
             ..Default::default()
         },
     );
@@ -8510,15 +8510,21 @@ fn a_farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
 
 #[test]
 fn a_built_farm_s_master_starts_a_make_and_another_default_task_is_reported() {
-    assert_eq!(farm_master().default_start(), (true, None));
+    use crate::objects::layers::DefaultTask;
+    assert_eq!(farm_master().default_start(), DefaultTask::Make);
     let mut other = farm_master();
     other.tasks[0].action_type = crate::movement::fly::FLY;
-    assert!(other.default_start().1.is_some());
+    assert_eq!(
+        other.default_start(),
+        DefaultTask::Fails(crate::objects::layers::Unstartable::Unported(
+            crate::movement::fly::FLY
+        ))
+    );
     // a type the factories make nothing of starts nothing (a wild animal's Explore, 6)
     other.tasks[0].action_type = ActionType::named(6);
-    assert_eq!(other.default_start(), (false, None));
+    assert_eq!(other.default_start(), DefaultTask::Nothing);
     other.default_task = None;
-    assert_eq!(other.default_start(), (false, None));
+    assert_eq!(other.default_start(), DefaultTask::Nothing);
 }
 
 /// `TRIBE_Building_Object::update`'s whole seconds (`0x1411c95a2`): a built building outside
@@ -17565,7 +17571,8 @@ fn livestock_got_in_by_its_artifact_s_enter_keeps_the_artifact_to_its_next_updat
 fn livestock_inside_gets_its_default_artifact_and_loses_it_by_turns() {
     let mut t = livestock_enter_world();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.actions.of_mut(v.id).unwrap().default_artifact = true;
+    t.parts.actions.of_mut(v.id).unwrap().default_task =
+        crate::objects::layers::DefaultTask::Artifact;
     t.parts
         .actions
         .of_mut(v.id)

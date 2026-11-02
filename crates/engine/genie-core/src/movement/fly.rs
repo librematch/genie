@@ -789,7 +789,8 @@ mod tests {
             let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
             let bird = &mut t.players[0].objects[ListIndex::new(0)];
             t.parts.actions.of_mut(bird.id).unwrap().list.set_fly(None);
-            t.parts.actions.of_mut(bird.id).unwrap().default_fly = true;
+            t.parts.actions.of_mut(bird.id).unwrap().default_task =
+                crate::objects::layers::DefaultTask::Fly;
             let master = t.masters[0].get_mut(master_id(96)).unwrap();
             master.tasks = vec![task];
             master.default_task = default;

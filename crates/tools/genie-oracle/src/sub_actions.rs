@@ -14,6 +14,7 @@ use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
+use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ACTION_FACTORY_TYPES;
 use genie_core::objects::masters::{ActionType, MasterId, action_type};
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
@@ -28,9 +29,6 @@ use genie_core::production::QueuedUnits;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
-
-/// A master the table does not have (the save names one the data file lacks).
-const NOT_IN_TABLE: GenieError = GenieError::unsupported("a master the table does not have");
 
 /// A saved unit's reload (the Strike's): its `mReloadStinger` plus its master's
 /// `speed_of_attack` less its `mReloadPowerup`; None without a combat master.
@@ -418,32 +416,27 @@ pub(super) enum DefaultStart {
 /// 0x14106ac90): only action objects (types 40 and up) have one. The default task is game data:
 /// the table's, from the `.dat`, or the object's own master's. The slice models the Artifact action
 /// (type 107, the default task of livestock) and a bird's Fly (type 10); any other default task is
-/// reported.
+/// a start the slice cannot make ([`Unstartable`]).
 pub(super) fn default_task(
     object: &genie_save::Object,
     s: &RgeStaticObject,
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
-) -> Result<Option<DefaultStart>, GenieError> {
+) -> Result<Option<DefaultStart>, Unstartable> {
     if !is_action_object(object) {
         return Ok(None);
     }
+    let not_in_table = Unstartable::Unread(UnreadDefault::NotInTable);
     let action = match s.own_master() {
         Some(_) => match own_default_task(s) {
             Some(-1) | None => DefaultAction::None,
-            Some(_) => {
-                return Err(GenieError::unsupported(
-                    "the default task of an object's own master",
-                ));
-            }
+            Some(_) => return Err(Unstartable::Unread(UnreadDefault::OwnMaster)),
         },
         None => masters
-            .ok_or(GenieError::unsupported(
-                "no master table: the default task is unknown",
-            ))?
-            .default_action(civ, dat_id(objects, s.master_obj).ok_or(NOT_IN_TABLE)?)
-            .ok_or(NOT_IN_TABLE)?,
+            .ok_or(Unstartable::Unread(UnreadDefault::NoMasterTable))?
+            .default_action(civ, dat_id(objects, s.master_obj).ok_or(not_in_table)?)
+            .ok_or(not_in_table)?,
     };
     match action {
         DefaultAction::None => Ok(None),
@@ -463,12 +456,8 @@ pub(super) fn default_task(
         // no action of the other types: the default task starts nothing (wild animals' Explore,
         // type 6)
         DefaultAction::Type(t) if !ACTION_FACTORY_TYPES.contains(&t) => Ok(None),
-        DefaultAction::Type(_) => Err(GenieError::unsupported(
-            "a default task other than the Artifact action",
-        )),
-        DefaultAction::NoSuchTask => Err(GenieError::unsupported(
-            "a default task id that names no task",
-        )),
+        DefaultAction::Type(t) => Err(Unstartable::Unported(t)),
+        DefaultAction::NoSuchTask => Err(Unstartable::Unread(UnreadDefault::NoSuchTask)),
     }
 }
 

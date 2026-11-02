@@ -76,7 +76,7 @@ mod tests {
 
     fn flying() -> Action {
         Action {
-            default_fly: true,
+            default_task: crate::objects::layers::DefaultTask::Fly,
             ..Action::default()
         }
     }
@@ -85,8 +85,12 @@ mod tests {
     fn an_object_the_table_does_not_hold_reads_an_empty_layer() {
         let mut parts = Parts::default();
         assert_eq!(parts.actions_of(object_id(1)), &Action::default());
-        parts.actions_mut(object_id(1)).unwrap().default_make = true;
-        assert!(parts.actions_of(object_id(1)).default_make);
+        parts.actions_mut(object_id(1)).unwrap().default_task =
+            crate::objects::layers::DefaultTask::Make;
+        assert_eq!(
+            parts.actions_of(object_id(1)).default_task,
+            crate::objects::layers::DefaultTask::Make
+        );
     }
 
     #[test]

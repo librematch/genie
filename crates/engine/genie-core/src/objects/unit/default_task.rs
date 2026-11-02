@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::objects::ObjectState;
+use crate::objects::layers::DefaultTask;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::ownership::artifact::Artifact;
@@ -25,40 +26,43 @@ impl Unit {
         {
             return Ok(false);
         }
-        if actions.default_fly {
-            let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
-                .copied()
-                .ok_or(GenieError::missing_data(
-                    "a bird's default Fly whose master has no default task",
-                ))?;
-            self.start_fly(actions, c, task)?;
-            return Ok(true);
+        match actions.default_task {
+            DefaultTask::Nothing => Ok(false),
+            DefaultTask::Fly => {
+                let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
+                    .copied()
+                    .ok_or(GenieError::missing_data(
+                        "a bird's default Fly whose master has no default task",
+                    ))?;
+                self.start_fly(actions, c, task)?;
+                Ok(true)
+            }
+            DefaultTask::Make => {
+                // it starts once
+                actions.default_task = DefaultTask::Nothing;
+                let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
+                    .copied()
+                    .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
+                actions
+                    .list
+                    .set_make(Some(crate::gathering::make::MakeAction::start(
+                        task,
+                        &c.w.players.player(c.player)?.attributes,
+                        &mut self.life,
+                    )));
+                Ok(true)
+            }
+            DefaultTask::Artifact => {
+                // the factory gives the action the default task, whose moving sprite its
+                // MoveTos take
+                let moving = Master::default_task(self.master(c.w.master_tables(), c.player)?)
+                    .and_then(|t| t.sprites.moving);
+                actions
+                    .list
+                    .set_artifact(Some(Artifact::new(c.player == PlayerId::GAIA, moving)));
+                Ok(true)
+            }
+            DefaultTask::Fails(f) => Err(f.error()),
         }
-        if std::mem::take(&mut actions.default_make) {
-            let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
-                .copied()
-                .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
-            actions
-                .list
-                .set_make(Some(crate::gathering::make::MakeAction::start(
-                    task,
-                    &c.w.players.player(c.player)?.attributes,
-                    &mut self.life,
-                )));
-            return Ok(true);
-        }
-        if actions.default_artifact {
-            // the factory gives the action the default task, whose moving sprite its MoveTos take
-            let moving = Master::default_task(self.master(c.w.master_tables(), c.player)?)
-                .and_then(|t| t.sprites.moving);
-            actions
-                .list
-                .set_artifact(Some(Artifact::new(c.player == PlayerId::GAIA, moving)));
-            return Ok(true);
-        }
-        if let Some(e) = &actions.default_task {
-            return Err(e.clone());
-        }
-        Ok(false)
     }
 }
