@@ -151,7 +151,9 @@ impl World {
         {
             return Ok(false);
         }
-        self.parts.actions_of(u.id).interruptible()
+        self.parts
+            .actions_of(u.id)
+            .interruptible(self.parts.unread.get(u.id))
     }
 
     /// `FUN_141007a50` of group `group`: at rest without a command (-1), its motion not moving
@@ -190,7 +192,7 @@ impl World {
         if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok(None);
         }
-        if let Some(e) = self.parts.actions_of(u.id).unmodelled_action.clone() {
+        if let Some(e) = self.parts.unread.get(u.id).map(crate::world::Unread::error) {
             return Err(e);
         }
         Ok(self
@@ -413,6 +415,7 @@ impl World {
             return Ok(true);
         };
         self.parts.actions_of(u.id).free_for_group(
+            self.parts.unread.get(u.id),
             u.master(self.master_tables(), p)?,
             self.parts.unit_ai.get(u.id),
         )
@@ -489,7 +492,7 @@ impl World {
             return Err(TRADE_CART_SPRITES);
         }
         if ACTION <= master.kind
-            && let Some(e) = self.parts.actions_of(u.id).unmodelled_action.clone()
+            && let Some(e) = self.parts.unread.get(u.id).map(crate::world::Unread::error)
         {
             return Err(e);
         }
@@ -562,13 +565,15 @@ impl World {
 impl crate::objects::layers::Action {
     /// [`World::member_idle`] of the unit itself (`FUN_141017f00`) by its action layer, of
     /// master `master` and unit AI `ai`, as its own update asks it (slot 0x5e0,
-    /// [`crate::movement::GroupSpeed`]).
+    /// [`crate::movement::GroupSpeed`]); `unread`: the load could not read it whole
+    /// ([`crate::world::Unread`]).
     ///
     /// # Errors
     ///
     /// A unit with an action the slice does not model.
     pub(crate) fn free_for_group(
         &self,
+        unread: Option<&crate::world::Unread>,
         master: &Master,
         ai: Option<&UnitAi>,
     ) -> Result<bool, GenieError> {
@@ -576,8 +581,8 @@ impl crate::objects::layers::Action {
         let state = if master.kind < ACTION {
             ActionState::NO_ACTION
         } else {
-            if let Some(e) = actions.unmodelled_action.clone() {
-                return Err(e);
+            if let Some(e) = unread {
+                return Err(e.error());
             }
             actions
                 .top_action()

@@ -8093,19 +8093,16 @@ fn an_order_resets_the_idle_timeouts_of_its_units_wherever_they_are() {
 }
 
 #[test]
-fn an_unmodelled_action_stops_its_player_unless_the_object_dies_first() {
+fn an_unread_object_stops_its_player_unless_it_dies_first() {
     let task = GenieError::unsupported("a default task the slice does not model");
     let with_task = |life| {
-        Object::with_actions(
+        Object::unread(
             Unit {
                 id: object_id(5),
                 life,
                 ..Unit::default()
             },
-            crate::objects::layers::Action {
-                unmodelled_action: Some(task.clone()),
-                ..Default::default()
-            },
+            task.clone(),
         )
     };
     let run = |unit| {
@@ -10235,11 +10232,10 @@ fn a_research_s_unmodelled_parts_fail() {
     );
     assert_eq!(
         fails(&|t| {
-            t.parts
-                .actions
-                .of_mut(t.players[0].objects[ListIndex::new(0)].id)
-                .unwrap()
-                .unmodelled_action = Some(GenieError::unsupported("an action"));
+            t.set_unread(
+                t.players[0].objects[ListIndex::new(0)].id,
+                GenieError::unsupported("an action"),
+            );
         }),
         "RESEARCH at a building with an unmodelled action"
     );
@@ -15426,7 +15422,7 @@ fn ai_move_of(
     let mut rng = Well512::default();
     let (masters, graphics) = scout_sprites();
     let _ = u.ai_move_with(
-        actions,
+        (actions, None),
         motion.lent(),
         m,
         (class, PlayerId::new(1)),
@@ -15739,7 +15735,7 @@ fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
     let none = Graphics::new();
     assert_eq!(
         u.head_takes_point(
-            &mut actions,
+            (&mut actions, None),
             motion.lent(),
             AI_POINT,
             PlayerId::new(1),
@@ -15748,13 +15744,16 @@ fn an_ai_move_of_a_trebuchet_packs_and_the_base_slot_takes_nothing() {
         ),
         Ok(PointMove::Declined)
     );
-    let (mut u, mut actions, mut motion) = mover_unit(7);
-    actions.unmodelled_action = Some(GenieError::unsupported("a test's action"));
+    let (u, mut actions, mut motion) = mover_unit(7);
+    let unread = Unread::new(GenieError::unsupported("a test's action"));
     assert!(
-        ai_move_of(
-            (&mut u, &mut actions, &mut motion),
-            forced(false),
-            class::CLASS_47
+        u.head_takes_point(
+            (&mut actions, Some(&unread)),
+            motion.lent(),
+            AI_POINT,
+            PlayerId::new(1),
+            OwnerMasters::new(no_own_masters(), None),
+            (&none, None)
         )
         .is_err()
     );
@@ -17329,7 +17328,7 @@ fn a_stop_s_error_names_the_command_or_the_object_it_happened_on() {
     let _ = t
         .push_live(
             PlayerId::new(0),
-            Object::with_actions(
+            Object::unread(
                 Unit {
                     id: object_id(5),
                     life: Lifecycle {
@@ -17338,10 +17337,7 @@ fn a_stop_s_error_names_the_command_or_the_object_it_happened_on() {
                     },
                     ..Unit::default()
                 },
-                crate::objects::layers::Action {
-                    unmodelled_action: Some(task),
-                    ..Default::default()
-                },
+                task,
             ),
         )
         .unwrap();

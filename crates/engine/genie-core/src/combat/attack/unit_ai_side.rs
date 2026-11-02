@@ -199,7 +199,7 @@ impl UnitView<'_, '_> {
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.unit.tear_down_actions(
-            self.actions,
+            (self.actions, self.c.w.parts.unread.get(self.unit.id)),
             self.c.w.parts.motion.layer_mut(self.unit.id),
             &mut releases,
             &mut leaves,
@@ -329,6 +329,7 @@ impl UnitView<'_, '_> {
                 self.c.w.parts.building_of(t.id),
                 self.c.w.parts.combat_of(t.id),
                 self.c.w.parts.actions.of(t.id),
+                self.c.w.parts.unread.get(t.id),
             ),
             (q, master, attributes),
             (self.player, &dip),
@@ -359,6 +360,7 @@ impl UnitView<'_, '_> {
                 self.c.w.parts.building_of(unit.id),
                 self.c.w.parts.combat_of(unit.id),
                 &*self.actions,
+                self.c.w.parts.unread.get(unit.id),
             ),
             master,
             &self.c.w.players.player(self.player)?.attributes,

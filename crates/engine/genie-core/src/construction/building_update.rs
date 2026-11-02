@@ -475,6 +475,7 @@ impl Unit {
                 c.w.parts.building_of(self.id),
                 c.w.parts.combat_of(self.id),
                 actions,
+                c.w.parts.unread.get(self.id),
             ),
             master,
             &c.w.players.player(c.player)?.attributes,

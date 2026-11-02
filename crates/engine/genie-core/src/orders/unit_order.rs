@@ -152,7 +152,10 @@ impl World {
                     if q != p
                         || u.life.state != ObjectState::Alive
                         || u.master(self.master_tables(), q)?.class != class::LIVESTOCK
-                        || !self.parts.actions_of(u.id).top_action_idle()?
+                        || !self
+                            .parts
+                            .actions_of(u.id)
+                            .top_action_idle(self.parts.unread.get(u.id))?
                         || listed.contains(&id)
                     {
                         continue;
@@ -265,7 +268,7 @@ impl World {
             {
                 continue;
             }
-            if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
+            if self.parts.unread.contains(unit.id) {
                 return Err(GenieError::unsupported(
                     "a UNIT_ORDER drop-off of an action not held",
                 ));

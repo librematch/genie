@@ -10,6 +10,7 @@ use crate::objects::actions;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::DefaultTask;
 use crate::objects::masters::ActionType;
+use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
 use genie_diff::Diff;
 
@@ -19,11 +20,6 @@ pub struct Action {
     /// Its action list (`RGE_Action_List`, [`ActionList`]): the actions it holds, its current one
     /// first.
     pub list: ActionList,
-    /// A default task other than the Artifact action. `RGE_Action_Object::update` (0x14106ac90)
-    /// starts it in an object's first update if the object is still in state 2 after its static
-    /// step; the slice does not model it, so that update stops the player.
-    #[diff(unsaved, eq)]
-    pub unmodelled_action: Option<GenieError>,
     /// What its master's default task starts once its action list is empty in state 2
     /// ([`DefaultTask`]).
     pub default_task: DefaultTask,
@@ -31,13 +27,17 @@ pub struct Action {
 
 impl Action {
     /// Its slot 0x190 (`FUN_14106d090`, then `FUN_140a78450`): the object its top action targets
-    /// (the action's `+0x30` when not −1); none without a top action.
+    /// (the action's `+0x30` when not −1); none without a top action. `unread`: the load could
+    /// not read the object whole ([`Unread`]).
     ///
     /// # Errors
     ///
     /// A top action the slice does not model.
-    pub fn top_action_object(&self) -> Result<Option<ObjectId>, GenieError> {
-        if self.unmodelled_action.is_some() {
+    pub fn top_action_object(
+        &self,
+        unread: Option<&Unread>,
+    ) -> Result<Option<ObjectId>, GenieError> {
+        if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x190 of an action the slice does not model",
             ));
@@ -48,13 +48,13 @@ impl Action {
     /// Its top action's slots 0x190 and 0x288 (`FUN_14106d090`, `FUN_141082dc0`): the action has
     /// neither a target nor a point (`+0x30`, `+0x38` −1), or there is none. An Artifact holds
     /// them while it walks a move ([`crate::ownership::artifact::Artifact::idle`]); a `MoveTo` always holds
-    /// its point.
+    /// its point. `unread`: the load could not read the object whole ([`Unread`]).
     ///
     /// # Errors
     ///
     /// A top action the slice does not model.
-    pub fn top_action_idle(&self) -> Result<bool, GenieError> {
-        if self.unmodelled_action.is_some() {
+    pub fn top_action_idle(&self, unread: Option<&Unread>) -> Result<bool, GenieError> {
+        if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slots 0x190 and 0x288 of an action the slice does not model",
             ));

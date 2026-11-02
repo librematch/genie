@@ -110,7 +110,13 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat, &parts.actions, motions),
+                (
+                    &parts.building,
+                    &parts.combat,
+                    &parts.actions,
+                    &parts.unread,
+                    motions,
+                ),
             ),
         };
         let beside = Beside {
@@ -284,7 +290,13 @@ impl Step<'_> {
                     &self.w.players,
                     &self.w.index,
                     crate::objects::masters::MasterTables::new(&self.w.masters, &parts.own_master),
-                    (&parts.building, &parts.combat, &parts.actions, motions),
+                    (
+                        &parts.building,
+                        &parts.combat,
+                        &parts.actions,
+                        &parts.unread,
+                        motions,
+                    ),
                 ),
             },
             sprite,

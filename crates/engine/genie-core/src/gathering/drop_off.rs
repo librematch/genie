@@ -581,6 +581,7 @@ impl Unit {
         let seeker = Seeker {
             unit: self,
             actions,
+            unread: by_id.unread(self.id),
             me,
             mover,
             plan: &mut plan,

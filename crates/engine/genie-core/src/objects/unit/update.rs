@@ -243,10 +243,12 @@ impl Unit {
         actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        if let Some(e) = actions
-            .unmodelled_action
-            .clone()
-            .filter(|_| self.life.state == ObjectState::Alive)
+        if let Some(e) =
+            c.w.parts
+                .unread
+                .get(self.id)
+                .map(crate::world::Unread::error)
+                .filter(|_| self.life.state == ObjectState::Alive)
         {
             return Err(e);
         }

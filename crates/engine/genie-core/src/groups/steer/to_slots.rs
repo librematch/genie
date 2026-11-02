@@ -162,8 +162,8 @@ impl World {
         if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
-        if let Some(e) = actions.unmodelled_action.clone() {
-            return Err(e);
+        if let Some(e) = self.parts.unread.get(u.id) {
+            return Err(e.error());
         }
         let top = actions.top_action();
         let state = top.map_or(ActionState::NO_ACTION, |a| a.state);

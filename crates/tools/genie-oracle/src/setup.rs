@@ -649,10 +649,9 @@ fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
         };
         building.garrison.push(id);
         if let Some(e) = unmodelled {
-            let mut actions = turns.parts.actions_of(b).clone();
-            actions.unmodelled_action = Some(e);
+            let unread = Part::Unread(Some(genie_core::world::Unread::new(e)));
             // the world holds the building (it is in its player's lists): the write cannot fail
-            if let Err(e) = turns.set_part(b, Part::Actions(Box::new(actions))) {
+            if let Err(e) = turns.set_part(b, unread) {
                 stop_all(turns, &e);
             }
         }

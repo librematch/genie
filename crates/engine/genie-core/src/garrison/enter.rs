@@ -413,6 +413,7 @@ impl World {
             unit,
             mover: self.parts.mover_of(unit.id),
             target_actions: self.parts.actions_of(target.id),
+            target_unread: self.parts.unread.get(target.id),
             target_mover: self.parts.mover_of(target.id),
         };
         action.walk_again(t, start, meeting, &reads, by_id)
@@ -453,6 +454,7 @@ impl World {
             unit,
             mover: self.parts.mover_of(unit.id),
             target_actions: self.parts.actions_of(target.id),
+            target_unread: self.parts.unread.get(target.id),
             target_mover: self.parts.mover_of(target.id),
         }
         .point(by_id)

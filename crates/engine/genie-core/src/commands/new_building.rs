@@ -353,7 +353,6 @@ impl World {
         let parts = ObjectParts {
             actions: crate::objects::layers::Action {
                 list: ActionList::default(),
-                unmodelled_action: None,
                 default_task,
             },
             unit_ai: ai,

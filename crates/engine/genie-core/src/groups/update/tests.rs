@@ -1482,7 +1482,7 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     let of = |groups: &UnitGroups, id| {
         let u = t.object(object_id(id)).unwrap().1;
         u.group_speed(
-            t.parts.actions_of(u.id),
+            (t.parts.actions_of(u.id), t.parts.unread.get(u.id)),
             groups,
             masters,
             t.parts.unit_ai.get(u.id),
@@ -1502,7 +1502,7 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     busy_ai.current_action = Some(ActionKind::Attack);
     assert_eq!(
         busy.group_speed(
-            t.parts.actions_of(busy.id),
+            (t.parts.actions_of(busy.id), t.parts.unread.get(busy.id)),
             &groups,
             masters,
             Some(&busy_ai)
@@ -1513,7 +1513,7 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     gone.group.id = Some(group_id(7));
     assert_eq!(
         gone.group_speed(
-            t.parts.actions_of(gone.id),
+            (t.parts.actions_of(gone.id), t.parts.unread.get(gone.id)),
             &groups,
             masters,
             Some(&busy_ai)
@@ -1523,7 +1523,7 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     gone.group.id = None;
     assert_eq!(
         gone.group_speed(
-            t.parts.actions_of(gone.id),
+            (t.parts.actions_of(gone.id), t.parts.unread.get(gone.id)),
             &groups,
             masters,
             Some(&busy_ai)
@@ -1533,7 +1533,7 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     let lost = t.object(object_id(11)).unwrap().1;
     assert_eq!(
         lost.group_speed(
-            t.parts.actions_of(lost.id),
+            (t.parts.actions_of(lost.id), t.parts.unread.get(lost.id)),
             &groups,
             crate::objects::masters::OwnerMasters::new(&t.parts.own_master, None),
             t.parts.unit_ai.get(lost.id)

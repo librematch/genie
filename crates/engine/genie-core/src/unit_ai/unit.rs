@@ -163,7 +163,7 @@ impl Unit {
             under_attack: self.under_attack,
             id: self.id,
             anim_speed: c.w.parts.anim_speed_of(self.id),
-            action_state: if actions.unmodelled_action.is_some() {
+            action_state: if c.w.parts.unread.contains(self.id) {
                 None
             } else {
                 Some(
@@ -304,12 +304,12 @@ impl Unit {
                 "a unit AI's run of a unit without one",
             ));
         };
-        let busy = actions.top_action_kind().is_some() || actions.unmodelled_action.is_some();
+        let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
         let master = Some(self.master(c.w.master_tables(), c.player)?);
         let class = master.map(|ms| ms.class);
         let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
         let view = OwnerView::of(c, None)?;
-        let interruptible = actions.interruptible()?;
+        let interruptible = actions.interruptible(c.w.parts.unread.get(self.id))?;
         let at = self.surroundings(
             actions,
             c,
@@ -416,7 +416,7 @@ impl Unit {
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
     ) -> Result<Option<AfterOrder>, GenieError> {
-        let busy = actions.top_action_kind().is_some() || actions.unmodelled_action.is_some();
+        let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
             c.w.parts.own_master.get(self.id),
@@ -463,7 +463,7 @@ impl Unit {
             return Ok(None);
         };
         // slot 0x2d0 matters only to a queue with orders
-        let interruptible = match actions.interruptible() {
+        let interruptible = match actions.interruptible(c.w.parts.unread.get(self.id)) {
             Ok(i) => i,
             Err(e) if orders => return Err(e),
             Err(_) => false,

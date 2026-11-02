@@ -29,7 +29,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
         PLAYERS,
     );
     assert_eq!(u.unit.id, ObjectId::UNSAVED);
-    assert!(u.parts.actions.unmodelled_action.is_some());
+    assert!(u.parts.unread.is_some());
 }
 
 /// A saved building's gather point and production lists are its object's parts, not its
@@ -68,7 +68,7 @@ fn a_saved_building_s_parts_are_its_object_s() {
     );
     let o = whole(0x100);
     assert!(o.parts.gather_point.is_none());
-    assert!(o.parts.actions.unmodelled_action.is_some());
+    assert!(o.parts.unread.is_some());
 }
 
 /// A save from the start: livestock's default task is the Artifact, which exists from the
@@ -102,7 +102,7 @@ fn livestock_starts_with_its_artifact() {
         genie_core::objects::layers::DefaultTask::Artifact
     );
     // a combat object's mover needs its master, which this save does not hold
-    assert!(u.parts.actions.unmodelled_action.is_some());
+    assert!(u.parts.unread.is_some());
 }
 
 /// Without a table the default task is unknown: reported, as the object's.
@@ -150,7 +150,7 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         None,
         PLAYERS,
     );
-    assert!(u.parts.actions.unmodelled_action.is_some());
+    assert!(u.parts.unread.is_some());
     assert_ne!(
         u.parts.actions.default_task,
         genie_core::objects::layers::DefaultTask::Fly
@@ -289,7 +289,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
     let o = whole(&object);
     assert_eq!(
-        o.parts.actions.unmodelled_action.map(|e| e.kind()),
+        o.parts.unread.map(|e| e.error().kind()),
         Some(genie_core::ErrorKind::InvalidInput)
     );
     assert_eq!(

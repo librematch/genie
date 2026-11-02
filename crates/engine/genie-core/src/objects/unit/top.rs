@@ -12,6 +12,7 @@ use crate::objects::masters::action_type;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 
+use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
 
 impl Unit {
@@ -147,9 +148,10 @@ impl crate::objects::layers::Action {
     /// test first; the slice holds no groups). None may; type `0x7e` never; by state, 0, 1, 3,
     /// 0xd and 0xe may, 2 unless an Attack (9); in any other state only an Artifact (`0x6b`)
     /// without a target or a point (`+0x30`, `+0x38` = −1). A trade (`0x6f`) in state 4 is not
-    /// modelled, nor is an action the slice does not hold.
-    pub(crate) fn interruptible(&self) -> Result<bool, GenieError> {
-        if self.unmodelled_action.is_some() {
+    /// modelled, nor is an action the slice does not hold (`unread`: the load could not read the
+    /// object whole, [`Unread`]).
+    pub(crate) fn interruptible(&self, unread: Option<&Unread>) -> Result<bool, GenieError> {
+        if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x2d0 of an action the slice does not model",
             ));

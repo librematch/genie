@@ -13,6 +13,7 @@ use crate::objects::unit::Unit;
 use crate::orders::town_bell::TownBell;
 use crate::production::Production;
 use crate::unit_ai::UnitAi;
+use crate::world::Unread;
 #[cfg(doc)]
 use crate::world::{World, parts::Parts};
 use genie_diff::{Diff, Differ};
@@ -59,6 +60,10 @@ pub struct ObjectParts {
     /// empty one's where the table holds none.
     #[diff(path = "actions")]
     pub actions: Action,
+    /// Why the load could not read it whole ([`Parts::unread`]): not game data, the import's
+    /// gap, compared only between two runs.
+    #[diff(unsaved, eq)]
+    pub unread: Option<Unread>,
 }
 
 impl ObjectParts {

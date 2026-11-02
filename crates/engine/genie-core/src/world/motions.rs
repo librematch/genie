@@ -193,7 +193,13 @@ impl Parts {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &self.own_master),
-                (&self.building, &self.combat, &self.actions, motions),
+                (
+                    &self.building,
+                    &self.combat,
+                    &self.actions,
+                    &self.unread,
+                    motions,
+                ),
             ),
         )
     }

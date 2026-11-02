@@ -35,6 +35,7 @@ mod parts_fixtures;
 pub(crate) mod player;
 pub(crate) mod slots;
 pub(crate) mod step;
+pub(crate) mod unread;
 pub(crate) mod whole;
 
 use crate::GenieError;
@@ -84,6 +85,7 @@ pub use self::options::{
 };
 pub use self::play_state::PlayState;
 pub use self::tick::Tick;
+pub use self::unread::Unread;
 
 /// What every building holds of a gate: `mGateLocked` (`+0xc7c`; a lock also sets the
 /// building's last move time, [`Mover::last_move`], slot 0x670, `FUN_1411dba30`), `mFirstUpdate`

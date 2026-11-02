@@ -107,7 +107,7 @@ impl Unit {
             // artifact holds (a `MoveTo` of its own), and the list goes
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.tear_down_actions(
-                actions,
+                (actions, c.w.parts.unread.get(self.id)),
                 c.w.parts.motion.layer_mut(self.id),
                 &mut releases,
                 &mut leaves,

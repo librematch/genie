@@ -100,7 +100,12 @@ impl World {
                 .unit_ai
                 .get(unit.id)
                 .is_some_and(|ai| ai.orders.is_empty());
-            if !idle || !self.parts.actions_of(unit.id).interruptible()? {
+            if !idle
+                || !self
+                    .parts
+                    .actions_of(unit.id)
+                    .interruptible(self.parts.unread.get(unit.id))?
+            {
                 i = i.next();
                 continue;
             }
@@ -251,6 +256,7 @@ impl World {
                 &self.parts.building,
                 &self.parts.combat,
                 &self.parts.actions,
+                &self.parts.unread,
                 self.parts.motion.unlent(),
             ),
         );

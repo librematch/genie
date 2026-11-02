@@ -366,7 +366,7 @@ impl World {
             return Ok(true);
         }
         let unit = &self.players.live(player, idx)?;
-        if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
+        if self.parts.unread.contains(unit.id) {
             return Err(GenieError::unsupported(
                 "a move to an object of a unit with an action",
             ));
@@ -461,7 +461,7 @@ impl World {
         let Some(target) = target else {
             return self.point_taken(player, idx, point);
         };
-        if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
+        if self.parts.unread.contains(unit.id) {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
             ));
@@ -510,7 +510,7 @@ impl World {
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
-            self.parts.actions.of_mut(id)?,
+            (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
             self.parts.motion.layer_mut(id),
             point,
             player,

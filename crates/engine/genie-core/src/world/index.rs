@@ -253,6 +253,16 @@ impl ObjectIndex {
     }
 }
 
+/// The part tables [`ObjectsRef::of_tables`] reads: the building, combat and action layers, the
+/// objects the load could not read whole and the motion layers (one of them lent out).
+pub type PartTables<'a> = (
+    &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
+    &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
+    &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
+    &'a crate::world::parts::PartTable<crate::world::Unread>,
+    crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
+);
+
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
 /// spatial index and the planners): the players' lists, the table by id, the players' masters
 /// and the objects' parts. An object out for its update is none.
@@ -264,6 +274,7 @@ pub struct ObjectsRef<'a> {
     buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
     combats: &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
     actions: &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
+    unread: &'a crate::world::parts::PartTable<crate::world::Unread>,
     motions: crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
 }
 
@@ -286,6 +297,7 @@ impl<'a> ObjectsRef<'a> {
                 &parts.building,
                 &parts.combat,
                 &parts.actions,
+                &parts.unread,
                 parts.motion.unlent(),
             ),
         )
@@ -293,20 +305,16 @@ impl<'a> ObjectsRef<'a> {
 
     /// [`ObjectsRef::new`] of the part tables it reads, for a caller that holds another part
     /// table to change: the world's `masters` (the players' and the objects' own), the building
-    /// layers `buildings`, the combat layers `combats`, the action layers `actions` and the
-    /// motion layers `motions` (one of them lent out to a walk,
+    /// layers `buildings`, the combat layers `combats`, the action layers `actions`, the objects
+    /// the load could not read whole `unread` and the motion layers `motions` (one of them lent
+    /// out to a walk,
     /// [`crate::world::parts::PartTable::lend`]).
     #[must_use]
     pub const fn of_tables(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: crate::objects::masters::MasterTables<'a>,
-        (buildings, combats, actions, motions): (
-            &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
-            &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
-            &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
-            crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
-        ),
+        (buildings, combats, actions, unread, motions): PartTables<'a>,
     ) -> Self {
         Self {
             players,
@@ -315,6 +323,7 @@ impl<'a> ObjectsRef<'a> {
             buildings,
             combats,
             actions,
+            unread,
             motions,
         }
     }
@@ -400,6 +409,13 @@ impl<'a> ObjectsRef<'a> {
     #[must_use]
     pub fn actions(&self, id: impl ObjectKey) -> Option<&'a crate::objects::layers::Action> {
         Some(self.actions.of(self.get(id)?.id))
+    }
+
+    /// Why the load could not read object `id` whole ([`crate::world::Unread`]), none for one it
+    /// read. The updating object's too: its entry stays in the table while its row is out.
+    #[must_use]
+    pub fn unread(&self, id: ObjectId) -> Option<&'a crate::world::Unread> {
+        self.unread.get(id)
     }
 
     /// The main building of the annex `id` (its `+0xbb8`); none for an object that is no annex,

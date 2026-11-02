@@ -555,7 +555,7 @@ impl World {
             // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
             // (`FUN_140a903a0`).
             if self.parts.actions_of(t.id).top_action_kind() == Some(action_type::UNPACK)
-                || self.parts.actions_of(t.id).unmodelled_action.is_some()
+                || self.parts.unread.contains(t.id)
             {
                 return Err(GenieError::unsupported(
                     "a gather retargeted to a building with an action (packing)",

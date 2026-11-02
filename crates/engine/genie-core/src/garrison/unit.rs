@@ -664,7 +664,7 @@ impl Unit {
         if !actions.list.is_empty() {
             return self.end_head_update(actions, c, HeadCode::Deletes);
         }
-        if actions.unmodelled_action.is_some() {
+        if c.w.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "the inside update of an action the slice does not hold",
             ));

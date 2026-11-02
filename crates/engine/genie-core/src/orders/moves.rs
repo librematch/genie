@@ -264,7 +264,7 @@ impl World {
         let id = self.players.live(player, idx)?.id;
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let sails = self.players.live_mut(player, idx)?.ai_move_with(
-            self.parts.actions.of_mut(id)?,
+            (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
             self.parts.motion.layer_mut(id),
             m,
             (class, player),
@@ -331,10 +331,7 @@ impl World {
             self.players.player(player)?.computer,
         );
         // a class 54 under an action the slice does not hold may be under its Pack or Unpack
-        if packs
-            || (class == class::CLASS_54
-                && self.parts.actions_of(unit.id).unmodelled_action.is_some())
-        {
+        if packs || (class == class::CLASS_54 && self.parts.unread.contains(unit.id)) {
             return Err(GenieError::unsupported(
                 "a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)",
             ));

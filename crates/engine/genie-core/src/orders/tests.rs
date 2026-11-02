@@ -2748,11 +2748,10 @@ fn the_head_action_takes_a_move_only_where_its_slot_0x40_does() {
         .unwrap()
         .list
         .set_artifact(None);
-    t.parts
-        .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
-        .unwrap()
-        .unmodelled_action = Some(GenieError::unsupported("a test's action"));
+    t.set_unread(
+        t.players[1].objects[ListIndex::new(0)].id,
+        GenieError::unsupported("a test's action"),
+    );
     assert!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point)
             .is_err()
@@ -4875,11 +4874,10 @@ fn a_gather_takes_a_farm_but_no_other_building() {
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(802))
             .is_err()
     );
-    t.parts
-        .actions
-        .of_mut(t.players[1].objects[ListIndex::new(3)].id)
-        .unwrap()
-        .unmodelled_action = Some(GenieError::unsupported("a pack"));
+    t.set_unread(
+        t.players[1].objects[ListIndex::new(3)].id,
+        GenieError::unsupported("a pack"),
+    );
     assert!(
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800))
             .is_err()
@@ -5117,11 +5115,10 @@ fn a_drop_off_order_takes_a_hunt_to_its_site() {
 #[test]
 fn a_drop_off_order_fails_on_what_it_does_not_hold() {
     let mut t = foraging();
-    t.parts
-        .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
-        .unwrap()
-        .unmodelled_action = Some(GenieError::unsupported("a test's action"));
+    t.set_unread(
+        t.players[1].objects[ListIndex::new(0)].id,
+        GenieError::unsupported("a test's action"),
+    );
     assert_eq!(
         t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
             .err()

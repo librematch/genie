@@ -207,19 +207,25 @@ fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<us
     Ok(n)
 }
 
-/// [`MeetingTarget`] of the target `t` with its action layer `t_actions` and its mover `t_mover`
-/// (of master `tm`) with `room` for
+/// [`MeetingTarget`] of the target `t` with its action layer `t_actions`, why the load could not
+/// read it whole `t_unread` ([`crate::world::Unread`]) and its mover `t_mover` (of master `tm`)
+/// with `room` for
 /// the unit: its top speed ([`crate::movement::MoveStats::speed`]), its top action's state and
 /// its point (`+0x38`, `+0x3c`): a `MoveTo`'s
 /// ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An action the slice
 /// does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    (t, t_actions, t_mover): (&crate::objects::unit::Unit, &Action, Option<&Mover>),
+    (t, t_actions, t_unread, t_mover): (
+        &crate::objects::unit::Unit,
+        &Action,
+        Option<&crate::world::Unread>,
+        Option<&Mover>,
+    ),
     tm: &Master,
     room: bool,
 ) -> Result<MeetingTarget, GenieError> {
-    if let Some(e) = t_actions.unmodelled_action.clone() {
-        return Err(e);
+    if let Some(e) = t_unread {
+        return Err(e.error());
     }
     let action_point = match (
         t_actions.top_action_kind(),
@@ -491,6 +497,8 @@ pub(crate) struct Meeting<'a> {
     pub(crate) target: &'a crate::objects::unit::Unit,
     /// The target's action layer.
     pub(crate) target_actions: &'a Action,
+    /// Why the load could not read the target whole, if it could not ([`crate::world::Unread`]).
+    pub(crate) target_unread: Option<&'a crate::world::Unread>,
     /// The target's master.
     pub(crate) master: &'a Master,
     /// The target has room for the unit (slot 0x198).
@@ -520,7 +528,12 @@ impl Meeting<'_> {
         }
         let stats = self.mover.map(|m| m.stats).ok_or(NO_SPEED)?;
         let t = meeting_target(
-            (self.target, self.target_actions, self.target_mover),
+            (
+                self.target,
+                self.target_actions,
+                self.target_unread,
+                self.target_mover,
+            ),
             self.master,
             self.room,
         )?;

@@ -25,6 +25,7 @@ use crate::objects::unit::Unit;
 use crate::orders::town_bell::TownBell;
 use crate::production::Production;
 use crate::unit_ai::UnitAi;
+use crate::world::Unread;
 use crate::world::World;
 pub use crate::world::whole::{Object, ObjectParts, ObjectView};
 use std::borrow::Cow;
@@ -246,6 +247,10 @@ pub struct Parts {
     /// ([`Parts::actions_of`], a tree's); a write puts one in ([`Parts::actions_mut`]). The
     /// updating object's layer is out of the table with its row ([`Parts::take_actions`]).
     pub actions: PartTable<Action>,
+    /// The objects the load could not read whole ([`Unread`], FD-045-D61): each one's reason,
+    /// the import's gap. A routine that reaches such an object counts it busy or stops the run
+    /// with the reason. The updating object's entry stays in the table.
+    pub unread: PartTable<Unread>,
 }
 
 /// The building layer of an object the table does not hold.
@@ -293,6 +298,7 @@ impl Parts {
             combat,
             motion,
             actions,
+            unread,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -327,6 +333,9 @@ impl Parts {
         if actions != Action::default() {
             let _ = self.actions.insert(id, actions);
         }
+        if let Some(u) = unread {
+            let _ = self.unread.insert(id, u);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -343,6 +352,7 @@ impl Parts {
             combat: self.combat.remove(id).unwrap_or_default(),
             motion: self.motion.remove(id),
             actions: self.actions.remove(id).unwrap_or_default(),
+            unread: self.unread.remove(id),
         }
     }
 
@@ -361,6 +371,7 @@ impl Parts {
             combat: self.combat_of(id).clone(),
             motion: self.motion.get(id).cloned(),
             actions: self.actions_of(id).clone(),
+            unread: self.unread.get(id).cloned(),
         }
     }
 
@@ -475,6 +486,7 @@ impl Parts {
             .chain(self.combat.iter().map(|(id, _)| id))
             .chain(self.motion.iter().map(|(id, _)| id))
             .chain(self.actions.iter().map(|(id, _)| id))
+            .chain(self.unread.iter().map(|(id, _)| id))
     }
 }
 
@@ -503,6 +515,8 @@ pub enum Part {
     Motion(Option<Box<Motion>>),
     /// The action layer ([`Parts::actions`]), boxed; an empty one leaves the table.
     Actions(Box<Action>),
+    /// Why the load could not read the object whole ([`Parts::unread`]), none clearing it.
+    Unread(Option<Unread>),
 }
 
 impl World {
@@ -570,6 +584,12 @@ impl World {
                 let _ = self.parts.motion.remove(id);
             }
             Part::Actions(a) => self.parts.put_actions(id, *a),
+            Part::Unread(Some(u)) => {
+                let _ = self.parts.unread.insert(id, u);
+            }
+            Part::Unread(None) => {
+                let _ = self.parts.unread.remove(id);
+            }
         }
         Ok(())
     }
@@ -924,6 +944,53 @@ mod tests {
         assert_eq!(gone.parts.town_bell, bell);
         assert!(t.parts.town_bell.is_empty());
         assert_eq!(t.parts.town_bell_of(id), TownBell::default());
+    }
+
+    /// An object the load could not read whole holds its reason in the table: the load files
+    /// it, the objects by id read it, a removal carries it, a write of none clears it.
+    #[test]
+    fn an_unread_object_holds_its_reason_in_the_table() {
+        use crate::objects::ListIndex;
+        use crate::players::PlayerId;
+        let id = object_id(5);
+        let why = Unread::new(GenieError::unsupported("a saved production list"));
+        let mut t = World::new(
+            crate::world::WorldTime::ZERO,
+            crate::world::FrameSeed::of_data(1),
+            PlayerId::new(0),
+            vec![crate::world::Millis::ZERO],
+            vec![crate::world::player::Player {
+                objects: vec![Unit {
+                    id,
+                    ..Unit::default()
+                }]
+                .into(),
+                ..Default::default()
+            }],
+        );
+        t.load_parts(
+            id,
+            ObjectParts {
+                unread: Some(why.clone()),
+                ..ObjectParts::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(t.parts.unread.get(id), Some(&why));
+        assert_eq!(t.parts.of(id).unread, Some(why.clone()));
+        let by_id =
+            crate::world::index::ObjectsRef::new(&t.players, &t.index, &t.masters, &t.parts);
+        assert_eq!(by_id.unread(id), Some(&why));
+        t.check_parts().unwrap();
+        let gone = t
+            .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
+            .unwrap();
+        assert_eq!(gone.parts.unread.as_ref(), Some(&why));
+        assert!(t.parts.unread.is_empty());
+        let _ = t.push_live(PlayerId::new(0), gone).unwrap();
+        assert!(t.parts.unread.contains(id));
+        t.set_part(id, Part::Unread(None)).unwrap();
+        assert!(t.parts.unread.is_empty());
     }
 
     /// An object's own master is a part the world's master lookups read before its player's

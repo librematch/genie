@@ -299,6 +299,10 @@ impl World {
             id,
             crate::world::parts::Part::Actions(Box::new(g.parts.actions.clone())),
         )?;
+        self.set_part(
+            id,
+            crate::world::parts::Part::Unread(g.parts.unread.clone()),
+        )?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
@@ -545,9 +549,13 @@ mod tests {
         walker.waiting = 3;
         let motion = crate::objects::layers::Motion::Moving(walker);
         game.players[1][0].parts.motion = Some(motion.clone());
+        // the game's import could not read it whole: the force takes its reason
+        let unread = crate::world::Unread::new(GenieError::unsupported("a saved list"));
+        game.players[1][0].parts.unread = Some(unread.clone());
         let notes = t.force(&game);
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(t.parts.motion.get(object_id(9175)), Some(&motion));
+        assert_eq!(t.parts.unread.get(object_id(9175)), Some(&unread));
         assert_eq!(t.parts.gather_point.get(object_id(9175)), Some(&gather));
         assert_eq!(t.parts.production.get(object_id(9175)), Some(&production));
         assert!(t.parts.town_bell_of(object_id(9175)).flag);

@@ -477,6 +477,7 @@ impl EnterAction {
                 unit,
                 mover: w.parts.mover_of(unit.id),
                 target_actions: w.parts.actions_of(target.id),
+                target_unread: w.parts.unread.get(target.id),
                 target_mover: w.parts.mover_of(target.id),
             };
             let sprites = SpriteReads {

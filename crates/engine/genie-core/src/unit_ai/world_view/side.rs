@@ -452,11 +452,15 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     }
 
     fn busy_now(&mut self) -> Result<bool, GenieError> {
-        Ok(self.actions.top_action_kind().is_some() || self.actions.unmodelled_action.is_some())
+        Ok(
+            self.actions.top_action_kind().is_some()
+                || self.c.w.parts.unread.contains(self.unit.id),
+        )
     }
 
     fn interruptible_now(&mut self) -> Result<bool, GenieError> {
-        self.actions.interruptible()
+        self.actions
+            .interruptible(self.c.w.parts.unread.get(self.unit.id))
     }
 
     fn seek_unexplored(

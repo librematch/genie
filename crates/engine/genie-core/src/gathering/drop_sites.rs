@@ -28,6 +28,8 @@ pub(crate) struct Seeker<'a, 'b> {
     pub(crate) unit: &'a Unit,
     /// Its action layer, whose top action's target the search reads (slot 0x190).
     pub(crate) actions: &'a crate::objects::layers::Action,
+    /// Why the load could not read it whole, if it could not ([`crate::world::Unread`]).
+    pub(crate) unread: Option<&'a crate::world::Unread>,
     pub(crate) me: Me,
     pub(crate) mover: &'a Mover,
     pub(crate) plan: &'a mut Planning<'b>,
@@ -119,7 +121,7 @@ impl Seeker<'_, '_> {
         if self.class != class::VILLAGER {
             return Ok(None);
         }
-        let Some(target) = self.actions.top_action_object()? else {
+        let Some(target) = self.actions.top_action_object(self.unread)? else {
             return Ok(None);
         };
         Ok(self
@@ -416,6 +418,7 @@ mod tests {
         let seeker = Seeker {
             unit,
             actions,
+            unread: seeker.parts.unread.as_ref(),
             me: Me {
                 human_order: WorldTime::ZERO,
                 id: unit.id,
@@ -503,7 +506,9 @@ mod tests {
             Ok(None)
         );
         let mut unmodelled = villager(None);
-        unmodelled.parts.actions.unmodelled_action = Some(GenieError::unsupported("an action"));
+        unmodelled.parts.unread = Some(crate::world::Unread::new(GenieError::unsupported(
+            "an action",
+        )));
         assert!(search(&sites(), &unmodelled, class::VILLAGER, at, &near_tc).is_err());
     }
 

@@ -181,7 +181,7 @@ fn the_saved_unit_ai_is_the_object_s_part() {
     }));
     assert_eq!(odd.parts.unit_ai, None);
     assert_eq!(
-        odd.parts.actions.unmodelled_action.map(|e| e.kind()),
+        odd.parts.unread.map(|e| e.error().kind()),
         Some(ErrorKind::InvalidInput)
     );
 }

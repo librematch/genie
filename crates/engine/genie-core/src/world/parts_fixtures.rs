@@ -88,6 +88,14 @@ impl Object {
         o
     }
 
+    /// A test's object: row `unit` (or an object, keeping its other parts) the load could not
+    /// read whole, for `why` ([`crate::world::Unread`]).
+    pub(crate) fn unread(unit: impl Into<Self>, why: crate::GenieError) -> Self {
+        let mut o = unit.into();
+        o.parts.unread = Some(crate::world::Unread::new(why));
+        o
+    }
+
     /// A test's object: row `unit` (or an object, keeping its other parts) with the building
     /// layer `layer`.
     pub(crate) fn with_building(unit: impl Into<Self>, layer: Building) -> Self {
@@ -229,6 +237,16 @@ impl World {
     pub(crate) fn set_actions(&mut self, id: ObjectId, layer: Action) {
         self.set_part(id, Part::Actions(Box::new(layer)))
             .expect("an action layer of an object the world holds");
+    }
+
+    /// A test's object `id` is one the load could not read whole, for `why` ([`Unread`]).
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    pub(crate) fn set_unread(&mut self, id: ObjectId, why: crate::GenieError) {
+        self.set_part(id, Part::Unread(Some(crate::world::Unread::new(why))))
+            .expect("an unread object the world holds");
     }
 
     /// A test's world with the action layers `layers` set on the objects it holds.

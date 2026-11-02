@@ -58,6 +58,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 | [`step.rs`](step.rs) | What a tick's update of one object reads and writes (`Step`) and its walks. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tick.rs`](tick.rs) | An update's number. |
+| [`unread.rs`](unread.rs) | The objects the load could not read whole (FD-045-D61): the import's gap, not game data. |
 | [`whole.rs`](whole.rs) | An object as one value (FD-045-D51): its row and its parts, as the world takes it in and gives it back whole, and the view a comparison reads (`ObjectView`). |
 | [`world_update.rs`](world_update.rs) | The world update's parts (`crate::world::schedule` runs them): the command phase, the moving objects, the players' relations and each player's objects' updates. |
 <!-- /files -->

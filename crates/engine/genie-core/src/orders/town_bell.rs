@@ -541,7 +541,7 @@ impl World {
         if self.parts.town_bell_of(unit.id).flag {
             return Ok(());
         }
-        if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
+        if self.parts.unread.contains(unit.id) {
             return Err(GenieError::unsupported(
                 "a town-bell record of an action not held",
             ));

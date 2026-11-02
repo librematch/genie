@@ -11,6 +11,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 use crate::unit_ai::{AiCommand, Effect};
+use crate::world::Unread;
 use crate::world::step::Step;
 
 impl Unit {
@@ -26,7 +27,11 @@ impl Unit {
         let sprite = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.stop_with(
-            (actions, c.w.parts.motion.layer_mut(self.id)),
+            (
+                actions,
+                c.w.parts.unread.get(self.id),
+                c.w.parts.motion.layer_mut(self.id),
+            ),
             (&mut releases, &mut leaves),
             by,
             crate::objects::masters::OwnerMasters::new(
@@ -42,17 +47,27 @@ impl Unit {
     /// [`Unit::stop_action`] on the parts of the world it changes: the targets its actions let
     /// go and the foundations its Build leaves (`by` the unit, [`Unit::clear_own_actions`]), its
     /// masters and sprites, and the Sprite stream; `actions` and `motion` are its action and
-    /// motion layers.
+    /// motion layers, `unread` why the load could not read it whole ([`Unread`]).
     pub(crate) fn stop_with(
         &mut self,
-        (actions, mut motion): (&mut crate::objects::layers::Action, MotionMut<'_>),
+        (actions, unread, mut motion): (
+            &mut crate::objects::layers::Action,
+            Option<&Unread>,
+            MotionMut<'_>,
+        ),
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
         masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.tear_down_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
+        self.tear_down_actions(
+            (actions, unread),
+            motion.reborrow(),
+            releases,
+            builder_leaves,
+            by,
+        )?;
         if self.life.state == ObjectState::Alive {
             self.show_standing(motion, masters, graphics, sprite)?;
         }
@@ -60,17 +75,18 @@ impl Unit {
     }
 
     /// The action list's clearing (`FUN_140a98620`) as the unit's own commands and stops run it
-    /// ([`Unit::clear_own_actions`]); an action the slice does not hold has a teardown it cannot
-    /// run.
+    /// ([`Unit::clear_own_actions`]) on its action layer `actions`; an action the slice does not
+    /// hold has a teardown it cannot run (`unread`: the load could not read it whole,
+    /// [`Unread`]).
     pub(crate) fn tear_down_actions(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        (actions, unread): (&mut crate::objects::layers::Action, Option<&Unread>),
         motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        if actions.unmodelled_action.is_some() {
+        if unread.is_some() {
             return Err(GenieError::unsupported(
                 "a unit AI's stop of an action list the slice does not model",
             ));

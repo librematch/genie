@@ -159,11 +159,10 @@ fn an_object_past_state_2_loses_its_actions() {
         Speed::new(0.0)
     );
     let mut t = forage_world();
-    t.parts
-        .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
-        .unwrap()
-        .unmodelled_action = Some(GenieError::unsupported("an action"));
+    t.set_unread(
+        t.players[1].objects[ListIndex::new(0)].id,
+        GenieError::unsupported("an action"),
+    );
     let r = in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -444,7 +443,7 @@ fn the_top_action_s_object_is_its_target_unless_it_has_none() {
         ))),
         ..Default::default()
     };
-    assert_eq!(building.top_action_object(), Ok(Some(object_id(800))));
+    assert_eq!(building.top_action_object(None), Ok(Some(object_id(800))));
     // a wait for a foundation keeps it at +0x68, its +0x30 is −1
     let waiting = crate::objects::layers::Action {
         list: ActionList::default().with_wait_solidify(Some(
@@ -455,16 +454,14 @@ fn the_top_action_s_object_is_its_target_unless_it_has_none() {
         )),
         ..Default::default()
     };
-    assert_eq!(waiting.top_action_object(), Ok(None));
+    assert_eq!(waiting.top_action_object(None), Ok(None));
     assert_eq!(
-        crate::objects::layers::Action::default().top_action_object(),
+        crate::objects::layers::Action::default().top_action_object(None),
         Ok(None)
     );
-    let unmodelled = crate::objects::layers::Action {
-        unmodelled_action: Some(GenieError::unsupported("an action")),
-        ..building
-    };
-    assert!(unmodelled.top_action_object().is_err());
+    // an object the load could not read whole: its top action is unknown
+    let unread = crate::world::Unread::new(GenieError::unsupported("an action"));
+    assert!(building.top_action_object(Some(&unread)).is_err());
 }
 
 /// The top action's sub-action: a Hunt's `MoveTo` with its state number, else its Attack; a

@@ -439,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unmodelled_action_tells_why_its_object_freezes() {
+    fn an_unread_object_tells_why_it_freezes() {
         let why =
             GenieError::unsupported("a default task the slice does not model").with("site", 1);
         let at = why.location();
@@ -447,13 +447,7 @@ mod tests {
             id: object_id(5),
             ..Unit::default()
         }]);
-        t.set_actions(
-            object_id(5),
-            crate::objects::layers::Action {
-                unmodelled_action: Some(why),
-                ..Default::default()
-            },
-        );
+        t.set_unread(object_id(5), why);
         let lines = heard(|| t.tick(Millis::new(10)));
         let warned: Vec<_> = lines.iter().filter(|l| l.starts_with("WARN")).collect();
         assert_eq!(

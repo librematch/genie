@@ -70,6 +70,7 @@ impl World {
                 self.parts.building_of(u.id),
                 self.parts.combat_of(u.id),
                 self.parts.actions.of(u.id),
+                self.parts.unread.get(u.id),
             ),
             master,
             &held.attributes,

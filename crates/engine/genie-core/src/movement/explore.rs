@@ -559,7 +559,7 @@ impl Unit {
             }
             owner
         } else {
-            if actions.top_action().is_some() || actions.unmodelled_action.is_some() {
+            if actions.top_action().is_some() || c.w.parts.unread.contains(self.id) {
                 return Err(GenieError::unsupported(
                     "an Explore replacing another action",
                 ));

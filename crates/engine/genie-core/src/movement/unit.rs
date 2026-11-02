@@ -50,7 +50,7 @@ impl Unit {
             .and_then(|m| m.velocity.as_ref())
         {
             Some(_) => self.group_speed(
-                actions,
+                (actions, c.w.parts.unread.get(self.id)),
                 &c.w.groups,
                 crate::objects::masters::OwnerMasters::new(
                     &c.w.parts.own_master,
@@ -90,7 +90,8 @@ impl Unit {
     }
 
     /// What slot 0x5e0 (`FUN_14114f300`) reads of the unit's group ([`GroupSpeed`]) among the
-    /// world's `groups`, the unit's master among `masters` and its unit AI `ai`: none outside a group the world holds (`+0x6d0`, `FUN_14152ff40`: none for −1), nor when the
+    /// world's `groups`, the unit's master among `masters` and its unit AI `ai`, with its action
+    /// layer `actions` and why the load could not read it whole `unread`: none outside a group the world holds (`+0x6d0`, `FUN_14152ff40`: none for −1), nor when the
     /// group's motion stands (`FUN_141046600`) and the unit is in its place
     /// ([`UnitGroup::slot_in_place`]), nor for a unit not free for the group's moves
     /// ([`Unit::free_for_group`]). Else its own move's reason (`FUN_141017590`): 2 moved aside,
@@ -103,7 +104,10 @@ impl Unit {
     /// [`UnitGroup::slot_in_place`]: crate::groups::UnitGroup::slot_in_place
     pub(crate) fn group_speed(
         &self,
-        actions: &crate::objects::layers::Action,
+        (actions, unread): (
+            &crate::objects::layers::Action,
+            Option<&crate::world::Unread>,
+        ),
         groups: &crate::groups::UnitGroups,
         masters: crate::objects::masters::OwnerMasters<'_>,
         ai: Option<&UnitAi>,
@@ -115,7 +119,7 @@ impl Unit {
             return Ok(None);
         }
         let master = self.master_in(masters)?;
-        if !actions.free_for_group(master, ai)? {
+        if !actions.free_for_group(unread, master, ai)? {
             return Ok(None);
         }
         Ok(Some(match g.member_reason(self.id) {

@@ -109,14 +109,11 @@ pub(super) fn saved_missile(
     })
 }
 
-/// The parts of an object the slice cannot read at all: none but its action layer, which holds
-/// `why` as its unmodelled action.
+/// The parts of an object the slice cannot read at all: none, the load's reason `why` its only
+/// entry ([`genie_core::world::Unread`]).
 fn unmodelled(why: GenieError) -> ObjectParts {
     ObjectParts {
-        actions: genie_core::objects::layers::Action {
-            unmodelled_action: Some(why),
-            ..Default::default()
-        },
+        unread: Some(genie_core::world::Unread::new(why)),
         ..ObjectParts::default()
     }
 }
@@ -391,14 +388,15 @@ fn row(
         Ok(m) => (m, Ok(())),
         Err(e) => (None, Err(e)),
     };
-    actions.unmodelled_action = life_read
+    let unread = life_read
         .and(ai_read)
         .and(lists_read)
         .and(gather_read)
         .and(imported)
         .and(production)
         .and(moving)
-        .err();
+        .err()
+        .map(genie_core::world::Unread::new);
     (
         unit,
         ObjectParts {
@@ -408,6 +406,7 @@ fn row(
             combat,
             motion: genie_core::objects::layers::Motion::of(animated, mover),
             actions,
+            unread,
             ..ObjectParts::default()
         },
     )

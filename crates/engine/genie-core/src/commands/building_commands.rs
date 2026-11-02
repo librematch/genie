@@ -403,12 +403,7 @@ impl World {
             ));
         }
         let top = self.parts.actions_of(building.id).top_action_kind();
-        if self
-            .parts
-            .actions_of(building.id)
-            .unmodelled_action
-            .is_some()
-        {
+        if self.parts.unread.contains(building.id) {
             return Err(GenieError::unsupported(
                 "RESEARCH at a building with an unmodelled action",
             ));

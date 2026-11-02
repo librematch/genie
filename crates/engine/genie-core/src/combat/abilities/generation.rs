@@ -133,7 +133,12 @@ impl World {
         let top = if short_cut || master.kind != COMBAT {
             None
         } else {
-            if let Some(e) = self.parts.actions_of(unit.id).unmodelled_action.clone() {
+            if let Some(e) = self
+                .parts
+                .unread
+                .get(unit.id)
+                .map(crate::world::Unread::error)
+            {
                 return Err(e);
             }
             match self.parts.actions_of(unit.id).top_action() {

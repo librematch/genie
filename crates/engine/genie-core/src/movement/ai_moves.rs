@@ -44,7 +44,7 @@ impl Unit {
         let sprite_rng = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let sails = self.ai_move_with(
-            actions,
+            (actions, c.w.parts.unread.get(self.id)),
             c.w.parts.motion.layer_mut(self.id),
             m,
             (class, c.player),
@@ -103,10 +103,14 @@ impl Unit {
     /// [`MoveToAction::to_point`]); one that ends at its start shows the standing sprite of the
     /// unit's master in `look` ([`Unit::shows_standing_sprite`]). True when a Transport on top
     /// takes the point, which the caller sails there ([`Unit::transport_sail`]). `motion` is
-    /// the unit's motion layer.
+    /// the unit's motion layer, `actions` its action layer and `unread` why the load could not
+    /// read it whole ([`crate::world::Unread`]).
     pub(crate) fn ai_move_with(
         &mut self,
-        actions: &mut crate::objects::layers::Action,
+        (actions, unread): (
+            &mut crate::objects::layers::Action,
+            Option<&crate::world::Unread>,
+        ),
         mut motion: MotionMut<'_>,
         m: AiMove,
         (class, player): (ClassId, PlayerId),
@@ -136,7 +140,7 @@ impl Unit {
             return Ok(false);
         }
         match self.head_takes_point(
-            actions,
+            (actions, unread),
             motion.reborrow(),
             m.point,
             player,
@@ -192,7 +196,10 @@ impl Unit {
     /// [`HuntAction::take_move`]: crate::gathering::hunt::HuntAction::take_move
     pub(crate) fn head_takes_point(
         &self,
-        actions: &mut crate::objects::layers::Action,
+        (actions, unread): (
+            &mut crate::objects::layers::Action,
+            Option<&crate::world::Unread>,
+        ),
         mut motion: MotionMut<'_>,
         point: Position,
         player: PlayerId,
@@ -202,7 +209,7 @@ impl Unit {
             Option<&crate::combat::abilities::Look>,
         ),
     ) -> Result<PointMove, GenieError> {
-        if actions.unmodelled_action.is_some() {
+        if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
             ));
@@ -354,7 +361,7 @@ impl Unit {
         range: Distance,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        if actions.unmodelled_action.is_some() {
+        if c.w.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit with an action",
             ));

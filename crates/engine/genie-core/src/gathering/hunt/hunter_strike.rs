@@ -243,7 +243,11 @@ impl Unit {
         // the animal's top action without a target or a point (slots 0x190, 0x288)
         let animal = others.get(action.target);
         let idle = match animal {
-            Some(u) => c.w.parts.actions_of(u.id).top_action_idle()?,
+            Some(u) => {
+                c.w.parts
+                    .actions_of(u.id)
+                    .top_action_idle(c.w.parts.unread.get(u.id))?
+            }
             None => false,
         };
         Ok(Some(Herd {

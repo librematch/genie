@@ -121,7 +121,7 @@ impl UnitView<'_, '_> {
         let patrolling = match u.group.id.and_then(|id| self.c.w.groups.get(id)) {
             None => {
                 let busy =
-                    actions.top_action_kind().is_some() || actions.unmodelled_action.is_some();
+                    actions.top_action_kind().is_some() || self.c.w.parts.unread.contains(u.id);
                 if ai.current_action.is_some()
                     || busy
                     || ai.current_order.is_some()
@@ -212,7 +212,7 @@ impl UnitView<'_, '_> {
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.unit.tear_down_actions(
-            self.actions,
+            (self.actions, self.c.w.parts.unread.get(self.unit.id)),
             self.c.w.parts.motion.layer_mut(self.unit.id),
             &mut releases,
             &mut leaves,
