@@ -29,6 +29,7 @@ its mills' food. After the objects, the player's scout map takes the tiles that 
 | [`tests.rs`](tests.rs) | Tests. |
 | [`tree_ids.rs`](tree_ids.rs) | The ids the tech tree table holds: its masters and its technologies, as the game's ints. |
 | [`update.rs`](update.rs) | The world player's update: the loop's seconds, the explored share, the defeat check and what keeps a player in the game. |
+| [`tech_tree/`](tech_tree/) |  |
 <!-- /files -->
 
 ## How it connects

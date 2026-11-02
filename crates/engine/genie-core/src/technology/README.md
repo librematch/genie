@@ -27,6 +27,7 @@ the player's masters, resources or other technologies.
 | [`mod.rs`](mod.rs) | Technologies and upgrades: the players' technologies, a research's effects and an object's upgrade to another master. |
 | [`research_count.rs`](research_count.rs) | A technology's research counts and their cap. |
 | [`research_state.rs`](research_state.rs) | A player's technology's state: whether it may be researched, is being researched or is researched. |
+| [`tech_def.rs`](tech_def.rs) | A technology's definition: its costs, its effect and the techs it links (FD-046). |
 | [`tech_id.rs`](tech_id.rs) | A technology's id as one type: the place of a technology in the tech tree and in a player's technologies, the `.dat`'s technology record index. |
 | [`tech_mode.rs`](tech_mode.rs) | The game modes a technology is for. |
 | [`tech_type.rs`](tech_type.rs) | A technology's type as one type: its record's `+0x3c`, the `.dat`'s `type`. |

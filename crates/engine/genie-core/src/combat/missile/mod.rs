@@ -33,6 +33,7 @@ mod hit_mode;
 mod miss_spread;
 mod missile_modes;
 mod missile_state;
+mod missile_stats;
 mod missile_target;
 mod projectile_type;
 mod shooter_id;
@@ -44,6 +45,7 @@ pub use self::hit_mode::HitMode;
 pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
+pub use self::missile_stats::MissileStats;
 pub use self::missile_target::{MissileTarget, MissileTargetId};
 pub use self::projectile_type::ProjectileType;
 pub use self::shooter_id::{Shooter, ShooterId};
@@ -84,32 +86,6 @@ const VOLLEY_SCALE: f32 = MISSILE_VOLLEY_SCALE;
 const VOLLEY_HALF: f32 = MISSILE_VOLLEY_HALF;
 /// What a volley's extra missile's reach adds to the range (`FUN_141226690`).
 const VOLLEY_REACH_MARGIN: f32 = MISSILE_VOLLEY_REACH_MARGIN;
-
-/// What a missile's master holds for the flight: the `.dat`'s `projectile_type` (`+0x880`, not
-/// saved), `smart_mode` (`+0x881`, the save's `targetting_type`), `hit_mode` (`+0x882`,
-/// `missile_hit_info`), `vanish_mode` (`+0x883`, `missile_die_info`) and `projectile_arc`
-/// (`+0x888`, `ballistics_ratio`); its master's speed (slot 0xe8, `+0x740`), radii
-/// (`+0x5d8`..`+0x5e0`) and the `.dat`'s `fly_mode` (`+0x608`: 0 holds it on the ground, 1 above
-/// it, `FUN_141193a10`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
-pub struct MissileStats {
-    /// `projectile_type` (`+0x880`).
-    pub projectile_type: ProjectileType,
-    /// `smart_mode`.
-    pub smart_mode: SmartMode,
-    /// `hit_mode` (`missile_hit_info`).
-    pub hit_mode: HitMode,
-    /// `vanish_mode` (`missile_die_info`).
-    pub vanish_mode: VanishMode,
-    /// `projectile_arc` (`ballistics_ratio`).
-    pub arc: ArcRatio,
-    /// Its master's speed (slot 0xe8).
-    pub speed: Speed,
-    /// Its master's radii (`+0x5d8`..`+0x5e0`).
-    pub radius: Radii,
-    /// The `.dat`'s `fly_mode` (`+0x608`): 0 holds it on the ground, 1 above it.
-    pub fly_mode: FlyMode,
-}
 
 /// Where a missile came from (`+0x9c`, `mProjectileData`, `FUN_140aa86e0`): the firing object's
 /// place, the missile master's radii on the ground, the firing object's master and owner (−1

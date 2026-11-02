@@ -19,22 +19,14 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 pub(crate) mod death_parts;
+mod master_data;
 mod object_state;
 
+pub use self::master_data::MasterData;
 pub use self::object_state::ObjectState;
 use crate::garrison::ContainerId;
 use crate::objects::FacetCount;
 use crate::world::player::Player;
-
-/// What the dead-object steps read from an object's master that the header save does not hold;
-/// they come from the `.dat`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
-pub struct MasterData {
-    /// Master `+0x620`: how much of the held attribute a dead object loses per second.
-    pub decay: AmountRate,
-    /// Master `+0x490`: a dead object turns undead (state 6) instead of leaving.
-    pub undead: bool,
-}
 
 /// Which update chain the object runs. `RGE_Animated_Object::update` and everything derived from
 /// it (types 20 and up) adds a step after the static update's.

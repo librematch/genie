@@ -10,6 +10,7 @@
 //! need are the objects' routines, which this file leaves to them.
 
 mod attribute_modifier;
+mod change;
 mod commands;
 mod completion;
 mod object_slots;
@@ -18,6 +19,7 @@ mod tech_change;
 mod upgrade;
 
 pub(crate) use self::attribute_modifier::{MasterSprites, follow_master};
+pub use self::change::Change;
 use self::object_slots::{CAPPED, ONE, ROUND, has_actions, within_table};
 #[cfg(test)]
 use self::object_slots::{POPULATION, RESOURCE_19, charge_after};
@@ -39,18 +41,5 @@ const ATTRIBUTE_39: usize = 39;
 /// The master whose enabling first asks the game's mode (`0x26d`, `FUN_1416665b0`); Sudden Death
 /// (11) never enables it.
 const MODE_TESTED_MASTER: MasterId = MasterId::named(0x26d);
-/// How slot 0x148 changes an attribute (its second argument): set (0, slot 0x150), add (1, slot
-/// 0x158) or multiply (2, slot 0x160); the masters' slots 0x18, 0x20, 0x28 and the objects' slots
-/// 0x78, 0x80, 0x88 follow it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Change {
-    /// The attribute takes the amount.
-    Set,
-    /// The amount adds to it.
-    Add,
-    /// It is multiplied by the amount.
-    Multiply,
-}
-
 #[cfg(test)]
 mod tests;

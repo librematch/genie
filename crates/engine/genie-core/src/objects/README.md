@@ -65,9 +65,11 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`voice.rs`](voice.rs) | Whether an action speaks for its unit (`Voice`): the base action's `+0x60`. |
 | [`work_rate.rs`](work_rate.rs) | A worker's work rate (`WorkRate`), with the game's `f32` operations. |
 | [`worker_count.rs`](worker_count.rs) | The count of the actions that work on an object, and the caps on it. |
+| [`facing/`](facing/) |  |
 | [`layers/`](layers/) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |
 | [`lifecycle/`](lifecycle/) | What happens to an object once it is dead: the state steps of `RGE_Static_Object::update` (158041 `0x14118ad50`) and `RGE_Animated_Object::update` (`0x141071880`), up to the update that returns 1 and so takes the object off its player's list (`RGE_Object_List::update`, `0x141166550`). |
 | [`masters/`](masters/) | What the engine reads of a player's masters: the tasks a unit can do and the masters a unit changes into to do them, and how an effect changes a master: the attribute setters (slots 0x18, 0x20 and 0x28 of every master type, `Master::set_attribute`), the master copy of an upgrade (slot 8, `Master::copy_from`) and the values the slice derives from a master (`Master::follow`). |
+| [`sprite/`](sprite/) |  |
 | [`unit/`](unit/) | What the slice tracks of one object (`Unit`) and its update, action by action. |
 <!-- /files -->
 

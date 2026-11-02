@@ -70,6 +70,7 @@ file for what the save does not hold.
 | [`interface_kind.rs`](interface_kind.rs) | A master's interface kind (`+0x62f`): which command panel its objects show. |
 | [`invulnerability.rs`](invulnerability.rs) | A master's invulnerability level: the hit points a hit cannot take. |
 | [`lookup.rs`](lookup.rs) | A player's masters by id (`Masters`) and the work command's choice of master and task. |
+| [`master.rs`](master.rs) | A master and the players' tables of them: the `.dat`'s unit records as the engine reads them (FD-046). |
 | [`master_id.rs`](master_id.rs) | A master's id as one type: the master a command builds, trains or turns an object into, and a target's master. |
 | [`master_kind.rs`](master_kind.rs) | A master's type as one type: the byte at `+0x8` that tells a static object from a combat unit or a building, which the `.dat` names `unit_type`. |
 | [`master_type.rs`](master_type.rs) | The master types (`+0x8`, the object's kind at `+0xf`): the one definition of the type bytes. |
@@ -87,6 +88,7 @@ file for what the save does not hold.
 | [`special_attack.rs`](special_attack.rs) | A master's special attack (`+0x8d8`): what a hit on its objects or their charge does. |
 | [`static_setters.rs`](static_setters.rs) | The static, animated, moving and action masters' setters. |
 | [`target_owner.rs`](target_owner.rs) | A task's owner type (`+0x18`): whose targets the task is for. |
+| [`task.rs`](task.rs) | A master's task: what its unit can do to a target (the `.dat`'s task list, FD-046). |
 | [`task_flags.rs`](task_flags.rs) | A task's flags (`TaskFlags`, `combat_level_flag`). |
 | [`task_group.rs`](task_group.rs) | A master's task swap group (`+0x7b8`): the masters a unit may switch between for a task. |
 | [`task_id.rs`](task_id.rs) | A task's id as one type: the place of a task in its master's task list, which an action keeps to name the task it works on. |

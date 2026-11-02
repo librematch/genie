@@ -24,6 +24,7 @@ mod effect_command;
 mod effect_id;
 mod research_count;
 mod research_state;
+mod tech_def;
 mod tech_id;
 mod tech_mode;
 mod tech_type;
@@ -39,11 +40,13 @@ pub use self::effect_command::{
 pub use self::effect_id::EffectId;
 pub use self::research_count::{ResearchCap, ResearchCount};
 pub use self::research_state::ResearchState;
+pub use self::tech_def::Cost;
+pub use self::tech_def::Linked;
+pub use self::tech_def::TechDef;
 pub use self::tech_id::TechId;
 pub use self::tech_mode::TechMode;
 pub use self::tech_type::TechType;
 pub use self::upgrade_mode::UpgradeMode;
-use crate::players::CivId;
 use crate::production::LocationButton;
 use crate::world::WholeSeconds;
 
@@ -62,93 +65,6 @@ const SCALED_BY_38: TechId = TechId::SCALED_BY_38;
 const ATTRIBUTE_38: AttributeId = AttributeId::numbered(38);
 /// The resource a cost the player cannot meet takes the rest from (`+0x18`: gold).
 const GOLD: AttributeId = attribute::GOLD;
-
-/// How a group of the game's `linkedTechs.json` links its technologies: the `+4` byte of the
-/// record the game settings' table (`FUN_140f39f40`) holds for each of them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Linked {
-    /// `MutuallyExclusive` (0).
-    MutuallyExclusive,
-    /// `Toggleable` (1): `FUN_140f39e80` asks the tech tree (`FUN_1413cc3d0`).
-    Toggleable,
-    /// `Cycle` (2): `FUN_140f39e80` holds it researchable in any state.
-    Cycle,
-}
-
-impl Linked {
-    /// The kind of the file's `Type`; None for one the game does not know.
-    #[must_use]
-    pub fn of(kind: &str) -> Option<Self> {
-        match kind {
-            "MutuallyExclusive" => Some(Self::MutuallyExclusive),
-            "Toggleable" => Some(Self::Toggleable),
-            "Cycle" => Some(Self::Cycle),
-            _ => None,
-        }
-    }
-}
-
-/// One cost entry of a technology in the `.dat`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Cost {
-    /// The attribute it takes, none for −1.
-    pub attribute: Option<AttributeId>,
-    /// How much.
-    pub amount: CostAmount,
-    /// 0 not paid, 1 paid from the player's attribute, 2 from the building (`FUN_141204310`).
-    pub paid: CostPaid,
-}
-
-/// A technology of the `.dat` as the tech tree holds it (its 0x88-byte record).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TechDef {
-    /// `+0x2a`, `+0x30`, `+0x36`: the cost entries' attributes, amounts and paid flags.
-    pub costs: [Cost; 3],
-    /// `+0x3c`, the technology's type.
-    pub kind: TechType,
-    /// Its effect (`+0x3a`) and the effect's commands (the world's effect table `+0x128`).
-    pub effect_id: EffectId,
-    /// The effect's commands.
-    pub effect: Vec<EffectCommand>,
-    /// `+0x18`, `+0x24`: the technologies it requires and how many of them.
-    pub required: [Option<TechId>; 6],
-    /// How many of them it requires.
-    pub required_count: i16,
-    /// `+0x26`: the civ it belongs to (below 1 every civ's); `+0x28`: the game modes it is for
-    /// (0 every one, `FUN_1413cf2f0`).
-    pub civ: Option<CivId>,
-    /// `+0x28`: the game modes it is for (0 and 1 every one, `FUN_1413cf2f0`).
-    pub mode: TechMode,
-    /// `+0x70`: where it is researched, the building's master and the seconds it takes.
-    pub locations: Vec<(Option<MasterId>, WholeSeconds)>,
-}
-
-impl TechDef {
-    /// Its effect upgrades a unit (a command of kind 3, the player's own), which keeps
-    /// RESEARCH's queue to one at a time (`FUN_1411d70f0`).
-    #[must_use]
-    pub fn upgrades(&self) -> bool {
-        self.effect.iter().any(|c| {
-            matches!(
-                c,
-                EffectCommand::Upgrade {
-                    party: Party::Own,
-                    ..
-                }
-            )
-        })
-    }
-
-    /// Its effect marks a master with an upgrade when its research starts: an upgrade of any
-    /// block (kinds 3, 13, 23, 33, 43; `FUN_140ec4540` from the research's start,
-    /// `FUN_1413d1530`, marks the master with the unit it turns into, `+0x330`).
-    #[must_use]
-    pub fn marks_upgrade(&self) -> bool {
-        self.effect
-            .iter()
-            .any(|c| matches!(c, EffectCommand::Upgrade { .. }))
-    }
-}
 
 /// Where a technology is researched (an entry of `+0x68`, 16 bytes): the building's master,
 /// the seconds it takes there, its button and the seconds added (`+0xc`, `FUN_1413cec90`).

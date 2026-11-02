@@ -8,6 +8,9 @@
 //! ([`SpriteFacets`]); the slice takes them from the unit's master when every sprite of the
 //! master has the same ([`crate::movement::MoveStats::facets`]).
 
+mod sprite_facets;
+
+pub use self::sprite_facets::SpriteFacets;
 use crate::map::Point;
 use crate::math::Angle;
 use crate::math::fmath::{self, BVector};
@@ -17,9 +20,8 @@ use crate::math::image::facing::{
     MINUS_TWO_PI as FACING_MINUS_TWO_PI, ONE as FACING_ONE, PI as FACING_PI,
     QUARTER_PI as FACING_QUARTER_PI, TWO as FACING_TWO, TWO_PI as FACING_TWO_PI,
 };
-use crate::objects::{Facet, FacetCount};
+use crate::objects::Facet;
 use crate::world::{Seconds, WorldTime};
-use genie_diff::Diff;
 
 const TWO_PI: f32 = FACING_TWO_PI;
 const MINUS_TWO_PI: f32 = FACING_MINUS_TWO_PI;
@@ -37,17 +39,6 @@ const EPSILON: f32 = FACING_EPSILON;
 const ONE: f32 = FACING_ONE;
 const MINUS_ONE: f32 = FACING_MINUS_ONE;
 const TWO: f32 = FACING_TWO;
-
-/// What the facing routines read of the current sprite: its facets and whether its sequence
-/// flags have bit 1 (`+0x1a`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
-pub struct SpriteFacets {
-    /// How many facets.
-    pub count: FacetCount,
-    /// Its sequence flags hold [`crate::objects::SpriteFlags::TURNS`] (`+0x1a`): the sprite
-    /// turns.
-    pub turns: bool,
-}
 
 /// The facets most routines count: the sprite's, at least 8 (`FUN_14114d780`, `FUN_14119d0c0`).
 fn at_least_eight(s: SpriteFacets) -> i32 {
@@ -241,6 +232,7 @@ pub fn draws_angle(s: Option<SpriteFacets>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::FacetCount;
 
     const VILLAGER: SpriteFacets = SpriteFacets {
         count: FacetCount::of_data(16),

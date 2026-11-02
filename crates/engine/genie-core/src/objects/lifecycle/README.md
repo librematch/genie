@@ -21,6 +21,7 @@ building's storage, the military and civilian counts.
 | File | What it holds |
 | --- | --- |
 | [`death_parts.rs`](death_parts.rs) | A death's parts: a farm's bonus, the visible resources forgotten, the combat object's death and refund, a built building's death and storage, and the military and civilian counts. |
+| [`master_data.rs`](master_data.rs) | What an object's life reads of its master (FD-046: the model's part of the lifecycle). |
 | [`mod.rs`](mod.rs) | What happens to an object once it is dead: the state steps of `RGE_Static_Object::update` (158041 `0x14118ad50`) and `RGE_Animated_Object::update` (`0x141071880`), up to the update that returns 1 and so takes the object off its player's list (`RGE_Object_List::update`, `0x141166550`). |
 | [`object_state.rs`](object_state.rs) | An object's state: where it stands between its placing and its leaving. |
 <!-- /files -->

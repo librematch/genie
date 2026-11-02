@@ -13,6 +13,10 @@
 //! `FUN_1413b2d90` (always), frame reset `FUN_1413b5030`, looped (slot 12) `FUN_1413b38e0`
 //! (never).
 
+mod graphic;
+
+pub use self::graphic::Graphic;
+pub(crate) use self::graphic::top_speed;
 use crate::combat::abilities::Look;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath;
@@ -27,62 +31,14 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::action_type;
 use crate::objects::masters::class;
-use crate::objects::{AnimateState, FacetCount, Frame};
+use crate::objects::{AnimateState, Frame};
 use crate::world::Seconds;
 use genie_diff::Diff;
-
-/// What the clock reads of a sprite (the `.dat` graphic, memory `+0x8`..`+0x1a`).
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
-pub struct Graphic {
-    /// The graphic's id.
-    pub id: SpriteId,
-    /// `+0x8`, `frame_count`.
-    pub frames: Frame,
-    /// `+0xa`, `angle_count`: the facets.
-    pub facets: FacetCount,
-    /// `+0xc`, `speed_multiplier`: at least 1e-7, it scales the frame duration.
-    pub speed_multiplier: SpeedMultiplier,
-    /// `+0x10`, `frame_duration`.
-    pub frame_duration: Seconds,
-    /// `+0x14`, `replay_delay`.
-    pub replay_delay: Seconds,
-    /// `+0x1a`, `sequence_type`.
-    pub flags: SpriteFlags,
-}
-
-impl Graphic {
-    const fn animated(&self) -> bool {
-        self.flags.contains(SpriteFlags::ANIMATED)
-    }
-
-    const fn backwards(&self) -> bool {
-        self.flags.contains(SpriteFlags::BACKWARDS)
-    }
-
-    /// The first frame: the last one for a sprite played backwards.
-    fn first_frame(&self) -> Frame {
-        if self.backwards() {
-            self.frames - Frame::ONE
-        } else {
-            Frame::ZERO
-        }
-    }
-}
 
 /// The shortest frame interval (`0x3a83126f`, also `DAT_142eb1e9c`).
 const SHORTEST: f32 = SPRITE_SHORTEST;
 /// The gap below which a speed multiplier counts as none (`DAT_142eb0c60`).
 const EPSILON: f32 = SPRITE_EPSILON;
-
-/// A moving object's top speed (slot 65, `FUN_14114d1d0`) with the sprite `shown`: its master's
-/// speed `base` (slot 0x1d0's `+0x740`), times the sprite's speed factor (`+0xc`) when that is
-/// above 0 (`COMISS`, `JBE`: a NaN is not). The game reads it from the current sprite (`+0x140`)
-/// each time; genie derives [`MoveStats::speed`] from it where the sprite or the base changes
-/// ([`new_sprite`]).
-#[must_use]
-pub(crate) fn top_speed(base: Speed, shown: Option<&Graphic>) -> Speed {
-    shown.map_or(base, |g| g.speed_multiplier.applied_to(base))
-}
 
 /// Slot 0x68, `new_sprite` (a combat object's `FUN_141217000`, the moving object's
 /// `FUN_141158620`, the static object's `FUN_141196580`): the object shows `g`. The sprite it
@@ -451,6 +407,7 @@ mod tests {
     #[cfg(test)]
     use crate::gathering::hunt::tests::walker;
     use crate::movement::Speed;
+    use crate::objects::FacetCount;
     use crate::objects::masters::TaskSprites;
     use crate::objects::masters::master_type;
     #[cfg(test)]
