@@ -35,6 +35,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::player::Player;
@@ -53,12 +54,17 @@ impl Unit {
     /// ([`Unit::missile_lands`]). A dead shooter's weapons going to the missile
     /// (`FUN_14113e170`), the sprite's pitch facet and the projectile types 1 and 2 are not
     /// modelled.
-    pub(crate) fn fly(&mut self, actions: &mut Action, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn fly(
+        &mut self,
+        actions: &mut Action,
+        c: &mut Step<'_>,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         let Some(mut missile) = c.w.parts.missile.get(self.id).copied() else {
             return Ok(());
         };
         let mut action = actions.list.take_missile();
-        let flown = self.fly_missile(actions, &mut missile, &mut action, c);
+        let flown = self.fly_missile(actions, &mut missile, &mut action, c, roles);
         actions.list.set_missile(action);
         if let Some(own) = c.w.parts.missile.get_mut(self.id) {
             *own = missile;
@@ -120,6 +126,7 @@ impl Unit {
         missile: &mut Missile,
         slot: &mut Option<MissileAction>,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let stats = master.missile_stats.ok_or(GenieError::unsupported(
@@ -180,7 +187,7 @@ impl Unit {
             self.missile_hits(actions, action, &stats, fired, old, c)?;
         }
         if ground == at.z() {
-            self.missile_lands(actions, missile, slot, &stats, c)?;
+            self.missile_lands(actions, missile, slot, &stats, c, roles)?;
         }
         Ok(())
     }
@@ -207,6 +214,7 @@ impl Unit {
         old: Position,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
+        let roles = &c.w.model.roles.clone();
         if !(0.0 < stats.radius.x() && 0.0 < stats.radius.y()) {
             return Ok(());
         }
@@ -224,7 +232,7 @@ impl Unit {
                     if Some(id) != action.target.map(MissileTargetId::id) {
                         continue;
                     }
-                    let result = self.missile_strike(actions, action, fired, c)?;
+                    let result = self.missile_strike(actions, action, fired, c, roles)?;
                     action.result = result;
                     if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
                         && result != StrikeResult::SHIELDED
@@ -242,7 +250,7 @@ impl Unit {
                             "a missed missile meeting another object than its target",
                         ));
                     }
-                    let result = self.missile_strike(actions, action, fired, c)?;
+                    let result = self.missile_strike(actions, action, fired, c, roles)?;
                     action.result = result;
                     // the master's dying sprite plays there (a sprite of its own, not held)
                     if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
@@ -302,7 +310,13 @@ impl Unit {
             ally_factor: 1.0,
             player: Some(c.player),
             ignore: &[RecordId::from(self.id)],
-            objects: ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts),
+            objects: ObjectsRef::new(
+                &c.w.players,
+                &c.w.index,
+                &c.w.model.masters,
+                &c.w.parts,
+                &c.w.model.roles,
+            ),
         })?;
         let mut met = Vec::new();
         for record in crossed {
@@ -346,14 +360,15 @@ impl Unit {
         action: &MissileAction,
         fired: Fired,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<StrikeResult, GenieError> {
         if fired.charge {
             return Err(GenieError::unsupported("a charge projectile's own hit"));
         }
         if action.fired_from.is_none() {
-            return self.own_strike(actions, action, fired.by, c);
+            return self.own_strike(actions, action, fired.by, c, roles);
         }
-        let mut victim = victim(c, action.target)?;
+        let mut victim = victim(c, action.target, roles)?;
         let (p, mode_680) = (c.player, c.w.mode_680);
         let shooter_slot = c.w.live_index(p, action.fired_from);
         let World {
@@ -396,6 +411,7 @@ impl Unit {
             p,
             terrain,
             mode_680,
+            roles,
         );
         let victim = victim.as_mut().ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
@@ -407,7 +423,7 @@ impl Unit {
             chance: master.hit_chance,
         };
         let object = streams.get(Stream::Object);
-        let struck = strike(&mut own, victim, &mut c.blasted, hit, object)?;
+        let struck = strike(&mut own, victim, &mut c.blasted, hit, object, roles)?;
         if let Some(target) = struck.executed {
             shooter.post_own(
                 &mut parts.unit_ai,
@@ -423,7 +439,7 @@ impl Unit {
                 "a retaliation killing a missile's shooter",
             ));
         }
-        write_strike_back(c, self, actions, victim)?;
+        write_strike_back(c, self, actions, victim, roles)?;
         Ok(struck.result)
     }
 
@@ -441,6 +457,7 @@ impl Unit {
         action: &MissileAction,
         fired_from: Option<ShooterId>,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<StrikeResult, GenieError> {
         if action.origin.owner.is_some() {
             return Err(GenieError::unsupported(
@@ -468,10 +485,11 @@ impl Unit {
             c.player,
             terrain,
             c.w.mode_680,
+            roles,
         );
         // the missile's own part is out of the unit while it flies
         own.source.fired_from = fired_from;
-        let mut victim = victim(c, action.target)?.ok_or(GenieError::unsupported(
+        let mut victim = victim(c, action.target, roles)?.ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
         let victim = &mut victim;
@@ -482,14 +500,14 @@ impl Unit {
             chance: master.hit_chance,
         };
         let object = c.w.streams.get(Stream::Object);
-        let struck = strike(&mut own, victim, &mut c.blasted, hit, object)?;
+        let struck = strike(&mut own, victim, &mut c.blasted, hit, object, roles)?;
         if self
             .hit_back(own, c.w.parts.ai_and_combat_mut(self.id)?)?
             .is_some()
         {
             return Err(GenieError::unsupported("a retaliation killing a missile"));
         }
-        write_strike_back(c, self, actions, victim)?;
+        write_strike_back(c, self, actions, victim, roles)?;
         Ok(struck.result)
     }
 
@@ -510,6 +528,7 @@ impl Unit {
         slot: &mut Option<MissileAction>,
         stats: &MissileStats,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let fired = Fired {
             charge: missile.charge,
@@ -519,7 +538,7 @@ impl Unit {
         let Some(action) = slot.as_mut() else {
             return Ok(());
         };
-        self.missile_lands_on_target(actions, action, fired, stats, c)?;
+        self.missile_lands_on_target(actions, action, fired, stats, c, roles)?;
         if action.state == MissileState::Done {
             return Ok(());
         }
@@ -558,6 +577,7 @@ impl Unit {
         fired: Fired,
         stats: &MissileStats,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(target) = action.target else {
             return Ok(());
@@ -565,13 +585,13 @@ impl Unit {
         if action.state == MissileState::Done || action.met.contains(&target.id()) {
             return Ok(());
         }
-        let v = victim(c, action.target)?.ok_or(GenieError::unsupported(
+        let v = victim(c, action.target, roles)?.ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
         if stats.hit_mode.strikes_on_landing(c.player != v.player)
             && on_target(self.position(), stats.radius, v.position, v.radius)
         {
-            let result = self.missile_strike(actions, action, fired, c)?;
+            let result = self.missile_strike(actions, action, fired, c, roles)?;
             action.result = result;
             if result != StrikeResult::SHIELDED {
                 self.end_missile(action);

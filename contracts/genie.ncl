@@ -20,6 +20,7 @@
   },
   AttributeId | doc "A player's attribute number (`player+0x100`'s array, the `.dat`'s attribute types, an effect's\nattribute argument): 0 or more. The first four are the resources (food, wood, stone, gold).\nThe simulation names the ones it tells apart (below); any other is a number the data holds\n([`AttributeId::numbered`]). A field that holds −1 for none is `Option<AttributeId>`." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
   AttributeRoles = [|  |],
+  AttributeSlots | doc "The attribute ids the engine names, one field each." = {},
   BestTargetTuning | doc "The `best_target` port's tuning values." = {
     distance_score | Number | doc "`best_target::DISTANCE_SCORE`: 75 in build 158041.",
     five | Number | doc "`best_target::FIVE`: 5 in build 158041.",
@@ -75,8 +76,14 @@
     class | DamageClass | doc "The class.",
     amount | DamageAmount | doc "The amount.",
   },
-  ClassId | doc "A master's class (`+0x410`, the `.dat`'s `unit_class`), 0 or more, or −1 for a master that has\nnone ([`ClassId::of_master`]). The `.dat` holds classes\nthat [`crate::objects::masters::class`] does not name (it names the ones the simulation tells\napart), so the class is a newtype with named constants, not an enum: any class the data\nholds is a class, and the named ones are values of the type." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
-  ClassRoles = [|  |],
+  ClassId | doc "A master's class (`+0x410`, the `.dat`'s `unit_class`), 0 or more, or −1 for a master that has\nnone ([`ClassId::of_master`]). The `.dat` holds classes the engine does not tell apart, and\nthe ones it does are roles of the build layer (`Roles::of_class`, FD-046-D03), so the class\nis a newtype, not an enum: any class the data holds is a class." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
+  ClassRoles = [| 'ALWAYS_SPARED, 'ARCHERY, 'ARCHERY_CANNON, 'ARTIFACT, 'ATTACK_MOVE_ATTACKS, 'BIRD, 'BOARDING_SHIP, 'BOAT, 'BOTH_LISTS_TARGET, 'BUILDING, 'CAPTURE_IGNORED, 'CATEGORY_LIST_TARGET, 'CAVALRY, 'CAVALRY_ARCHER, 'CAVALRY_CANNON, 'CAVALRY_RAIDER, 'CIVILIAN_COUNT, 'CLIFF, 'CLOSEST_LIVESTOCK, 'CLOSEST_PASTURE, 'CONTROLLED_ANIMAL, 'DAMAGE_BY_STORAGE, 'DAMAGE_BY_STORAGE_DEAD, 'DEATH_BLAST, 'DEEP_SEA_FISH, 'DOMESTIC_ANIMAL, 'ELEPHANT_ARCHER, 'FARM, 'FISHING_SHIP, 'FLAG, 'FORAGE_BUSH, 'FOUNDATION_TERRAIN, 'GAIA_KEPT, 'GATE, 'GOLD_FISH, 'GOLD_MINE, 'HEALER, 'INFANTRY, 'KEEPS_UNIT_AI_FROM, 'KEEPS_UNIT_AI_TO, 'KEPT_BY_MEMBERS, 'KING, 'LAND_MINE, 'LEAST_HIT, 'LION_TARGET, 'LIVESTOCK, 'MILITARY_COUNT, 'MILITARY_KEY, 'MISCELLANEOUS, 'MISC_BUILDING, 'MONK, 'MONK_WITH_RELIC, 'NEVER_EXHAUSTED, 'NEVER_PENDING, 'NOT_ANY, 'NOT_ATTACK_TARGET, 'NO_ATTACK, 'NO_ATTACK_UNLESS_HERO, 'OCEAN_FISH, 'ORE_MINE, 'PACKED_ATTACKS_NOTHING, 'PACKED_TREBUCHET, 'PACKS_TO_MOVE, 'PEACEFUL, 'PETARD, 'PHALANX, 'PIKEMAN, 'PREDATOR, 'PREDATOR_TARGET, 'PREY, 'PRIORITY_3_TARGET, 'RAIDER, 'RAM_TARGET, 'RELIC, 'REPAIRED_AS_UNIT, 'REPAIRED_AT_SHORE, 'REPAIR_COSTED, 'RESOURCE_PILE, 'SALVAGE_PILE, 'SCORPION, 'SCOUT_CAVALRY, 'SELF_ALERTING, 'SHARES_UNIT_AI, 'SHORE_FISH, 'SIEGE, 'SKIPS_SIEGE_CHECK, 'SPEARMAN, 'STONE_MINE, 'STRUCK_BUILDING, 'TERRAIN, 'TOWER, 'TRADER, 'TRADE_BOAT, 'TRADE_CART, 'TRANSPORT, 'TRANSPORT_CATEGORY, 'TREBUCHET_TARGET, 'TREE, 'TREE_STUMP, 'TWO_HANDED_SWORDSMAN, 'UNDELETABLE, 'UNPACKED_TREBUCHET, 'UNWATCHED, 'VILLAGER, 'WALL, 'WALL_BUILDER, 'WARSHIP, 'WAR_ELEPHANT, 'WHOLE_GARRISON_SHARE, 'WIDE_REACH |],
+  ClassSlots | doc "The class ids the engine names, one field each." = {
+    building | ClassId | doc "Buildings, which a unit's garrison task names.",
+    villager | ClassId | doc "Villagers (`-0xea8` raw).",
+    farm | ClassId | doc "Farms and a pasture's livestock (decoded 49, `0x31`).",
+    livestock | ClassId | doc "Livestock (decoded 58, `0x3a`, `-0xe72` raw), which goes to Gaia when killed.",
+  },
   CombatAbility | doc "The set's flag names joined by ` | `, unnamed bits as one hexadecimal number (`0x10`)." = String,
   CombatLevel | doc "A master's combat level (`+0x62c`, the `.dat`'s `combat_level`), every byte the data or an\neffect leaves kept. Named by the masters of build 158041's `.dat` that carry each value." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && 0 <= x && x <= 255),
   ConversionAdjust | doc "A master's `mMinConversionTimeAdj`, `mMaxConversionTimeAdj` and `mConversionChanceAdj`\n(`+0x934`, `+0x938`, `+0x93c`): what its effects add to a conversion's shortest and longest\ntime and to its chance." = {
@@ -471,6 +478,7 @@
   MasterId | doc "A master's id: the `.dat`'s unit id, the place of the master in a player's masters\n([`crate::objects::masters::Master::id`]), so 0 or more. A field that holds −1 for none\nholds `Option<MasterId>` ([`MasterId::of_field`])." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
   MasterKind | doc "A master's type (`+0x8`, the `.dat`'s `unit_type`): 10 to 80 in steps the game names (its\nconstants, the one definition of the type bytes: every routine that tests a type names it\nhere, and the attribute setters, slots 0x18, 0x20 and 0x28, differ by type). The routines that\ntest a type compare it with a threshold (`kind >= MasterKind::COMBAT`), so it is ordered. The\n`.dat` holds values the code does not name (0 for an empty slot, 90 and above for the data's\nown kinds), so the type is a newtype with named constants, not an enum: any byte the data holds\nis a type, and the named ones are values of the type (the reasoning of\n[`crate::objects::masters::ClassId`])." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && 0 <= x && x <= 255),
   MasterRoles = [|  |],
+  MasterSlots | doc "The master ids the engine names, one field each." = {},
   Masters | doc "A player's masters by id." = {
     by_id | Array (Master),
   },
@@ -624,7 +632,12 @@
     melee_armor | DamageAmount | doc "`+0x854`, `orig_armor`.",
     pierce_armor | DamageAmount | doc "`+0x8b0`, `orig_pierce_armor`.",
   },
-  Slots | doc "The ids the engine names by role, one id each (FD-046-D04)." = {},
+  Slots | doc "The ids the engine names by role, one id each, by id space (FD-046-D04)." = {
+    class | ClassSlots | doc "The class slots.",
+    master | MasterSlots | doc "The master slots.",
+    tech | TechSlots | doc "The tech slots.",
+    attribute | AttributeSlots | doc "The attribute slots.",
+  },
   SmartMode | doc "The set's flag names joined by ` | `, unnamed bits as one hexadecimal number (`0x10`)." = String,
   SoundEventId | doc "A sound event by its id (`mEventId`, the audio engine's event): what a task's sounds name\n(`+0x60`, `+0x78`). The `.dat`'s event 0 with sound files is the default event." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0),
   SoundEvents | doc "`+0x60` and `+0x78` of a task: the event ids of its gathering and its deposit sound, as the\ntask's load (`FUN_141062470`) leaves them. A terrain look task (159) names its dying and its\nundead sprite with their ids (`genie_core::combat::abilities`)." = {
@@ -709,6 +722,7 @@
   TechKind | doc "A technology's type (its record's `+0x3c`, the `.dat`'s `type`): the tech tree's tests name\nthe shared research (0x20) and the type a disable command makes available instead (0x21);\nevery other value is a type the simulation does not tell apart." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
   TechMode | doc "A technology's game modes (`+0x28`, the `.dat`'s `full_tech_mode`, a short): 0 and 1 every\none, 2 to 34 a rule, a mode or a starting age, a negative one its opposite\n([`crate::world::settings::Settings::tech_mode_allows`])." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
   TechRoles = [|  |],
+  TechSlots | doc "The tech ids the engine names, one field each." = {},
   TechTree | doc "The game's tech tree table (`FUN_140c7e080`: the game object's `+0xa60`, or `+0xa68` for a\nlocal player's civilisation in `FUN_140e9a7e0`'s list, 14 and 17) by civilisation index\n(`0x20` bytes each: its buildings, count `+0x10`), and each civilisation's unique unit by its\nindex (`FUN_140e87930`, `civilizations.json`'s `unique_unit_upgrade_id`, `unique_unit_id`,\n`elite_unique_unit_id`).\n\nThe game's data load (`FUN_140c81bd0`) reads `futuravailableunits.json` into `+0xa60` and\n`paphosfutureavailableunits.json` into `+0xa68` (`FUN_1414f3720`): civilisation indices 0 to\nthe full tech tree's (`FUN_140c7e6f0`), each its name's buildings (`ID`) with their units\n(`ID`, `RequiredUnitID`, `RequiredAge`, `RequiredTechID`, `FUN_1414f5c40`), the last\n`FullTechCiv`'s. With the game's `+0x680` at 0, as genie and the tick oracle hold it, that is\nindex 0 alone: a player of civilisation 1 or more without the full tech tree finds no\ncivilisation in it, as in the empty table genie-oracle leaves; the full tech tree's index 0\nis not loaded yet." = {
     civs | Array (Array (TreeBuilding)) | doc "The civilisations' buildings.",
     unique_units | Array (UniqueUnit) | doc "The civilisations' unique units.",

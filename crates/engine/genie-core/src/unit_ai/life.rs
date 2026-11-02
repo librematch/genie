@@ -11,7 +11,6 @@ use crate::movement::{PathFlags, WaypointIndex};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::OrderKind;
@@ -29,6 +28,8 @@ use crate::unit_ai::{
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
 impl UnitAi {
@@ -74,7 +75,12 @@ impl UnitAi {
     /// [`SOLDIER_CARED`]: crate::unit_ai::SOLDIER_CARED
     /// [`TOWER_CARED`]: crate::unit_ai::TOWER_CARED
     #[must_use]
-    pub fn constructed(ai_type: UnitAiType, new: &NewObject, ai: &mut Well512) -> Option<Self> {
+    pub fn constructed(
+        ai_type: UnitAiType,
+        new: &NewObject,
+        ai: &mut Well512,
+        roles: &Roles,
+    ) -> Option<Self> {
         if !matches!(ai_type.get(), 2..=0x13) {
             return None;
         }
@@ -86,7 +92,7 @@ impl UnitAi {
                     origin: new.position,
                     leash: new.hunt_range,
                 });
-                if new.class == class::KING {
+                if roles.of_class(new.class).contains(ClassRoles::KING) {
                     made.stance = UnitStance::AGGRESSIVE;
                 }
             }
@@ -115,7 +121,7 @@ impl UnitAi {
                     SOLDIER_IDLE_TIMEOUT
                 };
                 made.set_idle_timeout(timeout, ai);
-                made.stance = soldier_stance(new);
+                made.stance = soldier_stance(new, roles);
             }
             ARTIFACT_AI => {
                 made.stance = UnitStance::AGGRESSIVE;
@@ -126,7 +132,7 @@ impl UnitAi {
                 made.set_idle_timeout(TOWER_IDLE_TIMEOUT, ai);
             }
             UnitAiType::SIEGE => {
-                made.stance = siege_stance(new);
+                made.stance = siege_stance(new, roles);
                 made.set_idle_timeout(SIEGE_IDLE_TIMEOUT, ai);
             }
             UnitAiType::LIVESTOCK => made.stance = UnitStance::DEFENSIVE,

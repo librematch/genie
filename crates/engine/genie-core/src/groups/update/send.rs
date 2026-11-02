@@ -20,13 +20,13 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::world::Millis;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The retarget timer of a unit sent at a target is the milliseconds it needs to get there at
@@ -176,7 +176,11 @@ impl World {
             .ok_or_else(|| member_gone(id))?;
         let master = self.master(t.player(), t.master_id())?;
         if master.kind != MasterKind::BUILDING
-            || master.class != class::GATE
+            || !self
+                .model
+                .roles
+                .of_class(master.class)
+                .contains(ClassRoles::GATE)
             || self.in_weapon_range(unit, t)?
         {
             return Ok(t.id());

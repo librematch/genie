@@ -8,6 +8,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
+use crate::movement::ai_moves::MoveSprites;
 use crate::movement::move_to::{MoveToAction, point_sprite};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -16,7 +17,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::sprite::Graphic;
@@ -34,6 +34,7 @@ use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::{AiMove, Issuer, Notify, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).
@@ -193,8 +194,9 @@ impl World {
         let place = (unit.position().ground(), Some(class));
         if self.parts.unit_ai.contains(unit.id) {
             // a completion's stop (slot 0xb0 with 1): the unit's stopAction at once
+            let (roles, slots) = (self.model.roles.clone(), self.model.slots);
             self.run_ai_calls((player, idx), |ai, side, rng| {
-                ai.clear_notifies_at(world_time.since_start(), place, side, rng)
+                ai.clear_notifies_at(world_time.since_start(), place, side, rng, &roles, slots)
             })?;
         }
         let unit = self.players.live_mut(player, idx)?;
@@ -248,7 +250,8 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         let look = self.parts.combat_of(unit.id).abilities.look.as_ref();
-        Ok(point_sprite(master, look, false).and_then(|id| self.model.graphics.get(id).copied()))
+        Ok(point_sprite(master, look, false, &self.model.roles)
+            .and_then(|id| self.model.graphics.get(id).copied()))
     }
 
     /// The unit's slot 0x340 from its unit AI's move off a footprint (slot 0x148,
@@ -272,11 +275,15 @@ impl World {
             (class, player),
             (&mut releases, &mut builder_leaves, by),
             (
-                OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
-                (
-                    &self.model.graphics,
-                    self.parts.combat.of(id).abilities.look.as_ref(),
-                ),
+                MoveSprites {
+                    masters: OwnerMasters::new(
+                        &self.parts.own_master,
+                        self.model.masters.of(player),
+                    ),
+                    graphics: &self.model.graphics,
+                    look: self.parts.combat.of(id).abilities.look.as_ref(),
+                    roles: &self.model.roles,
+                },
                 self.streams.get(Stream::Sprite),
             ),
         )?;
@@ -328,9 +335,17 @@ impl World {
             reach,
             target.is_none(),
             self.players.player(player)?.kind,
+            &self.model.roles,
         );
         // a class 54 under an action the slice does not hold may be under its Pack or Unpack
-        if packs || (class == class::CLASS_54 && self.parts.unread.contains(unit.id)) {
+        if packs
+            || (self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::UNPACKED_TREBUCHET)
+                && self.parts.unread.contains(unit.id))
+        {
             return Err(GenieError::unsupported(
                 "a Pack or Unpack of class 54 or 51 (FUN_140ad4ff0, FUN_140ae58a0)",
             ));
@@ -373,7 +388,11 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?;
         let mut order = *order;
-        if master.class == class::LIVESTOCK
+        if self
+            .model
+            .roles
+            .of_class(master.class)
+            .contains(ClassRoles::LIVESTOCK)
             && let Some(target) = order.target
             && !self.enter_command(player, idx, target, false)?
         {
@@ -444,7 +463,11 @@ impl World {
             return Ok(PastureAfter::Tends(None));
         };
         let target = self.task_target(on, 0)?;
-        let pasture = master.class == class::VILLAGER
+        let pasture = self
+            .model
+            .roles
+            .of_class(master.class)
+            .contains(ClassRoles::VILLAGER)
             && target.master.kind == MasterKind::BUILDING
             && matches!(target.master.id, PASTURE_MANGROVE | PASTURE);
         if !pasture {
@@ -478,7 +501,11 @@ impl World {
             let search = Notify::own(
                 id,
                 NotifyKind::REQUIRES_SEARCH,
-                [AiAction::Hunt.value(), i32::from(class::FARM.get()), -1],
+                [
+                    AiAction::Hunt.value(),
+                    i32::from(self.model.slots.class.farm.get()),
+                    -1,
+                ],
             );
             let _ = ai.accept(search, state);
         }
@@ -509,11 +536,15 @@ impl World {
         a14: bool,
     ) -> Result<(), GenieError> {
         let villager = self
-            .players
-            .live(player, idx)?
-            .master(self.master_tables(), player)?
-            .class
-            == class::VILLAGER;
+            .model
+            .roles
+            .of_class(
+                self.players
+                    .live(player, idx)?
+                    .master(self.master_tables(), player)?
+                    .class,
+            )
+            .contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player, idx)?;
         if villager {
             self.parts.set_town_bell_flag(unit.id, false);

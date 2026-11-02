@@ -4,7 +4,6 @@
 use crate::GenieError;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::ObjectState;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::unit::Unit;
@@ -19,6 +18,7 @@ use crate::players::world_player::{
 };
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -196,7 +196,11 @@ impl World {
             return Ok(true);
         }
         let none = UNKEPT_LOW.contains(master.class);
-        let builds = matches!(master.class, class::TOWER | class::BUILDING);
+        let builds = self
+            .model
+            .roles
+            .of_class(master.class)
+            .intersects(ClassRoles::TOWER | ClassRoles::BUILDING);
         let never = UNKEPT_HIGH.contains(master.class);
         let other = !(none || builds || never);
         if other && state == ObjectState::Alive {
@@ -211,7 +215,11 @@ impl World {
             }
         }
         if (builds || other)
-            && matches!(master.class, class::CLASS_51 | class::CLASS_54)
+            && self
+                .model
+                .roles
+                .of_class(master.class)
+                .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
             && state == ObjectState::Foundation
         {
             return Ok(true);

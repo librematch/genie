@@ -31,6 +31,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
 use crate::world::WALKER_UNMOVING;
+use crate::world::layer::Roles;
 use genie_diff::Diff;
 
 /// A `MoveTo` (`RGE_Action_Move_To`): a unit's own top action (a wandering animal's, a moved or
@@ -126,8 +127,13 @@ pub fn object_range(range: Distance, master: Option<&Master>) -> Distance {
 /// 0): slot 0x7c8's, the walking sprite ([`walking`]), else slot 0x798's, the standing one
 /// ([`standing`]); `look` and `goods` as those read them.
 #[must_use]
-pub fn point_sprite(master: &Master, look: Option<&Look>, goods: bool) -> Option<SpriteId> {
-    walking(master, look, goods).or_else(|| standing(master, look, goods))
+pub fn point_sprite(
+    master: &Master,
+    look: Option<&Look>,
+    goods: bool,
+    roles: &Roles,
+) -> Option<SpriteId> {
+    walking(master, look, goods, roles).or_else(|| standing(master, look, goods, roles))
 }
 
 /// The sprite (`+0x58`) of a `MoveTo` to an object whose maker gives none (`FUN_140aa0df0` with
@@ -162,9 +168,9 @@ impl MoveDefaults {
     /// The defaults of a unit of `master` with the terrain look `look` (a trade cart's goods are
     /// not held: none).
     #[must_use]
-    pub fn of(master: &Master, look: Option<&Look>) -> Self {
+    pub fn of(master: &Master, look: Option<&Look>, roles: &Roles) -> Self {
         Self {
-            point: point_sprite(master, look, false),
+            point: point_sprite(master, look, false, roles),
             object: object_sprite(master),
         }
     }
@@ -523,6 +529,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
+    use crate::testing::roles;
 
     /// A sprite `id` whose speed factor is `factor`, looped.
     const fn graphic(id: i16, factor: f32) -> Graphic {
@@ -730,7 +737,7 @@ mod tests {
             ..Master::default()
         };
         assert_eq!(
-            point_sprite(&master, None, false),
+            point_sprite(&master, None, false, &roles()),
             Some(SpriteId::named(13153))
         );
         assert_eq!(object_sprite(&master), Some(SpriteId::named(13153)));
@@ -745,7 +752,7 @@ mod tests {
             undead: None,
         };
         assert_eq!(
-            point_sprite(&master, Some(&look), false),
+            point_sprite(&master, Some(&look), false, &roles()),
             Some(SpriteId::named(500))
         );
         let still = Master {
@@ -754,7 +761,7 @@ mod tests {
             ..master
         };
         assert_eq!(
-            point_sprite(&still, None, false),
+            point_sprite(&still, None, false, &roles()),
             Some(SpriteId::named(13151))
         );
         assert_eq!(object_sprite(&still), Some(SpriteId::named(13151)));
@@ -764,7 +771,7 @@ mod tests {
             ..look
         };
         assert_eq!(
-            point_sprite(&still, Some(&standing_look), false),
+            point_sprite(&still, Some(&standing_look), false, &roles()),
             Some(SpriteId::named(501))
         );
     }

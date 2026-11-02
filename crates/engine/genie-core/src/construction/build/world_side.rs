@@ -20,7 +20,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
@@ -30,6 +29,7 @@ use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::unit_ai_type;
 use crate::world::Seconds;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
 use crate::world::{Player, World};
@@ -83,7 +83,7 @@ impl World {
             player_type: self.players.player(owner)?.kind,
             ai: self.parts.unit_ai.contains(u.id),
         };
-        let part = completion.first_part(&construction)?;
+        let part = completion.first_part(&construction, &self.model.roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
         self.track_complete(owner, id, master.id)?;
         for (kind, amount) in part.attributes {
@@ -295,14 +295,23 @@ impl World {
         let new_master = nu.master(self.master_tables(), q)?;
         let mut point = None;
         let building_made = new_master.kind == MasterKind::BUILDING;
-        let gate_lock =
-            (building_made && old_class == class::GATE && new_master.class == class::GATE)
-                .then(|| {
-                    old_lock.ok_or(GenieError::unreachable(
-                        "a building without its gate state (every building holds one)",
-                    ))
-                })
-                .transpose()?;
+        let gate_lock = (building_made
+            && self
+                .model
+                .roles
+                .of_class(old_class)
+                .contains(ClassRoles::GATE)
+            && self
+                .model
+                .roles
+                .of_class(new_master.class)
+                .contains(ClassRoles::GATE))
+        .then(|| {
+            old_lock.ok_or(GenieError::unreachable(
+                "a building without its gate state (every building holds one)",
+            ))
+        })
+        .transpose()?;
         if building_made {
             // a gather point on the old building names the new one; one whose target the world
             // no longer holds keeps its point, none at x or y −1 (compared as floats)
@@ -420,7 +429,7 @@ impl World {
             }
             return Ok(Some(id));
         }
-        let ai = Ok(unit_ai_type(&made, master));
+        let ai = Ok(unit_ai_type(&made, master, &self.model.roles));
         let (id, _) = self.make_building(p, master, ai, at)?;
         if flagged {
             self.clear_footprint(p, master, at.ground(), true)?;

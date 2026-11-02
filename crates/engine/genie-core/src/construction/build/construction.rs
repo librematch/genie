@@ -36,6 +36,7 @@ use crate::world::Millis;
 use crate::world::Mode680;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::Roles;
 
 /// The completion's storage ([`crate::world::World::complete_building`]): its master's entries of modes 4, 8 and 64 go to its
 /// owner (slot 0xf8, into `attributes`), those of mode 16 to its own `store` (`FUN_1411abad0`: an
@@ -67,9 +68,27 @@ pub(super) fn hand_storage(
     }
 }
 
+/// The foundation terrain a completed `building` lays ([`lay_foundation`]): its own, or terrain
+/// 0x3f under master 1889's pasture on mangrove or rice (`stack_master` [`PASTURE_MANGROVE`]).
+pub(super) fn foundation_laid(
+    building: &BuildingMaster,
+    stack_master: Option<MasterId>,
+) -> Option<TerrainId> {
+    /// The terrain the pasture master 1889's stack unit on mangrove or rice terrain lays
+    /// (`0x3f`).
+    const RICE_PASTURE_TERRAIN: TerrainId = TerrainId::named(0x3f);
+    building.foundation_terrain.map(|foundation| {
+        if stack_master == Some(PASTURE_MANGROVE) {
+            RICE_PASTURE_TERRAIN
+        } else {
+            foundation
+        }
+    })
+}
+
 /// The completion's ground ([`crate::world::World::complete_building`]): on snow the building gets its snow flag; its foundation
-/// terrain covers its clearance (terrain 0x3f under master 1889's pasture on mangrove or rice,
-/// `stack_master` [`PASTURE_MANGROVE`]; [`crate::map::terrain::Terrain::cover`]).
+/// terrain `laid` ([`foundation_laid`]) covers its clearance
+/// ([`crate::map::terrain::Terrain::cover`]).
 ///
 /// # Errors
 ///
@@ -79,13 +98,10 @@ pub(super) fn lay_foundation(
     world: &mut Spatial,
     placed: &Placed,
     master: &Master,
-    building: &BuildingMaster,
-    stack_master: Option<MasterId>,
+    laid: Option<TerrainId>,
     mode_680: Mode680,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
-    /// The terrain the pasture master 1889's stack unit on mangrove or rice terrain lays
-    /// (`0x3f`).
-    const RICE_PASTURE_TERRAIN: TerrainId = TerrainId::named(0x3f);
     let terrain = world.terrain.as_mut().ok_or(GenieError::unsupported(
         "a completion without the map's terrain",
     ))?;
@@ -97,22 +113,20 @@ pub(super) fn lay_foundation(
     {
         c.snow = Snow::Completed;
     }
-    if let Some(foundation) = building.foundation_terrain {
-        let laid = if stack_master == Some(PASTURE_MANGROVE) {
-            RICE_PASTURE_TERRAIN
-        } else {
-            foundation
-        };
-        terrain.cover(&Foundation {
-            position: placed.position,
-            clearance: master.clearance,
-            terrain: laid,
-            snow: c.snow,
-            master: master.id,
-            class: master.class,
-            terrain_bonus: master.terrain_bonus,
-            mode_680,
-        })?;
+    if let Some(laid) = laid {
+        terrain.cover(
+            &Foundation {
+                position: placed.position,
+                clearance: master.clearance,
+                terrain: laid,
+                snow: c.snow,
+                master: master.id,
+                class: master.class,
+                terrain_bonus: master.terrain_bonus,
+                mode_680,
+            },
+            roles,
+        )?;
     }
     Ok(())
 }

@@ -15,11 +15,9 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Combat;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
@@ -38,6 +36,8 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -53,7 +53,10 @@ impl World {
     ///
     /// [`crate::world::lets::Lets::take`]'s.
     pub(crate) fn take(&mut self, id: ObjectId, by: Releaser) -> Result<(), GenieError> {
-        self.with_lets(by.player, |lets, others| lets.take(others, None, id, by))?
+        let roles = self.model.roles.clone();
+        self.with_lets(by.player, |lets, others| {
+            lets.take(others, None, id, by, &roles)
+        })?
     }
 
     /// Slot 0x180 on the object an action of `by` lets go, outside an update
@@ -122,7 +125,7 @@ impl World {
             time: self.world_time,
             position,
             target: Some(target),
-            category: category(t.life.master_id, class),
+            category: category(t.life.master_id, class, &self.model.roles),
             target_position: t.moved_vector(self.parts.mover_of(t.id)),
         };
         if let Some(ai) = self
@@ -248,7 +251,13 @@ impl World {
                 &mut self.spatial,
                 id,
                 &annexes,
-                ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
+                ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    &self.model.masters,
+                    &self.parts,
+                    &self.model.roles,
+                ),
             )?;
             for u in units {
                 self.shut_in_gate(u)?;
@@ -272,19 +281,18 @@ impl World {
     pub(super) fn shut_in_gate(&mut self, id: ObjectId) -> Result<(), GenieError> {
         /// The first master type whose slot 0xd8 is `FUN_141211340` (`TRIBE_Combat_Object`).
         const TRIBE_COMBAT: MasterKind = MasterKind::COMBAT;
-        /// The class `FUN_141211340` always spares.
-        const SPARED: ClassId = class::RELIC;
+
         let Some((p, u)) = self.object(id) else {
             return Ok(());
         };
         let master = u.master(self.master_tables(), p)?;
         let spared = TRIBE_COMBAT <= master.kind
-            && (master.class == SPARED
+            && (self.model.roles.of_class(master.class).contains(ClassRoles::ALWAYS_SPARED)
                 // The class `FUN_140c89760` lets scout without the master's flag when a game setting allows it
                 // (raw `0x3a`).
                 // The town centre (master 109, `0x6109` raw), to which livestock's `MoveTo` goes as to a point
                 // (`FUN_140aa0df0`).
-                || (master.class == class::LIVESTOCK && Amount::ZERO < u.life.amount));
+                || (self.model.roles.of_class(master.class).contains(ClassRoles::LIVESTOCK) && Amount::ZERO < u.life.amount));
         if spared {
             return Ok(());
         }
@@ -331,7 +339,13 @@ impl World {
         };
         let unit = self.players.live_mut(player, idx)?;
         let (combat, motion) = self.parts.combat_and_motion_mut(unit.id)?;
-        let switched = switch_master((unit, combat, motion), &old, &next, world)?;
+        let switched = switch_master(
+            (unit, combat, motion),
+            &old,
+            &next,
+            world,
+            &self.model.roles,
+        )?;
         let owner = self.players.player_mut(player)?;
         for &(kind, amount) in &switched.leaving {
             owner.add_attribute(kind, amount)?;
@@ -389,6 +403,7 @@ pub(crate) fn switch_master(
     old: &Master,
     next: &Master,
     world: SwitchWorld<'_>,
+    roles: &Roles,
 ) -> Result<Switched, GenieError> {
     let mut switched = Switched::default();
     let new = next.id;
@@ -414,8 +429,8 @@ pub(crate) fn switch_master(
         // FUN_1411859a0: the damage share picks the damage sprites; one that stays keeps them
         // (the object's `+0xd`, not held, taken to be the old master's share)
         if (old.damage_sprites || next.damage_sprites)
-            && (damage_share(old_hp, old.hit_points, old.class)?
-                != damage_share(unit.life.hp, next.hit_points, next.class)?)
+            && (damage_share(old_hp, old.hit_points, old.class, roles)?
+                != damage_share(unit.life.hp, next.hit_points, next.class, roles)?)
         {
             return Err(GenieError::unsupported(
                 "a master change that changes the damage sprites (FUN_1411859a0)",

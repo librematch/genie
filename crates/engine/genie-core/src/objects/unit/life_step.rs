@@ -15,6 +15,7 @@ use crate::objects::masters::GhostMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::{Outcome, Unit};
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -28,6 +29,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<Outcome, GenieError> {
         self.dying_storage_leaves(c)?;
         let before = self.life.state;
@@ -49,7 +51,7 @@ impl Unit {
             } else {
                 Outcome::Stay
             };
-        self.state_set_off(actions, c, before)?;
+        self.state_set_off(actions, c, before, roles)?;
         Ok(leaves)
     }
 
@@ -92,10 +94,11 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         before: ObjectState,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let after = self.life.state;
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
-            self.died(actions, c, before)?;
+            self.died(actions, c, before, roles)?;
             if self.master(c.w.master_tables(), c.player)?.ghost_on_death == GhostMode::LEAVES
                 && c.w.game_state.leaves_ghosts()
             {

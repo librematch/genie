@@ -18,7 +18,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::orders::object_gone;
 use crate::orders::{HERD_MOST, NO_POINT};
@@ -30,6 +29,7 @@ use crate::unit_ai::world_view::DropWorld;
 use crate::world::WALKER_UNMOVING;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -48,7 +48,11 @@ impl World {
     ) -> Result<(), GenieError> {
         let by = self.releaser(player, idx)?;
         let unit = &self.players.live(player, idx)?;
-        let livestock = unit.master(self.master_tables(), player)?.class == class::LIVESTOCK;
+        let livestock = self
+            .model
+            .roles
+            .of_class(unit.master(self.master_tables(), player)?.class)
+            .contains(ClassRoles::LIVESTOCK);
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "an Artifact's move to an object the slice does not hold",
         ))?;
@@ -72,6 +76,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         )?;
         let to = reads.walk_to(self, Some(target))?.ok_or(NOT_HELD)?;
         let to = WalkTo { at, ..to };
@@ -157,7 +162,11 @@ impl World {
                     let u = &self.players.live(q, i)?;
                     if q != p
                         || u.life.state != ObjectState::Alive
-                        || u.master(self.master_tables(), q)?.class != class::LIVESTOCK
+                        || !self
+                            .model
+                            .roles
+                            .of_class(u.master(self.master_tables(), q)?.class)
+                            .contains(ClassRoles::LIVESTOCK)
                         || !self
                             .parts
                             .actions_of(u.id)
@@ -387,9 +396,15 @@ impl World {
         // its action layer goes out of the table with it, as the updating object's
         let mut actions = self.parts.take_actions(unit.id);
         let player = &self.players.player(p)?;
-        let (mover, by_id) = self
-            .parts
-            .lend_mover(unit.id, (&self.players, &self.index, &self.model.masters));
+        let (mover, by_id) = self.parts.lend_mover(
+            unit.id,
+            (
+                &self.players,
+                &self.index,
+                &self.model.masters,
+                &self.model.roles,
+            ),
+        );
         let world = DropWorld {
             masters: by_id.masters().of(p),
             spatial: &mut self.spatial,

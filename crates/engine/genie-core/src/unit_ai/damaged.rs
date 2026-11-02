@@ -12,7 +12,6 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
-use crate::objects::masters::class;
 use crate::orders::Dispatch;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -26,6 +25,7 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetType;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, FOUNDATION_REACH, GO_ON,
     Memory, NO_ANIM_SPEED, Notify, Pick, QueuedOrder, SIEGE_TOWER_AI, Search, Surroundings, UnitAi,
@@ -33,6 +33,7 @@ use crate::unit_ai::{
     held_action_state,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
 
 impl UnitAi {
     /// The villager's damage notify (`FUN_140c22bf0`, case 500, "I took some damage from Unit
@@ -68,6 +69,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -82,8 +84,10 @@ impl UnitAi {
             ));
         }
         let added = self.attackers.add(Some(caller));
-        let fierce =
-            attacker.class == class::PREDATOR && attacker.combat_level == CombatLevel::ANIMAL;
+        let fierce = roles
+            .of_class(attacker.class)
+            .contains(ClassRoles::PREDATOR)
+            && attacker.combat_level == CombatLevel::ANIMAL;
         if added && self.current_target != Some(caller) && !fierce {
             self.ask_for_help(caller, at, player_type, side)?;
         }
@@ -136,6 +140,7 @@ impl UnitAi {
         attacker: &UnitSeen,
         fierce: bool,
     ) -> Result<bool, GenieError> {
+        let roles = &at.roles;
         let order = self.current_order;
         let state = held_action_state(at.action_state)?.get();
         let gathers = matches!(
@@ -148,7 +153,9 @@ impl UnitAi {
             || order == Some(OrderKind::Attack)
             || (gathers
                 && state == 12
-                && at.target.is_some_and(|t| t.class == class::PREDATOR)
+                && at
+                    .target
+                    .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::PREDATOR))
                 && attacker.owner == PlayerId::GAIA)
             || order == Some(OrderKind::Repair)
             || (fierce && gathers && state < 16 && (0x9110u32 >> state) & 1 != 0))
@@ -210,10 +217,14 @@ impl UnitAi {
     /// class (`+0x4c`) other than 3, 27, 39, 49 and 4, then a draw (`processNotify`) whose
     /// `r * 100 / 0x7fff` is at least the owner's `chance_for_archers_to_maintain_distance`.
     pub(super) fn keeps_distance(&self, at: &Surroundings, ai: &mut Well512) -> bool {
+        let roles = &at.roles;
         if !at_most_or_unordered(1.0, at.weapon_range.get())
-            || matches!(
-                self.target_class,
-                Some(class::BUILDING | class::WALL | class::GATE | class::FARM | class::VILLAGER)
+            || roles.of_some_class(self.target_class).intersects(
+                ClassRoles::BUILDING
+                    | ClassRoles::WALL
+                    | ClassRoles::GATE
+                    | ClassRoles::FARM
+                    | ClassRoles::VILLAGER,
             )
         {
             return false;
@@ -472,15 +483,18 @@ impl UnitAi {
         at: &Surroundings,
         ai_rng: &mut Well512,
     ) -> Option<ObjectId> {
+        let roles = &at.roles;
         let mut best = (ATTACKER_FAR, None);
         // none (−1) is an object the update does not hold
         for id in self.attackers.iter().flatten() {
             let Some(u) = at.unit(id) else {
                 continue;
             };
-            if matches!(
-                u.class,
-                class::BUILDING | class::SIEGE | class::TOWER | class::CLASS_54
+            if roles.of_class(u.class).intersects(
+                ClassRoles::BUILDING
+                    | ClassRoles::SIEGE
+                    | ClassRoles::TOWER
+                    | ClassRoles::UNPACKED_TREBUCHET,
             ) {
                 continue;
             }
@@ -529,6 +543,7 @@ impl UnitAi {
         player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
+        let roles = &at.roles;
         let Some(order) = self
             .current_order
             .filter(|_| at.state <= ObjectState::Alive)
@@ -548,13 +563,11 @@ impl UnitAi {
             target_type: self.target_class.and_then(OrderTargetType::of_class),
         };
         let place = (at.position.ground(), at.class);
-        self.order_now(
-            record,
-            Some(at.id),
-            Some(place),
-            Some((at, player_type)),
-            ai,
-            side,
-        )
+        let now = OrderNow {
+            order: record,
+            keep_from: Some(at.id),
+            place: Some(place),
+        };
+        self.order_now(now, Some((at, player_type)), ai, side, roles)
     }
 }

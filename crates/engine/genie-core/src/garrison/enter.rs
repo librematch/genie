@@ -352,7 +352,13 @@ impl World {
         target: ContainerId,
         range: Distance,
     ) -> Result<(EnterTarget, WalkStart), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let tm = t.master(self.master_tables(), tp)?.clone();
@@ -385,7 +391,13 @@ impl World {
         t: &EnterTarget,
         start: WalkStart,
     ) -> Result<Walking, GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let (tp, target) = self.object(action.target).ok_or(UNPLACED)?;
         let master = target.master(self.master_tables(), tp)?.clone();
         let target = placed_object(&self.players, self.place(action.target))?;
@@ -397,6 +409,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         );
         let meeting = Meeting {
             spatial: &mut self.spatial,
@@ -427,7 +440,13 @@ impl World {
         idx: ListIndex,
         target: ContainerId,
     ) -> Result<(Point, u8), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let id = self.players.live(player, idx)?.id;
         let (tp, t) = self.object(target).ok_or(UNPLACED)?;
         let master = t.master(self.master_tables(), tp)?.clone();
@@ -459,7 +478,13 @@ impl World {
         transport: Option<ContainerId>,
         to: Position,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let Some(Place::Live(tp, ti)) = self.place(transport) else {
             return Err(UNREACHED);
         };
@@ -524,8 +549,9 @@ impl World {
         let Some(Place::Live(..)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
+        let roles = self.model.roles.clone();
         self.run_on_step(player, idx, |unit, actions, c| {
-            if !unit.enter_building(actions, c, target, inside)? {
+            if !unit.enter_building(actions, c, target, inside, &roles)? {
                 return Err(GenieError::unsupported(
                     "an Enter in reach that did not get in",
                 ));
@@ -557,8 +583,9 @@ impl World {
             .live(tp, ti)?
             .master(self.master_tables(), tp)?
             .clone();
+        let roles = self.model.roles.clone();
         self.run_on_step(player, idx, |unit, actions, c| {
-            unit.go_inside(actions, c, target, &me, &bm)
+            unit.go_inside(actions, c, target, &me, &bm, &roles)
         })
     }
 }

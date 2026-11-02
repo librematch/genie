@@ -60,11 +60,11 @@ use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
+use crate::orders::split::splits_together;
 use crate::ownership::artifact::Artifact;
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -83,6 +83,8 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -93,6 +95,7 @@ use crate::unit_ai::{Effect, Notify, OrderPriority, PatrolPath};
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
 use crate::vision::visibility::Visibility;
+use crate::world::Formations;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::parts::Object;
@@ -157,7 +160,8 @@ fn damage_share_is_the_whole_less_the_hit_points_share() {
         damage_share(
             HitPoints::new(1650.0),
             MasterHitPoints::of_data(1650),
-            class::GATE
+            class::GATE,
+            &roles()
         ),
         Ok(0)
     );
@@ -165,7 +169,8 @@ fn damage_share_is_the_whole_less_the_hit_points_share() {
         damage_share(
             HitPoints::new(825.0),
             MasterHitPoints::of_data(1650),
-            class::GATE
+            class::GATE,
+            &roles()
         ),
         Ok(50)
     );
@@ -173,7 +178,8 @@ fn damage_share_is_the_whole_less_the_hit_points_share() {
         damage_share(
             HitPoints::new(1.0),
             MasterHitPoints::of_data(1650),
-            class::GATE
+            class::GATE,
+            &roles()
         ),
         Ok(99)
     );
@@ -181,7 +187,8 @@ fn damage_share_is_the_whole_less_the_hit_points_share() {
         damage_share(
             HitPoints::new(2000.0),
             MasterHitPoints::of_data(1650),
-            class::GATE
+            class::GATE,
+            &roles()
         ),
         Ok(0)
     );
@@ -189,7 +196,8 @@ fn damage_share_is_the_whole_less_the_hit_points_share() {
         damage_share(
             HitPoints::new(10.0),
             MasterHitPoints::of_data(100),
-            class::LIVESTOCK
+            class::LIVESTOCK,
+            &roles()
         )
         .is_err()
     );
@@ -2223,6 +2231,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         (Point::new(3.0, 4.0), Some(class::CLASS_6)),
         &mut fx,
         &mut Well512::default(),
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -2240,6 +2249,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
         (Point::new(3.0, 5.0), Some(class::CLASS_6)),
         &mut fx,
         &mut Well512::default(),
+        &roles(),
     )
     .unwrap();
     assert_eq!(ai.stance, UnitStance::NO_ATTACK);
@@ -2380,6 +2390,7 @@ fn master_change_inside_building_keeps_to_its_record() {
         &old,
         &next,
         world,
+        &roles(),
     )
     .unwrap();
     assert!(switched.promoted);
@@ -2457,6 +2468,7 @@ fn switched_in_the_open(
         old,
         next,
         world,
+        &roles(),
     )?;
     let record = spatial.get(unit.id).copied().unwrap();
     Ok((switched, (unit, combat), record))

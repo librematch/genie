@@ -320,6 +320,7 @@ impl Mover {
         ground_radius: Footprint,
         by_id: ObjectsRef<'_>,
     ) -> Result<LevelGaps, GenieError> {
+        let roles = by_id.roles();
         // FUN_1415417a0 on the level's target: none for -1 and for an object that is gone,
         // which then measures as a walk to a point (LAB_1411512df)
         let target = match target_id {
@@ -332,7 +333,7 @@ impl Mover {
         let gap = target.as_ref().map_or(Distance::new(FAR), |(id, t)| {
             let own = footprint_gap(at, ground_radius, t.position, t.radius);
             let near = (at, ground_radius);
-            gate_gap(world, near, (*id, t), own, |g| g - ANNEX_GAP, by_id)
+            gate_gap(world, near, (*id, t), own, |g| g - ANNEX_GAP, by_id, roles)
         });
         let to_end = match (&target, self.paths.len()) {
             (Some(_), _) => gap,
@@ -612,6 +613,7 @@ impl Mover {
         goal: Goal<'_>,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<Next>, GenieError> {
+        let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
         let level = self.paths.walked()?;
         match goal.target {
@@ -619,7 +621,7 @@ impl Mover {
                 let range = level.range;
                 let own = footprint_gap(at, ground_radius, t.position, t.radius) - range;
                 let near = (at, ground_radius);
-                let gap = gate_gap(world, near, (id, t), own, |g| g - range, by_id);
+                let gap = gate_gap(world, near, (id, t), own, |g| g - range, by_id, roles);
                 if gap.get() < EPSILON {
                     // in range of the target: the waypoint counts as reached
                     let level = self.paths.walked_mut()?;

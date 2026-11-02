@@ -27,6 +27,7 @@ use genie_core::vision::visibility::{
 };
 use genie_core::world::GameState;
 use genie_core::world::parts::Object;
+use genie_model::layer::Roles;
 use genie_rec::de;
 use genie_save::Header;
 use genie_save::generated::world::VisibleResourceManager;
@@ -157,6 +158,7 @@ impl SavedStep {
 pub(super) fn spatial(
     header: &Header,
     terrain: &TerrainTable,
+    roles: &Roles,
 ) -> Result<Spatial, genie_core::GenieError> {
     use genie_core::map::spatial::{Obstruction, Placed, Spatial, Tiles};
     let map = &header.world.base_world.map;
@@ -234,7 +236,7 @@ pub(super) fn spatial(
                     // the save's +0x924 (a map's objects keep what the map gave them, as
                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
                     capture: o.combat().map_or_else(
-                        || capture_kind(player, m.class, master),
+                        || capture_kind(player, m.class, master, roles),
                         |c| CaptureKind::of_data(c.rge_combat_object.capture_flag),
                     ),
                     // the object's type: the save's factory types 70 and 80, any other below

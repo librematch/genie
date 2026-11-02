@@ -22,13 +22,14 @@ use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
 use crate::objects::WorkerCount;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 /// A gatherer without movement state, which the Gather's walks and turns need.
@@ -98,6 +99,7 @@ impl GatherAction {
         me: Me,
         target: Option<&mut Victim>,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
         // a farm's time per stop follows the gatherer's work rate, every update
         if target
@@ -115,25 +117,27 @@ impl GatherAction {
         match self.state {
             GatherState::Done => return Ok(Next::Done),
             GatherState::Idle => return Ok(Next::Stay),
-            GatherState::Moved { .. } => return self.update_moved(c, unit, me, r),
-            GatherState::WalkBack { .. } => return self.update_walk_back(c, unit, me, r),
-            GatherState::FarmWait => return self.update_farm_wait(c, unit, target.as_deref(), r),
+            GatherState::Moved { .. } => return self.update_moved(c, unit, me, r, roles),
+            GatherState::WalkBack { .. } => return self.update_walk_back(c, unit, me, r, roles),
+            GatherState::FarmWait => {
+                return self.update_farm_wait(c, unit, target.as_deref(), r, roles);
+            }
             GatherState::ReseedWalk { .. } => {
-                return self.update_reseed_walk(c, unit, me, target.as_deref(), r);
+                return self.update_reseed_walk(c, unit, me, target.as_deref(), r, roles);
             }
             GatherState::Search => return Ok(self.update_search(dt)),
             _ => {}
         }
         let Some(target) = target.filter(|_| self.target.is_some()) else {
-            return self.update_without_target(c, unit, r);
+            return self.update_without_target(c, unit, r, roles);
         };
         match self.state {
             GatherState::Walk { .. } if self.timer < Seconds::ZERO => {
                 self.update_walk_wait(c, unit, target, dt, r)
             }
-            GatherState::Walk { .. } => self.update_walk(c, unit, me, target, r),
-            GatherState::Face => self.update_face(c, unit, target, r),
-            GatherState::Work => self.update_work(c, unit, target, r),
+            GatherState::Walk { .. } => self.update_walk(c, unit, me, target, r, roles),
+            GatherState::Face => self.update_face(c, unit, target, r, roles),
+            GatherState::Work => self.update_work(c, unit, target, r, roles),
             _ => Err(GenieError::unsupported(
                 "a Gather action in a state the slice does not model",
             )),
@@ -161,6 +165,7 @@ impl GatherAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
         if !matches!(
             self.state,
@@ -173,7 +178,7 @@ impl GatherAction {
         if Amount::ZERO < unit.life.amount {
             return Ok(Next::Drop);
         }
-        if waits_for_farm(r.master, self.target_class) {
+        if waits_for_farm(r.master, self.target_class, roles) {
             return self.begin_farm_wait(c, unit, r);
         }
         self.begin_search(c, unit, r)
@@ -223,8 +228,9 @@ impl GatherAction {
         unit: &mut Unit,
         target: &Victim,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
-        if target.class == class::FARM {
+        if roles.of_class(target.class).contains(ClassRoles::FARM) {
             if target.state < ObjectState::Alive {
                 return self.begin_search(c, unit, r);
             }
@@ -262,6 +268,7 @@ impl GatherAction {
         unit: &mut Unit,
         target: &mut Victim,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
         let dt = c.dt.seconds();
         if self.stops.several() {
@@ -279,7 +286,7 @@ impl GatherAction {
                 return Ok(Next::Stay);
             }
         }
-        self.gather(c, unit, target, r)
+        self.gather(c, unit, target, r, roles)
     }
 
     /// State 4's sub-action list (case 3, [`GatherAction::update_list`]): its code 0 walks or
@@ -295,12 +302,13 @@ impl GatherAction {
         me: Me,
         target: &Victim,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)?.get() {
+        match self.update_list(c, unit, me, r, roles)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                self.set_face(c, unit, target, r)
+                self.set_face(c, unit, target, r, roles)
             }
             // code 3: near a target with more than 3 workers it searches (set_state 3), else it
             // waits a random while (LAB_140a8ef80)
@@ -348,13 +356,14 @@ impl GatherAction {
         unit: &mut Unit,
         mut me: Me,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         me.action_state = ActionState::new(self.state.get());
         let state = self.state.move_to().map(|m| m.state);
         // the computer player's test is not held: its villagers would fail at once
         let how = ListUpdate {
             gives_up: GiveUp {
-                waits: r.class == class::VILLAGER,
+                waits: roles.of_class(r.class).contains(ClassRoles::VILLAGER),
                 stance: r.stance,
             },
             ..ListUpdate::default()

@@ -33,13 +33,14 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
 /// The gather groups the resource search tries, in order (0 to 4).
@@ -66,10 +67,13 @@ enum Start {
 /// else a `building` (master type 80) whose master has a task of action type 0x99 (`cart_task`,
 /// `FUN_1415c60b0`) searches. The caller then tests that it is ready (slot 0x2d0 with 1: its
 /// top action may be interrupted and its unit AI holds no order) and has a unit AI.
-const fn start_of(class: ClassId, building: bool, cart_task: bool) -> Option<Start> {
+fn start_of(class: ClassId, building: bool, cart_task: bool, roles: &Roles) -> Option<Start> {
     // The classes the pass puts to work: villagers and fishing ships (decoded 4 and 21).
     // The farm class a unit's tile is searched for, and the fish trap a fishing ship takes.
-    if matches!(class, class::VILLAGER | class::FISHING_SHIP) {
+    if roles
+        .of_class(class)
+        .intersects(ClassRoles::VILLAGER | ClassRoles::FISHING_SHIP)
+    {
         return Some(Start::Work);
     }
     if building && cart_task {
@@ -93,7 +97,7 @@ impl World {
             let class = master.class;
             let building = master.kind == MasterKind::BUILDING;
             let cart_task = building && self.has_task(p, unit.life.master_id, CART_TASK)?;
-            let Some(start) = start_of(class, building, cart_task) else {
+            let Some(start) = start_of(class, building, cart_task, &self.model.roles) else {
                 i = i.next();
                 continue;
             };
@@ -123,7 +127,12 @@ impl World {
             }
             let target = match self.farm_under(p, i, class)? {
                 Some(farm) => Some(farm),
-                None if class == class::FISHING_SHIP => {
+                None if self
+                    .model
+                    .roles
+                    .of_class(class)
+                    .contains(ClassRoles::FISHING_SHIP) =>
+                {
                     return Err(GenieError::unsupported(
                         "the Empire Wars start of a fishing ship (its unit AI's slot 0x80)",
                     ));
@@ -169,7 +178,18 @@ impl World {
                 "an object on a tile the slice does not hold",
             ))?;
             let m = o.master(self.master_tables(), owner)?;
-            if m.class == class::FARM && (class != class::FISHING_SHIP || m.id == FISH_TRAP) {
+            if self
+                .model
+                .roles
+                .of_class(m.class)
+                .contains(ClassRoles::FARM)
+                && (!self
+                    .model
+                    .roles
+                    .of_class(class)
+                    .contains(ClassRoles::FISHING_SHIP)
+                    || m.id == FISH_TRAP)
+            {
                 return Ok(Some(id));
             }
         }
@@ -261,6 +281,7 @@ impl World {
                 &self.parts.unread,
                 self.parts.motion.unlent(),
             ),
+            &self.model.roles,
         );
         let candidate = |spatial: &Spatial, id: ObjectId| -> Result<Candidate, GenieError> {
             let (owner, u, _) = index.locate(players, id).ok_or(GenieError::unsupported(
@@ -329,23 +350,37 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::class;
+    use crate::testing::roles;
 
     /// `BaseWorld::update`'s first update per object: a villager (4) or a fishing ship (21)
     /// works; else a building whose master has a task of action type 0x99 (a mule cart,
     /// 431096717's four carts of player 2) searches; anything else takes nothing.
     #[test]
     fn the_start_pass_works_villagers_and_lets_mule_carts_search() {
-        assert_eq!(start_of(class::VILLAGER, false, false), Some(Start::Work));
         assert_eq!(
-            start_of(class::FISHING_SHIP, false, false),
+            start_of(class::VILLAGER, false, false, &roles()),
             Some(Start::Work)
         );
         assert_eq!(
-            start_of(ClassId::of_master(99), true, true),
+            start_of(class::FISHING_SHIP, false, false, &roles()),
+            Some(Start::Work)
+        );
+        assert_eq!(
+            start_of(ClassId::of_master(99), true, true, &roles()),
             Some(Start::CartSearch)
         );
-        assert_eq!(start_of(ClassId::of_master(99), true, false), None);
-        assert_eq!(start_of(ClassId::of_master(99), false, true), None);
-        assert_eq!(start_of(ClassId::of_master(99), false, false), None);
+        assert_eq!(
+            start_of(ClassId::of_master(99), true, false, &roles()),
+            None
+        );
+        assert_eq!(
+            start_of(ClassId::of_master(99), false, true, &roles()),
+            None
+        );
+        assert_eq!(
+            start_of(ClassId::of_master(99), false, false, &roles()),
+            None
+        );
     }
 }

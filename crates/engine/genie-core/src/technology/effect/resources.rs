@@ -6,6 +6,7 @@ use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::ids;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -31,12 +32,8 @@ pub(super) const EFFECT_FUNCTION: AttributeId = AttributeId::numbered(0x21);
 pub(super) const FARM_EXPONENT: AttributeId = AttributeId::numbered(31);
 /// The masters whose objects' food a farm-food change grows (`DAT_142f925d0`'s keys: 50, 1187,
 /// 1897, 1893), in that order.
-pub(super) const FARMS: [MasterId; 4] = [
-    MasterId::named(50),
-    MasterId::named(1187),
-    MasterId::named(1897),
-    MasterId::named(1893),
-];
+pub(super) const FARMS: [MasterId; 4] =
+    [ids::FARM, ids::ID_1187, ids::PASTURE, ids::PASTURE_MANGROVE];
 
 impl World {
     /// Slot 0x1b0 (`FUN_141620c70`) of player `p` on resource `attribute` with `amount`: every

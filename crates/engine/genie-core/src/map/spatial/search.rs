@@ -8,9 +8,9 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::{
-    AttackField, CLOSEST_RANGE, ClosestChecks, FarmLook, Filter, LIVESTOCK_CLASS, PASTURE_CLASS,
-    PASTURES, Placed, QUERY_HITS, Reach, RecordId, SEARCH_REUSE_SQUARED, Spatial, TRAPPERS,
-    players_seen, record_meets_segment, tile_record_id,
+    AttackField, CLOSEST_RANGE, ClosestChecks, FarmLook, Filter, PASTURES, Placed, QUERY_HITS,
+    Reach, RecordId, SEARCH_REUSE_SQUARED, Spatial, TRAPPERS, players_seen, record_meets_segment,
+    tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::math::conversions::cvttss2si;
@@ -18,7 +18,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::players::PlayerId;
 use crate::players::UnitRelations;
@@ -31,6 +30,8 @@ use crate::vision::registry::Record;
 use crate::vision::registry::VisibleQuery;
 use crate::vision::visibility::Seer;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use std::fmt::{Debug, Error, Formatter};
 
 impl Spatial {
@@ -167,7 +168,7 @@ impl Spatial {
     /// answers for a found object whether a class-10 searcher passes it ([`Spatial::closest_object`]).
     ///
     /// [`SearchCache`]: crate::map::spatial::SearchCache
-    pub fn search(&mut self, query: SearchQuery<'_>) -> Result<Found, GenieError> {
+    pub fn search(&mut self, query: SearchQuery<'_>, roles: &Roles) -> Result<Found, GenieError> {
         let SearchQuery {
             searcher: me,
             player,
@@ -189,7 +190,12 @@ impl Spatial {
             fresh,
             attack,
             reach,
-            (moving, shuns, farm),
+            ClosestChecks {
+                moving,
+                shuns,
+                farm,
+                roles,
+            },
         )
     }
 
@@ -301,6 +307,7 @@ impl Spatial {
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<Found, GenieError> {
+        let roles = checks.roles;
         match search.pick {
             Pick::Closest {
                 group,
@@ -345,7 +352,7 @@ impl Spatial {
                 })
             }
             Pick::Attack { ask, .. } => {
-                let choice = self.best_unit_to_attack(&ask, search.memory, attack, reach)?;
+                let choice = self.best_unit_to_attack(&ask, search.memory, attack, reach, roles)?;
                 let id = choice.target;
                 let mut retries = [None; 3];
                 for (slot, r) in retries.iter_mut().zip(choice.retries) {
@@ -384,11 +391,12 @@ impl Spatial {
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<(Option<ObjectId>, f32), GenieError> {
+        let roles = checks.roles;
         let at = self.objects.get(me);
         let searcher = Searcher {
-            class_10: at.is_some_and(|m| m.class == class::PREDATOR),
+            class_10: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::PREDATOR)),
             // The villagers' class, which gathers from farms (`FUN_141195750`).
-            farmer: at.is_some_and(|m| m.class == class::VILLAGER),
+            farmer: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER)),
             trapper: at.is_some_and(|m| TRAPPERS.contains(&m.master)),
         };
         let spared = filter.spared.map(QueryRelation::list);
@@ -440,6 +448,7 @@ impl Spatial {
         memory: Memory<'_>,
         attack: &mut dyn AttackPicker,
         reach: &mut Reach<'_>,
+        roles: &Roles,
     ) -> Result<Choice, GenieError> {
         let me = attack.searcher(memory)?;
         let found = self.last_found()?;
@@ -449,7 +458,7 @@ impl Spatial {
             reach,
             world: self,
         };
-        best_target_best_unit_to_attack(&me, &ask.ask(), &lists, &mut field)
+        best_target_best_unit_to_attack(&me, &ask.ask(), &lists, &mut field, roles)
     }
 }
 
@@ -503,7 +512,12 @@ pub(super) fn closest_kept(
     (seer, p): (&Seer, &Placed),
     filter: Filter,
     (player, searcher): (PlayerId, Searcher),
-    (moving, shuns, farm): ClosestChecks<'_>,
+    ClosestChecks {
+        moving,
+        shuns,
+        farm,
+        roles,
+    }: ClosestChecks<'_>,
 ) -> Result<bool, GenieError> {
     if filter.group.is_some_and(|g| p.class != g) {
         return Ok(false);
@@ -522,10 +536,16 @@ pub(super) fn closest_kept(
     if filter.state == Some(ObjectState::Foundation) {
         return Err(GenieError::unsupported("ClosestObject's unbuilt farm test"));
     }
-    if filter.group == Some(PASTURE_CLASS) && !farm_kept(id, p, filter, searcher, farm)? {
+    if roles
+        .of_some_class(filter.group)
+        .contains(ClassRoles::CLOSEST_PASTURE)
+        && !farm_kept(id, p, filter, searcher, farm)?
+    {
         return Ok(false);
     }
-    if filter.group == Some(LIVESTOCK_CLASS)
+    if roles
+        .of_some_class(filter.group)
+        .contains(ClassRoles::CLOSEST_LIVESTOCK)
         && ((p.player != player && seer.state == ObjectState::Alive) || moving(id))
     {
         return Ok(false);

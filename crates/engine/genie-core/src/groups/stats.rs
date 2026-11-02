@@ -330,6 +330,7 @@ impl World {
             master.line_of_sight,
             master.search_radius,
             player_type,
+            &self.model.roles,
         )?;
         let search = Search {
             at: u.position().ground(),
@@ -370,7 +371,7 @@ impl World {
                 }
                 if list == UnitRelation::NEUTRAL {
                     let class = self.master(object.player(), object.master_id())?.class;
-                    if !type_attacks_neutral(ai_type, attack_priority, class) {
+                    if !type_attacks_neutral(ai_type, attack_priority, class, &self.model.roles) {
                         continue;
                     }
                 }
@@ -603,12 +604,13 @@ mod tests {
     use crate::objects::masters::ChargeEvent;
     use crate::objects::masters::ChargeKind;
     use crate::objects::masters::ChargeTarget;
+    use crate::objects::masters::ClassId;
     use crate::objects::masters::FormationClass;
-    use crate::objects::masters::{ClassId, class};
     use crate::objects::masters::{Master, Masters};
     use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
     use crate::players::PlayerId;
+    use crate::testing::class;
     use crate::vision::VisionBits;
     use crate::world::Millis;
     use crate::world::WorldTime;

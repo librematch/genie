@@ -23,7 +23,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::RELIC;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
@@ -31,6 +30,8 @@ use crate::production::spawn::{
     BuildSite, INSIDE, PASSABLE, REACH, Tested, hill_fails, placement_terrains,
 };
 use crate::vision::{VisionBits, VisionMasks};
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// An object near a candidate, as the placement test and the blocker test read it.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -88,9 +89,10 @@ impl Near {
     /// `enable_auto_gather` or of a class that stays from state 2 on (5, 9, 10, 29, 31, 33, 38,
     /// 40, 41, 58, 61) or from state 3 on (7, 8, 15, 32, 48, 63).
     #[must_use]
-    pub fn stays(&self) -> bool {
+    pub fn stays(&self, roles: &Roles) -> bool {
         if self.kind == MasterKind::BUILDING
-            || (self.class == class::TREE && ObjectState::Alive < self.state)
+            || (roles.of_class(self.class).contains(ClassRoles::TREE)
+                && ObjectState::Alive < self.state)
             || self.master == RELIC
         {
             return true;
@@ -98,25 +100,34 @@ impl Near {
         if self.auto_gather {
             return true;
         }
-        match self.class {
-            class::CLASS_5
-            | class::PREY
-            | class::PREDATOR
-            | class::CLASS_29
-            | class::CLASS_31
-            | class::CLASS_33
-            | class::CLASS_38
-            | class::CLASS_40
-            | class::CLASS_41
-            | class::LIVESTOCK
-            | class::CLASS_61 => ObjectState::Unfinished < self.state,
-            class::CLASS_7
-            | class::CLASS_8
-            | class::TREE
-            | class::CLASS_32
-            | class::CLASS_48
-            | class::CLASS_63 => ObjectState::Alive < self.state,
-            _ => false,
+        {
+            let held = roles.of_class(self.class);
+            if held.intersects(
+                ClassRoles::OCEAN_FISH
+                    | ClassRoles::PREY
+                    | ClassRoles::PREDATOR
+                    | ClassRoles::DOMESTIC_ANIMAL
+                    | ClassRoles::DEEP_SEA_FISH
+                    | ClassRoles::SHORE_FISH
+                    | ClassRoles::BIRD
+                    | ClassRoles::SALVAGE_PILE
+                    | ClassRoles::RESOURCE_PILE
+                    | ClassRoles::LIVESTOCK
+                    | ClassRoles::CONTROLLED_ANIMAL,
+            ) {
+                ObjectState::Unfinished < self.state
+            } else if held.intersects(
+                ClassRoles::FORAGE_BUSH
+                    | ClassRoles::STONE_MINE
+                    | ClassRoles::TREE
+                    | ClassRoles::GOLD_MINE
+                    | ClassRoles::ORE_MINE
+                    | ClassRoles::GOLD_FISH,
+            ) {
+                ObjectState::Alive < self.state
+            } else {
+                false
+            }
         }
     }
 }
@@ -241,11 +252,12 @@ pub fn build_placement(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
     p: Point,
+    roles: &Roles,
 ) -> Result<PlacementCode, GenieError> {
     if let Some(code) = build_static_test(site, map, p)? {
         return Ok(code);
     }
-    if site.scans && static_scans_find(site, map, p)? {
+    if site.scans && static_scans_find(site, map, p, roles)? {
         return Ok(PlacementCode::Blocked);
     }
     // FUN_14123aee0's scan
@@ -261,7 +273,8 @@ pub fn build_placement(
                 if site.own.contains(&o.id) {
                     continue;
                 }
-                if build_sees(site, map, &o, sight)? && blocks_build(site, map, &o, p) {
+                if build_sees(site, map, &o, sight, roles)? && blocks_build(site, map, &o, p, roles)
+                {
                     return Ok(PlacementCode::Blocked);
                 }
             }
@@ -282,6 +295,7 @@ fn static_scans_find(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
     p: Point,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
     let (rx, ry) = (site.radius.x(), site.radius.y());
     if !site.tall || !(0.0 < rx || 0.0 < ry) {
@@ -293,7 +307,8 @@ fn static_scans_find(
             && !o.buildable_on.passed()
             && (o.kind != MasterKind::BUILDING || !o.desolid);
         let tall = o.tall
-            || (site.class == class::TREE && o.class == class::FARM)
+            || (roles.of_class(site.class).contains(ClassRoles::TREE)
+                && roles.of_class(o.class).contains(ClassRoles::FARM))
             || (o.kind == MasterKind::BUILDING && o.obstruction_kind != ObstructionKind::NONE);
         listed.then_some(tall)
     };
@@ -306,8 +321,12 @@ fn static_scans_find(
             && !o.buildable_on.passed()
             && o.kind != MasterKind::COMBAT
             && (o.kind != MasterKind::BUILDING
-                || o.class == class::CLASS_51
-                || o.class == class::CLASS_54
+                || roles
+                    .of_class(o.class)
+                    .contains(ClassRoles::PACKED_TREBUCHET)
+                || roles
+                    .of_class(o.class)
+                    .contains(ClassRoles::UNPACKED_TREBUCHET)
                 || !o.desolid);
         let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall)
@@ -400,6 +419,7 @@ pub(super) fn build_sees(
     map: &dyn PlaceMap,
     o: &Near,
     (seen, visible): (bool, bool),
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
     let player = site.player;
     if !(seen && visible) {
@@ -417,7 +437,7 @@ pub(super) fn build_sees(
         // building (not a farm) whose visibility mask meets both the player's masks
         if fog == FogVisibility::INVISIBLE {
             let masks = map.vision(player);
-            let shown = o.class != class::FARM
+            let shown = !roles.of_class(o.class).contains(ClassRoles::FARM)
                 && MasterKind::RGE_COMBAT <= o.kind
                 && o.fog_mask
                     .is_some_and(|m| m.intersects(masks.explored) && m.intersects(masks.visible));
@@ -436,9 +456,15 @@ pub(super) fn build_sees(
 /// the site's box. Its box is its master's radii and height, for obstruction types 11 to 13 its
 /// outline's ([`Near::outline`]); a height of 0 counts as 1 for a building and for an object
 /// holding food, wood, stone or gold.
-pub(super) fn blocks_build(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near, at: Point) -> bool {
+pub(super) fn blocks_build(
+    site: &BuildSite<'_>,
+    map: &dyn PlaceMap,
+    o: &Near,
+    at: Point,
+    roles: &Roles,
+) -> bool {
     let (x, y) = (at.x(), at.y());
-    if build_ignores(site, map, o) || build_passes(site, map, o) {
+    if build_ignores(site, map, o, roles) || build_passes(site, map, o, roles) {
         return false;
     }
     let (or, tall) =
@@ -465,14 +491,23 @@ pub(super) fn blocks_build(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near, a
 /// The objects BUILD's scan ignores: one dead, a moving one where the site does not obstruct,
 /// a wall under the player's own gate, a desolid building (but classes 51 and 54) of a player
 /// that is not an ally both ways.
-pub(super) fn build_ignores(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -> bool {
+pub(super) fn build_ignores(
+    site: &BuildSite<'_>,
+    map: &dyn PlaceMap,
+    o: &Near,
+    roles: &Roles,
+) -> bool {
     let player = site.player;
     let alive = o.state < ObjectState::Dying
         || (o.kind != MasterKind::BUILDING && o.state < ObjectState::Removed);
     let standing = site.obstructs || o.kind < MasterKind::MOVING || !o.moving;
-    let gate_wall = site.class == class::GATE && o.class == class::WALL && o.player == player;
+    let gate_wall = roles.of_class(site.class).contains(ClassRoles::GATE)
+        && roles.of_class(o.class).contains(ClassRoles::WALL)
+        && o.player == player;
     let foundation = o.kind == MasterKind::BUILDING
-        && !matches!(o.class, class::CLASS_51 | class::CLASS_54)
+        && !roles
+            .of_class(o.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         && o.desolid
         && !(map.allied(player, o.player, true) && map.allied(o.player, player, true));
     !alive || !standing || gate_wall || foundation
@@ -480,7 +515,12 @@ pub(super) fn build_ignores(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) 
 
 /// The objects BUILD's scan passes over: a moving unit of the player, Gaia or a mutual ally,
 /// one buildable on, a felled tree off a forest.
-pub(super) fn build_passes(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -> bool {
+pub(super) fn build_passes(
+    site: &BuildSite<'_>,
+    map: &dyn PlaceMap,
+    o: &Near,
+    roles: &Roles,
+) -> bool {
     let player = site.player;
     // a moving unit of the player, of Gaia or of a mutual ally passes (the game type
     // 7's own test of allies is not modelled)
@@ -494,7 +534,9 @@ pub(super) fn build_passes(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -
     // tile's terrain)
     passes
         || o.buildable_on.passed()
-        || (o.class == class::TREE && o.hp <= HitPoints::new(1.0) && !o.forest_tile)
+        || (roles.of_class(o.class).contains(ClassRoles::TREE)
+            && o.hp <= HitPoints::new(1.0)
+            && !o.forest_tile)
 }
 
 /// How far BUILD's placement scan looks around the point (`FUN_14123aee0`, `DAT_142eb9430`).
@@ -518,6 +560,7 @@ pub fn placement(
     map: &dyn PlaceMap,
     p: Point,
     zones: bool,
+    roles: &Roles,
 ) -> Result<Tested, GenieError> {
     let (x, y) = (p.x(), p.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
@@ -567,7 +610,8 @@ pub fn placement(
                     && !o.buildable_on.passed()
                     && (o.kind != MasterKind::BUILDING || !o.desolid);
                 let tall = o.tall
-                    || (me.class == class::TREE && o.class == class::FARM)
+                    || (roles.of_class(me.class).contains(ClassRoles::TREE)
+                        && roles.of_class(o.class).contains(ClassRoles::FARM))
                     || (o.kind == MasterKind::BUILDING
                         && o.obstruction_kind != ObstructionKind::NONE);
                 listed.then_some(tall && me.tall)
@@ -588,8 +632,12 @@ pub fn placement(
         let listed = o.state < ObjectState::Removed
             && !o.buildable_on.passed()
             && (o.kind != MasterKind::BUILDING
-                || o.class == class::CLASS_51
-                || o.class == class::CLASS_54
+                || roles
+                    .of_class(o.class)
+                    .contains(ClassRoles::PACKED_TREBUCHET)
+                || roles
+                    .of_class(o.class)
+                    .contains(ClassRoles::UNPACKED_TREBUCHET)
                 || !o.desolid);
         let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall && me.tall)
@@ -604,6 +652,6 @@ pub fn placement(
         return Ok(Tested::Free);
     }
     Ok(Tested::Blocked {
-        stays: blocker.is_some_and(|b| b.stays()),
+        stays: blocker.is_some_and(|b| b.stays(roles)),
     })
 }

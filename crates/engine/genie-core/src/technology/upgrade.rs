@@ -23,7 +23,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskId;
-use crate::objects::masters::class;
 use crate::objects::masters::player_master;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -39,6 +38,8 @@ use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
 use std::mem::take;
@@ -47,12 +48,6 @@ use std::mem::take;
 const NO_HIT_POINTS: f32 = f32::EPSILON;
 /// A sprite the data file does not have.
 const NO_SPRITE: GenieError = GenieError::unsupported("a sprite the data file does not have");
-/// The class pairs whose change makes no new unit AI (`FUN_1415c6aa0`: the new class first).
-const SAME_AI_CLASSES: [(ClassId, ClassId); 3] = [
-    (class::CLASS_12, class::CLASS_47),
-    (class::MONK, class::CLASS_43),
-    (class::CLASS_43, class::MONK),
-];
 
 /// Slot 0xa8 (`FUN_141201670` for a combat object and a building; the base's `FUN_14106a520`
 /// answers 1): whether an object of a master of type `kind` in state `state` takes an upgrade
@@ -63,13 +58,23 @@ pub fn upgradable(kind: MasterKind, state: ObjectState) -> bool {
 }
 
 /// `FUN_1415c6aa0` on player `p`'s masters `new` and `old` (by id): the unit's new class needs
-/// another unit AI (`FUN_141215a90`) when the classes differ, but for the pairs of
-/// [`SAME_AI_CLASSES`].
-fn class_changes(new: Option<&Master>, old: Option<&Master>) -> bool {
+/// another unit AI (`FUN_141215a90`) when the classes differ, but for a change that keeps it
+/// ([`keeps_unit_ai`]).
+fn class_changes(new: Option<&Master>, old: Option<&Master>, roles: &Roles) -> bool {
     match (new, old) {
-        (Some(n), Some(o)) => n.class != o.class && !SAME_AI_CLASSES.contains(&(n.class, o.class)),
+        (Some(n), Some(o)) => n.class != o.class && !keeps_unit_ai(roles, n.class, o.class),
         _ => false,
     }
+}
+
+/// Whether a unit whose class changes from `old` to `new` keeps its unit AI (`FUN_1415c6aa0`'s
+/// pairs, the new class first: 12 from 47, 18 from 43 and 43 from 18): a class
+/// [`ClassRoles::KEEPS_UNIT_AI_TO`] from one [`ClassRoles::KEEPS_UNIT_AI_FROM`], or two classes
+/// that are both [`ClassRoles::SHARES_UNIT_AI`].
+fn keeps_unit_ai(roles: &Roles, new: ClassId, old: ClassId) -> bool {
+    let (new, old) = (roles.of_class(new), roles.of_class(old));
+    (new.contains(ClassRoles::KEEPS_UNIT_AI_TO) && old.contains(ClassRoles::KEEPS_UNIT_AI_FROM))
+        || (new.contains(ClassRoles::SHARES_UNIT_AI) && old.contains(ClassRoles::SHARES_UNIT_AI))
 }
 
 impl World {
@@ -130,6 +135,7 @@ impl World {
             && class_changes(
                 player_master(&self.model.masters, p, new.id),
                 player_master(&self.model.masters, p, old.id),
+                &self.model.roles,
             );
         if MasterKind::COMBAT <= kind {
             let id = self.object_at_mut(place)?.id;
@@ -153,7 +159,12 @@ impl World {
         if !keep {
             self.object_at_mut(place)?.life.master_id = new.id;
             if MasterKind::COMBAT <= kind {
-                count_class(&mut self.players.player_mut(p)?.attributes, new, 1.0);
+                count_class(
+                    &mut self.players.player_mut(p)?.attributes,
+                    new,
+                    1.0,
+                    &self.model.roles,
+                );
             }
         }
         if class_changed {
@@ -218,12 +229,17 @@ impl World {
     fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> Result<(), GenieError> {
         let kind = old.kind;
         if MasterKind::COMBAT <= kind {
-            count_class(&mut self.players.player_mut(p)?.attributes, old, -1.0);
+            count_class(
+                &mut self.players.player_mut(p)?.attributes,
+                old,
+                -1.0,
+                &self.model.roles,
+            );
         }
         let u = self.object_at(place)?;
         if MasterKind::COMBAT <= kind
             // The villager class (4), whose load an upgrade without its master kept goes to its player.
-            && old.class == class::VILLAGER
+            && self.model.roles.of_class(old.class).contains(ClassRoles::VILLAGER)
             && Amount::ZERO < u.life.amount
             && let Some(kind) = u.life.attribute_type
         {
@@ -313,7 +329,7 @@ impl World {
         } else {
             u.life.hp.get() / most
         };
-        let before = damage_share_of(u, old);
+        let before = damage_share_of(u, old, &self.model.roles);
         let state = u.life.state;
         self.object_at_mut(place)?.life.hp = HitPoints::new(most);
         let mut held = before;
@@ -373,6 +389,7 @@ impl World {
             master,
             before,
             (&graphics, &mut object, &mut sprite),
+            &self.model.roles,
         );
         self.model.graphics = graphics;
         *self.streams.get(Stream::Object) = object;
@@ -420,8 +437,9 @@ impl World {
     fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> Result<(), GenieError> {
         let position = self.object_at(place)?.position();
         let made = self.new_object(p, new.id, new, position)?;
-        let ai = unit_ai_type(new, new.id)
-            .and_then(|t| UnitAi::constructed(t, &made, self.streams.get(Stream::Ai)));
+        let ai = unit_ai_type(new, new.id, &self.model.roles).and_then(|t| {
+            UnitAi::constructed(t, &made, self.streams.get(Stream::Ai), &self.model.roles)
+        });
         let id = self.object_at(place)?.id;
         self.set_part(id, Part::UnitAi(ai.map(Box::new)))?;
         Ok(())
@@ -598,6 +616,8 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::test_ids::task_id;
+    use crate::testing::class;
+    use crate::testing::roles;
     use crate::vision::TileCount;
     use crate::vision::VisionBits;
     #[cfg(test)]
@@ -686,6 +706,7 @@ mod tests {
             &bare,
             HpPercent::of_data(7),
             (&graphics, &mut object, &mut sprite),
+            &roles(),
         );
         assert_eq!(
             (r, u.life.hp),
@@ -697,6 +718,7 @@ mod tests {
             &placed,
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
+            &roles(),
         );
         assert_eq!(
             (r, u.life.hp),
@@ -708,6 +730,7 @@ mod tests {
             &placed,
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
+            &roles(),
         );
         assert_eq!(
             (r, low.life.hp),
@@ -719,6 +742,7 @@ mod tests {
             &placed,
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
+            &roles(),
         );
         assert!(nan.life.hp.get().is_nan());
         // mode 0: nothing drawn
@@ -729,7 +753,8 @@ mod tests {
                 (&mut hurt, MotionMut::new(None)),
                 &placed,
                 HpPercent::of_data(0),
-                (&graphics, &mut object, &mut sprite)
+                (&graphics, &mut object, &mut sprite),
+                &roles()
             ),
             Ok(HpPercent::of_data(60))
         );
@@ -744,7 +769,8 @@ mod tests {
                 (&mut hurt, MotionMut::new(None)),
                 &scattered,
                 HpPercent::of_data(0),
-                (&graphics, &mut object, &mut sprite)
+                (&graphics, &mut object, &mut sprite),
+                &roles()
             ),
             Ok(HpPercent::of_data(60))
         );
@@ -756,7 +782,8 @@ mod tests {
                 (&mut hurt, MotionMut::new(None)),
                 &scattered,
                 HpPercent::of_data(30),
-                (&graphics, &mut object, &mut sprite)
+                (&graphics, &mut object, &mut sprite),
+                &roles()
             ),
             Ok(HpPercent::of_data(40))
         );
@@ -772,7 +799,8 @@ mod tests {
                 (&mut u, MotionMut::new(None)),
                 &shown,
                 HpPercent::of_data(0),
-                (&graphics, &mut object, &mut sprite)
+                (&graphics, &mut object, &mut sprite),
+                &roles()
             ),
             Ok(HpPercent::of_data(60))
         );
@@ -783,7 +811,8 @@ mod tests {
                 (&mut u, MotionMut::new(None)),
                 &shown,
                 HpPercent::of_data(60),
-                (&graphics, &mut object, &mut sprite)
+                (&graphics, &mut object, &mut sprite),
+                &roles()
             ),
             Ok(HpPercent::of_data(0))
         );
@@ -809,29 +838,35 @@ mod tests {
         };
         assert!(!class_changes(
             Some(&m(class::BUILDING)),
-            Some(&m(class::BUILDING))
+            Some(&m(class::BUILDING)),
+            &roles()
         ));
         assert!(class_changes(
             Some(&m(class::CLASS_6)),
-            Some(&m(class::CLASS_12))
+            Some(&m(class::CLASS_12)),
+            &roles()
         ));
         assert!(!class_changes(
             Some(&m(class::CLASS_12)),
-            Some(&m(class::CLASS_47))
+            Some(&m(class::CLASS_47)),
+            &roles()
         ));
         assert!(class_changes(
             Some(&m(class::CLASS_47)),
-            Some(&m(class::CLASS_12))
+            Some(&m(class::CLASS_12)),
+            &roles()
         ));
         assert!(!class_changes(
             Some(&m(class::MONK)),
-            Some(&m(class::CLASS_43))
+            Some(&m(class::CLASS_43)),
+            &roles()
         ));
         assert!(!class_changes(
             Some(&m(class::CLASS_43)),
-            Some(&m(class::MONK))
+            Some(&m(class::MONK)),
+            &roles()
         ));
-        assert!(!class_changes(None, Some(&m(class::BUILDING))));
+        assert!(!class_changes(None, Some(&m(class::BUILDING)), &roles()));
     }
 
     /// The Feudal Age's upgrade of the house (70 to 464, mode −1, `FUN_141657d10`): a house in

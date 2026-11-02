@@ -5,6 +5,11 @@
 
 use crate::GenieError;
 use crate::gathering::PastureId;
+use crate::gathering::gather_search::passes::first_resource;
+use crate::gathering::gather_search::passes::pass_distance;
+use crate::gathering::gather_search::passes::push_neighbours;
+use crate::gathering::gather_search::passes::search_passes;
+use crate::gathering::gather_search::passes::sort_point_and_side;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -14,11 +19,7 @@ use crate::map::Tile;
 use crate::map::TileOffset;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::sqrt;
-use crate::math::image::gather_search::{
-    DIAGONAL as GATHER_SEARCH_DIAGONAL, ROUNDING as GATHER_SEARCH_ROUNDING,
-    SITE_SHARE as GATHER_SEARCH_SITE_SHARE, TILE_CENTRE as GATHER_SEARCH_TILE_CENTRE,
-    UNIT_SHARE as GATHER_SEARCH_UNIT_SHARE,
-};
+use crate::math::image::gather_search::TILE_CENTRE as GATHER_SEARCH_TILE_CENTRE;
 use crate::math::msvc;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -26,16 +27,19 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::task_finder::DropSite;
 use crate::vision::SightTiles;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use std::fmt::{Debug, Error, Formatter};
 use std::mem::take;
+
+mod passes;
 
 /// What the searches read of an object in a map tile's list.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -108,6 +112,7 @@ pub fn more_work(
     map: GridSize,
     blocked: Option<&dyn Fn(Tile) -> Result<bool, GenieError>>,
     objects: &dyn Fn(Tile) -> Result<Vec<Candidate>, GenieError>,
+    roles: &Roles,
 ) -> Result<Option<Candidate>, GenieError> {
     let Some(entry) = entry.filter(|e| e.auto_work) else {
         return Ok(None);
@@ -151,10 +156,14 @@ pub fn more_work(
             }
             for o in objects(Tile::new(i32::from(x), i32::from(y)))? {
                 // The farm class (49), which both searches treat apart.
-                if o.class == class::FARM {
+                if roles.of_class(o.class).contains(ClassRoles::FARM) {
                     // its own tests (owner, pasture, the targeting flag, masters 1893 and 1897)
                     // come before the entry's, which takes no farm without a farm target
-                    if entry.targets.iter().any(|t| t.class == class::FARM) {
+                    if entry
+                        .targets
+                        .iter()
+                        .any(|t| roles.of_class(t.class).contains(ClassRoles::FARM))
+                    {
                         return Err(GenieError::unsupported(
                             "a farm in a builder's search for more work",
                         ));
@@ -511,169 +520,6 @@ pub fn closest_resource_at<W>(
     Ok((None, None))
 }
 
-/// [`closest_resource_at`]'s passes: from a footprint site its footprint's tiles the unit can
-/// stand on ([`footprint_seeds`], sorted by `nearer`, within the site's line of sight plus 10 of
-/// its tile), then the unit's tile alone; from another site its tile alone; without one the
-/// unit's tile alone (a single tile's pass within the line of sight `los` plus 5).
-///
-/// # Errors
-///
-/// What the sort of the footprint's tiles fails on.
-fn search_passes(
-    site: Option<&SearchSite>,
-    map: GridSize,
-    passable: &dyn Fn(Tile) -> bool,
-    unit_tile: Tile,
-    los: SightTiles,
-    nearer: &impl Fn(Cell, Cell) -> bool,
-) -> Result<Vec<Pass>, GenieError> {
-    let single = |at: Tile| Pass {
-        origin: at,
-        max_steps: los.get().wrapping_add(5),
-        seeds: vec![Cell { tile: at, steps: 0 }],
-    };
-    let mut passes = Vec::with_capacity(2);
-    match site {
-        Some(s) if s.footprint => {
-            let mut seeds = footprint_seeds(s, map, passable);
-            msvc::sort(&mut seeds, nearer)?;
-            passes.push(Pass {
-                origin: Tile::new(s.position.x() as i32, s.position.y() as i32),
-                max_steps: SightTiles::of(s.line_of_sight).get().wrapping_add(10),
-                seeds,
-            });
-            passes.push(single(unit_tile));
-        }
-        Some(s) => passes.push(single(Tile::new(
-            s.position.x() as i32,
-            s.position.y() as i32,
-        ))),
-        None => passes.push(single(unit_tile)),
-    }
-    Ok(passes)
-}
-
-/// [`closest_resource_at`]'s spread from a passable `cell`: its neighbours x−1, x+1, y−1, y+1
-/// ([`Tile::beside`]) not seen yet become seen (`at` gives a tile's index in `seen`), and those
-/// on the map join the `queue` a step farther.
-///
-/// # Errors
-///
-/// A neighbour outside `seen`.
-fn push_neighbours(
-    queue: &mut Vec<Cell>,
-    seen: &mut [bool],
-    at: &impl Fn(Tile) -> usize,
-    Cell { tile, steps }: Cell,
-    map: GridSize,
-) -> Result<(), GenieError> {
-    for n in tile.beside() {
-        let c = seen.checked_mut(at(n))?;
-        if !*c {
-            *c = true;
-            if map.holds(n) {
-                queue.push(Cell {
-                    tile: n,
-                    steps: steps + 1,
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
-/// [`closest_resource_at`]'s sort point and box side: without a site the unit's place and
-/// three times its line of sight plus 10; with one the point a quarter of the way from the
-/// site's place to the unit's, and for a footprint search the larger line of sight of the two.
-fn sort_point_and_side(at: Point, los: SightTiles, site: Option<&SearchSite>) -> ((f32, f32), i32) {
-    const SITE_SHARE: f32 = GATHER_SEARCH_SITE_SHARE;
-    const UNIT_SHARE: f32 = GATHER_SEARCH_UNIT_SHARE;
-    let (ux, uy) = (at.x(), at.y());
-    let box_side = |los: i32| los.wrapping_add(10).wrapping_mul(3);
-    let los = los.get();
-    site.map_or_else(
-        || ((ux, uy), box_side(los)),
-        |s| {
-            let (sx, sy) = (s.position.x(), s.position.y());
-            let at = (
-                sx * SITE_SHARE + ux * UNIT_SHARE,
-                sy * SITE_SHARE + uy * UNIT_SHARE,
-            );
-            let site_los = SightTiles::of(s.line_of_sight).get();
-            let wide = if site_los.wrapping_add(10) <= los.wrapping_add(10) {
-                los
-            } else {
-                site_los
-            };
-            (
-                at,
-                if s.footprint {
-                    box_side(wide)
-                } else {
-                    box_side(los)
-                },
-            )
-        },
-    )
-}
-
-/// [`closest_resource_at`]'s first pass from a site's footprint: every tile of the footprint
-/// the unit can stand on (x from the site's x less its radius, truncated, at least 1, less 1, to
-/// the site's x plus its radius, truncated, at most the map's last column; y alike), row by row.
-fn footprint_seeds(s: &SearchSite, map: GridSize, passable: &dyn Fn(Tile) -> bool) -> Vec<Cell> {
-    let (sx, sy) = (s.position.x(), s.position.y());
-    let (rx, ry) = (s.radius.x(), s.radius.y());
-    let x0 = ((sx - rx) as i32).max(1) - 1;
-    let x1 = ((sx + rx) as i32).min(map.width() - 1);
-    let y0 = ((sy - ry) as i32).max(1) - 1;
-    let y1 = ((sy + ry) as i32).min(map.height() - 1);
-    let mut seeds = Vec::new();
-    for y in y0..=y1 {
-        for x in x0..=x1 {
-            let tile = Tile::new(x, y);
-            if passable(tile) {
-                seeds.push(Cell { tile, steps: 0 });
-            }
-        }
-    }
-    seeds
-}
-
-/// The search's distance of `tile` from a pass's origin: the longer axis plus the shorter one
-/// times 1.4 rounded down, less the shorter one (`DIAGONAL` plus `ROUNDING`, truncated).
-fn pass_distance(origin: Tile, tile: Tile) -> i32 {
-    const DIAGONAL: f32 = GATHER_SEARCH_DIAGONAL;
-    const ROUNDING: f32 = GATHER_SEARCH_ROUNDING;
-    let (dx, dy) = ((origin.x() - tile.x()).abs(), (origin.y() - tile.y()).abs());
-    if dy < dx {
-        ((dy as f32 * DIAGONAL + ROUNDING) as i32 - dy) + dx
-    } else {
-        ((dx as f32 * DIAGONAL + ROUNDING) as i32 - dx) + dy
-    }
-}
-
-/// The object of a tile's list `ClosestResourceObject` takes: the first in a pasture or
-/// targetable whose master gathers by itself as `kind` with some amount held; with none, the
-/// last object when it is neither in a pasture nor targetable.
-fn first_resource(
-    on_tile: &[Candidate],
-    kind: GatherGroup,
-) -> Result<Option<Candidate>, GenieError> {
-    let open = |o: &Candidate| o.pasture.is_some() || !o.untargetable;
-    let found: Vec<&Candidate> = on_tile
-        .iter()
-        .filter(|o| open(o) && o.auto_gather && o.gather_group == kind && Amount::ZERO < o.amount)
-        .collect();
-    match found.as_slice() {
-        [one] => Ok(Some(**one)),
-        [] if on_tile.iter().all(open) => Ok(None),
-        [] if on_tile.len() == 1 => Ok(on_tile.first().copied()),
-        _ => Err(GenieError::unsupported(
-            "a tile whose order of objects decides a resource search",
-        )),
-    }
-}
-
 /// `FUN_140fdd470` then `FUN_140fdd5f0`: the gather group of a resource held, and the most workers
 /// the Build's search for more work lets an object of it have (`0x140ab0c57`): food (0, 15 to 17)
 /// forage (1) and 6, wood (0) and 2, stone (3) and 3, gold (4) and 3, the rest fish (2) and 2.
@@ -701,6 +547,8 @@ mod tests {
     use crate::players::attribute;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
+    use crate::testing::roles;
     use crate::unit_ai::task_finder::DropTarget;
 
     fn tree(id: i32, x: f32, y: f32) -> Candidate {
@@ -781,12 +629,28 @@ mod tests {
                 .copied()
                 .collect())
         };
-        let found = more_work(Some(&entry), &b, GridSize::new(40, 40), None, &objects).unwrap();
+        let found = more_work(
+            Some(&entry),
+            &b,
+            GridSize::new(40, 40),
+            None,
+            &objects,
+            &roles(),
+        )
+        .unwrap();
         assert_eq!(found.map(|o| o.id), Some(object_id(4)));
         let mut off = lumber_camp();
         off.auto_work = false;
         assert_eq!(
-            more_work(Some(&off), &b, GridSize::new(40, 40), None, &objects).unwrap(),
+            more_work(
+                Some(&off),
+                &b,
+                GridSize::new(40, 40),
+                None,
+                &objects,
+                &roles()
+            )
+            .unwrap(),
             None
         );
     }
@@ -818,7 +682,15 @@ mod tests {
                 .collect())
         };
         // the wood (2 tiles) is nearer than the gold (4 tiles): it takes over
-        let found = more_work(Some(&entry), &b, GridSize::new(40, 40), None, &objects).unwrap();
+        let found = more_work(
+            Some(&entry),
+            &b,
+            GridSize::new(40, 40),
+            None,
+            &objects,
+            &roles(),
+        )
+        .unwrap();
         assert_eq!(found.map(|o| o.id), Some(object_id(8)));
     }
 
@@ -843,9 +715,16 @@ mod tests {
                     .copied()
                     .collect())
             };
-            more_work(Some(&entry), &b, GridSize::new(40, 40), None, &objects)
-                .unwrap()
-                .map(|o| o.id)
+            more_work(
+                Some(&entry),
+                &b,
+                GridSize::new(40, 40),
+                None,
+                &objects,
+                &roles(),
+            )
+            .unwrap()
+            .map(|o| o.id)
         };
         assert_eq!(listed(9, 3), Some(object_id(9)));
         assert_eq!(listed(3, 9), Some(object_id(3)));

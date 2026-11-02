@@ -3,12 +3,28 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's id: the `.dat`'s unit id, the place of the master in a player's masters
 /// ([`crate::objects::masters::Master::id`]), so 0 or more. A field that holds −1 for none
 /// holds `Option<MasterId>` ([`MasterId::of_field`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    CopyGetters,
+    Serialize,
+    Deserialize,
+)]
+#[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterId(
     /// Its value, the master's place in a player's masters.
@@ -93,6 +109,13 @@ impl TryFrom<i16> for MasterId {
             );
         }
         Ok(Self(value))
+    }
+}
+
+impl From<MasterId> for i16 {
+    /// The master's id, as a slot's serde form holds it.
+    fn from(id: MasterId) -> Self {
+        id.0
     }
 }
 

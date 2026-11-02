@@ -21,7 +21,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
@@ -33,6 +32,7 @@ use crate::production::CostCount;
 use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_type;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// A queue takes a purchase only below this count (`0x28`).
@@ -223,7 +223,12 @@ impl World {
     pub fn reseed_master(&self, p: PlayerId) -> Result<Option<MasterId>, GenieError> {
         for m in [FARM, PASTURE] {
             if self.can_make(p, m)?
-                && player_master(&self.model.masters, p, m).is_some_and(|m| m.class == class::FARM)
+                && player_master(&self.model.masters, p, m).is_some_and(|m| {
+                    self.model
+                        .roles
+                        .of_class(m.class)
+                        .contains(ClassRoles::FARM)
+                })
             {
                 return Ok(Some(m));
             }
@@ -293,7 +298,7 @@ impl World {
             return Ok(false);
         };
         let made = self.master(p, master)?;
-        let ai = Ok(unit_ai_type(made, master));
+        let ai = Ok(unit_ai_type(made, master, &self.model.roles));
         let at = farm.with_height(0.0);
         let (foundation, _) = self.make_building(p, master, ai, at)?;
         if from_queue {
@@ -321,21 +326,31 @@ impl World {
         class: ClassId,
     ) -> Result<Option<(MasterId, bool, Queue)>, GenieError> {
         let owner = self.players.player(p)?;
-        let choice =
-            if (!owner.auto_farm_queue && !owner.farm_queue.any()) || class != class::VILLAGER {
-                if !owner.auto_fishtrap_queue && !owner.fish_trap_queue.any() {
-                    return Ok(None);
-                }
-                if class != class::FISHING_SHIP {
-                    return Ok(None);
-                }
-                (FISH_TRAP, owner.auto_fishtrap_queue, Queue::FishTraps)
-            } else {
-                let Some(master) = self.reseed_master(p)? else {
-                    return Ok(None);
-                };
-                (master, owner.auto_farm_queue, Queue::Farms)
+        let choice = if (!owner.auto_farm_queue && !owner.farm_queue.any())
+            || !self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::VILLAGER)
+        {
+            if !owner.auto_fishtrap_queue && !owner.fish_trap_queue.any() {
+                return Ok(None);
+            }
+            if !self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::FISHING_SHIP)
+            {
+                return Ok(None);
+            }
+            (FISH_TRAP, owner.auto_fishtrap_queue, Queue::FishTraps)
+        } else {
+            let Some(master) = self.reseed_master(p)? else {
+                return Ok(None);
             };
+            (master, owner.auto_farm_queue, Queue::Farms)
+        };
         Ok(Some(choice))
     }
 
@@ -436,6 +451,7 @@ mod tests {
     use crate::test_ids::opt_master;
     #[cfg(test)]
     use crate::test_ids::{amounts, attributes};
+    use crate::testing::class;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;

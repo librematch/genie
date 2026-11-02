@@ -6,10 +6,9 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, UnitRelation};
@@ -20,45 +19,26 @@ use crate::unit_ai::best_target::{
 use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::Millis;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use std::mem::take;
 
-/// The boats' classes (2, 20, 21, 22, 53), which a computer player's land unit passes over.
-pub(super) const BOATS: [ClassId; 5] = [
-    class::TRADE_BOAT,
-    class::TRANSPORT,
-    class::FISHING_SHIP,
-    class::WARSHIP,
-    class::CLASS_53,
-];
-/// The classes a search without `any_class` passes over: buildings, walls, towers, gates and
-/// the packed units.
-pub(super) const NOT_ANY: [ClassId; 5] = [
-    class::BUILDING,
-    class::WALL,
-    class::TOWER,
-    class::GATE,
-    class::CLASS_51,
-];
 /// The masters whose units attack by priority 0 without the moving rule: the rams, the siege
 /// masters 1744 and 1746, 420 and 691.
 pub(super) const PRIORITY_0_MASTERS: [MasterId; 8] = [
-    MasterId::named(35),
-    MasterId::named(422),
-    MasterId::named(548),
-    MasterId::named(1258),
-    MasterId::named(1744),
-    MasterId::named(1746),
-    MasterId::named(420),
-    MasterId::named(691),
+    ids::ID_35,
+    ids::ID_422,
+    ids::ID_548,
+    ids::ID_1258,
+    ids::ID_1744,
+    ids::ID_1746,
+    ids::CANNON_GALLEON,
+    ids::ELITE_CANNON_GALLEON,
 ];
 /// A computer player's unit of these masters passes no boat over: the castle, 45, the town
 /// centre.
-pub(super) const BOAT_HUNTERS: [MasterId; 3] = [
-    MasterId::named(82),
-    MasterId::named(45),
-    MasterId::named(109),
-];
+pub(super) const BOAT_HUNTERS: [MasterId; 3] = [ids::CASTLE, ids::ID_45, ids::TOWN_CENTRE];
 /// The gap of a closest gate or wall not found yet.
 const NO_GAP: Distance = Distance::new(-1.0);
 /// The moving targets past which the current target and the closest moving one answer.
@@ -88,6 +68,7 @@ pub(super) fn tested(
     id: ObjectId,
     relation: UnitRelation,
     world: &mut dyn Battlefield,
+    roles: &Roles,
 ) -> Result<Option<Thing>, crate::GenieError> {
     let Some(t) = world.thing(id)? else {
         return Ok(None);
@@ -102,7 +83,7 @@ pub(super) fn tested(
     if !t.targetable || (!t.attackable && me.action == Some(AiAction::Attack)) || world.shuns(id)? {
         return Ok(None);
     }
-    Ok(kept_by_owner_and_class(me, ask, &t).then_some(t))
+    Ok(kept_by_owner_and_class(me, ask, &t, roles).then_some(t))
 }
 
 /// The world's checks of object `id` (`t`, of relation list `relation`), in the game's order: it
@@ -135,8 +116,8 @@ pub(super) fn may_attack(
 /// towers, gates and packed units are passed over; a computer player's unit passes over Gaia's
 /// objects that hold something or that others take by sight, and boats unless it is a boat, of
 /// class 52 or of [`BOAT_HUNTERS`].
-pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing) -> bool {
-    if !ask.any_class && NOT_ANY.contains(&t.class) {
+pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles: &Roles) -> bool {
+    if !ask.any_class && roles.of_class(t.class).contains(ClassRoles::NOT_ANY) {
         return false;
     }
     let captured = MasterKind::COMBAT <= t.kind && t.capture;
@@ -145,10 +126,12 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing) -> bo
     if me.player_type.is_computer() && t.owner == PlayerId::GAIA && !free {
         return false;
     }
-    let boat_free = me.class == Some(class::TOWER)
+    let boat_free = roles.of_some_class(me.class).contains(ClassRoles::TOWER)
         || BOAT_HUNTERS.contains(&me.master)
-        || !BOATS.contains(&t.class);
-    let is_boat = me.class.is_some_and(|c| BOATS.contains(&c));
+        || !roles.of_class(t.class).contains(ClassRoles::BOAT);
+    let is_boat = me
+        .class
+        .is_some_and(|c| roles.of_class(c).contains(ClassRoles::BOAT));
     !(me.player_type.is_computer() && !boat_free && !is_boat)
 }
 
@@ -203,14 +186,15 @@ pub fn best_unit_to_attack(
     ask: &Ask,
     lists: &ByRelation<Vec<ObjectId>>,
     world: &mut dyn Battlefield,
+    roles: &Roles,
 ) -> Result<Choice, crate::GenieError> {
     let current = current_target(me, world)?;
-    let walls = attacks_walls(me);
+    let walls = attacks_walls(me, roles);
     let mut st = Statistics::default();
-    let narrowed = add_current(me, ask, current, &mut st, world)?;
-    add_extra(me, ask, &mut st, world)?;
+    let narrowed = add_current(me, ask, current, &mut st, world, roles)?;
+    add_extra(me, ask, &mut st, world, roles)?;
     let mut walked = Walked::new(narrowed, walls);
-    walked.walk_lists(me, ask, lists, &mut st, world)?;
+    walked.walk_lists(me, ask, lists, &mut st, world, roles)?;
     if walls && !walked.beyond_walls && walked.gate.0.is_some() {
         return Ok(Choice {
             target: walked.gate.0,
@@ -218,7 +202,7 @@ pub fn best_unit_to_attack(
         });
     }
     if st.entries.is_empty() {
-        walked.walk_later(me, ask, &mut st, world)?;
+        walked.walk_later(me, ask, &mut st, world, roles)?;
         if st.entries.is_empty() {
             return Ok(Choice {
                 target: walked.last_resort(),
@@ -226,7 +210,7 @@ pub fn best_unit_to_attack(
             });
         }
     }
-    let ranked = rank_entries(me, &mut st, world)?;
+    let ranked = rank_entries(me, &mut st, world, roles)?;
     choose(me, ask, current, &st, ranked, world, walked.last_resort())
 }
 
@@ -247,14 +231,15 @@ fn current_target(
 
 /// Whether the unit attacks walls: its targets' classes name a wall or a gate, or its owner's
 /// flag allows them outside the defend patrol of a unit that is no siege.
-fn attacks_walls(me: &Searcher) -> bool {
+fn attacks_walls(me: &Searcher, roles: &Roles) -> bool {
     let defending =
         // Class 13 (siege), whose units keep the walls' owner flag on the attack move order (`0x2dd`).
-        matches!(me.order, Some(OrderKind::AttackMove)) && me.class != Some(class::SIEGE);
-    me.target_classes
-        .iter()
-        .any(|c| matches!(c, Some(class::WALL | class::GATE)))
-        || (me.walls_allowed && !defending)
+        matches!(me.order, Some(OrderKind::AttackMove)) && !roles.of_some_class(me.class).contains(ClassRoles::SIEGE);
+    me.target_classes.iter().any(|c| {
+        roles
+            .of_some_class(*c)
+            .intersects(ClassRoles::WALL | ClassRoles::GATE)
+    }) || (me.walls_allowed && !defending)
 }
 
 /// The current target's entry, when within the unit's range or the unit moves; outside an idle
@@ -266,17 +251,20 @@ fn add_current(
     current: Option<(ObjectId, Thing)>,
     st: &mut Statistics,
     world: &mut dyn Battlefield,
+    roles: &Roles,
 ) -> Result<Option<AttackCategory>, crate::GenieError> {
     let Some((target, t)) =
         current.filter(|(_, t)| t.distance <= me.range || Speed::ZERO < me.speed)
     else {
         return Ok(None);
     };
-    let k = category(t.master, t.class);
+    let k = category(t.master, t.class, roles);
     st.add(&world.candidate(target, t.distance, k)?);
     let narrows = !ask.idle
         && t.distance <= ask.distance
-        && !matches!(t.class, class::BUILDING | class::FARM);
+        && !roles
+            .of_class(t.class)
+            .intersects(ClassRoles::BUILDING | ClassRoles::FARM);
     Ok(if narrows { k } else { None })
 }
 
@@ -288,6 +276,7 @@ pub(super) fn add_extra(
     ask: &Ask,
     st: &mut Statistics,
     world: &mut dyn Battlefield,
+    roles: &Roles,
 ) -> Result<(), crate::GenieError> {
     for &id in &ask.extra {
         if Some(id) == me.target {
@@ -306,9 +295,18 @@ pub(super) fn add_extra(
             }
             gap = gap + me.weapon_range + Distance::new(ONE);
         }
-        st.add(&world.candidate(id, gap, category(t.master, t.class))?);
+        st.add(&world.candidate(id, gap, category(t.master, t.class, roles))?);
     }
     Ok(())
+}
+
+/// An object of the unit's relation lists: its id and its list.
+#[derive(Clone, Copy, Debug)]
+struct Listed {
+    /// The object.
+    id: ObjectId,
+    /// Its list.
+    relation: UnitRelation,
 }
 
 /// The relation lists' walks (the main one and the retry walk): the category the search keeps
@@ -348,6 +346,7 @@ impl Walked {
         lists: &ByRelation<Vec<ObjectId>>,
         st: &mut Statistics,
         world: &mut dyn Battlefield,
+        roles: &Roles,
     ) -> Result<(), crate::GenieError> {
         let lowest = if me.scenario && !me.player_type.is_computer() {
             UnitRelation::ALLY
@@ -369,26 +368,27 @@ impl Walked {
                     self.later.push((id, relation));
                     continue;
                 }
-                let Some((t, gap, k)) = self.counted(me, ask, id, relation, me.sight, world)?
+                let listed = Listed { id, relation };
+                let Some((t, gap, k)) = self.counted(me, ask, listed, me.sight, world, roles)?
                 else {
                     continue;
                 };
-                match t.class {
-                    // The wall's and the gate's classes.
-                    class::GATE => {
+                {
+                    let held = roles.of_class(t.class);
+                    if held.contains(ClassRoles::GATE) {
                         if self.gate.1 < Distance::ZERO || gap < self.gate.1 {
                             self.gate = (Some(id), gap);
                         }
                         if !self.walls {
                             continue;
                         }
-                    }
-                    class::WALL => {
+                    } else if held.contains(ClassRoles::WALL) {
                         if !self.note_wall(id, gap) {
                             continue;
                         }
+                    } else {
+                        self.beyond_walls = true;
                     }
-                    _ => self.beyond_walls = true,
                 }
                 st.add(&world.candidate(id, gap, k)?);
             }
@@ -405,15 +405,22 @@ impl Walked {
         ask: &Ask,
         st: &mut Statistics,
         world: &mut dyn Battlefield,
+        roles: &Roles,
     ) -> Result<(), crate::GenieError> {
         for (id, relation) in take(&mut self.later) {
-            let Some((t, gap, k)) = self.counted(me, ask, id, relation, me.range, world)? else {
+            let listed = Listed { id, relation };
+            let Some((t, gap, k)) = self.counted(me, ask, listed, me.range, world, roles)? else {
                 continue;
             };
-            let counts = match t.class {
-                class::GATE => self.walls,
-                class::WALL => self.note_wall(id, gap),
-                _ => true,
+            let counts = {
+                let held = roles.of_class(t.class);
+                if held.contains(ClassRoles::GATE) {
+                    self.walls
+                } else if held.contains(ClassRoles::WALL) {
+                    self.note_wall(id, gap)
+                } else {
+                    true
+                }
             };
             if counts {
                 st.add(&world.candidate(id, gap, k)?);
@@ -428,19 +435,19 @@ impl Walked {
         &self,
         me: &Searcher,
         ask: &Ask,
-        id: ObjectId,
-        relation: UnitRelation,
+        Listed { id, relation }: Listed,
         near: Distance,
         world: &mut dyn Battlefield,
+        roles: &Roles,
     ) -> Result<Option<(Thing, Distance, Option<AttackCategory>)>, crate::GenieError> {
-        let Some(t) = tested(me, ask, id, relation, world)? else {
+        let Some(t) = tested(me, ask, id, relation, world, roles)? else {
             return Ok(None);
         };
         let gap = t.distance;
         if !within(me, ask, gap, near) {
             return Ok(None);
         }
-        let k = category(t.master, t.class);
+        let k = category(t.master, t.class, roles);
         if self.narrowed.is_some_and(|n| k != Some(n)) {
             return Ok(None);
         }
@@ -469,6 +476,7 @@ fn rank_entries(
     me: &Searcher,
     st: &mut Statistics,
     world: &mut dyn Battlefield,
+    roles: &Roles,
 ) -> Result<bool, crate::GenieError> {
     st.score(&me.weights, me.targeting, &mut |id| world.armored(id))?;
     let ranked = me.attack_priority == AttackPriority::PRIORITY_1
@@ -481,7 +489,9 @@ fn rank_entries(
         if EPSILON < (world.weapon_range(e.id)?).get() {
             return Ok(3);
         }
-        let farm = world.thing(e.id)?.is_some_and(|t| t.class == class::FARM);
+        let farm = world
+            .thing(e.id)?
+            .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::FARM));
         Ok(if farm { 1 } else { 2 })
     })?;
     st.sort()?;

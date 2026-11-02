@@ -10,7 +10,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
@@ -27,6 +26,8 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The least span [`UnitAi::set_randomized_retarget_timer`] draws around (`999 < span`: the
 /// immediate `1000`).
@@ -61,6 +62,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let roles = &at.roles;
         // without an order, the order whose own action the current one is (`action + 100`)
         let order = self
             .current_order
@@ -90,6 +92,7 @@ impl UnitAi {
             player_type,
             at.action_state,
             listed,
+            roles,
         )? {
             let _ = self.retarget_search(search, player_type, at, side, ai)?;
         }
@@ -193,6 +196,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         let current = Self::world_object(self.current_target, at, side)?;
         let (from, distance, any_class, work_state) =
             current.map_or((at.position, 0.0, true, false), |t| {
@@ -236,7 +240,7 @@ impl UnitAi {
             && self.current_order == Some(OrderKind::Attack)
             && let (Some(n), Some(c)) = (new, current)
             && c.state == ObjectState::Alive
-            && category(n.master, n.class) != category(c.master, c.class)
+            && category(n.master, n.class, roles) != category(c.master, c.class, roles)
         {
             return Ok(9);
         }
@@ -246,9 +250,14 @@ impl UnitAi {
         let mut id = found.id;
         if let Some(n) = new {
             if n.kind == MasterKind::BUILDING {
-                let farm_rule =
-                    current.is_none_or(|c| c.class != class::FARM) || n.class == class::FARM;
-                if !matches!(n.class, class::CLASS_51 | class::CLASS_54) && farm_rule {
+                let farm_rule = current
+                    .is_none_or(|c| !roles.of_class(c.class).contains(ClassRoles::FARM))
+                    || roles.of_class(n.class).contains(ClassRoles::FARM);
+                if !roles
+                    .of_class(n.class)
+                    .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
+                    && farm_rule
+                {
                     return Ok(10);
                 }
             }
@@ -281,6 +290,7 @@ impl UnitAi {
         player_type: PlayerType,
         action_state: Option<ActionState>,
         attack_listed: Option<bool>,
+        roles: &Roles,
     ) -> Result<Option<RetargetSearch>, GenieError> {
         let attack_order = self.current_order == Some(OrderKind::Attack);
         if attack_order && RETARGET_RANGE < weapon_range.get() && !player_type.is_computer() {
@@ -290,7 +300,7 @@ impl UnitAi {
         if self.current_target.is_some() {
             match target {
                 Some((PlayerId::GAIA, _)) => return Ok(None),
-                Some((_, class)) if searches_on_class(class) => {
+                Some((_, class)) if searches_on_class(class, roles) => {
                     if attack_order && !player_type.is_computer() {
                         return Ok(None);
                     }
@@ -431,7 +441,9 @@ impl UnitAi {
                     let _ = self.attack_slot(attacker, true, at, side, ai)?;
                     return Ok(true);
                 }
-                NearestAttacker::NoAttacker => return self.process_idle(at, player_type, ai, side),
+                NearestAttacker::NoAttacker => {
+                    return self.process_idle(at, player_type, ai, side);
+                }
                 NearestAttacker::NoUnitAi => {}
             }
         }

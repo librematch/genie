@@ -19,6 +19,7 @@ use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker};
 use crate::unit_ai::{Seeker, can_attack};
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::lets::{release as lets_release, take as lets_take, torn_down as lets_torn_down};
 use crate::world::slots::PlayerSlots;
 
@@ -51,6 +52,7 @@ impl UnitView<'_, '_> {
                 &self.c.w.index,
                 &self.c.w.model.masters,
                 &self.c.w.parts,
+                &self.c.w.model.roles,
             ),
             restriction: None,
             unit: &*self.unit,
@@ -69,10 +71,11 @@ impl UnitView<'_, '_> {
         &self,
         target: ObjectId,
         seeker: &Seeker,
+        roles: &Roles,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
         let picker = self.picker(Some(*seeker))?;
         let (t, _) = picker.target(&self.c.w.spatial, target)?;
-        Ok(can_attack(&self.attacker, seeker, &t)?.then_some((t.class, t.position)))
+        Ok(can_attack(&self.attacker, seeker, &t, roles)?.then_some((t.class, t.position)))
     }
 
     /// Whether the unit's view of the world (live objects, owner-first) holds object `id`.
@@ -104,6 +107,7 @@ impl UnitView<'_, '_> {
         actions: &Action,
         m: &Master,
         attacker: ObjectId,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         let others = owner_view(
             &self.c.w.players,
@@ -184,7 +188,7 @@ impl UnitView<'_, '_> {
         };
         let picker = self.picker(None)?;
         let (target, _) = picker.target(&self.c.w.spatial, attacker)?;
-        can_attack(&me, &ai.seeker_with(target_kind), &target)
+        can_attack(&me, &ai.seeker_with(target_kind), &target, roles)
     }
 }
 
@@ -230,8 +234,13 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// [`crate::world::lets::take`]'s.
-    pub(crate) fn take(&mut self, id: ObjectId, by: Releaser) -> Result<(), GenieError> {
-        lets_take(self.c, self.unit, id, by)
+    pub(crate) fn take(
+        &mut self,
+        id: ObjectId,
+        by: Releaser,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
+        lets_take(self.c, self.unit, id, by, roles)
     }
 
     /// Slot 0x180 on object `id`, which the unit's action of `by` lets go

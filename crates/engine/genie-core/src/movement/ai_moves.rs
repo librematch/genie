@@ -20,7 +20,6 @@ use crate::math::rng::{Stream, Well512};
 use crate::movement::move_to::{
     MoveTo, MoveToAction, MoveToReads, SpriteReads, ai_sprite, object_sprite, point_sprite,
 };
-use crate::objects::masters::class;
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 
@@ -45,12 +44,26 @@ use crate::objects::{Graphics, ObjectState};
 use crate::ownership::artifact::{ARTIFACT_TYPE, SubActionsGone};
 use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitStance;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::{take, torn_down};
 use crate::world::step::Step;
 use crate::world::{Unread, WALKER_UNMOVING};
 
-/// An unpacked trebuchet's class (`-0xe76` raw), whose slot 0x340 packs instead of moving.
-const UNPACKED_TREBUCHET: ClassId = class::CLASS_54;
+/// What the sprites of a move the unit AI gives read: the owner's masters, the sprites' table,
+/// the unit's terrain look and the build's roles ([`Unit::ai_move_with`],
+/// [`Unit::head_takes_point`]).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct MoveSprites<'a> {
+    /// The unit's owner's masters.
+    pub(crate) masters: OwnerMasters<'a>,
+    /// The sprites' table.
+    pub(crate) graphics: &'a Graphics,
+    /// The unit's terrain look.
+    pub(crate) look: Option<&'a Look>,
+    /// The build's roles.
+    pub(crate) roles: &'a Roles,
+}
 
 impl Unit {
     /// The unit's slot 0x340 on its unit AI's move ([`Unit::ai_move_with`]), what it lets go and
@@ -61,6 +74,7 @@ impl Unit {
         m: AiMove,
         class: ClassId,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
         let sprite_rng = c.w.streams.get(Stream::Sprite);
@@ -72,11 +86,15 @@ impl Unit {
             (class, c.player),
             (&mut releases, &mut leaves, by),
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                (
-                    &c.w.model.graphics,
-                    c.w.parts.combat.of(self.id).abilities.look.as_ref(),
-                ),
+                MoveSprites {
+                    masters: OwnerMasters::new(
+                        &c.w.parts.own_master,
+                        c.w.model.masters.of(c.player),
+                    ),
+                    graphics: &c.w.model.graphics,
+                    look: c.w.parts.combat.of(self.id).abilities.look.as_ref(),
+                    roles,
+                },
                 sprite_rng,
             ),
         )?;
@@ -96,6 +114,7 @@ impl Unit {
                     ),
                     sprite_rng,
                 ),
+                roles,
             )?;
         }
         Ok(())
@@ -132,13 +151,15 @@ impl Unit {
             &mut Vec<ObjectId>,
             Releaser,
         ),
-        (masters, (graphics, look), sprite_rng): (
-            OwnerMasters<'_>,
-            (&Graphics, Option<&Look>),
-            &mut Well512,
-        ),
+        (sprites, sprite_rng): (MoveSprites<'_>, &mut Well512),
     ) -> Result<bool, GenieError> {
-        if class == UNPACKED_TREBUCHET {
+        let MoveSprites {
+            masters,
+            graphics,
+            look,
+            roles,
+        } = sprites;
+        if roles.of_class(class).contains(ClassRoles::PACKS_TO_MOVE) {
             return Err(GenieError::unsupported(
                 "an AI move of an unpacked trebuchet (class 54: its Pack action, FUN_140ad4ff0)",
             ));
@@ -154,8 +175,7 @@ impl Unit {
             motion.reborrow(),
             m.point,
             player,
-            masters,
-            (graphics, look),
+            sprites,
         )? {
             PointMove::Taken(released) => {
                 if let Some(t) = released {
@@ -176,7 +196,7 @@ impl Unit {
         self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
         let sprite = ai_sprite(master, m.walk)
-            .or_else(|| point_sprite(master, look, false))
+            .or_else(|| point_sprite(master, look, false, roles))
             .and_then(|id| graphics.get(id).copied());
         let move_to = MoveToAction::to_point(m.point, m.range, sprite, motion.mover_mut());
         if move_to.shows_standing() {
@@ -210,9 +230,14 @@ impl Unit {
         mut motion: MotionMut<'_>,
         point: Position,
         player: PlayerId,
-        masters: OwnerMasters<'_>,
-        graphics: (&Graphics, Option<&Look>),
+        sprites: MoveSprites<'_>,
     ) -> Result<PointMove, GenieError> {
+        let MoveSprites {
+            masters,
+            graphics,
+            look,
+            roles,
+        } = sprites;
         if unread.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
@@ -232,22 +257,26 @@ impl Unit {
                 | WAIT_SOLIDIFY,
             ) => Ok(PointMove::Declined),
             Some(ARTIFACT_TYPE) => {
-                let sprites = self.point_sprites(masters, graphics)?;
+                let sprites = self.point_sprites(sprites)?;
                 self.artifact_takes_point(actions, motion.mover_mut(), point, &sprites)
             }
             Some(HUNT) => {
-                let sprites = self.point_sprites(masters, graphics)?;
+                let sprites = self.point_sprites(sprites)?;
                 self.hunt_takes_point(actions, motion.mover_mut(), point, player, sprites)
             }
             Some(GATHER) => {
-                let sprites = self.point_sprites(masters, graphics)?;
+                let sprites = self.point_sprites(sprites)?;
                 self.gather_takes_point(actions, motion.mover_mut(), point, player, sprites)
             }
             // the Transport's (0x140aa3e40): the caller sails it there
             Some(TRANSPORT) => Ok(PointMove::Sails),
             Some(REPAIR) => {
-                let move_reads =
-                    MoveToReads::of((self, motion.mover()), self.master_in(masters)?, graphics);
+                let move_reads = MoveToReads::of(
+                    (self, motion.mover()),
+                    self.master_in(masters)?,
+                    (graphics, look),
+                    roles,
+                );
                 actions.repair_takes_point(motion.mover_mut(), point, &move_reads)
             }
             Some(other) => Err(GenieError::unreachable(
@@ -259,12 +288,13 @@ impl Unit {
 
     /// The sprites a `MoveTo` to a point that the unit's head action makes takes for none
     /// (`FUN_140aa0d30`'s default from the unit's master and terrain look).
-    fn point_sprites<'g>(
-        &self,
-        masters: OwnerMasters<'_>,
-        (graphics, look): (&'g Graphics, Option<&Look>),
-    ) -> Result<SpriteReads<'g>, GenieError> {
-        Ok(SpriteReads::of(self.master_in(masters)?, look, graphics))
+    fn point_sprites<'g>(&self, sprites: MoveSprites<'g>) -> Result<SpriteReads<'g>, GenieError> {
+        Ok(SpriteReads::of(
+            self.master_in(sprites.masters)?,
+            sprites.look,
+            sprites.graphics,
+            sprites.roles,
+        ))
     }
 
     /// The Artifact's slot 0x40 (its slot 8 with the point, [`Artifact::take_point`]): its
@@ -361,6 +391,7 @@ impl Unit {
         (target, state): (ObjectId, ObjectState),
         range: Distance,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if c.w.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
@@ -372,11 +403,13 @@ impl Unit {
                 "an AI move to an object of a unit that does not move",
             ));
         }
-        let livestock = self.master(c.w.master_tables(), c.player)?.class == class::LIVESTOCK;
+        let livestock = roles
+            .of_class(self.master(c.w.master_tables(), c.player)?.class)
+            .contains(ClassRoles::LIVESTOCK);
         let master = c.w.spatial.get_known(target)?.ok_or(TARGET_LACKING)?.master;
         let by = self.releaser(c)?;
         if holds_object(livestock, master, state) {
-            take(c, self, target, by)?;
+            take(c, self, target, by, roles)?;
         }
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.clear_own_actions(

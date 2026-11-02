@@ -13,7 +13,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::players::PlayerId;
 use crate::world::WholeSeconds;
@@ -39,6 +38,7 @@ use crate::unit_ai::NotifyKind;
 use crate::vision::visibility::{BuildingSight, Seer, capture_kind};
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
+use crate::world::layer::ClassRoles;
 
 impl World {
     /// `FUN_14123bb20`'s sending off (with `DAT_1439e60e2` 1) of the units on `foundation`'s
@@ -89,7 +89,11 @@ impl World {
                 .and_then(|m| m.paths.first())
                 .map(|l| l.state);
             let stands = (owner == PlayerId::GAIA
-                && matches!(master.class, class::PREY | class::PREDATOR))
+                && self
+                    .model
+                    .roles
+                    .of_class(master.class)
+                    .intersects(ClassRoles::PREY | ClassRoles::PREDATOR))
                 || (!walking
                     && level.is_none_or(|s| matches!(s, PathState::Idle | PathState::GaveUp)));
             let busy = self.parts.unit_ai.get(u.id).is_none_or(|ai| {
@@ -138,7 +142,13 @@ impl World {
         radius: Footprint,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let site_at = self
             .spatial
             .get(foundation)
@@ -236,7 +246,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a farm's foundation without the map's terrain",
             ))?
-            .cover(&f)
+            .cover(&f, &self.model.roles)
     }
 
     /// The footprint clearing (`FUN_1415c3620` with `param_7` 0) of a new building of `master`
@@ -272,7 +282,7 @@ impl World {
                 let _ = looks.insert(id, look);
             }
         }
-        let cleared = footprint_clearing(&self.spatial, &site, &looks)?;
+        let cleared = footprint_clearing(&self.spatial, &site, &looks, &self.model.roles)?;
         for cl in cleared {
             self.clear_object(cl, false)?;
             if !trees {
@@ -389,7 +399,7 @@ impl World {
                     explored: false,
                     building: Some(BuildingSight::default()),
                     umv: umv as u8,
-                    capture: capture_kind(player, made.class, made.id),
+                    capture: capture_kind(player, made.class, made.id, &self.model.roles),
                     kind: MasterKind::BUILDING,
                 },
             );

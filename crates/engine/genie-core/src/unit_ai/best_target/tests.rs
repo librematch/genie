@@ -7,7 +7,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::Amount;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
@@ -17,6 +16,8 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::test_ids::{attack_category, category_of};
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
 use crate::world::Seconds;
@@ -301,7 +302,7 @@ fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
         any_class: true,
         ..Ask::default()
     };
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert_eq!(field.asked, [('q', object_id(7)), ('q', object_id(9))]);
     assert_eq!(c.retries, []);
@@ -309,7 +310,7 @@ fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
     field.quick.clear();
     field.paths = vec![object_id(9)];
     field.asked.clear();
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert_eq!(
         field.asked,
@@ -345,7 +346,7 @@ fn failed_paths_become_retarget_entries() {
         any_class: true,
         ..Ask::default()
     };
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, None);
     let mut retries = c.retries;
     retries.sort_unstable();
@@ -361,7 +362,7 @@ fn failed_paths_become_retarget_entries() {
         ..soldier()
     };
     field.asked.clear();
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, None);
     assert_eq!(field.asked, [('q', object_id(7)), ('p', object_id(7))]);
     // with 7 a retarget entry too, the retry walk takes both
@@ -371,7 +372,7 @@ fn failed_paths_become_retarget_entries() {
     };
     field.paths = vec![object_id(9)];
     field.asked.clear();
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(9)));
 }
 
@@ -426,7 +427,7 @@ fn the_lists_pass_over_what_the_unit_may_not_attack() {
         min_range: Distance::new(0.2),
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(36)));
     assert_eq!(field.asked, [('q', object_id(36))]);
 }
@@ -459,9 +460,9 @@ fn walls_and_gates_count_for_unit_that_attacks_walls() {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(22)));
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, None);
 }
 
@@ -470,26 +471,53 @@ fn walls_and_gates_count_for_unit_that_attacks_walls() {
 /// table is −1.
 #[test]
 fn the_categories_follow_the_classes_and_their_exceptions() {
-    assert_eq!(category(master_id(4), class::CLASS_0), attack_category(3));
-    assert_eq!(category(ids::ID_6, class::CLASS_0), attack_category(4));
-    assert_eq!(category(ids::ID_7, class::CLASS_23), attack_category(4));
     assert_eq!(
-        category(ids::VILLAGER_MALE, class::VILLAGER),
+        category(master_id(4), class::CLASS_0, &roles()),
+        attack_category(3)
+    );
+    assert_eq!(
+        category(ids::ID_6, class::CLASS_0, &roles()),
+        attack_category(4)
+    );
+    assert_eq!(
+        category(ids::ID_7, class::CLASS_23, &roles()),
+        attack_category(4)
+    );
+    assert_eq!(
+        category(ids::VILLAGER_MALE, class::VILLAGER, &roles()),
         attack_category(7)
     );
-    assert_eq!(category(master_id(74), class::CLASS_6), attack_category(1));
-    assert_eq!(category(ids::ID_1744, class::CLASS_6), attack_category(5));
-    assert_eq!(category(master_id(280), class::SIEGE), attack_category(6));
-    assert_eq!(category(ids::ID_35, class::SIEGE), attack_category(5));
-    assert_eq!(category(ids::ID_1258, class::CLASS_55), attack_category(5));
     assert_eq!(
-        category(ids::TOWN_CENTRE, class::BUILDING),
+        category(master_id(74), class::CLASS_6, &roles()),
+        attack_category(1)
+    );
+    assert_eq!(
+        category(ids::ID_1744, class::CLASS_6, &roles()),
+        attack_category(5)
+    );
+    assert_eq!(
+        category(master_id(280), class::SIEGE, &roles()),
+        attack_category(6)
+    );
+    assert_eq!(
+        category(ids::ID_35, class::SIEGE, &roles()),
+        attack_category(5)
+    );
+    assert_eq!(
+        category(ids::ID_1258, class::CLASS_55, &roles()),
+        attack_category(5)
+    );
+    assert_eq!(
+        category(ids::TOWN_CENTRE, class::BUILDING, &roles()),
         attack_category(0)
     );
-    assert_eq!(category(ids::ID_448, class::CLASS_47), attack_category(1));
-    assert_eq!(category(master_id(1), class::ARTIFACT), None);
-    assert_eq!(category(master_id(1), class::CLASS_63), None);
-    assert_eq!(category(master_id(1), class::NO_CLASS), None);
+    assert_eq!(
+        category(ids::ID_448, class::CLASS_47, &roles()),
+        attack_category(1)
+    );
+    assert_eq!(category(master_id(1), class::ARTIFACT, &roles()), None);
+    assert_eq!(category(master_id(1), class::CLASS_63, &roles()), None);
+    assert_eq!(category(master_id(1), class::NO_CLASS, &roles()), None);
 }
 
 /// `bestUnitToAttack`'s extra objects ([`add_extra`]): each the world holds but
@@ -516,7 +544,7 @@ fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
     };
     let counted = |me: &Searcher, field: &mut Field| {
         let mut st = Statistics::default();
-        add_extra(me, &ask, &mut st, field).unwrap();
+        add_extra(me, &ask, &mut st, field, &roles()).unwrap();
         st.entries
             .iter()
             .map(|e| (e.id, e.distance.get()))
@@ -562,7 +590,7 @@ fn gate_answers_at_once_only_among_walls() {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(7)));
     assert!(field.asked.contains(&('q', object_id(7))));
 }
@@ -592,7 +620,7 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
         target: Some(object_id(7)),
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(
         (c.target, &field.asked[..]),
         (Some(object_id(7)), &[('p', object_id(7))][..])
@@ -602,17 +630,17 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
         paths: 0,
         ..ask.clone()
     };
-    let c = best_unit_to_attack(&me, &at_once, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &at_once, &lists, &mut field, &roles()).unwrap();
     assert_eq!((c.target, field.asked.len()), (Some(object_id(7)), 0));
     field.paths.clear();
     field.quick = vec![object_id(9)];
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert_eq!(field.asked[0], ('p', object_id(7)));
     field.asked.clear();
     let idle = Ask { idle: true, ..ask };
     field.paths = vec![object_id(7)];
-    let c = best_unit_to_attack(&me, &idle, &lists, &mut field).unwrap();
+    let c = best_unit_to_attack(&me, &idle, &lists, &mut field, &roles()).unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert!(!field.asked.contains(&('p', object_id(7))));
 }
@@ -703,8 +731,13 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         class: class::BUILDING,
         ..thing
     };
-    assert!(!kept_by_owner_and_class(&human, &Ask::default(), &house));
-    assert!(kept_by_owner_and_class(&human, &any, &house));
+    assert!(!kept_by_owner_and_class(
+        &human,
+        &Ask::default(),
+        &house,
+        &roles()
+    ));
+    assert!(kept_by_owner_and_class(&human, &any, &house, &roles()));
     let gaia = Thing {
         owner: PlayerId::new(0),
         ..thing
@@ -717,22 +750,22 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         capture: true,
         ..gaia
     };
-    assert!(kept_by_owner_and_class(&computer, &any, &gaia));
+    assert!(kept_by_owner_and_class(&computer, &any, &gaia, &roles()));
     // a held amount that is not a number counts as held (`+0x310 <= 0` fails)
     let unordered = Thing {
         held: Amount::new(f32::NAN),
         ..gaia
     };
     for t in [holding, taken, unordered] {
-        assert!(!kept_by_owner_and_class(&computer, &any, &t));
-        assert!(kept_by_owner_and_class(&human, &any, &t));
+        assert!(!kept_by_owner_and_class(&computer, &any, &t, &roles()));
+        assert!(kept_by_owner_and_class(&human, &any, &t, &roles()));
     }
     let boat = Thing {
         class: class::WARSHIP,
         ..thing
     };
-    assert!(!kept_by_owner_and_class(&computer, &any, &boat));
-    assert!(kept_by_owner_and_class(&human, &any, &boat));
+    assert!(!kept_by_owner_and_class(&computer, &any, &boat, &roles()));
+    assert!(kept_by_owner_and_class(&human, &any, &boat, &roles()));
     for me in [
         Searcher {
             class: Some(class::TOWER),
@@ -747,6 +780,6 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
             ..computer
         },
     ] {
-        assert!(kept_by_owner_and_class(&me, &any, &boat));
+        assert!(kept_by_owner_and_class(&me, &any, &boat, &roles()));
     }
 }

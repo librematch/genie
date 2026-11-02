@@ -80,13 +80,14 @@ use crate::objects::masters::DamageAmount;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_of;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class;
+use crate::testing::roles;
 use std::f32::consts::FRAC_PI_2;
 
 fn sheep() -> Victim {
@@ -161,11 +162,23 @@ fn wall_foundation_pierce_armor_is_computed_as_any_other() {
         ..Armored::default()
     };
     assert_eq!(
-        class_armor(&a, OwnSlot::Pierce, class::WALL, ObjectState::Foundation),
+        class_armor(
+            &a,
+            OwnSlot::Pierce,
+            class::WALL,
+            ObjectState::Foundation,
+            &roles()
+        ),
         DamageAmount::new(5)
     );
     assert_eq!(
-        class_armor(&a, OwnSlot::Pierce, class::WALL, ObjectState::Alive),
+        class_armor(
+            &a,
+            OwnSlot::Pierce,
+            class::WALL,
+            ObjectState::Alive,
+            &roles()
+        ),
         DamageAmount::new(5)
     );
     let none = Armored {
@@ -174,12 +187,24 @@ fn wall_foundation_pierce_armor_is_computed_as_any_other() {
         ..Armored::default()
     };
     assert_eq!(
-        class_armor(&none, OwnSlot::Pierce, class::WALL, ObjectState::Foundation),
+        class_armor(
+            &none,
+            OwnSlot::Pierce,
+            class::WALL,
+            ObjectState::Foundation,
+            &roles()
+        ),
         DamageAmount::new(2)
     );
     // its melee armor (FUN_141213810's wall foundation) is 0
     assert_eq!(
-        class_armor(&a, OwnSlot::Melee, class::WALL, ObjectState::Foundation),
+        class_armor(
+            &a,
+            OwnSlot::Melee,
+            class::WALL,
+            ObjectState::Foundation,
+            &roles()
+        ),
         DamageAmount::new(0)
     );
 }
@@ -203,14 +228,14 @@ fn static_object_takes_ready_charge_first() {
         ..Attacker::default()
     };
     let mut t = tree();
-    take_static(&mut t, &charging, &[ClassAmount::new(4, 3)], 1.0);
+    take_static(&mut t, &charging, &[ClassAmount::new(4, 3)], 1.0, &roles());
     assert_eq!(t.hp, HitPoints::new(100.0 - (5.0 + 3.0)));
     let mut t = tree();
     let plain = Attacker {
         charge_kind: ChargeKind::NONE,
         ..charging
     };
-    take_static(&mut t, &plain, &[ClassAmount::new(4, 3)], 1.0);
+    take_static(&mut t, &plain, &[ClassAmount::new(4, 3)], 1.0, &roles());
     assert_eq!(t.hp, HitPoints::new(97.0));
 }
 
@@ -236,6 +261,7 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(4, 3), ClassAmount::new(3, 2)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -249,6 +275,7 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(4, 3), ClassAmount::new(3, 2)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     // a villager's hit leaves what it holds
@@ -266,6 +293,7 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(3, 4)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!((t.hp, t.amount), (HitPoints::ZERO, Amount::ZERO));
@@ -277,6 +305,7 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(3, 4)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert!(t.hp.get().is_nan() && t.amount == Amount::new(50.0) && t.goto_sleep);
@@ -287,7 +316,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
     let weapons = hunter.weapons.clone();
     assert_eq!(
-        armor_damage(&sheep, &weapons, 1.0, &hunter.source, 0.0),
+        armor_damage(&sheep, &weapons, 1.0, &hunter.source, 0.0, &roles()),
         Ok(HitPoints::new(12.0))
     );
     take(
@@ -297,6 +326,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         &weapons,
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(2.0));
@@ -309,6 +339,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         &weapons,
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::ZERO);
@@ -331,7 +362,8 @@ fn hunter_strikes_its_sheep_for_twelve() {
             &[ClassAmount::new(4, 3)],
             1.0,
             &hunter.source,
-            0.0
+            0.0,
+            &roles()
         ),
         Ok(HitPoints::new(1.0))
     );
@@ -340,7 +372,14 @@ fn hunter_strikes_its_sheep_for_twelve() {
         ..hunter.source
     };
     assert_eq!(
-        armor_damage(&armored, &[ClassAmount::new(4, 3)], 1.0, &zero, 0.0),
+        armor_damage(
+            &armored,
+            &[ClassAmount::new(4, 3)],
+            1.0,
+            &zero,
+            0.0,
+            &roles()
+        ),
         Ok(HitPoints::ZERO)
     );
 }
@@ -412,10 +451,10 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
     // any target below type 80: the sheep lacks half its hit points, two steps of 0.25
     hunter.bonus_tasks = vec![task(-1, None, Distance::new(1.0), 1)];
     let steps = libm::floorf(0.5 / 0.25 + EPSILON);
-    assert_eq!(bonus_damage(&hunter, &sheep), steps * 2.0);
+    assert_eq!(bonus_damage(&hunter, &sheep, &roles()), steps * 2.0);
     // the attacker's share (a work range of 0), whole: four steps
     hunter.bonus_tasks = vec![task(-1, None, Distance::ZERO, 0)];
-    assert_eq!(bonus_damage(&hunter, &sheep), 4.0 * 2.0);
+    assert_eq!(bonus_damage(&hunter, &sheep, &roles()), 4.0 * 2.0);
     // by class or master; another class, master or action type adds nothing
     hunter.bonus_tasks = vec![
         task(class::LIVESTOCK.get(), Some(ids::ID_0), Distance::ZERO, 0),
@@ -427,29 +466,29 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
             ..task(-1, None, Distance::ZERO, 0)
         },
     ];
-    assert_eq!(bonus_damage(&hunter, &sheep), 16.0);
+    assert_eq!(bonus_damage(&hunter, &sheep, &roles()), 16.0);
     // a building of another class than 51 and 54 needs its class or master
     let mut tc = sheep.clone();
     (tc.kind, tc.class) = (MasterKind::BUILDING, class::BUILDING);
     hunter.bonus_tasks = vec![task(-1, None, Distance::ZERO, 0)];
-    assert_eq!(bonus_damage(&hunter, &tc), 0.0);
+    assert_eq!(bonus_damage(&hunter, &tc, &roles()), 0.0);
     tc.class = class::CLASS_51;
-    assert_eq!(bonus_damage(&hunter, &tc), 8.0);
+    assert_eq!(bonus_damage(&hunter, &tc, &roles()), 8.0);
     // no step, no target hit points, or a negative sum: 0
     hunter.bonus_tasks = vec![Task {
         work_val2: WorkValue::new(0.0),
         ..task(-1, None, Distance::ZERO, 0)
     }];
-    assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
+    assert_eq!(bonus_damage(&hunter, &sheep, &roles()), 0.0);
     hunter.bonus_tasks = vec![task(-1, None, Distance::ZERO, 0)];
     sheep.hp = HitPoints::ZERO;
-    assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
+    assert_eq!(bonus_damage(&hunter, &sheep, &roles()), 0.0);
     sheep.hp = HitPoints::new(7.0);
     hunter.bonus_tasks = vec![Task {
         work_val1: WorkValue::new(-3.0),
         ..task(-1, None, Distance::ZERO, 0)
     }];
-    assert_eq!(bonus_damage(&hunter, &sheep), 0.0);
+    assert_eq!(bonus_damage(&hunter, &sheep, &roles()), 0.0);
 }
 
 /// The first melee weapon adds the bonus with the powerup.
@@ -463,7 +502,8 @@ fn the_bonus_damage_adds_to_the_first_melee_weapon() {
             &[ClassAmount::new(4, 3), ClassAmount::new(3, 2)],
             1.0,
             &hunter.source,
-            2.0
+            2.0,
+            &roles()
         ),
         Ok(HitPoints::new(3.0 + 2.0 + 1.0 + 2.0))
     );
@@ -477,14 +517,14 @@ fn the_bonus_damage_adds_to_the_first_melee_weapon() {
 fn combat_object_shows_its_attack_armor_and_range() {
     let (sheep, mut v) = (sheep(), hunter());
     let none = Shown::default();
-    assert_eq!(shown_attack(&v, &none), DamageAmount::new(3));
+    assert_eq!(shown_attack(&v, &none, &roles()), DamageAmount::new(3));
     v.source.attack_powerup = AttackPowerup::new(1.7);
-    assert_eq!(shown_attack(&v, &none), DamageAmount::new(4));
+    assert_eq!(shown_attack(&v, &none, &roles()), DamageAmount::new(4));
     let mut far = v.clone();
     far.weapons = vec![ClassAmount::new(13, 6), ClassAmount::new(11, -2)];
-    assert_eq!(shown_attack(&far, &none), DamageAmount::new(7));
+    assert_eq!(shown_attack(&far, &none, &roles()), DamageAmount::new(7));
     far.kind = MasterKind::RGE_COMBAT;
-    assert_eq!(shown_attack(&far, &none), DamageAmount::new(6));
+    assert_eq!(shown_attack(&far, &none, &roles()), DamageAmount::new(6));
     // the bonus against its attack's target
     v.bonus_tasks = vec![Task {
         action_kind: BONUS_DAMAGE,
@@ -497,16 +537,22 @@ fn combat_object_shows_its_attack_armor_and_range() {
         target: Some(&sheep),
         ..Shown::default()
     };
-    assert_eq!(shown_attack(&v, &at_sheep), DamageAmount::new(4 + 3));
+    assert_eq!(
+        shown_attack(&v, &at_sheep, &roles()),
+        DamageAmount::new(4 + 3)
+    );
     v.bonus_tasks.clear();
     // a ready charge of type 1 for every target, or for its target's class group
     (v.source.charge_kind, v.source.max_charge, v.source.charge) =
         (ChargeKind::ATTACK, Charge::new(5.0), Charge::new(5.5));
     v.source.charge_target = ChargeTarget::EVERY;
-    assert_eq!(shown_attack(&v, &none), DamageAmount::new(4 + 5));
+    assert_eq!(shown_attack(&v, &none, &roles()), DamageAmount::new(4 + 5));
     v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
-    assert_eq!(shown_attack(&v, &none), DamageAmount::new(4));
-    assert_eq!(shown_attack(&v, &at_sheep), DamageAmount::new(4 + 5));
+    assert_eq!(shown_attack(&v, &none, &roles()), DamageAmount::new(4));
+    assert_eq!(
+        shown_attack(&v, &at_sheep, &roles()),
+        DamageAmount::new(4 + 5)
+    );
     // a ready charge of type 6 shows the projectile's best fighting attack, and its range
     // the charge event
     (v.source.charge_kind, v.source.charge_target) = (ChargeKind::of_data(6), ChargeTarget::EVERY);
@@ -521,30 +567,33 @@ fn combat_object_shows_its_attack_armor_and_range() {
         range_powerup: Distance::new(1.0),
         ..Shown::default()
     };
-    assert_eq!(shown_attack(&v, &shot), DamageAmount::new(9));
+    assert_eq!(shown_attack(&v, &shot, &roles()), DamageAmount::new(9));
     v.source.weapon_range = Distance::new(4.0);
-    assert_eq!(shown_range(&v, &shot), Distance::new(1.0 + (2.0 + 4.0)));
+    assert_eq!(
+        shown_range(&v, &shot, &roles()),
+        Distance::new(1.0 + (2.0 + 4.0))
+    );
     v.source.charge = Charge::new(0.5);
-    assert_eq!(shown_attack(&v, &shot), DamageAmount::new(4));
-    assert_eq!(shown_range(&v, &shot), Distance::new(5.0));
+    assert_eq!(shown_attack(&v, &shot, &roles()), DamageAmount::new(4));
+    assert_eq!(shown_range(&v, &shot, &roles()), Distance::new(5.0));
     v.kind = MasterKind::RGE_COMBAT;
     v.source.charge = Charge::new(1.0);
-    assert_eq!(shown_range(&v, &shot), Distance::new(4.0));
+    assert_eq!(shown_range(&v, &shot, &roles()), Distance::new(4.0));
     // the melee armor: its best of class 4 plus the powerup; a wall foundation none; type 50
     // without the powerup; else its best of any, else its base armor
     let mut a = hunter();
     a.armored.as_mut().unwrap().armor_powerups = ArmorPair::new(2, 0);
-    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(2)));
+    assert_eq!(shown_melee_armor(&a, &roles()), Ok(DamageAmount::new(2)));
     (a.class, a.state) = (class::WALL, ObjectState::Foundation);
-    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(0)));
+    assert_eq!(shown_melee_armor(&a, &roles()), Ok(DamageAmount::new(0)));
     a.kind = MasterKind::RGE_COMBAT;
     a.armored.as_mut().unwrap().armors = vec![ClassAmount::new(3, 5), ClassAmount::new(11, 7)];
-    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(7)));
+    assert_eq!(shown_melee_armor(&a, &roles()), Ok(DamageAmount::new(7)));
     a.armored.as_mut().unwrap().armors.clear();
     a.armored.as_mut().unwrap().base_armor = DamageAmount::new(-1);
-    assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(-1)));
+    assert_eq!(shown_melee_armor(&a, &roles()), Ok(DamageAmount::new(-1)));
     a.armored = None;
-    assert!(shown_melee_armor(&a).is_err());
+    assert!(shown_melee_armor(&a, &roles()).is_err());
 }
 
 /// Slot 0x2f8: a ready charge of type 6 or 7 that works on the target.
@@ -554,11 +603,11 @@ fn range_charge_hits_target_its_class_group_names() {
     (v.source.charge_kind, v.source.max_charge, v.source.charge) =
         (ChargeKind::of_data(7), Charge::new(5.0), Charge::new(1.0));
     v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
-    assert!(range_charge_hit(&v.source, &sheep));
+    assert!(range_charge_hit(&v.source, &sheep, &roles()));
     v.source.charge = Charge::new(0.5);
-    assert!(!range_charge_hit(&v.source, &sheep));
+    assert!(!range_charge_hit(&v.source, &sheep, &roles()));
     (v.source.charge_kind, v.source.charge) = (ChargeKind::ATTACK, Charge::new(9.0));
-    assert!(!range_charge_hit(&v.source, &sheep));
+    assert!(!range_charge_hit(&v.source, &sheep, &roles()));
 }
 
 /// The terrain defense scales each weapon's damage; a restriction value of 0 counts as 1 for
@@ -570,11 +619,28 @@ fn terrain_defense_bonus_scales_the_damage() {
     let x = sheep.armored.as_mut().unwrap();
     (x.terrain_bonus, x.terrain) = (RestrictionField::of_data(4), Some(1.5));
     assert_eq!(
-        armor_damage(&sheep, &[ClassAmount::new(4, 4)], 1.0, &hunter.source, 0.0),
+        armor_damage(
+            &sheep,
+            &[ClassAmount::new(4, 4)],
+            1.0,
+            &hunter.source,
+            0.0,
+            &roles()
+        ),
         Ok(HitPoints::new(6.0))
     );
     sheep.armored.as_mut().unwrap().terrain = None;
-    assert!(armor_damage(&sheep, &[ClassAmount::new(4, 4)], 1.0, &hunter.source, 0.0).is_err());
+    assert!(
+        armor_damage(
+            &sheep,
+            &[ClassAmount::new(4, 4)],
+            1.0,
+            &hunter.source,
+            0.0,
+            &roles()
+        )
+        .is_err()
+    );
 }
 
 /// A ready charge of type 1 adds itself to the first melee weapon; the hit is the charge's,
@@ -592,7 +658,8 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
             &[ClassAmount::new(4, 3), ClassAmount::new(3, 2)],
             1.0,
             &hunter.source,
-            0.0
+            0.0,
+            &roles()
         ),
         Ok(HitPoints::new(5.0 + 3.0 + 2.0))
     );
@@ -603,6 +670,7 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(14.0 - 8.0));
@@ -611,7 +679,14 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     // not ready: no charge
     hunter.source.charge = Charge::new(4.0);
     assert_eq!(
-        armor_damage(&sheep, &[ClassAmount::new(4, 3)], 1.0, &hunter.source, 0.0),
+        armor_damage(
+            &sheep,
+            &[ClassAmount::new(4, 3)],
+            1.0,
+            &hunter.source,
+            0.0,
+            &roles()
+        ),
         Ok(HitPoints::new(3.0))
     );
 }
@@ -623,50 +698,58 @@ fn charge_target_picks_the_class_groups() {
         ChargeTarget::ALL_BUT_BUILDINGS,
         ChargeKind::ATTACK,
         class::CLASS_6,
-        MasterKind::COMBAT
+        MasterKind::COMBAT,
+        &roles()
     ));
     assert!(!charge_works(
         ChargeTarget::ALL_BUT_BUILDINGS,
         ChargeKind::ATTACK,
         class::BUILDING,
-        MasterKind::BUILDING
+        MasterKind::BUILDING,
+        &roles()
     ));
     assert!(charge_works(
         ChargeTarget::ALL_BUT_BUILDINGS,
         ChargeKind::ATTACK,
         class::CLASS_51,
-        MasterKind::COMBAT
+        MasterKind::COMBAT,
+        &roles()
     ));
     // bit 0 infantry (6), bit 8 buildings (3)
     assert!(charge_works(
         ChargeTarget::of_data(1),
         ChargeKind::ATTACK,
         class::CLASS_6,
-        MasterKind::COMBAT
+        MasterKind::COMBAT,
+        &roles()
     ));
     assert!(!charge_works(
         ChargeTarget::of_data(1),
         ChargeKind::ATTACK,
         class::CLASS_12,
-        MasterKind::COMBAT
+        MasterKind::COMBAT,
+        &roles()
     ));
     assert!(charge_works(
         ChargeTarget::of_data(0x100),
         ChargeKind::ATTACK,
         class::BUILDING,
-        MasterKind::BUILDING
+        MasterKind::BUILDING,
+        &roles()
     ));
     assert!(!charge_works(
         ChargeTarget::of_data(0x100),
         ChargeKind::ATTACK,
         ClassId::of_master(99),
-        MasterKind::COMBAT
+        MasterKind::COMBAT,
+        &roles()
     ));
     assert!(charge_works(
         ChargeTarget::of_data(0x10),
         ChargeKind::EVERY_TARGET,
         ClassId::of_master(99),
-        MasterKind::COMBAT
+        MasterKind::COMBAT,
+        &roles()
     ));
 }
 
@@ -741,6 +824,7 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         &[ClassAmount::new(4, 10)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(14.0 - 10.0 * SPECIAL));
@@ -755,6 +839,7 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         &[ClassAmount::new(4, 10)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(busy.hp, HitPoints::new(4.0));
@@ -767,7 +852,8 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
             &mut [],
             &[ClassAmount::new(4, 10)],
             1.0,
-            HitPoints::ZERO
+            HitPoints::ZERO,
+            &roles()
         )
         .is_err()
     );
@@ -794,6 +880,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -809,6 +896,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     // the hunter dies; the sheep loses the least, one hit point
@@ -831,6 +919,7 @@ fn reflected_damage_comes_back_at_least_one() {
         &[ClassAmount::new(4, 6)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -844,6 +933,7 @@ fn reflected_damage_comes_back_at_least_one() {
         &[ClassAmount::new(4, 1)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -878,7 +968,15 @@ fn blast_nan_paths_are_the_game_s() {
         ..enemy(10.8, 11.5)
     };
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [&mut t], 1.0),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut [&mut t],
+            1.0,
+            &roles()
+        ),
         Ok(true)
     );
     let f = (1.0 - fmath::sqrt(0.5 * 0.5)) / 1.0 * 0.5;
@@ -902,7 +1000,15 @@ fn blast_nan_paths_are_the_game_s() {
         .is_nan()
     );
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [&mut t], 1.0),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut [&mut t],
+            1.0,
+            &roles()
+        ),
         Ok(true)
     );
     assert_eq!(t.hp, HitPoints::new(9.0));
@@ -911,19 +1017,27 @@ fn blast_nan_paths_are_the_game_s() {
     elephant.source.area_damage = DamageShare::new(f32::NAN);
     let mut t = enemy(10.8, 11.0);
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [&mut t], 1.0),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut [&mut t],
+            1.0,
+            &roles()
+        ),
         Ok(true)
     );
     assert_eq!(t.hp, HitPoints::new(4.0));
     // no radius, no blast; a NaN radius blasts
     elephant.source.area_effect = Distance::ZERO;
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [], 1.0),
+        blast(&mut elephant, center, None, None, &mut [], 1.0, &roles()),
         Ok(false)
     );
     elephant.source.area_effect = Distance::new(f32::NAN);
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [], 1.0),
+        blast(&mut elephant, center, None, None, &mut [], 1.0, &roles()),
         Ok(true)
     );
     // CVTTSS2SI gives 0x80000000 past the i32 range: 0 in the low short
@@ -970,7 +1084,8 @@ fn blast_reaches_the_objects_about_its_attacker() {
             Some(object_id(1)),
             None,
             &mut all,
-            1.0
+            1.0,
+            &roles()
         ),
         Ok(true)
     );
@@ -988,7 +1103,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
     let mut near = enemy(2, 10.8);
     let mut all = [&mut near];
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut all, 1.0),
+        blast(&mut elephant, center, None, None, &mut all, 1.0, &roles()),
         Ok(true)
     );
     let dx = (10.8f32 - 10.5f32).abs();
@@ -1038,6 +1153,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(547.0));
@@ -1058,6 +1174,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(549.0));
@@ -1070,6 +1187,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 1)],
         0.5,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(548.5));
@@ -1085,6 +1203,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(550.0 - LEAST_CLASS_HIT));
@@ -1098,6 +1217,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::new(2.0),
+        &roles(),
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(550.0));
@@ -1108,6 +1228,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::new(f32::NAN),
+        &roles(),
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(550.0));
@@ -1129,6 +1250,7 @@ fn building_without_hit_points_takes_no_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!((h.hp, h.damaged.is_empty()), (HitPoints::ZERO, true));
@@ -1144,6 +1266,7 @@ fn building_without_hit_points_takes_no_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert!(!h.damaged.is_empty() && h.building.as_ref().unwrap().struck);
@@ -1186,6 +1309,7 @@ fn hit_on_an_annex_goes_to_its_main_building() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -1208,7 +1332,8 @@ fn hit_on_an_annex_goes_to_its_main_building() {
             &mut [],
             &[ClassAmount::new(4, 3)],
             1.0,
-            HitPoints::ZERO
+            HitPoints::ZERO,
+            &roles()
         ),
         Err(NOT_HELD)
     );
@@ -1234,6 +1359,7 @@ fn player_building_below_one_hit_point_is_razed() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(castle.hp, HitPoints::ZERO);
@@ -1295,6 +1421,7 @@ fn player_building_below_one_hit_point_is_razed() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     let razed = &wonder.building.as_ref().unwrap().razed;
@@ -1314,6 +1441,7 @@ fn player_building_below_one_hit_point_is_razed() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!(gaia.building.as_ref().unwrap().razed, Vec::new());
@@ -1347,6 +1475,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert_eq!((t.hp, t.killed), (HitPoints::new(0.5), None));
@@ -1376,6 +1505,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     assert!(t.killed.is_some());
@@ -1409,7 +1539,8 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
             &mut [],
             &[ClassAmount::new(4, 3)],
             1.0,
-            HitPoints::ZERO
+            HitPoints::ZERO,
+            &roles()
         )
         .is_err()
     );
@@ -1424,6 +1555,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     let mut h = Victim {
@@ -1437,6 +1569,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
     let mut villager = hunter();
@@ -1452,7 +1585,8 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
             &mut [],
             &[ClassAmount::new(4, 3)],
             1.0,
-            HitPoints::ZERO
+            HitPoints::ZERO,
+            &roles()
         )
         .is_err()
     );
@@ -1468,6 +1602,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
+        &roles(),
     )
     .unwrap();
 }
@@ -1515,7 +1650,7 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
     };
     let mut all = [&mut main, &mut annex];
     assert_eq!(
-        blast(&mut mangonel, center, None, None, &mut all, 1.0),
+        blast(&mut mangonel, center, None, None, &mut all, 1.0, &roles()),
         Ok(true)
     );
     assert_eq!(all.map(|t| t.id), [object_id(21), object_id(20)]);
@@ -1560,7 +1695,7 @@ fn blast_walks_tile_objects_in_its_list_order() {
     let center = elephant.position;
     let mut all = [&mut a, &mut b, &mut c];
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut all, 1.0),
+        blast(&mut elephant, center, None, None, &mut all, 1.0, &roles()),
         Ok(true)
     );
     assert_eq!(
@@ -1928,6 +2063,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         0,
         (&weapons, 0.5),
         (None, HitPoints::ZERO),
+        &roles(),
     )
     .unwrap();
     assert_eq!(enemy.hp, HitPoints::new(9.0));
@@ -1947,6 +2083,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         0,
         (&weapons, 1.0),
         (Some(0), HitPoints::ZERO),
+        &roles(),
     )
     .unwrap();
     let lost = 550.0 - all[0].hp.get();
@@ -1961,6 +2098,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         1,
         (&weapons, 1.0),
         (Some(0), HitPoints::ZERO),
+        &roles(),
     )
     .unwrap();
     assert_eq!(all[1].hp, HitPoints::new(550.0));
@@ -2005,7 +2143,7 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
     let b = blast(elephant.source);
     let mut hit = |b: &Blast, t: Victim| {
         let mut t = t;
-        let r = blast_one(&mut elephant, &mut [&mut t], 0, (b, &weapons));
+        let r = blast_one(&mut elephant, &mut [&mut t], 0, (b, &weapons), &roles());
         r.map(|()| t.hp)
     };
     assert_eq!(hit(&b, enemy.clone()), Ok(HitPoints::new(9.0)));

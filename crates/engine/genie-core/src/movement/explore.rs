@@ -23,7 +23,6 @@ use crate::objects::UpdateCode;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::unit::{Unit, object_master};
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
@@ -52,6 +51,8 @@ use crate::objects::layers::Action;
 use crate::objects::sprite::new_sprite;
 use crate::pathing::zones::ZoneId;
 use crate::unit_ai::NotifyKind;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// State 11 made without what its `MoveTo` reads of the unit.
 const WALK_WITHOUT_READS: GenieError =
@@ -103,9 +104,10 @@ impl<'a> ExploreMove<'a> {
         unit: (&Unit, Option<&Mover>),
         master: &Master,
         graphics: (&'a Graphics, Option<&Look>),
+        roles: &Roles,
     ) -> Self {
         Self {
-            reads: MoveToReads::of(unit, master, graphics),
+            reads: MoveToReads::of(unit, master, graphics, roles),
             given: master.move_sprite,
         }
     }
@@ -222,6 +224,7 @@ impl ExploreAction {
         c: &mut Step<'_>,
         explorer: &mut Unit,
         me: Me,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         // 0x140a880c0: state 1 is done (the action list removes it, the default task's restart
         // is not modelled), 11 walks, 13 fails; the others wait
@@ -232,7 +235,7 @@ impl ExploreAction {
             ExploreState::Failed => Err(GenieError::unsupported(
                 "a failed Explore (notify 0x1f9, set_state 2)",
             )),
-            ExploreState::Walk { .. } => self.walk(c, explorer, me),
+            ExploreState::Walk { .. } => self.walk(c, explorer, me, roles),
             _ => Ok(()),
         }
     }
@@ -240,14 +243,21 @@ impl ExploreAction {
     /// State 11's walk: the `MoveTo`'s update code (`FUN_140a992b0`): 1 once it arrived or
     /// without one, 3 once it failed. The motion step giving up makes a human player's villager
     /// wait once and fails any other unit's `MoveTo` (`LAB_140aa320c`).
-    fn walk(&mut self, c: &mut Step<'_>, explorer: &mut Unit, me: Me) -> Result<(), GenieError> {
+    fn walk(
+        &mut self,
+        c: &mut Step<'_>,
+        explorer: &mut Unit,
+        me: Me,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         let master = object_master(
             c.w.parts.own_master.get(explorer.id),
             (explorer.id, explorer.life.master_id),
             c.w.model.masters.of(c.player),
         )
         .ok();
-        let villager = master.is_some_and(|m| m.class == class::VILLAGER);
+        let villager =
+            master.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER));
         let gives_up = GiveUp {
             waits: villager && !c.w.players.player(c.player)?.kind.is_computer(),
             stance: c
@@ -565,9 +575,10 @@ impl Unit {
         actions: &mut Action,
         point: Point,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let at = Position::new(point.x(), point.y(), self.position().z());
-        let walk = self.explore_move(c);
+        let walk = self.explore_move(c, roles);
         let owner = if let Some(e) = actions.list.explore_mut() {
             let walked = e.state.move_to().is_some();
             let owner = e.take_point(at, &walk)?;
@@ -590,7 +601,7 @@ impl Unit {
 
     /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]); a unit whose master the world
     /// lacks reads no sprite defaults and gives none.
-    fn explore_move<'g>(&self, c: &'g Step<'_>) -> ExploreMove<'g> {
+    fn explore_move<'g>(&self, c: &'g Step<'_>, roles: &Roles) -> ExploreMove<'g> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -615,6 +626,7 @@ impl Unit {
                         &c.w.model.graphics,
                         c.w.parts.combat_of(self.id).abilities.look.as_ref(),
                     ),
+                    roles,
                 )
             },
         )

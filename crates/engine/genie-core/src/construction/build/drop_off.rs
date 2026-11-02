@@ -22,9 +22,12 @@ use crate::players::Amount;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::task_target_with;
 use crate::world::OBJECT_MASTER;
 use crate::world::Seconds;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -69,13 +72,15 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         by: Releaser,
+        slots: Slots,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let search = if Amount::ZERO < builder.life.amount {
-            Self::drop_search(c, builder, self.task.range)?
+            Self::drop_search(c, builder, self.task.range, slots, roles)?
         } else {
             DropSearch::Empty
         };
-        self.set_drop(c, builder, search, by)
+        self.set_drop(c, builder, search, by, roles)
     }
 
     /// The drop site the drop-off walks to ([`BuildAction::drop_again`]), with `task_range`
@@ -84,6 +89,8 @@ impl BuildAction {
         c: &Step<'_>,
         builder: &Unit,
         task_range: Distance,
+        slots: Slots,
+        roles: &Roles,
     ) -> Result<DropSearch, GenieError> {
         let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let masters =
@@ -143,7 +150,12 @@ impl BuildAction {
                     drop_sites: &c.w.model.drop_sites,
                 };
                 // slot 0x820's point: x, y and z −1, no terrain
-                task_search(masters, &actor, &t, &general, None, None, &dip)?
+                let on = TaskOn {
+                    target: Some(&t),
+                    general: Some(&general),
+                    terrain: None,
+                };
+                task_search(masters, &actor, &on, None, &dip, slots, roles)?
             }
             _ => None,
         };
@@ -176,11 +188,12 @@ impl BuildAction {
         builder: &mut Unit,
         search: DropSearch,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         self.state = BuildState::Drop { move_to: None };
         let found = match search {
-            DropSearch::Empty => return self.restart(c, builder),
+            DropSearch::Empty => return self.restart(c, builder, roles),
             DropSearch::Nothing => None,
             DropSearch::Site { id, range, sprite } => Some((id, range, sprite)),
         };
@@ -188,7 +201,7 @@ impl BuildAction {
         if self.site != new {
             let old = replace(&mut self.site, new);
             release(c, builder, old, by)?;
-            take(c, builder, new, by)?;
+            take(c, builder, new, by, roles)?;
         }
         let Some((id, range, sprite)) = found else {
             builder.post_own(
@@ -196,7 +209,7 @@ impl BuildAction {
                 NotifyKind::NO_DROP_SITE,
                 [AiAction::Build.value(), 0, 0],
             )?;
-            return self.restart(c, builder);
+            return self.restart(c, builder, roles);
         };
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
@@ -206,6 +219,7 @@ impl BuildAction {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let to = move_reads
             .walk_to(c.w, Some(id.id()))?
@@ -239,6 +253,8 @@ impl BuildAction {
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<HeadCode, GenieError> {
         if below_or_unordered(self.timer.get(), 0.0) {
             self.timer += c.dt.seconds();
@@ -246,20 +262,20 @@ impl BuildAction {
                 return Ok(HeadCode::Keeps);
             }
             self.timer = Seconds::ZERO;
-            self.drop_again(c, builder, reads.by)?;
+            self.drop_again(c, builder, reads.by, slots, roles)?;
             return Ok(HeadCode::Keeps);
         }
-        match self.step_walk(c, builder, me, reads)?.get() {
+        match self.step_walk(c, builder, me, reads, roles)?.get() {
             1 | 2 => {}
             3..=5 => {
-                self.drop_again(c, builder, reads.by)?;
+                self.drop_again(c, builder, reads.by, slots, roles)?;
                 return Ok(HeadCode::Keeps);
             }
             // 0 (it walks or waits) and any code above 5 (none): the update returns 0
             _ => return Ok(HeadCode::Keeps),
         }
         let Some((ObjectState::Alive, drop)) = reads.deposit.filter(|_| self.site.is_some()) else {
-            self.drop_again(c, builder, reads.by)?;
+            self.drop_again(c, builder, reads.by, slots, roles)?;
             return Ok(HeadCode::Keeps);
         };
         if !drop.takes {
@@ -275,7 +291,7 @@ impl BuildAction {
         let kind = resource_kind(builder.life.attribute_type, attributes);
         let amount = builder.life.amount;
         Self::drop_load(c, builder, kind, amount)?;
-        self.after_deposit(c, builder, reads)
+        self.after_deposit(c, builder, reads, roles)
     }
 
     /// State 8 after the load went to the player: a Build with a foundation lets the drop site
@@ -289,13 +305,14 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         if self.target.is_some() {
             let site = self.site.take();
             if site.is_some() {
                 release(c, builder, site, reads.by)?;
             }
-            self.restart(c, builder)?;
+            self.restart(c, builder, roles)?;
             return Ok(HeadCode::Keeps);
         }
         if let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) {
@@ -320,7 +337,7 @@ impl BuildAction {
             }
             return Ok(HeadCode::Keeps);
         }
-        self.walk_to_point(c, builder)?;
+        self.walk_to_point(c, builder, roles)?;
         Ok(HeadCode::Keeps)
     }
 }

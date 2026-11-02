@@ -10,6 +10,7 @@ use crate::movement::move_to::{MoveToAction, MoveToReads, TargetMoved, WalkTo};
 use crate::objects::UpdateCode;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 impl BuildTask {
@@ -45,6 +46,7 @@ impl BuildAction {
         &self,
         c: &Step<'_>,
         builder: &Unit,
+        roles: &Roles,
     ) -> Result<(Option<WalkTo>, Option<MoveToAction>), GenieError> {
         let move_reads = builder.move_to_reads(
             c.w.parts.motion.mover(builder.id),
@@ -54,6 +56,7 @@ impl BuildAction {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let to = if self.target.is_none() {
             None
@@ -82,9 +85,10 @@ impl BuildAction {
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         let how = ListUpdate {
-            gives_up: Self::gives_up(c, builder, reads)?,
+            gives_up: Self::gives_up(c, builder, reads, roles)?,
             ..ListUpdate::default()
         };
         match self.state.walk_mut() {

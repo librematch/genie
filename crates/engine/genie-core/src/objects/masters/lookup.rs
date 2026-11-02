@@ -8,6 +8,8 @@ use crate::objects::masters::ids;
 use crate::objects::masters::{Master, MasterId, Masters, Task};
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskOn, find_task};
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::parts::PartTable;
 use std::sync::Arc;
 
@@ -102,14 +104,14 @@ pub fn work_master<'m>(
     on: &TaskOn<'_, '_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
+    slots: Slots,
+    roles: &Roles,
 ) -> Result<Option<(MasterId, &'m Task)>, GenieError> {
     let own = actor.master;
     let own_list = masters.get(own.id).ok_or(GenieError::unsupported(
         "a unit of a master the player does not have",
     ))?;
-    let own_task = find_task(
-        own_list, actor, on.target, on.general, on.terrain, filter, dip,
-    )?;
+    let own_task = find_task(own_list, actor, on, filter, dip, slots, roles)?;
     if own_task.is_none_or(|t| t.action_kind == ActionKind::COMBAT)
         && own.task_by_group != TaskGroup::NONE
     {
@@ -121,9 +123,7 @@ pub fn work_master<'m>(
             {
                 continue;
             }
-            let found = find_task(
-                candidate, actor, on.target, on.general, on.terrain, filter, dip,
-            )?;
+            let found = find_task(candidate, actor, on, filter, dip, slots, roles)?;
             let Some(task) = found else { continue };
             if own_task.is_some_and(|t| t.action_kind == task.action_kind) {
                 continue;

@@ -6,14 +6,15 @@ use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ListIndex;
 use crate::objects::Voice;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::ownership::artifact::Artifact;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
+use crate::testing::class;
 
 use crate::movement::move_to::TargetMoved;
 use crate::objects::WorkerCount;
 use crate::ownership::artifact::{ArtifactState, ArtifactSub};
+use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
@@ -63,7 +64,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieErro
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |u, actions, c| {
-            u.capture_stop(actions, c, class)?;
+            u.capture_stop(actions, c, class, &roles())?;
             let gone = OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
                 .foreign_iter()

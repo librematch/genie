@@ -25,24 +25,18 @@ use crate::math::fmath::BVector;
 use crate::movement::WaypointIndex;
 use crate::movement::{
     Avoided, EPSILON, LONG_PATH_MOVER, LongWalker, Me, Mover, PUSHED, PathAsk, PathData, Planning,
-    REACH_NEAR, REACH_SHORT, ShortAsk, USER_WAYPOINT_MIDDLE, WIDE_CLASS, WIDE_RANGE, footprint_gap,
+    REACH_NEAR, REACH_SHORT, ShortAsk, USER_WAYPOINT_MIDDLE, WIDE_RANGE, footprint_gap,
     footprint_gap_squared, lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
 };
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::ID_45;
 use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches};
 use crate::pathing::tile_path::{Path, Request};
 use crate::players::PlayerId;
 use crate::players::PlayerSet;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 use crate::{GenieError, math::fmath};
-
-/// The classes whose hits a group member on an own move of reason 0 still keeps in
-/// [`Mover::avoid`]'s first loop (its tests against −0xea9, −0xe91, −0xe85 and −0xe78 at
-/// 0x141154411..0x1411544bc, decoded by + 0xeac): buildings (3), walls (27), gates (39) and 52.
-const KEPT_BY_MEMBERS: [ClassId; 4] = [class::BUILDING, class::WALL, class::GATE, class::TOWER];
 
 /// What a reach test asks of the unit ([`Mover::reach_test`]'s arguments after the world).
 #[derive(Clone, Copy, Debug)]
@@ -81,6 +75,7 @@ impl Mover {
         ask: ReachAsk,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let roles = by_id.roles();
         let ReachAsk {
             goal: to,
             target,
@@ -106,7 +101,9 @@ impl Mover {
         // index, which it writes
         let placed = target_placed(world, target)?;
         let target_radius = placed.map_or(0.0, |t| t.radius.x());
-        let bonus = placed.is_some_and(|t| t.master == ID_45 || t.class == WIDE_CLASS);
+        let bonus = placed.is_some_and(|t| {
+            t.master == ID_45 || roles.of_class(t.class).contains(ClassRoles::WIDE_REACH)
+        });
         let mut path = Path::default();
         if let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) {
             let req = Request {
@@ -505,6 +502,7 @@ impl Mover {
         dt: Seconds,
         (now, player_type): (WorldTime, PlayerType),
     ) -> Result<Avoided, GenieError> {
+        let roles = by_id.roles();
         let level = self.paths.walked()?;
         let player = world
             .get(me.id)
@@ -535,7 +533,11 @@ impl Mover {
             if level.targets(id) {
                 target_hit = true;
             }
-            if own_move && !KEPT_BY_MEMBERS.contains(&other.class) {
+            if own_move
+                && !roles
+                    .of_class(other.class)
+                    .contains(ClassRoles::KEPT_BY_MEMBERS)
+            {
                 continue;
             }
             if self.keeps_hit((at, me), player, (id, other), projected, now, by_id)? {

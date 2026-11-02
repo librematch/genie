@@ -11,40 +11,18 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::DamageSpriteMode;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::Master;
-use crate::objects::masters::class;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
 use crate::technology::upgrade::NO_SPRITE;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The whole of a damage share (`DAT_14330ebcc`, 100).
 const WHOLE: f32 = UPGRADE_WHOLE;
-/// The resource classes whose damage share is the share of their storage left from state 3 on
-/// (`FUN_141193590`), and those whose share is it once dead (state above 2).
-const RESOURCE_CLASSES: [ClassId; 11] = [
-    class::CLASS_5,
-    class::PREY,
-    class::PREDATOR,
-    class::CLASS_29,
-    class::CLASS_31,
-    class::CLASS_33,
-    class::CLASS_38,
-    class::CLASS_40,
-    class::CLASS_41,
-    class::LIVESTOCK,
-    class::CLASS_61,
-];
-const RESOURCE_CLASSES_DEAD: [ClassId; 6] = [
-    class::CLASS_7,
-    class::CLASS_8,
-    class::TREE,
-    class::CLASS_32,
-    class::CLASS_48,
-    class::CLASS_63,
-];
+
 /// What a damage sprite apply mode does to the simulation (`FUN_1411859a0`'s switch on the
 /// entry's `+0x9`).
 pub(super) const SPRITE_PLACED: DamageSpriteMode = DamageSpriteMode::PLACED;
@@ -54,10 +32,14 @@ pub(super) const SPRITE_SHOWN: DamageSpriteMode = DamageSpriteMode::SHOWN;
 /// `FUN_141193590`: an object of `master` in `state` whose damage share is its storage's
 /// (`+0x681` set, or a resource class: those of [`RESOURCE_CLASSES`] and
 /// [`RESOURCE_CLASSES_DEAD`] in a state above 2).
-fn storage_share(master: &Master, state: ObjectState) -> bool {
+fn storage_share(master: &Master, state: ObjectState, roles: &Roles) -> bool {
     master.auto_gather
-        || ((RESOURCE_CLASSES.contains(&master.class)
-            || RESOURCE_CLASSES_DEAD.contains(&master.class))
+        || ((roles
+            .of_class(master.class)
+            .contains(ClassRoles::DAMAGE_BY_STORAGE)
+            || roles
+                .of_class(master.class)
+                .contains(ClassRoles::DAMAGE_BY_STORAGE_DEAD))
             && ObjectState::Alive < state)
 }
 
@@ -83,9 +65,10 @@ pub(crate) fn damage_sprites(
     master: &Master,
     before: HpPercent,
     (graphics, object, sprite): (&Graphics, &mut Well512, &mut Well512),
+    roles: &Roles,
 ) -> Result<HpPercent, GenieError> {
     let entries = &master.damage_graphics;
-    let Some((share, hp)) = share_of(u, master) else {
+    let Some((share, hp)) = share_of(u, master, roles) else {
         return Ok(before);
     };
     u.life.hp = HitPoints::new(hp);
@@ -149,12 +132,12 @@ pub(crate) fn damage_sprites(
 /// The damage share [`damage_sprites`] finds for object `u` under `master`, with its hit points
 /// after it (within 0 and the master's for a share of hit points); None where it leaves the
 /// share (no damage sprites, or a master below 1 hit point).
-fn share_of(u: &Unit, master: &Master) -> Option<(HpPercent, f32)> {
+fn share_of(u: &Unit, master: &Master, roles: &Roles) -> Option<(HpPercent, f32)> {
     if master.damage_graphics.is_empty() {
         return None;
     }
     let mut hp = u.life.hp.get();
-    if storage_share(master, u.life.state) {
+    if storage_share(master, u.life.state, roles) {
         let held = master
             .storage
             .iter()
@@ -184,8 +167,8 @@ fn share_of(u: &Unit, master: &Master) -> Option<(HpPercent, f32)> {
 /// The damage share (`+0xd`) object `u` holds under `master`, which every change of its hit
 /// points or master set through [`damage_sprites`] (the slice does not hold it); 0 where that
 /// check would leave it.
-pub(super) fn damage_share_of(u: &Unit, master: &Master) -> HpPercent {
-    share_of(u, master).map_or(HpPercent::of_data(0), |(s, _)| s)
+pub(super) fn damage_share_of(u: &Unit, master: &Master, roles: &Roles) -> HpPercent {
+    share_of(u, master, roles).map_or(HpPercent::of_data(0), |(s, _)| s)
 }
 
 #[cfg(test)]
@@ -194,11 +177,13 @@ mod tests {
     use crate::objects::MasterHitPoints;
     use crate::objects::ObjectState;
     use crate::objects::lifecycle::Lifecycle;
-    use crate::objects::masters::{DamageGraphic, DamageSpriteMode, HpPercent, Master, class};
+    use crate::objects::masters::{DamageGraphic, DamageSpriteMode, HpPercent, Master};
     use crate::objects::unit::Unit;
     use crate::players::Amount;
     use crate::players::attribute;
     use crate::test_ids::{master_id, object_id};
+    use crate::testing::class;
+    use crate::testing::roles;
 
     /// `FUN_141193590`: a dead tree's share is that of its storage left (the entry of the kind
     /// it holds; none, 0), a living one's that of its hit points.
@@ -227,18 +212,18 @@ mod tests {
         };
         (u.life.attribute_type, u.life.amount) = (Some(attribute::WOOD), Amount::new(25.0));
         assert_eq!(
-            super::share_of(&u, &tree),
+            super::share_of(&u, &tree, &roles()),
             Some((HpPercent::of_data(75), 20.0))
         );
         u.life.attribute_type = Some(attribute::STONE);
         assert_eq!(
-            super::share_of(&u, &tree),
+            super::share_of(&u, &tree, &roles()),
             Some((HpPercent::of_data(0), 20.0))
         );
         u.life.state = ObjectState::Alive;
         u.life.hp = HitPoints::new(5.0);
         assert_eq!(
-            super::share_of(&u, &tree),
+            super::share_of(&u, &tree, &roles()),
             Some((HpPercent::of_data(75), 5.0))
         );
     }

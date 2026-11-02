@@ -18,6 +18,8 @@ use crate::players::PlayerId;
 use crate::players::Team;
 use crate::players::ai_module::AiModules;
 use crate::players::market::Market;
+#[cfg(test)]
+use crate::testing::build_158041::build_158041;
 use crate::trace::new_object;
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -28,6 +30,7 @@ use crate::world::player::Player;
 use crate::world::settings::Settings;
 use crate::world::{FrameSeed, Mode680, PlayState, Tick};
 use crate::world::{HISTORY_PERIOD, PLANNED_MASTERS, Recycling, World};
+use genie_model::layer::BuildLayer;
 use genie_model::model::Model;
 
 impl World {
@@ -60,7 +63,7 @@ impl World {
             players,
             ticks: Tick::ZERO,
             next_object_id: ObjectId::default(),
-            model: Model::default(),
+            model: Model::default().with_layer(&starting_layer()),
             spatial: Spatial::default(),
             pathing: Pathing::default(),
             settings: Settings::default(),
@@ -155,4 +158,18 @@ impl World {
         }
         Ok(())
     }
+}
+
+/// The build layer a new world starts with: none, the import applies the recording's build's
+/// (FD-046-D08); genie-core's own tests build their worlds on build 158041's fixture, as their
+/// masters and classes are that build's.
+#[cfg(not(test))]
+fn starting_layer() -> BuildLayer {
+    BuildLayer::default()
+}
+
+/// The build layer a new world of genie-core's tests starts with: build 158041's fixture.
+#[cfg(test)]
+fn starting_layer() -> BuildLayer {
+    build_158041()
 }

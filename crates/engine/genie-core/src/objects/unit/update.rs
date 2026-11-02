@@ -17,6 +17,8 @@ use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit, loses_actions};
 use crate::ownership::capture::Captured;
 use crate::unit_ai::task_finder::world::wait_progress;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::lets::torn_down;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
@@ -34,12 +36,14 @@ impl Unit {
         &mut self,
         actions: &mut LayersAction,
         c: &mut Step<'_>,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<Outcome, GenieError> {
-        let Some(leaves) = self.update_to_actions(actions, c)? else {
+        let Some(leaves) = self.update_to_actions(actions, c, roles)? else {
             return Ok(Outcome::Sleep);
         };
-        let captured = self.update_actions(actions, c)?;
-        self.ai_part(actions, c, (captured, leaves))
+        let captured = self.update_actions(actions, c, roles, slots)?;
+        self.ai_part(actions, c, (captured, leaves), roles)
     }
 
     /// `RGE_Static_Object::update` and the combat object's steps before the actions: the death
@@ -51,8 +55,9 @@ impl Unit {
         &mut self,
         actions: &mut LayersAction,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<Option<Outcome>, GenieError> {
-        self.death_blast(actions, c)?;
+        self.death_blast(actions, c, roles)?;
         if self.go_to_sleep(
             c.w.parts.mover_of(self.id),
             c.w.parts.unit_ai.contains(self.id),
@@ -60,16 +65,16 @@ impl Unit {
             return Ok(None);
         }
         self.take_sprite_facets(c.w.parts.mover_mut(self.id));
-        self.let_removed_links_go(c)?;
-        self.gate_update(actions, c)?;
-        self.complete_on_update(actions, c)?;
-        self.building_seconds(c)?;
+        self.let_removed_links_go(c, roles)?;
+        self.gate_update(actions, c, roles)?;
+        self.complete_on_update(actions, c, roles)?;
+        self.building_seconds(c, roles)?;
         // a new object's combat layer (none in the table) has no timer to run down
         if let Some(combat) = c.w.parts.combat.get_mut(self.id) {
             run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
         }
-        self.motion_step(actions, c)?;
-        let leaves = self.life_step(actions, c)?;
+        self.motion_step(actions, c, roles)?;
+        let leaves = self.life_step(actions, c, roles)?;
         self.animate(c);
         self.actions_past_life(actions, c)?;
         Ok(Some(leaves))
@@ -84,6 +89,8 @@ impl Unit {
         &mut self,
         actions: &mut LayersAction,
         c: &mut Step<'_>,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<Captured>, GenieError> {
         let started = self.start_default_task(actions, c)?;
         let captured = if started {
@@ -92,7 +99,7 @@ impl Unit {
             self.inside_update(actions, c)?;
             None
         } else {
-            self.update_head(actions, c)?
+            self.update_head(actions, c, roles, slots)?
         };
         self.after_actions(c)?;
         Ok(captured)
@@ -105,10 +112,12 @@ impl Unit {
         &mut self,
         actions: &mut LayersAction,
         c: &mut Step<'_>,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<Captured>, GenieError> {
         let me = self.me(actions);
         let mut captured = None;
-        let code = self.head_part(actions, c, me, &mut captured)?;
+        let code = self.head_part(actions, c, me, &mut captured, roles, slots)?;
         self.end_head_update(actions, c, code)?;
         Ok(captured)
     }
@@ -121,31 +130,38 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         captured: &mut Option<Captured>,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<HeadCode, GenieError> {
         match actions.list.head() {
             None => Ok(HeadCode::Keeps),
-            Some(Action::Artifact(_)) => self.artifact_part(actions, c, me).map(|found| {
-                *captured = found;
-                HeadCode::Keeps
-            }),
+            Some(Action::Artifact(_)) => {
+                self.artifact_part(actions, c, me, roles, slots)
+                    .map(|found| {
+                        *captured = found;
+                        HeadCode::Keeps
+                    })
+            }
             Some(Action::Build(_)) => self.build_part(actions, c, me),
-            Some(Action::Repair(_)) => self.repair_part(actions, c, me),
-            Some(Action::Enter(_)) => self.enter_part(actions, c, me),
-            Some(Action::Transport(_)) => self.transport_update(actions, c, me),
+            Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
+            Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
+            Some(Action::Transport(_)) => self.transport_update(actions, c, me, roles),
             Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                 OthersRef::of(&c.w.players, &c.w.index, c.player)?,
                 &c.w.parts.building,
             )),
-            Some(Action::Missile(_)) => self.fly(actions, c).map(|()| HeadCode::Keeps),
-            Some(Action::MoveTo(_)) => self.move_to_part(actions, c, me),
-            Some(Action::Explore(_)) => self.explore_part(actions, c, me).map(|()| HeadCode::Keeps),
+            Some(Action::Missile(_)) => self.fly(actions, c, roles).map(|()| HeadCode::Keeps),
+            Some(Action::MoveTo(_)) => self.move_to_part(actions, c, me, roles),
+            Some(Action::Explore(_)) => self
+                .explore_part(actions, c, me, roles)
+                .map(|()| HeadCode::Keeps),
             Some(Action::Fly(_)) => self.fly_part(actions, c, me).map(|()| HeadCode::Keeps),
-            Some(Action::Make(_)) => self.make_part(actions, c),
-            Some(Action::Gather(_)) => self.gather_update(actions, c, me),
-            Some(Action::Hunt(_)) => self.hunter_update(actions, c, me),
+            Some(Action::Make(_)) => self.make_part(actions, c, roles),
+            Some(Action::Gather(_)) => self.gather_update(actions, c, me, roles),
+            Some(Action::Hunt(_)) => self.hunter_update(actions, c, me, roles),
             Some(Action::Attack(_)) => {
-                let own = self.own_victim(actions, c)?;
-                self.attack_part(actions, c, me, own)
+                let own = self.own_victim(actions, c, roles)?;
+                self.attack_part(actions, c, me, own, roles)
             }
         }
     }
@@ -180,11 +196,12 @@ impl Unit {
         actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         self.hunt_targets(actions, c)?;
-        let mut own = self.own_victim(actions, c)?;
-        let tree_lost = self.tree_lost(actions, c);
-        self.hunt_part(actions, c, me, &mut own, tree_lost)
+        let mut own = self.own_victim(actions, c, roles)?;
+        let tree_lost = self.tree_lost(actions, c, roles);
+        self.hunt_part(actions, c, me, &mut own, tree_lost, roles)
     }
 
     /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops

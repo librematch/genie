@@ -24,7 +24,6 @@ use crate::movement::{
 };
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::pathing::FixedPoint;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::HullPather;
@@ -33,6 +32,7 @@ use crate::players::NO_RELATIONS;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath, pathing::short_path};
 
@@ -182,6 +182,7 @@ impl Mover {
         line: (Point, Point),
         by_id: ObjectsRef<'_>,
     ) -> Result<Vec<ObjectId>, GenieError> {
+        let roles = by_id.roles();
         let now = plan.now;
         let mut list = vec![me.id];
         if let Some((id, _)) = target {
@@ -222,16 +223,21 @@ impl Mover {
                 }
                 // slot 0x4f0: a building's master with a task of action type 0x99
                 // (FUN_1415c60b0), 0 for anything else
-                let worker_building = matches!(
-                    p.class,
-                    class::BUILDING | class::WALL | class::GATE | class::FARM | class::TOWER
+                let worker_building = roles.of_class(p.class).intersects(
+                    ClassRoles::BUILDING
+                        | ClassRoles::WALL
+                        | ClassRoles::GATE
+                        | ClassRoles::FARM
+                        | ClassRoles::TOWER,
                 ) && world
                     .task_0x99
                     .get(p.player.index())
                     .is_some_and(|m| m.contains(&p.master));
-                if !matches!(
-                    p.class,
-                    class::TRADE_BOAT | class::VILLAGER | class::TRADE_CART | class::FISHING_SHIP
+                if !roles.of_class(p.class).intersects(
+                    ClassRoles::TRADE_BOAT
+                        | ClassRoles::VILLAGER
+                        | ClassRoles::TRADE_CART
+                        | ClassRoles::FISHING_SHIP,
                 ) && !worker_building
                 {
                     continue;

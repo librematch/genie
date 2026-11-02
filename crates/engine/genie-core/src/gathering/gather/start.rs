@@ -24,7 +24,6 @@ use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
@@ -35,6 +34,8 @@ use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 /// What a gather's start takes besides its mover and stream ([`GatherAction::start`]'s
@@ -169,18 +170,23 @@ impl GatherAction {
         target: &Resource,
         farm_stops: bool,
         rate: StopRate,
+        roles: &Roles,
     ) -> Result<Self, GenieError> {
-        let farm = if target.class == class::FARM || SPECIAL_TARGETS.contains(&target.master) {
+        let farm = if roles.of_class(target.class).contains(ClassRoles::FARM)
+            || SPECIAL_TARGETS.contains(&target.master)
+        {
             target.position.ground()
         } else {
             Point::ORIGIN
         };
-        let (stops, time_per_stop) =
-            if farm_stops && target.class == class::FARM && STOP_FARMS.contains(&target.master) {
-                (FARM_STOPS, rate.time_per_stop(task.work_value, FARM_STOPS))
-            } else {
-                (FarmStops::ONE, Seconds::ZERO)
-            };
+        let (stops, time_per_stop) = if farm_stops
+            && roles.of_class(target.class).contains(ClassRoles::FARM)
+            && STOP_FARMS.contains(&target.master)
+        {
+            (FARM_STOPS, rate.time_per_stop(task.work_value, FARM_STOPS))
+        } else {
+            (FarmStops::ONE, Seconds::ZERO)
+        };
         Ok(Self {
             target: Some(GatherTargetId::new(target.id)),
             carry_to: None,
@@ -217,6 +223,7 @@ impl GatherAction {
         start: GatherStart<'_>,
         mover: &mut Mover,
         rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let GatherStart {
             target,
@@ -246,7 +253,11 @@ impl GatherAction {
         // a farm another farmer works (`+0x644` above 1 with this one, which the constructor
         // took): set_state(11) to its point, then the farm goes (slot 0x68 with none; the caller
         // lets it go)
-        if self.target_class == Some(class::FARM) && WorkerCount::ONE < target.workers.plus(1) {
+        if roles
+            .of_some_class(self.target_class)
+            .contains(ClassRoles::FARM)
+            && WorkerCount::ONE < target.workers.plus(1)
+        {
             let radius = if STOP_FARMS.contains(&target.master) {
                 0.0
             } else {
@@ -289,6 +300,7 @@ impl GatherAction {
         retarget: GatherRetarget<'_>,
         mover: &mut Mover,
         rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         let GatherRetarget {
             target,
@@ -338,7 +350,7 @@ impl GatherAction {
                 self.farm = target.position.ground();
             }
         }
-        if target.class == class::FARM && WorkerCount::ONE < workers {
+        if roles.of_class(target.class).contains(ClassRoles::FARM) && WorkerCount::ONE < workers {
             let radius = if STOP_FARMS.contains(&target.master) {
                 0.0
             } else {

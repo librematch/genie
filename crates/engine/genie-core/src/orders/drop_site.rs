@@ -17,7 +17,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::orders::Dispatch;
 use crate::orders::object_gone;
@@ -34,6 +33,7 @@ use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -99,7 +99,13 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<Option<DropSiteId>, GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let seeks = master.kind < MasterKind::COMBAT
@@ -107,7 +113,11 @@ impl World {
                 .drop_sites
                 .iter()
                 .any(|&d| d == ids::ID_45 || d == ids::ID_2172)
-                && !matches!(master.class, class::FISHING_SHIP | class::TRADE_BOAT));
+                && !self
+                    .model
+                    .roles
+                    .of_class(master.class)
+                    .intersects(ClassRoles::FISHING_SHIP | ClassRoles::TRADE_BOAT));
         let masters = self.model.masters.of(p).ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;
@@ -220,11 +230,12 @@ impl World {
         };
         // the Build's set_state(8) on the builder's step: its prelude leaves the builders, its
         // second targets and its notify go to the world and the unit AI at once
+        let roles = self.model.roles.clone();
         self.run_on_step(p, idx, |unit, actions, c| {
             let mut build = *actions.list.build().ok_or(GenieError::unreachable(
                 "a drop-off order without its Build",
             ))?;
-            let dropped = build.set_drop(c, unit, search, by);
+            let dropped = build.set_drop(c, unit, search, by, &roles);
             if let Some(b) = actions.list.build_mut() {
                 *b = build;
             }
@@ -334,7 +345,7 @@ impl World {
                     .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
             }))
         };
-        let (found, record) = bell.back_to_work(&lookup)?;
+        let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;
         let target = match found {
             Some(f) => {
                 let (op, o) = self.object(f.id).ok_or_else(|| object_gone(f.id))?;

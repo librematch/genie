@@ -10,7 +10,6 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::move_to::MoveToAction;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::teardown::HeadCode;
@@ -27,6 +26,8 @@ use crate::movement::Mover;
 use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
 use crate::orders::Work;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -177,6 +178,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         if c.w.players.player(c.player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
@@ -192,8 +194,12 @@ impl BuildAction {
         // LAB_140ab09af: a villager works the farm it built (FUN_141194b20, FUN_141195750), a
         // fishing ship its fish trap (FUN_141194640, FUN_1411945a0): its unit AI drops its build
         // orders (FUN_140c5e020 with 0x2be), then slot 0x7e8 on the building
-        let farm = master.class == class::FARM && master.id != FISH_TRAP;
-        let works_it = (farm && reads.class == Some(class::VILLAGER))
+        let farm =
+            roles.of_class(master.class).contains(ClassRoles::FARM) && master.id != FISH_TRAP;
+        let works_it = (farm
+            && roles
+                .of_some_class(reads.class)
+                .contains(ClassRoles::VILLAGER))
             || (master.id == FISH_TRAP && FISHING_SHIPS.contains(&builder.life.master_id));
         // a pasture is a farm to the test, so a villager works it as any farm; another builder
         // works it when its livestock's workers (slot 0x780, FUN_1411c5dd0) are its owner's
@@ -219,7 +225,7 @@ impl BuildAction {
         // FUN_140c5dcd0 (the building just completed is in state 2 now)
         drop_done_orders(ai, built, &reads.build_targets);
         if ai.orders.is_empty() {
-            self.search(c, builder, actions, reads)?;
+            self.search(c, builder, actions, reads, roles)?;
             return Ok(HeadCode::Keeps);
         }
         ai.end_order_and_action()?;
@@ -272,6 +278,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         // the caller read the foundation, so the player holds it
         let (Some(target), Some(built)) = (self.target, reads.built) else {
@@ -279,7 +286,7 @@ impl BuildAction {
                 "a builder's search for more work without its building",
             ));
         };
-        if let Some(work) = builder.more_work(actions, c, target.id(), built)? {
+        if let Some(work) = builder.more_work(actions, c, target.id(), built, roles)? {
             return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
         }
         self.no_more_work()?;
@@ -319,9 +326,14 @@ impl BuildAction {
     /// # Errors
     ///
     /// The prelude's, a builder without movement state, a foundation without a place.
-    pub(super) fn restart(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
+    pub(super) fn restart(
+        &mut self,
+        c: &mut Step<'_>,
+        builder: &Unit,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
-        let (to, walk) = self.walk_to_foundation(c, builder)?;
+        let (to, walk) = self.walk_to_foundation(c, builder, roles)?;
         *self = self.restarted(self.target, to.map_or(self.point, |t| t.at), walk);
         Ok(())
     }

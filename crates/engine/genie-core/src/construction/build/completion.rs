@@ -2,7 +2,9 @@
 //! is the call the game makes, where the game makes it.
 
 use crate::GenieError;
-use crate::construction::build::construction::{completion_counts, hand_storage, lay_foundation};
+use crate::construction::build::construction::{
+    completion_counts, foundation_laid, hand_storage, lay_foundation,
+};
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD, StackUnit, held, show_built};
 use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
@@ -11,7 +13,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{BuildingMaster, Master};
@@ -19,6 +20,7 @@ use crate::players::PlayerId;
 use crate::players::diplomacy::REVEAL_UNITS;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 use genie_model::model::Model;
 
@@ -132,7 +134,11 @@ impl World {
         master: &Master,
         placed: &Placed,
     ) -> Result<(), GenieError> {
-        if !matches!(master.class, class::CLASS_51 | class::CLASS_54)
+        if !self
+            .model
+            .roles
+            .of_class(master.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
             && let Some(v) = self.spatial.sight.as_mut()
         {
             v.construction_completed(id, placed.position, placed.radius)?;
@@ -228,8 +234,16 @@ impl World {
         let layer = parts.building_mut(u.id)?;
         let (main, rice) = (layer.annex_of.is_some(), layer.rice);
         let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
-        let laid = stack_master(master, building, rice);
-        lay_foundation(c, spatial, placed, master, building, laid, mode_680)?;
+        let laid = foundation_laid(building, stack_master(master, building, rice));
+        lay_foundation(
+            c,
+            spatial,
+            placed,
+            master,
+            laid,
+            mode_680,
+            &self.model.roles,
+        )?;
         let mut counts = Vec::new();
         let history = completion_counts(master, building, main, &mut counts);
         if let Some(kind) = history {

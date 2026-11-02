@@ -10,14 +10,14 @@ use crate::math::image::garrison::{
     EPSILON as GARRISON_EPSILON, ONE_MISSILE as GARRISON_ONE_MISSILE,
     RATE_RANGE as GARRISON_RATE_RANGE,
 };
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
 use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::objects::masters::{Master, Masters};
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// A combat master's attack rate needs a weapon range above this (`FUN_14120dc10`).
 pub(super) const RATE_RANGE: f32 = GARRISON_RATE_RANGE;
@@ -25,9 +25,6 @@ pub(super) const RATE_RANGE: f32 = GARRISON_RATE_RANGE;
 pub(super) const ONE_MISSILE: f32 = GARRISON_ONE_MISSILE;
 /// A reload at most this long gives no firepower (`FUN_14120e1a0`).
 pub(super) const EPSILON: f32 = GARRISON_EPSILON;
-/// The class whose garrison share is 1 whatever its firepower (`FUN_141213520`, `-0xe82` raw);
-/// UNLOAD's flag 0 leaves it inside (`FUN_14118a610`).
-pub(super) const WHOLE_SHARE_CLASS: ClassId = class::RELIC;
 
 /// The amounts of `weapons` (class, amount) whose class `counts`.
 pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) -> bool) -> f32 {
@@ -42,7 +39,12 @@ pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) 
 /// else the pierce and class 38 amounts of its volley missile (a master its player has; not for
 /// classes 4 and 6), else its own melee, pierce, class 31 and 38 amounts, over the reload.
 #[must_use]
-pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: Seconds) -> DamageRate {
+pub fn attack_rate(
+    master: &Master,
+    masters: &Masters,
+    reload_powerup: Seconds,
+    roles: &Roles,
+) -> DamageRate {
     // COMISS reload, 0 and COMISS range, 1.0, each with JBE
     if at_most_or_unordered(master.reload.get(), 0.0)
         || at_most_or_unordered(master.weapon_range.get(), RATE_RANGE)
@@ -54,7 +56,11 @@ pub fn attack_rate(master: &Master, masters: &Masters, reload_powerup: Seconds) 
     let volley = master
         .volley_missile
         .and_then(|id| masters.get(id))
-        .filter(|_| !matches!(master.class, class::VILLAGER | class::CLASS_6));
+        .filter(|_| {
+            !roles
+                .of_class(master.class)
+                .intersects(ClassRoles::VILLAGER | ClassRoles::INFANTRY)
+        });
     let sum = volley.map_or_else(
         || {
             weapons_sum(&master.weapons, |c| {
@@ -145,11 +151,15 @@ pub fn share(
     masters: &Masters,
     reload_powerup: Seconds,
     rate: DamageRate,
+    roles: &Roles,
 ) -> Result<Firepower, GenieError> {
     if rate.get() == 0.0 {
         return Ok(Firepower::ZERO);
     }
-    if master.class == WHOLE_SHARE_CLASS {
+    if roles
+        .of_class(master.class)
+        .contains(ClassRoles::WHOLE_GARRISON_SHARE)
+    {
         return Ok(Firepower::new(1.0));
     }
     let mut floor = 0.0;

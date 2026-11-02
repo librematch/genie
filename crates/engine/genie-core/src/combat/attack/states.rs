@@ -15,7 +15,6 @@ use crate::movement::Speed;
 use crate::movement::move_to::MoveToReads;
 use crate::objects::UpdateCode;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -25,6 +24,8 @@ use crate::unit_ai::LION_AI;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 use crate::world::{ATTACKER_UNMOVING, NO_STANDING_SPRITE};
 
@@ -127,10 +128,12 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
         if r.ai_order.has_ai()
-            && (f.victim.player != PlayerId::new(0) || f.own.class != class::VILLAGER)
+            && (f.victim.player != PlayerId::new(0)
+                || !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER))
         {
             forget_target(c.w.parts.unit_ai.get_mut(unit.id));
         }
@@ -150,7 +153,7 @@ impl Attack {
                     .map_or(Speed::ZERO, |m| m.stats.speed);
             if r.stance == UnitStance::AGGRESSIVE
                 && Speed::ZERO < speed
-                && f.own.class != class::VILLAGER
+                && !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
             {
                 // a mover of stance 0 that is not a villager waits where it saw the target:
                 // 0x1fb with 600 and 0x202 for a unit's own Attack, then `set_state(5)`
@@ -203,6 +206,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         let target = self.target.take();
         self.finish_in(
@@ -214,7 +218,9 @@ impl Attack {
         // The predators' class (10), whose unit AI's slot 0x1f0 a failed Attack calls.
         // The boar's unit-AI type, whose slot 0x1f0 (`FUN_140c16d50`) sends it home.
         // The lion's unit-AI type, whose slot 0x1f0 (`FUN_140c16d60`) does nothing.
-        if f.own.class == class::PREDATOR && !matches!(r.ai_type, Some(BOAR_AI | LION_AI) | None) {
+        if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
+            && !matches!(r.ai_type, Some(BOAR_AI | LION_AI) | None)
+        {
             return Err(GenieError::unsupported(
                 "a predator's failed Attack whose unit AI is not a boar's or a lion's (slot 0x1f0)",
             ));
@@ -226,7 +232,7 @@ impl Attack {
         if r.ai_order.has_ai() {
             forget_target(c.w.parts.unit_ai.get_mut(unit.id));
         }
-        if f.own.class == class::PREDATOR
+        if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
             && r.ai_type == Some(BOAR_AI)
             && let Some(home) =
                 c.w.parts

@@ -3,7 +3,7 @@
 use crate::GenieError;
 use crate::commands::unload::{UnloadCommand, UnloadPick};
 use crate::garrison::ContainerId;
-use crate::garrison::{SIEGE_UNLOAD, WHOLE_SHARE_CLASS};
+use crate::garrison::SIEGE_UNLOAD;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -14,7 +14,6 @@ use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::orders::object_gone;
 use crate::world::Seconds;
@@ -32,6 +31,8 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::{Issuer, NotifyKind, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// UNLOAD's point without one (`DAT_14330ec20`).
 pub(super) const NO_POINT: f32 = GARRISON_NO_POINT;
@@ -111,7 +112,12 @@ impl World {
                     .map(|(c, _)| c);
                 if matches!(pick, UnloadPick::Object(_)) || transport.is_some() {
                     self.drop_out(player, idx, transport, pick.object(), &mut last)?;
-                } else if master.class == class::SIEGE {
+                } else if self
+                    .model
+                    .roles
+                    .of_class(master.class)
+                    .contains(ClassRoles::SIEGE)
+                {
                     return Err(SIEGE_UNLOAD);
                 } else {
                     self.unload_order(player, idx, point)?;
@@ -273,9 +279,10 @@ impl World {
         let unit = self.players.live_mut(up, ui)?;
         let place = (unit.position().ground(), Some(made.class));
         if self.parts.unit_ai.contains(unit.id) {
+            let roles = self.model.roles.clone();
             self.run_ai_calls((up, ui), |ai, side, rng| {
                 let stance = ai.stance;
-                set_stance(ai, stance, place, side, rng)
+                set_stance(ai, stance, place, side, rng, &roles)
             })?;
         }
         if MasterKind::COMBAT <= made.kind {
@@ -310,7 +317,13 @@ impl World {
         let unit = self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
         // UCOMISS with −1, JP and JNZ: a NaN coordinate is not −1
-        let to = if master.class != class::BUILDING && point == Point::new(NO_POINT, NO_POINT) {
+        let to = if !self
+            .model
+            .roles
+            .of_class(master.class)
+            .contains(ClassRoles::BUILDING)
+            && point == Point::new(NO_POINT, NO_POINT)
+        {
             unit.position().ground()
         } else {
             point
@@ -372,7 +385,12 @@ impl World {
                 };
                 let m = u.master(self.master_tables(), up)?;
                 if MasterKind::COMBAT <= m.kind
-                    && (m.class == class::VILLAGER || m.id == MASTER_1808)
+                    && (self
+                        .model
+                        .roles
+                        .of_class(m.class)
+                        .contains(ClassRoles::VILLAGER)
+                        || m.id == MASTER_1808)
                 {
                     let _ = self.back_to_work(Some((p, idx)), inside)?;
                 }
@@ -424,7 +442,7 @@ impl World {
                     .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
             }))
         };
-        let (found, record) = bell.back_to_work(&lookup)?;
+        let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;
         self.parts.set_town_bell(id, bell);
         if found.is_none() && record.target_class.is_some() && record.action.is_some() {
             let unit = self.players.live_mut(up, ui)?;
@@ -477,22 +495,57 @@ impl World {
         let same_player = named.is_none_or(|(p, _)| p == player);
         let named = named.map(|(_, m)| m);
         Ok(match pick {
-            UnloadPick::All(_) => class != WHOLE_SHARE_CLASS,
+            UnloadPick::All(_) => !self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::WHOLE_GARRISON_SHARE),
             UnloadPick::Player(number) => player.index() as i32 == number,
-            UnloadPick::Group(group) => unload_group_takes(group, class),
+            UnloadPick::Group(group) => unload_group_takes(group, class, &self.model.roles),
             UnloadPick::Object(o) => Some(id) == o,
             UnloadPick::SameMaster(_) => match named.filter(|_| same_player) {
                 Some(m) if m.id == master.id => true,
-                Some(m) => class == class::VILLAGER && m.class == class::VILLAGER,
+                Some(m) => {
+                    self.model
+                        .roles
+                        .of_class(class)
+                        .contains(ClassRoles::VILLAGER)
+                        && self
+                            .model
+                            .roles
+                            .of_class(m.class)
+                            .contains(ClassRoles::VILLAGER)
+                }
                 None => false,
             },
-            UnloadPick::AllBut(o) => same_player && Some(id) != o && class != WHOLE_SHARE_CLASS,
+            UnloadPick::AllBut(o) => {
+                same_player
+                    && Some(id) != o
+                    && !self
+                        .model
+                        .roles
+                        .of_class(class)
+                        .contains(ClassRoles::WHOLE_GARRISON_SHARE)
+            }
             UnloadPick::OtherMasters(_) => match named.filter(|_| same_player) {
                 Some(m) if m.id != master.id => {
-                    if class == class::VILLAGER {
-                        m.class != class::VILLAGER
+                    if self
+                        .model
+                        .roles
+                        .of_class(class)
+                        .contains(ClassRoles::VILLAGER)
+                    {
+                        !self
+                            .model
+                            .roles
+                            .of_class(m.class)
+                            .contains(ClassRoles::VILLAGER)
                     } else {
-                        class != WHOLE_SHARE_CLASS
+                        !self
+                            .model
+                            .roles
+                            .of_class(class)
+                            .contains(ClassRoles::WHOLE_GARRISON_SHARE)
                     }
                 }
                 _ => false,
@@ -505,19 +558,31 @@ impl World {
 /// UNLOAD's flag 2 (`FUN_14118a610`): the classes of group `group` (1 villagers and class 19;
 /// 2 classes 6, 45, 46, 50 and 56; 3 classes 12, 23, 36, 47 and 57; 5 classes 0 and 44; 6
 /// classes 18, 42 and 43; no other group).
-pub(super) const fn unload_group_takes(group: i32, class: ClassId) -> bool {
+pub(super) fn unload_group_takes(group: i32, class: ClassId, roles: &Roles) -> bool {
     match group {
-        1 => matches!(class, class::VILLAGER | class::TRADE_CART),
-        2 => matches!(
-            class,
-            class::CLASS_6 | class::CLASS_45 | class::CLASS_46 | class::CLASS_50 | class::CLASS_56
+        1 => roles
+            .of_class(class)
+            .intersects(ClassRoles::VILLAGER | ClassRoles::TRADE_CART),
+        2 => roles.of_class(class).intersects(
+            ClassRoles::INFANTRY
+                | ClassRoles::TWO_HANDED_SWORDSMAN
+                | ClassRoles::PIKEMAN
+                | ClassRoles::SPEARMAN
+                | ClassRoles::RAIDER,
         ),
-        3 => matches!(
-            class,
-            class::CLASS_12 | class::CLASS_23 | class::CLASS_36 | class::CLASS_47 | class::CLASS_57
+        3 => roles.of_class(class).intersects(
+            ClassRoles::CAVALRY
+                | ClassRoles::CAVALRY_CANNON
+                | ClassRoles::CAVALRY_ARCHER
+                | ClassRoles::SCOUT_CAVALRY
+                | ClassRoles::CAVALRY_RAIDER,
         ),
-        5 => matches!(class, class::CLASS_0 | class::CLASS_44),
-        6 => matches!(class, class::MONK | WHOLE_SHARE_CLASS | class::CLASS_43),
+        5 => roles
+            .of_class(class)
+            .intersects(ClassRoles::ARCHERY | ClassRoles::ARCHERY_CANNON),
+        6 => roles.of_class(class).intersects(
+            ClassRoles::MONK | ClassRoles::WHOLE_GARRISON_SHARE | ClassRoles::MONK_WITH_RELIC,
+        ),
         _ => false,
     }
 }

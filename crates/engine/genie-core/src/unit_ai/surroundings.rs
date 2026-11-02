@@ -33,6 +33,8 @@ use crate::players::PlayerId;
 use crate::unit_ai::Search;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use genie_diff::Diff;
 use std::collections::HashSet;
 
@@ -135,7 +137,8 @@ pub struct Home {
     pub go_home: bool,
 }
 
-/// What an idle check reads of its unit and the game.
+/// What an idle check reads of its unit and the game, and the build's roles and slots it reads
+/// them by.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Surroundings {
     /// The unit's position (`+0x3c8`, `+0x4c8`, `+0x5a8`).
@@ -251,6 +254,11 @@ pub struct Surroundings {
     ///
     /// [`alert_owner`]: crate::unit_ai::alert_owner
     pub guest_computer: bool,
+    /// The build's roles, through which the unit AI reads the classes and masters it meets
+    /// (FD-046-D45).
+    pub roles: Roles,
+    /// The build's slots: the classes and masters the unit AI's code names.
+    pub slots: Slots,
 }
 
 /// The target of a unit's top action as its unit AI reads it ([`Surroundings::top_target`]).

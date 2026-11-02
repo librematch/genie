@@ -55,9 +55,16 @@ def is_test(path: Path, text: str) -> bool:
 
 
 def folder_doc(folder: Path) -> str:
-    """A sub-folder's line: its `mod.rs` doc's first sentence."""
+    """A sub-folder's line: its `mod.rs` doc's first sentence; a folder of a file's children
+    (`volley.rs` and `volley/`) has no `mod.rs`, so its README's subtitle (after the title's
+    colon) stands for it."""
     m = folder / "mod.rs"
-    return first_sentence(m.read_text()) if m.exists() else ""
+    if m.exists():
+        return first_sentence(m.read_text())
+    readme = folder / "README.md"
+    title = readme.read_text().split("\n", 1)[0] if readme.exists() else ""
+    _, colon, subtitle = title.partition(": ")
+    return subtitle[:1].upper() + subtitle[1:] + "." if colon and subtitle else ""
 
 
 def files_table(folder: Path) -> str:

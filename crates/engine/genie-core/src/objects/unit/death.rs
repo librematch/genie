@@ -19,6 +19,7 @@ use crate::objects::unit::{NO_DYING_SPRITE, Unit};
 use crate::players::Amount;
 use crate::players::tracker::key;
 use crate::technology::TechId;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -76,6 +77,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         before: ObjectState,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         // its master as the death starts: the world's calls below change other objects
         let master = &self.master(c.w.master_tables(), c.player)?.clone();
@@ -97,7 +99,7 @@ impl Unit {
             if before == ObjectState::Alive {
                 tech = self.built_building_died(c, master)?;
             } else if before == ObjectState::Foundation {
-                self.foundation_died(actions, c, master)?;
+                self.foundation_died(actions, c, master, roles)?;
             }
         } else if master.kind != MasterKind::COMBAT {
             // a static object's dying sprite is the lifecycle's ([`Lifecycle::die`]); an
@@ -118,6 +120,7 @@ impl Unit {
             master,
             &mut c.w.spatial,
             &mut c.w.pathing,
+            roles,
         )?;
         if before == ObjectState::Alive {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
@@ -180,6 +183,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         master: &Master,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let ai = c.w.parts.unit_ai.contains(self.id);
         let construction =
@@ -195,12 +199,13 @@ impl Unit {
             player_type: c.w.players.player(c.player)?.kind,
             ai,
         };
-        let part = completion.first_part(construction)?;
+        let part = completion.first_part(construction, roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
         let k = key(
             c.w.model.masters.of(c.player),
             &c.w.model.lines,
             self.life.master_id,
+            roles,
         );
         c.w.players
             .player_mut(c.player)?

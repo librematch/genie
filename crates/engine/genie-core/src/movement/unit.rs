@@ -16,7 +16,6 @@ use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::sprite::standing;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -27,6 +26,8 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::SPEED_EPSILON;
 use crate::world::Unread;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -44,6 +45,7 @@ impl Unit {
         &mut self,
         actions: &Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
@@ -62,6 +64,7 @@ impl Unit {
                 &c.w.groups,
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 c.w.parts.unit_ai.get(self.id),
+                roles,
             )?,
             None => None,
         };
@@ -113,6 +116,7 @@ impl Unit {
         groups: &UnitGroups,
         masters: OwnerMasters<'_>,
         ai: Option<&UnitAi>,
+        roles: &Roles,
     ) -> Result<Option<GroupSpeed>, GenieError> {
         let Some(g) = self.group.id.and_then(|id| groups.get(id)) else {
             return Ok(None);
@@ -121,7 +125,7 @@ impl Unit {
             return Ok(None);
         }
         let master = self.master_in(masters)?;
-        if !actions.free_for_group(unread, master, ai)? {
+        if !actions.free_for_group(unread, master, ai, roles)? {
             return Ok(None);
         }
         Ok(Some(match g.member_reason(self.id) {
@@ -141,13 +145,14 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         if let Some(code) = self.own_move_held(actions, c)? {
             return Ok(HeadCode::of(code));
         }
-        let step = self.own_move_step(actions, c, me)?;
+        let step = self.own_move_step(actions, c, me, roles)?;
         if step.gave_up {
-            self.own_move_give_up(actions, c)?;
+            self.own_move_give_up(actions, c, roles)?;
         }
         if step.target_moved {
             self.post_own(&mut c.w.parts.unit_ai, NotifyKind::TARGET_MOVED, [0, 0, 0])?;
@@ -165,8 +170,11 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        let villager = self.master(c.w.master_tables(), c.player)?.class == class::VILLAGER;
+        let villager = roles
+            .of_class(self.master(c.w.master_tables(), c.player)?.class)
+            .contains(ClassRoles::VILLAGER);
         let stance =
             c.w.parts
                 .unit_ai
@@ -218,6 +226,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<MoveStep, GenieError> {
         Ok(match actions.list.move_to_mut() {
             Some(move_to) => {
@@ -246,7 +255,7 @@ impl Unit {
                 let graphic =
                     |id: Option<SpriteId>| id.and_then(|id| c.w.model.graphics.get(id).copied());
                 let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
-                let standing = graphic(master.and_then(|m| standing(m, look, false)));
+                let standing = graphic(master.and_then(|m| standing(m, look, false, roles)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
                 let (walk, rng) = c.walk_and_sprites(&mut self.place, me)?;
                 let shows = Shows {
@@ -283,11 +292,12 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(mut explore) = actions.list.explore().copied() else {
             return Ok(());
         };
-        let explored = explore.update(c, self, me);
+        let explored = explore.update(c, self, me, roles);
         if let Some(e) = actions.list.explore_mut() {
             *e = explore;
         }

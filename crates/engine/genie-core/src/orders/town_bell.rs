@@ -22,7 +22,6 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::orders::Dispatch;
@@ -36,6 +35,8 @@ use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
 
@@ -137,6 +138,7 @@ pub struct RecordTarget {
 fn record_object(
     record: BackToWork,
     lookup: &dyn Fn(ObjectId) -> Result<Option<RecordTarget>, GenieError>,
+    roles: &Roles,
 ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
     let mut out = record;
     let named = |id: Option<ObjectId>| id.filter(|id| !id.is_recyclable());
@@ -156,7 +158,7 @@ fn record_object(
             .is_some_and(|a| ENDED_ON_BUILDING.contains(&a))
         && o.building
         // The farms' class, whose records a built farm does not end.
-        && o.class != class::FARM
+        && !roles.of_class(o.class).contains(ClassRoles::FARM)
         && o.built
     {
         out.target = None;
@@ -179,13 +181,14 @@ impl TownBell {
     pub fn back_to_work(
         &mut self,
         lookup: &dyn Fn(ObjectId) -> Result<Option<RecordTarget>, GenieError>,
+        roles: &Roles,
     ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
-        let (found, out) = record_object(self.work, lookup)?;
+        let (found, out) = record_object(self.work, lookup, roles)?;
         if found.is_some() {
             return Ok((found, out));
         }
         let before = self.before_building;
-        let (found, out) = record_object(before, lookup)?;
+        let (found, out) = record_object(before, lookup, roles)?;
         if found.is_some() {
             self.work = before;
             self.before_building = BackToWork::NONE;
@@ -278,7 +281,13 @@ impl World {
                 // COMISS REACH, gap; JC: a gap above it, or a NaN, is out
                 Ok(!below_or_unordered(REACH, gap.get()))
             };
-            if (class == class::VILLAGER && kind == MasterKind::COMBAT && near(self)?)
+            if (self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::VILLAGER)
+                && kind == MasterKind::COMBAT
+                && near(self)?)
                 || (master == MASTER_1808 && near(self)?)
             {
                 units.push(id);
@@ -412,7 +421,12 @@ impl World {
             };
             let um = u.master(self.master_tables(), up)?;
             if MasterKind::COMBAT <= um.kind
-                && (um.class == class::VILLAGER || um.id == MASTER_1808)
+                && (self
+                    .model
+                    .roles
+                    .of_class(um.class)
+                    .contains(ClassRoles::VILLAGER)
+                    || um.id == MASTER_1808)
             {
                 let _ = self.back_to_work(Some((owner, idx)), inside)?;
             }
@@ -425,7 +439,7 @@ impl World {
     /// from where it is.
     fn workers_back(&mut self, owner: PlayerId) -> Result<(), GenieError> {
         let tracker = &self.players.player(owner)?.tracker;
-        let mut ids = tracker.class_list(class::VILLAGER).to_vec();
+        let mut ids = tracker.class_list(self.model.slots.class.villager).to_vec();
         ids.extend_from_slice(tracker.list(ListKey::master(MASTER_1808)));
         // a queued unit's place (−1) names no object
         for id in ids.into_iter().flatten() {
@@ -508,7 +522,13 @@ impl World {
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        if !(master.class == class::VILLAGER || master.id == MASTER_1808) {
+        if !(self
+            .model
+            .roles
+            .of_class(master.class)
+            .contains(ClassRoles::VILLAGER)
+            || master.id == MASTER_1808)
+        {
             return Ok(());
         }
         let Some((tp, t)) = self.object(target) else {
@@ -622,6 +642,8 @@ mod tests {
     use crate::map::Point;
     use crate::objects::ObjectId;
     use crate::test_ids::{class_of, object_id};
+    use crate::testing::class;
+    use crate::testing::roles;
 
     use super::*;
 
@@ -719,7 +741,7 @@ mod tests {
             )
         };
         assert_eq!(
-            record_object(shepherd, &|id| Ok(object(id))).unwrap(),
+            record_object(shepherd, &|id| Ok(object(id)), &roles()).unwrap(),
             (object(object_id(10)), shepherd)
         );
         // a target the world no longer holds: the second target, unless it is below 0
@@ -732,7 +754,7 @@ mod tests {
             )
         };
         assert_eq!(
-            record_object(gone, &|id| Ok(object(id))).unwrap(),
+            record_object(gone, &|id| Ok(object(id)), &roles()).unwrap(),
             (object(object_id(10)), gone)
         );
         let none = BackToWork {
@@ -740,7 +762,7 @@ mod tests {
             ..gone
         };
         assert_eq!(
-            record_object(none, &|id| Ok(object(id))).unwrap(),
+            record_object(none, &|id| Ok(object(id)), &roles()).unwrap(),
             (None, none)
         );
         let lost = BackToWork {
@@ -748,7 +770,7 @@ mod tests {
             ..gone
         };
         assert_eq!(
-            record_object(lost, &|id| Ok(object(id))).unwrap(),
+            record_object(lost, &|id| Ok(object(id)), &roles()).unwrap(),
             (None, lost)
         );
         // a target below 0 is not looked up: the second target is
@@ -757,7 +779,7 @@ mod tests {
             ..work(None, Some(AiAction::Build), Point::new(5.0, 6.0))
         };
         assert_eq!(
-            record_object(second, &|id| Ok(object(id))).unwrap(),
+            record_object(second, &|id| Ok(object(id)), &roles()).unwrap(),
             (object(object_id(10)), second)
         );
         // building, gathering and hunting (mask 0x881 over 0x25a..0x265) on a built building
@@ -773,7 +795,7 @@ mod tests {
                 ..on_house
             };
             assert_eq!(
-                record_object(on_house, &|id| Ok(object(id))).unwrap(),
+                record_object(on_house, &|id| Ok(object(id)), &roles()).unwrap(),
                 (None, ended)
             );
             // reached through the second target, too
@@ -787,14 +809,14 @@ mod tests {
                 ..through_second
             };
             assert_eq!(
-                record_object(through_second, &|id| Ok(object(id))).unwrap(),
+                record_object(through_second, &|id| Ok(object(id)), &roles()).unwrap(),
                 (None, ended)
             );
             // a house not built yet and a built farm stay
             for kept in [8, 9] {
                 let r = work(Some(object_id(kept)), action, Point::new(5.0, 6.0));
                 assert_eq!(
-                    record_object(r, &|id| Ok(object(id))).unwrap(),
+                    record_object(r, &|id| Ok(object(id)), &roles()).unwrap(),
                     (object(object_id(kept)), r)
                 );
             }
@@ -810,7 +832,7 @@ mod tests {
         ] {
             let r = work(Some(object_id(7)), action, Point::new(5.0, 6.0));
             assert_eq!(
-                record_object(r, &|id| Ok(object(id))).unwrap(),
+                record_object(r, &|id| Ok(object(id)), &roles()).unwrap(),
                 (object(object_id(7)), r)
             );
         }
@@ -1061,7 +1083,7 @@ mod tests {
             before_building: second,
         };
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id))).unwrap(),
+            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
             (object(object_id(10)), first)
         );
         assert_eq!((bell.work, bell.before_building), (first, second));
@@ -1073,7 +1095,7 @@ mod tests {
         );
         bell.work = gone;
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id))).unwrap(),
+            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
             (object(object_id(8)), second)
         );
         assert_eq!(
@@ -1097,7 +1119,7 @@ mod tests {
             ),
         };
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id))).unwrap(),
+            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
             (None, ended)
         );
         assert_eq!(bell.work, ended);
@@ -1118,7 +1140,7 @@ mod tests {
             before_building: before,
         };
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id))).unwrap(),
+            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
             (None, before)
         );
         // one axis at −1 is a point
@@ -1129,7 +1151,7 @@ mod tests {
         );
         bell.work = half;
         assert_eq!(
-            bell.back_to_work(&|id| Ok(object(id))).unwrap(),
+            bell.back_to_work(&|id| Ok(object(id)), &roles()).unwrap(),
             (None, half)
         );
         assert_eq!((bell.work, bell.before_building), (half, before));

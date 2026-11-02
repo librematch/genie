@@ -9,8 +9,9 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::DamageShare;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::{ClassAmount, DamageAmount, DamageClass};
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// `FUN_141085450`, a combat object's melee armor as its master holds it: its best armor of
 /// class 4 above −32768, else its best of any, else its base armor.
@@ -39,9 +40,14 @@ pub(super) fn master_melee_armor(a: &Armored) -> DamageAmount {
 /// Slot 0x868 of a combat unit or building (`FUN_141213810`): [`master_melee_armor`] plus its
 /// melee armor powerup (`+0xa48`, slot 0x708) and stinger (`+0xb4c`, slot 0x770, 0 as
 /// [`Victim::most_hp`] says), each as 16 bits; a wall foundation (class 27 in state 0) has none.
-pub(super) fn melee_armor(a: &Armored, own_class: ClassId, state: ObjectState) -> DamageAmount {
+pub(super) fn melee_armor(
+    a: &Armored,
+    own_class: ClassId,
+    state: ObjectState,
+    roles: &Roles,
+) -> DamageAmount {
     let armor = master_melee_armor(a).plus(a.armor_powerups.melee);
-    if own_class == class::WALL && state == ObjectState::Foundation {
+    if roles.of_class(own_class).contains(ClassRoles::WALL) && state == ObjectState::Foundation {
         return DamageAmount::ZERO;
     }
     armor
@@ -56,6 +62,7 @@ pub(super) fn class_armor(
     class: OwnSlot,
     own_class: ClassId,
     state: ObjectState,
+    roles: &Roles,
 ) -> DamageAmount {
     let best = |c: DamageClass, from: DamageAmount| {
         a.armors
@@ -69,7 +76,7 @@ pub(super) fn class_armor(
             .fold(from, |m, e| if m < e.amount { e.amount } else { m })
     };
     match class {
-        OwnSlot::Melee => melee_armor(a, own_class, state).minus(a.armor_removed.melee),
+        OwnSlot::Melee => melee_armor(a, own_class, state, roles).minus(a.armor_removed.melee),
         OwnSlot::Pierce => {
             let mut armor = best(DamageClass::PIERCE, DamageAmount::NO_CLASS);
             if armor == DamageAmount::NO_CLASS {
@@ -113,6 +120,7 @@ pub(super) fn weapon_armor(
     kind: MasterKind,
     own_class: ClassId,
     state: ObjectState,
+    roles: &Roles,
 ) -> DamageAmount {
     let mut armor = a.base_armor;
     for e in &a.armors {
@@ -130,7 +138,7 @@ pub(super) fn weapon_armor(
         }
         armor = e.amount;
         if let Some(slot) = own_slot.filter(|_| MasterKind::COMBAT <= kind) {
-            armor = class_armor(a, slot, own_class, state);
+            armor = class_armor(a, slot, own_class, state, roles);
         }
     }
     armor
@@ -139,12 +147,18 @@ pub(super) fn weapon_armor(
 /// [`armor_damage`]'s charge test of the attacker's weapon against the victim (its class
 /// `own_class`, type `kind`): the charge works on it ([`charge_works`]), its type is 1 or 3 and
 /// it is full.
-pub(super) fn charges(attacker: &Attacker, own_class: ClassId, kind: MasterKind) -> bool {
+pub(super) fn charges(
+    attacker: &Attacker,
+    own_class: ClassId,
+    kind: MasterKind,
+    roles: &Roles,
+) -> bool {
     charge_works(
         attacker.charge_target,
         attacker.charge_kind,
         own_class,
         kind,
+        roles,
     ) && attacker.charge_kind.adds_to_attack()
         && attacker.max_charge <= attacker.charge
 }
@@ -172,6 +186,7 @@ pub fn armor_damage(
     factor: f32,
     attacker: &Attacker,
     bonus: f32,
+    roles: &Roles,
 ) -> Result<HitPoints, GenieError> {
     let a = v.armored.as_ref().ok_or(GenieError::unsupported(
         "the armor of an object without combat values",
@@ -188,7 +203,7 @@ pub fn armor_damage(
     let mut charged = false;
     let mut bonused = false;
     for &ClassAmount { class, amount } in weapons {
-        let armor_f = weapon_armor(a, class, attacker, kind, own_class, state).as_f32();
+        let armor_f = weapon_armor(a, class, attacker, kind, own_class, state, roles).as_f32();
         let mut attack = amount.as_f32();
         let pierce_or_melee = matches!(
             class,
@@ -196,8 +211,10 @@ pub fn armor_damage(
         );
         let mut resist = 1.0f32;
         if MasterKind::COMBAT <= attacker.kind {
-            let charge =
-                !charged && 0.0 < attack && pierce_or_melee && charges(attacker, own_class, kind);
+            let charge = !charged
+                && 0.0 < attack
+                && pierce_or_melee
+                && charges(attacker, own_class, kind, roles);
             let c = if charge {
                 charge_damage(attacker)?
             } else {

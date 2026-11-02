@@ -13,12 +13,10 @@ use crate::GenieError;
 use crate::objects::HitPoints;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
-use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -33,15 +31,14 @@ pub const MAKE: ActionKind = ActionKind::named(21);
 
 pub use crate::gathering::make_state::MakeState;
 use crate::objects::layers::Action;
+use crate::objects::masters::ids;
 use crate::world::NO_ATTRIBUTE;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The masters whose exhaustion the update does not check (`FUN_140a99e30`: the master id, not
 /// 0x765 and not 0x769): the pastures.
-pub const UNEXHAUSTED: [MasterId; 2] = [MasterId::named(1893), MasterId::named(1897)];
-
-/// The class whose slot 0xd8 (`FUN_141211340`, a combat object's or building's) does nothing
-/// (decoded 42); class 58 is spared only while it holds some, which an exhausted farm does not.
-const NEVER_EXHAUSTED_CLASS: ClassId = class::RELIC;
+pub const UNEXHAUSTED: [MasterId; 2] = [ids::PASTURE_MANGROVE, ids::PASTURE];
 
 /// `RGE_Action_Make`: its state (`+0x18`), the food still to make (`+0x44`, the base's
 /// `mTimer`), the food it makes in all (`+0x68`, the save's `work_timer`) and its task (`+0x48`).
@@ -122,6 +119,7 @@ impl MakeAction {
         &mut self,
         c: &mut Step<'_>,
         farm: &mut Unit,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let master = object_master(
             c.w.parts.own_master.get(farm.id),
@@ -156,7 +154,7 @@ impl MakeAction {
                     && farm.life.amount <= Amount::ZERO
                     // The first master type whose slot 0xd8 is `FUN_141211340` (70, `TRIBE_Combat_Object`, and 80);
                     // below it slot 0xd8 is `FUN_14118f580` itself.
-                    && (master.kind < MasterKind::COMBAT || master.class != NEVER_EXHAUSTED_CLASS) =>
+                    && (master.kind < MasterKind::COMBAT || !roles.of_class(master.class).contains(ClassRoles::NEVER_EXHAUSTED)) =>
             {
                 farm.life.hp = HitPoints::ZERO;
             }
@@ -172,11 +170,12 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let Some(mut make) = actions.list.make().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let made = make.update(c, self);
+        let made = make.update(c, self, roles);
         if let Some(m) = actions.list.make_mut() {
             *m = make;
         }
@@ -201,6 +200,8 @@ mod tests {
     use crate::players::attribute::AttributeId;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
+    use crate::testing::roles;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -273,7 +274,7 @@ mod tests {
         )
         .with_actions([(object_id(600), layer)]);
         let wall = Master {
-            class: NEVER_EXHAUSTED_CLASS,
+            class: class::RELIC,
             ..farm_master(ids::ID_7)
         };
         let masters = Masters::new([farm_master(ids::FARM), farm_master(ids::PASTURE), wall]);
@@ -284,12 +285,9 @@ mod tests {
     /// The farm's update of 104 ms through its step: its code, its Make, what it holds and its
     /// hit points.
     fn made(t: &mut World) -> (HeadCode, MakeAction, f32, f32) {
-        let code = in_update(
-            t,
-            (PlayerId::new(1), ListIndex::new(0)),
-            104,
-            Unit::make_part,
-        )
+        let code = in_update(t, (PlayerId::new(1), ListIndex::new(0)), 104, |u, a, c| {
+            Unit::make_part(u, a, c, &roles())
+        })
         .unwrap();
         let farm = &t.players[1].objects[ListIndex::new(0)];
         (
@@ -427,7 +425,7 @@ mod tests {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             104,
-            Unit::make_part,
+            |u, a, c| Unit::make_part(u, a, c, &roles()),
         );
         assert!(r.is_err());
     }

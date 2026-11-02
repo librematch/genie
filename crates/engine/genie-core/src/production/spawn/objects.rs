@@ -22,7 +22,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::objects::{Facet, FacetCount};
@@ -35,6 +35,7 @@ use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 
@@ -64,9 +65,14 @@ impl World {
                 self.spatial
                     .check_known(Rect::new(fx, fy, fx + 1.0, fy + 1.0))?;
             }
-            *wall = tiles
-                .iter()
-                .all(|t| self.spatial.object_on_tile(*t, |o| o.class == class::WALL));
+            *wall = tiles.iter().all(|t| {
+                self.spatial.object_on_tile(*t, |o| {
+                    self.model
+                        .roles
+                        .of_class(o.class)
+                        .contains(ClassRoles::WALL)
+                })
+            });
         }
         let site = Site {
             position,
@@ -98,7 +104,7 @@ impl World {
             let (x, y) = (spot.x(), spot.y());
             let (rx, ry) = (made.radius.x(), made.radius.y());
             spatial.check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
-            placement(&placing, &map, spot, false)
+            placement(&placing, &map, spot, false, &self.model.roles)
         })
     }
 
@@ -168,7 +174,7 @@ impl World {
                     explored: false,
                     building: None,
                     umv: 0,
-                    capture: capture_kind(p, made.class, master),
+                    capture: capture_kind(p, made.class, master, &self.model.roles),
                     kind: made.kind,
                 },
             );
@@ -351,7 +357,7 @@ impl World {
         players: u8,
     ) -> Result<(), GenieError> {
         /// The flare's master (`0x112`, FLARE2).
-        const FLARE: MasterId = MasterId::named(274);
+        const FLARE: MasterId = ids::FLARE_2;
         if self.players.len() < usize::from(players) {
             return Ok(());
         }
@@ -379,7 +385,7 @@ impl World {
         doubled: bool,
     ) -> Result<(), GenieError> {
         /// The flare a hit leaves (`0x70`, FLARE).
-        const HIT_FLARE: MasterId = MasterId::named(112);
+        const HIT_FLARE: MasterId = ids::FLARE;
         let before = self.players.player(p)?.objects.next_place();
         self.remains(p, HIT_FLARE, at, None)?;
         self.made_new_object(p)?;
@@ -409,7 +415,7 @@ impl World {
                 "a computer player's new building (its AI's slot 0x398)",
             ));
         }
-        let ai_type = unit_ai_type(made, made.id);
+        let ai_type = unit_ai_type(made, made.id, &self.model.roles);
         let _ = self.make_building(p, made.id, Ok(ai_type), at)?;
         Ok(())
     }

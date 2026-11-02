@@ -19,7 +19,6 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerType;
@@ -32,6 +31,8 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// What slot 73 does for a factory type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -121,7 +122,7 @@ pub(super) const INVALID_POINT: f32 = UNIT_AI_INVALID_POINT;
 /// What the defend order adds to its desired distance before it follows (`DAT_14330eb8c`, 1).
 pub(super) const DEFEND_SLACK: f32 = UNIT_AI_DEFEND_SLACK;
 /// The master whose unit takes no defend order (slot 0x230's case 0x2bd: raw `0x611c`).
-pub(super) const DEFENDLESS_MASTER: MasterId = MasterId::named(128);
+pub(super) const DEFENDLESS_MASTER: MasterId = ids::TRADE_CART;
 
 /// An order on an object run without the unit AI's update (its surroundings and side), as
 /// [`UnitAi::take_order_now`] runs one.
@@ -142,10 +143,7 @@ pub(super) const fn order_move(o: &QueuedOrder) -> AiMove {
         walk: true,
     }
 }
-/// The trebuchet's classes (`-0xe79`, `-0xe76` raw: packed and unpacked), whose attack move on
-/// a target attacks it.
-pub(super) const TREBUCHET_CLASS: ClassId = class::CLASS_51;
-pub(super) const TREBUCHET_PACKED_CLASS: ClassId = class::CLASS_54;
+
 /// The follow order's target counts as moved when it is more than a tile off the AI's target
 /// point on either axis (`0x140c567c0`: `DAT_14330ec20`, `DAT_14330eb8c`).
 pub(super) const FOLLOW_SLACK_LOW: f32 = UNIT_AI_FOLLOW_SLACK_LOW;
@@ -163,7 +161,7 @@ pub(super) const HUNTED_SIGHT_GROWTH: Distance = Distance::new(1.0);
 /// which the moving object's update counts it down.
 pub const HUMAN_ORDER_CAP: WorldTime = WorldTime::from_millis(5000);
 /// The master whose idle soldier does nothing (`FUN_140c20db0`, raw `0x635e`).
-pub(super) const SOLDIER_IDLE_MASTER: MasterId = MasterId::named(706);
+pub(super) const SOLDIER_IDLE_MASTER: MasterId = ids::SABOTEUR;
 /// The lion's idle timeout (`FUN_140c1fb70`, as its constructor `FUN_140c11bd0`).
 pub(super) const LION_IDLE_TIMEOUT: Millis = Millis::new(6000);
 /// The lion's idle timeout once its attack completed (`FUN_140c266f0`).
@@ -175,7 +173,7 @@ pub(super) const LION_SIGHT_SHARE: f32 = UNIT_AI_LION_SIGHT_SHARE;
 /// (`FUN_140c1fb70`, `DAT_142eb1c98`).
 pub(super) const LION_SIGHT_DIVISOR: f32 = UNIT_AI_LION_SIGHT_DIVISOR;
 /// The king's master that the branch passes over (raw `0x635c`).
-pub(super) const KING_UNLED: MasterId = MasterId::named(704);
+pub(super) const KING_UNLED: MasterId = ids::SHAH;
 
 /// The walk back's gap and range (`FUN_140c5e7d0`: `DAT_14330eb8c`, 1.0, whose image role in
 /// the unit AI's table is [`RUN_ONE`]'s).
@@ -216,8 +214,14 @@ pub(super) struct RetargetSearch {
 /// The unit AI type the factory (`FUN_141215a90`) gives a new object of master `master`, by
 /// the master's id `id` ([`factory_type`]).
 #[must_use]
-pub const fn unit_ai_type(master: &Master, id: MasterId) -> Option<UnitAiType> {
-    factory_type(master.class, id, master.volley_missile, master.combat_level)
+pub fn unit_ai_type(master: &Master, id: MasterId, roles: &Roles) -> Option<UnitAiType> {
+    factory_type(
+        master.class,
+        id,
+        master.volley_missile,
+        master.combat_level,
+        roles,
+    )
 }
 
 /// The unit-AI type the factory (`FUN_141215a90`) gives a new object of a master of `class`
@@ -232,58 +236,91 @@ pub const fn unit_ai_type(master: &Master, id: MasterId) -> Option<UnitAiType> {
 /// boar's (4, `FUN_140c11720`) when its master is of class 10 and combat level 1
 /// (`FUN_140fde4f0`), else the lion's (5, `FUN_140c11bd0`).
 #[must_use]
-pub const fn factory_type(
+pub fn factory_type(
     class: ClassId,
     master: MasterId,
     missile: Option<MasterId>,
     combat_level: CombatLevel,
+    roles: &Roles,
 ) -> Option<UnitAiType> {
     match master {
         ids::ID_1105 => return Some(UnitAiType::SIEGE_TOWER),
         ids::ID_1744 | ids::ID_1746 => return Some(UnitAiType::SIEGE),
         _ => {}
     }
-    Some(match class {
-        class::CLASS_5
-        | class::CLASS_7
-        | class::CLASS_8
-        | class::CLASS_11
-        | class::CLASS_14
-        | class::TREE
-        | class::CLASS_16
-        | class::CLASS_30
-        | class::CLASS_31
-        | class::CLASS_32
-        | class::CLASS_33
-        | class::CLASS_34
-        | class::CLASS_38
-        | class::RELIC
-        | class::CLASS_48
-        | class::CLASS_63 => return None,
-        class::ARTIFACT => UnitAiType::ARTIFACT,
-        class::TRADE_BOAT | class::TRADE_CART => UnitAiType::TRADE,
-        class::BUILDING | class::WALL | class::GATE | class::FARM | class::CLASS_60
-            if missile.is_none() =>
+    Some({
+        let held = roles.of_class(class);
+        if held.intersects(
+            ClassRoles::OCEAN_FISH
+                | ClassRoles::FORAGE_BUSH
+                | ClassRoles::STONE_MINE
+                | ClassRoles::MISCELLANEOUS
+                | ClassRoles::TERRAIN
+                | ClassRoles::TREE
+                | ClassRoles::TREE_STUMP
+                | ClassRoles::FLAG
+                | ClassRoles::DEEP_SEA_FISH
+                | ClassRoles::GOLD_MINE
+                | ClassRoles::SHORE_FISH
+                | ClassRoles::CLIFF
+                | ClassRoles::BIRD
+                | ClassRoles::RELIC
+                | ClassRoles::ORE_MINE
+                | ClassRoles::GOLD_FISH,
+        ) {
+            return None;
+        } else if held.contains(ClassRoles::ARTIFACT) {
+            UnitAiType::ARTIFACT
+        } else if held.intersects(ClassRoles::TRADE_BOAT | ClassRoles::TRADE_CART) {
+            UnitAiType::TRADE
+        } else if held.intersects(
+            ClassRoles::BUILDING
+                | ClassRoles::WALL
+                | ClassRoles::GATE
+                | ClassRoles::FARM
+                | ClassRoles::MISC_BUILDING,
+        ) && (missile.is_none())
         {
             UnitAiType::BUILDING
+        } else if held.intersects(
+            ClassRoles::BUILDING
+                | ClassRoles::WALL
+                | ClassRoles::GATE
+                | ClassRoles::FARM
+                | ClassRoles::TOWER
+                | ClassRoles::MISC_BUILDING,
+        ) {
+            TOWER_AI
+        } else if held.contains(ClassRoles::VILLAGER) {
+            CIVILIAN
+        } else if held.intersects(ClassRoles::PREY | ClassRoles::KING) {
+            UnitAiType::HUNTED
+        } else if held.contains(ClassRoles::PREDATOR)
+            && (combat_level.get() == CombatLevel::ANIMAL.get())
+        {
+            BOAR_AI
+        } else if held.contains(ClassRoles::PREDATOR) {
+            UnitAiType::LION
+        } else if held.intersects(
+            ClassRoles::SIEGE
+                | ClassRoles::PACKED_TREBUCHET
+                | ClassRoles::UNPACKED_TREBUCHET
+                | ClassRoles::SCORPION,
+        ) {
+            UnitAiType::SIEGE
+        } else if held
+            .intersects(ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC | ClassRoles::BOARDING_SHIP)
+        {
+            UnitAiType::PRIEST
+        } else if held.contains(ClassRoles::TRANSPORT) {
+            UnitAiType::TRANSPORT
+        } else if held.contains(ClassRoles::FISHING_SHIP) {
+            UnitAiType::FISHING
+        } else if held.intersects(ClassRoles::DOMESTIC_ANIMAL | ClassRoles::LIVESTOCK) {
+            UnitAiType::LIVESTOCK
+        } else {
+            SOLDIER_AI
         }
-        class::BUILDING
-        | class::WALL
-        | class::GATE
-        | class::FARM
-        | class::TOWER
-        | class::CLASS_60 => TOWER_AI,
-        class::VILLAGER => CIVILIAN,
-        class::PREY | class::KING => UnitAiType::HUNTED,
-        // FUN_140fde4f0: the master's class (`+0x410`, 10 in this case) and its combat level 1
-        class::PREDATOR if combat_level.get() == CombatLevel::ANIMAL.get() => BOAR_AI,
-        class::PREDATOR => UnitAiType::LION,
-        class::SIEGE | class::CLASS_51 | class::CLASS_54 | class::CLASS_55 => UnitAiType::SIEGE,
-        class::MONK | class::CLASS_43 | class::CLASS_53 => UnitAiType::PRIEST,
-        class::TRANSPORT => UnitAiType::TRANSPORT,
-        class::FISHING_SHIP => UnitAiType::FISHING,
-        class::CLASS_29 | class::LIVESTOCK => UnitAiType::LIVESTOCK,
-        _ => SOLDIER_AI,
     })
 }
 
@@ -355,23 +392,15 @@ pub(super) const COMPUTER_SOLDIER_IDLE_TIMEOUT: Millis = Millis::new(1500);
 /// The siege unit's idle timeout (`FUN_140c12040`'s `FUN_140c41bc0` with 1000).
 pub(super) const SIEGE_IDLE_TIMEOUT: Millis = Millis::new(1000);
 /// The masters whose soldier is defensive (`FUN_140c12300`, raw `0x62ab`, `0x62ac`, `0x64ec`).
-pub(super) const DEFENSIVE_MASTERS: [MasterId; 3] = [
-    MasterId::named(527),
-    MasterId::named(528),
-    MasterId::named(1104),
-];
-/// The classes of a human player's soldier in `NoAttack` (`FUN_140c12300`: `-0xe89`, `-0xe6c`
-/// raw).
-pub(super) const NO_ATTACK_CLASSES: [ClassId; 2] = [class::CLASS_35, class::CLASS_64];
-/// The class whose soldier is in `NoAttack` unless a hero (`FUN_140c12300`: `-0xe6f` raw).
-pub(super) const NO_ATTACK_CLASS: ClassId = class::CLASS_61;
+pub(super) const DEFENSIVE_MASTERS: [MasterId; 3] = [ids::ID_527, ids::ID_528, ids::ID_1104];
+
 /// The soldier's stance (`+0x1a9`) its constructor (`FUN_140c12300`) gives a new object: 2 (stand
 /// ground) to a human player's object of a master with object flag 0x10 that is its own copy
 /// (`copy_id`, `+0x158`, its id) while the player's current age (attribute 6) is 0; 1 (defensive)
 /// to a human player's of masters 527, 528 and 1104; 3 (no attack) to a human player's of classes
 /// 35 and 64; then 1 to a hero (its `hero_flag` grants [`HeroFlags::DEFENSIVE`]); 3 to class 61;
 /// else the owner's posture (slot 0x90, `+0x71c`, its low byte).
-pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
+pub(super) fn soldier_stance(new: &NewObject, roles: &Roles) -> UnitStance {
     // UCOMISS with JP, JNZ: the age equals 0 (a NaN does not)
     if !new.player_type.is_computer()
         && new.object_flags.contains(ObjectFlags::SCOUT)
@@ -383,14 +412,17 @@ pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
     if !new.player_type.is_computer() && DEFENSIVE_MASTERS.contains(&new.master) {
         return UnitStance::DEFENSIVE;
     }
-    if !new.player_type.is_computer() && NO_ATTACK_CLASSES.contains(&new.class) {
+    if !new.player_type.is_computer() && roles.of_class(new.class).contains(ClassRoles::NO_ATTACK) {
         return UnitStance::NO_ATTACK;
     }
     // TEST 9, then a signed byte at least 0 or bit 3 clear
     if new.hero_flag.grants(HeroFlags::DEFENSIVE) {
         return UnitStance::DEFENSIVE;
     }
-    if new.class == NO_ATTACK_CLASS {
+    if roles
+        .of_class(new.class)
+        .contains(ClassRoles::NO_ATTACK_UNLESS_HERO)
+    {
         return UnitStance::NO_ATTACK;
     }
     new.posture.stance()
@@ -399,11 +431,15 @@ pub(super) fn soldier_stance(new: &NewObject) -> UnitStance {
 /// The siege unit's stance (`+0x1a9`) its constructor (`FUN_140c12040`) gives a new object: 0
 /// for a computer player's and for classes 51 and 54 (`-0xe79`, `-0xe76` raw); the owner's
 /// posture (slot 0x90, its low byte) for class 55 (`-0xe75`); 1 for any other.
-pub(super) fn siege_stance(new: &NewObject) -> UnitStance {
-    if new.player_type.is_computer() || matches!(new.class, class::CLASS_51 | class::CLASS_54) {
+pub(super) fn siege_stance(new: &NewObject, roles: &Roles) -> UnitStance {
+    if new.player_type.is_computer()
+        || roles
+            .of_class(new.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
+    {
         return UnitStance::AGGRESSIVE;
     }
-    if new.class == class::CLASS_55 {
+    if roles.of_class(new.class).contains(ClassRoles::SCORPION) {
         return new.posture.stance();
     }
     UnitStance::DEFENSIVE
@@ -462,15 +498,14 @@ pub(super) const fn held_action_state(
 
 /// The classes of a target for which the retarget check of a unit on the attack order searches
 /// again (3, 27, 39, 49, 52, 51 and 54).
-pub(crate) const fn searches_on_class(class: ClassId) -> bool {
-    matches!(
-        class,
-        class::BUILDING
-            | class::WALL
-            | class::GATE
-            | class::FARM
-            | class::TOWER
-            | class::CLASS_51
-            | class::CLASS_54
+pub(crate) fn searches_on_class(class: ClassId, roles: &Roles) -> bool {
+    roles.of_class(class).intersects(
+        ClassRoles::BUILDING
+            | ClassRoles::WALL
+            | ClassRoles::GATE
+            | ClassRoles::FARM
+            | ClassRoles::TOWER
+            | ClassRoles::PACKED_TREBUCHET
+            | ClassRoles::UNPACKED_TREBUCHET,
     )
 }

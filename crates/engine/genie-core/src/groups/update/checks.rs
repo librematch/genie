@@ -31,7 +31,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::sprite::{new_sprite, running, standing, walking};
 use crate::objects::{ObjectId, ObjectKey};
@@ -42,6 +41,8 @@ use crate::unit_ai::UnitAi;
 use crate::world::Unread;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -312,7 +313,11 @@ impl World {
             let delivers = self.has_task(owner, u.life.master_id, RELIC_DELIVERY_ACTION)?;
             let target = self.world_object(ai.current_target);
             let relic = match target {
-                Some(t) => self.master(t.player(), t.master_id())?.class == class::RELIC,
+                Some(t) => self
+                    .model
+                    .roles
+                    .of_class(self.master(t.player(), t.master_id())?.class)
+                    .contains(ClassRoles::RELIC),
                 None => false,
             };
             if g.current_command == PICK_UP_RELIC
@@ -422,6 +427,7 @@ impl World {
             self.parts.unread.get(u.id),
             u.master(self.master_tables(), p)?,
             self.parts.unit_ai.get(u.id),
+            &self.model.roles,
         )
     }
 
@@ -489,10 +495,20 @@ impl World {
         }
         let trade_cart = match shown {
             Shown::Standing => {
-                master.kind == MasterKind::COMBAT && master.class == class::TRADE_CART
+                master.kind == MasterKind::COMBAT
+                    && self
+                        .model
+                        .roles
+                        .of_class(master.class)
+                        .contains(ClassRoles::TRADE_CART)
             }
             Shown::Walking => {
-                MasterKind::ACTION <= master.kind && master.class == class::TRADE_CART
+                MasterKind::ACTION <= master.kind
+                    && self
+                        .model
+                        .roles
+                        .of_class(master.class)
+                        .contains(ClassRoles::TRADE_CART)
             }
             Shown::Running => false,
         };
@@ -508,8 +524,8 @@ impl World {
         // trade cart's goods are passed above
         let look = self.parts.combat_of(u.id).abilities.look.as_ref();
         let sprite = match shown {
-            Shown::Standing => standing(master, look, false),
-            Shown::Walking => walking(master, look, false),
+            Shown::Standing => standing(master, look, false, &self.model.roles),
+            Shown::Walking => walking(master, look, false, &self.model.roles),
             Shown::Running => running(master, look),
         };
         Ok(sprite)
@@ -581,6 +597,7 @@ impl Action {
         unread: Option<&Unread>,
         master: &Master,
         ai: Option<&UnitAi>,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         let actions = self;
         let state = if master.kind < MasterKind::ACTION {
@@ -596,7 +613,13 @@ impl Action {
         .get();
         if 1 < state {
             if state == 2 {
-                if master.class == class::TRADE_CART || master.class == class::TRADE_BOAT {
+                if roles
+                    .of_class(master.class)
+                    .contains(ClassRoles::TRADE_CART)
+                    || roles
+                        .of_class(master.class)
+                        .contains(ClassRoles::TRADE_BOAT)
+                {
                     return Ok(true);
                 }
                 if actions.top_action_kind() == Some(ATTACK) {

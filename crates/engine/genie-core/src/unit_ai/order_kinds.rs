@@ -13,17 +13,19 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
-use crate::objects::masters::class;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
+use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
     AiMove, CIVILIAN, EXPLORE_Z, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
     Surroundings, UnitAi, UnitCommand, UnitSide, civilian_kind,
 };
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 impl UnitAi {
     /// Slot 0x170 (`FUN_140c4ccc0`), the defend of object `target` within `range`, `force`d or
@@ -369,6 +371,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         ai: &mut Well512,
     ) -> Result<OrderOutcome, GenieError> {
+        let roles = &at.roles;
         if Self::world_object(o.target, at, side)?.is_some() {
             side.effect_now(Effect::OrderOnTarget(*o), self, ai)?;
             self.ordered_on_target = true;
@@ -383,7 +386,7 @@ impl UnitAi {
                     None => return Ok(OrderOutcome::NotTaken),
                 },
             };
-            let Some(kind) = self.resource_kind(class) else {
+            let Some(kind) = self.resource_kind(class, roles) else {
                 return Ok(OrderOutcome::NotTaken);
             };
             // slot 0x88 (`FUN_140c4b0f0`): slot 0x80 from the order's shown point, without a
@@ -423,21 +426,28 @@ impl UnitAi {
             return Ok(OrderOutcome::NotTaken);
         };
         side.effect_now(Effect::Move(m), self, ai)?;
-        Ok(self.order_tail(Some(o.order), o.priority, class, false, ai))
+        Ok(self.order_tail(Some(o.order), o.priority, class, false, ai, roles))
     }
 
     /// Slot 0x1b0 by the unit AI's type: the kind of resource of a target class. The civilian's
     /// (`FUN_140c1c4f0`) and the building's (`FUN_140c1c460`, the same switch,
     /// [`civilian_kind`]); the fishing ship's (`FUN_140c1c580`): fish for classes 5, 31 and 33,
     /// gold for 63; the base's (`FUN_140c4cc00`) none. None for the byte 0xff.
-    pub(super) const fn resource_kind(&self, class: ClassId) -> Option<GatherGroup> {
+    pub(super) fn resource_kind(&self, class: ClassId, roles: &Roles) -> Option<GatherGroup> {
         match self.ai_type {
-            CIVILIAN | UnitAiType::BUILDING => civilian_kind(class),
-            FISHING_AI => match class {
-                class::CLASS_5 | class::CLASS_31 | class::CLASS_33 => Some(GatherGroup::FISH),
-                class::CLASS_63 => Some(GatherGroup::GOLD),
-                _ => None,
-            },
+            CIVILIAN | UnitAiType::BUILDING => civilian_kind(class, roles),
+            FISHING_AI => {
+                let held = roles.of_class(class);
+                if held.intersects(
+                    ClassRoles::OCEAN_FISH | ClassRoles::DEEP_SEA_FISH | ClassRoles::SHORE_FISH,
+                ) {
+                    Some(GatherGroup::FISH)
+                } else if held.contains(ClassRoles::GOLD_FISH) {
+                    Some(GatherGroup::GOLD)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -498,11 +508,17 @@ impl UnitAi {
         place: (Point, Option<ClassId>),
         ai: &mut Well512,
         side: &mut dyn UnitSide,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if ObjectState::Alive < unit_state {
             return Ok(());
         }
-        self.order_now(order, None, Some(place), None, ai, side)
+        let now = OrderNow {
+            order,
+            keep_from: None,
+            place: Some(place),
+        };
+        self.order_now(now, None, ai, side, roles)
     }
 
     /// Slot 0x28 (`FUN_140c55c90`) with Immediate set and inFront clear, from outside the unit
@@ -520,10 +536,16 @@ impl UnitAi {
         (at, side, player_type): (&Surroundings, &mut dyn UnitSide, PlayerType),
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
+        let roles = &at.roles;
         if ObjectState::Alive < at.state {
             return Ok(());
         }
         let place = (at.position.ground(), at.class);
-        self.order_now(order, None, Some(place), Some((at, player_type)), ai, side)
+        let now = OrderNow {
+            order,
+            keep_from: None,
+            place: Some(place),
+        };
+        self.order_now(now, Some((at, player_type)), ai, side, roles)
     }
 }

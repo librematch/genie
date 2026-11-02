@@ -26,7 +26,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use genie_diff::Diff;
@@ -50,6 +49,7 @@ use crate::math::image::repair::{
     MOVING_REACH as REPAIR_MOVING_REACH, ONE as REPAIR_ONE, REACH as REPAIR_REACH,
 };
 use crate::objects::masters::WorkValue;
+use crate::objects::masters::ids;
 use crate::unit_ai::UnitStance;
 
 /// The Repair action's type, which word 9 adds, and its tasks' action type.
@@ -67,21 +67,12 @@ const EXTRA_REPAIRER: f32 = REPAIR_EXTRA_REPAIRER;
 /// The wait of state 10 (`0x3f800000`), and the repairer count's first (`DAT_14330eb8c`).
 const ONE: f32 = REPAIR_ONE;
 
-/// The ship classes whose repair meets them at the shore (`FUN_140ad9120`: 20, 21, 22, 2, 53).
-pub const SHIPS: [ClassId; 5] = [
-    class::TRANSPORT,
-    class::FISHING_SHIP,
-    class::WARSHIP,
-    class::TRADE_BOAT,
-    class::CLASS_53,
-];
-
 /// The masters a unit of task swap group 1 or 2 (`+0x7b8`) becomes for a repair command (slot
 /// 0x378): its player's master table's entries at `+0x4e0` and `+0x6f0`, the repairers 156
 /// and 222, when the player has them.
 pub const REPAIRERS: [(TaskGroup, MasterId); 2] = [
-    (TaskGroup::MALE_VILLAGERS, MasterId::named(156)),
-    (TaskGroup::FEMALE_VILLAGERS, MasterId::named(222)),
+    (TaskGroup::MALE_VILLAGERS, ids::VILLAGER_REPAIRER_MALE),
+    (TaskGroup::FEMALE_VILLAGERS, ids::VILLAGER_REPAIRER_FEMALE),
 ];
 /// The repair of a ship (its meeting point, `FUN_140ad9120`), which is not modelled.
 pub const SHIP_REPAIR: GenieError =

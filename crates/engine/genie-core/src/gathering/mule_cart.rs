@@ -16,7 +16,6 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::orders::Work;
 use crate::players::PlayerId;
@@ -24,6 +23,7 @@ use crate::unit_ai::NO_POINT;
 use crate::unit_ai::world_view::Foreign;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use std::mem::replace;
@@ -125,12 +125,19 @@ impl World {
             if t.action_kind == CART_TASK {
                 cart_class = t.object_group;
             }
-            let kind = match cart_class {
-                Some(class::CLASS_7) => GatherGroup::FORAGE,
-                Some(class::CLASS_8) => GatherGroup::STONE,
-                Some(class::TREE) => GatherGroup::WOOD,
-                Some(class::CLASS_32 | class::CLASS_63) => GatherGroup::GOLD,
-                _ => continue,
+            let kind = {
+                let held = self.model.roles.of_some_class(cart_class);
+                if held.contains(ClassRoles::FORAGE_BUSH) {
+                    GatherGroup::FORAGE
+                } else if held.contains(ClassRoles::STONE_MINE) {
+                    GatherGroup::STONE
+                } else if held.contains(ClassRoles::TREE) {
+                    GatherGroup::WOOD
+                } else if held.intersects(ClassRoles::GOLD_MINE | ClassRoles::GOLD_FISH) {
+                    GatherGroup::GOLD
+                } else {
+                    continue;
+                }
             };
             kinds.push(kind);
         }
@@ -172,7 +179,13 @@ impl World {
                     others,
                     (kind, WorkerCount::NO_CAP, Some(DropSiteId::new(id))),
                     (current, ObjectState::Foundation, NO_POINT),
-                    ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
+                    ObjectsRef::new(
+                        &self.players,
+                        &self.index,
+                        &self.model.masters,
+                        &self.parts,
+                        &self.model.roles,
+                    ),
                 )?;
                 if let Some(f) = f {
                     found.push(f);

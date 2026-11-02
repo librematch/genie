@@ -36,6 +36,7 @@ use crate::players::PlayerType;
 use crate::unit_ai::{AiAction, UnitAi};
 use crate::unit_ai::{NotifyKind, alert_owner};
 use crate::world::World;
+use crate::world::layer::Roles;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -533,8 +534,9 @@ impl<'a> Ship<'a> {
         map: GridSize,
         graphics: (&'a Graphics, Option<&Look>),
         task: Option<TaskId>,
+        roles: &Roles,
     ) -> Result<Self, GenieError> {
-        let walk = MoveToReads::of((unit, mover), master, graphics);
+        let walk = MoveToReads::of((unit, mover), master, graphics, roles);
         let given = TransportAction::given_sprite(task, master)?;
         Ok(Self::of(unit, master.radius, map, walk, given))
     }

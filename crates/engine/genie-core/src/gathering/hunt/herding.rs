@@ -20,6 +20,7 @@ use crate::players::AmountRate;
 use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 impl HuntAction {
@@ -86,6 +87,7 @@ impl HuntAction {
         unit: &mut Unit,
         f: &Fight,
         r: &HuntReads,
+        roles: &Roles,
     ) -> Result<HuntNext, GenieError> {
         if self.target.is_none() {
             self.state = HuntState::Search;
@@ -95,7 +97,7 @@ impl HuntAction {
             "a hunt leading livestock unprepared",
         ))?;
         if herd.idle {
-            self.start_attack(c, unit, &herd)?;
+            self.start_attack(c, unit, &herd, roles)?;
             return Ok(HuntNext::Stay);
         }
         self.timer += c.dt.seconds();
@@ -104,7 +106,7 @@ impl HuntAction {
         }
         let v = f.victim.position;
         if v.x() == self.lead.start.x() && v.y() == self.lead.start.y() {
-            self.start_attack(c, unit, &herd)?;
+            self.start_attack(c, unit, &herd, roles)?;
             return Ok(HuntNext::Stay);
         }
         let ground =
@@ -130,6 +132,7 @@ impl HuntAction {
             &f.victim,
             player,
             &walks,
+            roles,
         )?;
         Ok(HuntNext::Stay)
     }
@@ -146,9 +149,10 @@ impl HuntAction {
         actions: &mut Action,
         stops_decay: bool,
         f: &mut Fight,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if self.stops_decay_of(stops_decay, &mut f.victim) {
-            write_target_back(c, hunter, actions, f)?;
+            write_target_back(c, hunter, actions, f, roles)?;
         }
         Ok(())
     }

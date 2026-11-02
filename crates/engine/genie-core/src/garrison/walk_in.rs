@@ -34,6 +34,7 @@ use crate::objects::unit::Unit;
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
 use genie_diff::Diff;
@@ -317,6 +318,7 @@ impl EnterAction {
         actions: &mut Action,
         me: Me,
         reads: &EnterReads,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let t = Self::held_target(reads.target)?;
         match self.state {
@@ -328,7 +330,7 @@ impl EnterAction {
             EnterState::Wait => {
                 self.timer -= c.dt.seconds();
                 if self.timer <= Seconds::ZERO {
-                    let _ = self.again(c, unit, actions, &t, reads)?;
+                    let _ = self.again(c, unit, actions, &t, reads, roles)?;
                 }
             }
             EnterState::Walk { .. } => self.walk_on(c, unit, actions, me, &t, reads)?,
@@ -362,8 +364,9 @@ impl EnterAction {
         t: &EnterTarget,
         reads: &EnterReads,
     ) -> Result<(), GenieError> {
+        let roles = &c.w.model.roles.clone();
         let walked_again = self.target_moved(t);
-        let entered = walked_again && self.again(c, unit, actions, t, reads)?;
+        let entered = walked_again && self.again(c, unit, actions, t, reads, roles)?;
         let code = self.move_to_update(c, unit, me, reads)?;
         match code.get() {
             // the walk again's enter put the unit inside, at the target's place: still in reach,
@@ -371,11 +374,11 @@ impl EnterAction {
             1 | 2 if entered => self.on_unit(unit, actions, |unit, actions| {
                 unit.entered_again(actions, c)
             }),
-            1 | 2 if t.in_reach => self.enter_at_once(actions, c, unit),
+            1 | 2 if t.in_reach => self.enter_at_once(actions, c, unit, roles),
             // a failed MoveTo is none a walk again made in this update
             3 if self.retry => {
                 self.retry = false;
-                self.again(c, unit, actions, t, reads).map(|_| ())
+                self.again(c, unit, actions, t, reads, roles).map(|_| ())
             }
             1..=3 => self.wait(c, unit),
             4 | 5 => Err(ENTER_TARGET_DIED),
@@ -461,6 +464,7 @@ impl EnterAction {
         actions: &mut Action,
         t: &EnterTarget,
         reads: &EnterReads,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         if self.state.move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(unit.id)
@@ -498,12 +502,18 @@ impl EnterAction {
                 reads.start,
                 meeting,
                 &moves,
-                ObjectsRef::new(&w.players, &w.index, &w.model.masters, &w.parts),
+                ObjectsRef::new(
+                    &w.players,
+                    &w.index,
+                    &w.model.masters,
+                    &w.parts,
+                    &w.model.roles,
+                ),
             )?
         };
         match walking {
             Walking::Enter => {
-                self.enter_at_once(actions, c, unit)?;
+                self.enter_at_once(actions, c, unit, roles)?;
                 return Ok(true);
             }
             Walking::Walk(Some(at)) => {
@@ -531,10 +541,11 @@ impl EnterAction {
         actions: &mut Action,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let target = self.target;
         self.on_unit(unit, actions, |unit, actions| {
-            unit.enter_in_update(actions, c, target)
+            unit.enter_in_update(actions, c, target, roles)
         })
     }
 

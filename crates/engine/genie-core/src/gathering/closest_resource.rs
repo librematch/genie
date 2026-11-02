@@ -17,6 +17,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::ids;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectState, WorkerCount};
@@ -72,7 +73,7 @@ pub(crate) fn closest_resource_of(
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
     /// The site masters whose search starts from their footprint in any zone.
-    const DOCKS: [MasterId; 2] = [MasterId::named(45), MasterId::named(2172)];
+    const DOCKS: [MasterId; 2] = [ids::ID_45, ids::ID_2172];
     let site = match site.filter(|&s| c.spatial.get(s).is_some()) {
         None => None,
         Some(site) => {
@@ -219,6 +220,7 @@ impl UnitView<'_, '_> {
             &self.c.w.index,
             &self.c.w.model.masters,
             &self.c.w.parts,
+            &self.c.w.model.roles,
         );
         let mut w = ResourceWorld {
             player: self.player,
@@ -311,7 +313,13 @@ impl Unit {
         cap: WorkerCount,
         site: Option<DropSiteId>,
     ) -> Result<Option<ObjectId>, GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+        );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current =
             c.w.parts

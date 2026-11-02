@@ -63,7 +63,7 @@ pub use self::attack_pick::{
     AttackAsk, Attacker, Memory, Pick, Search, Seeker, Target, can_attack, soldier_can_attack,
     tower_can_attack,
 };
-use self::attack_pick::{DEFEND_GROWTH, PRIORITY_3_CLASSES, point_gap_squared};
+use self::attack_pick::{DEFEND_GROWTH, point_gap_squared};
 pub use self::attack_picker::{AttackPicker, NoAttack};
 pub(crate) use self::attack_rules::patrol_distance;
 pub use self::attack_rules::{
@@ -72,8 +72,8 @@ pub use self::attack_rules::{
     type_attacks_neutral,
 };
 use self::attack_rules::{
-    DEFEND_PATROL_LEASH, PACKED_UNIT_CLASS, STAND_GROUND_PATROL_LEASH, back_up,
-    civilian_may_attack, computer_idle_check, defend_patrol_range, lion_may_attack,
+    DEFEND_PATROL_LEASH, STAND_GROUND_PATROL_LEASH, back_up, civilian_may_attack,
+    computer_idle_check, defend_patrol_range, lion_may_attack,
 };
 #[cfg(test)]
 use self::attack_rules::{PATROL_FARTHEST, line_distance};
@@ -102,9 +102,9 @@ use self::ids::{
     IDLE_TIMEOUT, INVALID_POINT, KING_UNLED, LION_ATTACKED_TIMEOUT, LION_IDLE_TIMEOUT,
     LION_SIGHT_DIVISOR, LION_SIGHT_SHARE, NO_ANIM_SPEED, OUTSIDE_ORDER, PRIEST_IDLE_TIMEOUT,
     RETARGET_RANGE, RETARGET_REACH, Retarget, RetargetSearch, SIEGE_IDLE_TIMEOUT,
-    SOLDIER_IDLE_MASTER, SOLDIER_IDLE_TIMEOUT, TOWER_IDLE_TIMEOUT, TREBUCHET_CLASS,
-    TREBUCHET_PACKED_CLASS, VILLAGER_NOTIFY, WALK_BACK, closest_undiscovered_tile, dodges,
-    held_action_state, order_move, retarget_kind, siege_stance, soldier_stance,
+    SOLDIER_IDLE_MASTER, SOLDIER_IDLE_TIMEOUT, TOWER_IDLE_TIMEOUT, VILLAGER_NOTIFY, WALK_BACK,
+    closest_undiscovered_tile, dodges, held_action_state, order_move, retarget_kind, siege_stance,
+    soldier_stance,
 };
 pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_type, unit_ai_type};
 pub(crate) use self::ids::{alert_owner, helper_answers, searches_on_class};
@@ -603,8 +603,8 @@ use crate::math::image::unit_ai::{
 };
 use crate::movement::{PathFlags, WaypointIndex};
 use crate::objects::ObjectState;
-use crate::objects::masters::class::classes;
 use crate::pathing::tile_path::Path;
+use crate::unit_ai::cared::classes;
 
 #[cfg(test)]
 mod test_sides;

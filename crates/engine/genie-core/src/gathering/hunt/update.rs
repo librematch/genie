@@ -14,11 +14,12 @@ use crate::movement::move_to::GiveUp;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 impl HuntAction {
@@ -43,6 +44,7 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
+        let roles = &c.w.model.roles.clone();
         if r.attack.player_type.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt (FUN_140fde4f0)",
@@ -58,7 +60,7 @@ impl HuntAction {
                 Ok(HuntNext::Stay)
             }
             HuntState::Walk { .. } => self.update_walk(c, unit, actions, me, f, r),
-            HuntState::Lead => self.update_lead(c, unit, f, r),
+            HuntState::Lead => self.update_lead(c, unit, f, r, roles),
             HuntState::Face => self.update_face(c, unit, f, r),
             // case 6 without a target (or a task): set_state(8) to carry the load off, set_state(3)
             // with none
@@ -70,8 +72,8 @@ impl HuntAction {
                 })
             }
             HuntState::Gather => {
-                let full = self.gather(c.dt.seconds(), unit, &mut f.victim, r)?;
-                write_target_back(c, unit, actions, f)?;
+                let full = self.gather(c.dt.seconds(), unit, &mut f.victim, r, roles)?;
+                write_target_back(c, unit, actions, f, roles)?;
                 Ok(if full { HuntNext::Drop } else { HuntNext::Stay })
             }
             _ => Err(GenieError::unsupported(
@@ -97,6 +99,7 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
+        let roles = &c.w.model.roles.clone();
         let attack =
             self.state
                 .attack_mut()
@@ -113,7 +116,9 @@ impl HuntAction {
             }
             1 | 2 | 5
                 if r.predator_hunts_end
-                    && f.victim.class == class::PREDATOR
+                    && roles
+                        .of_class(f.victim.class)
+                        .contains(ClassRoles::PREDATOR)
                     && !r.attack.queue_empty =>
             {
                 Err(GenieError::unsupported(
@@ -121,7 +126,7 @@ impl HuntAction {
                 ))
             }
             1 | 2 | 5 => {
-                self.decay_check(c, unit, actions, r.stops_decay, f)?;
+                self.decay_check(c, unit, actions, r.stops_decay, f, roles)?;
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let player = f.own.player;
                 self.set_walk(
@@ -130,6 +135,7 @@ impl HuntAction {
                     &f.victim,
                     player,
                     &walks,
+                    roles,
                 )?;
                 Ok(HuntNext::Stay)
             }
@@ -160,17 +166,21 @@ impl HuntAction {
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
+        let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
-            waits: !r.attack.player_type.is_computer() && f.own.class == class::VILLAGER,
+            waits: !r.attack.player_type.is_computer()
+                && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER),
             stance: r.attack.stance,
         };
         match self.update_list(c, unit, me, gives_up)?.get() {
             0 => Ok(HuntNext::Stay),
-            1 | 2 => self.walk_arrived(c, unit, actions, f, r),
+            1 | 2 => self.walk_arrived(c, unit, actions, f, r, roles),
             3 => self
-                .walk_failed(c.w.parts.motion_mut(unit.id), r)
+                .walk_failed(c.w.parts.motion_mut(unit.id), r, roles)
                 .map(|()| HuntNext::Stay),
-            4 | 5 => self.lost_on_the_way(c, unit, r).map(|()| HuntNext::Stay),
+            4 | 5 => self
+                .lost_on_the_way(c, unit, r, roles)
+                .map(|()| HuntNext::Stay),
             code => Err(QUIET_CODE.with("code", code)),
         }
     }
@@ -180,8 +190,13 @@ impl HuntAction {
     /// (`FUN_140c1c4f0`: 15, trees; the class its unit AI targets, else the hunt's: the caller's
     /// search, `Unit::hunt_tree_search`, which found none); then the hunt waits 3 seconds and the
     /// unit's animation stops (`FUN_141161850`).
-    fn walk_failed(&mut self, motion: MotionMut<'_>, r: &HuntReads) -> Result<(), GenieError> {
-        self.no_tree_search(r)?;
+    fn walk_failed(
+        &mut self,
+        motion: MotionMut<'_>,
+        r: &HuntReads,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
+        self.no_tree_search(r, roles)?;
         self.timer = Seconds::new(-3.0);
         set_walker_anim(motion, Speed::new(0.0));
         Ok(())
@@ -197,6 +212,7 @@ impl HuntAction {
         actions: &mut Action,
         f: &mut Fight,
         r: &HuntReads,
+        roles: &Roles,
     ) -> Result<HuntNext, GenieError> {
         self.tear_down(c.w.parts.mover_mut(unit.id))?;
         // a target the hunt let go (the `MoveTo`'s went from the world): `FUN_140ac44b0` does
@@ -205,8 +221,8 @@ impl HuntAction {
             self.begin_face(c, unit, r);
             return Ok(HuntNext::Stay);
         }
-        self.decay_check(c, unit, actions, r.stops_decay, f)?;
-        self.set_face(c, unit, actions, f, r)
+        self.decay_check(c, unit, actions, r.stops_decay, f, roles)?;
+        self.set_face(c, unit, actions, f, r, roles)
     }
 
     /// Case 5, the face (`FUN_141162db0`; a unit without a turn time turns at once, by the
@@ -247,8 +263,9 @@ impl HuntAction {
         c: &mut Step<'_>,
         unit: &Unit,
         r: &HuntReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        self.no_tree_search(r)?;
+        self.no_tree_search(r, roles)?;
         self.set_target(None);
         let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
@@ -256,12 +273,12 @@ impl HuntAction {
     }
 
     /// `FUN_140ac4670` with 8 and −1 for a class the unit AI's slot 0x1b0 gives 0 (trees, the
-    /// class [`class::TREE`]: the class its unit AI targets, else the hunt's): the caller's
+    /// role [`ClassRoles::TREE`]: the class its unit AI targets, else the hunt's): the caller's
     /// search (`Unit::hunt_tree_search`) found none; another one here is not modelled.
-    fn no_tree_search(&self, r: &HuntReads) -> Result<(), GenieError> {
+    fn no_tree_search(&self, r: &HuntReads, roles: &Roles) -> Result<(), GenieError> {
         if r.has_ai {
             let class = r.ai_class.or(self.target_class);
-            if class == Some(class::TREE) && !r.tree_searched {
+            if roles.of_some_class(class).contains(ClassRoles::TREE) && !r.tree_searched {
                 return Err(GenieError::unsupported(
                     "a hunt's search for another tree (FUN_140ac4670)",
                 ));
@@ -278,6 +295,7 @@ impl HuntAction {
         c: &mut Step<'_>,
         unit: &mut Unit,
         herd: &Herd,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
@@ -287,6 +305,7 @@ impl HuntAction {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         self.state = HuntState::Attack { attack: None };
@@ -294,7 +313,14 @@ impl HuntAction {
         let target = self.target.ok_or(GenieError::unreachable(
             "a hunt's Attack on its livestock without a target",
         ))?;
-        let (a, arrived) = Attack::start(target.id(), &herd.engagement, herd.arms, mover, &reads)?;
+        let (a, arrived) = Attack::start(
+            target.id(),
+            &herd.engagement,
+            herd.arms,
+            mover,
+            &reads,
+            roles,
+        )?;
         if arrived {
             a.arrived_sprite(
                 unit,
@@ -318,9 +344,10 @@ pub(super) fn write_target_back(
     hunter: &mut Unit,
     actions: &mut Action,
     f: &mut Fight,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     if let Some(k) = write_back(c, &mut f.victim)? {
-        file_kill(c, (hunter, actions), k)?;
+        file_kill(c, (hunter, actions), k, roles)?;
     }
     Ok(())
 }

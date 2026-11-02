@@ -184,7 +184,13 @@ impl World {
                 grow,
                 &members,
                 true,
-                ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
+                ObjectsRef::new(
+                    &self.players,
+                    &self.index,
+                    &self.model.masters,
+                    &self.parts,
+                    &self.model.roles,
+                ),
             )? {
                 return Ok(at);
             }
@@ -264,7 +270,13 @@ impl World {
         group: GroupId,
         ahead: Distance,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
@@ -438,7 +450,6 @@ mod tests {
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::class;
     #[cfg(test)]
     use crate::objects::masters::{Master, Masters};
     #[cfg(test)]
@@ -446,6 +457,7 @@ mod tests {
     use crate::test_ids::group_id;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
     use crate::world::Millis;
     use crate::world::WorldTime;
     #[cfg(test)]

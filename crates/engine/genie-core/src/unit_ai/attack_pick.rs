@@ -25,7 +25,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -43,6 +43,8 @@ use crate::unit_ai::{
     siege_can_attack,
 };
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// A unit AI's search (`FUN_140c63e20`) as the idle checks run it: it queries its player's
 /// objects in sight of `classes` within `radius` of `at` for a searcher of radii `size`
@@ -287,18 +289,8 @@ impl Seeker {
     }
 }
 
-/// The classes an attacker of `attack_priority` 3 may attack (`FUN_140fddf10`).
-pub(super) const PRIORITY_3_CLASSES: [ClassId; 6] = [
-    class::BUILDING,
-    class::WALL,
-    class::GATE,
-    class::FARM,
-    class::TOWER,
-    class::CLASS_60,
-];
-
 /// The masters a tower never attacks (`FUN_140c1a760`, raw `0x60ce`, `0x653f`).
-pub(super) const TOWER_SPARED: [MasterId; 2] = [MasterId::named(50), MasterId::named(1187)];
+pub(super) const TOWER_SPARED: [MasterId; 2] = [ids::FARM, ids::ID_1187];
 
 /// Slot 0xa0 of `me`'s unit AI with 0, `CanAttack`: whether it may attack `t`, by type: the
 /// hunted animal's (`FUN_140c18d00`) while its action list holds an Attack (type 9) or a type 7
@@ -308,10 +300,15 @@ pub(super) const TOWER_SPARED: [MasterId; 2] = [MasterId::named(50), MasterId::n
 /// livestock) always; the building's (`FUN_140c18b60`) never; the tower's
 /// ([`tower_can_attack`]), the soldier's ([`soldier_can_attack`]) and the siege unit's. The
 /// priest's (`FUN_140c19020`: its conversion test, slot 0x1b8) is not modelled here.
-pub fn can_attack(me: &Attacker, seeker: &Seeker, t: &Target) -> Result<bool, GenieError> {
+pub fn can_attack(
+    me: &Attacker,
+    seeker: &Seeker,
+    t: &Target,
+    roles: &Roles,
+) -> Result<bool, GenieError> {
     match me.ai_type {
         UnitAiType::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
-        UnitAiType::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class)),
+        UnitAiType::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
         BOAR_AI
         | UnitAiType::RANGED_6
         | UnitAiType::RANGED_7
@@ -321,48 +318,32 @@ pub fn can_attack(me: &Attacker, seeker: &Seeker, t: &Target) -> Result<bool, Ge
         | ARTIFACT_AI
         | SIEGE_TOWER_AI
         | UnitAiType::LIVESTOCK => Ok(true),
-        UnitAiType::LION => Ok(lion_may_attack(me.attack_priority, t.class)),
-        CIVILIAN => Ok(civilian_may_attack(me.attack_priority, t.class)),
+        UnitAiType::LION => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
+        CIVILIAN => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
         BUILDING_AI => Ok(false),
-        UnitAiType::TOWER => tower_can_attack(me, t),
-        UnitAiType::SOLDIER => soldier_can_attack(me, seeker, t),
-        SIEGE_AI => siege_can_attack(me, seeker, t, false),
+        UnitAiType::TOWER => tower_can_attack(me, t, roles),
+        UnitAiType::SOLDIER => soldier_can_attack(me, seeker, t, roles),
+        SIEGE_AI => siege_can_attack(me, seeker, t, false, roles),
         _ => Err(GenieError::unsupported(
             "an attack check (slot 0xa0) of a unit-AI type not modelled",
         )),
     }
 }
 
-/// The classes a predator attacks by its own choice (its slot 0xa0's list, `FUN_140c18ed0`).
-pub(super) const PREDATOR_ATTACKS: [ClassId; 18] = [
-    class::CLASS_0,
-    class::VILLAGER,
-    class::CLASS_6,
-    class::CLASS_12,
-    class::CLASS_23,
-    class::CLASS_24,
-    class::CLASS_25,
-    class::CLASS_26,
-    class::CLASS_28,
-    class::CLASS_35,
-    class::CLASS_36,
-    class::CLASS_44,
-    class::CLASS_45,
-    class::CLASS_46,
-    class::CLASS_47,
-    class::CLASS_50,
-    class::CLASS_56,
-    class::CLASS_57,
-];
-
 /// The predator's slot 0xa0 (`FUN_140c18ed0`) without its `any` flag: by the master's attack
 /// priority 1 and 2 anything, 3 the classes of [`PRIORITY_3_CLASSES`], any other the classes of
 /// [`PREDATOR_ATTACKS`].
-pub(super) fn predator_may_attack(attack_priority: AttackPriority, class: ClassId) -> bool {
+pub(super) fn predator_may_attack(
+    attack_priority: AttackPriority,
+    class: ClassId,
+    roles: &Roles,
+) -> bool {
     match attack_priority {
         AttackPriority::PRIORITY_1 | AttackPriority::PRIORITY_2 => true,
-        AttackPriority::PRIORITY_3 => PRIORITY_3_CLASSES.contains(&class),
-        _ => PREDATOR_ATTACKS.contains(&class),
+        AttackPriority::PRIORITY_3 => roles
+            .of_class(class)
+            .contains(ClassRoles::PRIORITY_3_TARGET),
+        _ => roles.of_class(class).contains(ClassRoles::PREDATOR_TARGET),
     }
 }
 
@@ -373,14 +354,20 @@ pub(super) fn predator_may_attack(attack_priority: AttackPriority, class: ClassI
 /// priority below 3 only of combat level 4 (`FUN_140fde120`); else when the tower is armed
 /// (`FUN_14120ea30`: classes 51 and 54, or a missile, or else a firepower, `+0xa00`, above 1)
 /// and its attack priority is not 3 or the class one of [`PRIORITY_3_CLASSES`].
-pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
-    if me.player == PlayerId::GAIA || matches!(t.class, class::ARTIFACT | class::RELIC) {
+pub fn tower_can_attack(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool, GenieError> {
+    if me.player == PlayerId::GAIA
+        || roles
+            .of_class(t.class)
+            .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
+    {
         return Ok(false);
     }
     let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
     if !gaia_combat
         && t.owner == PlayerId::GAIA
-        && !matches!(t.class, class::PREY | class::PREDATOR)
+        && !roles
+            .of_class(t.class)
+            .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
     {
         return Ok(false);
     }
@@ -390,27 +377,34 @@ pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
     {
         return Ok(false);
     }
-    if t.class == class::PREDATOR && me.attack_priority < AttackPriority::PRIORITY_3 {
+    if roles.of_class(t.class).contains(ClassRoles::PREDATOR)
+        && me.attack_priority < AttackPriority::PRIORITY_3
+    {
         return Ok(t.combat_level == CombatLevel::MILITARY);
     }
-    if !matches!(me.class, Some(class::CLASS_51 | class::CLASS_54))
+    if !roles
+        .of_some_class(me.class)
+        .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         && me.missile.is_none()
         && me.firepower <= ARMED_FIREPOWER
     {
         return Ok(false);
     }
-    Ok(!me.attack_priority.limited() || PRIORITY_3_CLASSES.contains(&t.class))
+    Ok(!me.attack_priority.limited()
+        || roles
+            .of_class(t.class)
+            .contains(ClassRoles::PRIORITY_3_TARGET))
 }
 
 /// An attacker without a missile is armed with a firepower above this (`FUN_14120ea30`,
 /// `DAT_14330eb8c`).
 pub(super) const ARMED_FIREPOWER: Firepower = Firepower::new(UNIT_AI_ARMED_FIREPOWER);
 /// A soldier never attacks with this master (raw `0x6258`).
-pub(super) const SOLDIER_NEVER: MasterId = MasterId::named(444);
+pub(super) const SOLDIER_NEVER: MasterId = ids::TOWN_CENTRE_444;
 /// The master and class whose packed state (top action 124 or 125) attacks nothing (raw
 /// `0x6109`; class 54).
-pub(super) const PACKED_MASTER: MasterId = MasterId::named(109);
-pub(super) const PACKED_CLASS: ClassId = class::CLASS_54;
+pub(super) const PACKED_MASTER: MasterId = ids::TOWN_CENTRE;
+
 /// The soldier's range against a target grows by this for its stance checks
 /// (`DAT_142e7f384`).
 pub(super) const STANCE_RANGE_GROWTH: Distance = Distance::new(UNIT_AI_STANCE_RANGE_GROWTH);
@@ -454,8 +448,13 @@ impl Attacker {
 /// `FUN_140a847c0`), but on order `0x2bd`; in Defend (1) within 5 more, the patrol orders' and a
 /// patrol path's tests not modelled. Then an attack priority of 3 takes only
 /// [`PRIORITY_3_CLASSES`].
-pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool, GenieError> {
-    if t.class == class::CLASS_64 {
+pub fn soldier_can_attack(
+    me: &Attacker,
+    s: &Seeker,
+    t: &Target,
+    roles: &Roles,
+) -> Result<bool, GenieError> {
+    if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
         return Ok(false);
     }
     let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
@@ -463,7 +462,9 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
         return Ok(false);
     }
     if t.owner == PlayerId::GAIA
-        && !matches!(t.class, class::PREY | class::PREDATOR)
+        && !roles
+            .of_class(t.class)
+            .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
         && !gaia_combat
     {
         return Ok(false);
@@ -476,11 +477,13 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
             "a computer player's soldier's attack check",
         ));
     }
-    if never_attacks(me) {
+    if never_attacks(me, roles) {
         return Ok(false);
     }
     if me.held == Some(attribute::RELIC)
-        || matches!(t.class, class::ARTIFACT | class::RELIC | class::CLASS_60)
+        || roles
+            .of_class(t.class)
+            .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC | ClassRoles::MISC_BUILDING)
     {
         return Ok(false);
     }
@@ -493,16 +496,26 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
     if !stance_reaches(me, s, t)? {
         return Ok(false);
     }
-    Ok(!me.attack_priority.limited() || PRIORITY_3_CLASSES.contains(&t.class))
+    Ok(!me.attack_priority.limited()
+        || roles
+            .of_class(t.class)
+            .contains(ClassRoles::PRIORITY_3_TARGET))
 }
 
 /// [`soldier_can_attack`]'s soldiers that never attack: class 51, master 444, and a packed class
 /// 54 or master 109 under its Pack or Unpack (top action 124 or 125).
-pub(super) fn never_attacks(me: &Attacker) -> bool {
-    if me.class == Some(class::CLASS_51) || me.master == SOLDIER_NEVER {
+pub(super) fn never_attacks(me: &Attacker, roles: &Roles) -> bool {
+    if roles
+        .of_some_class(me.class)
+        .contains(ClassRoles::PACKED_TREBUCHET)
+        || me.master == SOLDIER_NEVER
+    {
         return true;
     }
-    (me.class == Some(PACKED_CLASS) || me.master == PACKED_MASTER)
+    (roles
+        .of_some_class(me.class)
+        .contains(ClassRoles::PACKED_ATTACKS_NOTHING)
+        || me.master == PACKED_MASTER)
         && matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK))
 }
 
@@ -542,8 +555,12 @@ pub(super) fn stance_reaches(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
 /// `area_effect_level` has neither [`BlastLevel::SPARES_FRIENDS`] nor
 /// [`BlastLevel::SKIPS_FRIEND_CHECK`] (`FUN_1410bf160`, `FUN_1410bfcb0`) scans the tiles
 /// of the blast around the target for its own or allied objects (not modelled).
-pub(crate) fn spares_friends(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
-    if me.attack_priority == AttackPriority::PRIORITY_3 && !PRIORITY_3_CLASSES.contains(&t.class) {
+pub(crate) fn spares_friends(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool, GenieError> {
+    if me.attack_priority == AttackPriority::PRIORITY_3
+        && !roles
+            .of_class(t.class)
+            .contains(ClassRoles::PRIORITY_3_TARGET)
+    {
         return Ok(false);
     }
     let ranged = Distance::new(1.0) < me.range;

@@ -8,6 +8,7 @@ use genie_core::pathing::{FixedDistance, FixedPoint, FixedRect};
 use genie_core::pathing::{ShapeId, ShapeSide};
 
 use crate::masters::TerrainTable;
+use crate::setup::layer;
 use crate::{Error, live, spatial};
 use genie_core::map::{Restriction, RestrictionId, TerrainId};
 use genie_core::pathing::mesh::{Contact, Mesh};
@@ -149,7 +150,8 @@ pub fn planner_from_save(
         .iter()
         .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_type)))
         .collect();
-    let spatial = spatial(&header, terrain).map_err(Error::Unmodelled)?;
+    let roles = &layer().map_err(Error::Unmodelled)?.roles;
+    let spatial = spatial(&header, terrain, roles).map_err(Error::Unmodelled)?;
     let tiles = spatial.tiles();
     let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
     Ok(Planner::new(

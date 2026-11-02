@@ -44,10 +44,8 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::{Task, player_master};
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -84,9 +82,6 @@ const WORKING_ACTIONS: [ActionKind; 4] = [ATTACK, ActionKind::COMBAT, GATHER, HU
 /// The action state of an action at work (`+0x18`).
 const WORKING: ActionState = ActionState::new(7);
 
-/// The building classes a movement damage hits (`0x141207ae8`, decoded 0x33 and 0x36); it hits
-/// any object of another type.
-const STRUCK_BUILDING_CLASSES: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
 /// The blast defence from which an object is reached whatever the hitter's level (`+0x62b`).
 const ALWAYS_REACHED: BlastDefense = BlastDefense::ALWAYS_REACHED;
 

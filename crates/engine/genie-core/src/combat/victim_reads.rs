@@ -20,6 +20,7 @@ use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
+use crate::world::layer::Roles;
 use crate::world::{Mode680, Unread};
 
 /// What a hit of an attacker of player `attacker` reads of the object `u` of player `p`, of
@@ -40,6 +41,7 @@ pub(crate) fn victim_in(
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: Mode680,
+    roles: &Roles,
 ) -> Victim {
     let mut v = victim_of(
         (u, unit_ai, building, combat, actions, unread),
@@ -48,6 +50,7 @@ pub(crate) fn victim_in(
         p,
         spatial.terrain.as_ref(),
         mode_680,
+        roles,
     );
     v.allied = Allied {
         by_attacker: dip.allied(attacker, p, true),
@@ -82,6 +85,7 @@ pub(crate) fn victim_of(
     p: PlayerId,
     terrain: Option<&Terrain>,
     mode_680: Mode680,
+    roles: &Roles,
 ) -> Victim {
     let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
     let kind = master.kind;
@@ -203,7 +207,7 @@ pub(crate) fn victim_of(
             // that annex, inside the six tiles the pass reaches past the radius; a trample reads
             // its target's or its main building's after its own blast
             blast_taken: HitPoints::ZERO,
-            trebuchet: is_trebuchet(master),
+            trebuchet: is_trebuchet(master, roles),
             cost: paid_cost(master),
             damaged_lately: u.damaged_lately,
             struck: false,

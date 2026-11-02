@@ -25,6 +25,7 @@ use crate::players::{NO_RELATIONS, Relations};
 use crate::unit_ai::Notify;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
+use crate::world::layer::Roles;
 use crate::world::others::{Others, OthersRef};
 use crate::world::parts::{PartTable, repairers_in};
 use crate::world::step::Step;
@@ -150,12 +151,13 @@ pub(crate) fn take(
     me: &mut Unit,
     id: impl ObjectKey,
     by: Releaser,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     let Some(id) = id.key() else {
         return Ok(());
     };
     if id == c.me {
-        own_lets(c, |lets, others| lets.take(others, Some(me), id, by))?
+        own_lets(c, |lets, others| lets.take(others, Some(me), id, by, roles))?
     } else {
         c.w.take(id, by)
     }
@@ -244,6 +246,7 @@ impl Lets<'_> {
         me: Option<&mut Unit>,
         id: ObjectId,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if let Some(u) = me.filter(|u| u.id == id) {
             let allied = self.allied(others.view(), by.player, self.player);
@@ -258,7 +261,7 @@ impl Lets<'_> {
             if u.workers < WorkerCount::MOST {
                 u.workers = u.workers.plus(1);
             }
-            let _ = others.wake(id, self.tracker, (self.masters.players, self.lines));
+            let _ = others.wake(id, self.tracker, (self.masters.players, self.lines), roles);
             return Ok(());
         }
         let allied = self.allied(others.view(), by.player, p);

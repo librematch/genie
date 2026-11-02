@@ -23,7 +23,6 @@ use crate::objects::masters::SoundEvents;
 use crate::objects::masters::TaskFlags;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::TaskTerrain;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -34,6 +33,7 @@ use crate::test_ids::class_id;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::world::Millis;
@@ -373,21 +373,23 @@ fn movement_damage_strikes_enemies_in_reach() {
     let h = hitter();
     let b = bystander();
     // the gap is 1.5 - 0.6 = 0.9: within 1 (0.81 at most 1), not within 0.5
-    assert!(struck(&h, Distance::new(1.0), &b));
-    assert!(!struck(&h, Distance::new(0.5), &b));
-    assert!(struck(&h, Distance::new(f32::NAN), &b));
+    assert!(struck(&h, Distance::new(1.0), &b, &roles()));
+    assert!(!struck(&h, Distance::new(0.5), &b, &roles()));
+    assert!(struck(&h, Distance::new(f32::NAN), &b, &roles()));
     assert!(!struck(
         &h,
         Distance::new(1.0),
         &Bystander {
             id: object_id(1),
             ..b
-        }
+        },
+        &roles()
     ));
     assert!(!struck(
         &h,
         Distance::new(1.0),
-        &Bystander { allied: true, ..b }
+        &Bystander { allied: true, ..b },
+        &roles()
     ));
     assert!(!struck(
         &h,
@@ -395,7 +397,8 @@ fn movement_damage_strikes_enemies_in_reach() {
         &Bystander {
             player: PlayerId::new(0),
             ..b
-        }
+        },
+        &roles()
     ));
     assert!(!struck(
         &h,
@@ -403,7 +406,8 @@ fn movement_damage_strikes_enemies_in_reach() {
         &Bystander {
             state: ObjectState::Dying,
             ..b
-        }
+        },
+        &roles()
     ));
     // buildings only of classes 51 and 54
     let building = Bystander {
@@ -411,14 +415,15 @@ fn movement_damage_strikes_enemies_in_reach() {
         class: class::BUILDING,
         ..b
     };
-    assert!(!struck(&h, Distance::new(1.0), &building));
+    assert!(!struck(&h, Distance::new(1.0), &building, &roles()));
     assert!(struck(
         &h,
         Distance::new(1.0),
         &Bystander {
             class: class::CLASS_51,
             ..building
-        }
+        },
+        &roles()
     ));
     assert!(struck(
         &h,
@@ -426,21 +431,23 @@ fn movement_damage_strikes_enemies_in_reach() {
         &Bystander {
             class: class::CLASS_54,
             ..building
-        }
+        },
+        &roles()
     ));
     // the blast levels
     let high = Hitter {
         blast_level: BlastLevel::from_bits_retain(3),
         ..h
     };
-    assert!(!struck(&high, Distance::new(1.0), &b));
+    assert!(!struck(&high, Distance::new(1.0), &b, &roles()));
     assert!(struck(
         &high,
         Distance::new(1.0),
         &Bystander {
             blast_defense: BlastDefense::new(2),
             ..b
-        }
+        },
+        &roles()
     ));
     assert!(struck(
         &Hitter {
@@ -451,7 +458,8 @@ fn movement_damage_strikes_enemies_in_reach() {
         &Bystander {
             blast_defense: BlastDefense::new(1),
             ..b
-        }
+        },
+        &roles()
     ));
 }
 
@@ -658,6 +666,7 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::players::relation_row;
 use crate::test_ids::{amounts, attributes};
+use crate::testing::roles;
 use crate::vision::visibility::{BuildingSight, Seer, Visibility, VisibleMap};
 use crate::world::FrameSeed;
 use crate::world::Player;

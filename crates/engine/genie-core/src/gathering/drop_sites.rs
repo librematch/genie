@@ -12,7 +12,6 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::pathing::tile_path::Found;
 
 use crate::map::spatial::Spatial;
@@ -28,6 +27,8 @@ use crate::objects::unit::Unit;
 use crate::pathing::zones::ZoneMap;
 use crate::world::Unread;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 
 /// The unit a drop-site search goes from ([`drop_site_search`]).
@@ -55,12 +56,14 @@ pub(crate) struct Seeker<'a, 'b> {
 pub(crate) const NO_POINT: f32 = DROP_NO_POINT;
 
 impl Seeker<'_, '_> {
-    /// A fishing ship ([`class::FISHING_SHIP`]) seeks in every zone and counts a drop site its path
+    /// A fishing ship ([`ClassRoles::FISHING_SHIP`]) seeks in every zone and counts a drop site its path
     /// does not reach while near it.
-    fn fishing(&self) -> bool {
+    fn fishing(&self, roles: &Roles) -> bool {
         // The fishing ship's class (21), whose drop-site search passes over the zones.
         // The villager's class (4), which searches from the farm it works.
-        self.class == class::FISHING_SHIP
+        roles
+            .of_class(self.class)
+            .contains(ClassRoles::FISHING_SHIP)
     }
 
     /// What `FUN_1411671e0` measures to the drop site `o` (of `master`, its centre `squared`
@@ -81,6 +84,7 @@ impl Seeker<'_, '_> {
         last: &mut f32,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<f32>, GenieError> {
+        let roles = by_id.roles();
         let radii = Distance::new(self.mover.stats.radius.x() + master.radius.x());
         let to = o.position().ground();
         let ground = self.mover.stats.radius.ground();
@@ -92,7 +96,7 @@ impl Seeker<'_, '_> {
             self.mover
                 .plan_length(self.unit.position(), self.spatial, self.plan, to, radii)?;
         Ok(match planned {
-            Some((found, length)) if counted(found, by_path, self.fishing(), near) => {
+            Some((found, length)) if counted(found, by_path, self.fishing(roles), near) => {
                 if !by_path {
                     return Ok(Some(squared));
                 }
@@ -125,8 +129,8 @@ impl Seeker<'_, '_> {
     /// # Errors
     ///
     /// The villager's top action is not modelled, or the farm's place is unknown.
-    fn farm_worked(&self) -> Result<Option<Point>, GenieError> {
-        if self.class != class::VILLAGER {
+    fn farm_worked(&self, roles: &Roles) -> Result<Option<Point>, GenieError> {
+        if !roles.of_class(self.class).contains(ClassRoles::VILLAGER) {
             return Ok(None);
         }
         let Some(target) = self.actions.top_action_object(self.unread)? else {
@@ -135,7 +139,7 @@ impl Seeker<'_, '_> {
         Ok(self
             .spatial
             .get_known(target)?
-            .filter(|p| p.class == class::FARM)
+            .filter(|p| roles.of_class(p.class).contains(ClassRoles::FARM))
             .map(|p| p.position.ground()))
     }
 }
@@ -182,9 +186,10 @@ pub(crate) fn drop_site_search<'u>(
     (outside, at_work): (bool, Option<ActionKind>),
     by_id: ObjectsRef<'_>,
 ) -> Result<Option<DropSiteId>, GenieError> {
+    let roles = by_id.roles();
     let (mut x, mut y) = (at.x(), at.y());
     let pointless = x <= NO_POINT || y <= NO_POINT;
-    let fishing = seeker.as_ref().is_some_and(Seeker::fishing);
+    let fishing = seeker.as_ref().is_some_and(|s| s.fishing(roles));
     let own_zone = seeker
         .as_ref()
         .filter(|_| !fishing && !pointless)
@@ -224,7 +229,7 @@ pub(crate) fn drop_site_search<'u>(
         }
         if let Some(farm) = seeker
             .as_ref()
-            .map(Seeker::farm_worked)
+            .map(|s| s.farm_worked(roles))
             .transpose()?
             .flatten()
         {
@@ -316,6 +321,7 @@ mod tests {
     use crate::players::PlayerType;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
     use crate::world::WorldTime;
     #[cfg(test)]
     use crate::world::parts::{Object, no_own_masters};

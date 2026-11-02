@@ -119,7 +119,12 @@ impl World {
         if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
             return Ok(());
         }
-        let rate = attack_rate(master, masters, self.parts.combat_of(u.id).reload_powerup);
+        let rate = attack_rate(
+            master,
+            masters,
+            self.parts.combat_of(u.id).reload_powerup,
+            &self.model.roles,
+        );
         if at_most_or_unordered(rate.get(), 0.0) {
             return Ok(());
         }
@@ -135,6 +140,7 @@ impl World {
                     self.model.masters.checked(q.index())?,
                     self.parts.combat_of(unit.id).reload_powerup,
                     rate,
+                    &self.model.roles,
                 )?);
             }
         }

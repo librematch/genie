@@ -25,11 +25,13 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::{Master, Masters, class, player_master};
+use crate::objects::masters::{Master, Masters, player_master};
 use crate::objects::unit::Unit;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, Zones};
 use crate::world::Unread;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use std::sync::Arc;
 
 /// How near the point a transport must reach for an Enter (slot 0x3d8's range), and the range up
@@ -81,14 +83,14 @@ pub enum MeetAt {
 /// state 3, 4 or 11 meets it where that action goes, but a siege weapon (class 13) at its
 /// place; any other state at its place.
 #[must_use]
-pub fn meet_at(t: &MeetingTarget) -> MeetAt {
+pub fn meet_at(t: &MeetingTarget, roles: &Roles) -> MeetAt {
     if !t.room || t.speed <= Speed::ZERO {
         return MeetAt::Place;
     }
     if matches!(t.state.get(), 0 | 2) {
         return MeetAt::Shore;
     }
-    if t.class == class::SIEGE || !matches!(t.state.get(), 11 | 4 | 3) {
+    if roles.of_class(t.class).contains(ClassRoles::SIEGE) || !matches!(t.state.get(), 11 | 4 | 3) {
         return MeetAt::Place;
     }
     MeetAt::ActionPoint
@@ -286,7 +288,8 @@ pub(crate) fn meeting_point(
     zones: &mut Zones,
     by_id: ObjectsRef<'_>,
 ) -> Result<(Point, u8), GenieError> {
-    match meet_at(t) {
+    let roles = by_id.roles();
+    match meet_at(t, roles) {
         MeetAt::Place => Ok((t.position, 0)),
         MeetAt::ActionPoint => Ok((t.action_point.clone()?, 0)),
         MeetAt::Shore => shore_or_beach(t, unit, spatial, zones, by_id),

@@ -21,6 +21,7 @@ use crate::players::tracker::{Tracker, key};
 use crate::unit_ai::world_view::Foreign;
 use crate::world::World;
 use crate::world::index::{ObjectIndex, Place};
+use crate::world::layer::Roles;
 use crate::world::player::Player;
 use std::cmp::Ordering;
 use std::ptr::eq;
@@ -384,6 +385,7 @@ impl<'a> Others<'a> {
         id: ObjectId,
         own_tracker: &mut Tracker,
         (masters, lines): (&[Arc<Masters>], &UnitLines),
+        roles: &Roles,
     ) -> bool {
         let Self {
             player,
@@ -435,7 +437,7 @@ impl<'a> Others<'a> {
             return false;
         };
         woken.life.goto_sleep = false;
-        let k = key(masters.of(q), lines, woken.life.master_id);
+        let k = key(masters.of(q), lines, woken.life.master_id, roles);
         let _ = index.push(live, Place::Live(q, ListIndex::new(0)), woken);
         tracker.remove(id, k);
         tracker.add(id, k);
@@ -521,6 +523,7 @@ mod tests {
     use crate::objects::masters::ids;
     use crate::players::tracker::ListKey;
     use crate::test_ids::object_id;
+    use crate::testing::roles;
 
     fn unit(id: i32) -> Unit {
         Unit {
@@ -705,7 +708,7 @@ mod tests {
         let mut asleep = ObjectList::from(vec![unit(13)]);
         asleep[ListIndex::new(0)].life.goto_sleep = true;
         let lines = UnitLines::default();
-        let k = key(None, &lines, ids::ID_0);
+        let k = key(None, &lines, ids::ID_0, &roles());
         let mut tracker = Tracker::default();
         for id in [13, 10] {
             tracker.add(object_id(id), k);
@@ -720,10 +723,10 @@ mod tests {
             (&mut before, &mut after),
             &mut index,
         );
-        assert!(others.wake(object_id(13), &mut tracker, (&[], &lines)));
-        assert!(others.wake(object_id(2), &mut tracker, (&[], &lines)));
+        assert!(others.wake(object_id(13), &mut tracker, (&[], &lines), &roles()));
+        assert!(others.wake(object_id(2), &mut tracker, (&[], &lines), &roles()));
         assert!(
-            !others.wake(object_id(20), &mut tracker, (&[], &lines)),
+            !others.wake(object_id(20), &mut tracker, (&[], &lines), &roles()),
             "20 is awake"
         );
         assert_eq!(

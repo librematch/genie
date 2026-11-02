@@ -16,6 +16,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::players::Amount;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::TaskTarget;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::{Actor, find_task};
@@ -150,11 +151,15 @@ impl World {
             find_task(
                 list,
                 &actor,
-                Some(&t),
-                Some(&general),
-                terrain,
+                &TaskOn {
+                    target: Some(&t),
+                    general: Some(&general),
+                    terrain,
+                },
                 query.filter,
                 &world,
+                self.model.slots,
+                &self.model.roles,
             )
             .map(Option::<&Task>::copied)
         };

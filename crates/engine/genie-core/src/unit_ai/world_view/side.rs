@@ -32,7 +32,6 @@ use crate::objects::masters::ClassMask;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
 use crate::objects::masters::player_master;
 use crate::orders::nearest_table_site;
 use crate::orders::object_gone;
@@ -49,6 +48,7 @@ use crate::unit_ai::{
 use crate::unit_ai::{Search, UnitAi};
 use crate::world::PETARD;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use std::mem::{swap, take};
@@ -101,6 +101,7 @@ impl UnitSide for UnitView<'_, '_> {
             &self.c.w.index,
             &self.c.w.model.masters,
             &self.c.w.parts,
+            &self.c.w.model.roles,
         );
         self.c.w.spatial.point_clear(
             unit.id,
@@ -130,6 +131,7 @@ impl UnitSide for UnitView<'_, '_> {
         const SIEGE_TOWER: MasterId = MasterId::named(0x451);
         /// `AskForHelp`'s reach (`DAT_142ecccc4`): the squared footprint gap of 3 tiles.
         const HELP_REACH: DistanceSquared = DistanceSquared::new(UNIT_AI_HELP_REACH);
+        let roles = &self.c.w.model.roles.clone();
         let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
             "a search that reads the registry's last answer (before any query)",
         ))?;
@@ -164,7 +166,7 @@ impl UnitSide for UnitView<'_, '_> {
             if no_help || m.id == SIEGE_TOWER {
                 continue;
             }
-            if !gaia_attacker && m.class == class::VILLAGER {
+            if !gaia_attacker && roles.of_class(m.class).contains(ClassRoles::VILLAGER) {
                 continue;
             }
             if owner != self.player && !self.c.w.spatial.allied_with(owner, self.player) {
@@ -175,7 +177,14 @@ impl UnitSide for UnitView<'_, '_> {
             if HELP_REACH < gap {
                 continue;
             }
-            if !self.helper_free(owner, u, self.c.w.parts.actions_of(u.id), m, attacker)? {
+            if !self.helper_free(
+                owner,
+                u,
+                self.c.w.parts.actions_of(u.id),
+                m,
+                attacker,
+                roles,
+            )? {
                 continue;
             }
             return helper_answers();
@@ -184,11 +193,14 @@ impl UnitSide for UnitView<'_, '_> {
     }
 
     fn duel(&mut self, other: ObjectId) -> Result<Duel, GenieError> {
-        self.picker(None)?.duel(&self.c.w.spatial, other)
+        let roles = &self.c.w.model.roles.clone();
+        self.picker(None)?.duel(&self.c.w.spatial, other, roles)
     }
 
     fn harmless(&mut self, attacker: ObjectId) -> Result<bool, GenieError> {
-        self.picker(None)?.harmless(&self.c.w.spatial, attacker)
+        let roles = &self.c.w.model.roles.clone();
+        self.picker(None)?
+            .harmless(&self.c.w.spatial, attacker, roles)
     }
 
     fn defended_attacker(&mut self, target: ObjectId) -> Result<NearestAttacker, GenieError> {
@@ -285,6 +297,7 @@ impl UnitSide for UnitView<'_, '_> {
             &self.c.w.index,
             &self.c.w.model.masters,
             &self.c.w.parts,
+            &self.c.w.model.roles,
         );
         mover.reaches_object(
             (unit.position(), &walker),
@@ -297,6 +310,7 @@ impl UnitSide for UnitView<'_, '_> {
     }
 
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
+        let roles = &self.c.w.model.roles.clone();
         let seeker = match search.pick {
             Pick::Attack { seeker, .. } => Some(seeker),
             _ => None,
@@ -326,6 +340,7 @@ impl UnitSide for UnitView<'_, '_> {
                 &self.c.w.index,
                 &self.c.w.model.masters,
                 &self.c.w.parts,
+                &self.c.w.model.roles,
             ),
             restriction: self
                 .unit
@@ -368,6 +383,7 @@ impl UnitSide for UnitView<'_, '_> {
             &self.c.w.index,
             &self.c.w.model.masters,
             &self.c.w.parts,
+            &self.c.w.model.roles,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             let m = mover.ok_or(GenieError::unsupported(
@@ -392,16 +408,19 @@ impl UnitSide for UnitView<'_, '_> {
         };
         // a farm's workers (`+0x644`) and its pasture (`+0x790`)
         let farm = |id: ObjectId| others.get(id).map(|u| (u.workers, u.pasture));
-        self.c.w.spatial.search(SearchQuery {
-            searcher: unit.id,
-            player: self.player,
-            search,
-            attack: &mut picker,
-            reach: &mut reach,
-            moving: &moving,
-            shuns: &shuns,
-            farm: &farm,
-        })
+        self.c.w.spatial.search(
+            SearchQuery {
+                searcher: unit.id,
+                player: self.player,
+                search,
+                attack: &mut picker,
+                reach: &mut reach,
+                moving: &moving,
+                shuns: &shuns,
+                farm: &farm,
+            },
+            roles,
+        )
     }
 
     fn may_attack(
@@ -409,10 +428,11 @@ impl UnitSide for UnitView<'_, '_> {
         target: ObjectId,
         seeker: &UnitAiSeeker,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
+        let roles = &self.c.w.model.roles.clone();
         if !self.view_holds(target)? {
             return Ok(None);
         }
-        self.attack_check(target, seeker)
+        self.attack_check(target, seeker, roles)
     }
 
     fn attack(
@@ -421,7 +441,8 @@ impl UnitSide for UnitView<'_, '_> {
         force: bool,
         ai: &UnitAi,
     ) -> Result<Attacked, GenieError> {
-        self.start_attack_now(target, force, ai)
+        let roles = &self.c.w.model.roles.clone();
+        self.start_attack_now(target, force, ai, roles)
     }
 
     fn set_under_attack(&mut self, value: bool) {
@@ -439,6 +460,7 @@ impl UnitSide for UnitView<'_, '_> {
         ai: &mut UnitAi,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
+        let roles = &self.c.w.model.roles.clone();
         let held = self.c.side_notifies.take().unwrap_or_default();
         let posted = held
             .into_iter()
@@ -450,7 +472,10 @@ impl UnitSide for UnitView<'_, '_> {
             .master(self.c.w.master_tables(), self.c.player)
             .map(|m| m.class);
         let done = class.and_then(|class| {
-            posted.and_then(|()| self.unit.run_effect(self.actions, e, Some(class), self.c))
+            posted.and_then(|()| {
+                self.unit
+                    .run_effect(self.actions, e, Some(class), self.c, roles)
+            })
         });
         swap(self.c.w.streams.get(Stream::Ai), rng);
         self.c.side_notifies = Some(Vec::new());
@@ -503,7 +528,8 @@ impl UnitSide for UnitView<'_, '_> {
     }
 
     fn owner_hears(&mut self, n: Notify) -> Result<(), GenieError> {
-        self.hears(n)
+        let roles = &self.c.w.model.roles.clone();
+        self.hears(n, roles)
     }
 
     fn seek_beyond_sight(&mut self, rng: &mut Well512) -> Result<Option<Tile>, GenieError> {
@@ -550,9 +576,11 @@ impl UnitSide for UnitView<'_, '_> {
     /// with a task the new wait replaces the unit's actions, which the caller makes after the
     /// update ([`Wait`], [`World::wait_for_foundation`]).
     fn command(&mut self, command: UnitCommand) -> Result<bool, GenieError> {
+        let roles = &self.c.w.model.roles.clone();
+        let slots = self.c.w.model.slots;
         match command {
-            UnitCommand::Repair(target) => self.repair_command(target),
-            UnitCommand::Enter(target) => self.enter_command(target),
+            UnitCommand::Repair(target) => self.repair_command(target, slots, roles),
+            UnitCommand::Enter(target) => self.enter_command(target, slots, roles),
             // slot 0x3a8 (FUN_14108d050): its Transport, made at once, answers 1
             UnitCommand::Unload {
                 to,
@@ -569,11 +597,15 @@ impl UnitSide for UnitView<'_, '_> {
     }
 
     fn builds(&self, foundation: FoundationId) -> Result<bool, GenieError> {
-        self.builds_on(foundation)
+        let roles = &self.c.w.model.roles.clone();
+        let slots = self.c.w.model.slots;
+        self.builds_on(foundation, slots, roles)
     }
 
     fn wait_solidify(&mut self, target: ObjectId) -> Result<bool, GenieError> {
-        self.start_wait_now(target)
+        let roles = &self.c.w.model.roles.clone();
+        let slots = self.c.w.model.slots;
+        self.start_wait_now(target, slots, roles)
     }
 
     /// The soldier's `AttackObject` in a group (`FUN_140c17550`): the unit's future path data

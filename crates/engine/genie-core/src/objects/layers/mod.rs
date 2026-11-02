@@ -122,10 +122,10 @@ mod tests {
     use crate::map::spatial::Placed;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::class;
     use crate::objects::masters::ids;
     use crate::players::PlayerId;
     use crate::test_ids::object_id;
+    use crate::testing::class;
 
     /// A small map with object 7 indexed at `at`.
     fn indexed(at: Position) -> Spatial {

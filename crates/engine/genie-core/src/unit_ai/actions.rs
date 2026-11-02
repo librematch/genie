@@ -8,7 +8,6 @@ use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::orders::Dispatch;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
@@ -23,6 +22,8 @@ use crate::unit_ai::{
     UnitSide, WALK_BACK, point_gap_squared,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
 impl UnitAi {
@@ -246,7 +247,14 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.stop_with(order, Some((at.position.ground(), at.class)), side, rng)
+        let roles = &at.roles;
+        self.stop_with(
+            order,
+            Some((at.position.ground(), at.class)),
+            side,
+            rng,
+            roles,
+        )
     }
 
     /// [`UnitAi::stop_current`] with the unit's position and master's class (`place`), which only
@@ -257,6 +265,7 @@ impl UnitAi {
         place: Option<(Point, Option<ClassId>)>,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let action = self.current_action;
         let current = self.current_order;
@@ -278,7 +287,7 @@ impl UnitAi {
             // The class whose busy units skip the idle check (`-0xe98` raw).
             // The class of the attackers and targets a villager's damage notify looks at (`-0xea2` raw).
             // The class whose stop leaves the state position (`-0xe9a` raw, slot 0xb0).
-            if class != Some(class::MONK) {
+            if !roles.of_some_class(class).contains(ClassRoles::MONK) {
                 self.state_position = position;
             }
         }
@@ -505,13 +514,14 @@ impl UnitAi {
         player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
+        let roles = &at.roles;
         let mut k = 0;
         while k < self.orders.len() {
             if self.current_action.is_some() && self.orders.checked(k)?.priority.waits() {
                 return Ok(());
             }
             let order = *self.orders.checked(k)?;
-            let r = self.process_order(&order, Some((at, player_type)), None, ai, side)?;
+            let r = self.process_order(&order, Some((at, player_type)), None, ai, side, roles)?;
             if r == OrderOutcome::NotReady {
                 k += 1;
                 continue;

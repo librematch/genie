@@ -227,9 +227,18 @@ impl World {
             general: Some(&target),
             terrain: self.task_terrain(Position::new(position.x(), position.y(), 0.0)),
         };
-        let (with, task) = work_master(masters, &actor, &on, None, &world)?.ok_or(
-            GenieError::unsupported("a builder with no task for its foundation"),
-        )?;
+        let (with, task) = work_master(
+            masters,
+            &actor,
+            &on,
+            None,
+            &world,
+            self.model.slots,
+            &self.model.roles,
+        )?
+        .ok_or(GenieError::unsupported(
+            "a builder with no task for its foundation",
+        ))?;
         if task.action_kind != ActionKind::BUILD {
             return Err(GenieError::unsupported(
                 "a builder whose task for its foundation is not Build",
@@ -259,6 +268,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         );
         Ok((with, BuildAction::start(to, task, &move_reads)?))
     }
@@ -447,8 +457,19 @@ impl World {
         // (FUN_140aad4e0 on it), its type and its enablement unread
         // slot 0x820's point: the foundation's place
         let terrain = point_terrain(self.spatial.terrain.as_ref(), foundation_at);
-        let Some((task, switch)) =
-            task_search(masters, &actor, &t, &general, terrain, None, &world)?
+        let Some((task, switch)) = task_search(
+            masters,
+            &actor,
+            &TaskOn {
+                target: Some(&t),
+                general: Some(&general),
+                terrain,
+            },
+            None,
+            &world,
+            self.model.slots,
+            &self.model.roles,
+        )?
         else {
             return Ok(false);
         };
@@ -466,6 +487,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         );
         let build = BuildAction::start(
             to,

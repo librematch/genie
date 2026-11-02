@@ -29,7 +29,6 @@ use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
-use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -37,6 +36,8 @@ use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::step::Step;
 
@@ -84,10 +85,12 @@ impl Attack {
         me: Me,
         r: &AttackReads,
         master_class: ClassId,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         self.timer += c.dt.seconds();
         let gives_up = GiveUp {
-            waits: !r.player_type.is_computer() && master_class == class::VILLAGER,
+            waits: !r.player_type.is_computer()
+                && roles.of_class(master_class).contains(ClassRoles::VILLAGER),
             stance: r.stance,
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {
@@ -153,25 +156,26 @@ impl Attack {
         f: &mut Fight,
         r: &AttackReads,
     ) -> Result<UpdateCode, GenieError> {
+        let roles = &c.w.model.roles.clone();
         self.timer += c.dt.seconds();
         // a dead tree (class 15) up to state 5 keeps a non-villager's attack going: its update
         // goes on, the target not alive (`0x140a8342e`)
         let alive = f.victim.state <= ObjectState::Alive;
         let gone = !alive
-            && (f.victim.class != class::TREE
-                || f.own.class == class::VILLAGER
+            && (!roles.of_class(f.victim.class).contains(ClassRoles::TREE)
+                || roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
                 || ObjectState::Dead < f.victim.state);
         if self.state != AttackState::Killed && gone {
-            return self.target_died(c, unit, f, r);
+            return self.target_died(c, unit, f, r, roles);
         }
         let (_, t) = self.held_target(&c.w.spatial)?;
         if self.state != AttackState::Killed
             && (t.position.x() != self.seen.x() || t.position.y() != self.seen.y())
-            && let Some(code) = self.target_moved(c, unit, f, r, &t)?
+            && let Some(code) = self.target_moved(c, unit, f, r, &t, roles)?
         {
             return Ok(code);
         }
-        if let Some(code) = self.ends_early(c, unit, f, r, alive)? {
+        if let Some(code) = self.ends_early(c, unit, f, r, alive, roles)? {
             return Ok(code);
         }
         match self.state {
@@ -185,8 +189,8 @@ impl Attack {
             AttackState::Move { .. }
             | AttackState::GotoSeen { .. }
             | AttackState::GotoPoint { .. } => self.walk(c, unit, me, f, r, (t.position, t.radius)),
-            AttackState::Ready => self.ready_step(c, unit, f, r, alive),
-            AttackState::Swing => self.swing(c, unit, actions, f, r),
+            AttackState::Ready => self.ready_step(c, unit, f, r, alive, roles),
+            AttackState::Swing => self.swing(c, unit, actions, f, r, roles),
             AttackState::Killed => self.killed_step(c, unit),
             // case 0xc: a failed attack posts 0x1f9 with 600 every update (quiet or not), the
             // unit's animation stops and the update returns 3
@@ -213,6 +217,7 @@ impl Attack {
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         // the target died before the attack ended (the update's start): one of stance 0 that
         // moves would wait (set_state 5), not modelled; a villager's unit AI keeps a dead
@@ -221,9 +226,9 @@ impl Attack {
         // count clears, the caller's) and its point, posts no notify as the hunt's
         // sub-action (`+0x60`), ends (set_state 1) and returns 5
         if self.voice.is_loud() {
-            return self.lost(c, unit, f, r);
+            return self.lost(c, unit, f, r, roles);
         }
-        if f.own.class != class::VILLAGER {
+        if !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER) {
             return Err(GenieError::unsupported(
                 "an Attack of a unit other than a villager whose target died",
             ));
@@ -252,6 +257,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         t: &Placed,
+        roles: &Roles,
     ) -> Result<Option<UpdateCode>, GenieError> {
         // the target moved: where it was seen follows (`+0xa4`..`+0xac`); one the unit's
         // player sees (the target's slot 0x1e0, `FUN_1416635e0` at its tile: 0xf), or only
@@ -290,7 +296,7 @@ impl Attack {
                 AiOrder::Order(_) => !r.queue_empty,
             };
             if f.own.player == PlayerId::new(0) || gives_up {
-                return self.out_of_sight(c, unit, f, r).map(Some);
+                return self.out_of_sight(c, unit, f, r, roles).map(Some);
             }
             if !matches!(self.state, AttackState::GotoSeen { .. }) {
                 self.wait_at_seen(
@@ -315,13 +321,17 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         alive: bool,
+        roles: &Roles,
     ) -> Result<Option<UpdateCode>, GenieError> {
         // LAB_140a834ab: a live target (state 0 to 2) of a player's unit (+0x718 not 0) that
         // its player counts as itself or an ally (FUN_141663dc0 with 1) ends the attack
         // (set_state 1; its own Attack, not quiet, posts 0x1fb with 600 and the target) and
         // returns 1, unless the target is livestock (58) or a farm (49) that was its player's when
         // the Attack took it (+0x9f)
-        let spared = matches!(f.victim.class, class::LIVESTOCK | class::FARM) && self.same_owner;
+        let spared = roles
+            .of_class(f.victim.class)
+            .intersects(ClassRoles::LIVESTOCK | ClassRoles::FARM)
+            && self.same_owner;
         let rng = c.w.streams.get(Stream::Sprite);
         if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied.by_attacker {
             self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
@@ -374,15 +384,16 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         alive: bool,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         let mut g = c.w.attack_ground(unit.id);
-        match self.ready_to_attack(unit, &mut g, f, r, false)? {
+        match self.ready_to_attack(unit, &mut g, f, r, false, roles)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
                 self.finish(unit, g.motion.reborrow(), g.sprite_rng)?;
                 return Ok(UpdateCode::CODE_5);
             }
-            Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
+            Readiness::Ready => self.set_swing(unit, &mut g, f, r, roles)?,
             Readiness::Waiting => {}
             Readiness::Away(gap) => self.follow(unit, &mut g, r, f, gap)?,
         }
@@ -492,9 +503,10 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         target: Position,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         if sees(&c.w.spatial, f, target)? {
-            self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
+            self.ready(unit, &mut c.w.attack_ground(unit.id), f, r, roles)?;
             return Ok(UpdateCode::UNDER_WAY);
         }
         if matches!(self.state, AttackState::GotoSeen { .. })

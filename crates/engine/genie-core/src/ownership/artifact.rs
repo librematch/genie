@@ -112,6 +112,8 @@ pub use crate::ownership::artifact_state::ArtifactState;
 pub use crate::ownership::artifact_sub::ArtifactSub;
 use crate::unit_ai::NotifyKind;
 use crate::world::Tick;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::lets::release;
 use std::mem::take;
 
@@ -355,10 +357,11 @@ impl Artifact {
         unit: &mut Unit,
         me: Me,
         r: &ArtifactReads,
+        roles: &Roles,
     ) -> Result<Option<Handover>, GenieError> {
         self.walk(c, unit, me, r)?;
         let owner = if self.state == ArtifactState::Check && r.searches {
-            c.w.spatial.artifact_owner(unit.id, &c.w.players)?
+            c.w.spatial.artifact_owner(unit.id, &c.w.players, roles)?
         } else {
             None
         };
@@ -516,14 +519,16 @@ impl Unit {
         actions: &mut LayersAction,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<Captured>, GenieError> {
         let by = self.releaser(c)?;
         if c.w.ticks <= Tick::new(1) {
             return Ok(None);
         }
-        self.artifact_enter_part(actions, c, me, by)?;
-        let new = self.artifact_walk_and_check(actions, c, me, by)?;
-        self.artifact_handover(actions, c, new)
+        self.artifact_enter_part(actions, c, me, by, roles)?;
+        let new = self.artifact_walk_and_check(actions, c, me, by, roles)?;
+        self.artifact_handover(actions, c, new, roles, slots)
     }
 
     /// The Artifact's Enter sub-action (an enter command's, `FUN_1410847e0`) updates first
@@ -537,13 +542,14 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(e) = actions.list.artifact_mut().and_then(Artifact::take_enter) else {
             return Ok(());
         };
         let own = actions.list.take_enter();
         actions.list.set_enter(Some(e));
-        let updated = self.enter_part(actions, c, me);
+        let updated = self.enter_part(actions, c, me, roles);
         let mut after = actions.list.take_enter();
         actions.list.set_enter(own);
         if updated? == HeadCode::Deletes
@@ -578,6 +584,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<Option<Handover>, GenieError> {
         let Some(mut artifact) = actions.list.artifact().copied() else {
             return Ok(None);
@@ -594,7 +601,7 @@ impl Unit {
             by,
         };
         // written back before an error too: the stop's context reads the list
-        let new = artifact.update(c, self, me, &r);
+        let new = artifact.update(c, self, me, &r, roles);
         if let Some(own) = actions.list.artifact_mut() {
             *own = artifact;
         }
@@ -610,10 +617,12 @@ impl Unit {
         actions: &mut LayersAction,
         c: &mut Step<'_>,
         new: Option<Handover>,
+        roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<Captured>, GenieError> {
         match new {
             Some(Handover::Taken { new, .. }) => {
-                let (main, also) = self.capture(actions, c, new)?;
+                let (main, also) = self.capture(actions, c, new, roles, slots)?;
                 Ok(Some(Captured {
                     new,
                     main,
@@ -623,8 +632,8 @@ impl Unit {
             }
             Some(Handover::ToGaia) => {
                 let class = self.placed_class(c)?;
-                self.capture_stop(actions, c, class)?;
-                let main = self.change_owner(actions, c, PlayerId::GAIA)?;
+                self.capture_stop(actions, c, class, roles)?;
+                let main = self.change_owner(actions, c, PlayerId::GAIA, roles)?;
                 let building = take(&mut c.building_handover);
                 Ok((main || building).then(|| Captured {
                     new: PlayerId::new(0),
@@ -655,11 +664,12 @@ mod tests {
     use crate::objects::ObjectId;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
-    use crate::objects::masters::class;
     use crate::objects::sprite::Graphic;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
+    use crate::testing::class;
+    use crate::testing::roles;
     #[cfg(test)]
     use crate::world::WorldTime;
     use std::sync::Arc;
@@ -724,7 +734,7 @@ mod tests {
             },
         });
         let mut rig = Rig::on_the_path(Victim::default());
-        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));
+        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads(), &roles()));
         assert_eq!(found, Ok(None));
         assert_eq!(
             (a.state, a.timer, a.move_to().copied(), a.goal),
@@ -1506,7 +1516,7 @@ mod tests {
     fn an_update_checks_after_its_walk_and_lets_go_what_handover_drops() {
         let mut a = Artifact::new(false, None);
         let mut rig = Rig::on_the_path(Victim::default());
-        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));
+        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads(), &roles()));
         assert_eq!((found, a.state), (Ok(None), ArtifactState::Wait));
         // the step's effects on a handover: the Enter's transport let go, the unit stopped
         let mut e = EnterAction::new(

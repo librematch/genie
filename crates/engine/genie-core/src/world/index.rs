@@ -25,8 +25,11 @@ use crate::objects::masters::{MasterTables, Masters};
 use crate::objects::object_list::ObjectList;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
+#[cfg(test)]
+use crate::testing::static_roles;
 use crate::world::Unread;
 use crate::world::World;
+use crate::world::layer::Roles;
 use crate::world::motions::Lent;
 use crate::world::parts::Object;
 #[cfg(test)]
@@ -278,8 +281,9 @@ pub type PartTables<'a> = (
 );
 
 /// The world's objects by id, to read, beside the parts a caller holds apart (a walk holds the
-/// spatial index and the planners): the players' lists, the table by id, the players' masters
-/// and the objects' parts. An object out for its update is none.
+/// spatial index and the planners): the players' lists, the table by id, the players' masters,
+/// the objects' parts and the build's roles of their classes and masters. An object out for its
+/// update is none.
 #[derive(Clone, Copy, Debug)]
 pub struct ObjectsRef<'a> {
     players: &'a [Player],
@@ -290,18 +294,20 @@ pub struct ObjectsRef<'a> {
     actions: &'a PartTable<Action>,
     unread: &'a PartTable<Unread>,
     motions: Lent<'a, Motion>,
+    roles: &'a Roles,
 }
 
 impl<'a> ObjectsRef<'a> {
     /// The objects of `players`, which the world's table `index` finds, with the players'
-    /// `masters` and the objects' `parts` (their own masters, their building, combat and motion
-    /// layers).
+    /// `masters`, the objects' `parts` (their own masters, their building, combat and motion
+    /// layers) and the build's `roles`.
     #[must_use]
     pub fn new(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: &'a [Arc<Masters>],
         parts: &'a Parts,
+        roles: &'a Roles,
     ) -> Self {
         Self::of_tables(
             players,
@@ -314,6 +320,7 @@ impl<'a> ObjectsRef<'a> {
                 &parts.unread,
                 parts.motion.unlent(),
             ),
+            roles,
         )
     }
 
@@ -322,13 +329,14 @@ impl<'a> ObjectsRef<'a> {
     /// layers `buildings`, the combat layers `combats`, the action layers `actions`, the objects
     /// the load could not read whole `unread` and the motion layers `motions` (one of them lent
     /// out to a walk,
-    /// [`crate::world::parts::PartTable::lend`]).
+    /// [`crate::world::parts::PartTable::lend`]) and the build's `roles`.
     #[must_use]
     pub const fn of_tables(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: MasterTables<'a>,
         (buildings, combats, actions, unread, motions): PartTables<'a>,
+        roles: &'a Roles,
     ) -> Self {
         Self {
             players,
@@ -339,6 +347,7 @@ impl<'a> ObjectsRef<'a> {
             actions,
             unread,
             motions,
+            roles,
         }
     }
 
@@ -363,10 +372,22 @@ impl<'a> ObjectsRef<'a> {
         self.masters
     }
 
+    /// The build's roles of these objects' classes and masters (FD-046-D45).
+    #[must_use]
+    pub const fn roles(&self) -> &'a Roles {
+        self.roles
+    }
+
     /// No objects: a test's walk that meets none by id.
     #[cfg(test)]
     pub(crate) fn empty() -> ObjectsRef<'static> {
-        ObjectsRef::new(&[], ObjectIndex::scanning(), &[], no_parts())
+        ObjectsRef::new(
+            &[],
+            ObjectIndex::scanning(),
+            &[],
+            no_parts(),
+            static_roles(),
+        )
     }
 
     /// Object `id`, live or sleeping.
@@ -535,7 +556,13 @@ impl TestObjects {
 
     /// The units by id.
     pub(crate) fn view(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts)
+        ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.masters,
+            &self.parts,
+            static_roles(),
+        )
     }
 }
 
@@ -580,7 +607,13 @@ impl World {
     /// The objects by id, to read ([`ObjectsRef`]).
     #[must_use]
     pub fn objects(&self) -> ObjectsRef<'_> {
-        ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts)
+        ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        )
     }
 
     /// The table by id again from the players' lists (after a list changed in place).

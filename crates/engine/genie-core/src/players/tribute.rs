@@ -6,6 +6,7 @@ use crate::GenieError;
 use crate::commands::ResourceWord;
 use crate::math::fmath::maxss;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::TributeFee;
@@ -16,7 +17,7 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// The masters one of which a player needs to pay tribute (`FUN_1416259e0`: its tracker's count
 /// of the market, 84, or of 1647 above 0).
-const MARKETS: [MasterId; 2] = [MasterId::named(84), MasterId::named(1647)];
+const MARKETS: [MasterId; 2] = [ids::MARKET, ids::MARKET_1647];
 
 /// One of a tribute's four entries: the attribute (`+0x24`..), its amount (`+0x04`..) and the
 /// fee (`+0x14`..), a share of the amount.
@@ -129,7 +130,6 @@ impl World {
 mod tests {
     use super::*;
     use crate::objects::masters::MasterKind;
-    use crate::objects::masters::class;
     use crate::objects::masters::ids;
     use crate::objects::masters::{Master, Masters};
     #[cfg(test)]
@@ -140,6 +140,7 @@ mod tests {
     use crate::test_ids::player_id;
     #[cfg(test)]
     use crate::test_ids::{amounts, attributes};
+    use crate::testing::class;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;

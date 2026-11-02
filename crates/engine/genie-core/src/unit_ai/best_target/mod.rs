@@ -18,48 +18,66 @@ use self::world_view::ORDER_WINDOW;
 pub use self::world_view::{Ask, Battlefield, Searcher, Thing};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// `FUN_140c4c8e0`: the attack category of an object of master `master` and class `class`, by
 /// which `bestUnitToAttack` weighs and narrows its choice; none (−1) for a class it does not
 /// rank.
 #[must_use]
-pub const fn category(master: MasterId, class: ClassId) -> Option<AttackCategory> {
-    match class {
-        class::CLASS_0 | class::CLASS_23 | class::CLASS_26 | class::CLASS_36 | class::CLASS_44 => {
+pub fn category(master: MasterId, class: ClassId, roles: &Roles) -> Option<AttackCategory> {
+    {
+        let held = roles.of_class(class);
+        if held.intersects(
+            ClassRoles::ARCHERY
+                | ClassRoles::CAVALRY_CANNON
+                | ClassRoles::ELEPHANT_ARCHER
+                | ClassRoles::CAVALRY_ARCHER
+                | ClassRoles::ARCHERY_CANNON,
+        ) {
             if matches!(master, ids::ID_6 | ids::ID_7) {
                 Some(AttackCategory::named(4))
             } else {
                 Some(AttackCategory::named(3))
             }
-        }
-        class::TRADE_BOAT | class::FISHING_SHIP => Some(AttackCategory::named(11)),
-        class::BUILDING
-        | class::WALL
-        | class::GATE
-        | class::FARM
-        | class::CLASS_51
-        | class::TOWER => Some(AttackCategory::named(0)),
-        class::VILLAGER | class::TRADE_CART | class::LIVESTOCK | class::KING => {
+        } else if held.intersects(ClassRoles::TRADE_BOAT | ClassRoles::FISHING_SHIP) {
+            Some(AttackCategory::named(11))
+        } else if held.intersects(
+            ClassRoles::BUILDING
+                | ClassRoles::WALL
+                | ClassRoles::GATE
+                | ClassRoles::FARM
+                | ClassRoles::PACKED_TREBUCHET
+                | ClassRoles::TOWER,
+        ) {
+            Some(AttackCategory::named(0))
+        } else if held.intersects(
+            ClassRoles::VILLAGER
+                | ClassRoles::TRADE_CART
+                | ClassRoles::LIVESTOCK
+                | ClassRoles::KING,
+        ) {
             Some(AttackCategory::named(7))
-        }
-        class::CLASS_6
-        | class::CLASS_12
-        | class::CLASS_24
-        | class::CLASS_35
-        | class::CLASS_45
-        | class::CLASS_47
-        | class::CLASS_50
-        | class::CLASS_56
-        | class::CLASS_57 => {
+        } else if held.intersects(
+            ClassRoles::INFANTRY
+                | ClassRoles::CAVALRY
+                | ClassRoles::WAR_ELEPHANT
+                | ClassRoles::PETARD
+                | ClassRoles::TWO_HANDED_SWORDSMAN
+                | ClassRoles::SCOUT_CAVALRY
+                | ClassRoles::SPEARMAN
+                | ClassRoles::RAIDER
+                | ClassRoles::CAVALRY_RAIDER,
+        ) {
             if matches!(master, ids::ID_1744 | ids::ID_1746) {
                 Some(AttackCategory::named(5))
             } else {
                 Some(AttackCategory::named(1))
             }
-        }
-        class::SIEGE | class::CLASS_54 | class::CLASS_55 => {
+        } else if held
+            .intersects(ClassRoles::SIEGE | ClassRoles::UNPACKED_TREBUCHET | ClassRoles::SCORPION)
+        {
             if matches!(
                 master,
                 ids::ID_35 | ids::ID_422 | ids::ID_548 | ids::ID_1258
@@ -68,12 +86,19 @@ pub const fn category(master: MasterId, class: ClassId) -> Option<AttackCategory
             } else {
                 Some(AttackCategory::SIEGE)
             }
+        } else if held
+            .intersects(ClassRoles::HEALER | ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC)
+        {
+            Some(AttackCategory::named(8))
+        } else if held.intersects(ClassRoles::TRANSPORT | ClassRoles::TRANSPORT_CATEGORY) {
+            Some(AttackCategory::named(10))
+        } else if held.intersects(ClassRoles::WARSHIP | ClassRoles::BOARDING_SHIP) {
+            Some(AttackCategory::named(9))
+        } else if held.intersects(ClassRoles::PHALANX | ClassRoles::PIKEMAN) {
+            Some(AttackCategory::named(2))
+        } else {
+            None
         }
-        class::CLASS_17 | class::MONK | class::CLASS_43 => Some(AttackCategory::named(8)),
-        class::TRANSPORT | class::CLASS_62 => Some(AttackCategory::named(10)),
-        class::WARSHIP | class::CLASS_53 => Some(AttackCategory::named(9)),
-        class::CLASS_28 | class::CLASS_46 => Some(AttackCategory::named(2)),
-        _ => None,
     }
 }
 

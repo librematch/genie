@@ -19,6 +19,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::Task;
 use crate::players::Amount;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, Wait};
@@ -33,6 +34,8 @@ pub use crate::construction::wait_solidify_state::WaitSolidifyState;
 use crate::math::image::wait_solidify::SOLID_FROM as WAIT_SOLIDIFY_SOLID_FROM;
 use crate::objects::masters::MasterTables;
 use crate::world::UNIT_AI_MASTER;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 
 /// `DAT_142eb56a0` (a double): the foundation's build points (`+0xc50`, widened) at most which
 /// it is not solid yet.
@@ -83,7 +86,12 @@ impl UnitView<'_, '_> {
     /// the task the unit's slot 0x820 finds on `target` (any action type, with the master switch)
     /// gives the wait, made at once on the unit lent back to its slot
     /// ([`crate::world::World::wait_for_foundation`]); false without one.
-    pub(crate) fn start_wait_now(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn start_wait_now(
+        &mut self,
+        target: ObjectId,
+        slots: Slots,
+        roles: &Roles,
+    ) -> Result<bool, GenieError> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -158,7 +166,19 @@ impl UnitView<'_, '_> {
         // slot 0x820's point: the target's place
         let at = find(target).map_or(Position::ORIGIN, |(_, u)| u.position());
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), at);
-        let Some((task, switch)) = task_search(masters, &actor, &t, &general, terrain, None, &dip)?
+        let Some((task, switch)) = task_search(
+            masters,
+            &actor,
+            &TaskOn {
+                target: Some(&t),
+                general: Some(&general),
+                terrain,
+            },
+            None,
+            &dip,
+            slots,
+            roles,
+        )?
         else {
             return Ok(false);
         };

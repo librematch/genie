@@ -9,7 +9,6 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -26,6 +25,7 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 
 /// What the full update's tail takes besides the surroundings ([`UnitAi::update_tail`]'s
@@ -390,6 +390,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         let class = ClassId::of_param(n.p[1])?
             .or(self.target_class)
             .or(self.last_target_class);
@@ -398,7 +399,7 @@ impl UnitAi {
             self.stop_current(StopOrder::Keep, at, side, rng)?;
             return Ok(GO_ON);
         };
-        let kind = civilian_kind(class);
+        let kind = civilian_kind(class, roles);
         let found = match kind {
             None => {
                 let found = side.closest(&Search {
@@ -411,7 +412,7 @@ impl UnitAi {
                         relation: None,
                         state: None,
                         master: None,
-                        workers: if class == class::FARM {
+                        workers: if roles.of_class(class).contains(ClassRoles::FARM) {
                             WorkerCount::ONE
                         } else {
                             WorkerCount::NO_CAP
@@ -458,7 +459,7 @@ impl UnitAi {
             }
             return Ok(GO_ON);
         };
-        if class == class::FARM {
+        if roles.of_class(class).contains(ClassRoles::FARM) {
             return Err(GenieError::unsupported("a hunter's search finding a farm"));
         }
         self.hunt_object(found.id, found.class, found.position, at, side, rng)?;
@@ -484,6 +485,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         let noted = ClassId::of_param(n.p[1])?;
         let class = self.target_class.or(self.last_target_class).or(noted);
         let Some(class) = class else {
@@ -491,11 +493,12 @@ impl UnitAi {
             self.stop_current(StopOrder::Keep, at, side, rng)?;
             return Ok(GO_ON);
         };
-        let kind = civilian_kind(class);
+        let kind = civilian_kind(class, roles);
         let found = match kind {
             None => {
                 // "Calling closest object for a farm that's alive": the friends' pass over
-                let spared = (noted == Some(class::FARM)).then_some(QueryRelation::Friends);
+                let spared = (roles.of_some_class(noted).contains(ClassRoles::FARM))
+                    .then_some(QueryRelation::Friends);
                 let found = side.closest(&Search {
                     at: at.position.ground(),
                     radius: civilian_search_radius(at.los, at.search_radius),

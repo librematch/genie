@@ -3,8 +3,8 @@
 
 use crate::combat::Charge;
 use crate::combat::damage::{
-    Attacker, CONE, ELEPHANT_ARCHER, Kill, MINUS_CONE, RAMS, Victim, WIDE_CONE, armor_damage,
-    bonus_damage, charge_hit, elevation_factor, facing_offset, kill_bonus, lose, shield, take,
+    Attacker, CONE, Kill, MINUS_CONE, RAMS, Victim, WIDE_CONE, armor_damage, bonus_damage,
+    charge_hit, elevation_factor, facing_offset, kill_bonus, lose, shield, take,
 };
 use crate::combat::missile::ShooterId;
 use crate::construction::build::NOT_HELD;
@@ -19,9 +19,10 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 use std::mem::replace;
@@ -42,11 +43,19 @@ pub(super) fn damage(
     weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
-    let d = armor_damage(t, weapons, factor, &src.source, bonus_damage(src, t))?;
+    let d = armor_damage(
+        t,
+        weapons,
+        factor,
+        &src.source,
+        bonus_damage(src, t, roles),
+        roles,
+    )?;
     if blast_taken < d {
         if MasterKind::COMBAT <= src.kind {
-            let hit = charge_hit(&src.source, t);
+            let hit = charge_hit(&src.source, t, roles);
             src.source.charge_hit = hit;
             if hit && src.source.area_effect <= Distance::ZERO {
                 src.source.charge = Charge::ZERO;
@@ -55,7 +64,10 @@ pub(super) fn damage(
         lose(t, d - blast_taken);
     }
     let marks = t.kind == MasterKind::COMBAT
-        || (t.kind == MasterKind::BUILDING && matches!(t.class, class::CLASS_51 | class::CLASS_54));
+        || (t.kind == MasterKind::BUILDING
+            && roles
+                .of_class(t.class)
+                .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET));
     if MasterKind::MISSILE <= src.kind
         && src.source.ability.contains(CombatAbility::MARKS_TARGET)
         && marks
@@ -65,7 +77,10 @@ pub(super) fn damage(
         ));
     }
     let master_hp = i32::from(t.master_hp.get());
-    if src.source.class != ELEPHANT_ARCHER {
+    if !roles
+        .of_class(src.source.class)
+        .contains(ClassRoles::SELF_ALERTING)
+    {
         let sender = if src.kind == MasterKind::MISSILE {
             src.source.fired_from.map(ShooterId::id)
         } else {
@@ -89,7 +104,7 @@ pub(super) fn damage(
             // The livestock class, which goes to Gaia when killed.
             // The artifact class (1), which no blast reaches.
             to_gaia: t.kind == MasterKind::COMBAT
-                && t.class == class::LIVESTOCK
+                && roles.of_class(t.class).contains(ClassRoles::LIVESTOCK)
                 && t.player != PlayerId::new(0),
         });
     }
@@ -144,6 +159,7 @@ pub fn blast(
     main: Option<ObjectId>,
     targets: &mut [&mut Victim],
     factor: f32,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
     let a = attacker.source;
     let r = a.area_effect;
@@ -181,7 +197,7 @@ pub fn blast(
     attacker.source.charge_hit = false;
     let weapons = attacker.weapons.clone();
     for i in 0..targets.len() {
-        blast_one(attacker, targets, i, (&blast, &weapons))?;
+        blast_one(attacker, targets, i, (&blast, &weapons), roles)?;
     }
     Ok(true)
 }
@@ -221,6 +237,7 @@ pub(super) fn blast_one(
     targets: &mut [&mut Victim],
     i: usize,
     (b, weapons): (&Blast, &[ClassAmount]),
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     let a = &b.a;
     let t = &**targets.checked(i)?;
@@ -236,7 +253,7 @@ pub(super) fn blast_one(
     if (b.spares_friends && t.allied.by_attacker)
         || Some(t.id) == b.exclude
         || t.id == attacker.id
-        || t.class == class::ARTIFACT
+        || roles.of_class(t.class).contains(ClassRoles::ARTIFACT)
     {
         return Ok(());
     }
@@ -276,6 +293,7 @@ pub(super) fn blast_one(
         i,
         (weapons, f * b.factor),
         (ledger, blast_taken),
+        roles,
     )
 }
 
@@ -455,13 +473,22 @@ pub(super) fn blast_hit(
     i: usize,
     (weapons, factor): (&[ClassAmount], f32),
     (ledger, blast_taken): (Option<usize>, HitPoints),
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     let before = targets.checked(i)?.hp;
     let mut t = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
-    let hit = take(&mut t, attacker, targets, weapons, factor, blast_taken);
+    let hit = take(
+        &mut t,
+        attacker,
+        targets,
+        weapons,
+        factor,
+        blast_taken,
+        roles,
+    );
     if hit.is_ok() {
         if !attacker.source.charge_hit {
-            attacker.source.charge_hit = charge_hit(&attacker.source, &t);
+            attacker.source.charge_hit = charge_hit(&attacker.source, &t, roles);
         }
         let lost = before - t.hp;
         let ledger = match ledger {

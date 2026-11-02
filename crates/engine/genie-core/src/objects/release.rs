@@ -105,7 +105,12 @@ impl World {
         )?;
         forget_resource(&mut self.spatial, Some(master), gone.id, gone.position())?;
         if MasterKind::COMBAT <= master.kind {
-            count_class(&mut self.players.player_mut(p)?.attributes, master, -1.0);
+            count_class(
+                &mut self.players.player_mut(p)?.attributes,
+                master,
+                -1.0,
+                &self.model.roles,
+            );
         }
         let recyclable = master.recyclable;
         let left = self.spatial.leave(gone.id);

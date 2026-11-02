@@ -19,6 +19,7 @@ use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::unit_ai::task_finder::allied;
 use crate::world::HUNTER_UNMOVING;
+use crate::world::layer::Roles;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::step::Step;
@@ -41,6 +42,7 @@ impl Unit {
         c: &mut Step<'_>,
         within: Option<Distance>,
         near: Option<Distance>,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         // NaN compares false as the game's `comiss` does
         let beyond = |a: Position, b: Position, limit: Distance| {
@@ -132,11 +134,18 @@ impl Unit {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let old = hunt.target;
         let moving = hunt.task.walk_sprite_id(self.life.held());
-        let arms = arms(master, &c.w.model.graphics, hunt.task.sprites, moving);
+        let arms = arms(
+            master,
+            &c.w.model.graphics,
+            hunt.task.sprites,
+            moving,
+            roles,
+        );
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         if let Some(arrived) = hunt.retarget(
             HuntRetarget {
@@ -148,6 +157,7 @@ impl Unit {
             &engagement,
             arms,
             mover,
+            roles,
         )? {
             if arrived {
                 show_arrived(
@@ -160,7 +170,7 @@ impl Unit {
             // slot 0x68 (FUN_140a7a230): the old target goes, the new one is taken
             self.hunt_release(c, [old])?;
             let by = self.releaser(c)?;
-            take(c, self, found, by)?;
+            take(c, self, found, by, roles)?;
         }
         Ok(true)
     }

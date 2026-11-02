@@ -54,8 +54,8 @@ use crate::math::image::long_path::{
     EDGE_GAP as LONG_PATH_EDGE_GAP, EPSILON as LONG_PATH_EPSILON, REACHED as LONG_PATH_REACHED,
     TILE_CENTRE as LONG_PATH_TILE_CENTRE,
 };
-use crate::objects::masters::class::GATE;
 use crate::players::PlayerSet;
+use crate::world::layer::ClassRoles;
 
 /// The search expands at most this many tiles (`FUN_140f9eb70`: `20000 < n` breaks).
 const MOST_EXPANSIONS: i32 = 20000;
@@ -105,6 +105,7 @@ pub fn gate_lets_pass(
     player: PlayerId,
     tile: Tile,
 ) -> Result<bool, GenieError> {
+    let roles = objects.roles();
     let Some(links) = spatial.sight.as_ref() else {
         return Ok(false);
     };
@@ -119,12 +120,18 @@ pub fn gate_lets_pass(
         let Some((owner, gate, master)) = objects.with_master(id)? else {
             continue;
         };
-        if master.class == GATE {
+        if roles.of_class(master.class).contains(ClassRoles::GATE) {
             let layer = objects.building(id).ok_or_else(|| {
                 GenieError::unreachable("a gate whose layer the view does not find")
                     .with("object", id)
             })?;
-            return Ok(lets_pass((gate, layer, master), owner, player, spatial));
+            return Ok(lets_pass(
+                (gate, layer, master),
+                owner,
+                player,
+                spatial,
+                roles,
+            ));
         }
     }
     Ok(false)

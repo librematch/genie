@@ -34,7 +34,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
@@ -68,6 +67,8 @@ use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::{adds, amounts};
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
@@ -279,8 +280,9 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             ..Unit::default()
         },
         Action {
-            list: ActionList::default()
-                .with_gather(Some(GatherAction::new(task, &bush, false, rate).unwrap())),
+            list: ActionList::default().with_gather(Some(
+                GatherAction::new(task, &bush, false, rate, &roles()).unwrap(),
+            )),
             ..Default::default()
         },
     ));

@@ -51,6 +51,7 @@ impl Mover {
         now: WorldTime,
         by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
+        let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
         if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
             self.take_waypoint_place(place, me, world, pathing, now)?;
@@ -105,6 +106,7 @@ impl Mover {
                         own,
                         |g| (g - range) - Distance::new(RANGE_FLOOR),
                         by_id,
+                        roles,
                     )
                 });
         if goal.target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {

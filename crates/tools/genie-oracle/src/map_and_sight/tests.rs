@@ -111,12 +111,13 @@ mod spatial {
     };
     use crate::map_and_sight::spatial;
     use crate::masters::TerrainTable;
+    use crate::setup::layer;
     use crate::test_ids::object_id;
     use genie_core::map::Radii;
     use genie_core::map::Tile;
     use genie_core::map::spatial::Spatial;
+    use genie_core::objects::masters::ClassId;
     use genie_core::objects::masters::MasterKind;
-    use genie_core::objects::masters::class;
     use genie_core::objects::masters::ids::VILLAGER_MALE;
     use genie_core::objects::masters::{ObstructionClass, ObstructionKind};
     use genie_core::ownership::CaptureKind;
@@ -191,7 +192,7 @@ mod spatial {
                 tiles: vec![RgeTile::default(); 4],
             })
             .collect();
-        spatial(&save, &TerrainTable::default()).unwrap()
+        spatial(&save, &TerrainTable::default(), &layer().unwrap().roles).unwrap()
     }
 
     #[test]
@@ -200,7 +201,7 @@ mod spatial {
         let unit = out.get(object_id(10)).unwrap();
         assert_eq!(
             (unit.player, unit.master, unit.class),
-            (PlayerId::new(1), VILLAGER_MALE, class::CLASS_6)
+            (PlayerId::new(1), VILLAGER_MALE, ClassId::named(6))
         );
         assert!(unit.tall);
         let obstruction = unit.obstruction.unwrap();

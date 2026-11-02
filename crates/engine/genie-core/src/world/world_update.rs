@@ -9,7 +9,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::player_master;
-use crate::objects::unit::{Outcome, Unit};
+use crate::objects::unit::Outcome;
 use crate::ownership::capture::Captured;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -131,7 +131,10 @@ impl World {
             let _object =
                 tracing::trace_span!(target: UPDATE, "object", id = id.get(), master = %master)
                     .entered();
-            match self.step_object((p, i), (dt, turn, true), Unit::update) {
+            let (roles, slots) = (self.model.roles.clone(), self.model.slots);
+            match self.step_object((p, i), (dt, turn, true), |u, a, c| {
+                u.update(a, c, &roles, slots)
+            }) {
                 Ok(s) => {
                     if self.file_step(p, s.slot, s.outcome)? {
                         i = i.next();
@@ -186,6 +189,7 @@ impl World {
                     self.model.masters.of(p),
                     &self.model.lines,
                     asleep.unit.life.master_id,
+                    &self.model.roles,
                 );
                 let tracker = &mut self.players.player_mut(p)?.tracker;
                 tracker.remove(asleep.unit.id, k);
@@ -263,9 +267,19 @@ impl World {
         // 0x2d0), each tracker by its own masters
         for u in &moved {
             let m = u.unit.life.master_id;
-            let old = key(self.model.masters.of(p), &self.model.lines, m);
+            let old = key(
+                self.model.masters.of(p),
+                &self.model.lines,
+                m,
+                &self.model.roles,
+            );
             self.players.player_mut(p)?.tracker.remove(u.unit.id, old);
-            let k = key(self.model.masters.of(new), &self.model.lines, m);
+            let k = key(
+                self.model.masters.of(new),
+                &self.model.lines,
+                m,
+                &self.model.roles,
+            );
             self.players.player_mut(new)?.tracker.add(u.unit.id, k);
         }
         self.extend_live(new, moved)

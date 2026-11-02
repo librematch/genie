@@ -58,7 +58,6 @@ use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -73,6 +72,8 @@ use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
@@ -1499,6 +1500,7 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
             groups,
             masters,
             t.parts.unit_ai.get(u.id),
+            &roles(),
         )
     };
     assert_eq!(of(&groups, 10), Ok(None));
@@ -1518,7 +1520,8 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
             (t.parts.actions_of(busy.id), t.parts.unread.get(busy.id)),
             &groups,
             masters,
-            Some(&busy_ai)
+            Some(&busy_ai),
+            &roles()
         ),
         Ok(None)
     );
@@ -1529,7 +1532,8 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
             (t.parts.actions_of(gone.id), t.parts.unread.get(gone.id)),
             &groups,
             masters,
-            Some(&busy_ai)
+            Some(&busy_ai),
+            &roles()
         ),
         Ok(None)
     );
@@ -1539,7 +1543,8 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
             (t.parts.actions_of(gone.id), t.parts.unread.get(gone.id)),
             &groups,
             masters,
-            Some(&busy_ai)
+            Some(&busy_ai),
+            &roles()
         ),
         Ok(None)
     );
@@ -1549,7 +1554,8 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
             (t.parts.actions_of(lost.id), t.parts.unread.get(lost.id)),
             &groups,
             OwnerMasters::new(&t.parts.own_master, None),
-            t.parts.unit_ai.get(lost.id)
+            t.parts.unit_ai.get(lost.id),
+            &roles()
         ),
         Err(OBJECT_MASTER)
     );

@@ -26,6 +26,7 @@ use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::world_view::DropWorld;
 use crate::world::Seconds;
+use crate::world::layer::Roles;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -219,10 +220,17 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        let (mover, by_id) =
-            c.w.parts
-                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model.masters));
+        let (mover, by_id) = c.w.parts.lend_mover(
+            self.id,
+            (
+                &c.w.players,
+                &c.w.index,
+                &c.w.model.masters,
+                &c.w.model.roles,
+            ),
+        );
         let w = DropWorld {
             masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,
@@ -238,7 +246,7 @@ impl Unit {
             self.drop_off_in(actions, mover, w, others, &c.w.model.graphics, by_id)?
         {
             let by = self.releaser(c)?;
-            take(c, self, site, by)?;
+            take(c, self, site, by, roles)?;
         }
         Ok(())
     }

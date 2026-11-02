@@ -27,12 +27,10 @@ use crate::objects::SpriteId;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::lifecycle::Lifecycle;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::HOUSE;
 use crate::objects::masters::ids::MONASTERY;
@@ -45,6 +43,8 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -56,9 +56,9 @@ use std::mem::take;
 /// `TRIBE_Building_Object::update`'s walls' branch (`0x1411c9000`): a master of class 27 (a
 /// wall) or the house runs only its damage frames by its hit points and its combat update; no
 /// whole seconds, and an annex of it completes as well ([`Unit::complete_on_update`]).
-pub(crate) fn walls_branch(master: &Master) -> bool {
+pub(crate) fn walls_branch(master: &Master, roles: &Roles) -> bool {
     // The house's master id (`0x46`), whose update takes the walls' branch ([`walls_branch`]).
-    master.class == class::WALL || master.id == HOUSE
+    roles.of_class(master.class).contains(ClassRoles::WALL) || master.id == HOUSE
 }
 
 impl Unit {
@@ -71,9 +71,13 @@ impl Unit {
     /// # Errors
     ///
     /// A link to an object the world does not file.
-    pub(crate) fn let_removed_links_go(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn let_removed_links_go(
+        &self,
+        c: &mut Step<'_>,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        if master.kind != MasterKind::BUILDING || walls_branch(master) {
+        if master.kind != MasterKind::BUILDING || walls_branch(master, roles) {
             return Ok(());
         }
         let (players, index) = (&c.w.players, &c.w.index);
@@ -110,13 +114,17 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let transforms = master
             .building
             .as_ref()
             .is_some_and(|b| b.transform_unit.is_some());
-        if master.class != class::GATE || !transforms || self.life.state != ObjectState::Alive {
+        if !roles.of_class(master.class).contains(ClassRoles::GATE)
+            || !transforms
+            || self.life.state != ObjectState::Alive
+        {
             return Ok(());
         }
         let height = master.height.get();
@@ -133,7 +141,13 @@ impl Unit {
         }
         let locked = gate.locked;
         let annexes = c.w.parts.building_of(self.id).annexes;
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+        );
         let (total, allied) = self.gate_count(annexes, &mut c.w.spatial, by_id)?;
         let gate =
             c.w.parts
@@ -207,7 +221,7 @@ impl Unit {
     /// `FUN_1411ce250` maps the terrains 8, 27 and 64 by the local player's view and the tile's
     /// own (`+0x2e8`'s `+10`), which the slice does not hold; the masters' foundations (7, 63,
     /// 117) never give them.
-    pub(crate) fn farm_stage(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn farm_stage(&self, c: &mut Step<'_>, roles: &Roles) -> Result<(), GenieError> {
         let Some(cons) = c.w.parts.building_of(self.id).construction.filter(|k| {
             self.life.state == ObjectState::Foundation && WholeSeconds::ZERO < k.build_time
         }) else {
@@ -244,7 +258,7 @@ impl Unit {
             .ok_or(GenieError::unsupported(
                 "a farm's foundation without the map's terrain",
             ))?
-            .cover(&f)
+            .cover(&f, roles)
     }
 
     /// `TRIBE_Building_Object::update` (`0x1411c9000`) before its combat update: a building in
@@ -263,8 +277,9 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        self.farm_stage(c)?;
+        self.farm_stage(c, roles)?;
         let due = self.life.state == ObjectState::Foundation
             && c.w
                 .parts
@@ -275,7 +290,7 @@ impl Unit {
             return Ok(());
         }
         let master = self.master(c.w.master_tables(), c.player)?;
-        if !walls_branch(master) && c.w.parts.building_of(self.id).annex_of.is_some() {
+        if !walls_branch(master, roles) && c.w.parts.building_of(self.id).annex_of.is_some() {
             return Ok(());
         }
         let (p, id) = (c.player, self.id);
@@ -295,7 +310,11 @@ impl Unit {
     /// master's hit points (slot 0x110, [`Unit::heal`]); with villagers inside, a damaged
     /// building with a `garrison_repair_rate` repairs itself at a cost (`FUN_1411d33e0`, not
     /// modelled). Its `damaged_lately_timer` (`+0x30d`) loses one when whole seconds passed.
-    pub(crate) fn building_seconds(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn building_seconds(
+        &mut self,
+        c: &mut Step<'_>,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         if self.life.state != ObjectState::Alive {
             return Ok(());
         }
@@ -321,7 +340,7 @@ impl Unit {
             ));
         }
         // the walls' branch runs only its damage frames and its combat update
-        if walls_branch(master) {
+        if walls_branch(master, roles) {
             return Ok(());
         }
         if c.w
@@ -380,12 +399,12 @@ impl Unit {
                 c.w.model.masters.of(c.player),
             )?;
             // The villager's class (4), which a building's repair by its garrison counts.
-            if m.class == class::VILLAGER {
+            if roles.of_class(m.class).contains(ClassRoles::VILLAGER) {
                 villagers += 1;
             }
             let (class, hit_points) = (m.class, m.hit_points);
             if HitPoints::ZERO < rate && u.life.hp < HitPoints::of_master(hit_points) {
-                u.heal(c.w.parts.combat_mut(u.id)?, class, hit_points, rate)?;
+                u.heal(c.w.parts.combat_mut(u.id)?, class, hit_points, rate, roles)?;
             }
         }
         if 0 < villagers
@@ -466,9 +485,10 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        if !blasts_at_death(master, &self.life) {
+        if !blasts_at_death(master, &self.life, roles) {
             return Ok(());
         }
         let terrain = c.w.spatial.terrain.as_ref();
@@ -486,6 +506,7 @@ impl Unit {
             c.player,
             terrain,
             c.w.mode_680,
+            roles,
         );
         let mut targets: Vec<&mut Victim> = c.blasted.iter_mut().collect();
         let _ = blast(
@@ -495,11 +516,12 @@ impl Unit {
             None,
             &mut targets,
             DEATH_BLAST_FACTOR,
+            roles,
         )?;
         let mut blasted = take(&mut c.blasted);
         for v in &mut blasted {
             if let Some(k) = write_back(c, v)? {
-                file_kill(c, (self, actions), k)?;
+                file_kill(c, (self, actions), k, roles)?;
             }
         }
         c.blasted = blasted;
@@ -554,15 +576,14 @@ pub(crate) fn farm_stage_terrain(
 /// (`TRIBE_Combat_Object::update`, `0x141208440`): the demolition ships 527 and 528, the
 /// demolition raft 1104 and the incendiary raft and ships 2133 to 2135.
 pub(crate) const DEATH_BLAST_MASTERS: [MasterId; 6] = [
-    MasterId::named(527),
-    MasterId::named(528),
-    MasterId::named(1104),
-    MasterId::named(2133),
-    MasterId::named(2134),
-    MasterId::named(2135),
+    ids::ID_527,
+    ids::ID_528,
+    ids::ID_1104,
+    ids::ID_2133,
+    ids::ID_2134,
+    ids::ID_2135,
 ];
-/// The classes whose units blast so: 35 (petards) and 64.
-pub(crate) const DEATH_BLAST_CLASSES: [ClassId; 2] = [class::CLASS_35, class::CLASS_64];
+
 /// The hit points below which they blast (`DAT_14330eb8c`; `COMISS`, a NaN does not).
 pub(crate) const DEATH_BLAST_HP: f32 = TURN_DEATH_BLAST_HP;
 /// The blast's damage factor (`XMM11`, the same constant).
@@ -571,9 +592,12 @@ pub(crate) const DEATH_BLAST_FACTOR: f32 = TURN_DEATH_BLAST_FACTOR;
 /// `TRIBE_Combat_Object::update`'s test for the blast at death: a unit of one of
 /// [`DEATH_BLAST_MASTERS`] or [`DEATH_BLAST_CLASSES`] below [`DEATH_BLAST_HP`] hit points in state
 /// 2. The update runs for the combat objects and buildings (types 70 and 80).
-pub(crate) fn blasts_at_death(master: &Master, life: &Lifecycle) -> bool {
+pub(crate) fn blasts_at_death(master: &Master, life: &Lifecycle, roles: &Roles) -> bool {
     MasterKind::COMBAT <= master.kind
         && life.hp < HitPoints::new(DEATH_BLAST_HP)
         && life.state == ObjectState::Alive
-        && (DEATH_BLAST_MASTERS.contains(&master.id) || DEATH_BLAST_CLASSES.contains(&master.class))
+        && (DEATH_BLAST_MASTERS.contains(&master.id)
+            || roles
+                .of_class(master.class)
+                .contains(ClassRoles::DEATH_BLAST))
 }

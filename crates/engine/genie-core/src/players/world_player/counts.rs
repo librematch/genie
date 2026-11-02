@@ -7,7 +7,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class::BUILDING;
 use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::masters::player_master;
@@ -20,6 +19,7 @@ use crate::players::world_player::{
 };
 use crate::technology::ResearchState;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 
 impl World {
     /// `FUN_141658970`: player `p`'s first built town centre (state 2) among the ids its tracker
@@ -215,8 +215,12 @@ impl World {
         }
         let mut at = building;
         let local = player_master(&self.model.masters, self.local_player, building);
-        if let Some(b) = local.filter(|b| b.class == BUILDING)
-            && let Some(site) = b.building.as_ref()
+        if let Some(b) = local.filter(|b| {
+            self.model
+                .roles
+                .of_class(b.class)
+                .contains(ClassRoles::BUILDING)
+        }) && let Some(site) = b.building.as_ref()
             && site.disappears_when_built
             && let Some(stack) = site.stack_unit
         {

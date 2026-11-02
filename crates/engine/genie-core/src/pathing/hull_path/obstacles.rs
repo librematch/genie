@@ -10,9 +10,9 @@ use crate::map::spatial::RecordId;
 use crate::map::spatial::{Placed, tile_record_id};
 use crate::math::fmath::at_most_or_unordered;
 use crate::objects::ObjectId;
-use crate::objects::masters::class;
 use crate::pathing::hull_path::{HALF, Hull, HullIndex, HullPather, Point, Shape};
 use crate::players::PlayerId;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 
 impl HullPather<'_> {
@@ -168,7 +168,8 @@ impl HullPather<'_> {
         p: &Placed,
         player: Option<PlayerId>,
     ) -> Result<bool, GenieError> {
-        if p.class != class::GATE || player.is_none() {
+        let roles = self.by_id.roles();
+        if !roles.of_class(p.class).contains(ClassRoles::GATE) || player.is_none() {
             return Ok(false);
         }
         let gates = self.gates.ok_or(GenieError::unsupported(

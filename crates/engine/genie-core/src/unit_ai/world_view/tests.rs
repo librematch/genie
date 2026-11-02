@@ -18,7 +18,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::RestrictionField;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, MasterTables};
 use crate::objects::object_list::ObjectList;
@@ -28,6 +27,8 @@ use crate::players::Relation;
 use crate::test_ids::attack_category;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::UnitAiType;
@@ -145,7 +146,7 @@ fn harmless(master: Master) -> bool {
         now: WorldTime::ZERO,
         mode_680: Mode680::ZERO,
     };
-    picker.harmless(&spatial, object_id(50)).unwrap()
+    picker.harmless(&spatial, object_id(50), &roles()).unwrap()
 }
 
 /// Slot 0x78 of the ward's unit AI: of its attackers the world holds, the nearest by the
@@ -271,7 +272,11 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
         Ok(NearestAttacker::NoUnitAi)
     );
     // an object the world does not hold is not weighed
-    assert!(picker.duel(&Spatial::default(), object_id(77)).is_err());
+    assert!(
+        picker
+            .duel(&Spatial::default(), object_id(77), &roles())
+            .is_err()
+    );
 }
 
 #[test]

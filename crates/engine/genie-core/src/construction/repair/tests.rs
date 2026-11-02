@@ -18,7 +18,6 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::Voice;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -34,6 +33,8 @@ use crate::technology::Attributes;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::tests::{in_update, repairing};
 use crate::world::{Player, World, WorldTime};
@@ -212,7 +213,14 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
         attributes: &mut wood,
     };
     assert_eq!(
-        repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
+        repair_building(
+            &mut set,
+            0,
+            HitPoints::new(10.0),
+            true,
+            &mut payer,
+            &roles()
+        ),
         Ok(RepairOutcome::Healed)
     );
     assert_eq!(set[0].hp, HitPoints::new(510.0));
@@ -223,7 +231,14 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
         attributes: &mut wood,
     };
     assert_eq!(
-        repair_building(&mut set, 0, HitPoints::new(50.0), true, &mut payer),
+        repair_building(
+            &mut set,
+            0,
+            HitPoints::new(50.0),
+            true,
+            &mut payer,
+            &roles()
+        ),
         Ok(RepairOutcome::Full)
     );
     assert_eq!(set[0].hp, HitPoints::new(550.0));
@@ -234,13 +249,27 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
         attributes: &mut broke,
     };
     assert_eq!(
-        repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
+        repair_building(
+            &mut set,
+            0,
+            HitPoints::new(10.0),
+            true,
+            &mut payer,
+            &roles()
+        ),
         Ok(RepairOutcome::Unpaid)
     );
     assert_eq!(set[0].hp, HitPoints::new(500.0));
     let mut set = vec![house(1, HitPoints::new(0.5))];
     assert_eq!(
-        repair_building(&mut set, 0, HitPoints::new(10.0), true, &mut payer),
+        repair_building(
+            &mut set,
+            0,
+            HitPoints::new(10.0),
+            true,
+            &mut payer,
+            &roles()
+        ),
         Ok(RepairOutcome::Unpaid)
     );
 }
@@ -271,7 +300,14 @@ fn an_annex_repair_goes_to_its_main_building_and_its_annexes() {
         attributes: &mut wood,
     };
     assert_eq!(
-        repair_building(&mut set, 0, HitPoints::new(20.0), true, &mut payer),
+        repair_building(
+            &mut set,
+            0,
+            HitPoints::new(20.0),
+            true,
+            &mut payer,
+            &roles()
+        ),
         Ok(RepairOutcome::Full)
     );
     assert_eq!(
@@ -303,7 +339,7 @@ fn siege_unit_repair_pays_its_unit_share() {
         attributes: &mut held,
     };
     assert_eq!(
-        repair_unit(&mut set, 0, HitPoints::new(10.0), &mut payer),
+        repair_unit(&mut set, 0, HitPoints::new(10.0), &mut payer, &roles()),
         Ok(RepairOutcome::Healed)
     );
     let share = 0.5f32 * 10.0 / 175.0;
@@ -384,7 +420,7 @@ fn repaired(t: &mut World) -> Result<HeadCode, GenieError> {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            unit.repair_part(actions, c, me)
+            unit.repair_part(actions, c, me, &roles())
         },
     )
 }

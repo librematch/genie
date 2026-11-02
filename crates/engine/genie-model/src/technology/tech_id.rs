@@ -3,11 +3,27 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A technology's id (the `.dat`'s technology index, the place in a player's technologies), 0
 /// or more. A field that holds −1 for none holds `Option<TechId>` ([`TechId::of_field`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    CopyGetters,
+    Serialize,
+    Deserialize,
+)]
+#[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechId(
     /// Its value, the technology's place in the tree.
@@ -106,6 +122,13 @@ impl TryFrom<i16> for TechId {
             .with("tech", value));
         }
         Ok(Self(value))
+    }
+}
+
+impl From<TechId> for i16 {
+    /// The technology's id, as a slot's serde form holds it.
+    fn from(id: TechId) -> Self {
+        id.0
     }
 }
 

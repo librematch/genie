@@ -26,12 +26,13 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
 use crate::world::HUNTER_MASTER;
 use crate::world::TREE_NEAR;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -51,6 +52,7 @@ impl Unit {
         me: Me,
         own: &mut Option<Victim>,
         tree_lost: bool,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = object_master(
             c.w.parts.own_master.get(self.id),
@@ -58,7 +60,7 @@ impl Unit {
             c.w.model.masters.of(c.player),
         )?;
         let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
-        let victim = hunt_victim(c, &hunt)?;
+        let victim = hunt_victim(c, &hunt, roles)?;
         let own = own.take().ok_or(HUNTER_MASTER)?;
         let herd = self.herd_for(
             c,
@@ -66,8 +68,9 @@ impl Unit {
             &hunt,
             master,
             &victim,
+            roles,
         )?;
-        let r = self.hunt_reads(c, master, &hunt, herd, tree_lost)?;
+        let r = self.hunt_reads(c, master, &hunt, herd, tree_lost, roles)?;
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
         let next = hunt.update(c, self, actions, me, &mut f, &r);
@@ -78,13 +81,13 @@ impl Unit {
         // the retaliation's kill of the unit itself, which follows its step
         if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
             let own = KillLeft::own(self.id, k);
-            file_kill(c, (self, actions), own)?;
+            file_kill(c, (self, actions), own, roles)?;
         }
         match next {
             HuntNext::Stay => Ok(()),
-            HuntNext::Drop => self.hunt_drop_off(actions, c),
-            HuntNext::Search => self.hunt_set_search(actions, c),
-            HuntNext::AttackFailed => self.hunt_attack_failed(actions, c),
+            HuntNext::Drop => self.hunt_drop_off(actions, c, roles),
+            HuntNext::Search => self.hunt_set_search(actions, c, roles),
+            HuntNext::AttackFailed => self.hunt_attack_failed(actions, c, roles),
         }
     }
 
@@ -100,6 +103,7 @@ impl Unit {
         hunt: &HuntAction,
         herd: Option<Herd>,
         tree_lost: bool,
+        roles: &Roles,
     ) -> Result<HuntReads, GenieError> {
         let owner = c.w.players.player(c.player)?;
         let productivity = (hunt.task.productivity)
@@ -112,6 +116,7 @@ impl Unit {
             defaults: MoveDefaults::of(
                 master,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                roles,
             ),
             attack: AttackReads::of(
                 c.w.parts.combat_of(self.id),
@@ -122,6 +127,7 @@ impl Unit {
                 ),
                 c.w.parts.unit_ai.get(self.id),
                 (owner.kind, c.w.world_time),
+                roles,
             ),
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
@@ -155,20 +161,21 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let tree = c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
             let class = ai
                 .target_class
                 .or_else(|| actions.list.hunt().and_then(|h| h.target_class));
-            class == Some(class::TREE)
+            roles.of_some_class(class).contains(ClassRoles::TREE)
         });
-        if tree && self.hunt_tree_search(actions, c, None, Some(TREE_NEAR))? {
+        if tree && self.hunt_tree_search(actions, c, None, Some(TREE_NEAR), roles)? {
             return Ok(());
         }
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         hunt.tear_down(c.w.parts.mover_mut(self.id))?;
         hunt.state = HuntState::Search;
-        self.hunt_search_state(actions, c)
+        self.hunt_search_state(actions, c, roles)
     }
 
     /// What `set_state(6)` on live livestock reads (`0x140ac60e0` case 6), and the lead's update
@@ -182,13 +189,16 @@ impl Unit {
         action: &HuntAction,
         master: &Master,
         victim: &Victim,
+        roles: &Roles,
     ) -> Result<Option<Herd>, GenieError> {
         let faces = matches!(action.state, HuntState::Walk { .. })
             && action
                 .state
                 .move_to()
                 .is_some_and(|m| m.state == MoveTo::Arrived);
-        if !((faces && victim.class == class::LIVESTOCK && victim.state <= ObjectState::Alive)
+        if !((faces
+            && roles.of_class(victim.class).contains(ClassRoles::LIVESTOCK)
+            && victim.state <= ObjectState::Alive)
             || action.state == HuntState::Lead)
         {
             return Ok(None);
@@ -212,7 +222,13 @@ impl Unit {
             c.w.world_time,
         )?;
         let moving = action.task.walk_sprite_id(self.life.held());
-        let arms = arms(master, &c.w.model.graphics, action.task.sprites, moving);
+        let arms = arms(
+            master,
+            &c.w.model.graphics,
+            action.task.sprites,
+            moving,
+            roles,
+        );
         let own = them.player == c.player;
         let drop_site = if !own {
             None
@@ -284,7 +300,7 @@ impl Unit {
 /// its Attack's. A hunt whose start dropped its target (gone or past state 6) and holds no
 /// Attack reads none (state 7's end without a target): a stand-in no object holds
 /// ([`ObjectId::NOBODY`]).
-fn hunt_victim(c: &Step<'_>, action: &HuntAction) -> Result<Victim, GenieError> {
+fn hunt_victim(c: &Step<'_>, action: &HuntAction, roles: &Roles) -> Result<Victim, GenieError> {
     let target = action.target.map_or_else(
         || {
             action
@@ -299,7 +315,7 @@ fn hunt_victim(c: &Step<'_>, action: &HuntAction) -> Result<Victim, GenieError> 
             id: ObjectId::NOBODY,
             ..Victim::default()
         }),
-        Some(t) => victim(c, t)?.ok_or(GenieError::unsupported(
+        Some(t) => victim(c, t, roles)?.ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold live",
         )),
     }

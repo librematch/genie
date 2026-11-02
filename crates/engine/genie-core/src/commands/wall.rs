@@ -27,15 +27,14 @@ use crate::map::Tile;
 use crate::math::image::wall::{HALF as WALL_HALF, MAP_MARGIN as WALL_MAP_MARGIN, ONE as WALL_ONE};
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::BUILDER;
 use crate::objects::masters::{MasterId, player_master};
 use crate::orders::readiness;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::cmp::Ordering;
@@ -48,9 +47,7 @@ const MAP_MARGIN: f32 = WALL_MAP_MARGIN;
 
 /// A builder's master type is above this (`FUN_141262270`: `0x27`).
 const BUILDER_TYPE: MasterKind = MasterKind::of_data(0x27);
-/// The villagers' class (`FUN_141195750`: the master's class is 4), tested by the wall's train
-/// locations.
-const CIVILIAN: ClassId = class::VILLAGER;
+
 /// The builders the game's sort (`FUN_140e6eee0`) orders by insertion: 0x100 bytes of 8-byte
 /// entries. More go to its quicksort, which is not stable.
 const INSERTION_SORT_MAX: usize = 32;
@@ -411,7 +408,12 @@ impl World {
         if m.kind <= BUILDER_TYPE {
             return Ok(false);
         }
-        if m.class != CIVILIAN {
+        if !self
+            .model
+            .roles
+            .of_class(m.class)
+            .contains(ClassRoles::WALL_BUILDER)
+        {
             return Ok(m
                 .tasks
                 .iter()

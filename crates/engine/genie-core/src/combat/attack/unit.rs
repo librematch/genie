@@ -22,6 +22,7 @@ use crate::players::PlayerType;
 use crate::world::ATTACKER_MASTER;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -43,11 +44,12 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         match actions.list.attack().map(|a| a.target) {
             None => Ok(HeadCode::Keeps),
-            Some(None) => self.attack_lost_part(actions, c, me),
-            Some(_) => self.attack_strike_part(actions, c, me, own),
+            Some(None) => self.attack_lost_part(actions, c, me, roles),
+            Some(_) => self.attack_strike_part(actions, c, me, own, roles),
         }
     }
 
@@ -59,9 +61,10 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        let armed = armed(master, c.w.parts.combat_of(self.id).firepower);
+        let armed = armed(master, c.w.parts.combat_of(self.id).firepower, roles);
         let master_class = master.class;
         let walking = actions.list.attack().is_some_and(|a| {
             matches!(
@@ -70,7 +73,7 @@ impl Unit {
             )
         });
         if walking && armed {
-            return self.attack_walks_unseen(actions, c, me, master_class);
+            return self.attack_walks_unseen(actions, c, me, master_class, roles);
         }
         let attack = actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let (code, disarmed) =
@@ -96,6 +99,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         master_class: ClassId,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -112,8 +116,9 @@ impl Unit {
             ),
             c.w.parts.unit_ai.get(self.id),
             (player_type, c.w.world_time),
+            roles,
         );
-        let code = attack.update_gone(c, self, me, &r, master_class);
+        let code = attack.update_gone(c, self, me, &r, master_class, roles);
         if let Some(a) = actions.list.attack_mut() {
             *a = attack;
         }
@@ -130,6 +135,7 @@ impl Unit {
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = object_master(
@@ -150,8 +156,9 @@ impl Unit {
             ),
             c.w.parts.unit_ai.get(self.id),
             (player_type, c.w.world_time),
+            roles,
         );
-        let victim = victim(c, attack.target)?.ok_or(GenieError::unsupported(
+        let victim = victim(c, attack.target, roles)?.ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold live",
         ))?;
         let own = own.ok_or(ATTACKER_MASTER)?;
@@ -165,7 +172,7 @@ impl Unit {
         // the retaliation's kill of the unit itself, which follows its step
         if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
             let own = KillLeft::own(self.id, k);
-            file_kill(c, (self, actions), own)?;
+            file_kill(c, (self, actions), own, roles)?;
         }
         Ok(HeadCode::of(code))
     }
@@ -197,6 +204,7 @@ impl Unit {
         &self,
         actions: &Action,
         c: &Step<'_>,
+        roles: &Roles,
     ) -> Result<Option<Victim>, GenieError> {
         if actions.list.hunt().is_none() && actions.list.attack().is_none() {
             return Ok(None);
@@ -217,6 +225,7 @@ impl Unit {
             c.player,
             terrain,
             c.w.mode_680,
+            roles,
         )))
     }
 }

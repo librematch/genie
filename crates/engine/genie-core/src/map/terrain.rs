@@ -27,10 +27,11 @@ use crate::math::image::terrain::{INSIDE as TERRAIN_INSIDE, TILE as TERRAIN_TILE
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::RestrictionField;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::TOWN_CENTRE;
 use crate::world::Mode680;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use std::mem::swap;
 
@@ -45,8 +46,6 @@ const SNOW_FOUNDATION: TerrainId = TerrainId::named(6);
 const SNOW_LAYER: TerrainId = TerrainId::named(32);
 const SNOW_SKIPPED: TerrainId = TerrainId::named(36);
 
-/// The class whose foundation terrain always goes into the terrain (`FUN_1411ddd90`).
-const CLASS_14: ClassId = class::CLASS_14;
 /// Terrains a foundation never covers (`FUN_1411ddd90`: 47 and 69).
 const UNCOVERED: [TerrainId; 2] = [TerrainId::named(47), TerrainId::named(69)];
 
@@ -483,7 +482,7 @@ impl Terrain {
     /// # Panics
     ///
     /// Never: the tiles it covers are held on the map.
-    pub fn cover(&mut self, f: &Foundation) -> Result<(), GenieError> {
+    pub fn cover(&mut self, f: &Foundation, roles: &Roles) -> Result<(), GenieError> {
         /// `DAT_142eb1e9c`.
         const INSIDE: f32 = TERRAIN_INSIDE;
         let (x, y) = (f.position.x(), f.position.y());
@@ -525,7 +524,9 @@ impl Terrain {
         // nothing deferred), or a building of class 14 always goes into the terrain
         let into_terrain = is_farm_terrain(wanted)
             || matches!(f.master, ids::ID_357 | ids::ID_1188)
-            || f.class == CLASS_14;
+            || roles
+                .of_class(f.class)
+                .contains(ClassRoles::FOUNDATION_TERRAIN);
         for ty in y0..=y1 {
             for tx in x0..=x1 {
                 let i = self.size.index(Tile::new(tx, ty)).ok_or(TILE_OFF_MAP)?;
@@ -565,6 +566,8 @@ mod tests {
     use super::*;
     use crate::objects::masters::RestrictionField;
     use crate::test_ids::master_id;
+    use crate::testing::class;
+    use crate::testing::roles;
 
     /// Terrains of ids `k`.
     fn ids(k: &[u8]) -> Vec<TerrainId> {
@@ -781,16 +784,19 @@ mod tests {
         let mut t = map(vec![32, 32, 32, 9], vec![-1, -1, -1, 32]);
         assert!(t.snow_under(Tile::new(0, 0)).unwrap());
         assert!(t.snow_under(Tile::new(1, 1)).unwrap());
-        t.cover(&Foundation {
-            position: Position::new(1.0, 1.0, 0.0),
-            clearance: Footprint::new(1.0, 1.0),
-            terrain: FOUNDATION,
-            snow: Snow::Completed,
-            master: ids::HOUSE,
-            class: class::BUILDING,
-            terrain_bonus: RestrictionField::of_data(4),
-            mode_680: Mode680::ZERO,
-        })
+        t.cover(
+            &Foundation {
+                position: Position::new(1.0, 1.0, 0.0),
+                clearance: Footprint::new(1.0, 1.0),
+                terrain: FOUNDATION,
+                snow: Snow::Completed,
+                master: ids::HOUSE,
+                class: class::BUILDING,
+                terrain_bonus: RestrictionField::of_data(4),
+                mode_680: Mode680::ZERO,
+            },
+            &roles(),
+        )
         .unwrap();
         assert_eq!(t.kinds, ids(&[6, 6, 6, 6]));
         assert_eq!(t.layers, layers_of(&[32, 32, 32, 32]));
@@ -811,16 +817,19 @@ mod tests {
         let mut values = vec![0.0; 40];
         values[0] = 0.5;
         t.restrictions[4] = Restriction::new(values);
-        t.cover(&Foundation {
-            position: Position::new(2.0, 2.0, 0.0),
-            clearance: Footprint::new(2.0, 2.0),
-            terrain: FOUNDATION,
-            snow: Snow::None,
-            master: TOWN_CENTRE,
-            class: class::BUILDING,
-            terrain_bonus: RestrictionField::of_data(4),
-            mode_680: Mode680::ZERO,
-        })
+        t.cover(
+            &Foundation {
+                position: Position::new(2.0, 2.0, 0.0),
+                clearance: Footprint::new(2.0, 2.0),
+                terrain: FOUNDATION,
+                snow: Snow::None,
+                master: TOWN_CENTRE,
+                class: class::BUILDING,
+                terrain_bonus: RestrictionField::of_data(4),
+                mode_680: Mode680::ZERO,
+            },
+            &roles(),
+        )
         .unwrap();
         #[rustfmt::skip]
         let covered = [
@@ -837,16 +846,19 @@ mod tests {
     fn foundation_27_covers_grass_but_not_terrain_outside_its_list() {
         let mut t = map(vec![0, 2, 9, 47], vec![-1, -1, -1, -1]);
         assert!(!t.snow_under(Tile::new(0, 0)).unwrap());
-        t.cover(&Foundation {
-            position: Position::new(1.0, 1.0, 0.0),
-            clearance: Footprint::new(1.0, 1.0),
-            terrain: FOUNDATION,
-            snow: Snow::None,
-            master: ids::HOUSE,
-            class: class::BUILDING,
-            terrain_bonus: RestrictionField::NONE,
-            mode_680: Mode680::ZERO,
-        })
+        t.cover(
+            &Foundation {
+                position: Position::new(1.0, 1.0, 0.0),
+                clearance: Footprint::new(1.0, 1.0),
+                terrain: FOUNDATION,
+                snow: Snow::None,
+                master: ids::HOUSE,
+                class: class::BUILDING,
+                terrain_bonus: RestrictionField::NONE,
+                mode_680: Mode680::ZERO,
+            },
+            &roles(),
+        )
         .unwrap();
         assert_eq!(t.kinds, ids(&[27, 2, 27, 47]));
     }
@@ -867,15 +879,18 @@ mod tests {
             terrain_bonus: RestrictionField::NONE,
             mode_680: Mode680::ONE,
         };
-        t.cover(&farm).unwrap();
+        t.cover(&farm, &roles()).unwrap();
         assert_eq!(
             (t.kinds.clone(), t.layers.clone()),
             (ids(&[29, 29, 29, 47]), vec![None; 4])
         );
-        t.cover(&Foundation {
-            terrain: TerrainId::named(30),
-            ..farm
-        })
+        t.cover(
+            &Foundation {
+                terrain: TerrainId::named(30),
+                ..farm
+            },
+            &roles(),
+        )
         .unwrap();
         assert_eq!(t.kinds, ids(&[30, 30, 30, 47]));
     }
@@ -897,14 +912,14 @@ mod tests {
         };
         for master in [master_id(357), master_id(1188)] {
             let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
-            t.cover(&site(master)).unwrap();
+            t.cover(&site(master), &roles()).unwrap();
             assert_eq!(
                 (t.kinds.clone(), t.layers.clone()),
                 (ids(&[14, 14, 14, 47]), vec![None; 4])
             );
         }
         let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
-        t.cover(&site(ids::HOUSE)).unwrap();
+        t.cover(&site(ids::HOUSE), &roles()).unwrap();
         assert_eq!(t.kinds, ids(&[0, 3, 29, 47]));
         assert_eq!(t.layers, layers_of(&[14, 14, 14, -1]));
     }

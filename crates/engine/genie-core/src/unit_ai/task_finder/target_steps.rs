@@ -11,7 +11,6 @@ use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Task};
 use crate::orders::GARRISON;
@@ -23,6 +22,8 @@ use crate::unit_ai::task_finder::Finding;
 use crate::unit_ai::task_finder::TaskTarget;
 use crate::unit_ai::task_finder::first;
 use crate::unit_ai::task_finder::wanted;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The task finder's steps on a `target` (`LAB_1412795f5` to `LAB_1412796b4`): the drop-off
 /// ([`drop_off_finding`]), its player's foundation ([`build_task`]), the garrison into it
@@ -34,6 +35,7 @@ pub(super) fn on_target<'m>(
     t: &TaskTarget<'_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
+    roles: &Roles,
 ) -> Result<Finding<'m>, GenieError> {
     if let Finding::Answer(task) = drop_off_finding(list, actor, t, filter, dip) {
         return Ok(Finding::Answer(task));
@@ -49,11 +51,11 @@ pub(super) fn on_target<'m>(
         return Err(GenieError::unsupported("the task finder on master 199"));
     }
     // LAB_141279cfa -> LAB_1412796b4: garrisoning, repairing, task 0x6f
-    let (garrison, no_task) = garrison_into(list, actor, t, filter, dip);
+    let (garrison, no_task) = garrison_into(list, actor, t, filter, dip, roles);
     if let Finding::Answer(task) = garrison {
         return Ok(Finding::Answer(task));
     }
-    if let Finding::Answer(task) = repair_finding(list, actor, t, filter, dip) {
+    if let Finding::Answer(task) = repair_finding(list, actor, t, filter, dip, roles) {
         return Ok(Finding::Answer(task));
     }
     if let Some(task) = trade_task(list, t, filter) {
@@ -144,6 +146,7 @@ pub(super) fn garrison_into<'m>(
     t: &TaskTarget<'_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
+    roles: &Roles,
 ) -> (Finding<'m>, bool) {
     let own = actor.master;
     let allied = dip.allied(actor.player, t.player, false);
@@ -157,8 +160,10 @@ pub(super) fn garrison_into<'m>(
     if own_or_allied
         && t.state < ObjectState::Dying
         && t.master.object_flags.contains(ObjectFlags::GARRISON)
-        && (t.master.class == class::TRANSPORT
-            || own.class != class::VILLAGER
+        && (roles
+            .of_class(t.master.class)
+            .contains(ClassRoles::TRANSPORT)
+            || !roles.of_class(own.class).contains(ClassRoles::VILLAGER)
             || filter == Some(ENTER))
     {
         if let Some(task) = first(list, |task| {
@@ -184,23 +189,23 @@ pub(super) fn repair_finding<'m>(
     t: &TaskTarget<'_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
+    roles: &Roles,
 ) -> Finding<'m> {
     let repairable = t.player == actor.player
         || t.player == PlayerId::GAIA
         || dip.allied(actor.player, t.player, true);
     let repair_class = t.master.kind == MasterKind::BUILDING
-        || [
-            class::TRANSPORT,
-            class::FISHING_SHIP,
-            class::WARSHIP,
-            class::TRADE_BOAT,
-            class::CLASS_53,
-            class::SIEGE,
-            class::CLASS_51,
-            class::CLASS_54,
-            class::CLASS_55,
-        ]
-        .contains(&t.master.class);
+        || roles.of_class(t.master.class).intersects(
+            ClassRoles::TRANSPORT
+                | ClassRoles::FISHING_SHIP
+                | ClassRoles::WARSHIP
+                | ClassRoles::TRADE_BOAT
+                | ClassRoles::BOARDING_SHIP
+                | ClassRoles::SIEGE
+                | ClassRoles::PACKED_TREBUCHET
+                | ClassRoles::UNPACKED_TREBUCHET
+                | ClassRoles::SCORPION,
+        );
     if repairable && repair_class && t.hp < t.max_hp && t.state < ObjectState::Dying {
         // the repair tasks the filter takes: the last for any target, the last for the
         // target's class, else the first for its master, which ends the scan; the class's

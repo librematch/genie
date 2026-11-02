@@ -1,9 +1,13 @@
 use crate::layer::BuildLayer;
 use crate::layer::Roles;
 use crate::layer::by_id;
+use crate::layer::generated::ClassRoles;
+use crate::layer::generated::MasterRoles;
 use crate::model::Model;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::players::attribute::AttributeId;
+use crate::technology::TechId;
 use bitflags::bitflags;
 use serde::Deserialize;
 use serde::Serialize;
@@ -81,4 +85,52 @@ fn models_take_the_layers_roles_slots_and_tuning() {
     assert_eq!(model.slots, layer.slots);
     assert_eq!(*model.tuning, layer.tuning);
     assert_eq!(model.masters, Model::default().masters);
+}
+
+/// An optional class holds its class's roles; no class holds none.
+#[test]
+fn optional_classes_hold_their_class_roles() {
+    let gate = ClassRoles::from_bits_retain(1);
+    let roles = Roles {
+        classes: Arc::new(vec![ClassRoles::empty(), gate]),
+        ..Roles::default()
+    };
+    assert_eq!(roles.of_some_class(Some(ClassId::named(1))), gate);
+    assert!(roles.of_some_class(None).is_empty());
+}
+
+/// An optional master holds its master's roles; no master holds none.
+#[test]
+fn optional_masters_hold_their_master_roles() {
+    let dock = MasterRoles::from_bits_retain(1);
+    let roles = Roles {
+        masters: Arc::new(vec![MasterRoles::empty(), dock]),
+        ..Roles::default()
+    };
+    assert_eq!(roles.of_some_master(Some(MasterId::named(1))), dock);
+    assert!(roles.of_some_master(None).is_empty());
+}
+
+/// A slot's id serializes as its value and parses through the id's check.
+#[test]
+fn slot_ids_serialize_as_their_values() {
+    assert_eq!(serde_json::to_value(ClassId::named(4)).unwrap(), json!(4));
+    assert_eq!(
+        serde_json::from_value::<ClassId>(json!(49)).unwrap(),
+        ClassId::named(49)
+    );
+    assert!(serde_json::from_value::<ClassId>(json!(-2)).is_err());
+    assert_eq!(
+        serde_json::to_value(MasterId::named(50)).unwrap(),
+        json!(50)
+    );
+    assert!(serde_json::from_value::<MasterId>(json!(-1)).is_err());
+    assert_eq!(
+        serde_json::to_value(TechId::try_from(7).unwrap()).unwrap(),
+        json!(7)
+    );
+    assert_eq!(
+        serde_json::to_value(AttributeId::try_from(0).unwrap()).unwrap(),
+        json!(0)
+    );
 }

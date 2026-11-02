@@ -29,7 +29,6 @@ use crate::objects::Voice;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::class;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
@@ -42,6 +41,8 @@ use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 impl Attack {
@@ -90,6 +91,7 @@ impl Attack {
         arms: Arms,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
+        roles: &Roles,
     ) -> Result<(Self, bool), GenieError> {
         let mut a = Self {
             voice: Voice::Quiet,
@@ -99,7 +101,7 @@ impl Attack {
         // The gate class, whose parts' gaps readyToAttack measures.
         // The villagers' class, whose attack ends on any dead target.
         // The trees' class, a dead one of which up to state 5 keeps another unit's attack going.
-        if e.target_class == class::GATE {
+        if roles.of_class(e.target_class).contains(ClassRoles::GATE) {
             return Err(GenieError::unsupported(
                 "a hunt's Attack on a gate (its parts' gaps)",
             ));
@@ -146,6 +148,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
     ) -> Result<(Self, Begun, Vec<Posted>), GenieError> {
+        let roles = by_id.roles();
         let e = cmd.engagement;
         let t = *world.get_known(cmd.target)?.ok_or(TARGET_GONE)?;
         let ground = mover.stats.radius.ground();
@@ -156,6 +159,7 @@ impl Attack {
             e.gap,
             |g| g,
             by_id,
+            roles,
         );
         let mut attack = Self::own(cmd.target, e, cmd.arms);
         let mut posted = Vec::new();
@@ -188,6 +192,7 @@ impl Attack {
         c: &mut Step<'_>,
         unit: &mut Unit,
         cmd: &AttackCommand<'_>,
+        roles: &Roles,
     ) -> Result<(Self, Vec<Posted>), GenieError> {
         let reads = unit.move_to_reads(
             c.w.parts.motion.mover(unit.id),
@@ -197,10 +202,17 @@ impl Attack {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
-        let (mover, by_id) =
-            c.w.parts
-                .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.model.masters));
+        let (mover, by_id) = c.w.parts.lend_mover(
+            unit.id,
+            (
+                &c.w.players,
+                &c.w.index,
+                &c.w.model.masters,
+                &c.w.model.roles,
+            ),
+        );
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
             Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
@@ -218,9 +230,15 @@ impl Attack {
             let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
                 "an attack's target the slice does not hold live",
             ))?;
-            let (motion, by_id) =
-                c.w.parts
-                    .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.model.masters));
+            let (motion, by_id) = c.w.parts.lend_motion(
+                unit.id,
+                (
+                    &c.w.players,
+                    &c.w.index,
+                    &c.w.model.masters,
+                    &c.w.model.roles,
+                ),
+            );
             let mut g = Ground {
                 map: &c.w.spatial,
                 sprite_rng: c.w.streams.get(Stream::Sprite),
@@ -230,7 +248,7 @@ impl Attack {
                 by_id,
                 motion,
             };
-            attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
+            attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads, roles)?;
         }
         if begun.arrived {
             unit.shows_standing_sprite(
@@ -373,8 +391,9 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        self.ready(unit, g, f, r)
+        self.ready(unit, g, f, r, roles)
     }
 }
 
@@ -386,8 +405,9 @@ pub fn arms(
     graphics: &Graphics,
     sprites: TaskSprites,
     moving: Option<SpriteId>,
+    roles: &Roles,
 ) -> Arms {
-    arms_looking(master, None, graphics, sprites, moving)
+    arms_looking(master, None, graphics, sprites, moving, roles)
 }
 
 /// The Attack constructor's sprites and frames (`FUN_140a7c210`): the `MoveTo`'s sprite `moving`
@@ -404,12 +424,13 @@ pub fn arms_looking(
     graphics: &Graphics,
     sprites: TaskSprites,
     moving: Option<SpriteId>,
+    roles: &Roles,
 ) -> Arms {
     let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     Arms {
         move_sprite: g(moving)
             .or_else(|| g(running(master, look)))
-            .or_else(|| g(walking(master, look, false))),
+            .or_else(|| g(walking(master, look, false, roles))),
         sprite: g(sprites.proceeding).or_else(|| g(master.attack_sprite)),
         second_sprite: g(master.attack_sprite2),
         idle_sprite: g(master.standing_sprite),

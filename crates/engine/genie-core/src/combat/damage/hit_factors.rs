@@ -14,7 +14,8 @@ use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::class;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// Slot 0x1f0 of a combat object (`FUN_14120d780`) at height `z` whose player has `own` as
 /// attributes 211 and 212: a hit from higher up gains 25% and attributes 211 and the target's
@@ -86,41 +87,76 @@ pub fn charge_works(
     charge_type: ChargeKind,
     class: ClassId,
     kind: MasterKind,
+    roles: &Roles,
 ) -> bool {
     if charge_target == ChargeTarget::EVERY
         || charge_type == ChargeKind::EVERY_TARGET
         || (charge_target == ChargeTarget::ALL_BUT_BUILDINGS
             && !(MasterKind::BUILDING <= kind
-                && class != class::CLASS_51
-                && class != class::CLASS_54))
+                && !roles.of_class(class).contains(ClassRoles::PACKED_TREBUCHET)
+                && !roles
+                    .of_class(class)
+                    .contains(ClassRoles::UNPACKED_TREBUCHET)))
     {
         return true;
     }
-    let bit = match class {
-        class::CLASS_6
-        | class::CLASS_28
-        | class::CLASS_45
-        | class::CLASS_46
-        | class::CLASS_50
-        | class::CLASS_56 => 0,
-        class::CLASS_12 | class::CLASS_24 | class::CLASS_47 | class::CLASS_57 => 1,
-        class::CLASS_0 | class::CLASS_44 => 2,
-        class::CLASS_23 | class::CLASS_36 => 3,
-        class::CLASS_17 | class::MONK | class::CLASS_43 => 4,
-        class::VILLAGER | class::TRADE_CART | class::KING => 5,
-        class::TRADE_BOAT
-        | class::TRANSPORT
-        | class::FISHING_SHIP
-        | class::WARSHIP
-        | class::CLASS_53 => 6,
-        class::SIEGE | class::CLASS_35 | class::CLASS_51 | class::CLASS_54 | class::CLASS_55 => 7,
-        class::BUILDING
-        | class::WALL
-        | class::GATE
-        | class::FARM
-        | class::TOWER
-        | class::CLASS_60 => 8,
-        _ => return false,
+    let bit = {
+        let held = roles.of_class(class);
+        if held.intersects(
+            ClassRoles::INFANTRY
+                | ClassRoles::PHALANX
+                | ClassRoles::TWO_HANDED_SWORDSMAN
+                | ClassRoles::PIKEMAN
+                | ClassRoles::SPEARMAN
+                | ClassRoles::RAIDER,
+        ) {
+            0
+        } else if held.intersects(
+            ClassRoles::CAVALRY
+                | ClassRoles::WAR_ELEPHANT
+                | ClassRoles::SCOUT_CAVALRY
+                | ClassRoles::CAVALRY_RAIDER,
+        ) {
+            1
+        } else if held.intersects(ClassRoles::ARCHERY | ClassRoles::ARCHERY_CANNON) {
+            2
+        } else if held.intersects(ClassRoles::CAVALRY_CANNON | ClassRoles::CAVALRY_ARCHER) {
+            3
+        } else if held
+            .intersects(ClassRoles::HEALER | ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC)
+        {
+            4
+        } else if held.intersects(ClassRoles::VILLAGER | ClassRoles::TRADE_CART | ClassRoles::KING)
+        {
+            5
+        } else if held.intersects(
+            ClassRoles::TRADE_BOAT
+                | ClassRoles::TRANSPORT
+                | ClassRoles::FISHING_SHIP
+                | ClassRoles::WARSHIP
+                | ClassRoles::BOARDING_SHIP,
+        ) {
+            6
+        } else if held.intersects(
+            ClassRoles::SIEGE
+                | ClassRoles::PETARD
+                | ClassRoles::PACKED_TREBUCHET
+                | ClassRoles::UNPACKED_TREBUCHET
+                | ClassRoles::SCORPION,
+        ) {
+            7
+        } else if held.intersects(
+            ClassRoles::BUILDING
+                | ClassRoles::WALL
+                | ClassRoles::GATE
+                | ClassRoles::FARM
+                | ClassRoles::TOWER
+                | ClassRoles::MISC_BUILDING,
+        ) {
+            8
+        } else {
+            return false;
+        }
     };
     charge_target.holds(bit)
 }
@@ -139,9 +175,9 @@ pub fn charged(a: &Attacker) -> bool {
 /// Slot 0x2f0 of a combat object of type 70 or 80 (`FUN_14120e920`): a charge of type 1 or 3
 /// that works on `v` ([`charge_works`]) and is ready.
 #[must_use]
-pub fn charge_hit(a: &Attacker, v: &Victim) -> bool {
+pub fn charge_hit(a: &Attacker, v: &Victim, roles: &Roles) -> bool {
     a.charge_kind.adds_to_attack()
-        && charge_works(a.charge_target, a.charge_kind, v.class, v.kind)
+        && charge_works(a.charge_target, a.charge_kind, v.class, v.kind, roles)
         && charged(a)
 }
 
@@ -171,8 +207,8 @@ pub(super) fn charge_damage(a: &Attacker) -> Result<f32, GenieError> {
 /// Slot 0x2f8 of a combat unit or building (`FUN_14120f510`): a charge of type 6 or 7 (slot
 /// 0x308, `FUN_141203b50`) that works on `t` ([`charge_works`]) and is ready ([`charged`]).
 #[must_use]
-pub fn range_charge_hit(a: &Attacker, t: &Victim) -> bool {
+pub fn range_charge_hit(a: &Attacker, t: &Victim, roles: &Roles) -> bool {
     a.charge_kind.ranged()
-        && charge_works(a.charge_target, a.charge_kind, t.class, t.kind)
+        && charge_works(a.charge_target, a.charge_kind, t.class, t.kind, roles)
         && charged(a)
 }

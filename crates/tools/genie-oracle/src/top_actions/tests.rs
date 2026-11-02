@@ -33,12 +33,12 @@ use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TargetOwner;
+use genie_core::objects::masters::Task;
 use genie_core::objects::masters::TaskFlags;
 use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::WorkValue;
-use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
 use genie_core::objects::{Graphics, SpeedMultiplier};
 use genie_core::ownership::artifact::{ARTIFACT_TYPE, ArtifactState};
@@ -802,7 +802,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
     assert_eq!(
         (h.target_class, h.drop_site, h.task.id),
         (
-            Some(class::VILLAGER),
+            Some(ClassId::named(4)),
             Some(DropSiteId::new(object_id(40))),
             TaskId::of_task(0)
         )

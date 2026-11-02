@@ -17,11 +17,9 @@ use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::{
     built_death, combat_dies, forget_resource, refund_of,
 };
-use crate::objects::masters::ClassId;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::orders::object_gone;
@@ -32,16 +30,8 @@ use crate::players::game_status::GameStatus;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
-
-/// The classes no delete takes (`DAT_142f925c0`, and `FUN_14120f620`'s own test): livestock,
-/// class 42, artifacts and class 60.
-const UNDELETABLE: [ClassId; 4] = [
-    class::LIVESTOCK,
-    class::RELIC,
-    class::ARTIFACT,
-    class::CLASS_60,
-];
 
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
 const DELETABLE_TYPE: MasterKind = MasterKind::of_data(70);
@@ -95,7 +85,11 @@ impl World {
         let master = unit.master(self.master_tables(), owner)?;
         if unit.undeletable
             || master.kind < DELETABLE_TYPE
-            || UNDELETABLE.contains(&master.class)
+            || self
+                .model
+                .roles
+                .of_class(master.class)
+                .contains(ClassRoles::UNDELETABLE)
             || self.parts.combat_of(unit.id).capture_flag == CaptureKind::AGAIN
         {
             return Ok(());
@@ -183,12 +177,24 @@ impl World {
     fn delete_unit(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
         let class = unit.master(self.master_tables(), owner)?.class;
-        if UNDELETABLE.contains(&class) {
+        if self
+            .model
+            .roles
+            .of_class(class)
+            .contains(ClassRoles::UNDELETABLE)
+        {
             return Ok(());
         }
         // The class a unit's slot 0xd8 (`FUN_141211340`) spares, and the livestock it spares while it
         // holds some.
-        if class == class::RELIC || (class == class::LIVESTOCK && Amount::ZERO < unit.life.amount) {
+        if self.model.roles.of_class(class).contains(ClassRoles::RELIC)
+            || (self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::LIVESTOCK)
+                && Amount::ZERO < unit.life.amount)
+        {
             return Ok(());
         }
         let i = self.wake(id)?;
@@ -443,6 +449,7 @@ impl World {
                 master,
                 &mut self.spatial,
                 &mut self.pathing,
+                &self.model.roles,
             )?;
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
@@ -603,6 +610,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    use crate::testing::class;
     use crate::world::Millis;
     use crate::world::Player;
     use crate::world::Seconds;
@@ -829,6 +837,7 @@ mod clearing_tests {
     use crate::test_ids::object_id;
     #[cfg(test)]
     use crate::test_ids::{adds, amounts};
+    use crate::testing::class;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;

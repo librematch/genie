@@ -79,8 +79,8 @@ impl genie_diff::Diff for OrderTargetType {
 #[cfg(test)]
 mod tests {
     use crate::ErrorKind;
-    use crate::objects::masters::class;
     use crate::test_ids::master_id;
+    use crate::testing::class;
     use crate::unit_ai::OrderTargetType;
 
     /// A saved −1 is no type, any other number 0 or more a type that reads as the master and the

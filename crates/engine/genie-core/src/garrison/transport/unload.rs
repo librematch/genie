@@ -17,7 +17,6 @@ use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
@@ -25,6 +24,7 @@ use crate::players::PlayerId;
 use crate::production::spawn::{NOT_MOVING, Placing, Tested, WorldMap, placement};
 use crate::unit_ai::alert_owner;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 use crate::world::parts::Parts;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
@@ -82,6 +82,7 @@ impl World {
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
                 task,
+                &self.model.roles,
             )?
         };
         let restriction = self
@@ -150,6 +151,7 @@ impl World {
                 ),
                 rng,
             ),
+            &self.model.roles,
         )
     }
 
@@ -233,6 +235,7 @@ impl World {
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
                 t.task,
+                &self.model.roles,
             )?
         };
         let mut changes = Vec::new();
@@ -412,7 +415,7 @@ impl World {
                     placement: made.placement,
                 };
                 let map = WorldMap { turns: &*self };
-                placement(&placing, &map, spot, false)? == Tested::Free
+                placement(&placing, &map, spot, false, &self.model.roles)? == Tested::Free
             };
             if free
                 && self.spatial.point_clear(
@@ -420,7 +423,13 @@ impl World {
                     spot,
                     Distance::new(grow),
                     mask,
-                    ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
+                    ObjectsRef::new(
+                        &self.players,
+                        &self.index,
+                        &self.model.masters,
+                        &self.parts,
+                        &self.model.roles,
+                    ),
                 )?
             {
                 found = Some(spot);
@@ -446,7 +455,12 @@ impl World {
     ) -> Result<(), GenieError> {
         let ship = self.players.live(p, i)?;
         let at = ship.position();
-        if ship.master(self.master_tables(), p)?.class == class::SIEGE {
+        if self
+            .model
+            .roles
+            .of_class(ship.master(self.master_tables(), p)?.class)
+            .contains(ClassRoles::SIEGE)
+        {
             return Err(SIEGE_UNLOAD);
         }
         let (up, ui) = self.live_inside(id)?;

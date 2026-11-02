@@ -147,7 +147,7 @@ impl World {
             own,
         };
         let map = WorldMap { turns: self };
-        build_placement(&build, &map, at)
+        build_placement(&build, &map, at, &self.model.roles)
     }
 
     /// The Build's placement test of the building `placed` (`0x140aae200` case 7: its master's
@@ -186,7 +186,7 @@ impl World {
         };
         let map = WorldMap { turns: self };
         let at = placed.position.ground();
-        build_placement(&test, &map, at)
+        build_placement(&test, &map, at, &self.model.roles)
     }
 
     /// The terrain restriction a placement test of `site` reads (`+0x606`), from the data file.

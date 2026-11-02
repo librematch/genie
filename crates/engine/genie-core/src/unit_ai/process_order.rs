@@ -8,7 +8,6 @@ use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
@@ -17,10 +16,11 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     CIVILIAN, DEFENDLESS_MASTER, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI,
-    Surroundings, TREBUCHET_CLASS, TREBUCHET_PACKED_CLASS, UnitAi, UnitCommand, UnitSeen, UnitSide,
-    order_move,
+    Surroundings, UnitAi, UnitCommand, UnitSeen, UnitSide, order_move,
 };
 use crate::world::UNIT_AI_MASTER;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 impl UnitAi {
     /// Slot 0x230 (`FUN_140c5c170`, every type's) on the order `o`: one not ready returns 0xe.
@@ -84,6 +84,7 @@ impl UnitAi {
         place: Option<(Point, Option<ClassId>)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
+        roles: &Roles,
     ) -> Result<OrderOutcome, GenieError> {
         if !o.ready {
             return Ok(OrderOutcome::NotReady);
@@ -101,7 +102,9 @@ impl UnitAi {
             | OrderKind::RunAway
             | OrderKind::SeekAndDestroy
             | OrderKind::AttackRoundup
-            | OrderKind::AttackMove => self.combat_order(o, world, ai, side, &mut attack_move)?,
+            | OrderKind::AttackMove => {
+                self.combat_order(o, world, ai, side, &mut attack_move, roles)?
+            }
             OrderKind::Build
             | OrderKind::Heal
             | OrderKind::Convert
@@ -118,7 +121,7 @@ impl UnitAi {
             OrderKind::Explore => self.explore_at(o.point.tile(), true, side, ai)?,
             OrderKind::Stop => {
                 self.remove_target();
-                self.stop_with(StopOrder::Keep, place, side, ai)?;
+                self.stop_with(StopOrder::Keep, place, side, ai, roles)?;
                 true
             }
             OrderKind::Move | OrderKind::GroupGather => {
@@ -159,7 +162,7 @@ impl UnitAi {
         if !taken {
             return Ok(OrderOutcome::NotTaken);
         }
-        Ok(self.order_tail(Some(o.order), o.priority, class, attack_move, ai))
+        Ok(self.order_tail(Some(o.order), o.priority, class, attack_move, ai, roles))
     }
 
     /// [`UnitAi::process_order`]'s combat cases: the attack, the defence (a master that cannot
@@ -172,6 +175,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
         attack_move: &mut bool,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         let (at, player_type) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
@@ -194,7 +198,9 @@ impl UnitAi {
             (OrderKind::AttackRoundup, Some(t)) => self.attack_roundup(t, at, side)?,
             (OrderKind::AttackMove, target) => {
                 if let Some(t) = target
-                    && matches!(at.class, Some(TREBUCHET_CLASS | TREBUCHET_PACKED_CLASS))
+                    && roles
+                        .of_some_class(at.class)
+                        .contains(ClassRoles::ATTACK_MOVE_ATTACKS)
                 {
                     *attack_move = true;
                     self.attack_slot(t, true, at, side, ai)?
@@ -294,6 +300,7 @@ impl UnitAi {
         class: Option<ClassId>,
         attack_move: bool,
         ai: &mut Well512,
+        roles: &Roles,
     ) -> OrderOutcome {
         if order == Some(OrderKind::Stop) {
             self.leave_patrol_timers(ai);
@@ -304,7 +311,9 @@ impl UnitAi {
         let new = if order == Some(OrderKind::AttackRoundup) || attack_move {
             self.leave_patrol_timers(ai);
             Some(OrderKind::Attack)
-        } else if order == Some(OrderKind::Attack) && class == Some(class::MONK) {
+        } else if order == Some(OrderKind::Attack)
+            && roles.of_some_class(class).contains(ClassRoles::MONK)
+        {
             self.leave_patrol_timers(ai);
             self.current_target = None;
             None

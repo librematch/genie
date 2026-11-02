@@ -15,6 +15,7 @@ mod victory;
 use crate::math::image::game_status::ONE_UNIT_AGE as GAME_STATUS_ONE_UNIT_AGE;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::ids;
 use crate::players::PlayerId;
 use crate::players::Relation;
 #[cfg(test)]
@@ -116,12 +117,7 @@ const KILLS_OF: usize = 300;
 /// The action types whose stop keeps a value of the unit's (`+0x88a`, `FUN_14106fa60`).
 const KEEPING_TYPES: [ActionKind; 2] = [ActionKind::PACK, ActionKind::UNPACK];
 /// The buildings a stop leaves alone (`FUN_1411e6290`).
-const UNSTOPPED_BUILDINGS: [MasterId; 4] = [
-    MasterId::named(50),
-    MasterId::named(199),
-    MasterId::named(276),
-    MasterId::named(1187),
-];
+const UNSTOPPED_BUILDINGS: [MasterId; 4] = [ids::FARM, ids::FISH_TRAP, ids::WONDER, ids::ID_1187];
 /// That attribute's bound (`DAT_14330eb8c`).
 const ONE_UNIT_AGE: f32 = GAME_STATUS_ONE_UNIT_AGE;
 

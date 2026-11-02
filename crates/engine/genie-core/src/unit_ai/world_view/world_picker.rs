@@ -43,6 +43,7 @@ use crate::unit_ai::{
 use crate::world::Mode680;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::parts::Parts;
 use crate::world::player::AiSettings;
@@ -147,6 +148,7 @@ impl WorldPicker<'_> {
         who: ObjectId,
         whom: ObjectId,
         any: bool,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         let (_, p, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
             "a priest's conversion test of an object the slice does not hold",
@@ -172,7 +174,7 @@ impl WorldPicker<'_> {
             master: t.life.master_id,
             hero: tm.hero_flag,
         });
-        Ok(can_convert(&converter, target.as_ref(), any))
+        Ok(can_convert(&converter, target.as_ref(), any, roles))
     }
 
     /// What object `from` deals object `to` per hit (`to`'s slot 0x220 with `from`,
@@ -185,6 +187,7 @@ impl WorldPicker<'_> {
         spatial: &Spatial,
         from: ObjectId,
         to: ObjectId,
+        roles: &Roles,
     ) -> Result<HitPoints, GenieError> {
         let (fq, f, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
         let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
@@ -203,6 +206,7 @@ impl WorldPicker<'_> {
             tq,
             terrain,
             self.mode_680,
+            roles,
         );
         let unit = victim_of(
             (
@@ -218,6 +222,7 @@ impl WorldPicker<'_> {
             fq,
             terrain,
             self.mode_680,
+            roles,
         );
         let mut factor = elevation_factor(f.position().z(), unit.attack_elevation, &target);
         if fm.kind == MasterKind::BUILDING {
@@ -228,19 +233,24 @@ impl WorldPicker<'_> {
                 self.parts.building_of(t.id).relics,
             );
         }
-        let bonus = bonus_damage(&unit, &target);
-        armor_damage(&target, &unit.weapons, factor, &unit.source, bonus)
+        let bonus = bonus_damage(&unit, &target, roles);
+        armor_damage(&target, &unit.weapons, factor, &unit.source, bonus, roles)
     }
 
     /// What a computer player's unit weighs of object `other` on a damage notify
     /// ([`crate::unit_ai::Duel`]).
-    pub(crate) fn duel(&self, spatial: &Spatial, other: ObjectId) -> Result<Duel, GenieError> {
+    pub(crate) fn duel(
+        &self,
+        spatial: &Spatial,
+        other: ObjectId,
+        roles: &Roles,
+    ) -> Result<Duel, GenieError> {
         let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
         Ok(Duel {
-            converts: self.converts(other, self.me, true)?,
+            converts: self.converts(other, self.me, true, roles)?,
             attacks: attacks(om),
-            harms: self.damage(spatial, other, self.me)?,
-            harmed: self.damage(spatial, self.me, other)?,
+            harms: self.damage(spatial, other, self.me, roles)?,
+            harmed: self.damage(spatial, self.me, other, roles)?,
             hp: o.life.hp,
         })
     }
@@ -252,7 +262,12 @@ impl WorldPicker<'_> {
     /// range of at most [`HARMLESS_RANGE`] (slot 0x880, `COMISS` with `JNC`: not a NaN), is
     /// fought back as Gaia's attackers are. Its attack's target (an Attack's, `FUN_14107cc30`)
     /// counts when the world holds it.
-    pub(crate) fn harmless(&self, spatial: &Spatial, other: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn harmless(
+        &self,
+        spatial: &Spatial,
+        other: ObjectId,
+        roles: &Roles,
+    ) -> Result<bool, GenieError> {
         let (q, o, attributes, om) = self.held(other)?.ok_or(NOT_HELD)?;
         if !om.object_flags.contains(ObjectFlags::SCOUT) || om.copy_id != Some(om.id) {
             return Ok(false);
@@ -272,6 +287,7 @@ impl WorldPicker<'_> {
             q,
             terrain,
             self.mode_680,
+            roles,
         );
         let attacked = (self.actions_of(o.id).top_action_kind() == Some(ATTACK))
             .then(|| self.actions_of(o.id).top_target())
@@ -292,6 +308,7 @@ impl WorldPicker<'_> {
                     tq,
                     terrain,
                     self.mode_680,
+                    roles,
                 )
             }),
             None => None,
@@ -305,17 +322,17 @@ impl WorldPicker<'_> {
             charge_event: om.charge_event,
             range_powerup: self.parts.combat_of(o.id).range_powerup,
         };
-        let attack = shown_attack(&v, &shown);
+        let attack = shown_attack(&v, &shown, roles);
         let amount = DamageAmount::new;
         if amount(4) < attack
             || (amount(3) < attack && HARMLESS_HP <= HitPoints::of_master(om.hit_points).get())
         {
             return Ok(false);
         }
-        if amount(0) < shown_melee_armor(&v)? {
+        if amount(0) < shown_melee_armor(&v, roles)? {
             return Ok(false);
         }
-        Ok(shown_range(&v, &shown) <= HARMLESS_RANGE)
+        Ok(shown_range(&v, &shown, roles) <= HARMLESS_RANGE)
     }
 
     /// Slot 0x78 of object `target`'s unit AI (`FUN_140c48610`): of its attackers in their order,
@@ -467,20 +484,23 @@ impl AttackPicker for WorldPicker<'_> {
     }
 
     fn can_attack(&mut self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
+        let roles = self.by_id.roles();
         let seeker = self.seeker.ok_or(GenieError::unsupported(
             "an attack test outside bestUnitToAttack",
         ))?;
         let (target, _) = self.target(spatial, id)?;
-        unit_ai_can_attack(self.attacker, &seeker, &target)
+        unit_ai_can_attack(self.attacker, &seeker, &target, roles)
     }
 
     fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
-        Ok(unit_ai_attacks_neutral(self.attacker, class))
+        let roles = self.by_id.roles();
+        Ok(unit_ai_attacks_neutral(self.attacker, class, roles))
     }
 
     fn spares_friends(&mut self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
+        let roles = self.by_id.roles();
         let (target, _) = self.target(spatial, id)?;
-        unit_ai_spares_friends(self.attacker, &target)
+        unit_ai_spares_friends(self.attacker, &target, roles)
     }
 
     /// `FUN_140c41690`: a human player's unit passes nothing over (the computer player's test
@@ -502,12 +522,13 @@ impl AttackPicker for WorldPicker<'_> {
         distance: Distance,
         category: Option<AttackCategory>,
     ) -> Result<Candidate, GenieError> {
+        let roles = self.by_id.roles();
         let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
             "a searching unit of a master the slice does not have",
         ))?;
-        let damage = self.damage(spatial, self.me, id)?;
-        let armed = 0.0 < attacks(m) || self.converts(id, self.me, true)?;
+        let damage = self.damage(spatial, self.me, id, roles)?;
+        let armed = 0.0 < attacks(m) || self.converts(id, self.me, true, roles)?;
         Ok(Candidate {
             id,
             distance,
@@ -523,7 +544,7 @@ impl AttackPicker for WorldPicker<'_> {
             hp: t.life.hp,
             reload: self.parts.combat_of(me.id).reload_stinger
                 + (mm.reload - self.parts.combat_of(me.id).reload_powerup),
-            workable: self.converts(self.me, id, false)?,
+            workable: self.converts(self.me, id, false, roles)?,
             current: self.seeker.is_some_and(|s| s.target == Some(id)),
         })
     }
@@ -559,8 +580,9 @@ impl AttackPicker for WorldPicker<'_> {
     }
 
     fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+        let roles = self.by_id.roles();
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(0.0 < attacks(m) || self.converts(id, self.me, true)?)
+        Ok(0.0 < attacks(m) || self.converts(id, self.me, true, roles)?)
     }
 
     /// The quick path (slot 0x3e0) within `range`, with its master's terrain mask and radius on

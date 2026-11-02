@@ -201,7 +201,13 @@ impl World {
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
     fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> Result<bool, GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         self.spatial
             .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
     }
@@ -372,7 +378,13 @@ impl World {
         ignore: &[ObjectId],
         record: &mut Path,
     ) -> Result<ShortFound, GenieError> {
-        let by_id = ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts);
+        let by_id = ObjectsRef::new(
+            &self.players,
+            &self.index,
+            &self.model.masters,
+            &self.parts,
+            &self.model.roles,
+        );
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
@@ -424,7 +436,13 @@ impl World {
             player_type,
             (to, 0.0),
             None,
-            ObjectsRef::new(&self.players, &self.index, &self.model.masters, &self.parts),
+            ObjectsRef::new(
+                &self.players,
+                &self.index,
+                &self.model.masters,
+                &self.parts,
+                &self.model.roles,
+            ),
         )
     }
 

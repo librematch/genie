@@ -18,12 +18,14 @@ use crate::objects::masters::{MasterTables, Task};
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, Relations};
-use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskTarget};
+use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskOn, TaskTarget};
 use crate::unit_ai::task_finder::{
     allied as task_finder_allied, drops_at as task_finder_drops_at, find_task,
 };
 use crate::unit_ai::world_view::Foreign;
 use crate::world::Seconds;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::parts::Parts;
@@ -143,30 +145,29 @@ pub(crate) fn task_target_with<'a>(
     }))
 }
 
-/// The search of a unit's slot 0x820 (`FUN_14106c6a0`) on target `t` (`general` the target the
-/// general search reads, its main building's) with `filter`: the list of its own master
+/// The search of a unit's slot 0x820 (`FUN_14106c6a0`) on `on` (the target, the target the
+/// general search reads, its main building's, and the terrain) with `filter`: the list of its own master
 /// (`actor.master`) gives the task ([`crate::unit_ai::task_finder::find_task`] in mode 0); without one, a
 /// master with a task swap group (`+0x7b8`) tries its player's masters (`masters`) in id order
 /// of its class, type and group, its own too, with any filter, and the first with a task gives
 /// it. The task, with the master that gave it when the swap group did: with its `param_7` the
 /// routine switches the unit to that master (slot 0x90 with 0), its own too, which is the
-/// caller's. None: no task. `terrain`: the terrain under the point the caller passes, the
+/// caller's. None: no task. The terrain: the terrain under the point the caller passes, the
 /// target's place ([`point_terrain`]), which only a task for a terrain reads (as
 /// `World::find_work_task`, the same routine's port in `crate::orders`, which this module cannot
 /// call).
 pub(crate) fn task_search<'m>(
     masters: &'m Masters,
     actor: &Actor<'_>,
-    t: &TaskTarget<'_>,
-    general: &TaskTarget<'_>,
-    terrain: Option<TerrainId>,
+    on: &TaskOn<'_, '_>,
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
+    slots: Slots,
+    roles: &Roles,
 ) -> Result<Option<(Task, Option<&'m Master>)>, GenieError> {
     let own = actor.master;
     let find = |list: &Master, filter: Option<ActionKind>| {
-        find_task(list, actor, Some(t), Some(general), terrain, filter, dip)
-            .map(Option::<&Task>::copied)
+        find_task(list, actor, on, filter, dip, slots, roles).map(Option::<&Task>::copied)
     };
     if let Some(task) = find(own, filter)? {
         return Ok(Some((task, None)));

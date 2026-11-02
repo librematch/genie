@@ -20,24 +20,25 @@ use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::PlayerType;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 /// Whether a gatherer of `master` whose Gather has the target class `target_class` waits for
 /// another farm where another would search (`set_state(0xf3)`, `0x140a8e1d0`): the farmers'
 /// masters, and the fishing ships' on a farm-class target (a fish trap).
 #[must_use]
-pub fn waits_for_farm(master: MasterId, target_class: Option<ClassId>) -> bool {
+pub fn waits_for_farm(master: MasterId, target_class: Option<ClassId>, roles: &Roles) -> bool {
     FARM_WAITERS.contains(&master)
         // The farm class, whose gather the slice does not model yet.
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
-        || (TRAP_WAITERS.contains(&master) && target_class == Some(class::FARM))
+        || (TRAP_WAITERS.contains(&master) && roles.of_some_class(target_class).contains(ClassRoles::FARM))
 }
 
 impl GatherAction {
@@ -132,8 +133,9 @@ impl GatherAction {
         unit: &mut Unit,
         me: Me,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)?.get() {
+        match self.update_list(c, unit, me, r, roles)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 | 3 | 5 => self.begin_search(c, unit, r),
             code => Err(QUIET_CODE.with("code", code)),
@@ -168,6 +170,7 @@ impl GatherAction {
         unit: &mut Unit,
         target: Option<&Victim>,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
         if Seconds::ZERO <= self.timer {
             return Ok(Next::Stay);
@@ -184,7 +187,9 @@ impl GatherAction {
             }
         });
         if !self.worked {
-            if self.target_class == Some(class::FARM)
+            if roles
+                .of_some_class(self.target_class)
+                .contains(ClassRoles::FARM)
                 && target.is_some_and(|t| WorkerCount::ONE < t.workers)
             {
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
@@ -215,15 +220,16 @@ impl GatherAction {
         me: Me,
         target: Option<&Victim>,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)?.get() {
+        match self.update_list(c, unit, me, r, roles)?.get() {
             0 => Ok(Next::Stay),
             1 | 2 | 5 => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
                 if let Some(t) = target
                     && !(ObjectState::Alive < t.state && t.state != ObjectState::Undead)
                 {
-                    return self.set_face(c, unit, t, r);
+                    return self.set_face(c, unit, t, r, roles);
                 }
                 Ok(Next::Reseed { arrived: true })
             }
@@ -315,8 +321,9 @@ impl GatherAction {
         unit: &mut Unit,
         me: Me,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
-        match self.update_list(c, unit, me, r)?.get() {
+        match self.update_list(c, unit, me, r, roles)?.get() {
             0 => Ok(Next::Stay),
             code @ (1 | 2 | 3 | 5) => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;

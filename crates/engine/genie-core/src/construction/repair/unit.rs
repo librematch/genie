@@ -25,7 +25,6 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::{AttackPriority, MasterTables};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -41,6 +40,8 @@ use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::{Attacker, TopTarget};
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -54,12 +55,13 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let Some(mut repair) = actions.list.repair().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let reads = self.repair_reads(c, repair.target)?;
-        let repaired = repair.update(c, self, me, &reads);
+        let reads = self.repair_reads(c, repair.target, roles)?;
+        let repaired = repair.update(c, self, me, &reads, roles);
         if let Some(r) = actions.list.repair_mut() {
             *r = repair;
         }
@@ -76,6 +78,7 @@ impl Unit {
         &self,
         c: &Step<'_>,
         target: Option<RepairTargetId>,
+        roles: &Roles,
     ) -> Result<RepairReads, GenieError> {
         let own = repair_master(
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -93,7 +96,7 @@ impl Unit {
             radius: own.radius,
             scenario: c.w.settings.game_mode.scenario(),
             rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.work_rate,
-            waits: own.class == class::VILLAGER
+            waits: roles.of_class(own.class).contains(ClassRoles::VILLAGER)
                 && !c.w.players.player(c.player)?.kind.is_computer(),
             stance: c
                 .w
@@ -239,6 +242,7 @@ pub(crate) fn repair_target(
     c: &mut Step<'_>,
     target: Option<RepairTargetId>,
     amount: HitPoints,
+    roles: &Roles,
 ) -> Result<(RepairOutcome, MasterKind), GenieError> {
     let player = c.player;
     let mut set = Vec::new();
@@ -278,8 +282,8 @@ pub(crate) fn repair_target(
         attributes: &mut paid,
     };
     let answer = match kind {
-        MasterKind::BUILDING => repair_building(&mut set, 0, amount, true, &mut payer),
-        MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer),
+        MasterKind::BUILDING => repair_building(&mut set, 0, amount, true, &mut payer, roles),
+        MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer, roles),
         // the task finder repairs buildings and combat units of its classes alone
         _ => Err(GenieError::unreachable(
             "a repaired object of a type below 70 (slot 0x110)",

@@ -3,9 +3,9 @@
 
 use crate::GenieError;
 use crate::combat::damage::{
-    Armored, Attacker, Building, EPSILON, FACING, LEAST_CLASS_HIT, LEAST_HIT_CLASSES, MINUS_FACING,
-    ONE, RETALIATION_RANGE, RETALIATION_SCALE, Razed, SPECIAL, Victim, charge_hit, damage,
-    effective, elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
+    Armored, Attacker, Building, EPSILON, FACING, LEAST_CLASS_HIT, MINUS_FACING, ONE,
+    RETALIATION_RANGE, RETALIATION_SCALE, Razed, SPECIAL, Victim, charge_hit, damage, effective,
+    elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -22,14 +22,27 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::WONDER;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
 use crate::players::history::EventKind;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use std::mem::replace;
+
+/// One hit as a building takes it ([`take_building`]): the attacker's weapons, the factor they
+/// take and the blast damage the target took already.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Strike<'a> {
+    /// The attacker's attacks by armour class.
+    weapons: &'a [ClassAmount],
+    /// The factor its attacks take.
+    factor: f32,
+    /// The blast damage the target took already.
+    blast_taken: HitPoints,
+}
 
 /// The target's slot 0xe8 with the source's `weapons` at `factor`, less the damage a blast has
 /// already done to it (`blast_taken`, a building's `+0xb90`): a static, animated, doppelganger,
@@ -50,17 +63,23 @@ pub fn take(
     weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     match t.kind {
-        MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken),
+        MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken, roles),
         MasterKind::RGE_COMBAT | MasterKind::MISSILE => {
-            damage(t, src, weapons, factor, blast_taken)
+            damage(t, src, weapons, factor, blast_taken, roles)
         }
         MasterKind::BUILDING => {
-            take_building(t, src, others, weapons, factor, true, blast_taken).map(|_| ())
+            let strike = Strike {
+                weapons,
+                factor,
+                blast_taken,
+            };
+            take_building(t, src, others, strike, true, roles).map(|_| ())
         }
         _ => {
-            take_static(t, &src.source, weapons, factor);
+            take_static(t, &src.source, weapons, factor, roles);
             Ok(())
         }
     }
@@ -138,24 +157,31 @@ pub(super) fn take_building(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    weapons: &[ClassAmount],
-    factor: f32,
+    strike: Strike<'_>,
     forward: bool,
-    blast_taken: HitPoints,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
+    let Strike {
+        weapons,
+        factor,
+        blast_taken,
+    } = strike;
     let before = t.hp;
     let main = t.building.as_ref().and_then(|b| b.main);
     if forward && let Some(main) = main {
-        return forward_to_main(t, src, others, (weapons, factor), blast_taken, main);
+        return forward_to_main(t, src, others, strike, main, roles);
     }
     if HitPoints::ZERO >= t.hp {
         return Ok(false);
     }
-    damage(t, src, weapons, factor, blast_taken)?;
+    damage(t, src, weapons, factor, blast_taken, roles)?;
     // the kill of its damage ran slot 0x8b0, which counts it (+0x954)
     let counted = t.killed.is_some();
     if blast_taken == HitPoints::ZERO {
-        let least = if src.source.mode_680.is_one() && LEAST_HIT_CLASSES.contains(&src.source.class)
+        let least = if src.source.mode_680.is_one()
+            && roles
+                .of_class(src.source.class)
+                .contains(ClassRoles::LEAST_HIT)
         {
             LEAST_CLASS_HIT
         } else {
@@ -174,7 +200,7 @@ pub(super) fn take_building(
             _ => None,
         };
         let mut adds = Vec::new();
-        if b.main.is_none() && t.class != class::WALL {
+        if b.main.is_none() && !roles.of_class(t.class).contains(ClassRoles::WALL) {
             let cost = b.cost;
             if !b.trebuchet {
                 adds.extend(razing_counts((ap, q), cost)?);
@@ -214,16 +240,16 @@ fn forward_to_main(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    (weapons, factor): (&[ClassAmount], f32),
-    blast_taken: HitPoints,
+    strike: Strike<'_>,
     main: MainBuildingId,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
     let k = others
         .iter()
         .position(|v| v.id == main.id())
         .ok_or(NOT_HELD)?;
     let mut m = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
-    let struck = take_building(&mut m, src, others, weapons, factor, false, blast_taken);
+    let struck = take_building(&mut m, src, others, strike, false, roles);
     let annexed = m
         .building
         .as_ref()
@@ -281,10 +307,16 @@ impl Victim {
 /// slot 0x2f0 before it. Its last call (slot 0x4c0, `FUN_141196a00` or `FUN_141158bb0`) plays
 /// the master's damage sound (`+0x700`), whose draws are the Unsynced stream's: no simulation
 /// state.
-pub(super) fn take_static(t: &mut Victim, src: &Attacker, weapons: &[ClassAmount], factor: f32) {
+pub(super) fn take_static(
+    t: &mut Victim,
+    src: &Attacker,
+    weapons: &[ClassAmount],
+    factor: f32,
+    roles: &Roles,
+) {
     // slot 0x2f0 of a TRIBE attacker (types 70, 80; [`charge_hit`]) starts the sum at its raw
     // charge (slot 0x310, `+0x9e0`) plus 0
-    let mut damage = if MasterKind::COMBAT <= src.kind && charge_hit(src, t) {
+    let mut damage = if MasterKind::COMBAT <= src.kind && charge_hit(src, t, roles) {
         src.charge.get() + 0.0
     } else {
         0.0f32
@@ -297,7 +329,7 @@ pub(super) fn take_static(t: &mut Victim, src: &Attacker, weapons: &[ClassAmount
         t.hp = HitPoints::ZERO;
         t.goto_sleep = false;
         // The villager class (4): its hits leave what a static target holds.
-        if src.class != class::VILLAGER {
+        if !roles.of_class(src.class).contains(ClassRoles::VILLAGER) {
             t.amount = Amount::ZERO;
         }
     }
@@ -321,6 +353,7 @@ pub(super) fn take_unit(
     weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     let before = effective(t);
     if t.hp < HitPoints::new(1.0) {
@@ -341,10 +374,10 @@ pub(super) fn take_unit(
             }
         }
     }
-    if retaliates(t, src, others, &a)? {
+    if retaliates(t, src, others, &a, roles)? {
         factor = 0.0;
     }
-    damage(t, src, weapons, factor, blast_taken)?;
+    damage(t, src, weapons, factor, blast_taken, roles)?;
     after_hit(t, src, &a, before)
 }
 
@@ -374,6 +407,7 @@ pub(super) fn retaliates(
     src: &mut Victim,
     others: &mut [&mut Victim],
     a: &Armored,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
     let reach = src.source.weapon_range;
     let melee = reach <= Distance::new(RETALIATION_RANGE) && RETALIATION_RANGE != reach.get();
@@ -396,7 +430,7 @@ pub(super) fn retaliates(
         f *= RETALIATION_SCALE;
     }
     let w = t.weapons.clone();
-    take(src, t, others, &w, f, HitPoints::ZERO)?;
+    take(src, t, others, &w, f, HitPoints::ZERO, roles)?;
     Ok(src.hp <= HitPoints::new(1.0))
 }
 

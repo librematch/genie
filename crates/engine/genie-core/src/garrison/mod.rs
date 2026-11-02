@@ -32,7 +32,6 @@ pub use self::class_flags::ClassFlags;
 pub use self::container_id::{Container, ContainerId};
 pub use self::damage_rate::DamageRate;
 pub use self::enter_state::EnterState;
-use self::firepower::WHOLE_SHARE_CLASS;
 pub use self::firepower::{attack_rate, firepower, share};
 pub use self::inside_count::InsideCount;
 use self::meeting::{ENTER_NEAR, HALF_TILE, UNPLACED};

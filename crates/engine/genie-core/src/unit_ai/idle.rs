@@ -9,7 +9,6 @@ use crate::objects::ObjectId;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::OrderKind;
@@ -23,6 +22,7 @@ use crate::unit_ai::{
     civilian_search_radius, computer_idle_check, search_radius,
 };
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
 
 impl UnitAi {
     /// processIdle, slot 72 (`+0x240`) of each factory type's vtable: the hunted animal's
@@ -78,6 +78,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let roles = &at.roles;
         self.cap_human_order(side, ai)?;
         if !player_type.is_computer() || at.garrisoned {
             return Ok(false);
@@ -87,7 +88,10 @@ impl UnitAi {
                 &FISHING_CARED,
                 civilian_search_radius(at.los, at.search_radius).get(),
             )
-        } else if at.class == Some(class::TRADE_BOAT) {
+        } else if roles
+            .of_some_class(at.class)
+            .contains(ClassRoles::TRADE_BOAT)
+        {
             (
                 &TRADE_SHIP_CARED,
                 search_radius(at.los, at.search_radius).get(),

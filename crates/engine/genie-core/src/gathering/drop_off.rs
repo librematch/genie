@@ -32,6 +32,7 @@ use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{CIVILIAN, civilian_kind};
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::lets::{release, take};
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -53,15 +54,16 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
         if self.after_drop_orders(c)? {
             return Ok(HeadCode::Deletes);
         }
         let Some(found) = self.after_drop_search(actions, c)? else {
-            return self.after_drop_nothing(actions, c, by);
+            return self.after_drop_nothing(actions, c, by, roles);
         };
-        self.after_drop_retarget(actions, c, found, by)
+        self.after_drop_retarget(actions, c, found, by, roles)
             .map(|()| HeadCode::Keeps)
     }
 
@@ -114,7 +116,7 @@ impl Unit {
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));
         }
-        let Some(kind) = class.and_then(civilian_kind) else {
+        let Some(kind) = class.and_then(|class| civilian_kind(class, &c.w.model.roles)) else {
             return Ok(None);
         };
         self.resource_search(actions, c, kind, WorkerCount::NO_CAP)
@@ -130,10 +132,12 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let farm_waits = waits_for_farm(
             self.life.master_id,
             actions.list.gather().and_then(|g| g.target_class),
+            roles,
         );
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
@@ -143,6 +147,7 @@ impl Unit {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
         if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
@@ -220,6 +225,7 @@ impl Unit {
         c: &mut Step<'_>,
         found: ObjectId,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let (owner, resource) =
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
@@ -236,6 +242,7 @@ impl Unit {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let rate = StopRate {
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
@@ -264,6 +271,7 @@ impl Unit {
             },
             mover,
             rng,
+            roles,
         )?;
         let new = gather.targets();
         for (old, new) in old.into_iter().zip(new) {
@@ -287,7 +295,7 @@ impl Unit {
                 u.taken(None, by.id);
             } else {
                 let by = self.releaser(c)?;
-                take(c, self, new, by)?;
+                take(c, self, new, by, roles)?;
             }
         }
         Ok(())
@@ -338,10 +346,17 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        let (mover, by_id) =
-            c.w.parts
-                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model.masters));
+        let (mover, by_id) = c.w.parts.lend_mover(
+            self.id,
+            (
+                &c.w.players,
+                &c.w.index,
+                &c.w.model.masters,
+                &c.w.model.roles,
+            ),
+        );
         let w = DropWorld {
             masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,
@@ -357,7 +372,7 @@ impl Unit {
             self.gather_drop_off_in(actions, mover, w, others, &c.w.model.graphics, by_id)?
         {
             let by = self.releaser(c)?;
-            take(c, self, site, by)?;
+            take(c, self, site, by, roles)?;
         }
         Ok(())
     }
@@ -374,6 +389,7 @@ impl Unit {
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let roles = by_id.roles();
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
                 "a gather's drop-off carrying nothing (set_state 3)",
@@ -397,6 +413,7 @@ impl Unit {
             self.master_in(c.masters)?,
             by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
+            roles,
         );
         let walks = Walks::of(sprites, (self, mover.as_deref()));
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
@@ -421,6 +438,7 @@ impl Unit {
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let roles = by_id.roles();
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
                 "a hunt's drop-off carrying nothing (set_state 3)",
@@ -449,6 +467,7 @@ impl Unit {
             self.master_in(c.masters)?,
             by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
+            roles,
         );
         let walks = Walks::of(sprites, (self, mover.as_deref()));
         let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {

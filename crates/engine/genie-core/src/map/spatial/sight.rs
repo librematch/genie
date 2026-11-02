@@ -19,7 +19,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
@@ -27,6 +26,8 @@ use crate::vision::own_masks;
 use crate::vision::visibility::Visibility;
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::player::Player;
 impl Spatial {
     /// The Artifact action's owner search (`FUN_140aabc40`) for the animal `me`: the objects on
@@ -44,25 +45,8 @@ impl Spatial {
         &self,
         me: ObjectId,
         players: &[Player],
+        roles: &Roles,
     ) -> Result<Option<PlayerId>, GenieError> {
-        const KEPT: [ClassId; 16] = [
-            class::ARTIFACT,
-            class::CLASS_60,
-            class::RELIC,
-            class::CLASS_11,
-            class::CLASS_14,
-            class::CLASS_30,
-            class::LIVESTOCK,
-            class::BUILDING,
-            class::TOWER,
-            class::WALL,
-            class::GATE,
-            class::FARM,
-            class::CLASS_37,
-            class::PREY,
-            class::PREDATOR,
-            class::CLASS_38,
-        ];
         // a world without the players' sight (the unit tests') holds nobody near
         let Some(v) = self.sight.as_ref() else {
             return Ok(None);
@@ -101,7 +85,9 @@ impl Spatial {
             q.unknown.is_some_and(|u| {
                 let counts = v.seer(id).is_some_and(|s| s.kind == MasterKind::COMBAT)
                     && !out(q.player.index())
-                    && !KEPT.contains(&q.class);
+                    && !roles
+                        .of_class(q.class)
+                        .contains(ClassRoles::CAPTURE_IGNORED);
                 // the box grown by the unknown reach (`bx1 + u`: the sum only meets a
                 // comparison, so its operands' order does not show)
                 counts && 0.0 < u && area.overlaps(q.bounds().grown(Distance::new(u)))
@@ -118,7 +104,7 @@ impl Spatial {
         let mut nearest = vec![DistanceSquared::new(999.0); players];
         let mut own_seen = false;
         let mut taker = false;
-        let livestock = p.class == class::LIVESTOCK;
+        let livestock = roles.of_class(p.class).contains(ClassRoles::LIVESTOCK);
         // the tiles' lists row by row, each in its order: an object a full tile did not file is
         // not met
         let on_tiles = (y0..=y1)
@@ -127,7 +113,9 @@ impl Spatial {
             let Some(s) = v.seer(id) else { continue };
             if s.kind != MasterKind::COMBAT
                 || s.state != ObjectState::Alive
-                || KEPT.contains(&q.class)
+                || roles
+                    .of_class(q.class)
+                    .contains(ClassRoles::CAPTURE_IGNORED)
             {
                 continue;
             }

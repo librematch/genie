@@ -5,13 +5,14 @@ use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{GroupState, SINGLE_VOLLEY, Surroundings, UnitAi, UnitSide, group_lets_idle};
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 impl UnitAi {
     /// The idle part of the full update (`0x140c66b10` after slot 73): a unit without an action
@@ -29,7 +30,11 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
-        let class_20 = busy && at.class == Some(class::TRANSPORT);
+        let roles = &at.roles;
+        let class_20 = busy
+            && roles
+                .of_some_class(at.class)
+                .contains(ClassRoles::TRANSPORT);
         if !class_20
             && self.adjusted_idle_timeout < self.idle_timer
             && self.current_action.is_none()
@@ -48,7 +53,9 @@ impl UnitAi {
         // `-0xe78` raw).
         // A building's master type (`'P'`, `FUN_1411942c0`).
         // The combat type (`0x46`), from which on the full update's tail reads a target's `+0x924`.
-        if matches!(at.class, Some(class::BUILDING | class::TOWER))
+        if roles
+            .of_some_class(at.class)
+            .intersects(ClassRoles::BUILDING | ClassRoles::TOWER)
             && matches!(
                 self.current_action,
                 Some(AiAction::Make | AiAction::Research)
@@ -56,7 +63,7 @@ impl UnitAi {
         {
             return self.making_idle_part(at, player_type, ai, side);
         }
-        self.idle_part_end(at.class, at.player, group)
+        self.idle_part_end(at.class, at.player, group, roles)
     }
 
     /// The idle part's patrol branch (`0x140c67f0b`): "I have a patrol order, checking to see if
@@ -132,11 +139,14 @@ impl UnitAi {
         class: Option<ClassId>,
         player: PlayerId,
         group: Option<GroupState>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if self.patrols(group) {
             return Err(GenieError::unsupported("a patrol order's idle part"));
         }
-        if matches!(class, Some(class::BUILDING | class::TOWER))
+        if roles
+            .of_some_class(class)
+            .intersects(ClassRoles::BUILDING | ClassRoles::TOWER)
             && matches!(
                 self.current_action,
                 Some(AiAction::Make | AiAction::Research)

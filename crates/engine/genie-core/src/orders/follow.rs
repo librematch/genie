@@ -16,6 +16,7 @@ use crate::map::Position;
 use crate::math::fmath::below_or_unordered;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
+use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::PointMove;
 use crate::movement::explore::EXPLORE;
 use crate::movement::fly::FLY;
@@ -29,7 +30,6 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::orders::{Followed, GUARD_RANGE, follow_axis, follow_spread, ignore_unit};
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
@@ -39,6 +39,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::{OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
@@ -353,7 +354,11 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?
             .class;
-        let villager = class == class::VILLAGER;
+        let villager = self
+            .model
+            .roles
+            .of_class(class)
+            .contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player, idx)?;
         if villager {
             self.parts.set_town_bell_flag(unit.id, false);
@@ -367,8 +372,9 @@ impl World {
         let place = (unit.position().ground(), Some(class));
         if self.parts.unit_ai.contains(unit.id) {
             // a completion's stop (slot 0xb0 with 1): the unit's stopAction at once
+            let (roles, slots) = (self.model.roles.clone(), self.model.slots);
             self.run_ai_calls((player, idx), |ai, side, rng| {
-                ai.clear_notifies_at(world_time.since_start(), place, side, rng)
+                ai.clear_notifies_at(world_time.since_start(), place, side, rng, &roles, slots)
             })?;
         }
         let unit = self.players.live_mut(player, idx)?;
@@ -391,7 +397,11 @@ impl World {
         }
         // FUN_140aa0df0 makes the MoveTo first, which takes its target (slot 0x178, quiet 0);
         // slot 0x808 then clears the list (the old actions' teardowns) and starts it
-        let livestock = unit.master(self.master_tables(), player)?.class == class::LIVESTOCK;
+        let livestock = self
+            .model
+            .roles
+            .of_class(unit.master(self.master_tables(), player)?.class)
+            .contains(ClassRoles::LIVESTOCK);
         let (tp, t) = self.object(target).ok_or(TARGET_LACKING)?;
         let target_state = t.life.state;
         let target_master = t.master(self.master_tables(), tp)?.id;
@@ -522,11 +532,12 @@ impl World {
             self.parts.motion.layer_mut(id),
             point,
             player,
-            OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
-            (
-                &self.model.graphics,
-                self.parts.combat.of(id).abilities.look.as_ref(),
-            ),
+            MoveSprites {
+                masters: OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
+                graphics: &self.model.graphics,
+                look: self.parts.combat.of(id).abilities.look.as_ref(),
+                roles: &self.model.roles,
+            },
         )? {
             PointMove::Declined => return Ok(false),
             PointMove::Taken(released) => (released, None),

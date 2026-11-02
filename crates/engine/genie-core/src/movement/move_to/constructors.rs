@@ -23,6 +23,7 @@ use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::layer::Roles;
 
 /// The last object state a `MoveTo` takes as its target (`FUN_140a7a230`: one above is refused,
 /// its id −1).
@@ -100,9 +101,10 @@ impl<'g> MoveToReads<'g> {
         (unit, mover): (&Unit, Option<&Mover>),
         master: &Master,
         (graphics, look): (&'g Graphics, Option<&Look>),
+        roles: &Roles,
     ) -> Self {
         Self {
-            sprites: SpriteReads::of(master, look, graphics),
+            sprites: SpriteReads::of(master, look, graphics, roles),
             state: unit.life.state,
             speed: mover.map_or(Speed::ZERO, |m| m.stats.speed),
             at: unit.position(),
@@ -256,11 +258,13 @@ impl Unit {
         every: MasterTables<'_>,
         player: PlayerId,
         graphics: (&'g Graphics, Option<&Look>),
+        roles: &Roles,
     ) -> Result<MoveToReads<'g>, GenieError> {
         Ok(MoveToReads::of(
             (self, mover),
             self.master(every, player)?,
             graphics,
+            roles,
         ))
     }
 }

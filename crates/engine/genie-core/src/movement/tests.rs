@@ -27,7 +27,6 @@ use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::ID_45;
 use crate::objects::masters::{Master, Masters};
@@ -42,6 +41,8 @@ use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::UnitStance;
 use crate::vision::visibility::Visibility;
 use crate::world::Millis;
@@ -1486,6 +1487,7 @@ fn gate_gap_is_the_least_over_it_and_its_annexes() {
         own,
         |g| g - ANNEX_GAP,
         objects.view(),
+        &roles(),
     );
     let annex = footprint_gap(
         near.0,
@@ -1505,7 +1507,8 @@ fn gate_gap_is_the_least_over_it_and_its_annexes() {
             (object_id(100), &post),
             own,
             |g| g - Distance::new(1.0),
-            objects.view()
+            objects.view(),
+            &roles()
         ),
         own
     );

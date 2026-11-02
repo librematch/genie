@@ -3,6 +3,7 @@
 
 use crate::command_args::Frame;
 use crate::masters::{MasterTable, TerrainTable};
+use crate::setup::layer;
 use crate::{
     Decoder, Dumps, Error, SavedStep, TickReport, frames, ghost_pool_from_dump, groups,
     inside_lists_from_dump, mesh_from_dump, mesh_owners_from_dump, object_differences,
@@ -410,7 +411,8 @@ pub fn spatial_from_save(save: &[u8]) -> Result<Spatial, Error> {
 pub fn spatial_with_tiles(save: &[u8], terrain: &TerrainTable) -> Result<Spatial, Error> {
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
-    spatial(&header, terrain).map_err(Error::Unmodelled)
+    let roles = &layer().map_err(Error::Unmodelled)?.roles;
+    spatial(&header, terrain, roles).map_err(Error::Unmodelled)
 }
 
 #[cfg(test)]

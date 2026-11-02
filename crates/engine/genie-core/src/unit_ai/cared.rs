@@ -12,7 +12,6 @@ use crate::math::image::unit_ai::{
 use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
-use crate::objects::masters::class;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::UnitAiType;
@@ -21,6 +20,8 @@ use crate::unit_ai::{
     SIEGE_AI, SIEGE_TOWER_AI, SOLDIER_AI, Surroundings, TOWER_AI, TRADE_AI,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The hunted animal evades by its speed times this (`FUN_140c1eea0`, `DAT_142eb1c98`), and a
 /// point at the map's far edge goes this far in (`FUN_140c4d140`, `DAT_14330eb8c`).
@@ -42,23 +43,23 @@ pub(super) const EVASIVE_NEAR: f32 = UNIT_AI_EVASIVE_NEAR;
 pub(super) const EVADE_EDGE: f32 = UNIT_AI_EVADE_EDGE;
 
 /// The classes a hunted animal cares about (`+0x190`, the constructor's list).
-pub const HUNTED_CARED: [ClassId; 28] = class::classes([
+pub const HUNTED_CARED: [ClassId; 28] = classes([
     0, 4, 26, 24, 6, 25, 17, 10, 12, 35, 23, 36, 28, 18, 13, 44, 46, 43, 45, 47, 50, 51, 54, 55,
     56, 57, 19, 59,
 ]);
 
 /// The classes a lion cares about (`+0x190`, `FUN_140c11bd0`'s list; the game's `+0x6b4` of 1,
 /// not met, adds 47, 18, 13 and 55).
-pub const LION_CARED: [ClassId; 18] = class::classes([
+pub const LION_CARED: [ClassId; 18] = classes([
     4, 0, 26, 24, 6, 25, 12, 35, 23, 36, 28, 44, 46, 45, 50, 56, 57, 9,
 ]);
 
 /// The classes a predator (`TribePreditorUnitAIModule`, factory type 3) cares about (`+0x190`,
 /// `FUN_140c11da0`'s list).
-pub const PREDATOR_CARED: [ClassId; 2] = class::classes([58, 4]);
+pub const PREDATOR_CARED: [ClassId; 2] = classes([58, 4]);
 
 /// The classes a priest (factory type 9) cares about (`+0x190`, `FUN_140c11e30`'s 30 entries).
-pub const PRIEST_CARED: [ClassId; 30] = class::classes([
+pub const PRIEST_CARED: [ClassId; 30] = classes([
     3, 0, 4, 26, 24, 6, 25, 17, 10, 12, 35, 23, 36, 28, 18, 13, 44, 46, 43, 45, 47, 50, 51, 54, 55,
     56, 57, 19, 52, 42,
 ]);
@@ -68,7 +69,7 @@ pub const CIVILIAN: UnitAiType = UnitAiType::CIVILIAN;
 
 /// The classes a civilian cares about (`+0x190`, `TribeCivilianUnitAIModule`'s constructor
 /// `FUN_140c115d0`).
-pub const CIVILIAN_CARED: [ClassId; 39] = class::classes([
+pub const CIVILIAN_CARED: [ClassId; 39] = classes([
     3, 7, 8, 9, 10, 15, 17, 18, 32, 33, 27, 49, 39, 52, 58, 63, 0, 4, 26, 24, 6, 35, 25, 12, 23,
     36, 28, 22, 44, 46, 45, 47, 50, 52, 55, 56, 57, 19, 61,
 ]);
@@ -94,33 +95,43 @@ pub fn civilian_search_radius(los: Distance, search_radius: Distance) -> Distanc
 /// 15, forage for 7, fish for 5, 31 and 33, stone for 8, gold for 32 and 63), none (−1) for any
 /// other.
 #[must_use]
-pub const fn civilian_kind(class: ClassId) -> Option<GatherGroup> {
-    match class {
-        class::CLASS_5 | class::CLASS_31 | class::CLASS_33 => Some(GatherGroup::FISH),
-        class::CLASS_7 => Some(GatherGroup::FORAGE),
-        class::CLASS_8 => Some(GatherGroup::STONE),
-        class::TREE => Some(GatherGroup::WOOD),
-        class::CLASS_32 | class::CLASS_63 => Some(GatherGroup::GOLD),
-        _ => None,
+pub fn civilian_kind(class: ClassId, roles: &Roles) -> Option<GatherGroup> {
+    {
+        let held = roles.of_class(class);
+        if held
+            .intersects(ClassRoles::OCEAN_FISH | ClassRoles::DEEP_SEA_FISH | ClassRoles::SHORE_FISH)
+        {
+            Some(GatherGroup::FISH)
+        } else if held.contains(ClassRoles::FORAGE_BUSH) {
+            Some(GatherGroup::FORAGE)
+        } else if held.contains(ClassRoles::STONE_MINE) {
+            Some(GatherGroup::STONE)
+        } else if held.contains(ClassRoles::TREE) {
+            Some(GatherGroup::WOOD)
+        } else if held.intersects(ClassRoles::GOLD_MINE | ClassRoles::GOLD_FISH) {
+            Some(GatherGroup::GOLD)
+        } else {
+            None
+        }
     }
 }
 
 /// The classes a soldier cares about (`+0x190`, `TribeSoldierUnitAIModule`'s constructor
 /// `FUN_140c12300`; a computer player's adds 10).
-pub const SOLDIER_CARED: [ClassId; 39] = class::classes([
+pub const SOLDIER_CARED: [ClassId; 39] = classes([
     0, 3, 4, 26, 24, 6, 35, 25, 17, 12, 23, 36, 28, 18, 13, 27, 22, 20, 2, 21, 44, 46, 43, 45, 47,
     50, 51, 52, 53, 54, 55, 39, 56, 57, 19, 59, 49, 42, 61,
 ]);
 
 /// A computer player's soldier's classes: [`SOLDIER_CARED`], then 10 (`FUN_140c12300`).
-pub const SOLDIER_CARED_COMPUTER: [ClassId; 40] = class::classes([
+pub const SOLDIER_CARED_COMPUTER: [ClassId; 40] = classes([
     0, 3, 4, 26, 24, 6, 35, 25, 17, 12, 23, 36, 28, 18, 13, 27, 22, 20, 2, 21, 44, 46, 43, 45, 47,
     50, 51, 52, 53, 54, 55, 39, 56, 57, 19, 59, 49, 42, 61, 10,
 ]);
 
 /// The classes a building cares about (`+0x190`, `TribeBuildingUnitAIModule`'s constructor
 /// `FUN_140c11470`, its 39 entries in this order): the soldier's set, 52 moved behind 59.
-pub const BUILDING_CARED: [ClassId; 39] = class::classes([
+pub const BUILDING_CARED: [ClassId; 39] = classes([
     0, 3, 4, 26, 24, 6, 35, 25, 17, 12, 23, 36, 28, 18, 13, 27, 22, 20, 2, 21, 44, 46, 43, 45, 47,
     50, 51, 53, 54, 55, 56, 57, 19, 59, 52, 49, 39, 42, 61,
 ]);
@@ -132,14 +143,14 @@ pub const ARTIFACT_AI: UnitAiType = UnitAiType::ARTIFACT;
 
 /// The classes an artifact cares about (`+0x190`, `TribeArtifactUnitAIModule`'s constructor
 /// `FUN_140c11340`: the 0x84 bytes it copies from `DAT_142ef90f0` on, then 61).
-pub const ARTIFACT_CARED: [ClassId; 33] = class::classes([
+pub const ARTIFACT_CARED: [ClassId; 33] = classes([
     0, 4, 26, 24, 6, 35, 25, 17, 12, 23, 36, 28, 18, 13, 22, 20, 2, 21, 44, 46, 43, 45, 47, 50, 51,
     53, 54, 55, 56, 57, 19, 59, 61,
 ]);
 
 /// The classes a tower cares about (`+0x190`, `TribeTowerUnitAIModule`'s constructor
 /// `FUN_140c12960`): the soldier's and 10.
-pub const TOWER_CARED: [ClassId; 40] = class::classes([
+pub const TOWER_CARED: [ClassId; 40] = classes([
     0, 3, 4, 26, 24, 6, 35, 25, 17, 12, 23, 36, 28, 18, 13, 27, 22, 20, 2, 21, 44, 46, 43, 45, 47,
     50, 51, 52, 53, 54, 55, 39, 56, 57, 19, 59, 49, 10, 42, 61,
 ]);
@@ -147,23 +158,22 @@ pub const TOWER_CARED: [ClassId; 40] = class::classes([
 /// The classes a siege unit cares about (`+0x190`, `TribeSiegeUnitAIModule`'s constructor
 /// `FUN_140c12040`: the soldier's first 28, then 53, 54, 55, 39, 56, 57, 19, 59, 39, 49, 42, 61:
 /// 39 twice).
-pub const SIEGE_CARED: [ClassId; 40] = class::classes([
+pub const SIEGE_CARED: [ClassId; 40] = classes([
     0, 3, 4, 26, 24, 6, 35, 25, 17, 12, 23, 36, 28, 18, 13, 27, 22, 20, 2, 21, 44, 46, 43, 45, 47,
     50, 51, 52, 53, 54, 55, 39, 56, 57, 19, 59, 39, 49, 42, 61,
 ]);
 
 /// The classes a trade boat (class 2) cares about (`+0x190`, `FUN_140c12ab0`: the four of
 /// `DAT_142ef9020`, then 21, 53 and 52).
-pub const TRADE_SHIP_CARED: [ClassId; 7] = class::classes([3, 22, 20, 2, 21, 53, 52]);
+pub const TRADE_SHIP_CARED: [ClassId; 7] = classes([3, 22, 20, 2, 21, 53, 52]);
 
 /// The classes a trade cart (any other class of the trade ship's type) cares about (`+0x190`,
 /// `FUN_140c12ab0`: the four of `DAT_142ef91f0`, then 19).
-pub const TRADE_CART_CARED: [ClassId; 5] = class::classes([3, 17, 18, 52, 19]);
+pub const TRADE_CART_CARED: [ClassId; 5] = classes([3, 17, 18, 52, 19]);
 
 /// The classes a fishing ship cares about (`+0x190`, `FUN_140c11860`: the four of each of
 /// `DAT_142ef9020`, `DAT_142ef9130` and `DAT_142ef9160`, then 49).
-pub const FISHING_CARED: [ClassId; 13] =
-    class::classes([3, 22, 20, 2, 21, 5, 31, 33, 53, 52, 27, 39, 49]);
+pub const FISHING_CARED: [ClassId; 13] = classes([3, 22, 20, 2, 21, 5, 31, 33, 53, 52, 27, 39, 49]);
 
 /// The classes a unit AI of factory type `ai_type` cares about (its constructor's `+0x190` list),
 /// which its searches read: the trade AI's by its unit's `class` (a boat's or a cart's), the
@@ -177,6 +187,7 @@ pub(crate) fn cared_classes(
     ai_type: UnitAiType,
     class: Option<ClassId>,
     player_type: PlayerType,
+    roles: &Roles,
 ) -> Result<&'static [ClassId], GenieError> {
     match ai_type {
         UnitAiType::HUNTED => Ok(&HUNTED_CARED),
@@ -193,7 +204,9 @@ pub(crate) fn cared_classes(
         SIEGE_TOWER_AI => Ok(&SIEGE_TOWER_CARED),
         // The trade boat's class (`-0xeaa` raw): its cared classes and its trade partner are not the
         // trade cart's.
-        TRADE_AI if class == Some(class::TRADE_BOAT) => Ok(&TRADE_SHIP_CARED),
+        TRADE_AI if roles.of_some_class(class).contains(ClassRoles::TRADE_BOAT) => {
+            Ok(&TRADE_SHIP_CARED)
+        }
         TRADE_AI => Ok(&TRADE_CART_CARED),
         FISHING_AI => Ok(&FISHING_CARED),
         ARTIFACT_AI => Ok(&ARTIFACT_CARED),
@@ -221,8 +234,9 @@ pub(crate) fn search_area(
     los: Distance,
     radius: Distance,
     player_type: PlayerType,
+    roles: &Roles,
 ) -> Result<(&'static [ClassId], Distance), GenieError> {
-    let classes = cared_classes(ai_type, class, player_type)?;
+    let classes = cared_classes(ai_type, class, player_type, roles)?;
     let radius = if matches!(ai_type, CIVILIAN | FISHING_AI) {
         civilian_search_radius(los, radius)
     } else {
@@ -268,14 +282,26 @@ pub(super) fn adjusted_idle_timeout(base: Millis, ai: &mut Well512) -> Millis {
 
 /// The classes a transport ship cares about (`+0x190`, `TribeTransportShipUnitAIModule`'s
 /// constructor `FUN_140c12c30`).
-pub const TRANSPORT_CARED: [ClassId; 10] = class::classes([3, 22, 20, 2, 21, 53, 52, 27, 39, 49]);
+pub const TRANSPORT_CARED: [ClassId; 10] = classes([3, 22, 20, 2, 21, 53, 52, 27, 39, 49]);
 
 /// The classes a siege tower cares about (`+0x190`, `TribeSiegeTowerUnitAIModule`'s constructor
 /// `FUN_140c11fb0`).
-pub const SIEGE_TOWER_CARED: [ClassId; 2] = class::classes([27, 39]);
+pub const SIEGE_TOWER_CARED: [ClassId; 2] = classes([27, 39]);
 
 /// The building unit AI's factory type (`TribeBuildingUnitAIModule`).
 pub(super) const BUILDING_AI: UnitAiType = UnitAiType::BUILDING;
 
 /// The transport ship's factory type (`TribeTransportShipUnitAIModule`).
 pub(super) const TRANSPORT_AI: UnitAiType = UnitAiType::TRANSPORT;
+
+/// A table of classes from the game's numbers, in the order its search takes them (a unit AI's
+/// cared list, the fishing ship's foundations).
+pub(crate) const fn classes<const N: usize>(values: [i16; N]) -> [ClassId; N] {
+    let mut out = [ClassId::of_master(-1); N];
+    let mut i = 0;
+    while i < N {
+        out[i] = ClassId::named(values[i]);
+        i += 1;
+    }
+    out
+}

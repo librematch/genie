@@ -22,6 +22,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::ids;
 use crate::players::PlayerId;
 use crate::players::attribute::{PASTURE_FOOD, PASTURE_LIVESTOCK, PASTURE_WORKERS};
 use crate::technology::Attributes;
@@ -31,7 +32,7 @@ use crate::world::slots::PlayerSlots;
 
 /// The livestock a pasture holds (`DAT_143f51db0`, which the static constructor `FUN_140174900`
 /// fills): the Argali and the Ibex (Pasture).
-pub const LIVESTOCK: [MasterId; 2] = [MasterId::named(1899), MasterId::named(1900)];
+pub const LIVESTOCK: [MasterId; 2] = [ids::PASTURE_ARGALI, ids::PASTURE_IBEX];
 
 /// The edges lie this far inside the pasture's ground radius (`DAT_142e7f384`).
 const INSET: Distance = Distance::new(PASTURE_INSET);

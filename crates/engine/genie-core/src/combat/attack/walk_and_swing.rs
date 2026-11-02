@@ -24,7 +24,6 @@ use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::HitChance;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
@@ -34,6 +33,8 @@ use crate::world::Seconds;
 use crate::combat::AttackTargetId;
 use crate::objects::layers::Action;
 use crate::world::ATTACKER_UNMOVING;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 use crate::{GenieError, combat::damage};
 
@@ -59,18 +60,20 @@ impl Attack {
         r: &AttackReads,
         (target, radius): (Position, Footprint),
     ) -> Result<UpdateCode, GenieError> {
+        let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
-            waits: !r.player_type.is_computer() && f.own.class == class::VILLAGER,
+            waits: !r.player_type.is_computer()
+                && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER),
             stance: r.stance,
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {
-            0 => self.within_reach(c, unit, f, r, (target, radius)),
+            0 => self.within_reach(c, unit, f, r, (target, radius), roles),
             1 | 2 => {
                 self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
                 if !matches!(self.state, AttackState::Move { .. }) {
-                    return self.arrived_at_seen(c, unit, f, r, target);
+                    return self.arrived_at_seen(c, unit, f, r, target, roles);
                 }
-                self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
+                self.ready(unit, &mut c.w.attack_ground(unit.id), f, r, roles)?;
                 Ok(UpdateCode::UNDER_WAY)
             }
             3 => self.walk_failed(c, unit),
@@ -88,6 +91,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         (target, radius): (Position, Footprint),
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         let ground =
             c.w.parts
@@ -100,7 +104,7 @@ impl Attack {
         {
             return Ok(UpdateCode::UNDER_WAY);
         }
-        self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
+        self.ready(unit, &mut c.w.attack_ground(unit.id), f, r, roles)?;
         Ok(UpdateCode::UNDER_WAY)
     }
 
@@ -143,6 +147,7 @@ impl Attack {
         actions: &mut Action,
         f: &mut Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         let Some(sprite) = unit.sprite else {
             return Err(GenieError::unsupported("a swing without the unit's sprite"));
@@ -150,7 +155,7 @@ impl Attack {
         if self.pending {
             self.swing_to_hit(c, unit, actions, f, r, sprite)?;
         } else {
-            self.swing_after_hit(c, unit, f, r, sprite)?;
+            self.swing_after_hit(c, unit, f, r, sprite, roles)?;
         }
         Ok(UpdateCode::UNDER_WAY)
     }
@@ -168,9 +173,15 @@ impl Attack {
         r: &AttackReads,
         sprite: ActiveSprite,
     ) -> Result<(), GenieError> {
+        let roles = &c.w.model.roles.clone();
         let ranged = self.arms.missile.is_some();
-        if f.own.class == class::CLASS_51
-            || (!ranged && matches!(f.own.class, class::CLASS_35 | class::CLASS_64))
+        if roles
+            .of_class(f.own.class)
+            .contains(ClassRoles::PACKED_TREBUCHET)
+            || (!ranged
+                && roles
+                    .of_class(f.own.class)
+                    .intersects(ClassRoles::PETARD | ClassRoles::LAND_MINE))
         {
             return Err(GenieError::unsupported("a swing of class 35, 51 or 64"));
         }
@@ -211,6 +222,7 @@ impl Attack {
         r: &AttackReads,
         sprite: ActiveSprite,
     ) -> Result<(), GenieError> {
+        let roles = &c.w.model.roles.clone();
         let ranged = self.arms.missile.is_some();
         let frame = if self.arms.fire_frame == Frame::ZERO && !ranged {
             sprite.graphic.frames.half()
@@ -225,7 +237,11 @@ impl Attack {
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
         if ranged || r.volleys {
-            unit.volley(c, Aimed::at(self.target.map(AttackTargetId::id), &f.victim))?;
+            unit.volley(
+                c,
+                Aimed::at(self.target.map(AttackTargetId::id), &f.victim),
+                roles,
+            )?;
         } else {
             if matches!(
                 f.own.master_id,
@@ -242,7 +258,7 @@ impl Attack {
             }
             let executed = {
                 let object = c.w.streams.get(Stream::Object);
-                Self::hit(f, &mut c.blasted, r.hit_chance, object)?
+                Self::hit(f, &mut c.blasted, r.hit_chance, object, roles)?
             };
             if let Some(target) = executed {
                 unit.post_own(
@@ -251,7 +267,7 @@ impl Attack {
                     [600, target.get(), 0],
                 )?;
             }
-            write_strike_back(c, unit, actions, &mut f.victim)?;
+            write_strike_back(c, unit, actions, &mut f.victim, roles)?;
         }
         self.pending = false;
         if f.victim.hp <= HitPoints::ZERO {
@@ -279,6 +295,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let ranged = self.arms.missile.is_some();
         let timer = c.w.parts.combat_of(unit.id).attack_timer;
@@ -292,11 +309,13 @@ impl Attack {
             sprite.frame,
         ) {
             AfterHit::Done => return self.enter(AttackState::Killed, g.motion.reborrow()),
-            AfterHit::Ready => return self.ready(unit, &mut g, f, r),
+            AfterHit::Ready => return self.ready(unit, &mut g, f, r, roles),
             // readyToAttack with its third argument 0: a target out of reach is followed
             // (`set_state` 4); a ready unit only faces it; the swing goes on either way
             AfterHit::Continue { check: true } => {
-                if let Readiness::Away(gap) = self.ready_to_attack(unit, &mut g, f, r, false)? {
+                if let Readiness::Away(gap) =
+                    self.ready_to_attack(unit, &mut g, f, r, false, roles)?
+                {
                     self.follow(unit, &mut g, r, f, gap)?;
                 }
             }
@@ -331,7 +350,7 @@ impl Attack {
             }
             set_walker_anim(g.motion.reborrow(), Speed::new(1.0));
         }
-        self.ready(unit, &mut g, f, r)
+        self.ready(unit, &mut g, f, r, roles)
     }
 
     /// The hit of a melee unit (slot 0x858 -> `FUN_141081020` -> slot 0x860,
@@ -348,15 +367,16 @@ impl Attack {
         blasted: &mut [Victim],
         chance: HitChance,
         object_rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<Option<ObjectId>, GenieError> {
         let a = f.own.source;
         if Distance::ZERO < a.area_effect
             && a.weapon_range < Distance::new(damage::BLAST_RANGE)
-            && (a.charge_kind != ChargeKind::AREA || damage::charge_hit(&a, &f.victim))
+            && (a.charge_kind != ChargeKind::AREA || damage::charge_hit(&a, &f.victim, roles))
         {
-            return Self::trample(f, blasted, chance, object_rng);
+            return Self::trample(f, blasted, chance, object_rng, roles);
         }
-        Self::strike(f, blasted, chance, object_rng)
+        Self::strike(f, blasted, chance, object_rng, roles)
     }
 
     /// `FUN_141084230` with the unit's own place as the hit's origin ([`strike`]).
@@ -365,6 +385,7 @@ impl Attack {
         blasted: &mut [Victim],
         chance: HitChance,
         object_rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<Option<ObjectId>, GenieError> {
         let hit = Hit {
             at: f.own.position,
@@ -372,7 +393,7 @@ impl Attack {
             missile: false,
             chance,
         };
-        let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng)?;
+        let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng, roles)?;
         Ok(struck.executed)
     }
 
@@ -389,11 +410,20 @@ impl Attack {
         blasted: &mut [Victim],
         chance: HitChance,
         object_rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<Option<ObjectId>, GenieError> {
         let (center, target) = (f.own.position, f.victim.id);
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(&mut f.victim);
-        let _ = damage::blast(&mut f.own, center, Some(target), None, &mut targets, 1.0)?;
+        let _ = damage::blast(
+            &mut f.own,
+            center,
+            Some(target),
+            None,
+            &mut targets,
+            1.0,
+            roles,
+        )?;
         let taken = blast_so_far(&f.victim, blasted)?;
         let draw = object_rng.raw64();
         let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
@@ -410,6 +440,7 @@ impl Attack {
                     &weapons,
                     factor,
                     taken,
+                    roles,
                 )?;
             }
         }

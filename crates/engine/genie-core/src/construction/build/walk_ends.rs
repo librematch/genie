@@ -10,10 +10,11 @@ use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::movement::footprint_gap_squared;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::pathing::tile_path::Found;
 use crate::pathing::tile_path::{Path, Request};
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -35,14 +36,18 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if matches!(self.state, BuildState::Clear { .. }) {
-            return self.restart(c, builder);
+            return self.restart(c, builder, roles);
         }
         if self.target.is_none() {
             return self.idle(c, builder, reads);
         }
-        if reads.class != Some(class::VILLAGER) {
+        if !roles
+            .of_some_class(reads.class)
+            .contains(ClassRoles::VILLAGER)
+        {
             let at = builder.position();
             let ground =
                 c.w.parts
@@ -53,7 +58,7 @@ impl BuildAction {
             let gap = footprint_gap_squared(at, ground, t.position, t.radius);
             let range = self.task.range;
             if !(gap <= range.squared() || gap <= DistanceSquared::new(REACH)) {
-                return self.restart(c, builder);
+                return self.restart(c, builder, roles);
             }
         }
         self.leave(c, builder)?;
@@ -84,6 +89,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if let Some(target) = self.target {
             let s = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
@@ -135,7 +141,7 @@ impl BuildAction {
             found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
         }
         if found.reaches() {
-            self.restart(c, builder)
+            self.restart(c, builder, roles)
         } else {
             self.idle(c, builder, reads)
         }
@@ -170,13 +176,14 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         if self.target.is_some() {
             let target = self.target.take();
             release(c, builder, target, reads.by)?;
         }
-        self.walk_to_point(c, builder)
+        self.walk_to_point(c, builder, roles)
     }
 
     /// `set_state(11)` (`0x140aae200` case 0xb): the prelude ([`BuildAction::leave`]), then a
@@ -193,6 +200,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &Unit,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         self.state = BuildState::WalkPoint { move_to: None };
@@ -204,6 +212,7 @@ impl BuildAction {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         self.state = BuildState::WalkPoint {
             move_to: move_reads.to_point(self.point, Distance::ZERO, self.task.moving)?,

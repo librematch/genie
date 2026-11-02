@@ -10,7 +10,6 @@ use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
@@ -24,6 +23,7 @@ use crate::unit_ai::{
     search_area,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
 
 impl UnitAi {
     /// The hunted animal's damage notify (`FUN_140c26420`, case 500, "I took some damage from
@@ -43,6 +43,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -56,7 +57,7 @@ impl UnitAi {
         // the game also tests the action values 0x25f and 0x268 here, which no unit AI holds
         // ([`AiAction`])
         // The class of the king's branch of the hunted animal's idle check (`-0xe71` raw).
-        let uncon = at.class != Some(class::KING);
+        let uncon = !roles.of_some_class(at.class).contains(ClassRoles::KING);
         let _ = self.run_away(uncon, at, player_type, ai_rng, side)?;
         Ok(BREAK)
     }
@@ -77,11 +78,16 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let roles = &at.roles;
         // the siege unit's slot 0x160 (FUN_140c2a8f0): with a top action's target or of class 54
         // it does not run; a computer player's first lets the units inside it go
         // (FUN_141225c40 with −1, −1)
         if self.ai_type == SIEGE_AI {
-            if at.class == Some(class::CLASS_54) || Self::top_target_live(at, side)?.is_some() {
+            if roles
+                .of_some_class(at.class)
+                .contains(ClassRoles::UNPACKED_TREBUCHET)
+                || Self::top_target_live(at, side)?.is_some()
+            {
                 return Ok(false);
             }
             if player_type.is_computer() {
@@ -111,14 +117,18 @@ impl UnitAi {
             vx += u.position.x() - x;
             vy += u.position.y() - y;
             // The class whose attackers make a computer's unit warn its group (`FUN_140c5e900`: 22).
-            class_22 |= u.class == class::WARSHIP;
+            class_22 |= roles.of_class(u.class).contains(ClassRoles::WARSHIP);
         }
         if player_type.is_computer() && class_22 && Speed::ZERO < at.speed {
             return Err(GenieError::unsupported(
                 "a computer's unit running from class 22 (its group's runs)",
             ));
         }
-        if player_type.is_computer() && at.class == Some(class::TRANSPORT) {
+        if player_type.is_computer()
+            && roles
+                .of_some_class(at.class)
+                .contains(ClassRoles::TRANSPORT)
+        {
             return Err(GenieError::unsupported(
                 "a computer's transport ship running away",
             ));
@@ -232,6 +242,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         if n.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -244,7 +255,9 @@ impl UnitAi {
         else {
             return Ok(GO_ON);
         };
-        let villager = attacker.class == class::VILLAGER;
+        let villager = roles
+            .of_class(attacker.class)
+            .contains(ClassRoles::VILLAGER);
         let furious = if self.current_action == Some(AiAction::Attack) {
             let _ = self.attack_object(target, false, false, at, side)?;
             true
@@ -310,12 +323,14 @@ impl UnitAi {
         at: &Surroundings,
         player_type: PlayerType,
     ) -> Result<(&'static [ClassId], Distance), GenieError> {
+        let roles = &at.roles;
         search_area(
             self.ai_type,
             at.class,
             at.los,
             at.search_radius,
             player_type,
+            roles,
         )
     }
 
@@ -342,11 +357,15 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         match self.current_action {
-            Some(AiAction::Hunt) => return self.hunter_search(n, at, player_type, side, rng),
+            Some(AiAction::Hunt) => {
+                return self.hunter_search(n, at, player_type, side, rng);
+            }
             Some(AiAction::Shepherd) => {
                 return Err(VILLAGER_NOTIFY.with("action", AiAction::Shepherd.value()));
             }
-            Some(AiAction::Gather) => return self.gatherer_search(n, at, player_type, side, rng),
+            Some(AiAction::Gather) => {
+                return self.gatherer_search(n, at, player_type, side, rng);
+            }
             Some(AiAction::Build) => {
                 if let Some(found) = side.foundation_search()?
                     && side.reaches(found, FOUNDATION_REACH)?

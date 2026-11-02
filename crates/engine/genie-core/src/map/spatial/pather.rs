@@ -10,9 +10,9 @@ use crate::map::spatial::{QUERY_HITS, RecordId, Spatial};
 use crate::map::{Rect, Segment};
 use crate::math::fmath::below_or_unordered;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::class;
 use crate::pathing::tile_path::SegmentTest;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 
 /// A record a pather query met (an entry of `FUN_141051900`'s list): an object's, a temporary
 /// tile record's or a map edge's ([`RecordId`]), with its box (`+0x20`..`+0x2c`).
@@ -58,6 +58,7 @@ impl Spatial {
         first: bool,
     ) -> Result<Vec<Hit>, GenieError> {
         const MOST_HITS: usize = 25;
+        let roles = by_id.roles();
         let lo_x = if b.x() <= a.x() { b.x() } else { a.x() };
         let hi_x = if a.x() <= b.x() { b.x() } else { a.x() };
         let lo_y = if b.y() <= a.y() { b.y() } else { a.y() };
@@ -115,7 +116,7 @@ impl Spatial {
                 ));
             }
             // The class of a gate, which a player's allies may pass (slot 0x678, `FUN_1411d4a30`).
-            if p.class == class::GATE {
+            if roles.of_class(p.class).contains(ClassRoles::GATE) {
                 return Err(GenieError::unsupported(
                     "a pather query meeting a gate (its players' passage, slot 0x678)",
                 ));

@@ -23,7 +23,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use genie_diff::Diff;
@@ -59,6 +58,9 @@ use crate::math::image::missile::{
     VOLLEY_REACH_MARGIN as MISSILE_VOLLEY_REACH_MARGIN, VOLLEY_SCALE as MISSILE_VOLLEY_SCALE,
 };
 use crate::movement::Acceleration;
+use crate::objects::masters::ids;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The missile action's type, which word 9 adds when it is the top action.
 pub const MISSILE: ActionKind = ActionKind::named(8);
@@ -265,7 +267,7 @@ pub fn volley_reach(radius: Footprint, range: Distance) -> Distance {
 
 /// The missile master whose miss strays by its attack count's share (`0x62ac` raw; the game
 /// tests master 527, `0x62ab`, first, which keeps all of it as any other).
-const MASTER_528: MasterId = MasterId::named(528);
+const MASTER_528: MasterId = ids::ID_528;
 
 /// What the aim reads of the firing object (`+0x28`, else the missile): its master's
 /// `base_hit_chance` (`+0x83e`) and `missed_missile_spread` (`+0x860`), its class and the
@@ -307,7 +309,11 @@ pub struct AimAt<'a> {
 /// more draws, half each way; a missile of master 528 with an attack count (`+0x900`) strays by
 /// that share of it. The class-54 rule is the firing object's (`+0x28`): the caller's `aimer` is
 /// the missile's own master for a volley's extra missile, which has none.
-pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, GenieError> {
+pub fn aim(
+    at: AimAt<'_>,
+    draw: &mut dyn FnMut() -> u32,
+    roles: &Roles,
+) -> Result<Position, GenieError> {
     let AimAt {
         point,
         from,
@@ -325,9 +331,13 @@ pub fn aim(at: AimAt<'_>, draw: &mut dyn FnMut() -> u32) -> Result<Position, Gen
     let mut gap = fmath::sqrt((y - from.y()) * (y - from.y()) + dx * dx);
     let mut chance = aimer.hit_chance;
     if let Some((radius, class)) = target
-        && aimer.class == class::CLASS_54
+        && roles
+            .of_class(aimer.class)
+            .contains(ClassRoles::UNPACKED_TREBUCHET)
         && radius.x() < 1.0
-        && matches!(class, class::WALL | class::TOWER | class::BUILDING)
+        && roles
+            .of_class(class)
+            .intersects(ClassRoles::WALL | ClassRoles::TOWER | ClassRoles::BUILDING)
     {
         chance = HitChance::of_data(0x50);
     }
@@ -511,6 +521,8 @@ mod tests {
     use crate::objects::masters::ids;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
+    use crate::testing::roles;
     #[cfg(test)]
     use std::iter::once;
 
@@ -591,6 +603,7 @@ mod tests {
                     hit_mode: mode,
                 },
                 &mut || d.next().unwrap(),
+                &roles(),
             )
         };
         // a draw of 70% or less hits: the target's height rises by 1.5 / 3
@@ -644,7 +657,8 @@ mod tests {
                     attack_count: AttackCount::of_data(0),
                     hit_mode: &mut mode
                 },
-                &mut || d.next().unwrap()
+                &mut || d.next().unwrap(),
+                &roles()
             ),
             Ok(point)
         );

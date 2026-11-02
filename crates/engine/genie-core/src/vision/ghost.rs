@@ -20,26 +20,24 @@ use crate::map::Tile;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::players::PlayerId;
 use crate::players::PlayerSet;
 use crate::vision::VisionBits;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::collections::HashMap;
 
 /// The ghosts' master in every player's list (`player+0x28`'s entry 243, "DOPL").
-pub const GHOST_MASTER: MasterId = MasterId::named(243);
-/// The classes a building's watch leaves out (`FUN_1411cc980`) and the gates' class, whose annex
-/// stays watched.
-const UNWATCHED_CLASSES: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
+pub const GHOST_MASTER: MasterId = ids::DOPPELGANGER;
+
 /// The originals whose ghost's leaving changes the local player's terrain (`FUN_141090ad0`).
-const TERRAIN_ORIGINALS: [MasterId; 2] = [MasterId::named(357), MasterId::named(1188)];
+const TERRAIN_ORIGINALS: [MasterId; 2] = [ids::ID_357, ids::ID_1188];
 /// The type from which an object's entry and its ghost follow its footprint's UMV entry
 /// (`FUN_141090430`, `FUN_14108f9b0`: master type above 0x31).
 const MASKED_KIND: MasterKind = MasterKind::RGE_COMBAT;
@@ -241,11 +239,13 @@ impl World {
         };
         let m = u.master(self.master_tables(), p)?;
         let annex = linked && self.parts.building_of(u.id).annex_of.is_some();
-        Ok(!UNWATCHED_CLASSES.contains(&m.class)
+        Ok(
+            !self.model.roles.of_class(m.class).contains(ClassRoles::UNWATCHED)
             && !self.parts.building_of(u.id).construction.is_some_and(|c| c.desolid)
             // The master a building's watch leaves out (`FUN_1411cc980`).
-            && (!annex || m.class == class::GATE)
-            && m.id != MASTER_1808)
+            && (!annex || self.model.roles.of_class(m.class).contains(ClassRoles::GATE))
+            && m.id != MASTER_1808,
+        )
     }
 
     /// A building whose construction started (`FUN_1411e5670`): its owner watches it
@@ -320,7 +320,12 @@ impl World {
                     .iter()
                     .filter(|u| self.parts.building_of(u.id).annex_of.is_some())
                 {
-                    if u.master(self.master_tables(), p)?.class != class::GATE {
+                    if !self
+                        .model
+                        .roles
+                        .of_class(u.master(self.master_tables(), p)?.class)
+                        .contains(ClassRoles::GATE)
+                    {
                         annexes.push(u.id);
                     }
                 }
@@ -699,6 +704,7 @@ mod tests {
     use crate::players::{ByPlayer, PlayerType};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
     #[cfg(test)]
     use crate::vision::own_masks;
     #[cfg(test)]

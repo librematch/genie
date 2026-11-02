@@ -16,12 +16,13 @@ use crate::unit_ai::NotifyKind;
 use crate::world::WorldTime;
 
 use crate::objects::ObjectId;
-use crate::objects::masters::class;
 use crate::players::ai_module::InfoModule;
 use crate::players::ai_module::search::RING_SLACK;
 use crate::players::ai_module::{AiModule, SearchUnit};
 use crate::unit_ai::world_view::{UnitView, owner_view, town_centre_unit};
 use crate::unit_ai::{AiAction, Notify, alert_owner};
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// The world time (ms) before which an explorer's wait slot of -1 sends the search around the
 /// player's town centre instead of straight to the unit's place.
@@ -48,7 +49,7 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// The tasking or detasking, and what the search does not model.
-    pub(crate) fn hears(&mut self, n: Notify) -> Result<(), GenieError> {
+    pub(crate) fn hears(&mut self, n: Notify, roles: &Roles) -> Result<(), GenieError> {
         let player = self.player;
         if !self.player_type.is_computer() || n.kind != NotifyKind::REQUIRES_SEARCH {
             return Ok(());
@@ -57,7 +58,7 @@ impl UnitView<'_, '_> {
             return Ok(());
         };
         let saved = self.c.w.streams.clone();
-        let heard = self.hear_explore(&mut module, n);
+        let heard = self.hear_explore(&mut module, n, roles);
         self.c.w.streams = saved;
         self.c.w.ai.put_back(player, module);
         match heard? {
@@ -80,6 +81,7 @@ impl UnitView<'_, '_> {
         &mut self,
         module: &mut AiModule,
         n: Notify,
+        roles: &Roles,
     ) -> Result<Heard, GenieError> {
         let explore = [
             AiAction::Explore.value(),
@@ -94,7 +96,7 @@ impl UnitView<'_, '_> {
         let unit = SearchUnit {
             id,
             position: self.unit.position().ground(),
-            civilian: class_id == class::VILLAGER,
+            civilian: roles.of_class(class_id).contains(ClassRoles::VILLAGER),
         };
         let now = self.c.w.world_time;
         let slot = module.tactical.slot(WAIT_SLOT);

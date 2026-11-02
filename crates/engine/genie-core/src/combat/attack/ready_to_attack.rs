@@ -27,6 +27,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::Roles;
 
 impl Attack {
     /// `set_state(6)` (case 6): with a target or a point (`+0x38` not −1, `UCOMISS`: a NaN one
@@ -42,6 +43,7 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::Ready, g.motion.reborrow())?;
         if self.target.is_none() && self.point.x() == NONE {
@@ -50,8 +52,8 @@ impl Attack {
             }
             return self.finish(unit, g.motion.reborrow(), g.sprite_rng);
         }
-        match self.ready_to_attack(unit, g, f, r, false)? {
-            Readiness::Ready => self.set_swing(unit, g, f, r),
+        match self.ready_to_attack(unit, g, f, r, false, roles)? {
+            Readiness::Ready => self.set_swing(unit, g, f, r, roles),
             Readiness::Waiting => Ok(()),
             Readiness::Away(gap) => self.follow(unit, g, r, f, gap),
         }
@@ -103,6 +105,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         skip_ready: bool,
+        roles: &Roles,
     ) -> Result<Readiness, GenieError> {
         let (target, t) = self.held_target(g.map)?;
         let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
@@ -144,7 +147,15 @@ impl Attack {
             return self.fail(unit, g.motion.reborrow(), g.sprite_rng);
         }
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
-        let gap = gate_gap(g.map, (at, ground), (target, &t), gap, |g| g, g.by_id);
+        let gap = gate_gap(
+            g.map,
+            (at, ground),
+            (target, &t),
+            gap,
+            |g| g,
+            g.by_id,
+            roles,
+        );
         if self.reach() < gap {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;

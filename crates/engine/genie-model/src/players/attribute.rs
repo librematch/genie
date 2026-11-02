@@ -5,13 +5,29 @@
 
 use crate::GenieError;
 use getset::CopyGetters;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A player's attribute number (`player+0x100`'s array, the `.dat`'s attribute types, an effect's
 /// attribute argument): 0 or more. The first four are the resources (food, wood, stone, gold).
 /// The simulation names the ones it tells apart (below); any other is a number the data holds
 /// ([`AttributeId::numbered`]). A field that holds −1 for none is `Option<AttributeId>`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    CopyGetters,
+    Serialize,
+    Deserialize,
+)]
+#[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AttributeId(
     /// Its value, the attribute's place in the player's attributes.
@@ -299,6 +315,13 @@ pub const VILLAGER_KILLED_BY_TYPE_1: AttributeId = AttributeId::named(229);
 pub const VILLAGER_KILLED_BY_TYPE_2: AttributeId = AttributeId::named(226);
 /// A villager's death by a player of type 3.
 pub const VILLAGER_KILLED_BY_TYPE_3: AttributeId = AttributeId::named(228);
+
+impl From<AttributeId> for i16 {
+    /// The attribute's id, as a slot's serde form holds it.
+    fn from(id: AttributeId) -> Self {
+        id.0
+    }
+}
 
 #[cfg(test)]
 mod tests {

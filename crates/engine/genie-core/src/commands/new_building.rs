@@ -36,7 +36,6 @@ use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FARM;
@@ -57,6 +56,7 @@ use crate::world::NO_ATTRIBUTE;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
 use crate::world::{Gate, World};
@@ -72,7 +72,7 @@ impl World {
         master: MasterId,
         position: Position,
     ) -> Result<(FoundationId, Position), GenieError> {
-        let unit_ai = unit_ai_type(self.master(player, master)?, master);
+        let unit_ai = unit_ai_type(self.master(player, master)?, master, &self.model.roles);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
         let cost = self.master(player, master)?.cost;
         let owner = self.players.player_mut(player)?;
@@ -98,7 +98,12 @@ impl World {
         master: MasterId,
     ) -> Result<(), GenieError> {
         if let Some(m) = player_master(&self.model.masters, player, master) {
-            count_class(&mut self.players.player_mut(player)?.attributes, m, 1.0);
+            count_class(
+                &mut self.players.player_mut(player)?.attributes,
+                m,
+                1.0,
+                &self.model.roles,
+            );
         }
         let _ = self.streams.get(Stream::Object).rand15();
         if let Some(m) = player_master(&self.model.masters, player, master)
@@ -179,7 +184,9 @@ impl World {
         let ai = unit_ai
             .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
             .map(|(t, new)| {
-                t.and_then(|t| UnitAi::constructed(t, &new, self.streams.get(Stream::Ai)))
+                t.and_then(|t| {
+                    UnitAi::constructed(t, &new, self.streams.get(Stream::Ai), &self.model.roles)
+                })
             });
         let ai = match ai {
             Ok(ai) => ai,
@@ -231,7 +238,11 @@ impl World {
         let snow = constructed_snow(master, (tx, ty), terrain)?;
         // +0xcd0 (FUN_141188db0): mangrove or rice terrain under its place
         let rice = terrain.is_some_and(|t| t.kind(Tile::new(tx, ty)).is_some_and(is_rice_terrain));
-        let foundation = !matches!(made.class, class::CLASS_51 | class::CLASS_54)
+        let foundation = !self
+            .model
+            .roles
+            .of_class(made.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
             && !matches!(master, ids::ID_357 | ids::ID_1188)
             && building.head_unit.is_none();
         let hp = if foundation && WholeSeconds::ZERO < made.build_time {
@@ -262,7 +273,11 @@ impl World {
         };
         // FUN_1411cf770 with no master copy of its own and no annex link yet
         let desolid = WholeSeconds::ZERO < made.build_time
-            && !matches!(made.class, class::CLASS_51 | class::CLASS_54)
+            && !self
+                .model
+                .roles
+                .of_class(made.class)
+                .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
             && progress == Seconds::ZERO;
         let combat = Combat {
             builders: BuilderCount::of_data(0),
@@ -383,7 +398,7 @@ impl World {
             };
             // the .dat's annexes are buildings (type 80): another type's master has no building
             // part, which the constructor below refuses
-            let ai = Ok(unit_ai_type(&am, annex));
+            let ai = Ok(unit_ai_type(&am, annex, &self.model.roles));
             let at = Position::new(position.x() + off.x(), position.y() + off.y(), given_z);
             let (aid, at) = self.make_building(player, annex, ai, at)?;
             self.link_annex(player, (id, slot), aid, &made, &am)?;
@@ -433,7 +448,12 @@ impl World {
         }
         self.parts.building_mut(id)?.annexes.link(slot, aid)?;
         self.parts.building_mut(aid)?.annex_of = Some(MainBuildingId::new(id));
-        if made.class != class::GATE {
+        if !self
+            .model
+            .roles
+            .of_class(made.class)
+            .contains(ClassRoles::GATE)
+        {
             self.unwatch(player, aid)?;
         }
         if Distance::ZERO < am.height {

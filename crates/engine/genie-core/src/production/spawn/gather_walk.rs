@@ -13,7 +13,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Voice;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
@@ -24,6 +23,7 @@ use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 
 /// A building takes in its own gather point's new unit at once while it holds fewer than these
 /// (10, `FUN_140ace9c0`'s test) or fewer than its capacity.
@@ -61,7 +61,7 @@ impl World {
             // The gate class, whose own walls BUILD's placement scan passes over (`FUN_14123aee0`).
             // The relic's master, which always stays (`FUN_141194e80`).
             // The villager class, whose new units count in attribute 248.
-            self.players.live(p, new)?.master(self.master_tables(), p)?.class == class::VILLAGER;
+            self.model.roles.of_class(self.players.live(p, new)?.master(self.master_tables(), p)?.class).contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(p, new)?;
         if let Some(m) = self.parts.mover_mut(unit.id) {
             m.waiting = 1;
@@ -184,9 +184,8 @@ impl World {
         if let Some(id) = closest(gaia.objects.as_slice())? {
             return Ok(Some(id));
         }
-        if matches!(
-            class,
-            Some(class::CLASS_5 | class::CLASS_29 | class::CLASS_33)
+        if self.model.roles.of_some_class(class).intersects(
+            ClassRoles::OCEAN_FISH | ClassRoles::DOMESTIC_ANIMAL | ClassRoles::SHORE_FISH,
         ) {
             return Err(GenieError::unsupported(
                 "a gather point's lost target of class 5, 29 or 33 (the unit AI's slot 0x80)",

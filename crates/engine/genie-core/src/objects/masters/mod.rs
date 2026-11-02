@@ -53,7 +53,6 @@ use genie_model::objects::masters::carry_capacity;
 use genie_model::objects::masters::charge_event;
 use genie_model::objects::masters::charge_kind;
 use genie_model::objects::masters::charge_target;
-pub use genie_model::objects::masters::class;
 use genie_model::objects::masters::class_id;
 mod class_mask;
 use genie_model::objects::masters::combat_ability;

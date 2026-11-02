@@ -53,13 +53,15 @@ use crate::objects::masters::Masters;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, RelicCount, WorkerCount};
 use crate::players::PlayerId;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class;
+use crate::testing::roles;
+use crate::testing::static_roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::BOAR_AI;
 use crate::unit_ai::Home;
@@ -257,7 +259,13 @@ fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
         AttackState::GotoPoint { move_to: None },
     ] {
         let mut a = own_attack(7, state, Distance::ZERO);
-        let w = a.work(Some(deer), None, &LION, |_| panic!("no range test"));
+        let w = a.work(
+            Some(deer),
+            None,
+            &LION,
+            |_| panic!("no range test"),
+            &roles(),
+        );
         assert_eq!(
             w,
             Worked {
@@ -274,7 +282,7 @@ fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
         AttackState::Failed,
     ] {
         let mut a = own_attack(7, state, Distance::ZERO);
-        let w = a.work(Some(deer), None, &LION, |id| id == object_id(7));
+        let w = a.work(Some(deer), None, &LION, |id| id == object_id(7), &roles());
         assert_eq!(
             w,
             Worked {
@@ -290,7 +298,10 @@ fn an_attack_keeps_its_own_target_and_sees_it_again_out_of_its_moving_states() {
     }
     // none answers false
     let mut a = own_attack(7, AttackState::Done, Distance::ZERO);
-    assert_eq!(a.work(None, None, &LION, |_| true), Worked::default());
+    assert_eq!(
+        a.work(None, None, &LION, |_| true, &roles()),
+        Worked::default()
+    );
 }
 
 /// The range test of slot 9: a unit without speed, or whose unit AI may not move to attack,
@@ -306,7 +317,7 @@ fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
             speed: Speed::new(speed),
             ..LION
         };
-        a.work(Some(deer), None, &unit, |_| can).kept
+        a.work(Some(deer), None, &unit, |_| can, &roles()).kept
     };
     assert!(reach(Distance::ZERO, 1.2, true));
     assert!(!reach(Distance::new(2.0), 1.2, false));
@@ -324,7 +335,8 @@ fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
                 speed: Speed::ZERO,
                 ..LION
             },
-            |_| true
+            |_| true,
+            &roles()
         )
         .kept
     );
@@ -338,7 +350,8 @@ fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
                 speed: Speed::ZERO,
                 ..LION
             },
-            |_| { true }
+            |_| { true },
+            &roles()
         )
         .kept
     );
@@ -350,10 +363,16 @@ fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
         ..LION
     };
     assert!(
-        a.work(Some(deer), None, &unit, |_| {
-            asked = true;
-            true
-        })
+        a.work(
+            Some(deer),
+            None,
+            &unit,
+            |_| {
+                asked = true;
+                true
+            },
+            &roles()
+        )
         .kept
     );
     assert!(asked);
@@ -371,7 +390,8 @@ fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
                 speed: Speed::ZERO,
                 ..LION
             },
-            |_| false
+            |_| false,
+            &roles()
         )
         .kept
     );
@@ -399,7 +419,13 @@ fn an_area_effect_attack_takes_building_main_building() {
         ..LION
     };
     let mut a = own_attack(30, AttackState::Ready, Distance::ZERO);
-    let w = a.work(Some(annex), Some(main), &mangonel, |id| id == object_id(31));
+    let w = a.work(
+        Some(annex),
+        Some(main),
+        &mangonel,
+        |id| id == object_id(31),
+        &roles(),
+    );
     assert_eq!(
         w,
         Worked {
@@ -416,7 +442,7 @@ fn an_area_effect_attack_takes_building_main_building() {
     // without an area effect the annex itself is the target, its own in state 6
     let mut a = own_attack(30, AttackState::Ready, Distance::ZERO);
     assert_eq!(
-        a.work(Some(annex), Some(main), &LION, |_| true),
+        a.work(Some(annex), Some(main), &LION, |_| true, &roles()),
         Worked {
             kept: true,
             ..Worked::default()
@@ -425,7 +451,7 @@ fn an_area_effect_attack_takes_building_main_building() {
     // a sub-action lets go and takes nothing
     let mut a = own_attack(30, AttackState::Ready, Distance::ZERO);
     a.voice = Voice::Quiet;
-    let w = a.work(Some(annex), Some(main), &mangonel, |_| true);
+    let w = a.work(Some(annex), Some(main), &mangonel, |_| true, &roles());
     assert_eq!(
         (
             w.lets_go,
@@ -441,7 +467,7 @@ fn an_area_effect_attack_takes_building_main_building() {
         state: ObjectState::Removed,
         ..main
     };
-    let w = a.work(Some(annex), Some(dying), &mangonel, |_| true);
+    let w = a.work(Some(annex), Some(dying), &mangonel, |_| true, &roles());
     assert_eq!(
         (
             w.lets_go,
@@ -453,10 +479,10 @@ fn an_area_effect_attack_takes_building_main_building() {
     // class 60: slot 0x68 returns at once; the seen point still follows
     let mut a = own_attack(7, AttackState::Done, Distance::ZERO);
     let odd = Mark {
-        class: CLASS_60,
+        class: class::CLASS_60,
         ..mark(8, 10.5)
     };
-    let w = a.work(Some(odd), None, &LION, |_| true);
+    let w = a.work(Some(odd), None, &LION, |_| true, &roles());
     assert_eq!(
         (w, a.target, a.seen),
         (
@@ -471,7 +497,7 @@ fn an_area_effect_attack_takes_building_main_building() {
     // slot 0x68 with none: the count clears and the old target goes
     let mut a = own_attack(7, AttackState::Done, Distance::ZERO);
     assert_eq!(
-        a.set_target(None),
+        a.set_target(None, &roles()),
         Worked {
             clears_count: true,
             lets_go: Some(object_id(7)),
@@ -767,6 +793,7 @@ impl Rig {
                     &parts.unread,
                     motions,
                 ),
+                static_roles(),
             ),
             map: spatial,
             sprite_rng: sprite,
@@ -932,6 +959,7 @@ fn strike_on_an_annex_hits_its_main_building() {
         &mut blasted,
         hit,
         &mut Well512::default(),
+        &roles(),
     )
     .unwrap();
     assert_eq!(struck.result, StrikeResult::of_data(1));
@@ -986,6 +1014,7 @@ fn building_relic_raises_its_missile_hit() {
             &mut Vec::new(),
             hit,
             &mut Well512::default(),
+            &roles(),
         )
         .unwrap();
         target.hp
@@ -1048,6 +1077,7 @@ fn trample_hit_leaves_out_its_building_target_blast_so_far() {
         &mut blasted,
         HitChance::of_data(100),
         &mut Well512::default(),
+        &roles(),
     )
     .unwrap();
     assert_eq!(executed, Some(object_id(21)));
@@ -1162,7 +1192,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
             target(),
         );
         let mut a = soldier_attack(7, Distance::new(4.0), 2.0, Position::from([NONE; 3]));
-        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
+        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         assert_eq!(
             (a.state, rig.posted()),
@@ -1182,7 +1212,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
     let mut a = soldier_attack(7, Distance::new(4.0), 2.0, Position::from([NONE; 3]));
     a.voice = Voice::Quiet;
     let _ = rig
-        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
         .unwrap();
     assert_eq!(rig.posted(), Vec::new());
 }
@@ -1206,7 +1236,7 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
         rig.r.can_move = can_move;
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
             .unwrap();
         assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
         assert_eq!(matches!(r, Readiness::Away(_)), follows);
@@ -1234,7 +1264,7 @@ fn an_attack_on_target_out_of_sight_fails() {
         let ai = rig.ai_mut().unwrap();
         ai.current_target = Some(object_id(77));
         ai.home = Some(Home::default());
-        let code = rig.run(100, |c, u, _, f, r| a.out_of_sight(c, u, f, r));
+        let code = rig.run(100, |c, u, _, f, r| a.out_of_sight(c, u, f, r, &roles()));
         let ai = rig.ai().unwrap();
         let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().go_home);
         let let_go = rig.workers(77, PlayerId::new(1)) == Some(0);
@@ -1296,7 +1326,7 @@ fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
         rig.r.stance = stance;
         let mut a = soldier_attack(7, Distance::new(4.0), 0.0, at);
         a.seen = at;
-        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
+        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         if fails {
             assert_eq!(a.state.bare(), AttackState::Failed);
@@ -1531,7 +1561,7 @@ fn ready_to_attack_at_once_test_and_its_nan_paths() {
         rig.combat_mut().attack_timer = Seconds::new(timer);
         let mut a = soldier_attack(7, range, 0.0, point);
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip, &roles()))
             .unwrap();
         (r, a.point)
     };
@@ -1934,7 +1964,7 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
         attack_sprite: Some(SpriteId::named(12)),
         ..Master::default()
     };
-    let a = arms(&master, &graphics, TaskSprites::NONE, None);
+    let a = arms(&master, &graphics, TaskSprites::NONE, None, &roles());
     assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(11)));
     let look = Look {
         standing: None,
@@ -1944,7 +1974,14 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
         dying: None,
         undead: None,
     };
-    let a = arms_looking(&master, Some(&look), &graphics, TaskSprites::NONE, None);
+    let a = arms_looking(
+        &master,
+        Some(&look),
+        &graphics,
+        TaskSprites::NONE,
+        None,
+        &roles(),
+    );
     assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(20)));
     assert_eq!(a.sprite.map(|s| s.id), Some(SpriteId::named(12)));
     // its own MoveTo sprite first
@@ -1954,6 +1991,7 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
         &graphics,
         TaskSprites::NONE,
         Some(SpriteId::named(10)),
+        &roles(),
     );
     assert_eq!(a.move_sprite.map(|s| s.id), Some(SpriteId::named(10)));
 }
@@ -2317,7 +2355,7 @@ fn gate_reach_is_to_its_nearest_part() {
     rig.r.can_move = false;
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     let r = rig
-        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
         .unwrap();
     assert!(matches!(r, Readiness::Ready));
     assert_eq!(a.point, gate_at);
@@ -2350,7 +2388,8 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.arms.sprite = Some(attack_sprite);
         a.state = AttackState::New;
-        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r)).unwrap();
+        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r, &roles()))
+            .unwrap();
         assert_eq!(rig.posted(), vec![]);
         (a.state, a.pending, rig.sprite())
     };
@@ -2365,7 +2404,8 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
         Victim::default(),
     );
     let mut a = soldier_attack(-1, Distance::new(1.0), 0.0, Position::from([NONE; 3]));
-    rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r)).unwrap();
+    rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r, &roles()))
+        .unwrap();
     assert_eq!(a.state, AttackState::Done);
     assert_eq!(
         rig.posted(),
@@ -2402,7 +2442,8 @@ fn swing_with_second_sprite_draws_which_one_it_shows() {
         a.arms.sprite = Some(sprite(301));
         a.arms.second_sprite = Some(sprite(302));
         a.state = AttackState::New;
-        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r)).unwrap();
+        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r, &roles()))
+            .unwrap();
         (rig.sprite(), rig.t.streams.get(Stream::Object).clone())
     };
     // two seeds whose first draw scales to 0 and to 1
@@ -2465,7 +2506,7 @@ fn ready_to_attack_leash_fails_target_too_far_from_the_unit_ai_point() {
         (rig.r.stance, rig.r.state_position) = (UnitStance::DEFENSIVE, centre);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
             .unwrap();
         assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
         assert_eq!(matches!(r, Readiness::Away(_)), follows, "{centre:?}");
@@ -2534,7 +2575,7 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
         (PlayerId::new(1), ListIndex::new(2)),
         50,
         |u, actions, c| {
-            let code = u.attack_part(actions, c, me(object_id(700)), None)?;
+            let code = u.attack_part(actions, c, me(object_id(700)), None, &roles())?;
             u.end_head_update(actions, c, code)
         },
     )
@@ -2566,7 +2607,7 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |u, actions, c| {
-            let code = u.attack_part(actions, c, me(object_id(9175)), None)?;
+            let code = u.attack_part(actions, c, me(object_id(9175)), None, &roles())?;
             u.end_head_update(actions, c, code)
         },
     );
@@ -2770,8 +2811,10 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         let mut a = swinging_attack(AttackState::Swing, true, 3);
         (a.pending, a.target, a.swing) = (false, target, swing);
         a.arms.interrupt_frame = interrupt;
-        rig.run(100, |c, u, _, f, r| a.swing_after_hit(c, u, f, r, sprite))
-            .unwrap();
+        rig.run(100, |c, u, _, f, r| {
+            a.swing_after_hit(c, u, f, r, sprite, &roles())
+        })
+        .unwrap();
         (a.state.bare(), rig.mover().animated.speed)
     };
     assert_eq!(
@@ -3174,6 +3217,7 @@ fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
                     me(9177, AttackState::Move { move_to: None }),
                     r,
                     class::CLASS_6,
+                    &roles(),
                 )
             })
             .unwrap();
@@ -3261,14 +3305,14 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
     };
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, Voice::Loud));
     rig.r.ai_order = AiOrder::Idle;
-    let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
+    let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r, &roles()));
     assert_eq!(
         (code, rig.workers(7, PlayerId::new(0)), a.state),
         (Ok(UpdateCode::CODE_5), Some(0), AttackState::Done)
     );
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, Voice::Quiet));
     rig.f.own.class = class::VILLAGER;
-    let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
+    let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r, &roles()));
     assert_eq!(
         (
             code,
@@ -3284,14 +3328,14 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
         )
     );
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, Voice::Quiet));
-    let r = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
+    let r = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r, &roles()));
     assert_eq!(
         r.unwrap_err().reason(),
         "an Attack of a unit other than a villager whose target died"
     );
     let (mut rig, mut a) = on_target(dead(2), true, (AttackState::Ready, Voice::Quiet));
     rig.f.own.class = class::VILLAGER;
-    let r = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
+    let r = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r, &roles()));
     assert_eq!(
         r.unwrap_err().reason(),
         "a villager's Attack whose player-owned target died (its unit AI forgets it)"
@@ -3316,7 +3360,7 @@ fn an_attack_on_moved_target_follows_waits_or_fails() {
         rig.f.own.player = own_player;
         let t = *rig.t.spatial.get(object_id(7)).unwrap();
         let code = rig
-            .run(20, |c, u, _, f, r| a.target_moved(c, u, f, r, &t))
+            .run(20, |c, u, _, f, r| a.target_moved(c, u, f, r, &t, &roles()))
             .unwrap();
         (code, a)
     };
@@ -3385,7 +3429,7 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
         );
         set(&mut rig);
         let code = rig
-            .run(20, |c, u, _, f, r| a.ends_early(c, u, f, r, true))
+            .run(20, |c, u, _, f, r| a.ends_early(c, u, f, r, true, &roles()))
             .unwrap();
         ((code, rig.posted()), a)
     };
@@ -3440,7 +3484,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, Voice::Loud),
     );
     a.arms.sprite = Some(STANDING);
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true, &roles()));
     assert_eq!(
         (code, a.state.bare()),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Swing)
@@ -3455,7 +3499,9 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         true,
         (AttackState::Ready, Voice::Loud),
     );
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, false));
+    let code = rig.run(20, |c, u, _, f, r| {
+        a.ready_step(c, u, f, r, false, &roles())
+    });
     assert_eq!(
         (code, a.state.bare()),
         (Ok(UpdateCode::CODE_5), AttackState::Done)
@@ -3471,7 +3517,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, Voice::Loud),
     );
     a.point = Position::from([NONE; 3]);
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true, &roles()));
     assert_eq!(
         (code, a.state.bare()),
         (
@@ -3555,7 +3601,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
         rig.ai_mut().unwrap().current_target = Some(object_id(7));
         set(&mut rig);
         let code = rig
-            .run(20, |c, u, _, f, r| a.lost(c, u, f, r))
+            .run(20, |c, u, _, f, r| a.lost(c, u, f, r, &roles()))
             .map_err(|e| e.reason().to_owned());
         let forgot = rig.ai().unwrap().current_target.is_none();
         (

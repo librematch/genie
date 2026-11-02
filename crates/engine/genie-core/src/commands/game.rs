@@ -304,7 +304,6 @@ const TREASON_COST: Amount = Amount::new(TURN_TREASON_COST);
 mod tests {
     use super::*;
     use crate::gathering::QueueCount;
-    use crate::objects::masters::class;
     use crate::objects::masters::ids::CASTLE;
     use crate::objects::masters::ids::FISH_TRAP;
     use crate::players::Amount;
@@ -315,6 +314,7 @@ mod tests {
     use crate::test_ids::costs;
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    use crate::testing::class;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;

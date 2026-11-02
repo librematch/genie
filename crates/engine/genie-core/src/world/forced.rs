@@ -413,7 +413,7 @@ mod tests {
     fn forced_object_sight_follows_its_state() {
         use crate::map::Distance;
         use crate::map::spatial::Spatial;
-        use crate::objects::masters::class;
+        use crate::testing::class;
         let id = object_id(21712);
         let world = || {
             hands_world(

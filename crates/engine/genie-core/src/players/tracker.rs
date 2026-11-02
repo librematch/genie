@@ -34,15 +34,17 @@
 use crate::GenieError;
 use crate::objects::ObjectId;
 use crate::objects::lines::UnitLines;
+use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::{ClassId, class};
 use crate::players::PlayerId;
 use crate::production::QueuedUnits;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use std::collections::BTreeMap;
 use std::mem::take;
@@ -103,36 +105,6 @@ impl ListKey {
 const TRACKED_MASTERS: MasterId = MasterId::named(9000);
 /// The classes a key holds below this (`FUN_141658430`).
 const CLASSES: i16 = 100;
-/// The classes that count as done from the start (packed and unpacked siege, 51 and 54).
-const NEVER_PENDING: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
-/// The classes whose key carries the military byte (`+9`, `FUN_141658430`'s switch).
-const MILITARY: [ClassId; 25] = [
-    class::CLASS_0,
-    class::CLASS_6,
-    class::CLASS_12,
-    class::CLASS_17,
-    class::MONK,
-    class::TRANSPORT,
-    class::WARSHIP,
-    class::CLASS_23,
-    class::CLASS_24,
-    class::CLASS_25,
-    class::CLASS_26,
-    class::CLASS_28,
-    class::CLASS_35,
-    class::CLASS_36,
-    class::CLASS_43,
-    class::CLASS_44,
-    class::CLASS_45,
-    class::CLASS_46,
-    class::CLASS_47,
-    class::CLASS_50,
-    class::TOWER,
-    class::CLASS_53,
-    class::CLASS_56,
-    class::CLASS_57,
-    class::KING,
-];
 
 /// The key `FUN_141658430` gives a master (12 bytes: the key master, its class, two bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -182,7 +154,7 @@ impl Key {
 /// the player has, below 9000; its class below 100 is the key's class, and classes 51 and 54 do
 /// not wait.
 #[must_use]
-pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId) -> Key {
+pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId, roles: &Roles) -> Key {
     let get = |id: MasterId| masters?.get(id).filter(|_| id < TRACKED_MASTERS);
     let Some(m) = get(master) else {
         return Key::NONE;
@@ -206,11 +178,11 @@ pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId) -> Ke
     out.master = id;
     if classed && (0..CLASSES).contains(&k.class.get()) {
         out.class = Some(k.class);
-        if NEVER_PENDING.contains(&k.class) {
+        if roles.of_class(k.class).contains(ClassRoles::NEVER_PENDING) {
             out.pending = false;
             out.military = false;
         }
-        if MILITARY.contains(&k.class) {
+        if roles.of_class(k.class).contains(ClassRoles::MILITARY_KEY) {
             out.military = true;
         }
     }
@@ -403,7 +375,12 @@ impl World {
     /// [`key`] of player `p`'s master `master`.
     #[must_use]
     pub fn tracker_key(&self, p: PlayerId, master: MasterId) -> Key {
-        key(self.model.masters.of(p), &self.model.lines, master)
+        key(
+            self.model.masters.of(p),
+            &self.model.lines,
+            master,
+            &self.model.roles,
+        )
     }
 
     /// The load's filing: each player's objects as its lists hold them, the live ones then the
@@ -570,6 +547,8 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
+    use crate::testing::class;
+    use crate::testing::roles;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -718,7 +697,7 @@ mod tests {
     #[test]
     fn unit_keys_by_its_lines_first_master_and_building_by_its_stack_unit() {
         let (m, l) = (masters(), lines());
-        let k = |id| key(Some(&m), &l, id);
+        let k = |id| key(Some(&m), &l, id, &roles());
         // the crossbowman (24) files under the archer (4), class 0 a military one
         assert_eq!(
             k(master_id(24)),
@@ -784,13 +763,13 @@ mod tests {
         // a master the player lacks, a line whose first master it lacks, no table
         assert_eq!(k(ids::ID_7), Key::NONE);
         assert_eq!(k(master_id(492)), Key::NONE);
-        assert_eq!(key(None, &l, ids::VILLAGER_MALE), Key::NONE);
+        assert_eq!(key(None, &l, ids::VILLAGER_MALE, &roles()), Key::NONE);
     }
 
     #[test]
     fn building_waits_until_its_completion_moves_it_to_the_end_of_the_done_lists() {
         let (m, l) = (masters(), lines());
-        let tc = key(Some(&m), &l, ids::TOWN_CENTRE);
+        let tc = key(Some(&m), &l, ids::TOWN_CENTRE, &roles());
         let mut t = Tracker::default();
         t.add(object_id(10), tc);
         t.add(object_id(11), tc);
@@ -819,7 +798,7 @@ mod tests {
             [Some(object_id(11)), Some(object_id(10))]
         );
         // a key that does not wait changes nothing
-        let villager = key(Some(&m), &l, ids::VILLAGER_MALE);
+        let villager = key(Some(&m), &l, ids::VILLAGER_MALE, &roles());
         t.add(object_id(20), villager);
         t.complete(object_id(20), villager);
         assert_eq!(t.class_list(class::VILLAGER), [Some(object_id(20))]);
@@ -828,7 +807,7 @@ mod tests {
     #[test]
     fn removal_keeps_the_others_order() {
         let (m, l) = (masters(), lines());
-        let v = key(Some(&m), &l, ids::VILLAGER_MALE);
+        let v = key(Some(&m), &l, ids::VILLAGER_MALE, &roles());
         let mut t = Tracker::default();
         for id in [1, 2, 3, 4] {
             t.add(object_id(id), v);
@@ -842,7 +821,7 @@ mod tests {
             )
         );
         // a pending building leaves both its lists, done or not
-        let tc = key(Some(&m), &l, ids::TOWN_CENTRE);
+        let tc = key(Some(&m), &l, ids::TOWN_CENTRE, &roles());
         t.add(object_id(30), tc);
         t.add(object_id(31), tc);
         t.complete(object_id(31), tc);
@@ -862,8 +841,8 @@ mod tests {
     fn promotion_moves_an_object_to_the_end_of_its_new_lists() {
         let (m, l) = (masters(), lines());
         let (villager, builder) = (
-            key(Some(&m), &l, ids::VILLAGER_MALE),
-            key(Some(&m), &l, ids::BUILDER),
+            key(Some(&m), &l, ids::VILLAGER_MALE, &roles()),
+            key(Some(&m), &l, ids::BUILDER, &roles()),
         );
         let mut t = Tracker::default();
         for id in [1, 2, 3] {
@@ -883,8 +862,8 @@ mod tests {
             [Some(object_id(2)), Some(object_id(3)), Some(object_id(1))]
         );
         // an archer upgraded in its line stays under the archer, last
-        let archer = key(Some(&m), &l, master_id(4));
-        let crossbow = key(Some(&m), &l, master_id(24));
+        let archer = key(Some(&m), &l, master_id(4), &roles());
+        let crossbow = key(Some(&m), &l, master_id(24), &roles());
         t.add(object_id(7), archer);
         t.add(object_id(8), archer);
         t.promote(object_id(7), archer, crossbow);

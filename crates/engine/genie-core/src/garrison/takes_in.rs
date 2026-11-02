@@ -14,7 +14,7 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::{Task, player_master};
 use crate::objects::unit::Unit;
@@ -23,6 +23,8 @@ use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// `FUN_1411205e0`: whether a master's class (`+0x410`, the short `MOVSX` widens) has one of
 /// `flags` in the class-flags table: a class below 0 or not below the table's count
@@ -37,11 +39,11 @@ pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
 
 /// The unit masters whose own rules `FUN_14120eb10` keeps apart from their class's (the game
 /// compares their ids, + 0x609c).
-pub(super) const MASTER_1263: MasterId = MasterId::named(1263);
-pub(super) const MASTER_775: MasterId = MasterId::named(775);
-pub(super) const MASTER_1715: MasterId = MasterId::named(1715);
-pub(super) const MASTER_1811: MasterId = MasterId::named(1811);
-pub(super) const MASTER_1822: MasterId = MasterId::named(1822);
+pub(super) const MASTER_1263: MasterId = ids::FLAMING_CAMEL;
+pub(super) const MASTER_775: MasterId = ids::MISSIONARY;
+pub(super) const MASTER_1715: MasterId = ids::JADWIGA;
+pub(super) const MASTER_1811: MasterId = ids::WARRIOR_PRIEST;
+pub(super) const MASTER_1822: MasterId = ids::TAMAR;
 
 /// Whether `garrison_type` (a building master's `+0x9bc`) takes in a unit of `class` and master
 /// `id` (the switch of `FUN_14120eb10` on the class, [`GarrisonKinds`]'s bits; infantry not of
@@ -54,36 +56,57 @@ pub fn garrison_type_takes(
     class: ClassId,
     id: MasterId,
     with_42: bool,
+    roles: &Roles,
 ) -> bool {
     let bit = |kind| garrison_type.contains(kind);
-    let by_class = match class {
-        class::CLASS_0 | class::CLASS_44 => bit(GarrisonKinds::INFANTRY),
-        class::TRADE_BOAT
-        | class::TRANSPORT
-        | class::FISHING_SHIP
-        | class::WARSHIP
-        | class::CLASS_53 => bit(GarrisonKinds::SHIPS),
-        class::VILLAGER | class::TRADE_CART | class::KING => bit(GarrisonKinds::VILLAGERS),
-        class::CLASS_6
-        | class::CLASS_35
-        | class::CLASS_45
-        | class::CLASS_46
-        | class::CLASS_50
-        | class::CLASS_56 => id != MASTER_1263 && id != MASTER_1811 && bit(GarrisonKinds::INFANTRY),
-        class::CLASS_12 | class::CLASS_23 | class::CLASS_36 | class::CLASS_47 | class::CLASS_57 => {
+    let by_class = {
+        let held = roles.of_class(class);
+        if held.intersects(ClassRoles::ARCHERY | ClassRoles::ARCHERY_CANNON) {
+            bit(GarrisonKinds::INFANTRY)
+        } else if held.intersects(
+            ClassRoles::TRADE_BOAT
+                | ClassRoles::TRANSPORT
+                | ClassRoles::FISHING_SHIP
+                | ClassRoles::WARSHIP
+                | ClassRoles::BOARDING_SHIP,
+        ) {
+            bit(GarrisonKinds::SHIPS)
+        } else if held.intersects(ClassRoles::VILLAGER | ClassRoles::TRADE_CART | ClassRoles::KING)
+        {
+            bit(GarrisonKinds::VILLAGERS)
+        } else if held.intersects(
+            ClassRoles::INFANTRY
+                | ClassRoles::PETARD
+                | ClassRoles::TWO_HANDED_SWORDSMAN
+                | ClassRoles::PIKEMAN
+                | ClassRoles::SPEARMAN
+                | ClassRoles::RAIDER,
+        ) {
+            id != MASTER_1263 && id != MASTER_1811 && bit(GarrisonKinds::INFANTRY)
+        } else if held.intersects(
+            ClassRoles::CAVALRY
+                | ClassRoles::CAVALRY_CANNON
+                | ClassRoles::CAVALRY_ARCHER
+                | ClassRoles::SCOUT_CAVALRY
+                | ClassRoles::CAVALRY_RAIDER,
+        ) {
             bit(GarrisonKinds::CAVALRY)
-        }
-        class::SIEGE | class::CLASS_51 | class::CLASS_54 | class::CLASS_55 => {
+        } else if held.intersects(
+            ClassRoles::SIEGE
+                | ClassRoles::PACKED_TREBUCHET
+                | ClassRoles::UNPACKED_TREBUCHET
+                | ClassRoles::SCORPION,
+        ) {
             bit(GarrisonKinds::SIEGE)
-        }
-        class::MONK | class::CLASS_43 => {
+        } else if held.intersects(ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC)
+            || (held.contains(ClassRoles::RELIC) && with_42)
+        {
             id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(GarrisonKinds::MONKS)
+        } else if held.contains(ClassRoles::LIVESTOCK) {
+            bit(GarrisonKinds::HERDABLES)
+        } else {
+            false
         }
-        class::RELIC if with_42 => {
-            id != MASTER_775 && id != MASTER_1715 && id != MASTER_1822 && bit(GarrisonKinds::MONKS)
-        }
-        class::LIVESTOCK => bit(GarrisonKinds::HERDABLES),
-        _ => false,
     };
     let as_cavalry = matches!(id, MASTER_1263 | MASTER_775 | MASTER_1715 | MASTER_1822)
         && bit(GarrisonKinds::CAVALRY);
@@ -104,8 +127,11 @@ pub(super) fn has_garrison_task(tasks: &[Task], action: ActionKind, class: Class
 
 /// A garrison task (action type 3) on buildings (class 3).
 #[must_use]
-pub fn is_garrison_task(task: &Task) -> bool {
-    task.action_kind == GARRISON && task.object_group == Some(class::BUILDING)
+pub fn is_garrison_task(task: &Task, roles: &Roles) -> bool {
+    task.action_kind == GARRISON
+        && roles
+            .of_some_class(task.object_group)
+            .contains(ClassRoles::BUILDING)
 }
 
 impl World {
@@ -205,11 +231,11 @@ impl World {
         if !above || !bm.garrison.holds() {
             return Ok(false);
         }
-        if !has_garrison_task(&unit.tasks, GARRISON, class::BUILDING) {
+        if !has_garrison_task(&unit.tasks, GARRISON, self.model.slots.class.building) {
             return Ok(false);
         }
         let garrison_type = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_type);
-        if !garrison_type_takes(garrison_type, unit.class, unit.id, true) {
+        if !garrison_type_takes(garrison_type, unit.class, unit.id, true, &self.model.roles) {
             return Ok(false);
         }
         Ok(unchecked || self.has_room(bp, b, None)?)

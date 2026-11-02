@@ -4,7 +4,7 @@
 use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{
-    Attack, AttackReads, CLASS_60, Fight, Ground, NO_OBJECT_STREAM, reset_sprite, set_walker_anim,
+    Attack, AttackReads, Fight, Ground, NO_OBJECT_STREAM, reset_sprite, set_walker_anim,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -19,6 +19,8 @@ use crate::objects::masters::MasterKind;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::{GenieError, combat::damage};
 
 /// An object as the Attack's slot 9 ([`Attack::work`]) and slot 0x68 ([`Attack::set_target`])
@@ -86,6 +88,7 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::Swing, g.motion.reborrow())?;
         let alternates = g.motion.mover().is_some_and(|m| {
@@ -94,7 +97,7 @@ impl Attack {
                 .contains(MoveAlgorithm::ALTERNATES_SPRITES)
         });
         let special = r.swing_sprites.special.filter(|_| {
-            MasterKind::COMBAT <= f.own.kind && damage::charge_hit(&f.own.source, &f.victim)
+            MasterKind::COMBAT <= f.own.kind && damage::charge_hit(&f.own.source, &f.victim, roles)
         });
         let chosen = if let Some(look) = r.swing_sprites.look {
             Some(look)
@@ -172,6 +175,7 @@ impl Attack {
         main: Option<Mark>,
         unit: &Wielder,
         can_move: impl FnOnce(ObjectId) -> bool,
+        roles: &Roles,
     ) -> Worked {
         let Some(mut target) = target else {
             return Worked::default();
@@ -194,7 +198,7 @@ impl Attack {
                 return Worked::default();
             }
         }
-        let mut worked = self.set_target(Some(target));
+        let mut worked = self.set_target(Some(target), roles);
         self.seen = target.position;
         worked.kept = true;
         worked
@@ -207,9 +211,13 @@ impl Attack {
     /// becomes the Attack's (`+0x20`, its id `+0x30`) below state 7, taken (its slot 0x178 with
     /// the action's type 9, the caller's) unless a sub-action; one in state 7 or more leaves the
     /// Attack without a target (−1), as does none.
-    pub fn set_target(&mut self, target: Option<Mark>) -> Worked {
+    pub fn set_target(&mut self, target: Option<Mark>, roles: &Roles) -> Worked {
         let mut worked = Worked::default();
-        if target.is_some_and(|t| t.class == CLASS_60) {
+        if target.is_some_and(|t| {
+            roles
+                .of_class(t.class)
+                .contains(ClassRoles::NOT_ATTACK_TARGET)
+        }) {
             return worked;
         }
         // slot 0x68 gives the Attack its target

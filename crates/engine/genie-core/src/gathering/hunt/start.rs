@@ -21,13 +21,14 @@ use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::step::Step;
 
 /// Who walks to a hunt's point ([`HuntAction::update_point_walk`]).
@@ -92,6 +93,18 @@ pub struct HuntRetarget<'a> {
     pub drops_here: bool,
 }
 
+/// What a hunt's chase of its target takes besides its attack and its mover
+/// ([`HuntAction::chase`]'s arguments).
+#[derive(Clone, Copy, Debug)]
+pub struct HuntChase<'a> {
+    /// The target.
+    pub target: &'a Quarry,
+    /// The hunter's owner.
+    pub player: PlayerId,
+    /// What its `MoveTo`s' constructors read of the hunter.
+    pub walks: &'a Walks<'a>,
+}
+
 /// A move a hunt may take ([`HuntAction::take_move`]'s arguments before the mover).
 #[derive(Clone, Copy, Debug)]
 pub struct HuntMove<'a> {
@@ -125,6 +138,7 @@ impl HuntAction {
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
+        roles: &Roles,
     ) -> Result<(Self, bool), GenieError> {
         let HuntStart {
             task,
@@ -178,7 +192,12 @@ impl HuntAction {
             hunt.set_drop(target.position, attack.gap, mover, &walks)?;
             return Ok((hunt, false));
         }
-        let arrived = hunt.chase(target, player, attack, arms, mover, &walks)?;
+        let chase = HuntChase {
+            target,
+            player,
+            walks: &walks,
+        };
+        let arrived = hunt.chase(chase, attack, arms, mover, roles)?;
         Ok((hunt, arrived))
     }
 
@@ -191,18 +210,23 @@ impl HuntAction {
     /// Attack of the master's ranges. A live allied one fails the hunt (`set_state` 13).
     pub(crate) fn chase(
         &mut self,
-        target: &Quarry,
-        player: PlayerId,
+        chase: HuntChase<'_>,
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
-        walks: &Walks<'_>,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
+        let HuntChase {
+            target,
+            player,
+            walks,
+        } = chase;
         self.tear_down(Some(mover))?;
         self.state = HuntState::Walk { move_to: None };
         self.timer = Seconds::ZERO;
         self.point = target.position;
-        let own_livestock = target.class == class::LIVESTOCK && target.player == player;
+        let own_livestock =
+            roles.of_class(target.class).contains(ClassRoles::LIVESTOCK) && target.player == player;
         if ObjectState::Alive < target.state || own_livestock {
             let range = if ObjectState::Alive < target.state {
                 self.task.range
@@ -219,7 +243,7 @@ impl HuntAction {
             self.state = HuntState::Walk { move_to };
             return Ok(false);
         }
-        if target.class != class::FARM && target.allied {
+        if !roles.of_class(target.class).contains(ClassRoles::FARM) && target.allied {
             // LAB_140ac679d: set_state(13): the timer clears; the unit's sprite (slot 0x68 with
             // FUN_140ac5210's) is the caller's
             self.state = HuntState::Failed;
@@ -228,7 +252,7 @@ impl HuntAction {
         }
         self.state = HuntState::Attack { attack: None };
         let reads = walks.live(mover);
-        let (a, arrived) = Attack::start(target.id, attack, arms, mover, &reads)?;
+        let (a, arrived) = Attack::start(target.id, attack, arms, mover, &reads, roles)?;
         self.state = HuntState::Attack { attack: Some(a) };
         Ok(arrived)
     }
@@ -249,6 +273,7 @@ impl HuntAction {
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
+        roles: &Roles,
     ) -> Result<Option<bool>, GenieError> {
         let HuntRetarget {
             target,
@@ -279,8 +304,12 @@ impl HuntAction {
         self.set_target(Some(HuntTargetId::new(target.id)));
         self.target_class = Some(target.class);
         self.carry_to = None;
-        self.chase(target, player, attack, arms, mover, &walks)
-            .map(Some)
+        let chase = HuntChase {
+            target,
+            player,
+            walks: &walks,
+        };
+        self.chase(chase, attack, arms, mover, roles).map(Some)
     }
 
     /// Slot 0x40 (`FUN_140ac52c0`): the hunt takes a move's `target` (None for a point) and

@@ -21,17 +21,16 @@ use crate::math::fmath::{BVector, below_or_unordered};
 use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The formation categories a group keeps its units by (`FUN_141007ba0`, `FUN_14100c6c0`).
@@ -43,32 +42,10 @@ const SPECIAL_MOST: usize = 4;
 const FIRST_PASS_MOST: usize = 3;
 /// The masters of the refill's second first-pass list (`FUN_14100c6c0`).
 const LISTED_MASTERS: [MasterId; 4] = [ids::ID_329, ids::ID_330, ids::ID_282, ids::ID_556];
-/// A target of one of these classes takes both first-pass lists, the masters' first
-/// (`FUN_14100c6c0`).
-const BOTH_LISTS_CLASSES: [ClassId; 4] = [
-    class::CLASS_24,
-    class::CLASS_57,
-    class::CLASS_12,
-    class::CLASS_47,
-];
+
 /// A target of one of these masters takes the class list only (`FUN_14100c6c0`).
 const CLASS_LIST_MASTERS: [MasterId; 2] = [ids::ID_6, ids::ID_7];
-/// A target of one of these classes takes the group's units by formation category
-/// (`FUN_14100c6c0`).
-const CATEGORY_LIST_CLASSES: [ClassId; 12] = [
-    class::VILLAGER,
-    class::MONK,
-    class::CLASS_43,
-    class::SIEGE,
-    class::CLASS_54,
-    class::CLASS_51,
-    class::KING,
-    class::CLASS_35,
-    class::TRANSPORT,
-    class::TRADE_BOAT,
-    class::FISHING_SHIP,
-    class::CLASS_61,
-];
+
 /// The task whose range adds the player's attribute 280 (`FUN_1415cd0d0` with the filter `0x68`).
 const CONVERSION_TASK: ActionKind = ActionKind::named(0x68);
 /// The player attribute a [`CONVERSION_TASK`]'s range adds (`+0x8c0` of the attribute table).
@@ -353,7 +330,13 @@ impl World {
                 continue;
             };
             let master = self.master(obj.player(), obj.master_id())?;
-            if by_class.len() < FIRST_PASS_MOST && master.class == class::CLASS_46 {
+            if by_class.len() < FIRST_PASS_MOST
+                && self
+                    .model
+                    .roles
+                    .of_class(master.class)
+                    .contains(ClassRoles::PIKEMAN)
+            {
                 by_class.push(m.id);
             }
             if by_master.len() < FIRST_PASS_MOST && LISTED_MASTERS.contains(&master.id) {
@@ -362,12 +345,22 @@ impl World {
         }
         let target_class = self.master(t.player(), t.master_id())?.class;
         let mut list: Vec<ObjectId> = Vec::new();
-        if BOTH_LISTS_CLASSES.contains(&target_class) {
+        if self
+            .model
+            .roles
+            .of_class(target_class)
+            .contains(ClassRoles::BOTH_LISTS_TARGET)
+        {
             take_into(&mut list, &by_master, limit);
             take_into(&mut list, &by_class, limit);
         } else if CLASS_LIST_MASTERS.contains(&t.master_id()) {
             take_into(&mut list, &by_class, limit);
-        } else if CATEGORY_LIST_CLASSES.contains(&target_class) {
+        } else if self
+            .model
+            .roles
+            .of_class(target_class)
+            .contains(ClassRoles::CATEGORY_LIST_TARGET)
+        {
             for category in CATEGORIES {
                 if limit <= list.len() {
                     break;
@@ -443,7 +436,13 @@ impl World {
             return Ok(false);
         }
         let tm = self.master(target.player(), target.master_id())?;
-        let works = charge_works(master.charge_target, master.charge_kind, tm.class, tm.kind);
+        let works = charge_works(
+            master.charge_target,
+            master.charge_kind,
+            tm.class,
+            tm.kind,
+            &self.model.roles,
+        );
         Ok(works && Charge::new(1.0) <= self.parts.combat_of(u.id).charge)
     }
 }

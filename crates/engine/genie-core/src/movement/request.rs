@@ -24,9 +24,9 @@ use crate::movement::{
     point_or_zero,
 };
 use crate::objects::ObjectId;
-use crate::objects::masters::class;
 use crate::pathing::tile_path::Path;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
 
 /// What the long pather is asked for a far waypoint ([`Mover::long_plan`]'s arguments after the
 /// planning state).
@@ -63,6 +63,7 @@ impl Mover {
         plans: &mut StepPlans,
         include: &[ObjectId],
     ) -> Result<AfterRequest, GenieError> {
+        let roles = by_id.roles();
         // the request measures and plans from +0x824 (`pfVar14`, `local_18c8`), where the unit
         // last moved to
         let position = self.moved_at.vector();
@@ -76,7 +77,7 @@ impl Mover {
             // The classes a long path's stretch may not cross (`0x141150f00` after `FUN_140f9eb70`, raw
             // `-0xe91`, `-0xe78`, `-0xea9`): walls, towers, and buildings that do not move; gates
             // ([`GATE`]) too. A villager's (`-0xea8`) path crosses them.
-            .is_some_and(|p| p.class == class::TRADE_CART);
+            .is_some_and(|p| roles.of_class(p.class).contains(ClassRoles::TRADE_CART));
         if solid && !self.plan_allowed(me, world, plan, trade_cart, plans)? {
             return Ok(AfterRequest::Paused);
         }
@@ -315,8 +316,9 @@ impl Mover {
         path: &mut Path,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let roles = by_id.roles();
         let me_at = world.get(me.id);
-        if me_at.is_some_and(|p| p.class == class::VILLAGER) {
+        if me_at.is_some_and(|p| roles.of_class(p.class).contains(ClassRoles::VILLAGER)) {
             return Ok(true);
         }
         let player = me_at.map(|p| p.player);
@@ -339,8 +341,10 @@ impl Mover {
             })?;
             let walled = hits.iter().any(|&h| {
                 world.get(h).is_some_and(|p| {
-                    matches!(p.class, class::WALL | class::GATE | class::TOWER)
-                        || (p.class == class::BUILDING && !p.moves)
+                    roles
+                        .of_class(p.class)
+                        .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::TOWER)
+                        || (roles.of_class(p.class).contains(ClassRoles::BUILDING) && !p.moves)
                 })
             });
             if walled {

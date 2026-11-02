@@ -1,6 +1,7 @@
 //! What the task finder reads of a save ([`FinderWorld`]).
 
 use crate::masters::MasterTable;
+use crate::setup::layer;
 use crate::{Error, work_masters};
 use genie_core::gathering::PastureId;
 use genie_core::map::Position;
@@ -20,6 +21,8 @@ use genie_core::unit_ai::task_finder::{
     Actor, Diplomacy, DropSite, TaskTarget, allied as task_finder_allied,
     drops_at as task_finder_drops_at,
 };
+use genie_model::layer::Roles;
+use genie_model::layer::Slots;
 use genie_rec::de;
 use genie_save::generated::world::{RgeStaticObject, TribeCombatObject};
 use std::collections::HashMap;
@@ -42,6 +45,10 @@ pub struct FinderWorld {
     pub civs: Vec<CivId>,
     /// The drop-site table.
     pub drop_sites: Vec<DropSite>,
+    /// The build's roles.
+    pub roles: Roles,
+    /// The build's slots.
+    pub slots: Slots,
 }
 
 /// One object as the task finder reads it.
@@ -156,6 +163,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
         })
         .collect::<Result<_, _>>()?;
     let objects = finder_objects(&sections)?;
+    let layer = layer().map_err(Error::Unmodelled)?;
     Ok(FinderWorld {
         masters,
         objects,
@@ -179,6 +187,8 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Err
             .map(|p| CivId::new(p.world_player().base.civ_id))
             .collect(),
         drop_sites: table.drop_sites.clone(),
+        roles: layer.roles.clone(),
+        slots: layer.slots,
     })
 }
 

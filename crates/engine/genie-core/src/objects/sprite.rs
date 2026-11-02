@@ -30,9 +30,10 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::{AnimateState, Frame};
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use genie_diff::Diff;
 
 /// The shortest frame interval (`0x3a83126f`, also `DAT_142eb1e9c`).
@@ -329,16 +330,24 @@ pub fn trade_sprite(master: &Master) -> Option<SpriteId> {
 /// `FUN_14106a940`: a trade cart (its master's class 19) that carries goods (`goods`,
 /// `FUN_141188160`: an amount above 0 in its resource store, `+0x7a0`).
 #[must_use]
-pub fn loaded_cart(master: &Master, goods: bool) -> bool {
-    master.class == class::TRADE_CART && goods
+pub fn loaded_cart(master: &Master, goods: bool, roles: &Roles) -> bool {
+    roles
+        .of_class(master.class)
+        .contains(ClassRoles::TRADE_CART)
+        && goods
 }
 
 /// Slot 0x798 of a combat object (`FUN_1412029f0`, types 70 and 80): a loaded trade cart's
 /// trade sprite ([`trade_sprite`]), else its terrain look's standing sprite (`+0x8a9`, `+0x960`,
 /// [`crate::combat::abilities::Look`]), else its master's (`+0x470`).
 #[must_use]
-pub fn standing(master: &Master, look: Option<&Look>, goods: bool) -> Option<SpriteId> {
-    if loaded_cart(master, goods) {
+pub fn standing(
+    master: &Master,
+    look: Option<&Look>,
+    goods: bool,
+    roles: &Roles,
+) -> Option<SpriteId> {
+    if loaded_cart(master, goods, roles) {
         return trade_sprite(master);
     }
     look.map_or_else(|| master.standing_sprite, |l| l.standing)
@@ -347,8 +356,13 @@ pub fn standing(master: &Master, look: Option<&Look>, goods: bool) -> Option<Spr
 /// Slot 0x7c8 of a combat object (`FUN_1412030b0`): a loaded trade cart's trade sprite, else
 /// its terrain look's walking sprite (`+0x968`), else its master's (`+0x748`).
 #[must_use]
-pub fn walking(master: &Master, look: Option<&Look>, goods: bool) -> Option<SpriteId> {
-    if loaded_cart(master, goods) {
+pub fn walking(
+    master: &Master,
+    look: Option<&Look>,
+    goods: bool,
+    roles: &Roles,
+) -> Option<SpriteId> {
+    if loaded_cart(master, goods, roles) {
         return trade_sprite(master);
     }
     look.map_or_else(|| master.move_sprite, |l| l.walking)
@@ -413,6 +427,8 @@ mod tests {
     #[cfg(test)]
     use crate::objects::masters::{BuildingMaster, Task};
     use crate::test_ids::master_id;
+    use crate::testing::class;
+    use crate::testing::roles;
     use crate::world::WholeSeconds;
 
     /// Build 158041's Lumberjack Female (Attack), graphic 1239: 45 frames of 0.0444 s, animated.
@@ -708,15 +724,27 @@ mod tests {
     #[test]
     fn combat_object_slots_show_its_look_else_its_master_s() {
         let m = barracks();
-        assert_eq!(standing(&m, None, false), Some(SpriteId::named(2575)));
-        assert_eq!(walking(&m, None, false), Some(SpriteId::named(10)));
+        assert_eq!(
+            standing(&m, None, false, &roles()),
+            Some(SpriteId::named(2575))
+        );
+        assert_eq!(
+            walking(&m, None, false, &roles()),
+            Some(SpriteId::named(10))
+        );
         assert_eq!(running(&m, None), Some(SpriteId::named(11)));
         assert_eq!(attacking(&m, None), Some(SpriteId::named(12)));
         assert_eq!(dying(&m, None), Some(SpriteId::named(2573)));
         assert_eq!(undead(&m, None), None);
         let l = look();
-        assert_eq!(standing(&m, Some(&l), false), Some(SpriteId::named(1)));
-        assert_eq!(walking(&m, Some(&l), false), Some(SpriteId::named(2)));
+        assert_eq!(
+            standing(&m, Some(&l), false, &roles()),
+            Some(SpriteId::named(1))
+        );
+        assert_eq!(
+            walking(&m, Some(&l), false, &roles()),
+            Some(SpriteId::named(2))
+        );
         // the look's null sprite is its own, not the master's
         assert_eq!(running(&m, Some(&l)), None);
         assert_eq!(attacking(&m, Some(&l)), Some(SpriteId::named(3)));
@@ -744,25 +772,37 @@ mod tests {
             tasks: vec![other, trade],
             ..Master::default()
         };
-        assert_eq!(standing(&cart, None, true), Some(SpriteId::named(4)));
         assert_eq!(
-            walking(&cart, Some(&look()), true),
+            standing(&cart, None, true, &roles()),
             Some(SpriteId::named(4))
         );
-        assert_eq!(standing(&cart, None, false), Some(SpriteId::named(20)));
-        assert_eq!(walking(&cart, None, false), Some(SpriteId::named(21)));
+        assert_eq!(
+            walking(&cart, Some(&look()), true, &roles()),
+            Some(SpriteId::named(4))
+        );
+        assert_eq!(
+            standing(&cart, None, false, &roles()),
+            Some(SpriteId::named(20))
+        );
+        assert_eq!(
+            walking(&cart, None, false, &roles()),
+            Some(SpriteId::named(21))
+        );
         // without a trade task, none
         let bare = Master {
             tasks: Vec::new(),
             ..cart
         };
-        assert_eq!(standing(&bare, None, true), None);
+        assert_eq!(standing(&bare, None, true, &roles()), None);
         // another class's goods do not count
         let villager = Master {
             class: class::VILLAGER,
             ..bare
         };
-        assert_eq!(standing(&villager, None, true), Some(SpriteId::named(20)));
+        assert_eq!(
+            standing(&villager, None, true, &roles()),
+            Some(SpriteId::named(20))
+        );
     }
 
     /// records/425984813: a barracks that dies a foundation plays its destruction sprite (389),

@@ -14,13 +14,14 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
-use crate::objects::masters::class;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
 use crate::production::pay;
 use crate::technology::Attributes;
 use crate::world::NO_ATTRIBUTE;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use std::fmt::{Debug, Error, Formatter};
 
@@ -35,21 +36,6 @@ pub enum RepairOutcome {
     Unpaid,
 }
 
-/// The classes whose repair pays its unit share (`FUN_1412143b0`: the ships 20, 21, 22, 2 and
-/// 53, the siege 13 and the classes 51, 54 and 55).
-pub(super) const COSTED: [ClassId; 9] = [
-    class::TRANSPORT,
-    class::FISHING_SHIP,
-    class::WARSHIP,
-    class::TRADE_BOAT,
-    class::CLASS_53,
-    class::SIEGE,
-    class::CLASS_51,
-    class::CLASS_54,
-    class::CLASS_55,
-];
-/// The trebuchets' classes (51, 54), whose building repair is the unit's.
-pub(super) const TREBUCHETS: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
 /// The owner's attributes of a unit's and a building's repair cost (270, 271: `player+0x100`
 /// at `+0x870` and `+0x878`).
 pub const UNIT_REPAIR_COST: usize = 270;
@@ -124,26 +110,30 @@ pub fn repair_building(
     amount: HitPoints,
     top: bool,
     payer: &mut Payer<'_>,
+    roles: &Roles,
 ) -> Result<RepairOutcome, GenieError> {
     let o = set.checked(idx)?;
-    if TREBUCHETS.contains(&o.class) {
-        return repair_unit(set, idx, amount, payer);
+    if roles
+        .of_class(o.class)
+        .contains(ClassRoles::REPAIRED_AS_UNIT)
+    {
+        return repair_unit(set, idx, amount, payer, roles);
     }
     if below_or_unordered(o.hp.get(), ONE) {
         return Ok(RepairOutcome::Unpaid);
     }
     if top && let Some(main) = o.main {
         let m = find(set, main.id())?;
-        return repair_building(set, m, amount, true, payer);
+        return repair_building(set, m, amount, true, payer, roles);
     }
     for annex in o.annexes.clone() {
         let a = find(set, annex)?;
         match set.checked(a)?.kind {
             MasterKind::COMBAT => {
-                let _ = repair_unit(set, a, amount, payer)?;
+                let _ = repair_unit(set, a, amount, payer, roles)?;
             }
             MasterKind::BUILDING => {
-                let _ = repair_building(set, a, amount, false, payer)?;
+                let _ = repair_building(set, a, amount, false, payer, roles)?;
             }
             _ => {}
         }
@@ -156,7 +146,7 @@ pub fn repair_building(
     }
     let share = CostCount::new((o.building_repair_cost.get() * amount) / most);
     if pay(payer.masters, o.master, share, &mut *payer.attributes)? {
-        return repair_unit(set, idx, amount, payer);
+        return repair_unit(set, idx, amount, payer, roles);
     }
     Ok(RepairOutcome::Unpaid)
 }
@@ -176,10 +166,11 @@ pub fn repair_unit(
     idx: usize,
     amount: HitPoints,
     payer: &mut Payer<'_>,
+    roles: &Roles,
 ) -> Result<RepairOutcome, GenieError> {
     let o = set.checked_mut(idx)?;
     let mut amount = amount;
-    if COSTED.contains(&o.class) {
+    if roles.of_class(o.class).contains(ClassRoles::REPAIR_COSTED) {
         let most = HitPoints::of_master(o.master_hp) + o.hp_powerup.max;
         let now = o.hp_powerup.room() + o.hp;
         if most < now + amount {

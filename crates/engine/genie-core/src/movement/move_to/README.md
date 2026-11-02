@@ -34,5 +34,5 @@ unit's sprite and the Sprite stream to it.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`objects`](../../objects/), [`players`](../../players/), [`testing`](../../testing/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

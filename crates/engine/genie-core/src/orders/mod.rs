@@ -26,7 +26,6 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::pathing::tile_path::Found;
@@ -75,22 +74,24 @@ use crate::gathering::DropSiteId;
 use crate::gathering::hunt::HUNT;
 use crate::groups::UnitGroup;
 use crate::map::RestrictionId;
-use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
+use crate::math::fmath::below_or_unordered;
 use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
 use crate::math::image::order::{
     DAMAGE_WHOLE as ORDER_DAMAGE_WHOLE, GUARD_RANGE as ORDER_GUARD_RANGE,
-    SPLIT_PATH_REACH as ORDER_SPLIT_PATH_REACH, SPLIT_SPEED_GAP as ORDER_SPLIT_SPEED_GAP,
     TABLE_DROP_FAR as ORDER_TABLE_DROP_FAR, WAYPOINT_APART as ORDER_WAYPOINT_APART,
     WAYPOINT_APART_LOW as ORDER_WAYPOINT_APART_LOW,
 };
 use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::objects::layers::{Building, Combat};
+use crate::objects::masters::ids;
 use crate::players::CivId;
 use crate::players::tracker::Tracker;
 use crate::unit_ai::task_finder::{DropSite, table_drop_buildings};
 use crate::unit_ai::{QueuedOrder, UnitAi, UnitSide, UnitStance};
-use crate::world::{Formations, OBJECT_MASTER};
+use crate::world::OBJECT_MASTER;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
 
@@ -155,13 +156,24 @@ fn packs(
     reach: Option<(bool, bool)>,
     targetless: bool,
     player_type: PlayerType,
+    roles: &Roles,
 ) -> bool {
     match reach {
         // Masters and classes the order handler and slot 0x7e8 treat apart (decoded; the game stores a
         // class as its value − 0xeac, a master id as its id + 0x609c).
-        None => targetless && class == class::CLASS_54 && player_type.is_computer(),
+        None => {
+            targetless
+                && roles
+                    .of_class(class)
+                    .contains(ClassRoles::UNPACKED_TREBUCHET)
+                && player_type.is_computer()
+        }
         Some((within, _)) => {
-            (class == class::CLASS_54 && !within) || (class == class::CLASS_51 && within)
+            (roles
+                .of_class(class)
+                .contains(ClassRoles::UNPACKED_TREBUCHET)
+                && !within)
+                || (roles.of_class(class).contains(ClassRoles::PACKED_TREBUCHET) && within)
         }
     }
 }
@@ -253,67 +265,8 @@ pub(crate) const HUNT_TARGET_GONE: GenieError =
 pub(crate) const NO_HUNT_TASK: GenieError =
     GenieError::unsupported("a hunt command without a task");
 
-/// The splitter groups units of a type above this (`0x45`).
-const MAX_UNGROUPED: MasterKind = MasterKind::of_data(69);
-/// Units whose speeds differ by more than this do not join where the player breaks formations by
-/// speed (`FUN_140fd76d0`, `DAT_143cc2918`).
-const SPLIT_SPEED_GAP: f32 = ORDER_SPLIT_SPEED_GAP;
-/// Units nearer than this are measured by a path (`FUN_140fd76d0`, `DAT_142e7f38c`) while
-/// `DAT_1439e60e3` (1 at run time) holds.
-const SPLIT_PATH_REACH: f32 = ORDER_SPLIT_PATH_REACH;
-const SPLIT_BY_PATH: bool = true;
-
-/// `FUN_140fd76d0`'s test whether `b` joins `a`: both above type 69, both of formation category
-/// 0 or neither, the same object flags' bit 1, speeds within [`SPLIT_SPEED_GAP`] where the player
-/// breaks formations by speed (`COMISS`, `JA`: a NaN gap is within), then (`member`: for the
-/// chosen unit's group, also `b` in a state of 2 or more) within the player's influence distance
-/// on the ground (between where each last moved to, slot 0x520: `FUN_14087e560` with the height
-/// zeroed; `COMISS`, `JA`: a NaN distance is within). Below [`SPLIT_PATH_REACH`] (`COMISS`, `JBE`:
-/// a NaN distance is not) the game measures a path instead, when the planner of `b`'s
-/// restriction exists: from `b`'s place to `a`'s (`FUN_140f7c530` with `a`'s radius on x as the
-/// radii and `b`'s as the range, no tile search), which joins `b` when it reaches the goal
-/// (result 1) no longer than the influence distance (a NaN length is not longer); else `b` joins
-/// the splitter's far units (`FUN_140a3e380`).
-fn splits_together(
-    a: &Splittable,
-    b: &Splittable,
-    f: Formations,
-    member: bool,
-    path: &mut SplitPath<'_>,
-    far: &mut BTreeSet<ObjectId>,
-) -> Result<bool, GenieError> {
-    if a.kind <= MAX_UNGROUPED || b.kind <= MAX_UNGROUPED {
-        return Ok(false);
-    }
-    if a.grouped != b.grouped || a.turns != b.turns {
-        return Ok(false);
-    }
-    if f.by_speed && SPLIT_SPEED_GAP < (a.speed - b.speed).get().abs() {
-        return Ok(false);
-    }
-    if member && b.state < ObjectState::Alive {
-        return Ok(false);
-    }
-    let (dx, dy) = (
-        a.moved_at.x() - b.moved_at.x(),
-        a.moved_at.y() - b.moved_at.y(),
-    );
-    let d = sqrt(dx * dx + 0.0 + dy * dy);
-    if SPLIT_BY_PATH
-        && d < SPLIT_PATH_REACH
-        && let Some((found, length)) = path(a, b)?
-    {
-        let joins = found == Found::Goal && at_most_or_unordered(length.get(), f.influence.get());
-        if !joins {
-            let _ = far.insert(b.id);
-        }
-        return Ok(joins);
-    }
-    Ok(at_most_or_unordered(d, f.influence.get()))
-}
-
 /// The trophy master `TRANSFORM_OBJECT` changes ("Trophy None") and the trophies it may take.
-const TROPHY: MasterId = MasterId::named(1649);
+const TROPHY: MasterId = ids::TROPHY_NONE;
 const TROPHIES: RangeInclusive<i16> = 1650..=1653;
 /// A patrol's waypoint counts when it is this far from the last one on x or y
 /// (`FUN_14161b970`, `DAT_14330eb8c`), or this far the other way (`DAT_14330ec20`).
@@ -561,6 +514,7 @@ pub(crate) fn set_stance(
     place: (Point, Option<ClassId>),
     side: &mut dyn UnitSide,
     rng: &mut Well512,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     ai.stance = state;
     ai.state_position = place.0;
@@ -568,7 +522,7 @@ pub(crate) fn set_stance(
         && (ai.current_order == Some(OrderKind::Attack)
             || ai.current_action == Some(AiAction::Attack))
     {
-        ai.stop_with(StopOrder::Keep, Some(place), side, rng)?;
+        ai.stop_with(StopOrder::Keep, Some(place), side, rng, roles)?;
         ai.remove_target();
     }
     Ok(())
@@ -631,26 +585,26 @@ fn damage_share(
     hp: HitPoints,
     hit_points: MasterHitPoints,
     class: ClassId,
+    roles: &Roles,
 ) -> Result<u8, GenieError> {
-    if matches!(
-        class,
-        class::CLASS_5
-            | class::CLASS_7
-            | class::CLASS_8
-            | class::PREY
-            | class::PREDATOR
-            | class::TREE
-            | class::CLASS_29
-            | class::CLASS_31
-            | class::CLASS_32
-            | class::CLASS_33
-            | class::CLASS_38
-            | class::CLASS_40
-            | class::CLASS_41
-            | class::CLASS_48
-            | class::LIVESTOCK
-            | class::CLASS_61
-            | class::CLASS_63
+    if roles.of_class(class).intersects(
+        ClassRoles::OCEAN_FISH
+            | ClassRoles::FORAGE_BUSH
+            | ClassRoles::STONE_MINE
+            | ClassRoles::PREY
+            | ClassRoles::PREDATOR
+            | ClassRoles::TREE
+            | ClassRoles::DOMESTIC_ANIMAL
+            | ClassRoles::DEEP_SEA_FISH
+            | ClassRoles::GOLD_MINE
+            | ClassRoles::SHORE_FISH
+            | ClassRoles::BIRD
+            | ClassRoles::SALVAGE_PILE
+            | ClassRoles::RESOURCE_PILE
+            | ClassRoles::ORE_MINE
+            | ClassRoles::LIVESTOCK
+            | ClassRoles::CONTROLLED_ANIMAL
+            | ClassRoles::GOLD_FISH,
     ) {
         return Err(GenieError::unsupported(
             "the damage share of a resource object (FUN_141193590)",

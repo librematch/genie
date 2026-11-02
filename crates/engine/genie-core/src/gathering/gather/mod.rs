@@ -63,6 +63,7 @@ use crate::math::image::gather::{
 };
 use crate::movement::move_to::WalkTo;
 use crate::objects::WorkerCount;
+use crate::objects::masters::ids;
 use crate::unit_ai::UnitStance;
 
 /// The Gather action's type, which word 9 adds.
@@ -78,17 +79,17 @@ const NO_GATHER_POINT: f32 = GATHER_NO_GATHER_POINT;
 /// The gatherers whose gather without a target waits for another farm (`set_state(0xf3)`,
 /// `0x140a8e1d0`'s cases 3, 5 and 6: masters 259, 214, 1891 and 1892).
 const FARM_WAITERS: [MasterId; 4] = [
-    MasterId::named(259),
-    MasterId::named(214),
-    MasterId::named(1891),
-    MasterId::named(1892),
+    ids::VILLAGER_FARMER_MALE,
+    ids::VILLAGER_FARMER_FEMALE,
+    ids::VILLAGER_HERDER_FEMALE,
+    ids::VILLAGER_HERDER_MALE,
 ];
 /// The gatherers that wait so on a target of the farm class (masters 13, 2356 and 2171, the raw
 /// `0x60a9`, `0x69d0`, `0x6917` of the same cases).
 const TRAP_WAITERS: [MasterId; 3] = [
-    MasterId::named(13),
-    MasterId::named(2356),
-    MasterId::named(2171),
+    ids::FISHING_SHIP,
+    ids::ANTIQUITY_FISHING_SHIP,
+    ids::OYSTERING_SHIP,
 ];
 
 /// Below this a target's or a load's remainder counts as nothing (`DAT_142eb5690`).
@@ -106,16 +107,12 @@ const WAIT_WORKERS: f32 = GATHER_WAIT_WORKERS;
 const WAIT_GAP: f32 = GATHER_WAIT_GAP;
 /// The masters a gatherer may gather from while they hold nothing (the combat object's slot
 /// 0x2b8, `FUN_141216390`: the farm, the rice farm and master 45).
-const REGATHERED: [MasterId; 3] = [
-    MasterId::named(50),
-    MasterId::named(1187),
-    MasterId::named(45),
-];
+const REGATHERED: [MasterId; 3] = [ids::FARM, ids::ID_1187, ids::ID_45];
 /// Masters the constructor and `set_state(6)` treat apart (357 and 1188, `FUN_140a8b140`).
-const SPECIAL_TARGETS: [MasterId; 2] = [MasterId::named(357), MasterId::named(1188)];
+const SPECIAL_TARGETS: [MasterId; 2] = [ids::ID_357, ids::ID_1188];
 /// The farms whose gather goes in stops under the game's farm setting, and whose time per stop
 /// each update renews: the farm and the rice farm (the constructor's and the update's masters).
-const STOP_FARMS: [MasterId; 2] = [MasterId::named(50), MasterId::named(1187)];
+const STOP_FARMS: [MasterId; 2] = [ids::FARM, ids::ID_1187];
 /// A farm's stops under the game's farm setting (the constructor's `mNumberStops`).
 const FARM_STOPS: FarmStops = FarmStops::of_data(4);
 /// A stop's point lies this far into its tile (`DAT_142e7f384`).

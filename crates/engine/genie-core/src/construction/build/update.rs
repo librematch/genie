@@ -13,7 +13,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
 use crate::objects::teardown::HeadCode;
@@ -24,6 +23,8 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -95,6 +96,8 @@ impl BuildAction {
         me: Me,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
+        let roles = &c.w.model.roles.clone();
+        let slots = c.w.model.slots;
         // state 3 without a target: the update does nothing (0x140ab0370's default case)
         if self.state == BuildState::Idle && self.target.is_none() {
             return Ok(HeadCode::Keeps);
@@ -112,15 +115,15 @@ impl BuildAction {
             if self.pasture_built(c, builder, reads)? {
                 return Ok(HeadCode::Deletes);
             }
-            self.foundation_done(c, builder, reads)?;
+            self.foundation_done(c, builder, reads, roles)?;
         }
         if self.state == BuildState::Finished {
-            return self.after_work(c, builder, actions, reads);
+            return self.after_work(c, builder, actions, reads, roles);
         }
         if matches!(self.state, BuildState::Drop { .. }) {
-            return self.update_drop(c, builder, me, reads);
+            return self.update_drop(c, builder, me, reads, roles, slots);
         }
-        self.update_state(c, builder, actions, me, reads)
+        self.update_state(c, builder, actions, me, reads, roles)
     }
 
     /// The target's id names no object of the world (`FUN_1415417a0`; the builder's player
@@ -202,6 +205,7 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let Some(site) = Self::site_unit(c, reads)? else {
             return Ok(());
@@ -216,7 +220,8 @@ impl BuildAction {
             return Ok(());
         }
         let master = site.master(c.w.master_tables(), c.player)?;
-        let special = master.id == TOWN_CENTRE_621 || master.class == class::GATE;
+        let special =
+            master.id == TOWN_CENTRE_621 || roles.of_class(master.class).contains(ClassRoles::GATE);
         let unbuilt =
             c.w.parts
                 .building_of(site.id)
@@ -227,7 +232,7 @@ impl BuildAction {
         {
             return self.finish(c, builder, reads);
         }
-        self.restart(c, builder)?;
+        self.restart(c, builder, roles)?;
         let target = self.target.take();
         release(c, builder, target, reads.by)?;
         Ok(())
@@ -241,6 +246,7 @@ impl BuildAction {
         actions: &mut Action,
         me: Me,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         match self.state {
             // case 0: the update returns 1, the action list removes it
@@ -248,14 +254,14 @@ impl BuildAction {
             // case 1: set_state(13); the update returns 0
             BuildState::Halted => self.end(c, builder, BuildState::Failed)?,
             BuildState::Move { .. } | BuildState::Clear { .. } => {
-                self.walking(c, builder, me, reads)?;
+                self.walking(c, builder, me, reads, roles)?;
             }
-            BuildState::Work => self.face_and_place(c, builder, actions, reads)?,
+            BuildState::Work => self.face_and_place(c, builder, actions, reads, roles)?,
             BuildState::Place => self.work(c, builder, actions, reads)?,
-            BuildState::WalkPoint { .. } => self.walking_to_point(c, builder, me, reads)?,
+            BuildState::WalkPoint { .. } => self.walking_to_point(c, builder, me, reads, roles)?,
             // 13 (`0xd`): the Build failed; its next update tells its unit AI and halts it
             BuildState::Failed => return self.failed(c, builder, reads),
-            BuildState::Wait => self.wait_out(c, builder, actions, reads)?,
+            BuildState::Wait => self.wait_out(c, builder, actions, reads, roles)?,
             // the default case (3 with a target, and the bytes without a state, which no step
             // sets): the update returns 0; 8 and 224 returned before the switch
             BuildState::Idle | BuildState::Drop { .. } | BuildState::Finished => {}
@@ -279,11 +285,12 @@ impl BuildAction {
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, builder, me, reads)?.get() {
-            1 | 2 => self.walk_ended(c, builder, reads),
-            3 => self.walk_failed(c, builder, reads),
-            4 | 5 => self.lose_foundation(c, builder, reads),
+        match self.step_walk(c, builder, me, reads, roles)?.get() {
+            1 | 2 => self.walk_ended(c, builder, reads, roles),
+            3 => self.walk_failed(c, builder, reads, roles),
+            4 | 5 => self.lose_foundation(c, builder, reads, roles),
             _ => Ok(()),
         }
     }
@@ -303,10 +310,11 @@ impl BuildAction {
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        match self.step_walk(c, builder, me, reads)?.get() {
+        match self.step_walk(c, builder, me, reads, roles)?.get() {
             1..=3 | 5 => self.idle(c, builder, reads),
-            4 => self.lose_foundation(c, builder, reads),
+            4 => self.lose_foundation(c, builder, reads, roles),
             _ => Ok(()),
         }
     }
@@ -346,13 +354,14 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.timer -= c.dt.seconds();
         if Seconds::ZERO < self.timer {
             return Ok(());
         }
         self.timer = Seconds::ZERO;
-        self.place(c, builder, actions, reads)
+        self.place(c, builder, actions, reads, roles)
     }
 
     /// What the `MoveTo`'s answer to the motion step giving up reads ([`GiveUp`]): a human
@@ -361,10 +370,14 @@ impl BuildAction {
         c: &Step<'_>,
         builder: &Unit,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<GiveUp, GenieError> {
         let player_type = c.w.players.player(c.player)?.kind;
         Ok(GiveUp {
-            waits: reads.class == Some(class::VILLAGER) && !player_type.is_computer(),
+            waits: roles
+                .of_some_class(reads.class)
+                .contains(ClassRoles::VILLAGER)
+                && !player_type.is_computer(),
             stance: c
                 .w
                 .parts
@@ -382,6 +395,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let at = builder.position();
         let to =
@@ -398,7 +412,7 @@ impl BuildAction {
                 "a builder that turns over time to face its foundation",
             ));
         }
-        self.place(c, builder, actions, reads)
+        self.place(c, builder, actions, reads, roles)
     }
 }
 

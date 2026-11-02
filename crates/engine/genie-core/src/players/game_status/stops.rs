@@ -22,7 +22,6 @@ use crate::movement::move_to::MOVE_TO;
 use crate::objects::ListIndex;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
-use crate::objects::masters::class;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::ownership::artifact::ARTIFACT_TYPE;
@@ -32,6 +31,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::StopOrder;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// A halt of a top action finds the unit without that action.
@@ -58,7 +58,13 @@ impl World {
                 )
             });
             // The classes a defeat stops besides explorers: villagers (4) and fishing boats (21).
-            if matches!(class, class::VILLAGER | class::FISHING_SHIP) || explorer {
+            if self
+                .model
+                .roles
+                .of_class(class)
+                .intersects(ClassRoles::VILLAGER | ClassRoles::FISHING_SHIP)
+                || explorer
+            {
                 if let Some(m) = self.parts.mover_mut(self.players.live(p, idx)?.id) {
                     m.ignore_units.clear();
                 }
@@ -67,7 +73,12 @@ impl World {
                     m.stand()?;
                 }
             }
-            if class == class::BUILDING {
+            if self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::BUILDING)
+            {
                 if !UNSTOPPED_BUILDINGS.contains(&id) {
                     self.object_stop(p, idx)?;
                 }
@@ -105,7 +116,13 @@ impl World {
         // The livestock's class, whose unit AI a stop leaves alone (`FUN_14108c050`: raw `-0xe72`).
         // The trade carts' class, which keep their actions while they carry goods (`FUN_14106a940`).
         // The trade action's type (`0x6f`), whose load keeps a stopped unit's AI going.
-        if keeps && class == class::TRADE_CART {
+        if keeps
+            && self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::TRADE_CART)
+        {
             return Err(GenieError::unsupported(
                 "a trade cart's goods after its stop (+0x7a0, FUN_141188160)",
             ));
@@ -125,12 +142,20 @@ impl World {
         let Some(ai) = self.parts.unit_ai.get(unit.id) else {
             return Ok(());
         };
-        if class == class::LIVESTOCK || ai.current_action == Some(AiAction::HeroPower) || trading {
+        if self
+            .model
+            .roles
+            .of_class(class)
+            .contains(ClassRoles::LIVESTOCK)
+            || ai.current_action == Some(AiAction::HeroPower)
+            || trading
+        {
             return Ok(());
         }
         // slot 0xb0 with 0, its stopAction a call on the unit at once
+        let roles = self.model.roles.clone();
         self.run_ai_calls((p, idx), |ai, side, rng| {
-            ai.stop_with(StopOrder::End, Some(place), side, rng)?;
+            ai.stop_with(StopOrder::End, Some(place), side, rng, &roles)?;
             ai.forget_targets();
             Ok(())
         })

@@ -30,7 +30,6 @@ use crate::objects::masters::HillMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
@@ -42,6 +41,8 @@ use crate::players::attribute;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -271,20 +272,20 @@ fn sheep(state: ObjectState) -> Near {
 
 #[test]
 fn livestock_stays_alive_tree_only_once_dead() {
-    assert!(sheep(ObjectState::Alive).stays());
-    assert!(!sheep(ObjectState::Unfinished).stays());
+    assert!(sheep(ObjectState::Alive).stays(&roles()));
+    assert!(!sheep(ObjectState::Unfinished).stays(&roles()));
     let tree = Near {
         class: class::TREE,
         kind: MasterKind::STATIC,
         ..sheep(ObjectState::Alive)
     };
-    assert!(!tree.stays());
+    assert!(!tree.stays(&roles()));
     assert!(
         Near {
             state: ObjectState::Dying,
             ..tree
         }
-        .stays()
+        .stays(&roles())
     );
 }
 
@@ -360,9 +361,14 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         own: &[],
     };
     let test = |o: Near, masks: [u64; 2]| {
-        build_placement(&site, &Fogged(vec![o], masks), Point::new(21.0, 21.0))
-            .unwrap()
-            .code()
+        build_placement(
+            &site,
+            &Fogged(vec![o], masks),
+            Point::new(21.0, 21.0),
+            &roles(),
+        )
+        .unwrap()
+        .code()
     };
     // the house's mask meets what player 1 sees and explored: it blocks
     assert_eq!(test(house, [1 << 1, 1 << 33]), 6);
@@ -435,7 +441,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         placement: PlacementTerrains::NONE,
     };
     let map = Flat(vec![sheep(ObjectState::Alive)]);
-    let at = |x, y| placement(&villager, &map, Point::new(x, y), false).unwrap();
+    let at = |x, y| placement(&villager, &map, Point::new(x, y), false, &roles()).unwrap();
     assert_eq!(at(106.5, 47.5), Tested::Blocked { stays: true });
     assert_eq!(at(106.5, 47.0), Tested::Blocked { stays: true });
     assert_eq!(at(106.5, 46.5), Tested::Free);
@@ -462,7 +468,14 @@ fn the_first_object_of_tile_list_reports_the_block() {
         ..sheep(ObjectState::Alive)
     };
     let at = |list: Vec<Near>| {
-        placement(&villager, &Flat(list), Point::new(106.5, 47.5), false).unwrap()
+        placement(
+            &villager,
+            &Flat(list),
+            Point::new(106.5, 47.5),
+            false,
+            &roles(),
+        )
+        .unwrap()
     };
     assert_eq!(
         at(vec![sheep(ObjectState::Alive), soldier]),
@@ -1236,7 +1249,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
         fog_visibility,
         ..sheep(ObjectState::Alive)
     };
-    let sees = |map: &dyn PlaceMap, o: Near, sight| build_sees(&site, map, &o, sight);
+    let sees = |map: &dyn PlaceMap, o: Near, sight| build_sees(&site, map, &o, sight, &roles());
     assert_eq!(
         sees(
             &flat,
@@ -1314,7 +1327,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
         state: ObjectState::Alive,
         ..sheep(ObjectState::Alive)
     };
-    let ignores = |site: &BuildSite<'_>, o: Near| build_ignores(site, &flat, &o);
+    let ignores = |site: &BuildSite<'_>, o: Near| build_ignores(site, &flat, &o, &roles());
     assert!(!ignores(&site, house));
     assert!(ignores(
         &site,
@@ -1393,7 +1406,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
         state: ObjectState::Alive,
         ..sheep(ObjectState::Unfinished)
     };
-    let passes = |o: Near| build_passes(&site, &flat, &o);
+    let passes = |o: Near| build_passes(&site, &flat, &o, &roles());
     assert!(passes(walker));
     assert!(passes(Near {
         player: PlayerId::new(0),
@@ -1459,8 +1472,9 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         state: ObjectState::Alive,
         ..sheep(ObjectState::Alive)
     };
-    let blocks =
-        |site: &BuildSite<'_>, o: Near| blocks_build(site, &flat, &o, Point::new(21.0, 21.0));
+    let blocks = |site: &BuildSite<'_>, o: Near| {
+        blocks_build(site, &flat, &o, Point::new(21.0, 21.0), &roles())
+    };
     assert!(blocks(&site, house));
     for passed in [
         Near {
@@ -1539,7 +1553,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     let build_values = Restriction::new(vec![1.0]);
     let build = house_site(&build_values, false);
     let test = |site: &BuildSite<'_>, o: Near| {
-        build_placement(site, &Flat(vec![o]), Point::new(21.0, 21.0))
+        build_placement(site, &Flat(vec![o]), Point::new(21.0, 21.0), &roles())
             .unwrap()
             .code()
     };

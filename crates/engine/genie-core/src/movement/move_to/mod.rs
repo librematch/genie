@@ -48,6 +48,7 @@ pub use crate::movement::move_to::sub_action::{GiveUp, NO_TARGET_GAP};
 use crate::objects::Graphics;
 use crate::objects::masters::Master;
 use crate::world::WALKER_UNMOVING;
+use crate::world::layer::Roles;
 
 /// The `MoveTo` action's type, which word 9 adds when it is a unit's top action.
 pub const MOVE_TO: ActionKind = ActionKind::named(1);
@@ -355,9 +356,9 @@ impl<'a> SpriteReads<'a> {
     /// The defaults of a unit of `master` with the terrain look `look` ([`MoveDefaults::of`]),
     /// and the sprites' table.
     #[must_use]
-    pub fn of(master: &Master, look: Option<&Look>, graphics: &'a Graphics) -> Self {
+    pub fn of(master: &Master, look: Option<&Look>, graphics: &'a Graphics, roles: &Roles) -> Self {
         Self {
-            defaults: MoveDefaults::of(master, look),
+            defaults: MoveDefaults::of(master, look, roles),
             graphics,
         }
     }
@@ -567,10 +568,10 @@ mod tests {
     use crate::objects::Voice;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionKind;
-    use crate::objects::masters::class;
     use crate::players::PlayerId;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::class;
     #[cfg(test)]
     use crate::unit_ai::{AiAction, Inbox, NotifyKind, UnitAi};
 

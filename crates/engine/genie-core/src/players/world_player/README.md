@@ -28,7 +28,7 @@ its mills' food. After the objects, the player's scout map takes the tiles that 
 | [`tech_tree.rs`](tech_tree.rs) | The game's tech tree table (`TechTree`, `FUN_140c7e080`) and its lookups. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`update.rs`](update.rs) | The world player's update: the loop's seconds, the explored share, the defeat check and what keeps a player in the game. |
-| [`tech_tree/`](tech_tree/) |  |
+| [`tech_tree/`](tech_tree/) | The tech tree's data. |
 <!-- /files -->
 
 ## How it connects

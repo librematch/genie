@@ -11,6 +11,7 @@ use crate::objects::layers::{Motion, MotionMut};
 use crate::objects::masters::{MasterTables, Masters};
 use crate::world::Player;
 use crate::world::index::{ObjectIndex, ObjectsRef};
+use crate::world::layer::Roles;
 use crate::world::parts::{PartTable, Parts};
 use std::mem::replace;
 use std::sync::Arc;
@@ -177,11 +178,16 @@ impl Parts {
 
     /// Object `id`'s motion layer lent out of the table to change ([`MotionMut`], none for a
     /// static object) and the world's objects by id beside it (`players`, `index` and
-    /// `masters`, the other parts' tables), which read the others' motion.
+    /// `masters`, the other parts' tables, the build's `roles`), which read the others' motion.
     pub(crate) fn lend_motion<'a>(
         &'a mut self,
         id: ObjectId,
-        (players, index, masters): (&'a [Player], &'a ObjectIndex, &'a [Arc<Masters>]),
+        (players, index, masters, roles): (
+            &'a [Player],
+            &'a ObjectIndex,
+            &'a [Arc<Masters>],
+            &'a Roles,
+        ),
     ) -> (MotionMut<'a>, ObjectsRef<'a>) {
         let (motion, motions) = self.motion.lend(id);
         (
@@ -197,6 +203,7 @@ impl Parts {
                     &self.unread,
                     motions,
                 ),
+                roles,
             ),
         )
     }
@@ -207,7 +214,7 @@ impl Parts {
     pub(crate) fn lend_mover<'a>(
         &'a mut self,
         id: ObjectId,
-        tables: (&'a [Player], &'a ObjectIndex, &'a [Arc<Masters>]),
+        tables: (&'a [Player], &'a ObjectIndex, &'a [Arc<Masters>], &'a Roles),
     ) -> (Option<&'a mut Mover>, ObjectsRef<'a>) {
         let (motion, by_id) = self.lend_motion(id, tables);
         (motion.into_mover(), by_id)

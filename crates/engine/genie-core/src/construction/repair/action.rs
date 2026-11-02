@@ -9,7 +9,7 @@ use crate::construction::repair::RepairState;
 use crate::construction::repair::repair_target;
 use crate::construction::repair::{
     EXTRA_REPAIRER, LEAST_HP, MOVING_REACH, ONE, REACH, RepairAction, RepairReads, RepairTask,
-    Repairee, SHIP_REPAIR, SHIPS,
+    Repairee,
 };
 use crate::construction::{BuilderCount, RepairTargetId};
 use crate::map::Distance;
@@ -38,9 +38,12 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::step::Step;
 use std::mem::replace;
+
+mod enter;
 
 /// The work of one update (`0x140adaa20` case 6): the work `rate` times the task's
 /// `work_value` times the world's `dt`; with more than one repairer (`repairers`, `COMISS` with
@@ -184,12 +187,13 @@ impl RepairAction {
         repairer: &mut Unit,
         me: Me,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         if self.target.is_some() && reads.target.is_none() {
             // the target is gone: FUN_140ad9050 finds no object to leave the repairers of
             self.counted = false;
             self.target = None;
-            self.set_state(c, repairer, RepairState::Done, reads)?;
+            self.set_state(c, repairer, RepairState::Done, reads, roles)?;
             return Ok(HeadCode::Keeps);
         }
         if let Some(t) = reads.target
@@ -198,19 +202,21 @@ impl RepairAction {
                 || (!t.allied && t.owner != PlayerId::GAIA))
         {
             self.drop_target(c, repairer, reads)?;
-            self.set_state(c, repairer, RepairState::Done, reads)?;
+            self.set_state(c, repairer, RepairState::Done, reads, roles)?;
             return Ok(HeadCode::Keeps);
         }
         match self.state {
             RepairState::Done => return Ok(HeadCode::Deletes),
-            RepairState::Move { .. } => self.walking(c, repairer, me, reads)?,
-            RepairState::Face => self.facing(c, repairer, reads)?,
-            RepairState::Work => self.work(c, repairer, reads)?,
-            RepairState::Wait => self.waiting(c, repairer, reads)?,
-            RepairState::WalkPoint { .. } => self.walking_to_point(c, repairer, me, reads)?,
+            RepairState::Move { .. } => self.walking(c, repairer, me, reads, roles)?,
+            RepairState::Face => self.facing(c, repairer, reads, roles)?,
+            RepairState::Work => self.work(c, repairer, reads, roles)?,
+            RepairState::Wait => self.waiting(c, repairer, reads, roles)?,
+            RepairState::WalkPoint { .. } => {
+                self.walking_to_point(c, repairer, me, reads, roles)?;
+            }
             RepairState::Failed => {
                 notify(c, repairer, NotifyKind::ACTION_FAILED)?;
-                self.set_state(c, repairer, RepairState::Halted, reads)?;
+                self.set_state(c, repairer, RepairState::Halted, reads, roles)?;
                 return Ok(HeadCode::Deletes);
             }
             // states 2 and 3 (and the bytes without a state, which no step sets): the update
@@ -229,6 +235,7 @@ impl RepairAction {
         c: &mut Step<'_>,
         repairer: &mut Unit,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let t = reads.target.ok_or(GenieError::unreachable(
             "a Repair facing its target without one",
@@ -241,7 +248,7 @@ impl RepairAction {
                     "a repairer without movement state (an action object always has one)",
                 ))?;
         if face_target(mover, at, t.position, c.w.world_time)? {
-            self.set_state(c, repairer, RepairState::Work, reads)?;
+            self.set_state(c, repairer, RepairState::Work, reads, roles)?;
         }
         Ok(())
     }
@@ -254,13 +261,14 @@ impl RepairAction {
         c: &mut Step<'_>,
         repairer: &mut Unit,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.timer -= c.dt.seconds();
         if below_or_unordered(0.0, self.timer.get()) {
             return Ok(());
         }
         if Self::reaches(repairer, reads) {
-            self.set_state(c, repairer, RepairState::Face, reads)?;
+            self.set_state(c, repairer, RepairState::Face, reads, roles)?;
         } else {
             self.timer = Seconds::new(ONE);
         }
@@ -277,14 +285,21 @@ impl RepairAction {
         repairer: &mut Unit,
         me: Me,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         match self.step_walk(c, repairer, me, reads)?.get() {
             0 => Ok(()),
             4 => {
                 self.drop_target(c, repairer, reads)?;
-                self.set_state(c, repairer, RepairState::WalkPoint { move_to: None }, reads)
+                self.set_state(
+                    c,
+                    repairer,
+                    RepairState::WalkPoint { move_to: None },
+                    reads,
+                    roles,
+                )
             }
-            _ => self.set_state(c, repairer, RepairState::Done, reads),
+            _ => self.set_state(c, repairer, RepairState::Done, reads, roles),
         }
     }
 
@@ -300,24 +315,25 @@ impl RepairAction {
         repairer: &mut Unit,
         me: Me,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         match self.step_walk(c, repairer, me, reads)?.get() {
             0 => return Ok(()),
             4 | 5 => {
                 self.drop_target(c, repairer, reads)?;
-                return self.set_state(c, repairer, RepairState::Done, reads);
+                return self.set_state(c, repairer, RepairState::Done, reads, roles);
             }
             _ => {}
         }
         if Self::reaches(repairer, reads) {
-            return self.set_state(c, repairer, RepairState::Face, reads);
+            return self.set_state(c, repairer, RepairState::Face, reads, roles);
         }
         let next = if self.can_path(c, repairer, reads)? {
             RepairState::Wait
         } else {
             RepairState::Failed
         };
-        self.set_state(c, repairer, next, reads)
+        self.set_state(c, repairer, next, reads, roles)
     }
 
     /// Slot 0x3e0 (`canQuickPath`) of the repairer to its target within [`REACH`]: the old
@@ -329,7 +345,13 @@ impl RepairAction {
         repairer: &Unit,
         reads: &RepairReads,
     ) -> Result<bool, GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+        );
         let spatial = &mut c.w.spatial;
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let r = reads.restriction.ok_or(NO_RESTRICTION)?;
@@ -404,6 +426,7 @@ impl RepairAction {
         c: &mut Step<'_>,
         repairer: &mut Unit,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let t = reads.target.ok_or(GenieError::unreachable(
             "a Repair working without its target",
@@ -412,13 +435,19 @@ impl RepairAction {
         if moved {
             let gap = Self::gap(repairer, reads, t);
             if REACH < gap.get() {
-                return self.set_state(c, repairer, RepairState::Move { move_to: None }, reads);
+                return self.set_state(
+                    c,
+                    repairer,
+                    RepairState::Move { move_to: None },
+                    reads,
+                    roles,
+                );
             }
             self.point = t.position;
         }
         let repairers = reads.counted_in.map(|(_, n)| n);
         let amount = work_amount(reads.rate, self.task.work_value, c.dt.seconds(), repairers);
-        let (answer, kind) = repair_target(c, self.target, amount)?;
+        let (answer, kind) = repair_target(c, self.target, amount, roles)?;
         match answer {
             RepairOutcome::Full => {
                 if MasterKind::COMBAT <= kind
@@ -426,11 +455,11 @@ impl RepairAction {
                 {
                     c.w.parts.combat_mut(id)?.armor_removed = ArmorPair::ZERO;
                 }
-                self.set_state(c, repairer, RepairState::Done, reads)
+                self.set_state(c, repairer, RepairState::Done, reads, roles)
             }
             RepairOutcome::Unpaid => {
                 notify(c, repairer, NotifyKind::ACTION_INVALIDATED)?;
-                self.set_state(c, repairer, RepairState::Done, reads)
+                self.set_state(c, repairer, RepairState::Done, reads, roles)
             }
             RepairOutcome::Healed => Ok(()),
         }
@@ -488,6 +517,7 @@ impl RepairAction {
         repairer: &mut Unit,
         state: RepairState,
         reads: &RepairReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         if self.counted {
             Self::count(c, reads, -1)?;
@@ -499,113 +529,7 @@ impl RepairAction {
             m.stop()?;
         }
         self.state = state.bare();
-        self.enter(c, repairer, reads)
-    }
-
-    /// [`RepairAction::set_state`]'s part by the new state (`0x140ad9c60`'s switch).
-    fn enter(
-        &mut self,
-        c: &mut Step<'_>,
-        repairer: &mut Unit,
-        reads: &RepairReads,
-    ) -> Result<(), GenieError> {
-        match self.state {
-            RepairState::Done => self.enter_done(c, repairer, reads)?,
-            RepairState::Halted => standing(c, repairer)?,
-            RepairState::Idle => {
-                notify(c, repairer, NotifyKind::REQUIRES_SEARCH)?;
-                standing(c, repairer)?;
-            }
-            RepairState::Move { .. } => self.enter_walk(c, repairer, reads)?,
-            RepairState::Face => {
-                if let Some(t) = reads.target {
-                    self.point = t.position;
-                }
-                show(c, repairer, self.task.moving, reads.standing)?;
-            }
-            RepairState::Work => {
-                show(c, repairer, self.task.proceeding, reads.standing)?;
-                if reads.counted_in.is_some() {
-                    Self::count(c, reads, 1)?;
-                    self.counted = true;
-                }
-            }
-            RepairState::Wait => {
-                standing(c, repairer)?;
-                self.timer = Seconds::new(ONE);
-                if reads.target.is_some_and(|t| SHIPS.contains(&t.class)) {
-                    return Err(SHIP_REPAIR);
-                }
-            }
-            RepairState::WalkPoint { .. } => self.enter_walk_point(c, repairer)?,
-            // 13 has no case in set_state
-            RepairState::Failed => {}
-        }
-        Ok(())
-    }
-
-    /// `set_state(1)`'s case: the target goes, a loud repair tells its unit AI it completed,
-    /// and the repairer shows its standing sprite.
-    fn enter_done(
-        &mut self,
-        c: &mut Step<'_>,
-        repairer: &mut Unit,
-        reads: &RepairReads,
-    ) -> Result<(), GenieError> {
-        self.drop_target(c, repairer, reads)?;
-        if self.voice.is_loud() {
-            notify(c, repairer, NotifyKind::ACTION_COMPLETED)?;
-        }
-        standing(c, repairer)
-    }
-
-    /// `set_state(11)`'s case: the `MoveTo` to the action's point starts.
-    fn enter_walk_point(&mut self, c: &Step<'_>, repairer: &Unit) -> Result<(), GenieError> {
-        let move_reads = repairer.move_to_reads(
-            c.w.parts.motion.mover(repairer.id),
-            c.w.master_tables(),
-            c.player,
-            (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
-            ),
-        )?;
-        self.state = RepairState::WalkPoint {
-            move_to: self.to_point(self.point, &move_reads)?,
-        };
-        Ok(())
-    }
-
-    /// `set_state(4)`'s case: the target's place is the point, and the `MoveTo` to it starts
-    /// ([`RepairAction::walk`], none for a target the world does not hold).
-    ///
-    /// # Errors
-    ///
-    /// A repairer without its master, a target whose master its table lacks, a sprite the table
-    /// lacks.
-    fn enter_walk(
-        &mut self,
-        c: &Step<'_>,
-        repairer: &Unit,
-        reads: &RepairReads,
-    ) -> Result<(), GenieError> {
-        if let Some(t) = reads.target {
-            self.point = t.position;
-        }
-        let move_reads = repairer.move_to_reads(
-            c.w.parts.motion.mover(repairer.id),
-            c.w.master_tables(),
-            c.player,
-            (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(repairer.id).abilities.look.as_ref(),
-            ),
-        )?;
-        let to = move_reads.walk_to(c.w, self.target.map(RepairTargetId::id))?;
-        self.state = RepairState::Move {
-            move_to: self.walk(&move_reads, to)?,
-        };
-        Ok(())
+        self.enter(c, repairer, reads, roles)
     }
 
     /// `set_state(4)` from the work command's new target `to` (slot 0x48, the caller's

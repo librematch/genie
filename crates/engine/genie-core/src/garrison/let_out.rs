@@ -6,9 +6,7 @@ use crate::combat::Firepower;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::garrison::RaiderCountdown;
-use crate::garrison::{
-    INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, WHOLE_SHARE_CLASS, attack_rate, share,
-};
+use crate::garrison::{INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, attack_rate, share};
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Obstruction;
@@ -20,7 +18,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::orders::Work;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
@@ -29,6 +26,7 @@ use crate::vision::SightCentre;
 use crate::vision::SightShape;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -102,10 +100,25 @@ impl World {
         let made = unit.master(self.master_tables(), up)?.clone();
         // The class of siege weapons, whose own place an Enter's point keeps (`FUN_140a85f30`, the
         // short `0xd`).
-        if bm.class == class::SIEGE {
+        if self
+            .model
+            .roles
+            .of_class(bm.class)
+            .contains(ClassRoles::SIEGE)
+        {
             return Err(SIEGE_UNLOAD);
         }
-        if made.class == WHOLE_SHARE_CLASS || made.class == class::LIVESTOCK {
+        if self
+            .model
+            .roles
+            .of_class(made.class)
+            .contains(ClassRoles::WHOLE_GARRISON_SHARE)
+            || self
+                .model
+                .roles
+                .of_class(made.class)
+                .contains(ClassRoles::LIVESTOCK)
+        {
             return Err(GenieError::unsupported(
                 "a class 42 or livestock unit leaving a building (its player's counts)",
             ));
@@ -245,12 +258,18 @@ impl World {
         };
         let b = self.players.live(player, container)?;
         let unit = self.players.live(up, ui)?;
-        let rate = attack_rate(bm, own, self.parts.combat_of(b.id).reload_powerup);
+        let rate = attack_rate(
+            bm,
+            own,
+            self.parts.combat_of(b.id).reload_powerup,
+            &self.model.roles,
+        );
         Ok(Some(share(
             made,
             theirs,
             self.parts.combat_of(unit.id).reload_powerup,
             rate,
+            &self.model.roles,
         )?))
     }
 
@@ -304,11 +323,12 @@ impl World {
             let unit = self.players.live_mut(up, ui)?;
             let place = (unit.position().ground(), Some(class));
             if self.parts.unit_ai.contains(unit.id) {
+                let roles = self.model.roles.clone();
                 self.run_ai_calls((up, ui), |ai, side, rng| {
-                    ai.stop_with(StopOrder::Keep, Some(place), side, rng)?;
+                    ai.stop_with(StopOrder::Keep, Some(place), side, rng, &roles)?;
                     ai.remove_target();
                     let stance = ai.stance;
-                    set_stance(ai, stance, place, side, rng)
+                    set_stance(ai, stance, place, side, rng, &roles)
                 })?;
             }
             return Ok(true);

@@ -26,7 +26,6 @@ use crate::objects::Voice;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::Graphic;
 use crate::players::AmountRate;
@@ -35,6 +34,7 @@ use crate::players::attribute;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::object_id;
+use crate::testing::class;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
 
@@ -48,6 +48,7 @@ use crate::objects::layers::{Animated, Motion, Static};
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::test_ids::task_id;
+use crate::testing::roles;
 use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::World;
 
@@ -226,13 +227,13 @@ fn stopped_decay_goes_back_to_the_world_at_once() {
     hunt.task.kind4 = Some(DECAY_TASK);
     let mut rig = Rig::on_the_path(decaying.clone());
     rig.run(100, |c, u, actions, f, _| {
-        hunt.decay_check(c, u, actions, true, f)
+        hunt.decay_check(c, u, actions, true, f, &roles())
     })
     .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(-0.25));
     let mut rig = Rig::on_the_path(decaying);
     rig.run(100, |c, u, actions, f, _| {
-        hunt.decay_check(c, u, actions, false, f)
+        hunt.decay_check(c, u, actions, false, f, &roles())
     })
     .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(0.25));
@@ -366,6 +367,7 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
         &engagement(),
         ARMS,
         &mut mover,
+        &roles(),
     )
     .unwrap();
     assert_eq!(hunt.state.bare(), HuntState::Attack { attack: None });
@@ -410,6 +412,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         &engagement(),
         ARMS,
         &mut mover,
+        &roles(),
     )
     .unwrap();
     let retarget = |hunt: &mut HuntAction, q: &Quarry, e: &Engagement, m: &mut Mover| {
@@ -423,6 +426,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             e,
             ARMS,
             m,
+            &roles(),
         )
         .unwrap()
     };
@@ -480,6 +484,7 @@ fn hunt_new_target_clears_its_lead() {
         &engagement(),
         ARMS,
         &mut mover,
+        &roles(),
     )
     .unwrap();
     let led = Lead {
@@ -505,6 +510,7 @@ fn hunt_new_target_clears_its_lead() {
             &engagement(),
             ARMS,
             &mut mover,
+            &roles(),
         )
         .unwrap();
     assert_eq!(hunt.lead, led);
@@ -519,6 +525,7 @@ fn hunt_new_target_clears_its_lead() {
             &engagement(),
             ARMS,
             &mut mover,
+            &roles(),
         )
         .unwrap();
     assert_eq!(
@@ -544,6 +551,7 @@ fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
             &engagement(),
             ARMS,
             &mut walker(),
+            &roles(),
         )
         .unwrap();
         held
@@ -596,7 +604,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     unit.life.attribute_type = Some(attribute::WOOD);
     let mut tree = victim(100.0);
     assert_eq!(
-        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r),
+        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
         Ok(false)
     );
     let w = (1.0f32 * 0.39) * 0.02;
@@ -608,7 +616,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     unit.life.amount = Amount::new(9.95 - w);
     let mut tree = victim(50.0);
     assert_eq!(
-        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r),
+        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
         Ok(true)
     );
     assert_eq!(unit.life.amount, Amount::new(10.0));
@@ -617,7 +625,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     unit.life.amount = Amount::ZERO;
     let mut tree = victim(0.05);
     assert_eq!(
-        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r),
+        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
         Ok(true)
     );
     assert_eq!(
@@ -672,6 +680,7 @@ fn hunt_on_live_ally_fails() {
         &engagement(),
         ARMS,
         &mut walker(),
+        &roles(),
     )
     .expect("a hunt");
     assert_eq!(
@@ -713,6 +722,7 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
             &engagement(),
             ARMS,
             &mut walker(),
+            &roles(),
         )
         .unwrap();
         // a quiet MoveTo to the target that asks again when it moves (`+0x61` 1)
@@ -767,7 +777,7 @@ fn hunt_whose_target_went_walks_to_its_point() {
     };
     let lost = |h: &HuntAction, r: &HuntReads, rig: &mut Rig| {
         let mut h = *h;
-        let got = rig.run(100, |c, u, _, _, _| h.lost_on_the_way(c, u, r));
+        let got = rig.run(100, |c, u, _, _, _| h.lost_on_the_way(c, u, r, &roles()));
         (got, h)
     };
     assert!(lost(&hunt, &r, &mut rig).0.is_err());
@@ -837,7 +847,7 @@ fn hunt_faces_its_own_pasture_dead_livestock() {
             ..hunt_reads()
         };
         let got = rig.run(50, |c, u, actions, f, _| {
-            hunt.set_face(c, u, actions, f, &r)
+            hunt.set_face(c, u, actions, f, &r, &roles())
         });
         (got, hunt, rig.sprite())
     };
@@ -1146,6 +1156,7 @@ fn hunt_walks_to_its_target_place_within_its_range() {
             victim,
             PlayerId::new(1),
             &walks(Held::default()),
+            &roles(),
         )
     };
     let walk = |h: &HuntAction| {
@@ -1237,7 +1248,7 @@ fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
             herd,
             ..hunt_reads()
         };
-        rig.run(100, |c, u, _, f, _| h.update_lead(c, u, f, &r))
+        rig.run(100, |c, u, _, f, _| h.update_lead(c, u, f, &r, &roles()))
     };
     let leading = |timer| HuntAction {
         state: HuntState::Lead,
@@ -1627,7 +1638,9 @@ fn hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
             herd,
             ..hunt_reads()
         };
-        rig.run(100, |c, u, actions, f, _| h.set_face(c, u, actions, f, &r))
+        rig.run(100, |c, u, actions, f, _| {
+            h.set_face(c, u, actions, f, &r, &roles())
+        })
     };
     let walking = |target, moved| HuntAction {
         state: HuntState::Walk { move_to: None },
@@ -1987,7 +2000,9 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
             },
             ..hunting(-1)
         }));
-        rig.run(100, |c, u, actions, _, _| Ok(u.tree_lost(actions, c)))
+        rig.run(100, |c, u, actions, _, _| {
+            Ok(u.tree_lost(actions, c, &roles()))
+        })
     };
     assert_eq!(
         tree_lost(ObjectState::Removed, MoveTo::Moving, true),

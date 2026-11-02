@@ -81,6 +81,7 @@ use crate::movement::MoveAlgorithm;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
+use crate::movement::ai_moves::MoveSprites;
 use crate::movement::ai_moves::PointMove;
 use crate::movement::explore::{ExploreAction, ExploreState, InfluenceMap, bare_walk};
 use crate::movement::fly::FLY;
@@ -143,7 +144,6 @@ use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskIndex;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::VolleySpread;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{
     BuildingMaster, DamageShare, Task, TrainLocation, WorkValue, player_master,
@@ -209,6 +209,10 @@ use crate::test_ids::task_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::unit_list;
 use crate::test_ids::{adds as test_ids_adds, amounts, attributes};
+use crate::testing::class;
+use crate::testing::roles;
+use crate::testing::slots;
+use crate::testing::static_roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Attackers;
@@ -222,6 +226,7 @@ use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::DropSite;
 use crate::unit_ai::task_finder::DropTarget;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{
     SideWorld, TaskWorld, task_search, task_target_with, wait_progress,
 };
@@ -1801,8 +1806,8 @@ fn combat_object_counts_in_its_player_class_attributes() {
             task_by_group,
             ..Master::default()
         };
-        count_class(&mut a, &m, 1.0);
-        count_class(&mut a, &m, 1.0);
+        count_class(&mut a, &m, 1.0, &roles());
+        count_class(&mut a, &m, 1.0, &roles());
         [a[37], a[38], a[40], a[235]].map(Amount::get)
     };
     assert_eq!(
@@ -1849,6 +1854,7 @@ fn combat_object_counts_in_its_player_class_attributes() {
             ..Master::default()
         },
         -1.0,
+        &roles(),
     );
     assert_eq!(a[40], Amount::new(4.0));
 }
@@ -2376,9 +2382,21 @@ fn slot_0x820_search_takes_the_own_task_else_the_first_master_of_the_swap_group(
             attribute_95: Amount::ZERO,
             civ: CivId::new(0),
         };
-        task_search(masters, &actor, &site, &site, None, None, &world)
-            .unwrap()
-            .map(|(task, switch)| (task.action_kind, switch.map(|m| m.id.get())))
+        task_search(
+            masters,
+            &actor,
+            &TaskOn {
+                target: Some(&site),
+                general: Some(&site),
+                terrain: None,
+            },
+            None,
+            &world,
+            slots(),
+            &roles(),
+        )
+        .unwrap()
+        .map(|(task, switch)| (task.action_kind, switch.map(|m| m.id.get())))
     };
     // a villager of master 83 builds as the builder 118, the first of its group with a task
     assert_eq!(
@@ -5287,9 +5305,9 @@ fn hunt_part_of(t: &mut World, dt: u32) -> Result<(), GenieError> {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let mut own = unit.own_victim(actions, c)?;
-            let tree_lost = unit.tree_lost(actions, c);
-            let code = unit.hunt_part(actions, c, me, &mut own, tree_lost)?;
+            let mut own = unit.own_victim(actions, c, &roles())?;
+            let tree_lost = unit.tree_lost(actions, c, &roles());
+            let code = unit.hunt_part(actions, c, me, &mut own, tree_lost, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -5737,9 +5755,9 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let mut own = unit.own_victim(actions, c)?;
-            let tree_lost = unit.tree_lost(actions, c);
-            let code = unit.hunt_part(actions, c, me, &mut own, tree_lost)?;
+            let mut own = unit.own_victim(actions, c, &roles())?;
+            let tree_lost = unit.tree_lost(actions, c, &roles());
+            let code = unit.hunt_part(actions, c, me, &mut own, tree_lost, &roles())?;
             unit.end_head_update(actions, c, code)?;
             Ok(OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
@@ -5777,8 +5795,8 @@ fn gathering_hunt_whose_target_left_searches_without_reading_one() {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let mut own = unit.own_victim(actions, c)?;
-            let code = unit.hunt_part(actions, c, me, &mut own, false)?;
+            let mut own = unit.own_victim(actions, c, &roles())?;
+            let code = unit.hunt_part(actions, c, me, &mut own, false, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     );
@@ -5959,9 +5977,9 @@ fn hunter_sheep_walks_before_the_hunter_update_ends() {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let mut own = unit.own_victim(actions, c)?;
-            let tree_lost = unit.tree_lost(actions, c);
-            let _ = unit.hunt_part(actions, c, me, &mut own, tree_lost)?;
+            let mut own = unit.own_victim(actions, c, &roles())?;
+            let tree_lost = unit.tree_lost(actions, c, &roles());
+            let _ = unit.hunt_part(actions, c, me, &mut own, tree_lost, &roles())?;
             Ok(c.w
                 .parts
                 .actions_of(c.w.players[1].objects[ListIndex::new(3)].id)
@@ -6125,11 +6143,11 @@ fn an_update_take_counts_its_worker_and_wakes_sleeping_object() {
         |unit, _, c| {
             let by = unit.releaser(c)?;
             for id in [520, 521, 530, 9999] {
-                take(c, unit, object_id(id), by).unwrap();
+                take(c, unit, object_id(id), by, &roles()).unwrap();
             }
             let before = unit.workers.get();
-            take(c, unit, unit.id, by).unwrap();
-            take(c, unit, object_id(530), gaia).unwrap();
+            take(c, unit, unit.id, by, &roles()).unwrap();
+            take(c, unit, object_id(530), gaia, &roles()).unwrap();
             Ok((before, unit.workers.get()))
         },
     );
@@ -6146,6 +6164,7 @@ fn an_update_take_counts_its_worker_and_wakes_sleeping_object() {
         t.model.masters.first().map(|m| &**m),
         &t.model.lines,
         master_id(349),
+        &roles(),
     );
     assert_eq!(
         t.players[0]
@@ -6236,6 +6255,7 @@ fn outside_an_update_the_lets_run_on_the_whole_world() {
         t.model.masters.first().map(|m| &**m),
         &t.model.lines,
         master_id(349),
+        &roles(),
     );
     assert_eq!(
         t.players[0]
@@ -6519,7 +6539,7 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
             t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            |unit, actions, c| unit.hunt_tree_search(actions, c, within, near),
+            |unit, actions, c| unit.hunt_tree_search(actions, c, within, near, &roles()),
         )
     };
     let mut t = lumber_world(31.5);
@@ -6567,12 +6587,9 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
 #[test]
 fn hunt_whose_attack_failed_takes_near_tree_or_searches() {
     let failed = |t: &mut World| {
-        in_update(
-            t,
-            (PlayerId::new(1), ListIndex::new(0)),
-            50,
-            Unit::hunt_attack_failed,
-        )
+        in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, a, c| {
+            Unit::hunt_attack_failed(u, a, c, &roles())
+        })
     };
     let mut t = lumber_world(31.5);
     assert_eq!(failed(&mut t), Ok(()));
@@ -7130,7 +7147,7 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            Unit::update,
+            |u, a, c| Unit::update(u, a, c, &roles(), slots()),
         )
         .unwrap();
         let made = t
@@ -7147,7 +7164,7 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            Unit::update,
+            |u, a, c| Unit::update(u, a, c, &roles(), slots()),
         )
         .unwrap();
         let v = &t.players[1].objects[ListIndex::new(0)];
@@ -7292,7 +7309,7 @@ fn an_enter_update_adds_its_unit_to_its_building_own_or_an_ally_s() {
                         .top_action()
                         .map_or(ActionState::NO_ACTION, |a| a.state),
                 };
-                let code = unit.enter_part(actions, c, me)?;
+                let code = unit.enter_part(actions, c, me, &roles())?;
                 unit.end_head_update(actions, c, code)?;
                 let (_, house) = OthersRef::of(&c.w.players, &c.w.index, c.player)
                     .unwrap()
@@ -7356,7 +7373,7 @@ fn an_enter_unit_leaves_its_group_inside_the_update() {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let code = unit.enter_part(actions, c, me)?;
+            let code = unit.enter_part(actions, c, me, &roles())?;
             unit.end_head_update(actions, c, code)?;
             let members: Vec<ObjectId> =
                 c.w.groups
@@ -7556,7 +7573,14 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
     t.run_unit_ai(
         (PlayerId::new(1), ListIndex::new(0)),
         |ai, at, side, _, rng| {
-            let r = ai.process_order(&order, Some((at, PlayerType::HUMAN)), None, rng, side)?;
+            let r = ai.process_order(
+                &order,
+                Some((at, PlayerType::HUMAN)),
+                None,
+                rng,
+                side,
+                &roles(),
+            )?;
             assert_eq!(r, OrderOutcome::Taken);
             Ok(())
         },
@@ -7650,7 +7674,7 @@ fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
     let seen = t
         .run_ai_calls((PlayerId::new(1), ListIndex::new(0)), |ai, side, rng| {
             let before = side.busy_now()?;
-            ai.stop_with(StopOrder::Keep, None, side, rng)?;
+            ai.stop_with(StopOrder::Keep, None, side, rng, &roles())?;
             Ok((before, side.busy_now()?))
         })
         .unwrap();
@@ -8128,7 +8152,7 @@ fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() 
         position: Position::new(10.0, 10.0, 0.0),
         ..NewObject::default()
     };
-    let first = UnitAi::constructed(UnitAiType::BUILDING, &new, ai).unwrap();
+    let first = UnitAi::constructed(UnitAiType::BUILDING, &new, ai, &roles()).unwrap();
     assert_eq!(built.parts.unit_ai.get(foundation.id), Some(&first));
     let next = 750 + ai.rand15() % 500;
     stock_masters(&mut by_hand);
@@ -8752,6 +8776,7 @@ fn unit_inside_heals_up_to_its_hit_points() {
         master.class,
         master.hit_points,
         HitPoints::new(0.1),
+        &roles(),
     )
     .unwrap();
     assert_eq!(v.life.hp, HitPoints::new(11.1));
@@ -8766,6 +8791,7 @@ fn unit_inside_heals_up_to_its_hit_points() {
         master.class,
         master.hit_points,
         HitPoints::new(0.1),
+        &roles(),
     )
     .unwrap();
     assert_eq!(
@@ -8784,6 +8810,7 @@ fn unit_inside_heals_up_to_its_hit_points() {
         master.class,
         master.hit_points,
         HitPoints::new(0.1),
+        &roles(),
     )
     .unwrap();
     assert_eq!(v.life.hp, HitPoints::new(25.0));
@@ -8801,7 +8828,8 @@ fn unit_inside_heals_up_to_its_hit_points() {
             &mut combat,
             ship.class,
             ship.hit_points,
-            HitPoints::new(0.1)
+            HitPoints::new(0.1),
+            &roles()
         )
         .is_err()
     );
@@ -9464,7 +9492,7 @@ fn gate_update_of(
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            unit.gate_update(actions, c)?;
+            unit.gate_update(actions, c, &roles())?;
             Ok(unit.life.master_id)
         },
     )?;
@@ -10668,7 +10696,7 @@ pub(crate) fn hands_world(
             explored: true,
             building: None,
             umv: 0,
-            capture: capture_kind(p, class, master),
+            capture: capture_kind(p, class, master, &roles()),
             kind: MasterKind::COMBAT,
         },
     );
@@ -10738,6 +10766,7 @@ fn hands(
         MasterTables::new(masters, own),
         s,
         now,
+        &roles(),
     )?;
     Ok(answer
         .map(|m| {
@@ -10931,7 +10960,7 @@ fn owner_search_unit(s: &mut Spatial, id: i32, p: PlayerId, x: f32) {
             explored: true,
             building: None,
             umv: 0,
-            capture: capture_kind(p, class::CLASS_0, master_id(4)),
+            capture: capture_kind(p, class::CLASS_0, master_id(4), &roles()),
             kind: MasterKind::COMBAT,
         },
     );
@@ -10996,7 +11025,8 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(Some(PlayerId::new(1)))
     );
@@ -11006,7 +11036,8 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             &artifact_players(
                 &none,
                 &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::PLAYING]
-            )
+            ),
+            &roles()
         ),
         Ok(None)
     );
@@ -11022,7 +11053,8 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(Some(PlayerId::new(1)))
     );
@@ -11032,7 +11064,8 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             &artifact_players(
                 &none,
                 &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::PLAYING]
-            )
+            ),
+            &roles()
         ),
         Ok(Some(PlayerId::new(2)))
     );
@@ -11042,7 +11075,8 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             &artifact_players(
                 &none,
                 &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::WON]
-            )
+            ),
+            &roles()
         ),
         Ok(None)
     );
@@ -11076,7 +11110,8 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(None)
     );
@@ -11090,7 +11125,8 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(Some(PlayerId::new(2)))
     );
@@ -11104,7 +11140,8 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(None)
     );
@@ -11132,7 +11169,8 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(None)
     );
@@ -11155,7 +11193,8 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(Some(PlayerId::new(1)))
     );
@@ -11167,7 +11206,7 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
 fn an_owner_search_unmodelled_parts_fail() {
     let none = [0.0; 3];
     let reason = |s: &Spatial, me, status: &[GameStatus]| {
-        s.artifact_owner(me, &artifact_players(&none, status))
+        s.artifact_owner(me, &artifact_players(&none, status), &roles())
             .unwrap_err()
             .reason()
     };
@@ -11279,7 +11318,8 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(None)
     );
@@ -11294,7 +11334,8 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
                     GameStatus::PLAYING,
                     GameStatus::PLAYING
                 ]
-            )
+            ),
+            &roles()
         ),
         Ok(Some(PlayerId::new(1)))
     );
@@ -11863,7 +11904,7 @@ fn deaths_world() -> World {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let gather = GatherAction::new(chop, &tree, false, rate).unwrap();
+    let gather = GatherAction::new(chop, &tree, false, rate, &roles()).unwrap();
     let villagers = vec![
         dead(object_id(40)),
         dead(object_id(41)),
@@ -13744,7 +13785,7 @@ fn kill_in_the_step_reports_the_object_new_slot() {
             (Millis::ZERO, None, false),
             |u, actions, c| {
                 if let Some(k) = write_back(c, &mut v)? {
-                    file_kill(c, (u, actions), k)?;
+                    file_kill(c, (u, actions), k, &roles())?;
                 }
                 Ok(Outcome::Stay)
             },
@@ -13772,7 +13813,7 @@ fn hit_kill_reaches_the_world_where_the_hit_runs() {
         0,
         |u, actions, c| {
             if let Some(k) = write_back(c, &mut v)? {
-                file_kill(c, (u, actions), k)?;
+                file_kill(c, (u, actions), k, &roles())?;
             }
             let gaia_s = c.w.players[0]
                 .objects
@@ -13788,7 +13829,7 @@ fn hit_kill_reaches_the_world_where_the_hit_runs() {
             // the town centre as a master of the table, its own kill counted by it
             u.life.master_id = master_id(705);
             let before = c.w.players[1].attributes[325];
-            file_kill(c, (u, actions), KillLeft::own(c.me, kill))?;
+            file_kill(c, (u, actions), KillLeft::own(c.me, kill), &roles())?;
             Ok((gaia_s, counted, c.w.players[1].attributes[325] - before))
         },
     );
@@ -13814,7 +13855,7 @@ fn an_own_kill_gives_the_livestock_to_gaia_at_once() {
                 attacker_class: class::CLASS_0,
                 to_gaia: true,
             };
-            file_kill(c, (u, actions), KillLeft::own(c.me, kill))?;
+            file_kill(c, (u, actions), KillLeft::own(c.me, kill), &roles())?;
             Ok((
                 c.taken_over,
                 c.w.spatial.get(object_id(9520)).map(|p| p.player),
@@ -14035,7 +14076,7 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
 fn write_hit(t: &mut World, (p, i): (PlayerId, ListIndex), mut v: Victim) {
     in_update(t, (p, i), 0, |u, actions, c| {
         if let Some(k) = write_back(c, &mut v)? {
-            file_kill(c, (u, actions), k)?;
+            file_kill(c, (u, actions), k, &roles())?;
         }
         Ok(())
     })
@@ -14125,36 +14166,50 @@ fn trebuchet_is_master_of_class_51_or_54_with_weapon() {
         weapons,
         ..Master::default()
     };
-    assert!(is_trebuchet(&m(
-        MasterKind::BUILDING,
-        class::CLASS_54,
-        vec![ClassAmount::new(4, 200)]
-    )));
-    assert!(is_trebuchet(&m(
-        MasterKind::BUILDING,
-        class::CLASS_51,
-        vec![ClassAmount::new(4, 1)]
-    )));
-    assert!(is_trebuchet(&m(
-        MasterKind::COMBAT,
-        class::CLASS_54,
-        vec![ClassAmount::new(4, 1)]
-    )));
-    assert!(!is_trebuchet(&m(
-        MasterKind::BUILDING,
-        class::CLASS_51,
-        vec![]
-    )));
-    assert!(!is_trebuchet(&m(
-        MasterKind::MISSILE,
-        class::CLASS_54,
-        vec![ClassAmount::new(4, 1)]
-    )));
-    assert!(!is_trebuchet(&m(
-        MasterKind::BUILDING,
-        class::BUILDING,
-        vec![ClassAmount::new(3, 11)]
-    )));
+    assert!(is_trebuchet(
+        &m(
+            MasterKind::BUILDING,
+            class::CLASS_54,
+            vec![ClassAmount::new(4, 200)]
+        ),
+        &roles()
+    ));
+    assert!(is_trebuchet(
+        &m(
+            MasterKind::BUILDING,
+            class::CLASS_51,
+            vec![ClassAmount::new(4, 1)]
+        ),
+        &roles()
+    ));
+    assert!(is_trebuchet(
+        &m(
+            MasterKind::COMBAT,
+            class::CLASS_54,
+            vec![ClassAmount::new(4, 1)]
+        ),
+        &roles()
+    ));
+    assert!(!is_trebuchet(
+        &m(MasterKind::BUILDING, class::CLASS_51, vec![]),
+        &roles()
+    ));
+    assert!(!is_trebuchet(
+        &m(
+            MasterKind::MISSILE,
+            class::CLASS_54,
+            vec![ClassAmount::new(4, 1)]
+        ),
+        &roles()
+    ));
+    assert!(!is_trebuchet(
+        &m(
+            MasterKind::BUILDING,
+            class::BUILDING,
+            vec![ClassAmount::new(3, 11)]
+        ),
+        &roles()
+    ));
     let paid = Master {
         cost: costs(&[
             (attribute::WOOD, 200, true),
@@ -15538,8 +15593,12 @@ fn ai_move_of(
         (class, PlayerId::new(1)),
         (&mut releases, &mut leaves, by),
         (
-            OwnerMasters::new(no_own_masters(), Some(&masters)),
-            (&graphics, None),
+            MoveSprites {
+                masters: OwnerMasters::new(no_own_masters(), Some(&masters)),
+                graphics: &graphics,
+                look: None,
+                roles: static_roles(),
+            },
             &mut rng,
         ),
     )?;
@@ -15668,7 +15727,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let mut gather = GatherAction::new(task, &bush, false, rate).unwrap();
+    let mut gather = GatherAction::new(task, &bush, false, rate, &roles()).unwrap();
     gather.state = GatherState::Idle;
     let (mut u, mut actions, mut motion) = mover_unit(31139);
     actions.list.set_gather(Some(gather));
@@ -15866,8 +15925,12 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
             motion.lent(),
             AI_POINT,
             PlayerId::new(1),
-            OwnerMasters::new(no_own_masters(), None),
-            (&none, None)
+            MoveSprites {
+                masters: OwnerMasters::new(no_own_masters(), None),
+                graphics: &none,
+                look: None,
+                roles: static_roles(),
+            },
         ),
         Ok(PointMove::Declined)
     );
@@ -15879,8 +15942,12 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
             motion.lent(),
             AI_POINT,
             PlayerId::new(1),
-            OwnerMasters::new(no_own_masters(), None),
-            (&none, None)
+            MoveSprites {
+                masters: OwnerMasters::new(no_own_masters(), None),
+                graphics: &none,
+                look: None,
+                roles: static_roles(),
+            },
         )
         .is_err()
     );
@@ -16339,7 +16406,10 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
     let every = vec![Masters::new([wolf]), masters];
     let lines = UnitLines::default();
     let mut tracker = Tracker::default();
-    tracker.add(object_id(123), key(every.get(1), &lines, attacker_master));
+    tracker.add(
+        object_id(123),
+        key(every.get(1), &lines, attacker_master, &roles()),
+    );
     let ((attacked, adds), t) = on_side(
         (gaia, vec![unit], tracker),
         (spatial, every, graphics),
@@ -16541,6 +16611,7 @@ fn helper_free_of(owner: PlayerId, helper: Object, groups: &UnitGroups) -> bool 
             side.c.w.parts.actions_of(helper.id),
             &scout,
             object_id(50),
+            &roles(),
         )
         .unwrap()
     })
@@ -17020,7 +17091,7 @@ fn reseed_world() -> World {
         state: GatherState::ReseedWalk { move_to: None },
         target: None,
         worked: true,
-        ..GatherAction::new(task, &farm, false, rate).unwrap()
+        ..GatherAction::new(task, &farm, false, rate, &roles()).unwrap()
     };
     let farmer = Object::with_actions(
         Unit {
@@ -17967,7 +18038,7 @@ fn hit_flare_is_made_where_the_volley_runs() {
         (PlayerId::new(1), ListIndex::new(0)),
         0,
         |unit, _, c| {
-            unit.volley(c, aimed)?;
+            unit.volley(c, aimed, &roles())?;
             let own = &c.w.players[1].objects;
             Ok(own
                 .iter()
@@ -18080,11 +18151,12 @@ fn fired_missile_joins_its_owner_list_at_its_making() {
         (PlayerId::new(1), ListIndex::new(0)),
         100,
         |unit, actions, c| {
-            let _ = unit.update(actions, c)?;
+            let _ = unit.update(actions, c, &roles(), slots())?;
             let k = key(
                 c.w.model.masters.of(c.player),
                 &c.w.model.lines,
                 master_id(363),
+                &roles(),
             );
             let listed = OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
@@ -18491,7 +18563,10 @@ fn foraging() -> World {
 /// `n` of the forager's whole updates (50 ms each), up to the first after which `stop` holds.
 fn forage_until(t: &mut World, n: usize, stop: impl Fn(&World) -> bool) {
     for _ in 0..n {
-        let _ = in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, Unit::update).unwrap();
+        let _ = in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, a, c| {
+            Unit::update(u, a, c, &roles(), slots())
+        })
+        .unwrap();
         if stop(t) {
             return;
         }
@@ -18778,7 +18853,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            let code = unit.gather_after_drop(actions, c)?;
+            let code = unit.gather_after_drop(actions, c, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -18808,7 +18883,7 @@ fn gather_step(t: &mut World) -> Result<(), GenieError> {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let code = unit.gather_update(actions, c, me)?;
+            let code = unit.gather_update(actions, c, me, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -18854,6 +18929,7 @@ fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
                         next,
                         (old.0.map(GatherTargetId::new), old.1),
                         by,
+                        &roles(),
                     )
                     .and_then(|code| unit.end_head_update(actions, c, code));
                 // the objects let go, as the update leaves them
@@ -19018,6 +19094,7 @@ fn house_builder() -> World {
         t.model.masters.get(1).map(|m| &**m),
         &t.model.lines,
         ids::TOWN_CENTRE,
+        &roles(),
     );
     t.players[1].tracker.add(object_id(700), k);
     t.players[1].tracker.complete(object_id(700), k);
@@ -19040,7 +19117,7 @@ fn drop_again_with(held: Held) -> (BuildState, Option<ObjectId>, f32, i32, Vec<N
         |unit, actions, c| {
             let mut b = *actions.list.build().unwrap();
             let by = unit.releaser(c)?;
-            let dropped = b.drop_again(c, unit, by);
+            let dropped = b.drop_again(c, unit, by, slots(), &roles());
             *actions.list.build_mut().unwrap() = b;
             dropped
         },
@@ -19155,7 +19232,13 @@ fn drop_site_sought(
         objects,
         ActionState::NO_ACTION,
         args,
-        index::ObjectsRef::new(&t.players, &t.index, &t.model.masters, &t.parts),
+        index::ObjectsRef::new(
+            &t.players,
+            &t.index,
+            &t.model.masters,
+            &t.parts,
+            &t.model.roles,
+        ),
     )
 }
 
@@ -19269,7 +19352,7 @@ fn own_move(t: &mut World) -> OwnMoved {
                     ActionState::new(m.state.number())
                 }),
             };
-            let code = unit.move_to_part(actions, c, me)?;
+            let code = unit.move_to_part(actions, c, me, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     );
@@ -19463,7 +19546,7 @@ fn explored(set: impl FnOnce(&mut ExploreAction)) -> Explored {
                 group: unit.group.id,
                 action_state: ActionState::new(ExploreState::Walk { move_to: None }.get()),
             };
-            unit.explore_part(actions, c, me)
+            unit.explore_part(actions, c, me, &roles())
         },
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -19506,14 +19589,14 @@ fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            unit.explore_to(actions, Point::new(40.5, 89.5), c)?;
+            unit.explore_to(actions, Point::new(40.5, 89.5), c, &roles())?;
             let me = Me {
                 human_order: WorldTime::ZERO,
                 id: unit.id,
                 group: unit.group.id,
                 action_state: ActionState::new(ExploreState::Walk { move_to: None }.get()),
             };
-            unit.explore_part(actions, c, me)
+            unit.explore_part(actions, c, me, &roles())
         },
     );
     assert_eq!(r, Ok(()));
@@ -19650,7 +19733,7 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
         (PlayerId::new(1), ListIndex::new(0)),
         50,
         |unit, actions, c| {
-            let code = unit.hunt_after_drop(actions, c)?;
+            let code = unit.hunt_after_drop(actions, c, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -19793,6 +19876,7 @@ fn annexed_house() -> World {
         t.model.masters.get(1).map(|m| &**m),
         &t.model.lines,
         ids::HOUSE,
+        &roles(),
     );
     t.players[1].tracker.add(object_id(10030), k);
     t
@@ -19804,6 +19888,7 @@ fn done_at(t: &World, a: i32, b: i32) -> (Option<usize>, Option<usize>) {
         t.model.masters.get(1).map(|m| &**m),
         &t.model.lines,
         ids::HOUSE,
+        &roles(),
     );
     let done = t.players[1].tracker.list(ListKey::of_master(k.master));
     let at = |id| done.iter().position(|&d| d == id);
@@ -19826,7 +19911,7 @@ fn building_own_completion_completes_its_annexes_first() {
     k.progress = Seconds::of_master(k.build_time);
     let i = t.players[1].objects.position_of(object_id(10028)).unwrap();
     let seen = in_update(&mut t, (PlayerId::new(1), i), 50, |unit, actions, c| {
-        unit.complete_on_update(actions, c)?;
+        unit.complete_on_update(actions, c, &roles())?;
         Ok(c.w.object(object_id(10030)).map(|(_, a)| a.life.state))
     });
     assert_eq!(
@@ -19845,7 +19930,7 @@ fn links_after_update(
 ) -> Result<(Vec<ObjectId>, Option<MainBuildingId>), GenieError> {
     let i = t.players[1].objects.position_of(id).unwrap();
     in_update(t, (PlayerId::new(1), i), 50, |unit, _, c| {
-        unit.let_removed_links_go(c)?;
+        unit.let_removed_links_go(c, &roles())?;
         let layer = c.w.parts.building_of(unit.id);
         Ok((layer.annexes.ids().collect(), layer.annex_of))
     })
@@ -20139,6 +20224,7 @@ fn builder_completion_reaches_the_world_within_its_update() {
         t.model.masters.get(1).map(|m| &**m),
         &t.model.lines,
         ids::HOUSE,
+        &roles(),
     );
     assert!(
         t.players[1]
@@ -20213,7 +20299,7 @@ fn completed_house(setup: fn(&mut World)) -> (World, Completed) {
         50,
         |unit, actions, c| {
             let before = attribute_values(c.w, 1);
-            unit.complete_on_update(actions, c)?;
+            unit.complete_on_update(actions, c, &roles())?;
             Ok((gained(c.w, 1, &before), watches(c.w, 1, 10028)))
         },
     )
@@ -20238,6 +20324,7 @@ fn foundation_whose_build_points_reached_its_build_time_completes() {
         t.model.masters.get(1).map(|m| &**m),
         &t.model.lines,
         ids::HOUSE,
+        &roles(),
     );
     assert_eq!(
         t.players[1].tracker.list(ListKey::of_master(key.master)),
@@ -20273,7 +20360,7 @@ fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves()
             (PlayerId::new(1), ListIndex::new(1)),
             50,
             |unit, actions, c| {
-                unit.complete_on_update(actions, c)?;
+                unit.complete_on_update(actions, c, &roles())?;
                 let events: Vec<(EventKind, f32)> = c.w.players[1]
                     .history
                     .events
@@ -20341,7 +20428,7 @@ fn dying_desolid_foundation_owner_watches_it_within_its_update() {
         0,
         |unit, actions, c| {
             unit.life.state = ObjectState::Dying;
-            unit.died(actions, c, ObjectState::Foundation)?;
+            unit.died(actions, c, ObjectState::Foundation, &roles())?;
             Ok(watches(c.w, 1, 10028))
         },
     );
@@ -20375,7 +20462,7 @@ fn centre_seconds(setup: impl FnOnce(&mut World)) -> Result<(f32, u32), GenieErr
         &mut t,
         (PlayerId::new(1), ListIndex::new(2)),
         50,
-        |unit, _, c| unit.building_seconds(c),
+        |unit, _, c| unit.building_seconds(c, &roles()),
     )?;
     let hp = t.players[1].objects[ListIndex::new(0)].life.hp.get();
     Ok((
@@ -20473,9 +20560,12 @@ fn wall_or_house_counts_no_whole_seconds() {
         class,
         ..Master::default()
     };
-    assert!(walls_branch(&master(ids::HOUSE, class::BUILDING)));
-    assert!(walls_branch(&master(master_id(117), class::WALL)));
-    assert!(!walls_branch(&master(ids::TOWN_CENTRE, class::BUILDING)));
+    assert!(walls_branch(&master(ids::HOUSE, class::BUILDING), &roles()));
+    assert!(walls_branch(&master(master_id(117), class::WALL), &roles()));
+    assert!(!walls_branch(
+        &master(ids::TOWN_CENTRE, class::BUILDING),
+        &roles()
+    ));
 }
 
 /// [`repair_world`] on [`open_map`] with the repairer 9175 (a mover) at `at` and the house
@@ -20562,7 +20652,7 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
                         .top_action()
                         .map_or(ActionState::NO_ACTION, |a| a.state),
                 };
-                let code = unit.repair_part(actions, c, me)?;
+                let code = unit.repair_part(actions, c, me, &roles())?;
                 unit.end_head_update(actions, c, code)
             },
         )
@@ -20667,7 +20757,7 @@ fn repair_pays_from_what_its_owner_holds_at_the_payment() {
                     .top_action()
                     .map_or(ActionState::NO_ACTION, |a| a.state),
             };
-            let code = unit.repair_part(actions, c, me)?;
+            let code = unit.repair_part(actions, c, me, &roles())?;
             unit.end_head_update(actions, c, code)
         },
     )
@@ -20954,7 +21044,7 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
                         .top_action()
                         .map_or(ActionState::NO_ACTION, |a| a.state),
                 };
-                let code = unit.repair_part(actions, c, me)?;
+                let code = unit.repair_part(actions, c, me, &roles())?;
                 unit.end_head_update(actions, c, code)
             })
             .unwrap();
@@ -21040,7 +21130,7 @@ fn builder_walks_to_its_house_builds_it_and_waits_after() {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            Unit::update,
+            |u, a, c| Unit::update(u, a, c, &roles(), slots()),
         )
         .unwrap();
         let b = t
@@ -21148,7 +21238,7 @@ fn loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
         |unit, actions, c| {
             let mut b = *actions.list.build().unwrap();
             let by = unit.releaser(c)?;
-            let dropped = b.drop_again(c, unit, by);
+            let dropped = b.drop_again(c, unit, by, slots(), &roles());
             *actions.list.build_mut().unwrap() = b;
             dropped
         },
@@ -21160,7 +21250,7 @@ fn loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            Unit::update,
+            |u, a, c| Unit::update(u, a, c, &roles(), slots()),
         )
         .unwrap();
         let v = &t.players[1].objects[ListIndex::new(0)];
@@ -21278,7 +21368,7 @@ fn dying_building_lets_its_annexes_go_in_its_own_update() {
         0,
         |unit, actions, c| {
             unit.life.hp = HitPoints::new(3.0);
-            unit.died(actions, c, ObjectState::Unfinished)?;
+            unit.died(actions, c, ObjectState::Unfinished, &roles())?;
             let (_, annex) = OthersRef::of(&c.w.players, &c.w.index, c.player)
                 .unwrap()
                 .find(object_id(700))
@@ -21317,7 +21407,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
             50,
             |unit, actions, c| {
                 for e in effects {
-                    unit.run_effect(actions, e, None, c)?;
+                    unit.run_effect(actions, e, None, c, &roles())?;
                 }
                 Ok(actions.top_action_kind())
             },
@@ -21333,7 +21423,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
             |unit, actions, c| {
                 let by = unit.releaser(c)?;
                 let g = actions.list.gather().copied().unwrap();
-                let _ = unit.gather_next(actions, c, next, (g.target, g.carry_to), by)?;
+                let _ = unit.gather_next(actions, c, next, (g.target, g.carry_to), by, &roles())?;
                 let bush = OthersRef::of(&c.w.players, &c.w.index, PlayerId::new(0))
                     .unwrap()
                     .find(object_id(600))
@@ -21518,7 +21608,7 @@ fn the_own_razings_count_where_the_hit_runs() {
             (PlayerId::new(1), ListIndex::new(0)),
             0,
             |u, actions, c| {
-                file_kill(c, (u, actions), own_razing(adds))?;
+                file_kill(c, (u, actions), own_razing(adds), &roles())?;
                 Ok(c.w.players[1].attributes[98].get())
             },
         );
@@ -21705,7 +21795,7 @@ fn built_building_death_reaches_its_owner_within_its_update() {
             0,
             |unit, actions, c| {
                 unit.life.state = ObjectState::Dying;
-                unit.died(actions, c, ObjectState::Alive)?;
+                unit.died(actions, c, ObjectState::Alive, &roles())?;
                 let a = &c.w.players[1].attributes;
                 let withdrawn = c.w.players[1].techs[0].state != ResearchState::Researched;
                 Ok((

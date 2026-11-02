@@ -22,7 +22,7 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
@@ -30,9 +30,11 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    Attacker, BUILDING_AI, CIVILIAN, DEFEND_GROWTH, LION_AI, PREDATOR_AI, PRIEST_AI,
-    PRIORITY_3_CLASSES, SIEGE_AI, SOLDIER_AI, Seeker, TOWER_AI, Target,
+    Attacker, BUILDING_AI, CIVILIAN, DEFEND_GROWTH, LION_AI, PREDATOR_AI, PRIEST_AI, SIEGE_AI,
+    SOLDIER_AI, Seeker, TOWER_AI, Target,
 };
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
 /// What a priest's conversion test (`FUN_140c1af00`, the priest's slot 0x1b8) reads of the
@@ -71,18 +73,18 @@ pub(super) const FULL_FAITH: Amount = Amount::new(UNIT_AI_FULL_FAITH);
 /// The town centres a priest never converts (109, 618 to 621), the relic cart's master 159, the
 /// farms and fish trap (50, 1187, 199).
 pub(super) const NEVER_CONVERTED: [MasterId; 9] = [
-    MasterId::named(109),
-    MasterId::named(618),
-    MasterId::named(619),
-    MasterId::named(620),
-    MasterId::named(621),
-    MasterId::named(159),
-    MasterId::named(50),
-    MasterId::named(1187),
-    MasterId::named(199),
+    ids::TOWN_CENTRE,
+    ids::TOWN_CENTRE_618,
+    ids::TOWN_CENTRE_619,
+    ids::TOWN_CENTRE_620,
+    ids::TOWN_CENTRE_621,
+    ids::ARTIFACT_CART,
+    ids::FARM,
+    ids::ID_1187,
+    ids::FISH_TRAP,
 ];
 /// The priest master that converts only boats (53).
-pub(super) const BOAT_CONVERTER: MasterId = MasterId::named(53);
+pub(super) const BOAT_CONVERTER: MasterId = ids::FISH_PERCH;
 
 /// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert object
 /// `t` (None: one the world does not hold), with `any` its faith not asked. Never for class 43, nor
@@ -93,8 +95,11 @@ pub(super) const BOAT_CONVERTER: MasterId = MasterId::named(53);
 /// (action type 104): its last for any class and master, or the first for the object's master or
 /// class; one that names an attribute (`+0x26`) the owner holds at most 0 (or not a number) fails.
 #[must_use]
-pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool {
-    if p.class == class::CLASS_43 {
+pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool, roles: &Roles) -> bool {
+    if roles
+        .of_class(p.class)
+        .contains(ClassRoles::MONK_WITH_RELIC)
+    {
         return false;
     }
     // full faith (`COMISS`: a NaN has none)
@@ -107,22 +112,23 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
     };
     if t.owner == PlayerId::GAIA
         || p.attributes.get(67).is_some_and(|&a| a <= Amount::ZERO)
-        || t.class == class::LIVESTOCK
+        || roles.of_class(t.class).contains(ClassRoles::LIVESTOCK)
     {
         return false;
     }
     if p.master == BOAT_CONVERTER {
-        return matches!(
-            t.class,
-            class::TRADE_BOAT
-                | class::TRANSPORT
-                | class::FISHING_SHIP
-                | class::WARSHIP
-                | class::CLASS_53
+        return roles.of_class(t.class).intersects(
+            ClassRoles::TRADE_BOAT
+                | ClassRoles::TRANSPORT
+                | ClassRoles::FISHING_SHIP
+                | ClassRoles::WARSHIP
+                | ClassRoles::BOARDING_SHIP,
         );
     }
     if NEVER_CONVERTED.contains(&t.master)
-        || matches!(t.class, class::WALL | class::GATE | class::CLASS_30)
+        || roles
+            .of_class(t.class)
+            .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::FLAG)
     {
         return false;
     }
@@ -172,8 +178,8 @@ pub fn attack_sight(me: &Attacker) -> Result<Distance, GenieError> {
 /// The unit AI's slot 0xa8 (`me`'s type, [`type_attacks_neutral`]) on a neutral object of
 /// `class`.
 #[must_use]
-pub fn attacks_neutral(me: &Attacker, class: ClassId) -> bool {
-    type_attacks_neutral(me.ai_type, me.attack_priority, class)
+pub fn attacks_neutral(me: &Attacker, class: ClassId, roles: &Roles) -> bool {
+    type_attacks_neutral(me.ai_type, me.attack_priority, class, roles)
 }
 
 /// Slot 0xa8 of the unit AI of factory type `ai_type` (`FUN_141215560`'s modules), whether it
@@ -190,18 +196,25 @@ pub fn type_attacks_neutral(
     ai_type: UnitAiType,
     attack_priority: AttackPriority,
     class: ClassId,
+    roles: &Roles,
 ) -> bool {
     match ai_type {
         CIVILIAN | BUILDING_AI => false,
         PREDATOR_AI | LION_AI => {
-            !matches!(
-                class,
-                class::SIEGE | class::WARSHIP | class::TOWER | class::CLASS_54 | class::CLASS_55
-            ) && (!attack_priority.limited() || PRIORITY_3_CLASSES.contains(&class))
+            !roles.of_class(class).intersects(
+                ClassRoles::SIEGE
+                    | ClassRoles::WARSHIP
+                    | ClassRoles::TOWER
+                    | ClassRoles::UNPACKED_TREBUCHET
+                    | ClassRoles::SCORPION,
+            ) && (!attack_priority.limited()
+                || roles
+                    .of_class(class)
+                    .contains(ClassRoles::PRIORITY_3_TARGET))
         }
-        PRIEST_AI => priest_attacks_neutral(attack_priority, class),
-        SOLDIER_AI | TOWER_AI => soldier_attacks_neutral(attack_priority, class),
-        SIEGE_AI => siege_attacks_neutral(attack_priority, class),
+        PRIEST_AI => priest_attacks_neutral(attack_priority, class, roles),
+        SOLDIER_AI | TOWER_AI => soldier_attacks_neutral(attack_priority, class, roles),
+        SIEGE_AI => siege_attacks_neutral(attack_priority, class, roles),
         _ => true,
     }
 }
@@ -214,11 +227,18 @@ pub(super) const PRIEST_NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2_0080_0838
 /// [`PRIEST_NEUTRAL_SPARED`] (`class` taken as unsigned), and with attack priority 3 only
 /// [`PRIORITY_3_CLASSES`].
 #[must_use]
-pub fn priest_attacks_neutral(attack_priority: AttackPriority, class: ClassId) -> bool {
+pub fn priest_attacks_neutral(
+    attack_priority: AttackPriority,
+    class: ClassId,
+    roles: &Roles,
+) -> bool {
     if PRIEST_NEUTRAL_SPARED.contains(class) {
         return false;
     }
-    !attack_priority.limited() || PRIORITY_3_CLASSES.contains(&class)
+    !attack_priority.limited()
+        || roles
+            .of_class(class)
+            .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 
 /// The classes slot 0xa8 of the soldier's unit AI (`FUN_140c1ae60`) passes among neutral objects:
@@ -230,11 +250,18 @@ pub(super) const NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2002_0080_0838_001
 /// [`NEUTRAL_SPARED`]'s classes, and with the unit's master's `attack_priority` 3
 /// (`FUN_141202220`) only [`PRIORITY_3_CLASSES`] (`FUN_140fddf10`).
 #[must_use]
-pub fn soldier_attacks_neutral(attack_priority: AttackPriority, class: ClassId) -> bool {
+pub fn soldier_attacks_neutral(
+    attack_priority: AttackPriority,
+    class: ClassId,
+    roles: &Roles,
+) -> bool {
     if NEUTRAL_SPARED.contains(class) {
         return false;
     }
-    !attack_priority.limited() || PRIORITY_3_CLASSES.contains(&class)
+    !attack_priority.limited()
+        || roles
+            .of_class(class)
+            .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 
 /// A computer player's soldier's or siege unit's idle check past its target: its target test
@@ -269,54 +296,29 @@ pub(super) const SIEGE_NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2002_0080_08
 /// [`SIEGE_NEUTRAL_SPARED`] (`class` taken as unsigned), and with attack priority 3 only
 /// [`PRIORITY_3_CLASSES`].
 #[must_use]
-pub fn siege_attacks_neutral(attack_priority: AttackPriority, class: ClassId) -> bool {
+pub fn siege_attacks_neutral(
+    attack_priority: AttackPriority,
+    class: ClassId,
+    roles: &Roles,
+) -> bool {
     if SIEGE_NEUTRAL_SPARED.contains(class) {
         return false;
     }
-    !attack_priority.limited() || PRIORITY_3_CLASSES.contains(&class)
+    !attack_priority.limited()
+        || roles
+            .of_class(class)
+            .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 
 /// The rams (masters 35, 422, 548 and 1258, raw `0x60bf`, `0x6242`, `0x62c0`, `0x6586`), which
 /// by attack priority 0 attack only [`RAM_TARGETS`].
-pub(super) const RAM_MASTERS: [MasterId; 4] = [
-    MasterId::named(35),
-    MasterId::named(422),
-    MasterId::named(548),
-    MasterId::named(1258),
-];
-/// What a ram attacks by its own choice: buildings, siege, walls, gates, farms, the packed
-/// units, towers, the unpacked siege and the scorpions.
-pub(super) const RAM_TARGETS: [ClassId; 9] = [
-    class::BUILDING,
-    class::SIEGE,
-    class::WALL,
-    class::GATE,
-    class::FARM,
-    class::CLASS_51,
-    class::TOWER,
-    class::CLASS_54,
-    class::CLASS_55,
-];
-/// What a trebuchet (class 51 or 54) attacks by its own choice: the rams' but siege and
-/// scorpions.
-pub(super) const TREBUCHET_TARGETS: [ClassId; 7] = [
-    class::BUILDING,
-    class::WALL,
-    class::GATE,
-    class::FARM,
-    class::CLASS_51,
-    class::TOWER,
-    class::CLASS_54,
-];
+pub(super) const RAM_MASTERS: [MasterId; 4] = [ids::ID_35, ids::ID_422, ids::ID_548, ids::ID_1258];
+
 /// The siege masters whose current building target decides by attack priority alone (1744,
 /// 1746, raw `0x676c`, `0x676e`).
-pub(super) const SIEGE_BUILDING_MASTERS: [MasterId; 2] =
-    [MasterId::named(1744), MasterId::named(1746)];
+pub(super) const SIEGE_BUILDING_MASTERS: [MasterId; 2] = [ids::ID_1744, ids::ID_1746];
 /// A Gaia target lets the siege unit's range grow by this (`DAT_142eb4838`).
 pub(super) const GAIA_TARGET_REACH: Distance = Distance::new(UNIT_AI_GAIA_TARGET_REACH);
-/// The packed unit's class (51), which a human player's siege attack check passes over unless
-/// asked for any target.
-pub(super) const PACKED_UNIT_CLASS: ClassId = class::CLASS_51;
 
 /// The defend stance's leash from a saved patrol's path (`DAT_14330ebb8`, 5).
 pub(super) const DEFEND_PATROL_LEASH: Distance = Distance::new(UNIT_AI_DEFEND_PATROL_LEASH);
@@ -391,8 +393,11 @@ pub fn siege_can_attack(
     s: &Seeker,
     t: &Target,
     any: bool,
+    roles: &Roles,
 ) -> Result<bool, GenieError> {
-    if matches!(t.class, class::ARTIFACT | class::RELIC)
+    if roles
+        .of_class(t.class)
+        .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
         || s.stance == UnitStance::NO_ATTACK
         || !siege_in_reach(me, s, t)?
     {
@@ -405,13 +410,18 @@ pub fn siege_can_attack(
     if (t.kind == MasterKind::BUILDING && t.desolid) || me.state < ObjectState::Alive {
         return Ok(false);
     }
-    if !me.player_type.is_computer() && !any && me.class == Some(PACKED_UNIT_CLASS) {
+    if !me.player_type.is_computer()
+        && !any
+        && roles
+            .of_some_class(me.class)
+            .contains(ClassRoles::SKIPS_SIEGE_CHECK)
+    {
         return Ok(false);
     }
     if matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
         return Ok(false);
     }
-    Ok(any || siege_chooses(me, s, t))
+    Ok(any || siege_chooses(me, s, t, roles))
 }
 
 /// [`siege_can_attack`]'s reach by the stance: the target's footprint gap to the unit's state
@@ -454,14 +464,19 @@ pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
 /// [`RAM_TARGETS`] and a trebuchet [`TREBUCHET_TARGETS`]; masters 1744 and 1746 with a building
 /// as their current target by their priority alone; attack priority 3 only
 /// [`PRIORITY_3_CLASSES`].
-pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target) -> bool {
+pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles) -> bool {
     let priority = me.attack_priority;
     if priority == AttackPriority::PRIORITY_0 {
         if RAM_MASTERS.contains(&me.master) {
-            return RAM_TARGETS.contains(&t.class);
+            return roles.of_class(t.class).contains(ClassRoles::RAM_TARGET);
         }
-        if matches!(me.class, Some(class::CLASS_51 | class::CLASS_54)) {
-            return TREBUCHET_TARGETS.contains(&t.class);
+        if roles
+            .of_some_class(me.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
+        {
+            return roles
+                .of_class(t.class)
+                .contains(ClassRoles::TREBUCHET_TARGET);
         }
     }
     if SIEGE_BUILDING_MASTERS.contains(&me.master)
@@ -470,50 +485,44 @@ pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target) -> bool {
     {
         return priority == AttackPriority::PRIORITY_1 || priority.past_3();
     }
-    !priority.limited() || PRIORITY_3_CLASSES.contains(&t.class)
+    !priority.limited()
+        || roles
+            .of_class(t.class)
+            .contains(ClassRoles::PRIORITY_3_TARGET)
 }
-
-/// The classes a lion attacks by its own choice (its slot 0xa0's list, `FUN_140c18d50`; the
-/// game's `+0x6b4` of 1, not met, adds 13, 18 and 55).
-pub(super) const LION_ATTACKS: [ClassId; 19] = [
-    class::CLASS_0,
-    class::VILLAGER,
-    class::CLASS_6,
-    class::PREY,
-    class::CLASS_12,
-    class::CLASS_23,
-    class::CLASS_24,
-    class::CLASS_25,
-    class::CLASS_26,
-    class::CLASS_28,
-    class::CLASS_35,
-    class::CLASS_36,
-    class::CLASS_44,
-    class::CLASS_45,
-    class::CLASS_46,
-    class::CLASS_47,
-    class::CLASS_50,
-    class::CLASS_56,
-    class::CLASS_57,
-];
 
 /// The lion's slot 0xa0 (`FUN_140c18d50`) without its `any` flag: by the master's attack
 /// priority 1 and 2 anything, 3 the classes of [`PRIORITY_3_CLASSES`], any other the classes
 /// of [`LION_ATTACKS`].
-pub(super) fn lion_may_attack(attack_priority: AttackPriority, class: ClassId) -> bool {
+pub(super) fn lion_may_attack(
+    attack_priority: AttackPriority,
+    class: ClassId,
+    roles: &Roles,
+) -> bool {
     match attack_priority {
         AttackPriority::PRIORITY_1 | AttackPriority::PRIORITY_2 => true,
-        AttackPriority::PRIORITY_3 => PRIORITY_3_CLASSES.contains(&class),
-        _ => LION_ATTACKS.contains(&class),
+        AttackPriority::PRIORITY_3 => roles
+            .of_class(class)
+            .contains(ClassRoles::PRIORITY_3_TARGET),
+        _ => roles.of_class(class).contains(ClassRoles::LION_TARGET),
     }
 }
 
 /// The civilian's slot 0xa0 (`FUN_140c18b70`) without its `any` flag: never classes 1 and 42;
 /// with the unit's master's `attack_priority` 3 (`FUN_141202220`) only [`PRIORITY_3_CLASSES`]
 /// (`FUN_140fddf10`).
-pub(super) fn civilian_may_attack(attack_priority: AttackPriority, class: ClassId) -> bool {
-    !matches!(class, class::ARTIFACT | class::RELIC)
-        && (!attack_priority.limited() || PRIORITY_3_CLASSES.contains(&class))
+pub(super) fn civilian_may_attack(
+    attack_priority: AttackPriority,
+    class: ClassId,
+    roles: &Roles,
+) -> bool {
+    !roles
+        .of_class(class)
+        .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
+        && (!attack_priority.limited()
+            || roles
+                .of_class(class)
+                .contains(ClassRoles::PRIORITY_3_TARGET))
 }
 
 /// What [`UnitSide::attack`] answers: the unit attacks the target, and the notifies the command

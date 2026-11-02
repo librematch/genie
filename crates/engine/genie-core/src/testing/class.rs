@@ -1,8 +1,5 @@
-//! The master classes (`+0x18`, an `i16`): the one definition of the class values. A master's
-//! class groups the masters the game treats alike (villagers, siege, gates, farms); the obfuscated
-//! build stores a class as its value minus `0xeac`, the values here are the decoded ones. Import
-//! the module and name a class as `class::VILLAGER`: several names also stand for a master type
-//! ([`crate::objects::masters::MasterKind`]'s constants).
+//! The classes genie-core's tests name: build 158041's `.dat` values, as the tests' masters carry
+//! them. The engine names no class (FD-046-D43): it asks the build layer's roles and slots.
 
 use crate::objects::masters::ClassId;
 

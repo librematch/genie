@@ -16,7 +16,6 @@ use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, second_target_checked};
@@ -29,6 +28,8 @@ use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
 use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -94,7 +95,7 @@ impl Unit {
     /// finds the target it holds past state 6, code 5), or whose `MoveTo` failed (code 3), and
     /// whose class is a tree's: it searches for the next tree (`FUN_140ac4670` with 8 and -1
     /// both times).
-    pub(crate) fn tree_lost(&self, actions: &Action, c: &Step<'_>) -> bool {
+    pub(crate) fn tree_lost(&self, actions: &Action, c: &Step<'_>, roles: &Roles) -> bool {
         actions.list.hunt().is_some_and(|h| {
             matches!(h.state, HuntState::Walk { .. })
                 && Seconds::ZERO <= h.timer
@@ -108,7 +109,7 @@ impl Unit {
             let class = ai
                 .target_class
                 .or_else(|| actions.list.hunt().and_then(|h| h.target_class));
-            class == Some(class::TREE)
+            roles.of_some_class(class).contains(ClassRoles::TREE)
         })
     }
 
@@ -126,6 +127,7 @@ impl Unit {
         me: Me,
         own: &mut Option<Victim>,
         tree_lost: bool,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let (state, timer, target) = actions
             .list
@@ -135,30 +137,30 @@ impl Unit {
             });
         match state {
             Some(HuntState::Drop { .. }) if timer < Seconds::ZERO => {
-                self.hunt_drop_wait(actions, c)?;
+                self.hunt_drop_wait(actions, c, roles)?;
             }
-            Some(HuntState::Drop { .. }) => return self.hunt_drop_walk(actions, c, me),
+            Some(HuntState::Drop { .. }) => return self.hunt_drop_walk(actions, c, me, roles),
             // State 13: the hunt failed; its next update tells its unit AI (notify 0x1f9) and ends it.
             Some(HuntState::Failed) => return self.hunt_failed(c),
             Some(HuntState::WalkPoint { .. } | HuntState::WalkSearch { .. }) => {
-                self.hunt_point_walk(actions, c, me)?;
+                self.hunt_point_walk(actions, c, me, roles)?;
             }
             Some(HuntState::Search) => self.hunt_search_wait(actions, c)?,
             Some(HuntState::Idle) => {
-                actions.hunt_idle()?;
+                actions.hunt_idle(roles)?;
             }
             Some(HuntState::Walk { .. }) if target.is_none() && timer < Seconds::ZERO => {
-                self.hunt_wait_walk(actions, c)?;
+                self.hunt_wait_walk(actions, c, roles)?;
             }
             Some(HuntState::Lead) if target.is_none() => {
                 // state 10 without its target (0x140ac7a00 case 9): set_state(3), the search
                 actions.list.hunt_mut().ok_or(NO_HUNT)?.state = HuntState::Search;
-                self.hunt_set_search(actions, c)?;
+                self.hunt_set_search(actions, c, roles)?;
             }
             // the hunt took the next tree (slot 0x48): its MoveTo's code 5 ends the update
             _ if tree_lost
-                && self.hunt_tree_search(actions, c, Some(TREE_SEARCH_WITHIN), None)? => {}
-            Some(_) => self.hunt_strike(actions, c, me, own, tree_lost)?,
+                && self.hunt_tree_search(actions, c, Some(TREE_SEARCH_WITHIN), None, roles)? => {}
+            Some(_) => self.hunt_strike(actions, c, me, own, tree_lost, roles)?,
             None => {}
         }
         Ok(HeadCode::Keeps)
@@ -171,6 +173,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         hunt.timer += c.dt.seconds();
@@ -178,7 +181,7 @@ impl Unit {
             hunt.timer = Seconds::ZERO;
             let site = hunt.carry_to.take();
             self.hunt_release(c, [site.map(DropSiteId::id)])?;
-            self.hunt_drop_off(actions, c)?;
+            self.hunt_drop_off(actions, c, roles)?;
         }
         Ok(())
     }
@@ -193,6 +196,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
         let master = object_master(
@@ -236,7 +240,7 @@ impl Unit {
         };
         let who = PointWalker {
             player_type: c.w.players.player(c.player)?.kind,
-            villager: master.class == class::VILLAGER,
+            villager: roles.of_class(master.class).contains(ClassRoles::VILLAGER),
             stance: c
                 .w
                 .parts
@@ -257,14 +261,14 @@ impl Unit {
                 // the local player's tracker (FUN_14097daf0) are not held; a sharing player's
                 // allies' share (+0x1426) is not modelled
                 c.give_load(kind, amount)?;
-                return self.hunt_after_drop(actions, c);
+                return self.hunt_after_drop(actions, c, roles);
             }
             Dropped::Again => {
                 // the drop site goes (FUN_140a7a190 with none), then set_state(8)
                 let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
                 let site = hunt.carry_to.take();
                 self.hunt_release(c, [site.map(DropSiteId::id)])?;
-                self.hunt_drop_off(actions, c)?;
+                self.hunt_drop_off(actions, c, roles)?;
             }
             Dropped::Idle => {
                 return Err(GenieError::unsupported(
@@ -297,6 +301,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
         let master = object_master(
@@ -306,7 +311,7 @@ impl Unit {
         )?;
         let who = PointWalker {
             player_type: c.w.players.player(c.player)?.kind,
-            villager: master.class == class::VILLAGER,
+            villager: roles.of_class(master.class).contains(ClassRoles::VILLAGER),
             stance: c
                 .w
                 .parts
@@ -321,7 +326,7 @@ impl Unit {
         let walked = walked?;
         match walked {
             PointWalk::Walking => {}
-            PointWalk::Search => self.hunt_search_state(actions, c)?,
+            PointWalk::Search => self.hunt_search_state(actions, c, roles)?,
             PointWalk::Done { target, second } => {
                 let task = hunt.task;
                 self.hunt_stand(c, &task)?;
@@ -355,6 +360,7 @@ impl Unit {
         &self,
         actions: &mut Action,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
@@ -364,6 +370,7 @@ impl Unit {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
@@ -374,12 +381,12 @@ impl Unit {
 impl Action {
     /// State 2 (case 1): a done hunt waits; one of a tree's target class would search again
     /// (`set_state` 3), which is not modelled.
-    pub(crate) fn hunt_idle(&self) -> Result<(), GenieError> {
-        if self
-            .list
-            .hunt()
-            .is_some_and(|h| h.target_class == Some(class::TREE))
-        {
+    pub(crate) fn hunt_idle(&self, roles: &Roles) -> Result<(), GenieError> {
+        if self.list.hunt().is_some_and(|h| {
+            roles
+                .of_some_class(h.target_class)
+                .contains(ClassRoles::TREE)
+        }) {
             return Err(GenieError::unsupported(
                 "a done hunt of a tree's class (set_state 3)",
             ));

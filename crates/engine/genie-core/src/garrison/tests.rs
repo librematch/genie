@@ -64,7 +64,6 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TaskTerrain;
-use crate::objects::masters::class;
 use crate::objects::masters::{MasterId, ids};
 use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
@@ -92,6 +91,8 @@ use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::test_ids::unit_list;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
@@ -244,7 +245,7 @@ fn garrison_world() -> World {
 fn the_unload_groups() {
     let group = |g| {
         (0..64)
-            .filter(|&c| unload_group_takes(g, ClassId::of_master(c)))
+            .filter(|&c| unload_group_takes(g, ClassId::of_master(c), &roles()))
             .collect::<Vec<_>>()
     };
     assert_eq!(group(1), [4, 19]);
@@ -593,7 +594,7 @@ fn enter_update(t: &mut World, dt: u32) -> Result<HeadCode, GenieError> {
                 .top_action()
                 .map_or(ActionState::NO_ACTION, |a| a.state),
         };
-        u.enter_part(actions, c, me)
+        u.enter_part(actions, c, me, &roles())
     })
 }
 
@@ -894,12 +895,12 @@ fn meeting_point_is_the_shore_on_the_way_else_beach_under_the_unit() {
         position: Point::new(79.5, 92.5),
         action_point: Err(UNPLACED),
     };
-    assert_eq!(meet_at(&ship), MeetAt::Shore);
+    assert_eq!(meet_at(&ship, &roles()), MeetAt::Shore);
     let idle = MeetingTarget {
         state: ActionState::new(2),
         ..ship.clone()
     };
-    assert_eq!(meet_at(&idle), MeetAt::Shore);
+    assert_eq!(meet_at(&idle, &roles()), MeetAt::Shore);
     for t in [
         MeetingTarget {
             room: false,
@@ -914,29 +915,32 @@ fn meeting_point_is_the_shore_on_the_way_else_beach_under_the_unit() {
             ..ship.clone()
         },
     ] {
-        assert_eq!(meet_at(&t), MeetAt::Place);
+        assert_eq!(meet_at(&t, &roles()), MeetAt::Place);
     }
     let nan = MeetingTarget {
         speed: Speed::new(f32::NAN),
         ..ship.clone()
     };
-    assert_eq!(meet_at(&nan), MeetAt::Shore);
+    assert_eq!(meet_at(&nan, &roles()), MeetAt::Shore);
     let moving = MeetingTarget {
         state: ActionState::new(4),
         action_point: Ok(Point::new(60.0, 70.0)),
         ..ship
     };
-    assert_eq!(meet_at(&moving), MeetAt::ActionPoint);
+    assert_eq!(meet_at(&moving, &roles()), MeetAt::ActionPoint);
     let siege = MeetingTarget {
         class: class::SIEGE,
         ..moving.clone()
     };
-    assert_eq!(meet_at(&siege), MeetAt::Place);
+    assert_eq!(meet_at(&siege, &roles()), MeetAt::Place);
     assert_eq!(
-        meet_at(&MeetingTarget {
-            state: ActionState::new(7),
-            ..moving
-        }),
+        meet_at(
+            &MeetingTarget {
+                state: ActionState::new(7),
+                ..moving
+            },
+            &roles()
+        ),
         MeetAt::Place
     );
     // the shore on the way: from the ship's tile (5, 30) toward the villager's (5, 12) the
@@ -1145,57 +1149,66 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::VILLAGER,
         ids::VILLAGER_MALE,
-        true
+        true,
+        &roles()
     ));
     assert!(garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
         master_id(74),
-        true
+        true,
+        &roles()
     ));
     assert!(!garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_12,
         master_id(38),
-        true
+        true,
+        &roles()
     ));
     assert!(garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::MONK,
         master_id(125),
-        true
+        true,
+        &roles()
     ));
     // master 1811 is no infantry, but a monk
     assert!(garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
         MASTER_1811,
-        true
+        true,
+        &roles()
     ));
     assert!(!garrison_type_takes(
         GarrisonKinds::INFANTRY,
         class::CLASS_6,
         MASTER_1811,
-        true
+        true,
+        &roles()
     ));
     // a tower's 3 takes no monk; the task finder takes no class 42
     assert!(!garrison_type_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY,
         class::MONK,
         master_id(125),
-        true
+        true,
+        &roles()
     ));
     assert!(garrison_type_takes(
         GarrisonKinds::MONKS,
         class::RELIC,
         master_id(1),
-        true
+        true,
+        &roles()
     ));
     assert!(!garrison_type_takes(
         GarrisonKinds::MONKS,
         class::RELIC,
         master_id(1),
-        false
+        false,
+        &roles()
     ));
 }
 
@@ -1237,7 +1250,7 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
         ..Master::default()
     };
     let masters = Masters::new([arrow, tc.clone(), villager.clone()]);
-    let rate = attack_rate(&tc, &masters, Seconds::ZERO);
+    let rate = attack_rate(&tc, &masters, Seconds::ZERO, &roles());
     assert_eq!(rate, DamageRate::new(2.5));
     // a garrison firepower at most 0 is its magnitude
     assert_eq!(
@@ -1245,11 +1258,17 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
         DamageRate::new(2.5)
     );
     assert_eq!(
-        share(&villager, &masters, Seconds::ZERO, rate),
+        share(&villager, &masters, Seconds::ZERO, rate, &roles()),
         Ok(Firepower::new(1.0))
     );
     assert_eq!(
-        share(&villager, &masters, Seconds::ZERO, DamageRate::new(0.0)),
+        share(
+            &villager,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(0.0),
+            &roles()
+        ),
         Ok(Firepower::new(0.0))
     );
     // one above 0 times the melee, pierce, class 31 and 38 amounts over the reload
@@ -1295,7 +1314,7 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     };
     let masters = Masters::new([arrow, town_center()]);
     assert_eq!(
-        attack_rate(&town_center(), &masters, Seconds::ZERO),
+        attack_rate(&town_center(), &masters, Seconds::ZERO, &roles()),
         DamageRate::new(3.5)
     );
     for (reload, range) in [(f32::NAN, 6.0), (2.0, f32::NAN), (0.0, 6.0), (2.0, 1.0)] {
@@ -1305,7 +1324,9 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
             ..town_center()
         };
         assert_eq!(
-            attack_rate(&tc, &masters, Seconds::ZERO).get().to_bits(),
+            attack_rate(&tc, &masters, Seconds::ZERO, &roles())
+                .get()
+                .to_bits(),
             0.0f32.to_bits()
         );
     }
@@ -1322,7 +1343,7 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
         ..town_center()
     };
     assert_eq!(
-        attack_rate(&infantry, &masters, Seconds::new(0.5)),
+        attack_rate(&infantry, &masters, Seconds::new(0.5), &roles()),
         DamageRate::new(8.0 / 1.5)
     );
 }
@@ -1458,12 +1479,24 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
     let masters = Masters::new([foot.clone(), mounted.clone()]);
     // its own 1.0 against the other form's 3.0, over a rate of 2
     assert_eq!(
-        share(&foot, &masters, Seconds::ZERO, DamageRate::new(2.0)),
+        share(
+            &foot,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(2.0),
+            &roles()
+        ),
         Ok(Firepower::new(1.5))
     );
     // the other form's lower share leaves its own
     assert_eq!(
-        share(&mounted, &masters, Seconds::ZERO, DamageRate::new(2.0)),
+        share(
+            &mounted,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(2.0),
+            &roles()
+        ),
         Ok(Firepower::new(1.5))
     );
     let reversed = Master {
@@ -1471,7 +1504,13 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
         ..mounted.clone()
     };
     assert_eq!(
-        share(&reversed, &masters, Seconds::ZERO, DamageRate::new(2.0)),
+        share(
+            &reversed,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(2.0),
+            &roles()
+        ),
         Ok(Firepower::new(1.5))
     );
     // a named master not of type 70, or none, gives the floor 0.0; flag 3 clear names none
@@ -1481,7 +1520,13 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
     };
     let masters_80 = Masters::new([foot.clone(), building]);
     assert_eq!(
-        share(&foot, &masters_80, Seconds::ZERO, DamageRate::new(2.0)),
+        share(
+            &foot,
+            &masters_80,
+            Seconds::ZERO,
+            DamageRate::new(2.0),
+            &roles()
+        ),
         Ok(Firepower::new(0.5))
     );
     let unflagged = Master {
@@ -1489,12 +1534,24 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
         ..foot.clone()
     };
     assert_eq!(
-        share(&unflagged, &masters, Seconds::ZERO, DamageRate::new(2.0)),
+        share(
+            &unflagged,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(2.0),
+            &roles()
+        ),
         Ok(Firepower::new(0.5))
     );
     // a negative quotient and a NaN one give the floor 0.0
     assert_eq!(
-        share(&unflagged, &masters, Seconds::ZERO, DamageRate::new(-2.0)),
+        share(
+            &unflagged,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(-2.0),
+            &roles()
+        ),
         Ok(Firepower::new(0.0))
     );
     assert_eq!(
@@ -1502,17 +1559,25 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
             &unflagged,
             &masters,
             Seconds::ZERO,
-            DamageRate::new(f32::NAN)
+            DamageRate::new(f32::NAN),
+            &roles()
         ),
         Ok(Firepower::new(0.0))
     );
     // _fdclass: a rate of ±0 gives +0.0; class 42 gives 1.0 whatever the rate
     assert_eq!(
-        share(&foot, &masters, Seconds::ZERO, DamageRate::new(-0.0)).map(|f| f.get().to_bits()),
+        share(
+            &foot,
+            &masters,
+            Seconds::ZERO,
+            DamageRate::new(-0.0),
+            &roles()
+        )
+        .map(|f| f.get().to_bits()),
         Ok(0)
     );
     let relic_like = Master {
-        class: WHOLE_SHARE_CLASS,
+        class: class::RELIC,
         ..foot
     };
     assert_eq!(
@@ -1520,7 +1585,8 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
             &relic_like,
             &masters,
             Seconds::ZERO,
-            DamageRate::new(f32::NAN)
+            DamageRate::new(f32::NAN),
+            &roles()
         ),
         Ok(Firepower::new(1.0))
     );
@@ -1712,7 +1778,7 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
     relic = Masters::new(relic.iter().cloned().chain([Master {
         id: ids::RELIC,
         kind: MasterKind::COMBAT,
-        class: WHOLE_SHARE_CLASS,
+        class: class::RELIC,
         ..Master::default()
     }]));
     t.model.masters = (0..4).map(|_| relic.clone()).map(Arc::new).collect();
@@ -3940,7 +4006,7 @@ fn transport_unloads_inside_its_own_update() {
                 .top_action()
                 .map_or(ActionState::NO_ACTION, |a| a.state),
         };
-        let _ = unit.transport_update(actions, c, me)?;
+        let _ = unit.transport_update(actions, c, me, &roles())?;
         let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
         Ok((inside, actions.list.transport().map(|t| t.state)))
     });

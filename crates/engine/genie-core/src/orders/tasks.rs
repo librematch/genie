@@ -4,7 +4,7 @@ use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::construction::build::{BuildAction, BuildTask};
 use crate::construction::repair::RepairState;
-use crate::construction::repair::{RepairAction, RepairTask, SHIP_REPAIR, SHIPS};
+use crate::construction::repair::{RepairAction, RepairTask, SHIP_REPAIR};
 use crate::construction::{FoundationId, RepairTargetId};
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HuntTask;
@@ -26,6 +26,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::RepairOrder;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// A repairer whose top action is no Repair where the order retargets it.
@@ -159,6 +160,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         );
         let build = BuildAction::start(to, build_task, &move_reads)?;
         self.take(target, self.releaser(player, idx)?)?;
@@ -197,7 +199,12 @@ impl World {
     ) -> Result<(RepairAction, ClassId), GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = t.master(self.master_tables(), tp)?;
-        if SHIPS.contains(&tm.class) {
+        if self
+            .model
+            .roles
+            .of_class(tm.class)
+            .contains(ClassRoles::REPAIRED_AT_SHORE)
+        {
             return Err(SHIP_REPAIR);
         }
         let class = tm.class;
@@ -210,6 +217,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         );
         let to = move_reads
             .walk_to(self, Some(target))?
@@ -345,7 +353,13 @@ impl World {
     ) -> Result<ClassId, GenieError> {
         let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
         let tm = t.master(self.master_tables(), tp)?;
-        let (class, ship) = (tm.class, SHIPS.contains(&tm.class));
+        let (class, ship) = (
+            tm.class,
+            self.model
+                .roles
+                .of_class(tm.class)
+                .contains(ClassRoles::REPAIRED_AT_SHORE),
+        );
         let player_type = self.players.player(player)?.kind;
         let repair = self
             .parts
@@ -383,6 +397,7 @@ impl World {
                     &self.model.graphics,
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
+                &self.model.roles,
             );
             let to = move_reads
                 .walk_to(self, Some(target))?
@@ -485,6 +500,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         );
         let walk = old.task.walk(&move_reads, Some(to))?;
         // the work command gives the Build its new foundation

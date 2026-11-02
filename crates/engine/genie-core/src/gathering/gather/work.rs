@@ -15,13 +15,14 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::{PASTURE, PASTURE_MANGROVE};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 use std::mem::take as mem_take;
@@ -37,10 +38,11 @@ impl GatherAction {
         unit: &mut Unit,
         target: &Victim,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
         self.state = GatherState::Face;
         // another player's farm is the gatherer's to take (FUN_141185360, FUN_1411858f0)
-        if target.class == class::FARM && target.player != c.player {
+        if roles.of_class(target.class).contains(ClassRoles::FARM) && target.player != c.player {
             return Err(GenieError::unsupported(
                 "a gather's set_state 6 on another player's farm (FUN_141185360)",
             ));
@@ -113,6 +115,7 @@ impl GatherAction {
         unit: &mut Unit,
         target: &mut Victim,
         r: &GatherReads,
+        roles: &Roles,
     ) -> Result<Next, GenieError> {
         let held = &mut unit.life.amount;
         let work = Amount::new((r.work_rate * self.task.work_value) * c.dt.seconds());
@@ -141,7 +144,7 @@ impl GatherAction {
         // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
         // 0xf8 with 1), the unit holds none, and the gathering goes on
         if Amount::ZERO < r.food_sold
-            && target.class == class::FARM
+            && roles.of_class(target.class).contains(ClassRoles::FARM)
             // The food kind a farm holds (`+0x308` 16): the food sold at once.
             && unit.life.attribute_type == Some(attribute::FARM_FOOD)
         {
@@ -178,6 +181,7 @@ impl GatherAction {
         me: Me,
         r: &GatherReads,
         site: Option<DropOff>,
+        roles: &Roles,
     ) -> Result<Dropped, GenieError> {
         if self.timer < Seconds::ZERO {
             self.timer += c.dt.seconds();
@@ -188,7 +192,7 @@ impl GatherAction {
             return Ok(Dropped::Again);
         }
         // the list's code: 0 walks or waits, 1 and 2 end it; 3 to 5 wait at random
-        match self.update_list(c, unit, me, r)?.get() {
+        match self.update_list(c, unit, me, r, roles)?.get() {
             0 => return Ok(Dropped::Going),
             3..=5 => {
                 self.random_wait(c, unit);

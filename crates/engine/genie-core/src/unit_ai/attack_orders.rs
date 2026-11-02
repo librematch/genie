@@ -7,7 +7,6 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
@@ -22,7 +21,21 @@ use crate::unit_ai::{
     UnitSide, civilian_may_attack, lion_may_attack,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
+
+/// The order [`UnitAi::order_now`] runs at once: the order, the unit that keeps the current
+/// order in front of the queue (inFront 1) and the unit's place for the stop.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct OrderNow {
+    /// The order.
+    pub(super) order: QueuedOrder,
+    /// The unit whose current order goes in front of the queue first.
+    pub(super) keep_from: Option<ObjectId>,
+    /// The unit's position (x, y) and master's class, for the stop.
+    pub(super) place: Option<(Point, Option<ClassId>)>,
+}
 
 impl UnitAi {
     /// `FUN_140c55c90`'s immediate branch ("Adding as an immediate order."), for a unit in state
@@ -39,13 +52,17 @@ impl UnitAi {
     /// and the unit) and, unless it was not ready, leaves the queue (`FUN_140c5e280`).
     pub(super) fn order_now(
         &mut self,
-        order: QueuedOrder,
-        keep_from: Option<ObjectId>,
-        place: Option<(Point, Option<ClassId>)>,
+        now: OrderNow,
         world: Option<(&Surroundings, PlayerType)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
+        let OrderNow {
+            order,
+            keep_from,
+            place,
+        } = now;
         if let Some(unit) = keep_from
             && let Some(current) = self.current_order
         {
@@ -66,14 +83,14 @@ impl UnitAi {
         self.insert_order(order, QueueEnd::Front);
         if order.order != OrderKind::AttackRoundup {
             self.remove_target();
-            self.stop_with(StopOrder::Keep, place, side, ai)?;
+            self.stop_with(StopOrder::Keep, place, side, ai, roles)?;
         }
         match &world {
             Some((at, _)) => self.end_notifies(Millis::ZERO, at, side, ai)?,
             None => self.clear_notifies(Millis::ZERO)?,
         }
         let front = *self.orders.checked(0)?;
-        if self.process_order(&front, world, place, ai, side)? != OrderOutcome::NotReady {
+        if self.process_order(&front, world, place, ai, side, roles)? != OrderOutcome::NotReady {
             let _ = self.orders.remove(0);
         }
         Ok(())
@@ -134,6 +151,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
+        let roles = &at.roles;
         if matches!(
             self.ai_type,
             UnitAiType::SOLDIER | UnitAiType::TOWER | SIEGE_AI
@@ -156,8 +174,8 @@ impl UnitAi {
             | ARTIFACT_AI
             | SIEGE_TOWER_AI
             | UnitAiType::LIVESTOCK => true,
-            UnitAiType::LION => any || lion_may_attack(at.attack_priority, t.class),
-            CIVILIAN => civilian_may_attack(at.attack_priority, t.class),
+            UnitAiType::LION => any || lion_may_attack(at.attack_priority, t.class, roles),
+            CIVILIAN => civilian_may_attack(at.attack_priority, t.class, roles),
             // FUN_140c18b60
             UnitAiType::BUILDING => false,
             _ => {
@@ -200,6 +218,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
+        let roles = &at.roles;
         let t = match at.unit(target) {
             Some(t) => *t,
             None => match side.seen_unit(target)? {
@@ -207,7 +226,10 @@ impl UnitAi {
                 None => return Ok(false),
             },
         };
-        if matches!(t.class, class::PREY | class::PREDATOR | class::TREE) {
+        if roles
+            .of_class(t.class)
+            .intersects(ClassRoles::PREY | ClassRoles::PREDATOR | ClassRoles::TREE)
+        {
             self.hunt_object(target, t.class, t.position, at, side, rng)?;
             return Ok(true);
         }

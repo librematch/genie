@@ -18,7 +18,6 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
@@ -50,6 +49,7 @@ use crate::unit_ai::{NewObject, Notify, UnitAi};
 use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 
 impl World {
     /// `FUN_140ad0240`: the unit of `master` spawns beside the building at `i`. The spawn point
@@ -173,33 +173,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let master = self.players.live(p, new)?.life.master_id;
         for o in queue {
-            let target = o
-                .target
-                .is_some()
-                .then(|| self.object(o.target))
-                .flatten()
-                .map(|(tp, t)| (tp, t.life.master_id));
-            if let Some((tp, tm)) = target {
-                let ai = self.parts.unit_ai.get(self.players.live(p, new)?.id);
-                // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`):
-                // an order whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
-                let relic_order =
-                    |q: &QueuedOrder| q.target_type.is_some_and(|t| t.class() == class::RELIC);
-                let keeps =
-                    tm == MONASTERY && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
-                let target_master = self.master(tp, tm)?;
-                if !keeps
-                    && MasterKind::COMBAT <= target_master.kind
-                    && target_master.garrison.holds()
-                    // a queued order's target −1 is a point: it takes nothing in
-                    && o.target
-                        .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?
-                {
-                    return Err(GenieError::unsupported(
-                        "a command queue's order on a building the unit may enter (its room, slot 0x198)",
-                    ));
-                }
-            }
+            self.queued_target(p, new, master, o)?;
             let unit = self.players.live_mut(p, new)?;
             let state = unit.life.state;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -212,6 +186,54 @@ impl World {
                 };
                 let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
             }
+        }
+        Ok(())
+    }
+
+    /// [`World::hand_queue`]'s test of a queued order's target `o.target` for the new unit at
+    /// `new` (of master `master`): an order on a monastery (104) of a unit whose AI already queues
+    /// one of the relic's target type keeps its kind; on another object the unit may enter it
+    /// would become an enter order (`0x2cd`), not modelled. An order without a target, or on one
+    /// the world does not hold, passes.
+    fn queued_target(
+        &self,
+        p: PlayerId,
+        new: ListIndex,
+        master: MasterId,
+        o: &QueuedOrder,
+    ) -> Result<(), GenieError> {
+        let target = o
+            .target
+            .is_some()
+            .then(|| self.object(o.target))
+            .flatten()
+            .map(|(tp, t)| (tp, t.life.master_id));
+        let Some((tp, tm)) = target else {
+            return Ok(());
+        };
+        let ai = self.parts.unit_ai.get(self.players.live(p, new)?.id);
+        // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`): an order
+        // whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
+        let relic_order = |q: &QueuedOrder| {
+            q.target_type.is_some_and(|t| {
+                self.model
+                    .roles
+                    .of_class(t.class())
+                    .contains(ClassRoles::RELIC)
+            })
+        };
+        let keeps = tm == MONASTERY && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
+        let target_master = self.master(tp, tm)?;
+        if !keeps
+            && MasterKind::COMBAT <= target_master.kind
+            && target_master.garrison.holds()
+            // a queued order's target −1 is a point: it takes nothing in
+            && o.target
+                .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?
+        {
+            return Err(GenieError::unsupported(
+                "a command queue's order on a building the unit may enter (its room, slot 0x198)",
+            ));
         }
         Ok(())
     }
@@ -316,9 +338,9 @@ impl World {
                 )
             })
         });
-        let ai_type = unit_ai_type(made, master).ok_or(GenieError::unsupported(
-            "a new combat unit without a unit AI",
-        ))?;
+        let ai_type = unit_ai_type(made, master, &self.model.roles).ok_or(
+            GenieError::unsupported("a new combat unit without a unit AI"),
+        )?;
         let new_object = self.new_object(p, master, made, position)?;
         let standing = made
             .standing_sprite
@@ -328,7 +350,12 @@ impl World {
             ))?;
         let id = self.take_object_id(p, master);
         let (sprite, facets, angle) = self.setup_draws(standing);
-        let ai = UnitAi::constructed(ai_type, &new_object, self.streams.get(Stream::Ai));
+        let ai = UnitAi::constructed(
+            ai_type,
+            &new_object,
+            self.streams.get(Stream::Ai),
+            &self.model.roles,
+        );
         let _ = self.streams.get(Stream::Object).rand15();
         // its place, record, mesh shape and sight (new_position, slot 0x58, and FUN_141054fe0)
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
@@ -364,7 +391,7 @@ impl World {
                     explored: false,
                     building: None,
                     umv: 0,
-                    capture: capture_kind(p, made.class, master),
+                    capture: capture_kind(p, made.class, master, &self.model.roles),
                     kind: made.kind,
                 },
             );
@@ -397,11 +424,16 @@ impl World {
         owner.add_attribute(attribute::TOTAL_VALUE, Amount::new(cost as f32))?;
         owner.add_attribute(attribute::UNITS_VALUE, Amount::new(cost as f32))?;
         owner.add_attribute(AttributeId::numbered(246), Amount::new(cost as f32))?;
-        if made.class == class::VILLAGER {
+        if self
+            .model
+            .roles
+            .of_class(made.class)
+            .contains(ClassRoles::VILLAGER)
+        {
             owner.add_attribute(AttributeId::numbered(248), Amount::new(1.0))?;
         }
         // the combat setup's class counters (FUN_141226060)
-        count_class(&mut owner.attributes, made, 1.0);
+        count_class(&mut owner.attributes, made, 1.0, &self.model.roles);
         let combat = Combat {
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
             firepower: made.volley_fire,

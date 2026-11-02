@@ -12,12 +12,13 @@ the two equal. The module exists in test builds only.
 | File | What it holds |
 | --- | --- |
 | [`build_158041.rs`](build_158041.rs) | Build 158041's layer as genie's tests build it (FD-046-D08): the values of `builds/158041.ncl`, each float by its bits, without Nickel. |
-| [`mod.rs`](mod.rs) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel. |
+| [`class.rs`](class.rs) | The classes genie-core's tests name: build 158041's `.dat` values, as the tests' masters carry them. |
+| [`mod.rs`](mod.rs) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes the tests name. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: no other system.
-- Used by: no other system.
+- Uses: [`objects`](../objects/), [`world`](../world/).
+- Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

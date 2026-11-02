@@ -3,14 +3,18 @@
 
 use crate::GenieError;
 use genie_diff::{Diff, Differ};
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's class (`+0x410`, the `.dat`'s `unit_class`), 0 or more, or −1 for a master that has
-/// none ([`ClassId::of_master`]). The `.dat` holds classes
-/// that [`crate::objects::masters::class`] does not name (it names the ones the simulation tells
-/// apart), so the class is a newtype with named constants, not an enum: any class the data
-/// holds is a class, and the named ones are values of the type.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// none ([`ClassId::of_master`]). The `.dat` holds classes the engine does not tell apart, and
+/// the ones it does are roles of the build layer (`Roles::of_class`, FD-046-D03), so the class
+/// is a newtype, not an enum: any class the data holds is a class.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(try_from = "i16", into = "i16")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClassId(
     /// Its value, as the `.dat` and the obfuscated build's decoded short hold it.
@@ -83,9 +87,13 @@ impl ClassId {
         Self::of_field(short)
     }
 
-    /// A class the code names, in a constant: only [`crate::objects::masters::class`] makes
-    /// them.
-    pub(super) const fn named(value: i16) -> Self {
+    /// A class a constant names: a slot of the build layer's fixture, a test's class.
+    ///
+    /// # Panics
+    ///
+    /// For a negative value, which no class is (at compile time in a constant).
+    #[must_use]
+    pub const fn named(value: i16) -> Self {
         assert!(0 <= value, "a negative class");
         Self(value)
     }
@@ -122,10 +130,17 @@ impl TryFrom<i16> for ClassId {
     }
 }
 
+impl From<ClassId> for i16 {
+    /// The class's value, as a slot's serde form holds it.
+    fn from(id: ClassId) -> Self {
+        id.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ErrorKind;
-    use crate::objects::masters::{ClassId, class};
+    use crate::objects::masters::ClassId;
 
     /// A class is 0 or more; a negative value is no class.
     #[test]
@@ -141,17 +156,17 @@ mod tests {
     /// A master's −1 is no class as an optional field holds it; any other class is itself.
     #[test]
     fn master_minus_one_is_no_class_in_field() {
-        assert_eq!(class::NO_CLASS.or_none(), None);
-        assert_eq!(class::FARM.or_none(), Some(class::FARM));
+        assert_eq!(ClassId::of_master(-1).or_none(), None);
+        assert_eq!(ClassId::named(49).or_none(), Some(ClassId::named(49)));
     }
 
     /// A field of −1 is no class, any other value a class, and each converts back to its value.
     #[test]
     fn field_minus_one_is_none_and_any_other_value_class() {
         assert_eq!(ClassId::of_field(-1), Ok(None));
-        assert_eq!(ClassId::of_field(0), Ok(Some(class::CLASS_0)));
+        assert_eq!(ClassId::of_field(0), Ok(Some(ClassId::named(0))));
         assert_eq!(ClassId::field(None), -1);
-        assert_eq!(ClassId::field(Some(class::VILLAGER)), 4);
+        assert_eq!(ClassId::field(Some(ClassId::named(4))), 4);
         assert_eq!(
             ClassId::of_field(-2).map_err(|e| e.kind()),
             Err(ErrorKind::InvalidInput)
@@ -163,15 +178,15 @@ mod tests {
     fn master_without_class_holds_minus_one() {
         assert_eq!(ClassId::of_master(-1).get(), -1);
         assert_eq!(ClassId::of_master(-1).index(), None);
-        assert_eq!(class::VILLAGER.index(), Some(4));
-        assert_eq!(ClassId::of_master(4), class::VILLAGER);
+        assert_eq!(ClassId::named(4).index(), Some(4));
+        assert_eq!(ClassId::of_master(4), ClassId::named(4));
     }
 
-    /// The named classes are values of the type, equal to the data's.
+    /// A class a constant names is a value of the type, equal to the data's.
     #[test]
     fn the_named_classes_are_values_of_the_type() {
-        assert_eq!(class::VILLAGER, ClassId::try_from(4).unwrap());
-        assert_ne!(class::VILLAGER, class::BUILDING);
-        assert!(class::BUILDING < class::VILLAGER);
+        assert_eq!(ClassId::named(4), ClassId::try_from(4).unwrap());
+        assert_ne!(ClassId::named(4), ClassId::named(3));
+        assert!(ClassId::named(3) < ClassId::named(4));
     }
 }

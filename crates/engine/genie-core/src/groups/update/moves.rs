@@ -428,9 +428,15 @@ impl World {
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(p, idx)?;
         let me = unit.me(self.parts.actions_of(unit.id));
-        let (mover, by_id) = self
-            .parts
-            .lend_mover(unit.id, (&self.players, &self.index, &self.model.masters));
+        let (mover, by_id) = self.parts.lend_mover(
+            unit.id,
+            (
+                &self.players,
+                &self.index,
+                &self.model.masters,
+                &self.model.roles,
+            ),
+        );
         let stepped = match mover {
             Some(mover) => {
                 let mut plan = Planning {

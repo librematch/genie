@@ -10,12 +10,16 @@
 
 pub mod generated;
 
-use crate::layer::generated::AttributeRoles;
-use crate::layer::generated::ClassRoles;
-use crate::layer::generated::MasterRoles;
-use crate::layer::generated::Slots;
-use crate::layer::generated::TechRoles;
-use crate::layer::generated::Tuning;
+pub use crate::layer::generated::AttributeRoles;
+pub use crate::layer::generated::AttributeSlots;
+pub use crate::layer::generated::ClassRoles;
+pub use crate::layer::generated::ClassSlots;
+pub use crate::layer::generated::MasterRoles;
+pub use crate::layer::generated::MasterSlots;
+pub use crate::layer::generated::Slots;
+pub use crate::layer::generated::TechRoles;
+pub use crate::layer::generated::TechSlots;
+pub use crate::layer::generated::Tuning;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::attribute::AttributeId;
@@ -75,6 +79,12 @@ impl Roles {
             .unwrap_or_default()
     }
 
+    /// The roles of an optional class: its class's, none for none.
+    #[must_use]
+    pub fn of_some_class(&self, class: Option<ClassId>) -> ClassRoles {
+        class.map_or_else(ClassRoles::empty, |c| self.of_class(c))
+    }
+
     /// The roles of a master; none for one beyond the table.
     #[must_use]
     pub fn of_master(&self, master: MasterId) -> MasterRoles {
@@ -82,6 +92,12 @@ impl Roles {
             .get(master.index())
             .copied()
             .unwrap_or_default()
+    }
+
+    /// The roles of an optional master: its master's, none for none.
+    #[must_use]
+    pub fn of_some_master(&self, master: Option<MasterId>) -> MasterRoles {
+        master.map_or_else(MasterRoles::empty, |m| self.of_master(m))
     }
 
     /// The roles of a technology; none for one beyond the table.

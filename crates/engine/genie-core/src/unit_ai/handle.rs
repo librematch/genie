@@ -182,6 +182,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         match n.kind {
             NotifyKind::ACTION_COMPLETED => self.action_completed(n, at, player_type, ai_rng, side),
             NotifyKind::ACTION_FAILED => self.action_failed(n, at, player_type, ai_rng, side),
@@ -224,7 +225,7 @@ impl UnitAi {
                 self.damaged(n, time, at, player_type, ai_rng, side)
             }
             NotifyKind::IN_THE_WAY => self.in_the_way(n, at, side, ai_rng),
-            NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng),
+            NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles),
             // a unit of a group sent off a footprint: the action value 0x2c0
             NotifyKind::SENT_OFF_GROUP => {
                 self.set_action(Some(AiAction::GroupAside));

@@ -12,6 +12,7 @@ use crate::gathering::gather::{
     FARM_FOOD_SOLD, GatherAction, GatherReads, GatherState, Next, productivity_of,
 };
 use crate::gathering::hunt::DropOff;
+use crate::gathering::hunt::Dropped;
 use crate::gathering::hunt::HuntSprites;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -43,6 +44,7 @@ use crate::unit_ai::task_finder::world::state_of;
 use crate::unit_ai::task_finder::{allied, drops_at};
 use crate::unit_ai::world_view::DropWorld;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -67,11 +69,12 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
         self.gather_check_targets(actions, c, by)?;
         let gather = *actions.list.gather().ok_or(NO_GATHER)?;
-        let reads = self.gather_reads(c, &gather)?;
+        let reads = self.gather_reads(c, &gather, roles)?;
         if matches!(gather.state, GatherState::Drop { .. }) {
             return self.gather_drop_update(actions, c, me, gather, &reads, by);
         }
@@ -136,8 +139,9 @@ impl Unit {
         every: MasterTables<'_>,
         player: PlayerId,
         (graphics, look): (&'g Graphics, Option<&Look>),
+        roles: &Roles,
     ) -> Result<Walks<'g>, GenieError> {
-        let sprites = SpriteReads::of(self.master(every, player)?, look, graphics);
+        let sprites = SpriteReads::of(self.master(every, player)?, look, graphics, roles);
         Ok(Walks::of(sprites, (self, mover)))
     }
 
@@ -150,7 +154,12 @@ impl Unit {
     /// # Errors
     ///
     /// A gatherer whose master the slice lacks.
-    fn gather_reads(&self, c: &Step<'_>, gather: &GatherAction) -> Result<GatherReads, GenieError> {
+    fn gather_reads(
+        &self,
+        c: &Step<'_>,
+        gather: &GatherAction,
+        roles: &Roles,
+    ) -> Result<GatherReads, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let g = |id: Option<SpriteId>| id.and_then(|s| c.w.model.graphics.get(s).copied());
         let task = gather.task;
@@ -173,6 +182,7 @@ impl Unit {
             defaults: MoveDefaults::of(
                 master,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                roles,
             ),
             master: self.life.master_id,
             stance: c
@@ -204,7 +214,7 @@ impl Unit {
         reads: &GatherReads,
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
-        use crate::gathering::hunt::Dropped;
+        let roles = &c.w.model.roles.clone();
         let (position, radius) =
             c.w.spatial
                 .get_known(self.id)?
@@ -212,15 +222,17 @@ impl Unit {
                 .ok_or(GenieError::unsupported("a gatherer without a place"))?;
         let site = self.gather_site(c, gather.carry_to, (position, radius))?;
         let before = gather.targets();
-        let dropped = gather.update_drop(c, self, me, reads, site);
+        let dropped = gather.update_drop(c, self, me, reads, site, roles);
         actions.put_gather(gather);
         match dropped? {
             Dropped::Going => Ok(HeadCode::Keeps),
             Dropped::Load(kind, amount) => {
-                self.gather_load_dropped(actions, c, by, (kind, amount), radius)
+                self.gather_load_dropped(actions, c, by, (kind, amount), radius, roles)
             }
             // set_state(8) again: the drop site kept or searched
-            Dropped::Again => self.gather_drop_off(actions, c).map(|()| HeadCode::Keeps),
+            Dropped::Again => self
+                .gather_drop_off(actions, c, roles)
+                .map(|()| HeadCode::Keeps),
             // set_state(2): the target, then the drop site go (slot 0x68, FUN_140a7a190)
             Dropped::Idle => {
                 for id in before.into_iter().flatten() {
@@ -277,11 +289,12 @@ impl Unit {
         by: Releaser,
         (kind, amount): (AttributeId, Amount),
         radius: Footprint,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         c.give_load(kind, amount)?;
         let gather = actions.list.gather().ok_or(NO_GATHER)?;
         if gather.target.is_none() {
-            return self.gather_after_drop(actions, c);
+            return self.gather_after_drop(actions, c, roles);
         }
         release(c, self, gather.carry_to, by)?;
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
@@ -293,6 +306,7 @@ impl Unit {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
         gather.carry_to = None;
@@ -331,18 +345,19 @@ impl Unit {
         reads: &GatherReads,
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
-        let mut victim = victim(c, gather.target)?;
+        let roles = &c.w.model.roles.clone();
+        let mut victim = victim(c, gather.target, roles)?;
         let old = (gather.target, gather.carry_to);
-        let next = gather.update(c, self, me, victim.as_mut(), reads);
+        let next = gather.update(c, self, me, victim.as_mut(), reads, roles);
         actions.put_gather(gather);
         let next = next?;
         // what the work changed on its target, where it ran
         if let Some(v) = victim.as_mut()
             && let Some(k) = write_back(c, v)?
         {
-            file_kill(c, (self, actions), k)?;
+            file_kill(c, (self, actions), k, roles)?;
         }
-        self.gather_next(actions, c, next, old, by)
+        self.gather_next(actions, c, next, old, by, roles)
     }
 
     /// What follows the Gather's update (`next`; `old`: its targets before): an end is its code
@@ -360,6 +375,7 @@ impl Unit {
         next: Next,
         (old_target, old_second): (Option<GatherTargetId>, Option<DropSiteId>),
         by: Releaser,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         use crate::gathering::gather::Next;
         if next == Next::Done {
@@ -382,7 +398,7 @@ impl Unit {
             }
         }
         match next {
-            Next::Drop => self.gather_drop_off(actions, c)?,
+            Next::Drop => self.gather_drop_off(actions, c, roles)?,
             Next::Search => self.gather_search(actions, c)?,
             Next::Build => {
                 // a build command on no foundation does nothing
@@ -414,7 +430,13 @@ impl Unit {
         actions: &Action,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+        );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);

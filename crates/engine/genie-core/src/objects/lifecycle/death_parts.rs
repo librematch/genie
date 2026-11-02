@@ -11,12 +11,11 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::ids::WONDER;
@@ -30,6 +29,8 @@ use crate::players::attribute::AttributeId;
 use crate::players::attribute::CASTLES;
 use crate::players::attribute::MONASTERIES;
 use crate::players::attribute::WONDERS;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`Completion::farm_bonus`]);
@@ -101,16 +102,17 @@ pub(crate) fn combat_dies(
     master: &Master,
     spatial: &mut Spatial,
     pathing: &mut Pathing,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     if u.pasture.is_some() || u.my_pasture.is_some() {
         return Err(GenieError::unsupported(
             "a dying unit in a pasture (FUN_141189ca0)",
         ));
     }
-    if matches!(
-        master.class,
-        class::ARTIFACT | class::SIEGE | class::CLASS_43
-    ) {
+    if roles
+        .of_class(master.class)
+        .intersects(ClassRoles::ARTIFACT | ClassRoles::SIEGE | ClassRoles::MONK_WITH_RELIC)
+    {
         return Err(GenieError::unsupported("a dying unit of class 1, 13 or 43"));
     }
     u.life.hp = HitPoints::ZERO;
@@ -297,43 +299,8 @@ pub(crate) fn clear_look_of(
     })
 }
 
-/// The classes a combat object of which counts in its player's attribute 40
-/// (`FUN_141226060`).
-pub(crate) const MILITARY_CLASSES: [ClassId; 24] = [
-    class::CLASS_0,
-    class::CLASS_6,
-    class::CLASS_12,
-    class::SIEGE,
-    class::MONK,
-    class::WARSHIP,
-    class::CLASS_23,
-    class::CLASS_24,
-    class::CLASS_26,
-    class::CLASS_28,
-    class::CLASS_35,
-    class::CLASS_36,
-    class::CLASS_43,
-    class::CLASS_44,
-    class::CLASS_45,
-    class::CLASS_46,
-    class::CLASS_47,
-    class::CLASS_50,
-    class::CLASS_51,
-    class::CLASS_53,
-    class::CLASS_54,
-    class::CLASS_55,
-    class::CLASS_56,
-    class::CLASS_57,
-];
 /// The masters whose objects count in attribute 235 besides 40 (`FUN_141226060`).
-pub(crate) const MILITARY_235: [MasterId; 2] = [MasterId::named(1663), MasterId::named(1697)];
-/// The classes that count in attribute 37 (`FUN_141226060`); the villagers' (4) too.
-pub(crate) const CIVILIAN_CLASSES: [ClassId; 4] = [
-    class::TRADE_BOAT,
-    class::TRADE_CART,
-    class::TRANSPORT,
-    class::FISHING_SHIP,
-];
+pub(crate) const MILITARY_235: [MasterId; 2] = [ids::ID_1663, ids::ID_1697];
 
 /// `FUN_141226060`: a combat object (type 70 and up) of `master` counts `by` (1 or -1) in its
 /// player's `attributes` by its class: a military class (0, 6, 12, 13, 18, 22 to 24, 26, 28, 35,
@@ -343,20 +310,23 @@ pub(crate) const CIVILIAN_CLASSES: [ClassId; 4] = [
 /// Its callers: the combat setup (`FUN_14121df60`, 1), the destructors (`FUN_141200450`,
 /// `FUN_1411ec020`, -1), the ownership change (`FUN_14120f800`, -1 then 1 for the new owner) and
 /// the master change (`FUN_141186580` through `FUN_141209d90`, -1 then 1 with the new master).
-pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32) {
+pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32, roles: &Roles) {
     let mut add = |i: usize| {
         if let Some(v) = attributes.get_mut(i) {
             *v += Amount::new(by);
         }
     };
-    if MILITARY_CLASSES.contains(&master.class) {
+    if roles
+        .of_class(master.class)
+        .contains(ClassRoles::MILITARY_COUNT)
+    {
         add(40);
         if MILITARY_235.contains(&master.id) {
             add(235);
         }
         return;
     }
-    if master.class == class::VILLAGER
+    if roles.of_class(master.class).contains(ClassRoles::VILLAGER)
         && matches!(
             master.task_by_group,
             TaskGroup::MALE_VILLAGERS | TaskGroup::FEMALE_VILLAGERS
@@ -364,7 +334,11 @@ pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32) {
     {
         add(38);
     }
-    if master.class == class::VILLAGER || CIVILIAN_CLASSES.contains(&master.class) {
+    if roles.of_class(master.class).contains(ClassRoles::VILLAGER)
+        || roles
+            .of_class(master.class)
+            .contains(ClassRoles::CIVILIAN_COUNT)
+    {
         add(37);
     }
 }

@@ -31,7 +31,6 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
@@ -57,6 +56,8 @@ use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -84,12 +85,13 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let Some(mut enter) = actions.list.enter().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let reads = self.enter_reads(c, &enter)?;
-        let updated = enter.update(c, self, actions, me, &reads);
+        let reads = self.enter_reads(c, &enter, roles)?;
+        let updated = enter.update(c, self, actions, me, &reads, roles);
         if let Some(e) = actions.list.enter_mut() {
             *e = enter;
         }
@@ -106,8 +108,19 @@ impl Unit {
     /// # Errors
     ///
     /// The target's master's and [`crate::garrison::enter_view`]'s.
-    fn enter_reads(&self, c: &mut Step<'_>, enter: &EnterAction) -> Result<EnterReads, GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
+    fn enter_reads(
+        &self,
+        c: &mut Step<'_>,
+        enter: &EnterAction,
+        roles: &Roles,
+    ) -> Result<EnterReads, GenieError> {
+        let by_id = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+        );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let (target, start) = match others.find(enter.target) {
             Some((tp, t)) => {
@@ -137,7 +150,7 @@ impl Unit {
             ),
         };
         let master = self.master(c.w.master_tables(), c.player)?;
-        let villager = master.class == class::VILLAGER;
+        let villager = roles.of_class(master.class).contains(ClassRoles::VILLAGER);
         Ok(EnterReads {
             target,
             start,
@@ -151,6 +164,7 @@ impl Unit {
             defaults: MoveDefaults::of(
                 master,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                roles,
             ),
         })
     }
@@ -162,6 +176,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         target: Option<ContainerId>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let target = target.ok_or(GenieError::unreachable(
             "an Enter's enter without its target",
@@ -170,7 +185,7 @@ impl Unit {
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             target.id(),
         );
-        if !self.enter_building(actions, c, target, inside)? {
+        if !self.enter_building(actions, c, target, inside, roles)? {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",
             ));
@@ -211,6 +226,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         me: Me,
+        roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let mut t = *actions.list.transport().ok_or(NO_TRANSPORT)?;
         let master = object_master(
@@ -225,6 +241,7 @@ impl Unit {
             defaults: MoveDefaults::of(
                 master,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                roles,
             ),
             given,
             standing: master
@@ -254,6 +271,7 @@ impl Unit {
             (&Graphics, Option<&Look>),
             &mut Well512,
         ),
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = self.master_in(masters)?;
         let task = actions
@@ -267,6 +285,7 @@ impl Unit {
             spatial.map,
             (graphics, look),
             task,
+            roles,
         )?;
         let restriction = master.terrain_restriction;
         let mut shore = MapShore::new(spatial, zones, pathing, restriction, self.position())?;
@@ -346,6 +365,7 @@ impl Unit {
         c: &mut Step<'_>,
         target: ContainerId,
         inside: usize,
+        roles: &Roles,
     ) -> Result<bool, GenieError> {
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
@@ -427,7 +447,7 @@ impl Unit {
         if bm.garrison.units() <= inside {
             return Ok(false);
         }
-        self.go_inside(actions, c, target, &me, &bm)?;
+        self.go_inside(actions, c, target, &me, &bm, roles)?;
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
@@ -454,6 +474,7 @@ impl Unit {
         target: ContainerId,
         me: &Master,
         bm: &Master,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let id = self.id;
         if self.life.inside.is_some() {
@@ -507,7 +528,7 @@ impl Unit {
         self.enter_sight(c, target, at, building_radius, placed, bm)?;
         let mut bell = c.w.parts.town_bell_of(id);
         let ai = c.w.parts.unit_ai.get(id);
-        self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm))?;
+        self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm), roles)?;
         c.w.parts.set_town_bell(id, bell);
         Ok(())
     }
@@ -524,15 +545,17 @@ impl Unit {
         me: &Master,
         bm: &Master,
     ) -> Result<(), GenieError> {
+        let roles = &c.w.model.roles.clone();
         let masters = c.w.model.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
             let own = c.w.model.masters.of(bp).unwrap_or(masters);
-            let rate = attack_rate(bm, own, reload);
+            let rate = attack_rate(bm, own, reload, roles);
             share(
                 me,
                 masters,
                 c.w.parts.combat_of(self.id).reload_powerup,
                 rate,
+                roles,
             )?
         } else {
             Firepower::ZERO
@@ -602,8 +625,9 @@ impl Unit {
         at: Position,
         state: ObjectState,
         (me, bm): (&Master, &Master),
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        if me.class != class::VILLAGER && me.id != MASTER_1808 {
+        if !roles.of_class(me.class).contains(ClassRoles::VILLAGER) && me.id != MASTER_1808 {
             return Ok(());
         }
         if !bell.flag {

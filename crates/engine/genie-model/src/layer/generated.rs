@@ -2,6 +2,7 @@
 //! The build layer's generated types (FD-046-D08, D32): the role sets of the id spaces, the
 //! slots and the tuning groups of build 158041's symbol table.
 
+use crate::objects::masters::ClassId;
 use bitflags::bitflags;
 use serde::Deserialize;
 use serde::Serialize;
@@ -11,6 +12,226 @@ bitflags! {
     /// exe tests the id for.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct ClassRoles: u128 {
+        /// The class `FUN_141211340` always spares.
+        const ALWAYS_SPARED = 1 << 0;
+        /// Class 0, the random-map scripts' `ARCHERY_CLASS` (900).
+        const ARCHERY = 1 << 1;
+        /// Class 44, the random-map scripts' `ARCHERY_CANNON_CLASS` (944).
+        const ARCHERY_CANNON = 1 << 2;
+        /// Artifacts (relics' neighbours that no blast reaches).
+        const ARTIFACT = 1 << 3;
+        /// The trebuchet's classes (`-0xe79`, `-0xe76` raw: packed and unpacked), whose attack move on a target attacks it.
+        const ATTACK_MOVE_ATTACKS = 1 << 4;
+        /// Class 38, the random-map scripts' `BIRD_CLASS` (938).
+        const BIRD = 1 << 5;
+        /// Boarding boats (`.dat` class 53, `-0xe77` raw), which the task finder treats apart.
+        const BOARDING_SHIP = 1 << 6;
+        /// The boats' classes (2, 20, 21, 22, 53), which a computer player's land unit passes over.
+        const BOAT = 1 << 7;
+        /// A target of one of these classes takes both first-pass lists, the masters' first (`FUN_14100c6c0`).
+        const BOTH_LISTS_TARGET = 1 << 8;
+        /// Buildings, which a unit's garrison task names.
+        const BUILDING = 1 << 9;
+        /// The classes whose units do not count in the Artifact action's owner search (`FUN_140aabc40`).
+        const CAPTURE_IGNORED = 1 << 10;
+        /// A target of one of these classes takes the group's units by formation category (`FUN_14100c6c0`).
+        const CATEGORY_LIST_TARGET = 1 << 11;
+        /// Class 12 (`-0xea0` raw): a group's command on an attack task of a target of it lists the group's special units (`FUN_14100c6c0`).
+        const CAVALRY = 1 << 12;
+        /// Class 36, the random-map scripts' `CAVALRY_ARCHER_CLASS` (936).
+        const CAVALRY_ARCHER = 1 << 13;
+        /// Class 23, the random-map scripts' `CAVALRY_CANNON_CLASS` (923).
+        const CAVALRY_CANNON = 1 << 14;
+        /// Class 57 (`-0xe73` raw), listed as `CAVALRY` is.
+        const CAVALRY_RAIDER = 1 << 15;
+        /// The classes that count in attribute 37 (`FUN_141226060`); the villagers' (4) too.
+        const CIVILIAN_COUNT = 1 << 16;
+        /// Class 34, the random-map scripts' `CLIFF_CLASS` (934).
+        const CLIFF = 1 << 17;
+        /// The livestock class `ClosestObject` treats apart.
+        const CLOSEST_LIVESTOCK = 1 << 18;
+        /// The pasture and livestock classes `ClosestObject` treats apart.
+        const CLOSEST_PASTURE = 1 << 19;
+        /// Class 61 (`-0xe6f` raw), listed as `PETARD` is.
+        const CONTROLLED_ANIMAL = 1 << 20;
+        /// The resource classes whose damage share is the share of their storage left from state 3 on (`FUN_141193590`).
+        const DAMAGE_BY_STORAGE = 1 << 21;
+        /// The resource classes whose damage share is the share of their storage left once dead (state above 2, `FUN_141193590`).
+        const DAMAGE_BY_STORAGE_DEAD = 1 << 22;
+        /// The classes whose units blast so: 35 (petards) and 64.
+        const DEATH_BLAST = 1 << 23;
+        /// Class 31, the random-map scripts' `DEEP_SEA_FISH_CLASS` (931).
+        const DEEP_SEA_FISH = 1 << 24;
+        /// Class 29, the random-map scripts' `DOMESTIC_ANIMAL_CLASS` (929).
+        const DOMESTIC_ANIMAL = 1 << 25;
+        /// Class 26, the random-map scripts' `ELEPHANT_ARCHER_CLASS` (926).
+        const ELEPHANT_ARCHER = 1 << 26;
+        /// Farms and a pasture's livestock (decoded 49, `0x31`).
+        const FARM = 1 << 27;
+        /// The fishing ship (decoded 21, `0x15`).
+        const FISHING_SHIP = 1 << 28;
+        /// Class 30, the random-map scripts' `FLAG_CLASS` (930).
+        const FLAG = 1 << 29;
+        /// Class 7, the random-map scripts' `FORAGE_BUSH_CLASS` (907).
+        const FORAGE_BUSH = 1 << 30;
+        /// The class whose foundation terrain always goes into the terrain (`FUN_1411ddd90`).
+        const FOUNDATION_TERRAIN = 1 << 31;
+        /// The classes of Gaia's objects that a combat object's setup (`FUN_14121df60`) keeps from being taken over by sight.
+        const GAIA_KEPT = 1 << 32;
+        /// Gates (decoded 39), whose annexes stay in their owner's watched list.
+        const GATE = 1 << 33;
+        /// Class 63, the random-map scripts' `GOLD_FISH_CLASS` (963).
+        const GOLD_FISH = 1 << 34;
+        /// Class 32, the random-map scripts' `GOLD_MINE_CLASS` (932).
+        const GOLD_MINE = 1 << 35;
+        /// Class 17, the random-map scripts' `HEALER_CLASS` (917).
+        const HEALER = 1 << 36;
+        /// Class 6, the random-map scripts' `INFANTRY_CLASS` (906).
+        const INFANTRY = 1 << 37;
+        /// A class whose unit keeps its unit AI on becoming a class that is KEEPS_UNIT_AI_TO (`FUN_1415c6aa0`: 47 to 12).
+        const KEEPS_UNIT_AI_FROM = 1 << 38;
+        /// A class a unit keeps its unit AI on becoming, from a class that is KEEPS_UNIT_AI_FROM (`FUN_1415c6aa0`: 12 from 47).
+        const KEEPS_UNIT_AI_TO = 1 << 39;
+        /// The classes whose hits a group member on an own move of reason 0 still keeps in `Mover::avoid`'s first loop (its tests against −0xea9, −0xe91, −0xe85 and −0xe78 at 0x141154411..0x1411544bc, decoded by + 0xeac): buildings (3), walls (27), gates (39) and 52.
+        const KEPT_BY_MEMBERS = 1 << 40;
+        /// The king's class (`-0xe71` raw).
+        const KING = 1 << 41;
+        /// Class 64, the random-map scripts' `LAND_MINE_CLASS` (964).
+        const LAND_MINE = 1 << 42;
+        /// The attacker classes whose least hit on a building is `LEAST_CLASS_HIT` (decoded `0`, `0x24`, `0x16`, `0x2c`, `0x34` at `0x1411ced23`..`0x1411cee9e`).
+        const LEAST_HIT = 1 << 43;
+        /// The classes a lion attacks by its own choice (its slot 0xa0's list, `FUN_140c18d50`; the game's `+0x6b4` of 1, not met, adds 13, 18 and 55).
+        const LION_TARGET = 1 << 44;
+        /// Livestock (decoded 58, `0x3a`, `-0xe72` raw), which goes to Gaia when killed.
+        const LIVESTOCK = 1 << 45;
+        /// The classes a combat object of which counts in its player's attribute 40 (`FUN_141226060`).
+        const MILITARY_COUNT = 1 << 46;
+        /// The classes whose key carries the military byte (`+9`, `FUN_141658430`'s switch).
+        const MILITARY_KEY = 1 << 47;
+        /// Class 11, the random-map scripts' `MISCELLANEOUS_CLASS` (911).
+        const MISCELLANEOUS = 1 << 48;
+        /// Class 60, the random-map scripts' `MISC_BUILDING_CLASS` (960).
+        const MISC_BUILDING = 1 << 49;
+        /// Monks (`-0xe9a` raw), whose stop leaves the state position.
+        const MONK = 1 << 50;
+        /// Monks carrying a relic (`.dat` class 43, `-0xe81` raw), which the task finder treats apart.
+        const MONK_WITH_RELIC = 1 << 51;
+        /// The class whose slot 0xd8 (`FUN_141211340`, a combat object's or building's) does nothing (decoded 42); class 58 is spared only while it holds some, which an exhausted farm does not.
+        const NEVER_EXHAUSTED = 1 << 52;
+        /// The classes that count as done from the start (packed and unpacked siege, 51 and 54).
+        const NEVER_PENDING = 1 << 53;
+        /// The classes a search without `any_class` passes over: buildings, walls, towers, gates and the packed units.
+        const NOT_ANY = 1 << 54;
+        /// The class an Attack does not take as its target (`-0xe70` raw, `Attack::set_target`).
+        const NOT_ATTACK_TARGET = 1 << 55;
+        /// The classes of a human player's soldier in `NoAttack` (`FUN_140c12300`: `-0xe89`, `-0xe6c` raw).
+        const NO_ATTACK = 1 << 56;
+        /// The class whose soldier is in `NoAttack` unless a hero (`FUN_140c12300`: `-0xe6f` raw).
+        const NO_ATTACK_UNLESS_HERO = 1 << 57;
+        /// Class 5, the random-map scripts' `OCEAN_FISH_CLASS` (905).
+        const OCEAN_FISH = 1 << 58;
+        /// Class 48, the random-map scripts' `ORE_MINE_CLASS` (948).
+        const ORE_MINE = 1 << 59;
+        /// The class whose packed state (top action 124 or 125) attacks nothing, as master 109's does.
+        const PACKED_ATTACKS_NOTHING = 1 << 60;
+        /// Packed siege units (`.dat` class 51, `-0xe79` raw: the packed trebuchet and mangonel, master type 80): they block a placement though desolid, and their ghosts stay watched.
+        const PACKED_TREBUCHET = 1 << 61;
+        /// An unpacked trebuchet's class (`-0xe76` raw), whose slot 0x340 packs instead of moving.
+        const PACKS_TO_MOVE = 1 << 62;
+        /// The non-military classes (`FUN_141188b20`): a kill of one counts no kill for its killer and no loss for its owner (`FUN_1412005b0`).
+        const PEACEFUL = 1 << 63;
+        /// Class 35 (`-0xe89` raw): a target the group's command lists the units by formation category for (`FUN_14100c6c0`).
+        const PETARD = 1 << 64;
+        /// Class 28, the random-map scripts' `PHALANX_CLASS` (928).
+        const PHALANX = 1 << 65;
+        /// Class 46 (`-0xe7e` raw): the units the group's special units list takes first (`FUN_14100c6c0`).
+        const PIKEMAN = 1 << 66;
+        /// The predators (`-0xea2` raw), whose unit AI's slot 0x1f0 a failed Attack calls.
+        const PREDATOR = 1 << 67;
+        /// The classes a predator attacks by its own choice (its slot 0xa0's list, `FUN_140c18ed0`).
+        const PREDATOR_TARGET = 1 << 68;
+        /// The prey animals (`-0xea3` raw).
+        const PREY = 1 << 69;
+        /// The classes an attacker of `attack_priority` 3 may attack (`FUN_140fddf10`).
+        const PRIORITY_3_TARGET = 1 << 70;
+        /// Class 56, the random-map scripts' `RAIDER_CLASS` (956).
+        const RAIDER = 1 << 71;
+        /// What a ram attacks by its own choice: buildings, siege, walls, gates, farms, the packed units, towers, the unpacked siege and the scorpions.
+        const RAM_TARGET = 1 << 72;
+        /// Relics (`.dat` class 42, `0x2a`, `-0xe82` raw): a delete spares them.
+        const RELIC = 1 << 73;
+        /// The trebuchets' classes (51, 54), whose building repair is the unit's.
+        const REPAIRED_AS_UNIT = 1 << 74;
+        /// The ship classes whose repair meets them at the shore (`FUN_140ad9120`: 20, 21, 22, 2, 53).
+        const REPAIRED_AT_SHORE = 1 << 75;
+        /// The classes whose repair pays its unit share (`FUN_1412143b0`: the ships 20, 21, 22, 2 and 53, the siege 13 and the classes 51, 54 and 55).
+        const REPAIR_COSTED = 1 << 76;
+        /// Class 41, the random-map scripts' `RESOURCE_PILE_CLASS` (941).
+        const RESOURCE_PILE = 1 << 77;
+        /// Class 40, the random-map scripts' `SALVAGE_PILE_CLASS` (940).
+        const SALVAGE_PILE = 1 << 78;
+        /// Scorpions and the like (`.dat` class 55, `-0xe75` raw), which the task finder treats apart.
+        const SCORPION = 1 << 79;
+        /// Class 47 (`-0xe7d` raw), listed as `CAVALRY` is.
+        const SCOUT_CAVALRY = 1 << 80;
+        /// The class whose damage alerts its target's owner itself (`-0xe6c` raw): its target's unit AI gets no notify 500.
+        const SELF_ALERTING = 1 << 81;
+        /// The classes between which a unit keeps its unit AI (`FUN_1415c6aa0`: 18 and 43 both ways).
+        const SHARES_UNIT_AI = 1 << 82;
+        /// Class 33, the random-map scripts' `SHORE_FISH_CLASS` (933).
+        const SHORE_FISH = 1 << 83;
+        /// Siege weapons (`-0xe9f` raw, the short `0xd`).
+        const SIEGE = 1 << 84;
+        /// The packed unit's class (51), which a human player's siege attack check passes over unless asked for any target.
+        const SKIPS_SIEGE_CHECK = 1 << 85;
+        /// Class 50, the random-map scripts' `SPEARMAN_CLASS` (950).
+        const SPEARMAN = 1 << 86;
+        /// Class 8, the random-map scripts' `STONE_MINE_CLASS` (908).
+        const STONE_MINE = 1 << 87;
+        /// The building classes a movement damage hits (`0x141207ae8`, decoded 0x33 and 0x36); it hits any object of another type.
+        const STRUCK_BUILDING = 1 << 88;
+        /// Class 14, the random-map scripts' `TERRAIN_CLASS` (914).
+        const TERRAIN = 1 << 89;
+        /// Towers.
+        const TOWER = 1 << 90;
+        /// The trade cart's and the trade boat's classes (`FUN_141195400`, `FUN_141195490`).
+        const TRADER = 1 << 91;
+        /// The trade boat (`-0xeaa` raw): its cared classes and its trade partner are not the cart's.
+        const TRADE_BOAT = 1 << 92;
+        /// The trade cart (decoded `0x13`).
+        const TRADE_CART = 1 << 93;
+        /// The class whose busy units skip the idle check (`-0xe98` raw).
+        const TRANSPORT = 1 << 94;
+        /// Class 62, which the best target's category puts with the transports (attack category 10).
+        const TRANSPORT_CATEGORY = 1 << 95;
+        /// What a trebuchet (class 51 or 54) attacks by its own choice: the rams' but siege and scorpions.
+        const TREBUCHET_TARGET = 1 << 96;
+        /// Trees.
+        const TREE = 1 << 97;
+        /// Class 16, the random-map scripts' `TREE_STUMP_CLASS` (916).
+        const TREE_STUMP = 1 << 98;
+        /// Class 45, the random-map scripts' `TWO_HANDED_SWORDSMAN_CLASS` (945).
+        const TWO_HANDED_SWORDSMAN = 1 << 99;
+        /// The classes no delete takes (`DAT_142f925c0`, and `FUN_14120f620`'s own test): livestock, class 42, artifacts and class 60.
+        const UNDELETABLE = 1 << 100;
+        /// Unpacked siege units (`.dat` class 54, `-0xe76` raw: the trebuchet, the bombard cannon): they block a placement though desolid, and their ghosts stay watched.
+        const UNPACKED_TREBUCHET = 1 << 101;
+        /// The classes a building's watch leaves out (`FUN_1411cc980`).
+        const UNWATCHED = 1 << 102;
+        /// Villagers (`-0xea8` raw).
+        const VILLAGER = 1 << 103;
+        /// Walls (decoded 27, `0x1b`).
+        const WALL = 1 << 104;
+        /// The villagers' class (`FUN_141195750`: the master's class is 4), tested by the wall's train locations.
+        const WALL_BUILDER = 1 << 105;
+        /// The warships (`-0xe96` raw), whose attackers make a computer's unit warn its group.
+        const WARSHIP = 1 << 106;
+        /// Class 24 (`-0xe94` raw), listed as `CAVALRY` is.
+        const WAR_ELEPHANT = 1 << 107;
+        /// The class whose garrison share is 1 whatever its firepower (`FUN_141213520`, `-0xe82` raw); UNLOAD's flag 0 leaves it inside (`FUN_14118a610`).
+        const WHOLE_GARRISON_SHARE = 1 << 108;
+        /// The target class whose reach test (the path end's) plans with the wide range added to the range, as master 45 does.
+        const WIDE_REACH = 1 << 109;
     }
 }
 
@@ -38,10 +259,48 @@ bitflags! {
     }
 }
 
-/// The ids the engine names by role, one id each (FD-046-D04).
+/// The ids the engine names by role, one id each, by id space (FD-046-D04).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct Slots {}
+pub struct Slots {
+    /// The class slots.
+    pub class: ClassSlots,
+    /// The master slots.
+    pub master: MasterSlots,
+    /// The tech slots.
+    pub tech: TechSlots,
+    /// The attribute slots.
+    pub attribute: AttributeSlots,
+}
+
+/// The class ids the engine names, one field each.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ClassSlots {
+    /// Buildings, which a unit's garrison task names.
+    pub building: ClassId,
+    /// Villagers (`-0xea8` raw).
+    pub villager: ClassId,
+    /// Farms and a pasture's livestock (decoded 49, `0x31`).
+    pub farm: ClassId,
+    /// Livestock (decoded 58, `0x3a`, `-0xe72` raw), which goes to Gaia when killed.
+    pub livestock: ClassId,
+}
+
+/// The master ids the engine names, one field each.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct MasterSlots {}
+
+/// The tech ids the engine names, one field each.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct TechSlots {}
+
+/// The attribute ids the engine names, one field each.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AttributeSlots {}
 
 /// The tuning values, one group per port module (FD-046-D32).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

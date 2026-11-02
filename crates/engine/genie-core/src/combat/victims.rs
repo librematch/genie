@@ -9,10 +9,8 @@ use crate::map::Tile;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -35,6 +33,8 @@ use crate::objects::layers::Action;
 use crate::objects::masters::cost_entries;
 use crate::unit_ai::{NotifyKind, Seen};
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use std::mem::take;
 
 impl World {
@@ -68,6 +68,7 @@ impl World {
             (attacker, &world),
             &self.spatial,
             self.mode_680,
+            &self.model.roles,
         )))
     }
 
@@ -211,7 +212,11 @@ pub(crate) fn readable<'o>(
 
 /// What a hit of the updating unit reads of object `id` ([`World::victim`] from the update):
 /// an object [`readable`] by the hit.
-pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>, GenieError> {
+pub(crate) fn victim(
+    c: &Step<'_>,
+    id: impl ObjectKey,
+    roles: &Roles,
+) -> Result<Option<Victim>, GenieError> {
     let Some((p, u, master)) = readable(c, id)? else {
         return Ok(None);
     };
@@ -243,6 +248,7 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
         (c.player, &sides),
         &c.w.spatial,
         c.w.mode_680,
+        roles,
     )))
 }
 
@@ -334,6 +340,7 @@ pub(crate) fn file_kill(
     c: &mut Step<'_>,
     (me, actions): (&mut Unit, &mut Action),
     k: KillLeft,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     if k.id != c.me {
         return c.w.kill_left(&k);
@@ -342,7 +349,7 @@ pub(crate) fn file_kill(
         let master = me.master(c.w.master_tables(), c.player)?.clone();
         c.w.count_killed(c.player, &master, kill)?;
         if kill.to_gaia {
-            me.ai_change_owner(actions, PlayerId::GAIA, c)?;
+            me.ai_change_owner(actions, PlayerId::GAIA, c, roles)?;
         }
     }
     c.w.count_razed(&k.razed)
@@ -361,15 +368,16 @@ pub(crate) fn write_struck(
     actions: &mut Action,
     mut blasted: Vec<Victim>,
     v: &mut Victim,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     for b in &mut blasted {
         if let Some(k) = write_back(c, b)? {
-            file_kill(c, (me, actions), k)?;
+            file_kill(c, (me, actions), k, roles)?;
         }
     }
     c.blasted = blasted;
     if let Some(k) = write_back(c, v)? {
-        file_kill(c, (me, actions), k)?;
+        file_kill(c, (me, actions), k, roles)?;
     }
     Ok(())
 }
@@ -385,9 +393,10 @@ pub(crate) fn write_strike_back(
     me: &mut Unit,
     actions: &mut Action,
     v: &mut Victim,
+    roles: &Roles,
 ) -> Result<(), GenieError> {
     let blasted = take(&mut c.blasted);
-    write_struck(c, me, actions, blasted, v)
+    write_struck(c, me, actions, blasted, v, roles)
 }
 
 impl World {
@@ -478,9 +487,19 @@ impl World {
             ));
         }
         let ap = kill.attacker_player;
-        if master.class == class::VILLAGER {
+        if self
+            .model
+            .roles
+            .of_class(master.class)
+            .contains(ClassRoles::VILLAGER)
+        {
             // the attacker's class as the hit saw it: the attacker may be out for its update
-            if matches!(kill.attacker_class, class::PREY | class::PREDATOR) {
+            if self
+                .model
+                .roles
+                .of_class(kill.attacker_class)
+                .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
+            {
                 self.players
                     .player_mut(q)?
                     .add_attribute(attribute::VILLAGER_KILLED_BY_ANIMAL, Amount::new(1.0))?;
@@ -524,35 +543,12 @@ impl World {
         master: &Master,
         ap: PlayerId,
     ) -> Result<(), GenieError> {
-        const PEACEFUL: [ClassId; 26] = [
-            class::ARTIFACT,
-            class::BUILDING,
-            class::CLASS_5,
-            class::CLASS_7,
-            class::CLASS_8,
-            class::PREY,
-            class::PREDATOR,
-            class::CLASS_11,
-            class::CLASS_14,
-            class::TREE,
-            class::CLASS_16,
-            class::WALL,
-            class::CLASS_29,
-            class::CLASS_30,
-            class::CLASS_31,
-            class::CLASS_32,
-            class::CLASS_33,
-            class::CLASS_34,
-            class::CLASS_38,
-            class::GATE,
-            class::CLASS_40,
-            class::CLASS_48,
-            class::TOWER,
-            class::LIVESTOCK,
-            class::CLASS_60,
-            class::CLASS_63,
-        ];
-        if !PEACEFUL.contains(&master.class) {
+        if !self
+            .model
+            .roles
+            .of_class(master.class)
+            .contains(ClassRoles::PEACEFUL)
+        {
             self.players
                 .player_mut(ap)?
                 .add_attribute(attribute::KILLS, Amount::new(1.0))?;
@@ -582,9 +578,11 @@ impl World {
 
 /// `FUN_140fde380`: `master` is of type 70 and up, of class 51 or 54, with a weapon (`+0x810`
 /// above 0): a trebuchet, packed or not, whose kill counts as a unit's.
-pub(crate) fn is_trebuchet(master: &Master) -> bool {
+pub(crate) fn is_trebuchet(master: &Master, roles: &Roles) -> bool {
     MasterKind::COMBAT <= master.kind
-        && matches!(master.class, class::CLASS_51 | class::CLASS_54)
+        && roles
+            .of_class(master.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         && !master.weapons.is_empty()
 }
 

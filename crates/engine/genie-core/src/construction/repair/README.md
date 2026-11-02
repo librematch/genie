@@ -27,6 +27,7 @@ target's cost.
 | [`repair_state.rs`](repair_state.rs) | A Repair's state: the steps of its update from the walk to the work, each walk with its `MoveTo`. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`unit.rs`](unit.rs) | The repair part of the update and the unit's attackers and seen target. |
+| [`action/`](action/) | The Repair's state entry. |
 <!-- /files -->
 
 ## How it connects

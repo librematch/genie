@@ -127,6 +127,15 @@ const LAYER_BUILD: u32 = 158_041;
 /// The build layer, evaluated once from its Nickel source (FD-046-D08, D09's step 2).
 static LAYER: LazyLock<Result<BuildLayer, GenieError>> = LazyLock::new(|| build_layer(LAYER_BUILD));
 
+/// The build layer genie-oracle's import reads ([`LAYER`]).
+///
+/// # Errors
+///
+/// Its Nickel source does not evaluate or breaks its contracts.
+pub(crate) fn layer() -> Result<&'static BuildLayer, GenieError> {
+    LAYER.as_ref().map_err(Clone::clone)
+}
+
 /// The slice set up from the header save: every player's live objects in their saved order, and
 /// `BaseWorld`'s fields before the map, the frame seed (`mCurrentFrameRandomSeed`, world+0x7d0) and
 /// the turn order (`player_turn`, `player_time_delta[i]`).
@@ -331,7 +340,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     }
     let none = TerrainTable::default();
     let terrain = masters.map_or(&none, |t| &t.terrain);
-    match spatial(header, terrain) {
+    match layer().and_then(|l| spatial(header, terrain, &l.roles)) {
         Ok(s) => turns.spatial = s,
         Err(e) => stop_all(&mut turns, &e),
     }
@@ -448,9 +457,9 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             effects: Arc::new(table.effects.clone()),
             ..Model::default()
         };
-        match &*LAYER {
+        match layer() {
             Ok(layer) => turns.model = take(&mut turns.model).with_layer(layer),
-            Err(e) => stop_all(&mut turns, e),
+            Err(e) => stop_all(&mut turns, &e),
         }
         // the players' unit masters (type 70), Gaia's left out
         let all = || {
@@ -638,12 +647,18 @@ fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
             .filter(|m| m.kind == MasterKind::COMBAT)
             .and_then(|me| {
                 let bm = masters.get(b.life.master_id)?;
-                let rate = attack_rate(bm, masters, turns.parts.combat_of(b.id).reload_powerup);
+                let rate = attack_rate(
+                    bm,
+                    masters,
+                    turns.parts.combat_of(b.id).reload_powerup,
+                    &turns.model.roles,
+                );
                 Some(garrison_share(
                     me,
                     masters,
                     turns.parts.combat_of(u.id).reload_powerup,
                     rate,
+                    &turns.model.roles,
                 ))
             });
         entered.push((b.id, u.id, share));

@@ -15,10 +15,11 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
-    BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, PACKED_UNIT_CLASS, Surroundings,
-    UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner, back_up, dodges,
+    BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, Surroundings, UnitAi, UnitSide,
+    VILLAGER_NOTIFY, alert_owner, back_up, dodges,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
 
 impl UnitAi {
     /// The hunted animal's handler (`TribeHuntedAnimalUnitAIModule`, `FUN_140c26420`): its
@@ -340,9 +341,13 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         match n.kind {
             NotifyKind::DAMAGED
-                if at.class == Some(PACKED_UNIT_CLASS) && player_type.is_computer() =>
+                if roles
+                    .of_some_class(at.class)
+                    .contains(ClassRoles::SKIPS_SIEGE_CHECK)
+                    && player_type.is_computer() =>
             {
                 self.packed_damaged(n, time, at, player_type, ai_rng, side)
             }

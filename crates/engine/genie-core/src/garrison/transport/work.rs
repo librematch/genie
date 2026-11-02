@@ -7,18 +7,14 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::masters::ClassId;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
 use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
-
-/// The trade cart's and the trade boat's classes (`FUN_141195400`, `FUN_141195490`).
-const TRADE_CLASSES: [ClassId; 2] = [class::TRADE_CART, class::TRADE_BOAT];
 
 impl World {
     /// The work command's Transport (its task of action type 12, the factory `FUN_140aca4b0`
@@ -118,7 +114,12 @@ impl World {
             .live(p, i)?
             .master(self.master_tables(), p)?
             .class;
-        Ok(market && TRADE_CLASSES.contains(&class))
+        Ok(market
+            && self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::TRADER))
     }
 
     /// The unit AI's notify of the work command's Transport (`FUN_14106e4e0` kind 0xc): the
@@ -176,6 +177,7 @@ impl World {
                     self.parts.combat_of(unit.id).abilities.look.as_ref(),
                 ),
                 task,
+                &self.model.roles,
             )?
         };
         let restriction = self

@@ -19,11 +19,12 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::WONDER;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -58,6 +59,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let desolid =
             c.w.parts
@@ -68,7 +70,7 @@ impl BuildAction {
         self.uncount(c)?;
         self.state = BuildState::Place;
         if !desolid {
-            return self.join(c, builder);
+            return self.join(c, builder, roles);
         }
         let site = self.target.ok_or(SITE_GONE)?;
         let placed = *c.w.spatial.get_known(site)?.ok_or(SITE_GONE)?;
@@ -80,7 +82,7 @@ impl BuildAction {
             at: placed.position.ground(),
             trees: true,
         };
-        let cleared = footprint_clearing(&c.w.spatial, &clearing, &reads.looks)?;
+        let cleared = footprint_clearing(&c.w.spatial, &clearing, &reads.looks, roles)?;
         for cl in cleared.iter().filter(|cl| cl.record_goes) {
             c.w.pathing.removed(cl.id);
             c.w.spatial.drop_record(cl.id);
@@ -126,18 +128,18 @@ impl BuildAction {
             if parts.occupied {
                 return self.wait_or_halt(c, builder, reads);
             }
-            return self.join(c, builder);
+            return self.join(c, builder, roles);
         }
         let (bx, by) = (builder.position().x(), builder.position().y());
         let (sx, sy) = (placed.position.x(), placed.position.y());
         let inside = (bx - sx).abs() <= placed.radius.x() && (by - sy).abs() <= placed.radius.y();
         if inside {
-            return self.clear(c, builder, site.id());
+            return self.clear(c, builder, site.id(), roles);
         }
         if let Some(annex) = self.annex_beneath(c, builder, placed.radius)? {
             // set_state(223) with the annex as the target, which the foundation replaces again
             // after it: the walk off the annex's footprint
-            return self.clear(c, builder, annex);
+            return self.clear(c, builder, annex, roles);
         }
         self.wait_or_halt(c, builder, reads)
     }
@@ -283,7 +285,12 @@ impl BuildAction {
     /// # Errors
     ///
     /// A foundation gone from the map, the walls beside a diagonal builder, and the count's.
-    pub(super) fn join(&mut self, c: &mut Step<'_>, builder: &Unit) -> Result<(), GenieError> {
+    pub(super) fn join(
+        &mut self,
+        c: &mut Step<'_>,
+        builder: &Unit,
+        roles: &Roles,
+    ) -> Result<(), GenieError> {
         let placed = *c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
         let [bx, by] = [builder.position().x() as i32, builder.position().y() as i32];
         let [tx, mut ty] = [placed.position.x() as i32, placed.position.y() as i32];
@@ -302,8 +309,9 @@ impl BuildAction {
             let (a, b) = beside_diagonal(bx, by, dx, dy);
             let player = placed.player;
             let walled = |t: Tile| {
-                c.w.spatial
-                    .object_on_tile(t, |o| o.class == class::WALL && o.player != player)
+                c.w.spatial.object_on_tile(t, |o| {
+                    roles.of_class(o.class).contains(ClassRoles::WALL) && o.player != player
+                })
             };
             if walled(a) && walled(b) {
                 return Err(GenieError::unsupported(
@@ -377,8 +385,15 @@ impl BuildAction {
         c: &mut Step<'_>,
         builder: &Unit,
         footprint: ObjectId,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        let by_id = ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts);
+        let by_id = ObjectsRef::new(
+            &c.w.players,
+            &c.w.index,
+            &c.w.model.masters,
+            &c.w.parts,
+            &c.w.model.roles,
+        );
         let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
@@ -404,6 +419,7 @@ impl BuildAction {
                 &c.w.model.graphics,
                 c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
+            roles,
         )?;
         self.state = BuildState::Clear {
             move_to: move_reads.to_point(

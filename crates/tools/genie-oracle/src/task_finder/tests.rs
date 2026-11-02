@@ -1,4 +1,7 @@
-use crate::task_finder::{FinderObject, FinderWorld, finder_objects};
+use crate::fixtures::{gaia, header, human, recording};
+use crate::masters::MasterTable;
+use crate::setup::layer;
+use crate::task_finder::{FinderObject, FinderWorld, finder_objects, finder_world};
 use crate::test_ids::object_id;
 use genie_core::gathering::gather::GATHER;
 use genie_core::map::Position;
@@ -14,6 +17,8 @@ use genie_core::players::PlayerId;
 use genie_core::players::attribute;
 use genie_core::players::{ByPlayer, Relations};
 use genie_core::unit_ai::task_finder::Diplomacy;
+use genie_model::layer::Roles;
+use genie_model::layer::Slots;
 use std::sync::Arc;
 
 /// An object of player 1, master 83, at the main building `annex_of` if it is an annex.
@@ -62,6 +67,8 @@ fn world(relation: u8) -> FinderWorld {
         attribute_95: vec![Amount::ZERO, Amount::new(1.5)],
         civs: vec![CivId::GAIA, CivId::new(4)],
         drop_sites: vec![],
+        roles: Roles::default(),
+        slots: Slots::default(),
     }
 }
 
@@ -140,4 +147,17 @@ fn the_finder_objects_are_every_player_by_id() {
         finder_objects(&none.players()),
         Err(crate::Error::Unmodelled(_))
     ));
+}
+
+/// A save's finder world: each player's masters, objects, relations and civ, with the build's
+/// roles and slots; bytes that are no save fail.
+#[test]
+fn the_finder_takes_its_players_from_the_save_and_its_roles_from_the_build() {
+    let save = recording(&header(vec![gaia(Vec::new()), human(Vec::new())]), &[]);
+    let world = finder_world(&save, &MasterTable::default()).unwrap();
+    assert_eq!((world.masters.len(), world.civs.len()), (2, 2));
+    assert!(world.objects.is_empty());
+    let layer = layer().unwrap();
+    assert_eq!((&world.roles, world.slots), (&layer.roles, layer.slots));
+    assert!(finder_world(b"no save", &MasterTable::default()).is_err());
 }

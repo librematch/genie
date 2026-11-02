@@ -11,7 +11,6 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::sprite::new_sprite;
 use crate::orders::{lock_gate, set_stance};
@@ -22,6 +21,7 @@ use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::unit_ai::{Issuer, OrderPriority, UnitStance};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -69,7 +69,11 @@ impl World {
             }
             let master = unit.master(self.master_tables(), p)?;
             if state.leashed()
-                && (matches!(master.class, class::CLASS_51 | class::CLASS_54)
+                && (self
+                    .model
+                    .roles
+                    .of_class(master.class)
+                    .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
                     || matches!(master.id, ids::ID_42 | ids::ID_331))
             {
                 continue;
@@ -78,8 +82,9 @@ impl World {
             let unit = &self.players.live(p, idx)?;
             let place = (unit.position().ground(), Some(class));
             // slot 0x1c0, its stop a call on the unit at once
+            let roles = self.model.roles.clone();
             self.run_ai_calls((p, idx), |ai, side, rng| {
-                set_stance(ai, state, place, side, rng)
+                set_stance(ai, state, place, side, rng, &roles)
             })?;
         }
         Ok(())
@@ -154,7 +159,12 @@ impl World {
             }
             let master = unit.master(self.master_tables(), p)?;
             if !master.object_flags.contains(ObjectFlags::SCOUT) {
-                if master.class == class::LIVESTOCK {
+                if self
+                    .model
+                    .roles
+                    .of_class(master.class)
+                    .contains(ClassRoles::LIVESTOCK)
+                {
                     return Err(GenieError::unsupported(
                         "AUTO_SCOUT's class 58 rule (FUN_140eca780)",
                     ));
@@ -185,8 +195,16 @@ impl World {
                 target_type: None,
             };
             // the order at once, its calls on the unit at once
+            let roles = self.model.roles.clone();
             self.run_ai_calls((p, idx), |ai, side, rng| {
-                ai.take_order_now(state, order, (position.ground(), Some(class)), rng, side)
+                ai.take_order_now(
+                    state,
+                    order,
+                    (position.ground(), Some(class)),
+                    rng,
+                    side,
+                    &roles,
+                )
             })?;
         }
         Ok(())

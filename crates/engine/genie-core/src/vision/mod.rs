@@ -35,6 +35,7 @@ pub use self::sight_shape::{SightCentre, SightShape};
 pub use self::sight_tiles::SightTiles;
 pub use self::tile_count::TileCount;
 pub use self::vision_bits::{VisionBits, VisionMasks};
+use crate::objects::masters::ids;
 use crate::players::Relation;
 
 /// The attribute whose change turns the allied vision on (`FUN_141616820`'s case 0x32).
@@ -45,7 +46,7 @@ pub const REVEAL_ALL: usize = 183;
 /// master 697 (FLARE4, slot 0x1c0) at each of their town centres (master 109, `FUN_141165d30`),
 /// each player's once, recorded in `mTCFlared` ([`crate::world::Player::tc_flared`]).
 const REVEAL_CENTRES: usize = 209;
-const FLARE4: MasterId = MasterId::named(697);
+const FLARE4: MasterId = ids::FLARE_4;
 /// The attributes that add a scenario's masks of visible and explored players, not modelled.
 const SHARED_MASKS: [usize; 2] = [285, 286];
 

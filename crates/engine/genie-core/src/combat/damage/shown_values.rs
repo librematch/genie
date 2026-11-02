@@ -11,9 +11,10 @@ use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::DamageAmount;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::players::attribute::AttributeId;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::{GenieError, math::fmath};
 
 /// The action type of a bonus damage task (`FUN_14107ce60`).
@@ -76,7 +77,7 @@ impl Victim {
 /// `attribute_type4` not 0. A `work_val2` not above 0, or a target without hit points above 0
 /// (slot 0xc0), adds nothing (`COMISS` with `JBE`). The sum is at least 0 (`MAXSS`).
 #[must_use]
-pub fn bonus_damage(attacker: &Victim, target: &Victim) -> f32 {
+pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
     let mut sum = 0.0f32;
     for t in attacker
         .bonus_tasks
@@ -85,7 +86,9 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim) -> f32 {
     {
         let any = t.object_id.is_none()
             && t.object_group.is_none()
-            && (matches!(target.class, class::CLASS_51 | class::CLASS_54)
+            && (roles
+                .of_class(target.class)
+                .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
                 || target.kind < MasterKind::BUILDING);
         if !(any || t.object_id == Some(target.master_id) || t.for_class(target.class)) {
             continue;
@@ -127,12 +130,12 @@ pub struct Shown<'a> {
 /// [`charged`]) and, unless its master's `charge_target` is −1, works on `target` (slot 0x2f0,
 /// [`charge_hit`], or slot 0x2f8, [`range_charge_hit`]); with a `charge_target` but no target,
 /// not. A combat object of type 50 or 60 has no charge (`FUN_14106c580`).
-pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>) -> bool {
+pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>, roles: &Roles) -> bool {
     let a = &v.source;
     v.tribe()
         && charged(a)
         && (a.charge_target == ChargeTarget::EVERY
-            || target.is_some_and(|t| charge_hit(a, t) || range_charge_hit(a, t)))
+            || target.is_some_and(|t| charge_hit(a, t, roles) || range_charge_hit(a, t, roles)))
 }
 
 /// The best amount of `weapons` above 0 (the first of a tie), of a melee, pierce or class-31
@@ -165,9 +168,9 @@ pub(super) fn best_attack(weapons: &[ClassAmount], fighting: bool) -> DamageAmou
 /// or 3 adds the charge (`+0x9e0`). A combat object of type 50 or 60 has no powerups (its slots
 /// answer 0). The sums wrap at 16 bits.
 #[must_use]
-pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
+pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
     let a = &v.source;
-    let charge = charge_shown(v, s.target);
+    let charge = charge_shown(v, s.target, roles);
     if charge
         && a.charge_kind.ranged()
         && let Some(weapons) = s.projectile
@@ -187,7 +190,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
         .plus(DamageAmount::of_effect(powerup))
         .plus(DamageAmount::of_effect(0.0));
     if let Some(t) = s.target {
-        attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, t)));
+        attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, t, roles)));
     }
     if charge && a.charge_kind.adds_to_attack() {
         attack = attack.plus(DamageAmount::of_effect(a.charge.get()));
@@ -202,12 +205,12 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
 /// # Errors
 ///
 /// An object without combat values (a type below 50).
-pub fn shown_melee_armor(v: &Victim) -> Result<DamageAmount, GenieError> {
+pub fn shown_melee_armor(v: &Victim, roles: &Roles) -> Result<DamageAmount, GenieError> {
     let a = v.armored.as_ref().ok_or(GenieError::unreachable(
         "the melee armor of an object without combat values",
     ))?;
     Ok(if v.tribe() {
-        melee_armor(a, v.class, v.state)
+        melee_armor(a, v.class, v.state, roles)
     } else {
         master_melee_armor(a)
     })
@@ -217,10 +220,10 @@ pub fn shown_melee_armor(v: &Victim) -> Result<DamageAmount, GenieError> {
 /// range (`+0x828`), to which a ready charge of type 6 or 7 ([`charge_shown`]) adds its master's
 /// `charge_event`, plus its max range powerup (`+0xa40`, slot 0x700; 0 for a type 50 or 60).
 #[must_use]
-pub fn shown_range(v: &Victim, s: &Shown<'_>) -> Distance {
+pub fn shown_range(v: &Victim, s: &Shown<'_>, roles: &Roles) -> Distance {
     let a = &v.source;
     let mut range = a.weapon_range;
-    if a.charge_kind.ranged() && charge_shown(v, s.target) {
+    if a.charge_kind.ranged() && charge_shown(v, s.target, roles) {
         range += s.charge_event.range();
     }
     let powerup = if v.tribe() {

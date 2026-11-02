@@ -10,7 +10,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
 use crate::objects::masters::{Master, MasterTables, player_master};
@@ -33,6 +32,8 @@ use crate::ownership::capture::HANDS_LEFT;
 use crate::unit_ai::{Inbox, UnitAi};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::parts::Part;
 use crate::world::player::Player;
 
@@ -59,6 +60,7 @@ impl World {
             tables,
             &mut self.spatial,
             self.world_time,
+            &self.model.roles,
         );
         let j = self.put_back_own(q, unit)?;
         let Some(own) = changed? else {
@@ -337,6 +339,7 @@ impl World {
             tables,
             &mut self.spatial,
             self.world_time,
+            &self.model.roles,
         );
         let idx = self.put_back_own(old, unit)?;
         let own = changed?;
@@ -455,8 +458,18 @@ impl World {
                 self.players.player_mut(old)?.add_attribute(kind, -amount)?;
             }
         }
-        count_class(&mut self.players.player_mut(old)?.attributes, m, -1.0);
-        count_class(&mut self.players.player_mut(new)?.attributes, m, 1.0);
+        count_class(
+            &mut self.players.player_mut(old)?.attributes,
+            m,
+            -1.0,
+            &self.model.roles,
+        );
+        count_class(
+            &mut self.players.player_mut(new)?.attributes,
+            m,
+            1.0,
+            &self.model.roles,
+        );
         for &(kind, amount, flag) in &m.storage {
             if let Some(kind) = kind
                 && matches!(flag, 1 | 2 | 32)
@@ -529,6 +542,7 @@ pub(crate) fn change_hands(
     masters: MasterTables<'_>,
     spatial: &mut Spatial,
     world_time: WorldTime,
+    roles: &Roles,
 ) -> Result<Option<Box<Master>>, GenieError> {
     spatial.records_owner(u.id, new)?;
     let Some(to) = player_master(masters.players, new, u.life.master_id) else {
@@ -546,7 +560,7 @@ pub(crate) fn change_hands(
             .clone(),
     );
     own.fog_visibility = to.fog_visibility;
-    if own.class == class::LIVESTOCK {
+    if roles.of_class(own.class).contains(ClassRoles::LIVESTOCK) {
         own.line_of_sight = to.line_of_sight;
     }
     let los = own.line_of_sight;

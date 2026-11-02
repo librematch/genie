@@ -14,7 +14,6 @@ pub mod carry_capacity;
 pub mod charge_event;
 pub mod charge_kind;
 pub mod charge_target;
-pub mod class;
 pub mod class_id;
 pub mod combat_ability;
 pub mod combat_level;

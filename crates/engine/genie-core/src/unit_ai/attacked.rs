@@ -11,7 +11,6 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::WONDER;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -29,6 +28,8 @@ use crate::unit_ai::{
     alert_owner, closest_undiscovered_tile,
 };
 use crate::world::Millis;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 impl UnitAi {
     /// The base handler's damage case (`FUN_140c589c0`, cases 500 and a missile's warning, 0x20f:
@@ -220,6 +221,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         let attacker_id = attacker.id;
         let reaches = side.reaches(attacker_id, at.weapon_range)?;
         let Some(target) = current else {
@@ -235,7 +237,10 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         if !player_type.is_computer() {
-            if matches!(target.class, class::BUILDING | class::WALL | class::TOWER) {
+            if roles
+                .of_class(target.class)
+                .intersects(ClassRoles::BUILDING | ClassRoles::WALL | ClassRoles::TOWER)
+            {
                 return self.strike_back(attacker_id, at, ai_rng, side);
             }
             return Ok(GO_ON);
@@ -253,14 +258,15 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let roles = &at.roles;
         let attacker_id = attacker.id;
         if target.master == WONDER
-            || (target.class == class::TOWER && attacker.class == class::TOWER)
+            || (roles.of_class(target.class).contains(ClassRoles::TOWER)
+                && roles.of_class(attacker.class).contains(ClassRoles::TOWER))
             || attacker.kind == MasterKind::MISSILE
-            || (attacker.class == class::TOWER
-                && !matches!(
-                    at.class,
-                    Some(class::SIEGE | class::CLASS_54 | class::WARSHIP)
+            || (roles.of_class(attacker.class).contains(ClassRoles::TOWER)
+                && !roles.of_some_class(at.class).intersects(
+                    ClassRoles::SIEGE | ClassRoles::UNPACKED_TREBUCHET | ClassRoles::WARSHIP,
                 )
                 && at.disable_tower_priority)
         {
@@ -338,7 +344,9 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
-        let boar = at.class == Some(class::PREDATOR) && at.combat_level == CombatLevel::ANIMAL;
+        let roles = &at.roles;
+        let boar = roles.of_some_class(at.class).contains(ClassRoles::PREDATOR)
+            && at.combat_level == CombatLevel::ANIMAL;
         // p1 the unit met (−1 names none the update holds)
         if !boar
             && let Some(met) = ObjectId::of_field(n.p[0])
@@ -368,6 +376,7 @@ impl UnitAi {
         n: Notify,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
+        roles: &Roles,
     ) -> Result<u32, GenieError> {
         let radius = Footprint::new(n.p[0] as f32 / RADIUS_SCALE, n.p[1] as f32 / RADIUS_SCALE);
         // p3 the foundation: none (−1) has no footprint, so the unit has nowhere to go
@@ -383,7 +392,7 @@ impl UnitAi {
                     force: true,
                     // The prey animals' class, whose move off a footprint runs (slot 0x148's seventh argument).
                     // The villagers' class.
-                    walk: off.class != class::PREY,
+                    walk: !roles.of_class(off.class).contains(ClassRoles::PREY),
                 },
                 side,
                 rng,
@@ -391,7 +400,7 @@ impl UnitAi {
         }
         if !off.player_type.is_computer()
             // The villager class (`-0xea8` raw): a boar attacking one turns furious.
-            && off.class == class::VILLAGER
+            && roles.of_class(off.class).contains(ClassRoles::VILLAGER)
             && let (Some(site), Some(target)) = (off.site, off.action_target)
         {
             let order = |o: &Named, order: OrderKind| QueuedOrder {

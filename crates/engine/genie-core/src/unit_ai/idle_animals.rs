@@ -9,7 +9,6 @@ use crate::math::fmath::sqrt;
 use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
-use crate::objects::masters::class;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::unit_ai::{
@@ -19,6 +18,7 @@ use crate::unit_ai::{
     Memory, Pick, Search, Surroundings, UnitAi, UnitSide, point_gap_squared,
 };
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
 use std::cmp::Ordering;
 
 impl UnitAi {
@@ -151,8 +151,9 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let roles = &at.roles;
         self.cap_human_order(side, ai)?;
-        if at.class == Some(class::KING) {
+        if roles.of_some_class(at.class).contains(ClassRoles::KING) {
             let led = at.master != KING_UNLED
                 && !at.garrisoned
                 && self.current_order.is_none()
@@ -276,6 +277,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let slots = at.slots;
         self.cap_human_order(side, ai)?;
         self.set_idle_timeout(LION_IDLE_TIMEOUT, ai);
         let sight = at.los + HUNTED_SIGHT_GROWTH;
@@ -311,7 +313,7 @@ impl UnitAi {
             ));
         }
         // each search that queries sets the alert mode (`FUN_140c63e20`)
-        let mut found = side.closest(&search(Some(class::VILLAGER)))?;
+        let mut found = side.closest(&search(Some(slots.class.villager)))?;
         self.alert(found, at.dt_seconds);
         // none or a negative id (`JL`)
         if found.id.is_none_or(|id| id.get() < 0) {

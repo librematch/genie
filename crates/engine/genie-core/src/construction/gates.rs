@@ -11,13 +11,14 @@ use crate::objects::layers::Building;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::class;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::{GATE_COUNT_CAP, GATE_GROW, GATE_QUERY_RECORDS, World};
 
@@ -33,6 +34,7 @@ pub fn lets_pass(
     owner: PlayerId,
     player: PlayerId,
     spatial: &Spatial,
+    roles: &Roles,
 ) -> bool {
     let transforms = master
         .building
@@ -40,7 +42,7 @@ pub fn lets_pass(
         .is_some_and(|b| b.transform_unit.is_some());
     master.kind == MasterKind::BUILDING
         && gate.life.state < ObjectState::Dying
-        && master.class == class::GATE
+        && roles.of_class(master.class).contains(ClassRoles::GATE)
         && transforms
         && !layer.gate.is_some_and(|g| g.locked)
         && spatial.allied_with(owner, player)
@@ -62,6 +64,7 @@ pub(crate) fn gate_units(
     annexes: &[ObjectId],
     by_id: ObjectsRef<'_>,
 ) -> Result<(Vec<ObjectId>, usize), GenieError> {
+    let roles = by_id.roles();
     let [a, b] = annexes[..] else {
         return Err(GenieError::unsupported("a gate without its two annexes"));
     };
@@ -101,8 +104,10 @@ pub(crate) fn gate_units(
         let Some((id, p)) = id.key().and_then(|o| Some((o, spatial.get(o)?))) else {
             continue;
         };
-        let counts = !matches!(p.class, class::WALL | class::GATE | class::TOWER)
-            && (p.class != class::BUILDING || p.moves)
+        let counts = !roles
+            .of_class(p.class)
+            .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::TOWER)
+            && (!roles.of_class(p.class).contains(ClassRoles::BUILDING) || p.moves)
             && (p.moves || p.player != PlayerId::GAIA);
         if counts {
             units.push(id);
@@ -127,7 +132,11 @@ impl World {
                 .objects
                 .checked(i)?
                 .master_in(OwnerMasters::new(&self.parts.own_master, masters))?;
-            if m.class == class::GATE
+            if self
+                .model
+                .roles
+                .of_class(m.class)
+                .contains(ClassRoles::GATE)
                 && m.building
                     .as_ref()
                     .is_some_and(|b| b.transform_unit.is_some())
@@ -148,7 +157,13 @@ impl World {
         let gate = self.players.live(q, i)?;
         let m = gate.master(self.master_tables(), q)?;
         let layer = self.parts.building_of(gate.id);
-        Ok(lets_pass((gate, layer, m), q, p, &self.spatial))
+        Ok(lets_pass(
+            (gate, layer, m),
+            q,
+            p,
+            &self.spatial,
+            &self.model.roles,
+        ))
     }
 
     /// `BaseWorld::update` before player `p` updates (not Gaia): the gates of each player `q`

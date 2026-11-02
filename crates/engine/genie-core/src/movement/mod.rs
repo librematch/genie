@@ -27,9 +27,7 @@ use crate::math::fmath::{self, BVector};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
-use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::ID_45;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -102,6 +100,7 @@ use crate::math::image::movement::{
 #[cfg(test)]
 use crate::math::rng::Well512;
 use crate::objects::facing::SpriteFacets;
+use crate::objects::masters::ids;
 #[cfg(test)]
 use crate::pathing::hull_path::HullPather;
 #[cfg(test)]
@@ -110,6 +109,8 @@ use crate::pathing::tile_path::Path;
 use crate::pathing::{Pathing, PlanBudget};
 use crate::world::WALKER_UNMOVING;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 pub use genie_model::movement::{Turning, turn_rate, turning};
 
 /// The velocity data (`+0x868`): velocity and acceleration in the unit's own frame; component 2 is
@@ -307,8 +308,8 @@ const REACH_SHORT: f32 = MOVEMENT_REACH_SHORT;
 /// short pather did not reach it (`FUN_140fa0370`, `DAT_14330eb8c`).
 const REACH_NEAR: DistanceSquared = DistanceSquared::new(MOVEMENT_REACH_NEAR);
 /// The master the long pather lets move without a speed (`FUN_140f9eb70`, raw id `0x2a`).
-pub(crate) const LONG_PATH_MOVER: MasterId = MasterId::named(42);
-const WIDE_CLASS: ClassId = class::CLASS_33;
+pub(crate) const LONG_PATH_MOVER: MasterId = ids::ID_42;
+
 const WIDE_RANGE: Distance = Distance::new(MOVEMENT_WIDE_RANGE);
 /// A long path's stretch is checked for walls with the unit's radius times this
 /// (`DAT_142e85190`).
@@ -519,9 +520,10 @@ pub(crate) fn gate_gap(
     own: Distance,
     annex: impl Fn(Distance) -> Distance,
     by_id: ObjectsRef<'_>,
+    roles: &Roles,
 ) -> Distance {
     // The class the motion step measures by its annexes (`-0xe85` encoded).
-    if target.class != class::GATE {
+    if !roles.of_class(target.class).contains(ClassRoles::GATE) {
         return own;
     }
     let mut gap = own;

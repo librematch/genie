@@ -58,6 +58,16 @@ class Files(unittest.TestCase):
             )
             self.assertIn("| [`tests.rs`](tests.rs) | Tests. |", rd.files_table(src / "combat" / "attack"))
 
+    def test_a_folder_of_a_file_s_children_takes_its_readme_s_subtitle(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = crate(Path(d))
+            child = src / "combat" / "volley"
+            child.mkdir()
+            (child / "launch.rs").write_text("//! The launch.\n")
+            self.assertEqual(rd.folder_doc(child), "")
+            (child / "README.md").write_text("# `combat/volley`: the missile launch\n\nProse.\n")
+            self.assertEqual(rd.folder_doc(child), "The missile launch.")
+
 
 class Uses(unittest.TestCase):
     def test_a_system_names_what_it_uses_and_what_uses_it(self):

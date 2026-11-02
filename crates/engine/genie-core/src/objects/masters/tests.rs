@@ -36,7 +36,6 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::facing::SpriteFacets;
-use crate::objects::masters::class;
 use crate::objects::sprite::Graphic;
 use crate::players::Amount;
 use crate::players::CivId;
@@ -49,6 +48,9 @@ use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::{class_of, opt_master};
+use crate::testing::class;
+use crate::testing::roles;
+use crate::testing::slots;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::unit_ai_type;
@@ -1581,7 +1583,7 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
             general: Some(&site),
             terrain: None,
         };
-        work_master(m, &actor, &on, None, &Alone).map(|w| {
+        work_master(m, &actor, &on, None, &Alone, slots(), &roles()).map(|w| {
             w.map(|(id, t)| {
                 (
                     id.get(),
@@ -1647,7 +1649,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             general: Some(&site),
             terrain: None,
         };
-        work_master(&m, &actor, &on, None, &Alone)
+        work_master(&m, &actor, &on, None, &Alone, slots(), &roles())
             .map(|w| w.map(|(id, t)| (id.get(), t.action_kind)))
     };
     assert_eq!(pick(ids::VILLAGER_MALE), Ok(Some((118, ActionKind::BUILD))));
@@ -1670,7 +1672,8 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     assert_eq!(
         unit_ai_type(
             &master(class::BUILDING, None, CombatLevel::NONE),
-            ids::HOUSE
+            ids::HOUSE,
+            &roles()
         ),
         Some(UnitAiType::BUILDING)
     );
@@ -1678,20 +1681,23 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
         unit_ai_type(
             &master(class::BUILDING, Some(master_id(5)), CombatLevel::NONE),
             master_id(79),
+            &roles(),
         ),
         Some(UnitAiType::TOWER)
     );
     assert_eq!(
         unit_ai_type(
             &master(class::PREDATOR, None, CombatLevel::ANIMAL),
-            master_id(48)
+            master_id(48),
+            &roles()
         ),
         Some(UnitAiType::BOAR)
     );
     assert_eq!(
         unit_ai_type(
             &master(class::PREDATOR, None, CombatLevel::NONE),
-            master_id(126)
+            master_id(126),
+            &roles()
         ),
         Some(UnitAiType::LION)
     );
@@ -1699,7 +1705,8 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     assert_eq!(
         unit_ai_type(
             &master(class::BUILDING, None, CombatLevel::NONE),
-            ids::ID_1105
+            ids::ID_1105,
+            &roles()
         ),
         Some(UnitAiType::SIEGE_TOWER)
     );

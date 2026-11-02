@@ -24,7 +24,6 @@ use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
@@ -37,6 +36,7 @@ use crate::unit_ai::QueueEnd;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
@@ -121,7 +121,15 @@ impl World {
                 let building = match target_annex {
                     // The class of buildings, which a unit's garrison task names (`FUN_1415c9240` with 3, 3).
                     // A gate's class: its annex is not its main building for a garrison order.
-                    Some(main) if tm.class != class::GATE => main.id(),
+                    Some(main)
+                        if !self
+                            .model
+                            .roles
+                            .of_class(tm.class)
+                            .contains(ClassRoles::GATE) =>
+                    {
+                        main.id()
+                    }
                     _ => target,
                 };
                 Shelters {
@@ -167,7 +175,13 @@ impl World {
                 continue;
             };
             let m = u.master(self.master_tables(), p)?;
-            if m.class == class::VILLAGER && m.kind == MasterKind::COMBAT {
+            if self
+                .model
+                .roles
+                .of_class(m.class)
+                .contains(ClassRoles::VILLAGER)
+                && m.kind == MasterKind::COMBAT
+            {
                 units.push(id);
             }
             if m.id == MASTER_1808 {
@@ -229,7 +243,13 @@ impl World {
             let om = o.master(self.master_tables(), op)?;
             if om.kind < MasterKind::BUILDING {
                 shelters.transports.push(ContainerId::new(id));
-            } else if om.class != class::GATE && self.parts.building_of(o.id).annex_of.is_none() {
+            } else if !self
+                .model
+                .roles
+                .of_class(om.class)
+                .contains(ClassRoles::GATE)
+                && self.parts.building_of(o.id).annex_of.is_none()
+            {
                 shelters.buildings.push(ContainerId::new(id));
             }
             shelters.counts.push(self.garrisoned(id)?);

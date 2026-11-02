@@ -134,3 +134,79 @@ pub const ID_1663: MasterId = MasterId::named(1663);
 pub const ID_1697: MasterId = MasterId::named(1697);
 /// Master 2134, between 2133 and 2135 of the self-destructing attackers.
 pub const ID_2134: MasterId = MasterId::named(2134);
+/// Master 13, as the `.dat` numbers it.
+pub const FISHING_SHIP: MasterId = MasterId::named(13);
+/// Master 53, as the `.dat` numbers it.
+pub const FISH_PERCH: MasterId = MasterId::named(53);
+/// Master 112, as the `.dat` numbers it.
+pub const FLARE: MasterId = MasterId::named(112);
+/// Master 128, as the `.dat` numbers it.
+pub const TRADE_CART: MasterId = MasterId::named(128);
+/// Master 156, as the `.dat` numbers it.
+pub const VILLAGER_REPAIRER_MALE: MasterId = MasterId::named(156);
+/// Master 159, as the `.dat` numbers it.
+pub const ARTIFACT_CART: MasterId = MasterId::named(159);
+/// Master 214, as the `.dat` numbers it.
+pub const VILLAGER_FARMER_FEMALE: MasterId = MasterId::named(214);
+/// Master 222, as the `.dat` numbers it.
+pub const VILLAGER_REPAIRER_FEMALE: MasterId = MasterId::named(222);
+/// Master 243, as the `.dat` numbers it.
+pub const DOPPELGANGER: MasterId = MasterId::named(243);
+/// Master 259, as the `.dat` numbers it.
+pub const VILLAGER_FARMER_MALE: MasterId = MasterId::named(259);
+/// Master 274, as the `.dat` numbers it.
+pub const FLARE_2: MasterId = MasterId::named(274);
+/// Master 420, as the `.dat` numbers it.
+pub const CANNON_GALLEON: MasterId = MasterId::named(420);
+/// Master 440, as the `.dat` numbers it.
+pub const PETARD: MasterId = MasterId::named(440);
+/// Master 535, as the `.dat` numbers it.
+pub const BOARDING_GALLEY: MasterId = MasterId::named(535);
+/// Master 562, as the `.dat` numbers it.
+pub const LUMBER_CAMP: MasterId = MasterId::named(562);
+/// Master 584, as the `.dat` numbers it.
+pub const MINING_CAMP: MasterId = MasterId::named(584);
+/// Master 618, as the `.dat` numbers it.
+pub const TOWN_CENTRE_618: MasterId = MasterId::named(618);
+/// Master 619, as the `.dat` numbers it.
+pub const TOWN_CENTRE_619: MasterId = MasterId::named(619);
+/// Master 620, as the `.dat` numbers it.
+pub const TOWN_CENTRE_620: MasterId = MasterId::named(620);
+/// Master 691, as the `.dat` numbers it.
+pub const ELITE_CANNON_GALLEON: MasterId = MasterId::named(691);
+/// Master 697, as the `.dat` numbers it.
+pub const FLARE_4: MasterId = MasterId::named(697);
+/// Master 704, as the `.dat` numbers it.
+pub const SHAH: MasterId = MasterId::named(704);
+/// Master 706, as the `.dat` numbers it.
+pub const SABOTEUR: MasterId = MasterId::named(706);
+/// Master 775, as the `.dat` numbers it.
+pub const MISSIONARY: MasterId = MasterId::named(775);
+/// Master 1263, as the `.dat` numbers it.
+pub const FLAMING_CAMEL: MasterId = MasterId::named(1263);
+/// Master 1647, as the `.dat` numbers it.
+pub const MARKET_1647: MasterId = MasterId::named(1647);
+/// Master 1649, as the `.dat` numbers it.
+pub const TROPHY_NONE: MasterId = MasterId::named(1649);
+/// Master 1704, as the `.dat` numbers it.
+pub const HUSSITE_WAGON: MasterId = MasterId::named(1704);
+/// Master 1706, as the `.dat` numbers it.
+pub const ELITE_HUSSITE_WAGON: MasterId = MasterId::named(1706);
+/// Master 1715, as the `.dat` numbers it.
+pub const JADWIGA: MasterId = MasterId::named(1715);
+/// Master 1811, as the `.dat` numbers it.
+pub const WARRIOR_PRIEST: MasterId = MasterId::named(1811);
+/// Master 1822, as the `.dat` numbers it.
+pub const TAMAR: MasterId = MasterId::named(1822);
+/// Master 1891, as the `.dat` numbers it.
+pub const VILLAGER_HERDER_FEMALE: MasterId = MasterId::named(1891);
+/// Master 1892, as the `.dat` numbers it.
+pub const VILLAGER_HERDER_MALE: MasterId = MasterId::named(1892);
+/// Master 1899, as the `.dat` numbers it.
+pub const PASTURE_ARGALI: MasterId = MasterId::named(1899);
+/// Master 1900, as the `.dat` numbers it.
+pub const PASTURE_IBEX: MasterId = MasterId::named(1900);
+/// Master 2171, as the `.dat` numbers it.
+pub const OYSTERING_SHIP: MasterId = MasterId::named(2171);
+/// Master 2356, as the `.dat` numbers it.
+pub const ANTIQUITY_FISHING_SHIP: MasterId = MasterId::named(2356);

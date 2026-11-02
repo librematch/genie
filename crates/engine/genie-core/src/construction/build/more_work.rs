@@ -10,13 +10,14 @@ use crate::map::spatial::Spatial;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::pathing::tile_path::GridLevel;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::drop_site;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
@@ -39,6 +40,7 @@ impl Unit {
         c: &mut Step<'_>,
         building: ObjectId,
         built: MasterId,
+        roles: &Roles,
     ) -> Result<Option<Work>, GenieError> {
         use crate::gathering::gather_search::{self, Candidate};
         use crate::math::image::gather_search::{REACH_CAP, REACH_FLOOR};
@@ -129,12 +131,19 @@ impl Unit {
                 let cell = (width * i64::from(t.y()) + i64::from(t.x())) as usize;
                 Ok(cells.checked(cell)?.edges.is_empty())
             };
-            gather_search::more_work(entry, &builder, spatial.map, Some(&blocked), &objects)?
+            gather_search::more_work(
+                entry,
+                &builder,
+                spatial.map,
+                Some(&blocked),
+                &objects,
+                roles,
+            )?
         };
         let Some(found) = found else {
             return Ok(None);
         };
-        if found.class == class::FARM {
+        if roles.of_class(found.class).contains(ClassRoles::FARM) {
             return Err(GenieError::unsupported(
                 "a builder's search for more work finding a farm",
             ));

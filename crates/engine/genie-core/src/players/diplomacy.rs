@@ -21,7 +21,6 @@ use crate::math::image::diplomacy::NO_POINT as DIPLOMACY_NO_POINT;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
 use crate::players::PlayerId;
 use crate::players::Relation;
@@ -30,6 +29,7 @@ use crate::players::Team;
 use crate::players::UnitRelation;
 use crate::vision::VisionBits;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The reveal of a player's units of a kind to the others (its attribute 204 not 0,
@@ -174,7 +174,7 @@ impl World {
             // The market (master 84), whose owner's diplomacy change toward a computer player shows it to
             // that player's tile list.
             // The siege tower's class (13), whose units leave it for a player no longer allied.
-            if class == class::SIEGE
+            if self.model.roles.of_class(class).contains(ClassRoles::SIEGE)
                 && garrison
                     .iter()
                     .any(|&g| self.object(g).is_some_and(|(gp, _)| gp == q))
@@ -220,7 +220,12 @@ impl World {
             if !self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? {
                 self.destroy(p, id)?;
             }
-        } else if holder_master.class == class::SIEGE {
+        } else if self
+            .model
+            .roles
+            .of_class(holder_master.class)
+            .contains(ClassRoles::SIEGE)
+        {
             return Err(SIEGE_UNLOAD);
         }
         Ok(())

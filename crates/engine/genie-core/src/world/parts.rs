@@ -997,7 +997,13 @@ mod tests {
         .unwrap();
         assert_eq!(t.parts.unread.get(id), Some(&why));
         assert_eq!(t.parts.of(id).unread, Some(why.clone()));
-        let by_id = ObjectsRef::new(&t.players, &t.index, &t.model.masters, &t.parts);
+        let by_id = ObjectsRef::new(
+            &t.players,
+            &t.index,
+            &t.model.masters,
+            &t.parts,
+            &t.model.roles,
+        );
         assert_eq!(by_id.unread(id), Some(&why));
         t.check_parts().unwrap();
         let gone = t

@@ -28,7 +28,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
 use crate::objects::masters::work_master;
 use crate::orders::gather::HuntOrder;
@@ -43,8 +42,11 @@ use crate::unit_ai::task_finder::world::point_terrain;
 use crate::unit_ai::task_finder::{Actor, enabled};
 use crate::unit_ai::task_finder::{TaskOn, find_task};
 use crate::world::World;
+use crate::world::layer::ClassRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+
+mod garrison;
 
 /// A task of an object's action (Enter, Attack, Hunt, Build, Repair, Gather) that the task
 /// finder gave a work command without a target, for the terrain at its point: the game starts
@@ -134,55 +136,6 @@ impl World {
         Ok(())
     }
 
-    /// The unit at `idx` of player `player` as the task finder's actor.
-    ///
-    /// # Errors
-    ///
-    /// A unit or a master the world does not hold.
-    fn garrison_actor(&self, player: PlayerId, idx: ListIndex) -> Result<Actor<'_>, GenieError> {
-        let owner = self.players.player(player)?;
-        let unit = owner.live(idx)?;
-        Ok(Actor {
-            id: unit.id,
-            master: unit.master(self.master_tables(), player)?,
-            player,
-            held: unit.life.held(),
-            attribute_95: owner.attributes.get(95).copied().unwrap_or(Amount::ZERO),
-            civ: owner.civ,
-        })
-    }
-
-    /// The unit's own task list's finder with filter 3 (slot 2 of its master's `+0x788`,
-    /// `FUN_1412784d0`: the garrison's, [`crate::unit_ai::task_finder::find_task`]) on `target` at
-    /// the gather `point`: whether it finds a task, as a gather point on a building asks
-    /// (`FUN_140ace9c0`).
-    pub(crate) fn garrison_task_found(
-        &self,
-        player: PlayerId,
-        idx: ListIndex,
-        target: ObjectId,
-        point: Position,
-    ) -> Result<bool, GenieError> {
-        let actor = self.garrison_actor(player, idx)?;
-        let master = actor.master;
-        let world = TaskWorld {
-            players: &self.players,
-            drop_sites: &self.model.drop_sites,
-        };
-        let t = self.task_target(target, 1)?;
-        let general = self.task_target(target, 2)?;
-        Ok(find_task(
-            master,
-            &actor,
-            Some(&t),
-            Some(&general),
-            self.task_terrain(point),
-            Some(ENTER),
-            &world,
-        )?
-        .is_some())
-    }
-
     /// The work command's carried-resource test (`+0x12`, `FUN_14106ff70` with `param_8`) on the
     /// task found: a gather or hunt task (action type 5 or 0x6e) of another resource (`+0x20`)
     /// than the unit holds (`+0x308`; the food kinds 0 and 15 to 17 count as one) leaves the
@@ -209,7 +162,11 @@ impl World {
             }
         }
         if matches!(task.action_kind, ATTACK_TASK | ATTACK)
-            && class != class::VILLAGER
+            && !self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::VILLAGER)
             && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
         {
             ai.retarget_disabled = 1;
@@ -327,7 +284,16 @@ impl World {
             general: general.as_ref(),
             terrain: self.task_terrain(point),
         };
-        Ok(work_master(masters, &actor, &on, filter, &world)?.map(|(with, task)| (with, *task)))
+        Ok(work_master(
+            masters,
+            &actor,
+            &on,
+            filter,
+            &world,
+            self.model.slots,
+            &self.model.roles,
+        )?
+        .map(|(with, task)| (with, *task)))
     }
 
     /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
@@ -584,7 +550,13 @@ impl World {
             )?;
             self.remember_order(player, idx, (order, action))?;
         }
-        if alive || class == class::CLASS_51 {
+        if alive
+            || self
+                .model
+                .roles
+                .of_class(class)
+                .contains(ClassRoles::PACKED_TREBUCHET)
+        {
             match target {
                 None => self.move_point_order_with(player, idx, point, notified)?,
                 Some(target) => {
@@ -639,11 +611,15 @@ impl World {
             find_task(
                 list,
                 &actor,
-                Some(&t),
-                Some(&general),
-                terrain,
+                &TaskOn {
+                    target: Some(&t),
+                    general: Some(&general),
+                    terrain,
+                },
                 filter,
                 &world,
+                self.model.slots,
+                &self.model.roles,
             )
             .map(Option::<&Task>::copied)
         };

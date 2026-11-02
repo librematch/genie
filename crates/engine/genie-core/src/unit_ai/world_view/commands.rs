@@ -17,6 +17,7 @@ use crate::movement::{Me, Mover, Planning};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
+use crate::objects::masters::ids;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
 use crate::ownership::artifact::ARTIFACT_TYPE;
@@ -25,11 +26,14 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::ai_module::SearchArea;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{EnterOrder, RepairOrder, UnitView};
 use crate::world::UNIT_AI_MASTER;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -43,7 +47,12 @@ impl UnitView<'_, '_> {
     /// (`FUN_140ad7fa0`) replaces the unit's actions (slot 0x808): 1; none: 0. The switches and
     /// the Repair are made at once on the unit lent back to its slot ([`RepairOrder`],
     /// [`World::repair_order`]).
-    pub(super) fn repair_command(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    pub(super) fn repair_command(
+        &mut self,
+        target: ObjectId,
+        slots: Slots,
+        roles: &Roles,
+    ) -> Result<bool, GenieError> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -134,7 +143,19 @@ impl UnitView<'_, '_> {
             foreign,
             drop_sites: &self.c.w.model.drop_sites,
         };
-        let found = task_search(masters, &actor, &t, &general, terrain, Some(REPAIR), &dip)?;
+        let found = task_search(
+            masters,
+            &actor,
+            &TaskOn {
+                target: Some(&t),
+                general: Some(&general),
+                terrain,
+            },
+            Some(REPAIR),
+            &dip,
+            slots,
+            roles,
+        )?;
         if switch.is_none() && found.is_none() {
             return Ok(false);
         }
@@ -161,7 +182,12 @@ impl UnitView<'_, '_> {
     /// its sub-action): 1; none: 0. The switch and the Enter are made at once on the unit lent
     /// back to its slot ([`EnterOrder`], [`World::enter_order`]); the notify its install gives
     /// the unit's own AI waits for the side's return.
-    pub(super) fn enter_command(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    pub(super) fn enter_command(
+        &mut self,
+        target: ObjectId,
+        slots: Slots,
+        roles: &Roles,
+    ) -> Result<bool, GenieError> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -241,8 +267,19 @@ impl UnitView<'_, '_> {
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
-        let Some((task, switch)) =
-            task_search(masters, &actor, &t, &general, terrain, Some(GARRISON), &dip)?
+        let Some((task, switch)) = task_search(
+            masters,
+            &actor,
+            &TaskOn {
+                target: Some(&t),
+                general: Some(&general),
+                terrain,
+            },
+            Some(GARRISON),
+            &dip,
+            slots,
+            roles,
+        )?
         else {
             return Ok(false);
         };
@@ -300,6 +337,7 @@ impl UnitView<'_, '_> {
                 &self.c.w.index,
                 &self.c.w.model.masters,
                 &self.c.w.parts,
+                &self.c.w.model.roles,
             ),
             zones,
             plan: Planning {
@@ -327,7 +365,7 @@ impl UnitView<'_, '_> {
 pub(crate) const LOS_MARGIN: Distance = Distance::new(EXPLORE_LOS_MARGIN);
 
 /// The masters of a town centre (`FUN_1416597e0`: 109, then 444).
-pub(crate) const TOWN_CENTRES: [MasterId; 2] = [MasterId::named(109), MasterId::named(444)];
+pub(crate) const TOWN_CENTRES: [MasterId; 2] = [ids::TOWN_CENTRE, ids::TOWN_CENTRE_444];
 
 /// `FUN_1416597e0` with 0: the player's first town centre, by the player's index of objects by
 /// master (`player+0x18`, `FUN_14104f560`: those of master 109, then 444), as its tile. The

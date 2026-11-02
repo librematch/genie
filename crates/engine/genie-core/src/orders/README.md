@@ -47,11 +47,13 @@ The files hold the orders by kind:
 | [`town_bell.rs`](town_bell.rs) | A villager's town-bell record (`+0x9ac`..`+0x9dc`): what it worked on when an order to a target took it off its work (`FUN_141206a20`), which a later back-to-work order sends it back to, and the flag a garrison order sets (`FUN_1412067f0`). |
 | [`unit_order.rs`](unit_order.rs) | An artifact's and a herd's take, an order's cancel and a unit's order. |
 | [`work.rs`](work.rs) | A kept attack, the garrison task and the work command and its task. |
+| [`gather/`](gather/) | The work command's Hunt. |
+| [`work/`](work/) | The garrison finder's view. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`testing`](../testing/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 - Used by: [`commands`](../commands/), [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`objects`](../objects/), [`ownership`](../ownership/), [`production`](../production/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

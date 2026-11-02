@@ -21,7 +21,6 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
 use crate::objects::masters::player_master;
@@ -34,6 +33,8 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::world::SideWorld;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{NOT_HELD, UnitView};
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::{ATTACKER_UNPLACED, NO_STANDING_SPRITE};
 
@@ -59,6 +60,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         force: bool,
         ai: &UnitAi,
+        roles: &Roles,
     ) -> Result<Attacked, GenieError> {
         // the unit's master, a copy: the attack's start changes the unit (its master's switch)
         let own = self
@@ -66,7 +68,10 @@ impl UnitView<'_, '_> {
             .master(self.c.w.master_tables(), self.player)?
             .clone();
         let master = &own;
-        if matches!(master.class, class::CLASS_51 | class::CLASS_54) {
+        if roles
+            .of_class(master.class)
+            .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
+        {
             return Err(GenieError::unsupported(
                 "the attack command of a unit of class 51 or 54",
             ));
@@ -82,14 +87,14 @@ impl UnitView<'_, '_> {
             .is_some_and(|a| a.target.map(AttackTargetId::id) == Some(target))
         {
             if force {
-                self.attack_again(target, &t, master, ai)?;
+                self.attack_again(target, &t, master, ai, roles)?;
             }
             return Ok(Attacked {
                 attacks: true,
                 posted: Vec::new(),
             });
         }
-        let master = &self.swapped_master(own)?;
+        let master = &self.swapped_master(own, roles)?;
         let me_at = *self
             .c
             .w
@@ -109,6 +114,7 @@ impl UnitView<'_, '_> {
             &self.c.w.model.graphics,
             TaskSprites::NONE,
             None,
+            roles,
         );
         let standing = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         if unit.sprite.is_none() {
@@ -123,7 +129,7 @@ impl UnitView<'_, '_> {
         // the constructor clears +0x900 for a target other than its own (none yet)
         self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         if unit.life.inside.is_some() {
-            return self.attack_from_inside(Attack::own(target, &e, arms), by);
+            return self.attack_from_inside(Attack::own(target, &e, arms), by, roles);
         }
         new_sprite(
             &mut unit.sprite,
@@ -137,12 +143,12 @@ impl UnitView<'_, '_> {
             arms,
             visible,
             target_owner: t.player,
-            ready: self.ready_reads(target, master, ai)?,
+            ready: self.ready_reads(target, master, ai, roles)?,
         };
         let unit = &mut *self.unit;
-        let (attack, posted) = Attack::command(self.c, unit, &cmd)?;
+        let (attack, posted) = Attack::command(self.c, unit, &cmd, roles)?;
         self.actions.list.set_attack(Some(attack));
-        self.take(target, by)?;
+        self.take(target, by, roles)?;
         Ok(Attacked {
             attacks: true,
             posted,
@@ -152,8 +158,8 @@ impl UnitView<'_, '_> {
     /// The attack command's master: a villager switches to its player's villager of its task
     /// swap group first ([`UnitView::villager_swap`]; slot 0x90 with 0: the action list clears,
     /// then the master change at once, [`UnitView::switch_unit_master`]), else it keeps `own`.
-    fn swapped_master(&mut self, own: Master) -> Result<Master, GenieError> {
-        let Some(next) = self.villager_swap(&own).cloned() else {
+    fn swapped_master(&mut self, own: Master, roles: &Roles) -> Result<Master, GenieError> {
+        let Some(next) = self.villager_swap(&own, roles).cloned() else {
             return Ok(own);
         };
         self.switch_unit_master(&own, next.id)?;
@@ -167,6 +173,7 @@ impl UnitView<'_, '_> {
         &mut self,
         mut attack: Attack,
         by: Releaser,
+        roles: &Roles,
     ) -> Result<Attacked, GenieError> {
         let unit = &mut *self.unit;
         attack.fail_at_start(
@@ -177,7 +184,7 @@ impl UnitView<'_, '_> {
         let target = attack.target;
         self.actions.list.set_attack(Some(attack));
         if let Some(target) = target {
-            self.take(target.id(), by)?;
+            self.take(target.id(), by, roles)?;
         }
         Ok(Attacked {
             attacks: true,
@@ -219,6 +226,7 @@ impl UnitView<'_, '_> {
         t: &Placed,
         master: &Master,
         ai: &UnitAi,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         let mark = |id: ObjectId, p: &Placed| -> Result<Mark, GenieError> {
             let u = owner_view(
@@ -269,7 +277,7 @@ impl UnitView<'_, '_> {
         };
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE;
         let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
-        let w = attack.work(Some(target_mark), main, &wielder, |_| can_move);
+        let w = attack.work(Some(target_mark), main, &wielder, |_| can_move, roles);
         let by = Releaser {
             id: unit.id,
             class: Some(master.class),
@@ -282,7 +290,7 @@ impl UnitView<'_, '_> {
             self.release(old, by)?;
         }
         if let Some(new) = w.takes {
-            self.take(new, by)?;
+            self.take(new, by, roles)?;
         }
         Ok(())
     }
@@ -291,7 +299,7 @@ impl UnitView<'_, '_> {
     /// objects or another player's; None for an object the view does not hold (the owner's
     /// sleeping objects, or the old owner's of a unit taken over in its update, whose attributes
     /// it does not hold).
-    fn victim_of_target(&self, id: ObjectId) -> Result<Option<Victim>, GenieError> {
+    fn victim_of_target(&self, id: ObjectId, roles: &Roles) -> Result<Option<Victim>, GenieError> {
         let view = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -329,6 +337,7 @@ impl UnitView<'_, '_> {
             (self.player, &dip),
             &self.c.w.spatial,
             self.c.w.mode_680,
+            roles,
         )))
     }
 
@@ -342,8 +351,9 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         master: &Master,
         ai: &UnitAi,
+        roles: &Roles,
     ) -> Result<Option<ReadyReads>, GenieError> {
-        let Some(victim) = self.victim_of_target(target)? else {
+        let Some(victim) = self.victim_of_target(target, roles)? else {
             return Ok(None);
         };
         let unit = &*self.unit;
@@ -361,6 +371,7 @@ impl UnitView<'_, '_> {
             self.player,
             self.c.w.spatial.terrain.as_ref(),
             self.c.w.mode_680,
+            roles,
         );
         let reads = AttackReads::of(
             self.c.w.parts.combat_of(unit.id),
@@ -374,6 +385,7 @@ impl UnitView<'_, '_> {
             ),
             Some(ai),
             (self.player_type, self.c.w.world_time),
+            roles,
         );
         Ok(Some(ReadyReads {
             reads,
@@ -397,8 +409,8 @@ impl UnitView<'_, '_> {
     /// The attack command's villager swap: a villager (class 4) switches to its player's villager
     /// of its task swap group (`+0x7b8` 1: the master table's `+0x298`, 83; else `+0x928`, 293)
     /// when the player has it.
-    fn villager_swap(&self, master: &Master) -> Option<&Master> {
-        if master.class != class::VILLAGER {
+    fn villager_swap(&self, master: &Master, roles: &Roles) -> Option<&Master> {
+        if !roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
             return None;
         }
         let swap = if master.task_by_group == TaskGroup::MALE_VILLAGERS {

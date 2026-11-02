@@ -12,7 +12,6 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
@@ -23,6 +22,8 @@ use crate::map::spatial::Spatial;
 use crate::math::image::build::{
     CLEARING_REACH as BUILD_CLEARING_REACH, STUMP_HP as BUILD_STUMP_HP,
 };
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// What the footprint clearing (`FUN_1415c3620`) reads of the new building: its owner
 /// (`param_2`), its master's id (`param_3`), class and radii, its place (`param_4`,
@@ -115,6 +116,7 @@ pub(crate) fn footprint_clearing(
     world: &Spatial,
     site: &ClearingSite,
     looks: &BTreeMap<ObjectId, ClearLook>,
+    roles: &Roles,
 ) -> Result<Vec<Cleared>, GenieError> {
     use crate::math::fmath::below_or_unordered;
     let (rx, ry) = (site.radius.x(), site.radius.y());
@@ -139,7 +141,7 @@ pub(crate) fn footprint_clearing(
     for y in y0..=y1 {
         for x in x0..=x1 {
             for (id, o) in world.objects_on(Tile::new(i32::from(x), i32::from(y))) {
-                if let Some(c) = clearing_takes(site, id, o, looks)? {
+                if let Some(c) = clearing_takes(site, id, o, looks, roles)? {
                     cleared.push(c);
                 }
             }
@@ -200,6 +202,7 @@ pub(super) fn clearing_takes(
     id: ObjectId,
     o: &Placed,
     looks: &BTreeMap<ObjectId, ClearLook>,
+    roles: &Roles,
 ) -> Result<Option<Cleared>, GenieError> {
     use crate::math::fmath::below_or_unordered;
     if o.master == site.master {
@@ -207,10 +210,13 @@ pub(super) fn clearing_takes(
     }
     // The masters whose classes (39, the gate, and 52) take their owner's walls (27) off their
     // footprint, and the tree class (15).
-    let under_gate = matches!(site.class, class::GATE | class::TOWER);
+    let under_gate = roles
+        .of_class(site.class)
+        .intersects(ClassRoles::GATE | ClassRoles::TOWER);
     // The wall class (27, `0x1b`): two walls beside a builder on a footprint's diagonal stop it.
-    let own_wall = o.player == site.player && under_gate && o.class == class::WALL;
-    let tree = site.trees && o.class == class::TREE;
+    let own_wall =
+        o.player == site.player && under_gate && roles.of_class(o.class).contains(ClassRoles::WALL);
+    let tree = site.trees && roles.of_class(o.class).contains(ClassRoles::TREE);
     if !o.buildable_on.cleared() && !own_wall && !tree {
         return Ok(None);
     }
@@ -244,7 +250,7 @@ pub(super) fn clearing_takes(
         && (below_or_unordered(0.0, seen.height.get()) || o.obstruction.is_some());
     Ok(Some(Cleared {
         id,
-        wall: o.class == class::WALL,
+        wall: roles.of_class(o.class).contains(ClassRoles::WALL),
         record_goes: destroy_drops || roo_drops,
     }))
 }

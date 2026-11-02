@@ -80,7 +80,7 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::class;
+use crate::objects::masters::ids;
 use crate::objects::masters::{
     ClassAmount, DamageAmount, DamageShare, InvulnerabilityLevel, RestrictionField, Task,
 };
@@ -134,32 +134,15 @@ const CONE: f32 = DAMAGE_CONE;
 const MINUS_CONE: f32 = DAMAGE_MINUS_CONE;
 const WIDE_CONE: f32 = DAMAGE_WIDE_CONE;
 
-/// The class whose damage alerts its target's owner itself (`-0xe6c` raw): its target's unit AI
-/// gets no notify 500.
-const ELEPHANT_ARCHER: ClassId = class::CLASS_64;
 /// The rams (masters 35, 422, 548 and 1258): their blast reaches only buildings and their
 /// target.
-const RAMS: [MasterId; 4] = [
-    MasterId::named(35),
-    MasterId::named(422),
-    MasterId::named(548),
-    MasterId::named(1258),
-];
+const RAMS: [MasterId; 4] = [ids::ID_35, ids::ID_422, ids::ID_548, ids::ID_1258];
 /// 1 (`DAT_14330eb8c`, read into `XMM9` at `0x1411cec8e`): a building's least hit, the hit
 /// points below which a hit razes a building or kills a unit, and what each razing count adds.
 const ONE: f32 = DAMAGE_ONE;
 /// The least hit of the attacker classes [`LEAST_HIT_CLASSES`] under the game's setting `+0x680`
 /// at 1 (`DAT_142eb5690`, read into `XMM6` at `0x1411ceea4`).
 const LEAST_CLASS_HIT: f32 = DAMAGE_LEAST_CLASS_HIT;
-/// The attacker classes whose least hit on a building is [`LEAST_CLASS_HIT`] (decoded `0`, `0x24`,
-/// `0x16`, `0x2c`, `0x34` at `0x1411ced23`..`0x1411cee9e`).
-const LEAST_HIT_CLASSES: [ClassId; 5] = [
-    class::CLASS_0,
-    class::CLASS_36,
-    class::WARSHIP,
-    class::CLASS_44,
-    class::TOWER,
-];
 
 /// An object as a hit reads and changes it: the target, and the attacker as the target of a
 /// retaliation or of reflected damage.

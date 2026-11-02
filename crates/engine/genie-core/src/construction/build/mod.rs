@@ -24,7 +24,6 @@ use crate::objects::lifecycle::death_parts::FarmBonus;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::TaskId;
-use crate::objects::masters::class;
 use crate::objects::masters::{MasterId, ids};
 use crate::players::Amount;
 use crate::players::PlayerType;
@@ -83,6 +82,8 @@ use crate::pathing::Pathing;
 #[cfg(test)]
 use crate::players::PlayerId;
 use crate::world::NO_ATTRIBUTE;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 
 /// A builder within this of its foundation's footprint has reached it (`DAT_142eb5690`).
 const REACH: f32 = BUILD_REACH;
@@ -232,7 +233,7 @@ impl Completion<'_> {
     /// # Errors
     ///
     /// What it does not model.
-    pub fn first_part(&self, c: &Construction) -> Result<FirstPart, GenieError> {
+    pub fn first_part(&self, c: &Construction, roles: &Roles) -> Result<FirstPart, GenieError> {
         use crate::math::conversions::cvttss2si;
         let master = self.master.ok_or(GenieError::unsupported(
             "a completion of a master the slice does not have",
@@ -248,7 +249,9 @@ impl Completion<'_> {
             ));
         }
         let mut part = FirstPart::default();
-        if master.class == class::FARM && Seconds::of_master(c.build_time) <= c.progress {
+        if roles.of_class(master.class).contains(ClassRoles::FARM)
+            && Seconds::of_master(c.build_time) <= c.progress
+        {
             let FarmBonus {
                 amount,
                 resource,
@@ -489,6 +492,7 @@ mod stack_tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
+    use crate::testing::class;
     use crate::unit_ai::UnitAiType;
     use crate::world::Millis;
     use crate::world::WorldTime;

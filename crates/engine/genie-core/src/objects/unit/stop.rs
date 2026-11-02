@@ -17,6 +17,7 @@ use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::unit_ai::{AiCommand, Effect};
 use crate::world::Unread;
+use crate::world::layer::Roles;
 use crate::world::lets::torn_down;
 use crate::world::step::Step;
 
@@ -187,6 +188,7 @@ impl Unit {
         e: Effect,
         class: Option<ClassId>,
         c: &mut Step<'_>,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
         match e {
             Effect::Stop => self.stop_action(actions, c),
@@ -205,19 +207,19 @@ impl Unit {
                         c.w.parts.motion.mover_mut(self.id),
                     ),
                 };
-                m.map_or(Ok(()), |m| self.ai_move(actions, m, class, c))
+                m.map_or(Ok(()), |m| self.ai_move(actions, m, class, c, roles))
             }
             Effect::OrderOnTarget(order) => c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                 w.order_on_target(p, i, order)
             }),
             Effect::Command(command) => self.ai_command(actions, command, c),
-            Effect::ChangeOwner(new) => self.ai_change_owner(actions, new, c),
-            Effect::Explore(point) => self.explore_to(actions, point, c),
+            Effect::ChangeOwner(new) => self.ai_change_owner(actions, new, c, roles),
+            Effect::Explore(point) => self.explore_to(actions, point, c, roles),
             Effect::MoveToObject {
                 target,
                 state,
                 range,
-            } => self.move_to_object(actions, (target, state), range, c),
+            } => self.move_to_object(actions, (target, state), range, c, roles),
         }
     }
 

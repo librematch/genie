@@ -29,7 +29,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::class;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -83,12 +82,14 @@ use crate::math::image::attack::{
 #[cfg(test)]
 use crate::movement::Mover;
 use crate::objects::layers::Combat;
+use crate::objects::masters::ids;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 #[cfg(test)]
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::{Frame, Graphics};
 use crate::unit_ai::NotifyKind;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
 
 /// The Attack action's type, which word 9 adds.
 pub const ATTACK: ActionKind = ActionKind::named(9);
@@ -328,6 +329,7 @@ impl AttackReads {
         (masters, graphics): (OwnerMasters<'_>, &Graphics),
         ai: Option<&UnitAi>,
         (player_type, now): (PlayerType, WorldTime),
+        roles: &Roles,
     ) -> Self {
         Self {
             standing: master
@@ -337,7 +339,7 @@ impl AttackReads {
             volleys: masters.table.is_some_and(|m| volleys(master, m)),
             reload: combat.reload_stinger + (master.reload - combat.reload_powerup),
             hit_chance: master.hit_chance,
-            armed: armed(master, combat.firepower),
+            armed: armed(master, combat.firepower, roles),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             player_type,
             world_time: now,
@@ -349,7 +351,7 @@ impl AttackReads {
             ai_order: AiOrder::of(ai),
             ai_type: ai.map(|ai| ai.ai_type),
             volley_under_way: combat.next_volley != MissileCount::ZERO,
-            move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref()),
+            move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref(), roles),
         }
     }
 }
@@ -458,9 +460,13 @@ impl World {
             players,
             index,
             parts,
-            model: Model {
-                graphics, masters, ..
-            },
+            model:
+                Model {
+                    graphics,
+                    masters,
+                    roles,
+                    ..
+                },
             ..
         } = self;
         let (object, sprite) = streams.object_and_sprite();
@@ -482,6 +488,7 @@ impl World {
                     &parts.unread,
                     motions,
                 ),
+                roles,
             ),
             motion: MotionMut::new(motion),
         }
@@ -504,14 +511,11 @@ const SHORT_RANGE_GAP: Distance = Distance::new(ATTACK_SHORT_RANGE_GAP);
 const LEASH_SLACK: Distance = Distance::new(ATTACK_LEASH_SLACK);
 
 /// The masters readyToAttack does not turn to face their target (`0x6744`, `0x6746` raw).
-const MASTER_1704: MasterId = MasterId::named(1704);
-const MASTER_1706: MasterId = MasterId::named(1706);
+const MASTER_1704: MasterId = ids::HUSSITE_WAGON;
+const MASTER_1706: MasterId = ids::ELITE_HUSSITE_WAGON;
 
 /// The masters whose swings post no executed action (`0x60e5`, `0x62cb` raw).
-const QUIET_SWINGS: [MasterId; 2] = [MasterId::named(73), MasterId::named(559)];
-
-/// The class an Attack does not take as its target (`-0xe70` raw, [`Attack::set_target`]).
-const CLASS_60: ClassId = class::CLASS_60;
+const QUIET_SWINGS: [MasterId; 2] = [ids::ID_73, ids::ID_559];
 
 /// An Attack in a state that walks to its target object, without one.
 const ATTACK_WITHOUT_TARGET: GenieError =

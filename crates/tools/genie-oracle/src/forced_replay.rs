@@ -106,6 +106,7 @@ pub fn old_pather_paths(
                     &turns.index,
                     &turns.model.masters,
                     &turns.parts,
+                    &turns.model.roles,
                 ),
             ),
             id,

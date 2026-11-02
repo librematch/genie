@@ -68,6 +68,7 @@ impl World {
             ),
             self.parts.unit_ai.get(u.id),
             (held.kind, world_time),
+            &self.model.roles,
         );
         let own = victim_of(
             (
@@ -83,6 +84,7 @@ impl World {
             player,
             self.spatial.terrain.as_ref(),
             self.mode_680,
+            &self.model.roles,
         );
         Ok(self.victim(target, player)?.map(|victim| ReadyReads {
             reads,
@@ -131,6 +133,7 @@ impl World {
             &self.model.graphics,
             task.sprites,
             task.sprites.moving,
+            &self.model.roles,
         );
         let standing = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         let me_at = *self
@@ -191,8 +194,10 @@ impl World {
         target: ObjectId,
         cmd: &AttackCommand<'_>,
     ) -> Result<(), GenieError> {
-        let (mut attack, posted) =
-            self.run_on_step(player, idx, |unit, _, c| Attack::command(c, unit, cmd))?;
+        let roles = self.model.roles.clone();
+        let (mut attack, posted) = self.run_on_step(player, idx, |unit, _, c| {
+            Attack::command(c, unit, cmd, &roles)
+        })?;
         // the start's notifies go to the unit AI (the unit's slot 0x328 -> the AI's slot 0x38)
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
@@ -328,6 +333,7 @@ impl World {
                 &self.model.graphics,
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
+            &self.model.roles,
         )?;
         let (Some(hunt), Some(mover)) = (
             self.parts.actions.of_mut(unit.id)?.list.hunt_mut(),
@@ -348,6 +354,7 @@ impl World {
             &engagement,
             arms,
             mover,
+            &self.model.roles,
         )? {
             if arrived {
                 show_arrived(

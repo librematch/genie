@@ -9,7 +9,6 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::ownership::CaptureKind;
@@ -19,6 +18,8 @@ use crate::players::relation_row;
 use crate::players::relations;
 use crate::test_ids::class_id;
 use crate::test_ids::{master_id, object_id};
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::{Memory, NoAttack};
 use crate::vision::VisionBits;
 use crate::vision::own_masks;
@@ -327,16 +328,19 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
     let no_farm = |_: ObjectId| None;
     let mut search = |s: &mut Spatial, at| {
         let f = s
-            .search(SearchQuery {
-                searcher: object_id(9),
-                player: PlayerId::new(2),
-                search: &look(at),
-                attack: &mut never,
-                reach: &mut reach,
-                moving: &still,
-                shuns: &none,
-                farm: &no_farm,
-            })
+            .search(
+                SearchQuery {
+                    searcher: object_id(9),
+                    player: PlayerId::new(2),
+                    search: &look(at),
+                    attack: &mut never,
+                    reach: &mut reach,
+                    moving: &still,
+                    shuns: &none,
+                    farm: &no_farm,
+                },
+                &roles(),
+            )
             .unwrap();
         (f.enemies, f.fresh)
     };
@@ -2271,7 +2275,13 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     let (takes, shuns) = (|_: &Placed| Ok(false), |_: &Placed| Ok(true));
     let fails = |_: &Placed| Err(GenieError::unsupported("a test's shunning"));
     let farm = |_: ObjectId| None;
-    let checks: ClosestChecks<'_> = (&still, &takes, &farm);
+    let roles = roles();
+    let checks = ClosestChecks {
+        moving: &still,
+        shuns: &takes,
+        farm: &farm,
+        roles: &roles,
+    };
     let p = villager(1.0, 1.0);
     let kept = |filter, p: &Placed, state, searcher, checks| {
         closest_kept(
@@ -2355,7 +2365,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     );
     let livestock = with(|f| f.group = Some(class_id(58)));
     let mut sheep = Placed {
-        class: LIVESTOCK,
+        class: class::LIVESTOCK,
         ..p
     };
     assert!(!kept(livestock, &sheep, ObjectState::Alive, plain, checks).unwrap());
@@ -2368,7 +2378,11 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             &sheep,
             ObjectState::Alive,
             plain,
-            (&moving, &takes, &farm)
+            ClosestChecks {
+                moving: &moving,
+                shuns: &takes,
+                ..checks
+            }
         )
         .unwrap()
     );
@@ -2383,7 +2397,11 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             &p,
             ObjectState::Alive,
             wolf,
-            (&still, &shuns, &farm)
+            ClosestChecks {
+                moving: &still,
+                shuns: &shuns,
+                ..checks
+            }
         )
         .unwrap()
     );
@@ -2393,7 +2411,11 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             &p,
             ObjectState::Alive,
             plain,
-            (&still, &shuns, &farm)
+            ClosestChecks {
+                moving: &still,
+                shuns: &shuns,
+                ..checks
+            }
         )
         .unwrap()
     );
@@ -2403,7 +2425,11 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
             &p,
             ObjectState::Alive,
             wolf,
-            (&still, &fails, &farm)
+            ClosestChecks {
+                moving: &still,
+                shuns: &fails,
+                ..checks
+            }
         )
         .is_err()
     );
@@ -2420,7 +2446,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         ..any_filter()
     };
     let farm_of = |master| Placed {
-        class: FARM,
+        class: class::FARM,
         master,
         ..villager(1.0, 1.0)
     };
@@ -2464,7 +2490,13 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
     );
     // through the tests past the relation: the worked farm passed, the free one kept
     let (still, takes) = (|_: ObjectId| false, |_: &Placed| Ok(false));
-    let checks: ClosestChecks<'_> = (&still, &takes, &look);
+    let roles = roles();
+    let checks = ClosestChecks {
+        moving: &still,
+        shuns: &takes,
+        farm: &look,
+        roles: &roles,
+    };
     let s = seer_in(ObjectState::Alive);
     assert!(
         closest_kept(
@@ -2472,7 +2504,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
             (&s, &farm),
             filter,
             (PlayerId::new(1), farmer),
-            checks
+            checks,
         )
         .unwrap()
     );
@@ -2482,7 +2514,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
             (&s, &farm),
             filter,
             (PlayerId::new(1), farmer),
-            checks
+            checks,
         )
         .unwrap()
     );

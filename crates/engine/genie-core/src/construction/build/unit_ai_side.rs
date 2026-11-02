@@ -17,12 +17,15 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Actor;
+use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
 use crate::unit_ai::world_view::UnitView;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::{Named, OffFootprint, flood_search};
 use crate::world::UNIT_AI_MASTER;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
@@ -31,7 +34,12 @@ impl UnitView<'_, '_> {
     /// reads before it takes the build ([`crate::unit_ai::UnitSide::builds`]): 0 for a
     /// foundation the world does not hold (`FUN_1415417a0`), 1 with a Build on top (its slot
     /// 0x48), else whether slot 0x820 finds a task ([`UnitView::build_found`]).
-    pub(crate) fn builds_on(&self, foundation: FoundationId) -> Result<bool, GenieError> {
+    pub(crate) fn builds_on(
+        &self,
+        foundation: FoundationId,
+        slots: Slots,
+        roles: &Roles,
+    ) -> Result<bool, GenieError> {
         let view = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -45,7 +53,7 @@ impl UnitView<'_, '_> {
         if self.actions.top_action_kind() == Some(ActionKind::BUILD) {
             return Ok(true);
         }
-        self.build_found(foundation)
+        self.build_found(foundation, slots, roles)
     }
 
     /// Object `id` as slot 0x380 finds it (`FUN_1415417a0`): the unit, the player's live list,
@@ -61,7 +69,12 @@ impl UnitView<'_, '_> {
     /// Slot 0x380's search without a Build on top: the foundation (false when the world does not
     /// hold it), then slot 0x820 with any action type and the switch ([`task_search`] on the
     /// foundation and its main building); false without a task.
-    fn build_found(&self, foundation: FoundationId) -> Result<bool, GenieError> {
+    fn build_found(
+        &self,
+        foundation: FoundationId,
+        slots: Slots,
+        roles: &Roles,
+    ) -> Result<bool, GenieError> {
         let view = owner_view(
             &self.c.w.players,
             &self.c.w.index,
@@ -129,7 +142,20 @@ impl UnitView<'_, '_> {
         };
         // slot 0x820's point: the foundation's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), f.position());
-        Ok(task_search(masters, &actor, &t, &general, terrain, None, &dip)?.is_some())
+        Ok(task_search(
+            masters,
+            &actor,
+            &TaskOn {
+                target: Some(&t),
+                general: Some(&general),
+                terrain,
+            },
+            None,
+            &dip,
+            slots,
+            roles,
+        )?
+        .is_some())
     }
 
     /// `FUN_140c1c7c0`: the flood ([`crate::unit_ai::flood_search`]) from the unit's tile over the
@@ -190,6 +216,7 @@ impl UnitView<'_, '_> {
             &self.c.w.index,
             &self.c.w.model.masters,
             &self.c.w.parts,
+            &self.c.w.model.roles,
         );
         let unit = &*self.unit;
         let master = unit.master(

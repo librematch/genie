@@ -345,10 +345,10 @@ impl Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objects::masters::class;
     #[cfg(test)]
     use crate::players::{ByPlayer, relations};
     use crate::test_ids::{class_id, object_id};
+    use crate::testing::class;
 
     fn registry() -> Registry {
         Registry::new(3, 65)

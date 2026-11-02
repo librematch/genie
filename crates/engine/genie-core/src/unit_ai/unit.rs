@@ -32,6 +32,7 @@ use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
 use crate::unit_ai::{Attacker, GroupState, NotifyKind, Seen, UnitSeen, UnitSide};
 use crate::vision::visibility::sight_taker;
 use crate::world::UNIT_AI_MASTER;
+use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
@@ -54,6 +55,7 @@ impl Unit {
         actions: &mut Action,
         c: &mut Step<'_>,
         (captured, leaves): (Option<Captured>, Outcome),
+        roles: &Roles,
     ) -> Result<Outcome, GenieError> {
         self.refresh_pathing(c)?;
         // RGE_Combat_Object::update after the actions: the object's sight mask; a changed mask of
@@ -78,7 +80,7 @@ impl Unit {
                 .get(q.index())
                 .is_some_and(|m| m.get(self.life.master_id).is_some())
         {
-            self.take_by_sight(actions, c, q)?;
+            self.take_by_sight(actions, c, q, roles)?;
             captured = Some(Captured {
                 new: q,
                 main: true,
@@ -225,6 +227,8 @@ impl Unit {
                             .is_some_and(|q| q.kind.is_computer())
                 })
             }),
+            roles: c.w.model.roles.clone(),
+            slots: c.w.model.slots,
         })
     }
 

@@ -26,13 +26,13 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::RestrictionField;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class;
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::parts::Object;
@@ -174,7 +174,7 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
         trees,
     };
     let ids = |world: &Spatial, s: ClearingSite| -> Vec<ObjectId> {
-        footprint_clearing(world, &s, &look)
+        footprint_clearing(world, &s, &look, &roles())
             .unwrap()
             .iter()
             .map(|c| c.id)
@@ -318,7 +318,7 @@ fn cleared_object_loses_its_record_by_its_type_and_the_call() {
             at: Point::new(10.5, 10.5),
             trees,
         };
-        footprint_clearing(&world, &s, &look)
+        footprint_clearing(&world, &s, &look, &roles())
             .unwrap()
             .iter()
             .filter(|c| c.record_goes)
@@ -372,7 +372,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
             player_type: PlayerType::HUMAN,
             ai: false,
         }
-        .first_part(c)
+        .first_part(c, &roles())
     };
     assert_eq!(
         part([45.0, 0.0, -1.0], &built).unwrap().attributes,
@@ -421,7 +421,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
             player_type: PlayerType::HUMAN,
             ai,
         }
-        .first_part(&built)
+        .first_part(&built, &roles())
         .unwrap()
         .cart
     };
@@ -1272,4 +1272,5 @@ use crate::objects::masters::BuildingMaster;
 use crate::objects::sprite::Graphic;
 use crate::players::history::{EntryKind, Population};
 use crate::test_ids::adds;
+use crate::testing::roles;
 use crate::world::FrameSeed;

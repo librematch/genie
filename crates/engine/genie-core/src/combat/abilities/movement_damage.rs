@@ -1,7 +1,7 @@
 //! The movement damage tasks (action type 152): their timer and reach, the bystanders they
 //! strike and the hit.
 
-use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own, STRUCK_BUILDING_CLASSES};
+use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own};
 use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
 use crate::combat::victims::victim_of;
@@ -28,6 +28,8 @@ use crate::unit_ai::task_finder::allied;
 use crate::vision::ghost::GHOST_MASTER;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::{GenieError, math::fmath};
 
@@ -114,11 +116,15 @@ pub struct Hitter {
 /// footprint gap squared (`FUN_14118f8c0`) not past the range squared (`COMISS`/`JA`: a NaN is
 /// within).
 #[must_use]
-pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander) -> bool {
+pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander, roles: &Roles) -> bool {
     if b.id == hitter.id || b.allied || b.player == PlayerId::GAIA {
         return false;
     }
-    if b.kind == MasterKind::BUILDING && !STRUCK_BUILDING_CLASSES.contains(&b.class) {
+    if b.kind == MasterKind::BUILDING
+        && !roles
+            .of_class(b.class)
+            .contains(ClassRoles::STRUCK_BUILDING)
+    {
         return false;
     }
     if ObjectState::Alive < b.state {
@@ -211,7 +217,7 @@ impl World {
                     let Some(b) = self.bystander(id, owner)? else {
                         continue;
                     };
-                    if !struck(&hitter, range, &b) {
+                    if !struck(&hitter, range, &b, &self.model.roles) {
                         continue;
                     }
                     self.parts
@@ -301,6 +307,7 @@ impl World {
             q,
             self.spatial.terrain.as_ref(),
             self.mode_680,
+            &self.model.roles,
         );
         lose(&mut v, damage);
         let killed = finish(&mut v);

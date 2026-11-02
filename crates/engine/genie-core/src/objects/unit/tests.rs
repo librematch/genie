@@ -37,7 +37,6 @@ use crate::objects::layers::{Action, Action as LayersAction, DefaultTask};
 use crate::objects::layers::{Animated, Motion};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::TaskId;
-use crate::objects::masters::class::NO_CLASS;
 use crate::objects::masters::{Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
@@ -47,6 +46,9 @@ use crate::players::PlayerId;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class::NO_CLASS;
+use crate::testing::roles;
+use crate::testing::slots;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
@@ -229,9 +231,15 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
             let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
             Ok((
                 level,
-                ObjectsRef::new(&c.w.players, &c.w.index, &c.w.model.masters, &c.w.parts)
-                    .gait(object_id(600))
-                    .and_then(|g| g.pause),
+                ObjectsRef::new(
+                    &c.w.players,
+                    &c.w.index,
+                    &c.w.model.masters,
+                    &c.w.parts,
+                    &c.w.model.roles,
+                )
+                .gait(object_id(600))
+                .and_then(|g| g.pause),
             ))
         },
     )
@@ -266,7 +274,7 @@ fn the_update_up_to_the_actions_ends_for_sleeper() {
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        Unit::update_to_actions,
+        |u, a, c| Unit::update_to_actions(u, a, c, &roles()),
     )
     .unwrap();
     assert!(step.is_some());
@@ -277,7 +285,7 @@ fn the_update_up_to_the_actions_ends_for_sleeper() {
         &mut t,
         (PlayerId::new(0), ListIndex::new(0)),
         50,
-        Unit::update_to_actions,
+        |u, a, c| Unit::update_to_actions(u, a, c, &roles()),
     )
     .unwrap();
     assert_eq!(step, None);
@@ -293,7 +301,7 @@ fn the_actions_update_runs_the_action_held() {
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        Unit::update_actions,
+        |u, a, c| Unit::update_actions(u, a, c, &roles(), slots()),
     )
     .unwrap();
     assert!(captured.is_none());
@@ -307,7 +315,7 @@ fn the_actions_update_runs_the_action_held() {
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        Unit::update_actions,
+        |u, a, c| Unit::update_actions(u, a, c, &roles(), slots()),
     )
     .unwrap();
     assert!(captured.is_none());
@@ -330,7 +338,7 @@ fn the_actions_update_runs_the_action_held() {
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        Unit::update_actions,
+        |u, a, c| Unit::update_actions(u, a, c, &roles(), slots()),
     )
     .unwrap();
     assert!(captured.is_none());
@@ -379,7 +387,7 @@ fn the_list_update_stops_at_an_action_below_its_head() {
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         50,
-        Unit::update_actions,
+        |u, a, c| Unit::update_actions(u, a, c, &roles(), slots()),
     )
     .unwrap_err();
     assert_eq!(err.kind(), crate::ErrorKind::Unreachable);
@@ -411,7 +419,7 @@ fn an_object_inside_another_runs_its_inside_update() {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            Unit::update_actions
+            |u, a, c| Unit::update_actions(u, a, c, &roles(), slots())
         ),
         Ok(None)
     );
@@ -426,7 +434,7 @@ fn an_object_inside_another_runs_its_inside_update() {
             &mut t,
             (PlayerId::new(1), ListIndex::new(0)),
             50,
-            Unit::update_actions
+            |u, a, c| Unit::update_actions(u, a, c, &roles(), slots())
         ),
         Ok(None)
     );

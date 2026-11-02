@@ -48,7 +48,6 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
-use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
@@ -58,6 +57,8 @@ use crate::players::PlayerId;
 use crate::players::tracker::key;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::class;
+use crate::testing::roles;
 use crate::unit_ai::CIVILIAN;
 use crate::unit_ai::task_finder::{DropSite, DropTarget};
 use crate::unit_ai::{AiAction, OrderKind, QueuedOrder, UnitAi};
@@ -630,7 +631,7 @@ fn waiting_builder_whose_foundation_dies_walks_to_its_place() {
     let restarted = |t: &mut World, state| {
         own(t, HOUSE).life.state = state;
         on_build(t, |b, c, u, _| {
-            b.restart(c, u)?;
+            b.restart(c, u, &roles())?;
             let walk = b.state.move_to().copied().unwrap();
             Ok((walk.target, walk.point, walk.state))
         })
@@ -873,7 +874,7 @@ fn build_move_to_shows_its_sprite_as_it_starts() {
         );
         plan(&mut t);
         // set_state(4)'s MoveTo, its sprite as its constructor resolves it for the builder
-        on_build(&mut t, |b, c, u, _| b.restart(c, u)).unwrap();
+        on_build(&mut t, |b, c, u, _| b.restart(c, u, &roles())).unwrap();
         own(&mut t, BUILDER).sprite = None;
         let _ = code(&mut t, 250);
         assert_eq!(walk_state(&t), Some(MoveTo::Moving));
@@ -1350,6 +1351,7 @@ fn with_mill(t: &mut World) {
         t.model.masters.get(1).map(|m| &**m),
         &t.model.lines,
         master_id(68),
+        &roles(),
     );
     t.players[1].tracker.add(object_id(300), k);
     t.players[1].tracker.complete(object_id(300), k);
@@ -1394,7 +1396,7 @@ fn builder_drop_off_walks_to_the_drop_site_its_search_found() {
     };
     let drop = |t: &mut World, search| {
         on_build(t, |b, c, u, reads| {
-            b.set_drop(c, u, search, reads.by)?;
+            b.set_drop(c, u, search, reads.by, &roles())?;
             Ok(*b)
         })
         .unwrap()

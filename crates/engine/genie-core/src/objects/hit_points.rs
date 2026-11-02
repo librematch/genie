@@ -21,9 +21,10 @@ use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
-use crate::objects::masters::class;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
+use crate::world::layer::ClassRoles;
+use crate::world::layer::Roles;
 use genie_diff::Diff;
 
 /// A hero's regeneration (`DAT_142ed06a8`, a minute's hit points).
@@ -105,14 +106,14 @@ impl Unit {
         class: ClassId,
         hit_points: MasterHitPoints,
         amount: HitPoints,
+        roles: &Roles,
     ) -> Result<(), GenieError> {
-        if matches!(
-            class,
-            class::TRADE_BOAT
-                | class::TRANSPORT
-                | class::FISHING_SHIP
-                | class::WARSHIP
-                | class::CLASS_53
+        if roles.of_class(class).intersects(
+            ClassRoles::TRADE_BOAT
+                | ClassRoles::TRANSPORT
+                | ClassRoles::FISHING_SHIP
+                | ClassRoles::WARSHIP
+                | ClassRoles::BOARDING_SHIP,
         ) {
             return Err(GenieError::unsupported(
                 "a heal at a cost (FUN_141213b10's classes)",
