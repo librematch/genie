@@ -146,7 +146,7 @@ impl World {
                     .building_of(u.id)
                     .construction
                     .is_some_and(|c| c.desolid);
-                let kind = m.obstruction_type;
+                let kind = m.obstruction_kind;
                 if placed.tall
                     && kind.recorded()
                     && m.obstruction_class != ObstructionClass::NONE

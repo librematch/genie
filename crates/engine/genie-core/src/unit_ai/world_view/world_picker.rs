@@ -20,9 +20,8 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{DamageAmount, DamageClass, Master, MasterTables};
 use crate::objects::unit::Unit;
@@ -221,7 +220,7 @@ impl WorldPicker<'_> {
             self.mode_680,
         );
         let mut factor = elevation_factor(f.position().z(), unit.attack_elevation, &target);
-        if fm.kind == BUILDING {
+        if fm.kind == MasterKind::BUILDING {
             factor = building_elevation_factor(
                 factor,
                 self.parts.building_of(f.id).relics,
@@ -552,7 +551,7 @@ impl AttackPicker for WorldPicker<'_> {
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).
     fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError> {
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(if RGE_COMBAT <= m.kind {
+        Ok(if MasterKind::RGE_COMBAT <= m.kind {
             m.weapon_range
         } else {
             Distance::ZERO

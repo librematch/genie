@@ -20,9 +20,9 @@ use crate::math::conversions::cvttss2si;
 use crate::math::image::diplomacy::NO_POINT as DIPLOMACY_NO_POINT;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
-use crate::objects::masters::master_type;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::Stance;
@@ -164,7 +164,7 @@ impl World {
         };
         let master = u.master(self.master_tables(), p)?;
         let (kind, class, master_id) = (master.kind, master.class, master.id);
-        if kind != master_type::COMBAT && kind != master_type::BUILDING {
+        if kind != MasterKind::COMBAT && kind != MasterKind::BUILDING {
             return Ok(());
         }
         let inside = u.life.inside;
@@ -182,7 +182,7 @@ impl World {
                 return Err(SIEGE_UNLOAD);
             }
         }
-        if kind != master_type::BUILDING {
+        if kind != MasterKind::BUILDING {
             return Ok(());
         }
         if relation == Relation::ALLY {
@@ -215,7 +215,7 @@ impl World {
             return Ok(());
         }
         let holder_master = h.master(self.master_tables(), hp)?;
-        if holder_master.kind == master_type::BUILDING {
+        if holder_master.kind == MasterKind::BUILDING {
             let hi = self.housed_index(hp, holder.id())?;
             if !self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? {
                 self.destroy(p, id)?;

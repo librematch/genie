@@ -28,7 +28,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectKey, WorkerCount};
 use crate::players::NO_RELATIONS;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::Search;
@@ -185,7 +185,7 @@ impl Unit {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
-            [ActionKind::Hunt.value(), class, site],
+            [AiAction::Hunt.value(), class, site],
         )
     }
 

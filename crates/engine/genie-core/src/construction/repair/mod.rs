@@ -20,7 +20,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::WorkRate;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::Task;
@@ -53,7 +53,7 @@ use crate::objects::masters::WorkValue;
 use crate::unit_ai::UnitStance;
 
 /// The Repair action's type, which word 9 adds, and its tasks' action type.
-pub const REPAIR: ActionType = ActionType::named(0x6a);
+pub const REPAIR: ActionKind = ActionKind::named(0x6a);
 
 /// The gap within which a repairer reaches its target (`DAT_142eb5690`).
 pub const REACH: f32 = REPAIR_REACH;

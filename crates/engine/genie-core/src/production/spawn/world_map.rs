@@ -6,7 +6,7 @@ use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::Speed;
-use crate::objects::masters::master_type::RGE_COMBAT;
+use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::NO_RELATIONS;
 use crate::players::PlayerId;
@@ -110,7 +110,7 @@ impl PlaceMap for WorldMap<'_> {
                     class: placed.class,
                     master: placed.master,
                     buildable_on: placed.buildable_on,
-                    obstruction_type: placed.obstruction_type,
+                    obstruction_kind: placed.obstruction_kind,
                     auto_gather: master.auto_gather,
                     state: unit.life.state,
                     desolid: t
@@ -126,7 +126,7 @@ impl PlaceMap for WorldMap<'_> {
                     fog_visibility: master.fog_visibility,
                     fog_mask: t.spatial.sight.as_ref().and_then(|v| {
                         let umv = v.seer(id).map_or(0, |s| s.umv);
-                        (RGE_COMBAT <= master.kind && umv != 0).then(|| {
+                        (MasterKind::RGE_COMBAT <= master.kind && umv != 0).then(|| {
                             v.registry
                                 .as_ref()
                                 .and_then(|r| r.entry(id))

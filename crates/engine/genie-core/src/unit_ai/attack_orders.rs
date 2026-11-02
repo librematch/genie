@@ -9,7 +9,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -114,7 +114,7 @@ impl UnitAi {
         if !self.attack_command(target, force, at, side)? {
             return Ok(false);
         }
-        self.set_action(Some(ActionKind::Attack));
+        self.set_action(Some(AiAction::Attack));
         self.target_at(Some(target), Some(class), position);
         Ok(true)
     }

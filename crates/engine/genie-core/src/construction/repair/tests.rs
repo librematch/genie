@@ -17,9 +17,9 @@ use crate::objects::MasterHitPoints;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::Voice;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
@@ -34,7 +34,7 @@ use crate::technology::Attributes;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
-use crate::unit_ai::{ActionKind, NotifyKind};
+use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::tests::{in_update, repairing};
 use crate::world::{Player, World, WorldTime};
 
@@ -159,7 +159,7 @@ fn masters() -> Masters {
         Master {
             id: ids::HOUSE,
             terrain_restriction: Some(RestrictionId::named(0)),
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(550),
             cost: costs(&[(attribute::WOOD, 25, true)]),
@@ -168,7 +168,7 @@ fn masters() -> Masters {
         Master {
             id: ids::ID_35,
             terrain_restriction: Some(RestrictionId::named(0)),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::SIEGE,
             hit_points: MasterHitPoints::of_data(175),
             cost: costs(&[(attribute::WOOD, 160, true), (attribute::GOLD, 75, true)]),
@@ -180,7 +180,7 @@ fn masters() -> Masters {
 fn house(id: i32, hp: HitPoints) -> Repaired {
     Repaired {
         id: object_id(id),
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         master: ids::HOUSE,
         master_hp: MasterHitPoints::of_data(550),
@@ -291,7 +291,7 @@ fn siege_unit_repair_pays_its_unit_share() {
         Amount::new(1000.0),
     ]);
     let mut set = vec![Repaired {
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::SIEGE,
         master: ids::ID_35,
         master_hp: MasterHitPoints::of_data(175),
@@ -404,7 +404,7 @@ fn heard(t: &World) -> Vec<NotifyKind> {
         .unit_ai
         .get(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
-    let repair = ActionKind::Repair.value();
+    let repair = AiAction::Repair.value();
     ai.notifies
         .iter()
         .inspect(|n| assert_eq!(n.p, [repair, 0, 0]))

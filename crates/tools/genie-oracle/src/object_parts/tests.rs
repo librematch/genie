@@ -3,7 +3,7 @@ use crate::object_parts::unit_ai;
 use crate::saved_unit::object as saved_unit_object;
 use crate::test_ids::object_id;
 use genie_core::ErrorKind;
-use genie_core::unit_ai::{ActionKind, OrderKind};
+use genie_core::unit_ai::{AiAction, OrderKind};
 use genie_save::generated::world::{TribeTowerUnitAiModule, UnitAiModule, UnitAiModuleEntry1};
 
 /// A two-player game's players with Gaia.
@@ -76,7 +76,7 @@ fn the_saved_orders_and_actions_import_as_their_kinds() {
     );
     assert_eq!(
         (ai.current_action, ai.last_action),
-        (Some(ActionKind::Gather), None)
+        (Some(AiAction::Gather), None)
     );
     let records: Vec<_> = ai
         .order_history
@@ -85,10 +85,7 @@ fn the_saved_orders_and_actions_import_as_their_kinds() {
         .collect();
     assert_eq!(
         records,
-        [
-            (Some(OrderKind::Hunt), Some(ActionKind::Hunt)),
-            (None, None)
-        ]
+        [(Some(OrderKind::Hunt), Some(AiAction::Hunt)), (None, None)]
     );
     assert_eq!(ai.orders[0].order, OrderKind::Move);
     assert_eq!(ai.building_orders, []);

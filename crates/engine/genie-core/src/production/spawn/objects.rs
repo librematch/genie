@@ -20,14 +20,9 @@ use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::ANIMATED;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MOVING;
-use crate::objects::masters::master_type::STATIC;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::objects::{Facet, FacetCount};
@@ -122,10 +117,10 @@ impl World {
         facet: Option<Facet>,
     ) -> Result<(), GenieError> {
         let made = self.master(p, master)?.clone();
-        if made.kind == BUILDING {
+        if made.kind == MasterKind::BUILDING {
             return self.new_building(p, &made, at);
         }
-        if made.kind == COMBAT {
+        if made.kind == MasterKind::COMBAT {
             let new = self.combat_object(p, master, &made, at)?;
             // a moving dead object's override (FUN_14119d490, FUN_14114d780): the new unit takes
             // its facet's angle
@@ -230,7 +225,7 @@ impl World {
             turns: g.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
-        let moving = if MOVING <= made.kind {
+        let moving = if MasterKind::MOVING <= made.kind {
             // the moving setup's angle draw (FUN_141141640, "setup" line 0x2c3)
             let drawn = if draws_angle(facets) {
                 let r = self.streams.get(Stream::Object).rand15();
@@ -267,14 +262,14 @@ impl World {
             class: made.class,
             player: p,
             master,
-            obstruction_type: made.obstruction_type,
+            obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
             tall: made.tall,
             moves: made.moves(),
             unknown: None,
-            obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
+            obstruction: (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(
                 Obstruction {
-                    kind: made.obstruction_type,
+                    kind: made.obstruction_kind,
                     class: made.obstruction_class,
                 },
             ),
@@ -290,7 +285,7 @@ impl World {
         let held = static_storage(owner, &made.storage)?;
         // a static object (type 10) dies on its sprite after its death (the dying one, else its
         // standing one), which may start on a random facet
-        let death_facets = if made.kind == STATIC {
+        let death_facets = if made.kind == MasterKind::STATIC {
             let after = made.death_sprite.or(made.standing_sprite);
             after
                 .and_then(|after| self.graphics.get(after))
@@ -302,7 +297,7 @@ impl World {
         let unit = Unit {
             id,
             life: Lifecycle {
-                class: if made.kind == STATIC {
+                class: if made.kind == MasterKind::STATIC {
                     Class::Static
                 } else {
                     Class::Animated
@@ -329,7 +324,7 @@ impl World {
         let parts = ObjectParts {
             // an animated one's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             motion: Motion::of(
-                (ANIMATED <= made.kind).then(Animated::default),
+                (MasterKind::ANIMATED <= made.kind).then(Animated::default),
                 moving.map(|stats| {
                     Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)
                 }),
@@ -423,12 +418,14 @@ impl World {
 /// Remains the slice models: a static object of 10 or 20 to 39 without hit points, of a master
 /// that is not recyclable.
 fn remains_supported(made: &Master) -> Result<(), GenieError> {
-    if made.kind != STATIC && !(ANIMATED..master_type::ACTION).contains(&made.kind) {
+    if made.kind != MasterKind::STATIC
+        && !(MasterKind::ANIMATED..MasterKind::ACTION).contains(&made.kind)
+    {
         return Err(GenieError::unsupported(
             "remains of a type other than 10 and 20 to 39",
         ));
     }
-    if made.kind == STATIC && 0 < made.hit_points.get() {
+    if made.kind == MasterKind::STATIC && 0 < made.hit_points.get() {
         return Err(GenieError::unsupported(
             "remains with hit points (the sleeping list)",
         ));

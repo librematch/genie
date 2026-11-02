@@ -17,11 +17,10 @@ use crate::objects::lifecycle::death_parts::{
     farm_bonus, storage_leaves as death_parts_storage_leaves,
 };
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::lock_gate;
@@ -190,7 +189,7 @@ impl World {
                     .building_of(a.id)
                     .construction
                     .is_some_and(|c| c.desolid);
-                if a.master(self.master_tables(), q)?.kind < BUILDING || !desolid {
+                if a.master(self.master_tables(), q)?.kind < MasterKind::BUILDING || !desolid {
                     continue;
                 }
                 self.clear_foundations_under(annex)?;
@@ -292,7 +291,7 @@ impl World {
         let (q, nu) = self.object(new).ok_or(NOT_HELD)?;
         let new_master = nu.master(self.master_tables(), q)?;
         let mut point = None;
-        let building_made = new_master.kind == BUILDING;
+        let building_made = new_master.kind == MasterKind::BUILDING;
         let gate_lock =
             (building_made && old_class == class::GATE && new_master.class == class::GATE)
                 .then(|| {
@@ -394,7 +393,7 @@ impl World {
         };
         // a combat unit (type 70, an effect's spawn): the master's slot 0x40 there, its footprint
         // cleared with the flag, its visible resources for one that gathers by itself
-        if made.kind == COMBAT {
+        if made.kind == MasterKind::COMBAT {
             let idx = self.combat_object(p, master, &made, at)?;
             let id = self.players.live(p, idx)?.id;
             if flagged {
@@ -407,7 +406,7 @@ impl World {
         }
         // a plain object (types 10 and 20 to 39: a pasture's livestock): the master's slot 0x40
         // there, facing its drawn angle
-        if made.kind != BUILDING {
+        if made.kind != MasterKind::BUILDING {
             let idx = self.plain_object(p, master, &made, at, Facing::Drawn)?;
             let id = self.players.live(p, idx)?.id;
             if flagged {

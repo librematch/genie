@@ -11,7 +11,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::orders::Dispatch;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
@@ -55,9 +55,8 @@ impl UnitAi {
                 ));
             }
         }
-        let attack = ActionKind::Attack.value();
-        if p0 == attack && (order == Some(OrderKind::Attack) || action == Some(ActionKind::Attack))
-        {
+        let attack = AiAction::Attack.value();
+        if p0 == attack && (order == Some(OrderKind::Attack) || action == Some(AiAction::Attack)) {
             let produced = self.process_idle(at, player_type, ai, side)?;
             if produced {
                 return Ok(PRODUCED);
@@ -71,13 +70,13 @@ impl UnitAi {
             self.stop_current(StopOrder::Keep, at, side, ai)?;
             return Ok(GO_ON);
         }
-        let own = order.map_or_else(|| ActionKind::field(action) == p0, |o| o.owns(action));
+        let own = order.map_or_else(|| AiAction::field(action) == p0, |o| o.owns(action));
         if own {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, ai)?;
             return Ok(GO_ON);
         }
-        let moved = p0 == ActionKind::Move.value();
+        let moved = p0 == AiAction::Move.value();
         match order {
             Some(OrderKind::GroupGather) if moved => {
                 self.remove_target();
@@ -117,7 +116,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
-        let attack = ActionKind::Attack.value();
+        let attack = AiAction::Attack.value();
         if (order == Some(OrderKind::Attack) || n.p[2] == 0x202) && p0 == attack {
             if self.retarget_disabled != 0 {
                 return Err(GenieError::unsupported(
@@ -138,10 +137,10 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         let own = if order.is_none() {
-            ActionKind::field(action) == p0
+            AiAction::field(action) == p0
         } else {
             if matches!(order, Some(OrderKind::GroupGather | OrderKind::Defend))
-                && p0 == ActionKind::Move.value()
+                && p0 == AiAction::Move.value()
             {
                 return Err(GenieError::unsupported(
                     "an invalidated action 0x262 on order 0x2d4 or 0x2bd",
@@ -178,9 +177,9 @@ impl UnitAi {
         if order.is_some() || at.group.is_some_and(|g| g.commanded) {
             self.state_position = at.position.ground();
         }
-        let attack = ActionKind::Attack.value();
+        let attack = AiAction::Attack.value();
         if order.is_none() {
-            if ActionKind::field(action) == p1 || p1 == attack {
+            if AiAction::field(action) == p1 || p1 == attack {
                 self.remove_target();
                 self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             }
@@ -194,12 +193,12 @@ impl UnitAi {
             self.stop_current(StopOrder::End, at, side, ai_rng)?;
             return Ok(GO_ON);
         }
-        if ActionKind::field(action) == p1 && order.is_some_and(|o| o.owns(action)) {
+        if AiAction::field(action) == p1 && order.is_some_and(|o| o.owns(action)) {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             return Ok(GO_ON);
         }
-        let moved = p1 == ActionKind::Move.value();
+        let moved = p1 == AiAction::Move.value();
         match order {
             Some(OrderKind::GroupGather) if moved => {
                 self.remove_target();
@@ -210,7 +209,7 @@ impl UnitAi {
                 self.set_action(None);
                 return Ok(GO_ON);
             }
-            Some(OrderKind::Follow) if moved && action == Some(ActionKind::MoveAside) => {
+            Some(OrderKind::Follow) if moved && action == Some(AiAction::MoveAside) => {
                 self.set_action(None);
                 return Ok(GO_ON);
             }
@@ -329,7 +328,7 @@ impl UnitAi {
             self,
             rng,
         )?;
-        self.set_action(Some(ActionKind::Move));
+        self.set_action(Some(AiAction::Move));
         Ok(true)
     }
 
@@ -341,7 +340,7 @@ impl UnitAi {
             .current_action
             .is_some_and(|a| ENDED_ACTIONS.contains(&a))
         {
-            if self.current_action == Some(ActionKind::MoveAside)
+            if self.current_action == Some(AiAction::MoveAside)
                 && self.stance == UnitStance::STAND_GROUND
             {
                 self.state_position = at.position.ground();

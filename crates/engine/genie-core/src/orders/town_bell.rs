@@ -18,20 +18,19 @@ use crate::movement::footprint_gap_squared;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
 use crate::objects::masters::ids::TOWN_CENTRE;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::orders::Dispatch;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
@@ -50,7 +49,7 @@ pub struct BackToWork {
     /// (`+0x68`), else −1.
     pub target_class: Option<ClassId>,
     /// `town_bell_action` (`+0x9b4`): the unit AI's current action (`+0x44`).
-    pub action: Option<ActionKind>,
+    pub action: Option<AiAction>,
     /// `townBellTargetId2` (`+0x9b8`): the top action's second target (`+0x34`).
     pub target2: Option<ObjectId>,
     /// `town_bell_target_x`, `_y` (`+0x9bc`, `+0x9c0`): the target's place, else the unit's own.
@@ -101,8 +100,8 @@ impl TownBell {
         if self.flag || now == self.work {
             return;
         }
-        if now.action == Some(ActionKind::Build) {
-            if self.work.action != Some(ActionKind::Build) {
+        if now.action == Some(AiAction::Build) {
+            if self.work.action != Some(AiAction::Build) {
                 self.before_building = self.work;
             }
         } else {
@@ -114,8 +113,7 @@ impl TownBell {
 
 /// The unit AI's actions whose record a finished building ends: building (`0x25a`), gathering
 /// (`0x261`) and hunting (`0x265`) (`FUN_1411f8fa0`'s mask `0x881`).
-const ENDED_ON_BUILDING: [ActionKind; 3] =
-    [ActionKind::Build, ActionKind::Gather, ActionKind::Hunt];
+const ENDED_ON_BUILDING: [AiAction; 3] = [AiAction::Build, AiAction::Gather, AiAction::Hunt];
 
 /// What a back-to-work record's check (`FUN_1411f8fa0`) reads of an object the world holds:
 /// whether it is a building (type 80), its master's class, and its build points (`+0xc50`)
@@ -280,11 +278,11 @@ impl World {
                 // COMISS REACH, gap; JC: a gap above it, or a NaN, is out
                 Ok(!below_or_unordered(REACH, gap.get()))
             };
-            if (class == class::VILLAGER && kind == COMBAT && near(self)?)
+            if (class == class::VILLAGER && kind == MasterKind::COMBAT && near(self)?)
                 || (master == MASTER_1808 && near(self)?)
             {
                 units.push(id);
-            } else if kind == BUILDING && takes_villagers && near(self)? {
+            } else if kind == MasterKind::BUILDING && takes_villagers && near(self)? {
                 shelters.buildings.push(ContainerId::new(id));
                 shelters.counts.push(self.garrisoned(id)?);
                 self.parts.set_town_bell_flag(id, true);
@@ -329,7 +327,7 @@ impl World {
             let takes_villagers = m
                 .building
                 .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
-            if m.kind != BUILDING
+            if m.kind != MasterKind::BUILDING
                 || ObjectState::Dying <= b.life.state
                 || !takes_villagers
                 || !self.parts.town_bell_of(b.id).flag
@@ -382,7 +380,7 @@ impl World {
                 .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
             if b.life.state != ObjectState::Alive
                 || b.life.inside.is_some()
-                || m.kind != BUILDING
+                || m.kind != MasterKind::BUILDING
                 || !takes_villagers
             {
                 continue;
@@ -413,7 +411,9 @@ impl World {
                 continue;
             };
             let um = u.master(self.master_tables(), up)?;
-            if COMBAT <= um.kind && (um.class == class::VILLAGER || um.id == MASTER_1808) {
+            if MasterKind::COMBAT <= um.kind
+                && (um.class == class::VILLAGER || um.id == MASTER_1808)
+            {
                 let _ = self.back_to_work(Some((owner, idx)), inside)?;
             }
         }
@@ -504,7 +504,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        filter: Option<ActionType>,
+        filter: Option<ActionKind>,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
@@ -520,7 +520,7 @@ impl World {
                 players: &self.players,
                 drop_sites: &self.drop_sites,
             };
-            (tm.kind == BUILDING
+            (tm.kind == MasterKind::BUILDING
                 && t.life.state == ObjectState::Alive
                 && world.allied(player, tp, true)
                 && tm
@@ -637,7 +637,7 @@ mod tests {
         t.parts.set_town_bell(object_id(id), b);
     }
 
-    fn work(target: Option<ObjectId>, action: Option<ActionKind>, point: Point) -> BackToWork {
+    fn work(target: Option<ObjectId>, action: Option<AiAction>, point: Point) -> BackToWork {
         BackToWork {
             target,
             action,
@@ -656,7 +656,7 @@ mod tests {
         };
         let building = work(
             Some(object_id(10028)),
-            Some(ActionKind::Build),
+            Some(AiAction::Build),
             Point::new(30.0, 88.0),
         );
         bell.record(building);
@@ -669,7 +669,7 @@ mod tests {
             target_class: class_of(15),
             ..work(
                 Some(object_id(9365)),
-                Some(ActionKind::Hunt),
+                Some(AiAction::Hunt),
                 Point::new(24.5, 97.5),
             )
         };
@@ -683,7 +683,7 @@ mod tests {
         bell.flag = true;
         bell.record(work(
             Some(object_id(1)),
-            Some(ActionKind::Wait),
+            Some(AiAction::Wait),
             Point::new(3.0, 4.0),
         ));
         assert_eq!(bell.work, cutting);
@@ -714,7 +714,7 @@ mod tests {
             target2: Some(object_id(7)),
             ..work(
                 Some(object_id(10)),
-                Some(ActionKind::Gather),
+                Some(AiAction::Gather),
                 Point::new(5.0, 6.0),
             )
         };
@@ -727,7 +727,7 @@ mod tests {
             target2: Some(object_id(10)),
             ..work(
                 Some(object_id(11)),
-                Some(ActionKind::Hunt),
+                Some(AiAction::Hunt),
                 Point::new(5.0, 6.0),
             )
         };
@@ -754,7 +754,7 @@ mod tests {
         // a target below 0 is not looked up: the second target is
         let second = BackToWork {
             target2: Some(object_id(10)),
-            ..work(None, Some(ActionKind::Build), Point::new(5.0, 6.0))
+            ..work(None, Some(AiAction::Build), Point::new(5.0, 6.0))
         };
         assert_eq!(
             record_object(second, &|id| Ok(object(id))).unwrap(),
@@ -762,7 +762,7 @@ mod tests {
         );
         // building, gathering and hunting (mask 0x881 over 0x25a..0x265) on a built building
         // other than a farm end the record: no object, both targets −1 in the copy
-        for action in [ActionKind::Build, ActionKind::Gather, ActionKind::Hunt].map(Some) {
+        for action in [AiAction::Build, AiAction::Gather, AiAction::Hunt].map(Some) {
             let on_house = BackToWork {
                 target2: Some(object_id(10)),
                 ..work(Some(object_id(7)), action, Point::new(5.0, 6.0))
@@ -801,11 +801,11 @@ mod tests {
         }
         // the actions between them, and any other, keep a built building
         for action in [
-            Some(ActionKind::Heal),
-            Some(ActionKind::Move),
-            Some(ActionKind::Follow),
-            Some(ActionKind::Transport),
-            Some(ActionKind::Defend),
+            Some(AiAction::Heal),
+            Some(AiAction::Move),
+            Some(AiAction::Follow),
+            Some(AiAction::Transport),
+            Some(AiAction::Defend),
             None,
         ] {
             let r = work(Some(object_id(7)), action, Point::new(5.0, 6.0));
@@ -1047,12 +1047,12 @@ mod tests {
         // FUN_1412035a0: the first record's object wins; the records stay
         let first = work(
             Some(object_id(10)),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Point::new(5.0, 6.0),
         );
         let second = work(
             Some(object_id(8)),
-            Some(ActionKind::Build),
+            Some(AiAction::Build),
             Point::new(1.0, 2.0),
         );
         let mut bell = TownBell {
@@ -1068,7 +1068,7 @@ mod tests {
         // the first's object gone: the second's object, and the second becomes the first
         let gone = work(
             Some(object_id(11)),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Point::new(5.0, 6.0),
         );
         bell.work = gone;
@@ -1084,7 +1084,7 @@ mod tests {
         // building ended it
         let ended = work(
             Some(object_id(7)),
-            Some(ActionKind::Build),
+            Some(AiAction::Build),
             Point::new(5.0, 6.0),
         );
         let mut bell = TownBell {
@@ -1092,7 +1092,7 @@ mod tests {
             work: ended,
             before_building: work(
                 Some(object_id(12)),
-                Some(ActionKind::Gather),
+                Some(AiAction::Gather),
                 Point::new(1.0, 2.0),
             ),
         };
@@ -1104,12 +1104,12 @@ mod tests {
         // ... or the second when the first has no point (−1, −1 on both axes)
         let pointless = work(
             Some(object_id(11)),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Point::new(-1.0, -1.0),
         );
         let before = work(
             Some(object_id(12)),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Point::new(1.0, 2.0),
         );
         let mut bell = TownBell {
@@ -1124,7 +1124,7 @@ mod tests {
         // one axis at −1 is a point
         let half = work(
             Some(object_id(11)),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Point::new(-1.0, 3.0),
         );
         bell.work = half;

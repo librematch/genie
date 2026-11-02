@@ -5,9 +5,9 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's charge type (`charge_type`, `+0x922`): what its charge (`+0x9e0`) does. Every short
 /// the data or an effect leaves is kept; the values the game tests are named.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct ChargeType(i16);
+pub struct ChargeKind(i16);
 
-impl ChargeType {
+impl ChargeKind {
     /// 0: no charge.
     pub const NONE: Self = Self(0);
     /// 1: a full charge adds to the attack.
@@ -53,13 +53,13 @@ impl ChargeType {
     }
 }
 
-impl Display for ChargeType {
+impl Display for ChargeKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
 
-impl genie_diff::Diff for ChargeType {
+impl genie_diff::Diff for ChargeKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
     }
@@ -67,22 +67,22 @@ impl genie_diff::Diff for ChargeType {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::masters::ChargeType;
+    use crate::objects::masters::ChargeKind;
 
     /// The attack adders are 1 and 3, the ranged 6 and 7, the charging ones those above 0.
     #[test]
     fn charge_type_groups() {
-        let of = |test: fn(ChargeType) -> bool| -> Vec<i16> {
+        let of = |test: fn(ChargeKind) -> bool| -> Vec<i16> {
             (-5..9)
-                .map(ChargeType::of_data)
+                .map(ChargeKind::of_data)
                 .filter(|&t| test(t))
-                .map(ChargeType::get)
+                .map(ChargeKind::get)
                 .collect()
         };
-        assert_eq!(of(ChargeType::adds_to_attack), [1, 3]);
-        assert_eq!(of(ChargeType::ranged), [6, 7]);
-        assert_eq!(of(ChargeType::charges), [1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(ChargeType::of_data(-4), ChargeType::EVERY_TARGET);
-        assert_eq!(ChargeType::AREA.to_string(), "3");
+        assert_eq!(of(ChargeKind::adds_to_attack), [1, 3]);
+        assert_eq!(of(ChargeKind::ranged), [6, 7]);
+        assert_eq!(of(ChargeKind::charges), [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(ChargeKind::of_data(-4), ChargeKind::EVERY_TARGET);
+        assert_eq!(ChargeKind::AREA.to_string(), "3");
     }
 }

@@ -5,7 +5,7 @@
 use crate::GenieError;
 use crate::gathering::make::MAKE;
 use crate::objects::masters::ACTION_FACTORY_TYPES;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use genie_diff::{Diff, Differ};
 
@@ -34,7 +34,7 @@ pub enum DefaultTask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unstartable {
     /// One of an action type the factory makes that the slice does not start.
-    Unported(ActionType),
+    Unported(ActionKind),
     /// One the load could not read.
     Unread(UnreadDefault),
 }
@@ -123,9 +123,9 @@ impl DefaultTask {
 #[must_use]
 pub fn default_start(master: &Master) -> DefaultTask {
     match master.default_task() {
-        Some(t) if t.action_type == MAKE => DefaultTask::Make,
-        Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_type) => {
-            DefaultTask::Fails(Unstartable::Unported(t.action_type))
+        Some(t) if t.action_kind == MAKE => DefaultTask::Make,
+        Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_kind) => {
+            DefaultTask::Fails(Unstartable::Unported(t.action_kind))
         }
         _ => DefaultTask::Nothing,
     }
@@ -146,7 +146,7 @@ mod tests {
         ] {
             assert_eq!(t.fails(), None, "{t:?}");
         }
-        let e = Unstartable::Unported(ActionType::named(6)).error();
+        let e = Unstartable::Unported(ActionKind::named(6)).error();
         assert_eq!(e.reason(), "a default task the slice does not model");
         let e = Unstartable::Unread(UnreadDefault::OwnMaster).error();
         assert_eq!(e.reason(), "the default task of an object's own master");

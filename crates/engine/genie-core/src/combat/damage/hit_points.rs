@@ -7,9 +7,8 @@ use crate::math::fmath;
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::MasterHitPoints;
-use crate::objects::masters::ChargeType;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::ChargeKind;
+use crate::objects::masters::MasterKind;
 
 /// `FUN_14108d8a0`: a shield blocks the hit: a target whose master's charge type is 5 against a
 /// melee hit (4 against a missile) spends a charge of 1 when it has one (`COMISS 1.0, charge`,
@@ -18,11 +17,11 @@ use crate::objects::masters::master_type::COMBAT;
 /// charge type 0.
 pub fn shield(v: &mut Victim, missile: bool) -> bool {
     let kind = if missile {
-        ChargeType::MISSILE_SHIELD
+        ChargeKind::MISSILE_SHIELD
     } else {
-        ChargeType::MELEE_SHIELD
+        ChargeKind::MELEE_SHIELD
     };
-    if v.source.charge_type == kind && fmath::at_most_or_unordered(1.0, v.source.charge.get()) {
+    if v.source.charge_kind == kind && fmath::at_most_or_unordered(1.0, v.source.charge.get()) {
         v.source.charge -= Charge::new(1.0);
         return true;
     }
@@ -48,7 +47,7 @@ pub(super) fn effective(v: &Victim) -> HitPoints {
 /// stingers (`+0xb58`) and a surviving object's hit point transforms (`+0xb20`,
 /// `FUN_141204450`).
 pub fn lose(t: &mut Victim, d: HitPoints) {
-    let unit = matches!(t.kind, COMBAT | BUILDING);
+    let unit = matches!(t.kind, MasterKind::COMBAT | MasterKind::BUILDING);
     let Some(a) = t.armored.as_mut().filter(|_| unit) else {
         t.hp -= d;
         return;

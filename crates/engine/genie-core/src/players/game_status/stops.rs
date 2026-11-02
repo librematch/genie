@@ -21,15 +21,14 @@ use crate::movement::fly::FLY;
 use crate::movement::move_to::MOVE_TO;
 use crate::objects::ListIndex;
 use crate::objects::SpriteId;
-use crate::objects::masters::ActionType;
-use crate::objects::masters::action_type;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::class;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
 use crate::players::game_status::{KEEPING_TYPES, UNSTOPPED_BUILDINGS};
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::StopOrder;
 use crate::world::Seconds;
 use crate::world::World;
@@ -55,7 +54,7 @@ impl World {
             let explorer = self.parts.unit_ai.get(unit.id).is_some_and(|ai| {
                 matches!(
                     ai.current_action,
-                    Some(ActionKind::AutoScout | ActionKind::Explore)
+                    Some(AiAction::AutoScout | AiAction::Explore)
                 )
             });
             // The classes a defeat stops besides explorers: villagers (4) and fishing boats (21).
@@ -120,14 +119,13 @@ impl World {
         let place = (unit.position().ground(), Some(class));
         // slot 0x438 is the top action's type: a trade (0x6f) with a load held (COMISS 0, held;
         // JNC at 0x14108c11e: a NaN load counts) keeps the unit AI going
-        let trading = self.parts.actions_of(unit.id).top_action_kind() == Some(action_type::TRADE)
+        let trading = self.parts.actions_of(unit.id).top_action_kind() == Some(ActionKind::TRADE)
             && below_or_unordered(0.0, unit.life.amount.get())
             && unit.life.attribute_type.is_some();
         let Some(ai) = self.parts.unit_ai.get(unit.id) else {
             return Ok(());
         };
-        if class == class::LIVESTOCK || ai.current_action == Some(ActionKind::HeroPower) || trading
-        {
+        if class == class::LIVESTOCK || ai.current_action == Some(AiAction::HeroPower) || trading {
             return Ok(());
         }
         // slot 0xb0 with 0, its stopAction a call on the unit at once
@@ -224,14 +222,14 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        kind: ActionType,
+        kind: ActionKind,
     ) -> Result<bool, GenieError> {
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
         match kind {
             GATHER => self.halt_gather(p, idx, standing, by)?,
-            action_type::BUILD => self.halt_build(p, idx, by)?,
+            ActionKind::BUILD => self.halt_build(p, idx, by)?,
             REPAIR => self.halt_repair(p, idx)?,
             ATTACK => {
                 let unit = self.players.live_mut(p, idx)?;

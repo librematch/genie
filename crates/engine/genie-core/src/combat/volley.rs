@@ -34,13 +34,13 @@ use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::VolleySpread;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::ActiveSprite;
@@ -129,7 +129,7 @@ impl Unit {
                 "a self-destructing attacker's hit (its object 112 and its death)",
             ));
         }
-        if master.charge_type.ranged() {
+        if master.charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "a charged hit (slot 0x2f8 with charge types 6 and 7)",
             ));
@@ -247,7 +247,7 @@ impl Unit {
         let combat = c.w.parts.combat_mut(self.id)?;
         combat.attack_count = combat.attack_count.next();
         let master = self.master(c.w.master_tables(), c.player)?;
-        if master.charge_type.ranged() {
+        if master.charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
             ));
@@ -478,14 +478,14 @@ impl Unit {
             class: made.class,
             player: c.player,
             master: made.id,
-            obstruction_type: made.obstruction_type,
+            obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
             tall: made.tall,
             moves: made.moves(),
             unknown: None,
-            obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
+            obstruction: (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(
                 Obstruction {
-                    kind: made.obstruction_type,
+                    kind: made.obstruction_kind,
                     class: made.obstruction_class,
                 },
             ),
@@ -655,7 +655,7 @@ impl Aimed {
 /// `FUN_14120ea30` of an attacker of `master` with `firepower` (`+0xa00`): a building can attack
 /// when of class 51 or 54, with a missile, or with a firepower above 1; any other attacker can.
 pub(crate) fn armed(master: &Master, firepower: Firepower) -> bool {
-    master.kind != BUILDING
+    master.kind != MasterKind::BUILDING
         || matches!(master.class, class::CLASS_51 | class::CLASS_54)
         || master.missile.master().is_some()
         || ARMED_FIREPOWER < firepower

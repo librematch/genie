@@ -27,14 +27,14 @@ use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::WorkRate;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{OwnerMasters, WorkValue};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
@@ -68,7 +68,7 @@ fn notify(c: &mut Step<'_>, repairer: &Unit, kind: NotifyKind) -> Result<(), Gen
     repairer.post_own(
         &mut c.w.parts.unit_ai,
         kind,
-        [ActionKind::Repair.value(), 0, 0],
+        [AiAction::Repair.value(), 0, 0],
     )
 }
 
@@ -421,7 +421,7 @@ impl RepairAction {
         let (answer, kind) = repair_target(c, self.target, amount)?;
         match answer {
             RepairOutcome::Full => {
-                if COMBAT <= kind
+                if MasterKind::COMBAT <= kind
                     && let Some(id) = c.w.object(self.target).map(|(_, u)| u.id)
                 {
                     c.w.parts.combat_mut(id)?.armor_removed = ArmorPair::ZERO;

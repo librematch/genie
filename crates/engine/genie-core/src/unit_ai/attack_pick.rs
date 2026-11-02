@@ -17,25 +17,22 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
-use crate::objects::masters::ChargeType;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::action_type::{COMBAT as ACTION_TYPE_COMBAT, PACK, UNPACK};
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
@@ -182,7 +179,7 @@ pub struct Attacker {
     /// The kind it holds (`attribute_type_held`, `+0x308`), none for −1.
     pub held: Option<AttributeId>,
     /// Its top action's type, if any.
-    pub top_action: Option<ActionType>,
+    pub top_action: Option<ActionKind>,
     /// Its master's id.
     pub master: MasterId,
     /// Its master's type.
@@ -198,7 +195,7 @@ pub struct Attacker {
     /// Its master's least range (slot 0x240, `+0x850`).
     pub min_range: Distance,
     /// Its master's charge type: 6 and 7 add to the range against a target (slot 0x2f8).
-    pub charge_type: ChargeType,
+    pub charge_kind: ChargeKind,
     /// Its master's `area_effect_range` (`+0x82c`).
     pub area_effect: Distance,
     /// Its master's `area_effect_level` (`+0x830`).
@@ -265,7 +262,7 @@ pub struct Seeker {
     /// `+0x3c`.
     pub order: Option<OrderKind>,
     /// `+0x44`.
-    pub action: Option<ActionKind>,
+    pub action: Option<AiAction>,
     /// `+0x48`.
     pub target: Option<ObjectId>,
     /// `+0x4c`: the target's class.
@@ -313,7 +310,7 @@ pub(super) const TOWER_SPARED: [MasterId; 2] = [MasterId::named(50), MasterId::n
 /// priest's (`FUN_140c19020`: its conversion test, slot 0x1b8) is not modelled here.
 pub fn can_attack(me: &Attacker, seeker: &Seeker, t: &Target) -> Result<bool, GenieError> {
     match me.ai_type {
-        UnitAiType::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ACTION_TYPE_COMBAT))),
+        UnitAiType::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
         UnitAiType::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class)),
         BOAR_AI
         | UnitAiType::RANGED_6
@@ -380,14 +377,14 @@ pub fn tower_can_attack(me: &Attacker, t: &Target) -> Result<bool, GenieError> {
     if me.player == PlayerId::GAIA || matches!(t.class, class::ARTIFACT | class::RELIC) {
         return Ok(false);
     }
-    let gaia_combat = !me.scenario && COMBAT <= t.kind && !t.capture.any();
+    let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
     if !gaia_combat
         && t.owner == PlayerId::GAIA
         && !matches!(t.class, class::PREY | class::PREDATOR)
     {
         return Ok(false);
     }
-    if (t.kind == BUILDING && t.desolid)
+    if (t.kind == MasterKind::BUILDING && t.desolid)
         || TOWER_SPARED.contains(&t.master)
         || me.state <= ObjectState::Unfinished
     {
@@ -437,7 +434,7 @@ impl Attacker {
     ///
     /// A charge of type 6 or 7.
     pub const fn range_against(&self) -> Result<Distance, GenieError> {
-        if self.charge_type.ranged() {
+        if self.charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "an attacker whose charge adds to its range (slot 0x2f8)",
             ));
@@ -461,7 +458,7 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
     if t.class == class::CLASS_64 {
         return Ok(false);
     }
-    let gaia_combat = !me.scenario && COMBAT <= t.kind && !t.capture.any();
+    let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
     if me.player == PlayerId::GAIA && !gaia_combat {
         return Ok(false);
     }
@@ -487,7 +484,7 @@ pub fn soldier_can_attack(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool,
     {
         return Ok(false);
     }
-    if t.kind == BUILDING && t.desolid {
+    if t.kind == MasterKind::BUILDING && t.desolid {
         return Ok(false);
     }
     if s.stance == UnitStance::NO_ATTACK {
@@ -506,7 +503,7 @@ pub(super) fn never_attacks(me: &Attacker) -> bool {
         return true;
     }
     (me.class == Some(PACKED_CLASS) || me.master == PACKED_MASTER)
-        && matches!(me.top_action, Some(PACK | UNPACK))
+        && matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK))
 }
 
 /// [`soldier_can_attack`]'s stance: in `StandGround` (stance 2) only within its range against

@@ -6,9 +6,8 @@ use crate::gathering::QueueCount;
 use crate::math::fmath::at_most_or_unordered;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, Masters};
 use crate::players::Amount;
 use crate::players::attribute;
@@ -29,7 +28,7 @@ pub fn refund(
     costs: &[(Option<AttributeId>, Amount); 3],
     attributes: &mut dyn Attributes,
 ) -> Result<(), GenieError> {
-    if master.kind < COMBAT {
+    if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
     for (attribute, _, paid) in cost_entries(&master.cost) {
@@ -76,7 +75,7 @@ pub fn refund_master(
     n: QueueCount,
     attributes: &mut dyn Attributes,
 ) -> Result<(), GenieError> {
-    if master.kind < COMBAT {
+    if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
     for (attribute, amount, paid) in cost_entries(&master.cost) {
@@ -148,7 +147,7 @@ fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, boo
 #[must_use]
 pub fn costed<'m>(masters: &'m Masters, m: &'m Master) -> (&'m Master, bool) {
     // The buildings' master type (`'P'`), whose annex's costs the cost test reads.
-    if m.kind != BUILDING {
+    if m.kind != MasterKind::BUILDING {
         return (m, false);
     }
     let Some(head) = m
@@ -181,7 +180,7 @@ pub fn cost_test(
     population: bool,
     attributes: &dyn Attributes,
 ) -> Result<bool, GenieError> {
-    let Some(m) = masters.get(master).filter(|m| COMBAT <= m.kind) else {
+    let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
         return Ok(false);
     };
     let (m, annex) = costed(masters, m);
@@ -260,7 +259,7 @@ pub fn master_costs(
     use crate::math::conversions::cvttss2si;
     let mut out = [(None, 0i16); 3];
     let can = cost_test(masters, master, ONE, true, attributes)?;
-    let Some(m) = masters.get(master).filter(|m| COMBAT <= m.kind) else {
+    let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
         return Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))));
     };
     let mut extra = 0i16;

@@ -25,9 +25,9 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::FlyMode;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::sprite::Graphic;
 use crate::players::AmountRate;
 use crate::players::PlayerType;
@@ -299,7 +299,7 @@ fn tree() -> Quarry {
         id: object_id(9365),
         position: Position::new(24.5, 97.5, 0.0),
         class: class::TREE,
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         state: ObjectState::Alive,
         player: PlayerId::new(0),
         amount: Amount::new(100.0),
@@ -567,7 +567,7 @@ fn victim(amount: f32) -> Victim {
         id: object_id(9357),
         amount: Amount::new(amount),
         state: ObjectState::Dying,
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         class: class::TREE,
         storage: Amount::new(100.0),
         ..Victim::default()
@@ -816,7 +816,7 @@ fn hunt_faces_its_own_pasture_dead_livestock() {
     let ibex = Victim {
         id: object_id(15371),
         class: class::FARM,
-        kind: master_type::MOVING,
+        kind: MasterKind::MOVING,
         player: PlayerId::new(1),
         state: ObjectState::Dead,
         ..Victim::default()

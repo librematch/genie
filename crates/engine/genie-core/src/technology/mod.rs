@@ -26,8 +26,8 @@ mod research_count;
 mod research_state;
 use genie_model::technology::tech_def;
 use genie_model::technology::tech_id;
+use genie_model::technology::tech_kind;
 use genie_model::technology::tech_mode;
-use genie_model::technology::tech_type;
 pub mod upgrade;
 use genie_model::technology::upgrade_mode;
 
@@ -44,8 +44,8 @@ pub use self::tech_def::Cost;
 pub use self::tech_def::Linked;
 pub use self::tech_def::TechDef;
 pub use self::tech_id::TechId;
+pub use self::tech_kind::TechKind;
 pub use self::tech_mode::TechMode;
-pub use self::tech_type::TechType;
 pub use self::upgrade_mode::UpgradeMode;
 use crate::production::LocationButton;
 use crate::world::WholeSeconds;
@@ -322,7 +322,7 @@ impl TechState {
         repeat: bool,
         attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
     ) -> Result<bool, GenieError> {
-        let shared = def.kind == TechType::SHARED;
+        let shared = def.kind == TechKind::SHARED;
         if self.state != ResearchState::Available
             && (!repeat
                 || self.state == ResearchState::Disabled
@@ -383,7 +383,7 @@ impl TechState {
                 attributes.set(attr, Amount::ZERO)?;
             }
         }
-        if def.kind == TechType::SHARED {
+        if def.kind == TechKind::SHARED {
             return Err(GenieError::unsupported(
                 "a research of the shared kind (FUN_1411c49a0)",
             ));
@@ -398,7 +398,7 @@ impl TechState {
     /// below 0x100 under the player's `+0x648`, `many`).
     #[must_use]
     pub fn repeatable(&self, def: &TechDef, many: bool) -> bool {
-        if def.kind == TechType::SHARED || !self.allow_multiple {
+        if def.kind == TechKind::SHARED || !self.allow_multiple {
             return false;
         }
         let done = i32::from(self.pending.get()) + i32::from(self.times_researched.get());

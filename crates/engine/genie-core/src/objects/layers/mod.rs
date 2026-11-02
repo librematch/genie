@@ -121,7 +121,7 @@ mod tests {
     use crate::map::Tile;
     use crate::map::spatial::Placed;
     use crate::objects::masters::BuildableOn;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::class;
     use crate::objects::masters::ids;
     use crate::players::PlayerId;
@@ -138,7 +138,7 @@ mod tests {
                 class: class::VILLAGER,
                 player: PlayerId::new(1),
                 master: ids::VILLAGER_MALE,
-                obstruction_type: ObstructionType::NONE,
+                obstruction_kind: ObstructionKind::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,

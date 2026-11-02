@@ -28,11 +28,11 @@ use crate::objects::SpriteId;
 use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -42,7 +42,7 @@ use crate::players::PlayerType;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::UnitAi;
 use crate::world::FrameSeed;
 use crate::world::Millis;
@@ -136,7 +136,7 @@ fn world() -> World {
     t.dt_seconds = Seconds::new(DT);
     let master = Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.2, 0.2),
@@ -199,13 +199,13 @@ fn post(x: f32, y: f32) -> Placed {
         class: class::VILLAGER,
         player: PlayerId::new(2),
         master: ids::ID_0,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
-            kind: ObstructionType::CIRCLE,
+            kind: ObstructionKind::CIRCLE,
             class: ObstructionClass::UNIT,
         }),
     }
@@ -382,7 +382,7 @@ fn busy_member_stops_and_its_slot_counts_it_there() {
             .unit_ai
             .get_mut(t.players[1].objects[ListIndex::new(0)].id)
             .unwrap()
-            .current_action = Some(ActionKind::Attack);
+            .current_action = Some(AiAction::Attack);
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.current_formation.as_mut().unwrap().slots[0].state = before;
         g.members[0].specific_move.consecutive_move_failures = 3;

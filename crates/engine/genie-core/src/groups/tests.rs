@@ -13,17 +13,15 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Static;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::action_type::{BUILD, COMBAT, CONVERT, HEAL, PICK_UP};
-use crate::objects::masters::master_type;
 use crate::objects::masters::{ClassId, class};
 use crate::objects::masters::{Master, Masters, Task, WorkValue};
 use crate::objects::masters::{MasterId, ids};
@@ -249,7 +247,7 @@ fn the_stored_positions_keep_their_desired_length() {
 fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     assert_eq!(
         sub_formation(
-            master_type::MISSILE,
+            MasterKind::MISSILE,
             HeroFlags::NONE,
             FormationClass::of_data(3)
         ),
@@ -257,7 +255,7 @@ fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             HeroFlags::NONE,
             FormationClass::of_data(3)
         ),
@@ -265,19 +263,19 @@ fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             HeroFlags::NONE,
             FormationClass::UNGROUPED
         ),
         Some(FormationCategory::PROTECTED)
     );
     assert_eq!(
-        sub_formation(master_type::COMBAT, HeroFlags::NONE, FormationClass::FIRST),
+        sub_formation(MasterKind::COMBAT, HeroFlags::NONE, FormationClass::FIRST),
         Some(FormationCategory::named(0))
     );
     assert_eq!(
         sub_formation(
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             HeroFlags::NONE,
             FormationClass::of_data(255)
         ),
@@ -285,7 +283,7 @@ fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             HeroFlags::FULL_HERO,
             FormationClass::of_data(3)
         ),
@@ -293,7 +291,7 @@ fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             HeroFlags::PROTECTED_FORMATION | HeroFlags::INVERTED,
             FormationClass::of_data(3)
         ),
@@ -301,7 +299,7 @@ fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
     );
     assert_eq!(
         sub_formation(
-            master_type::BUILDING,
+            MasterKind::BUILDING,
             HeroFlags::FULL_HERO,
             FormationClass::of_data(3)
         ),
@@ -415,7 +413,7 @@ fn tasked_world(masters: Vec<Master>, owner_range: f32) -> World {
 fn task_master(id: MasterId, tasks: Vec<Task>) -> Master {
     Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: MasterHitPoints::of_data(25),
@@ -427,16 +425,16 @@ fn task_master(id: MasterId, tasks: Vec<Task>) -> Master {
 fn building_master() -> Master {
     Master {
         id: ids::HOUSE,
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         hit_points: MasterHitPoints::of_data(550),
         ..Master::default()
     }
 }
 
-fn plain_task(action_type: ActionType, range: Distance) -> Task {
+fn plain_task(action_type: ActionKind, range: Distance) -> Task {
     Task {
-        action_type,
+        action_kind: action_type,
         work_range: range,
         work_val1: WorkValue::new(1.0),
         ..Task::default()
@@ -464,7 +462,7 @@ fn member_own_task_is_the_command_with_the_task_range() {
         vec![
             task_master(
                 ids::VILLAGER_MALE,
-                vec![plain_task(BUILD, Distance::new(2.5))],
+                vec![plain_task(ActionKind::BUILD, Distance::new(2.5))],
             ),
             building_master(),
         ],
@@ -474,7 +472,7 @@ fn member_own_task_is_the_command_with_the_task_range() {
     assert_eq!(
         got,
         Some(task::TargetTask {
-            command: BUILD,
+            command: ActionKind::BUILD,
             range: Some(Distance::new(2.5))
         })
     );
@@ -487,7 +485,7 @@ fn member_has_no_task_on_itself() {
         vec![
             task_master(
                 ids::VILLAGER_MALE,
-                vec![plain_task(BUILD, Distance::new(2.5))],
+                vec![plain_task(ActionKind::BUILD, Distance::new(2.5))],
             ),
             building_master(),
         ],
@@ -510,8 +508,14 @@ fn the_ranges_of_tasks_0x69_and_0x68_do_not_come_from_the_task() {
         t.task_range(&plain_task(action, Distance::new(2.5)), &target)
             .map(|g| (g.command, g.range))
     };
-    assert_eq!(range(HEAL).unwrap(), (HEAL, Some(Distance::new(9.0))));
-    assert_eq!(range(CONVERT).unwrap(), (CONVERT, None));
+    assert_eq!(
+        range(ActionKind::HEAL).unwrap(),
+        (ActionKind::HEAL, Some(Distance::new(9.0)))
+    );
+    assert_eq!(
+        range(ActionKind::CONVERT).unwrap(),
+        (ActionKind::CONVERT, None)
+    );
     assert_eq!(range(GATHER).unwrap(), (GATHER, Some(Distance::new(2.5))));
 }
 
@@ -522,8 +526,14 @@ fn member_without_task_takes_the_swap_group_first_with_one() {
     let t = tasked_world(
         vec![
             task_master(ids::VILLAGER_MALE, vec![]),
-            task_master(ids::BUILDER, vec![plain_task(BUILD, Distance::new(1.5))]),
-            task_master(master_id(119), vec![plain_task(BUILD, Distance::new(1.0))]),
+            task_master(
+                ids::BUILDER,
+                vec![plain_task(ActionKind::BUILD, Distance::new(1.5))],
+            ),
+            task_master(
+                master_id(119),
+                vec![plain_task(ActionKind::BUILD, Distance::new(1.0))],
+            ),
             building_master(),
         ],
         9.0,
@@ -531,7 +541,7 @@ fn member_without_task_takes_the_swap_group_first_with_one() {
     let got = t.member_task(member_11(), &query_on(60)).unwrap();
     assert_eq!(
         got.map(|g| (g.command, g.range)),
-        Some((BUILD, Some(Distance::new(1.5))))
+        Some((ActionKind::BUILD, Some(Distance::new(1.5))))
     );
 }
 
@@ -543,7 +553,10 @@ fn master_without_swap_group_has_no_other_to_try() {
     let t = tasked_world(
         vec![
             own,
-            task_master(ids::BUILDER, vec![plain_task(BUILD, Distance::new(1.5))]),
+            task_master(
+                ids::BUILDER,
+                vec![plain_task(ActionKind::BUILD, Distance::new(1.5))],
+            ),
             building_master(),
         ],
         9.0,
@@ -557,7 +570,7 @@ fn master_without_swap_group_has_no_other_to_try() {
 fn master_with_board_task_and_no_task_found_is_not_modelled() {
     let mut own = task_master(
         ids::VILLAGER_MALE,
-        vec![plain_task(PICK_UP, Distance::new(1.0))],
+        vec![plain_task(ActionKind::PICK_UP, Distance::new(1.0))],
     );
     own.task_by_group = TaskGroup::NONE;
     // its own list finds the board task for any target, so give it one for another object
@@ -625,7 +638,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
     );
     let soldier = |id, class| Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class,
         formation_category: FormationClass::of_data(1),
         weapon_range: Distance::new(4.0),
@@ -678,7 +691,7 @@ fn register(t: &mut World) {
                     class: m.class,
                     player: p,
                     master: m.id,
-                    obstruction_type: ObstructionType::NONE,
+                    obstruction_kind: ObstructionKind::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: false,
                     moves: false,
@@ -693,7 +706,7 @@ fn register(t: &mut World) {
     }
 }
 
-fn attack_on(filter: Option<ActionType>) -> attack::AttackOrder {
+fn attack_on(filter: Option<ActionKind>) -> attack::AttackOrder {
     attack::AttackOrder {
         disable_retargeting: false,
         filter,
@@ -716,7 +729,7 @@ fn group_commanded_on_target_out_of_reach_moves_to_it() {
         t.command_attack(
             group_id(1),
             building_60(),
-            attack_on(Some(ActionType::named(0x1234)))
+            attack_on(Some(ActionKind::named(0x1234)))
         )
         .unwrap()
     );
@@ -730,7 +743,7 @@ fn group_commanded_on_target_out_of_reach_moves_to_it() {
             range: Distance::new(4.0),
             target_radius: Distance::new(radius),
             disable_retargeting: 0,
-            certain_action: Some(ActionType::named(0x1234)),
+            certain_action: Some(ActionKind::named(0x1234)),
         }
     );
     assert_eq!(g.current_command, GroupCommandKind::ATTACK);
@@ -840,7 +853,7 @@ fn filter_takes_the_range_of_the_members_task_of_that_type() {
     for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
         master.tasks = vec![
             plain_task(GATHER, Distance::new(6.0)),
-            plain_task(CONVERT, Distance::new(1.5)),
+            plain_task(ActionKind::CONVERT, Distance::new(1.5)),
         ];
     }
     t.players[1].attributes = vec![Amount::ZERO; 300];
@@ -855,7 +868,7 @@ fn filter_takes_the_range_of_the_members_task_of_that_type() {
         6.0
     );
     assert_eq!(
-        t.task_reach(PlayerId::new(1), master_id(4), Some(CONVERT))
+        t.task_reach(PlayerId::new(1), master_id(4), Some(ActionKind::CONVERT))
             .unwrap(),
         3.5
     );
@@ -1073,7 +1086,7 @@ fn the_categories_attack_ranges_rise_to_their_members_ranges() {
 /// An attack task for a building of another player (task 7, owner type 2, class 3).
 fn attack_task() -> Task {
     Task {
-        action_type: COMBAT,
+        action_kind: ActionKind::COMBAT,
         owner_type: TargetOwner::ENEMY,
         object_group: Some(class_id(3)),
         work_range: Distance::new(1.5),
@@ -1128,7 +1141,7 @@ fn group_ordered_with_general_task_runs_the_general_command() {
     let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     for master in t.masters.iter_mut().filter_map(|m| m.get_mut(master_id(4))) {
         master.tasks = vec![Task {
-            action_type: GATHER,
+            action_kind: GATHER,
             work_range: Distance::new(6.0),
             ..attack_task()
         }];
@@ -1269,7 +1282,7 @@ fn queued_attack_on_held_target_ends_the_run_with_the_attack() {
             g.current_target.disable_retargeting,
             g.current_target.certain_action
         ),
-        (1, ActionType::of_data(0x0102))
+        (1, ActionKind::of_data(0x0102))
     );
 }
 

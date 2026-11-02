@@ -21,7 +21,7 @@ use crate::objects::sprite::standing;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
@@ -273,7 +273,7 @@ impl Unit {
         self.post_own(
             &mut c.w.parts.unit_ai,
             notify,
-            [ActionKind::Move.value(), 0, 0],
+            [AiAction::Move.value(), 0, 0],
         )
     }
 

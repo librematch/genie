@@ -19,16 +19,16 @@ use crate::movement::move_to::MoveToReads;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
 use crate::orders::object_gone;
 use crate::ownership::artifact::{ARTIFACT_TYPE, ArtifactSub};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::EnterOrder;
 use crate::unit_ai::{AiMove, Notify, NotifyKind};
@@ -58,17 +58,13 @@ impl World {
         {
             ai.notify_work(
                 Some(OrderKind::Enter),
-                Some(ActionKind::Enter),
+                Some(AiAction::Enter),
                 Some((target.id(), class)),
                 point,
                 clears,
                 self.streams.get(Stream::Ai),
             )?;
-            self.remember_order(
-                player,
-                idx,
-                (Some(OrderKind::Enter), Some(ActionKind::Enter)),
-            )?;
+            self.remember_order(player, idx, (Some(OrderKind::Enter), Some(AiAction::Enter)))?;
         }
         let failed = self.install_enter(player, idx, target, action, task)?;
         self.post_own_failure(player, idx, failed)
@@ -184,14 +180,16 @@ impl World {
         let (tp, t) = self
             .object(target)
             .ok_or(GenieError::unsupported("an Enter whose building is gone"))?;
-        let target = ContainerId::new(if t.master(self.master_tables(), tp)?.kind == BUILDING {
-            self.parts
-                .building_of(t.id)
-                .annex_of
-                .map_or(target, MainBuildingId::id)
-        } else {
-            target
-        });
+        let target = ContainerId::new(
+            if t.master(self.master_tables(), tp)?.kind == MasterKind::BUILDING {
+                self.parts
+                    .building_of(t.id)
+                    .annex_of
+                    .map_or(target, MainBuildingId::id)
+            } else {
+                target
+            },
+        );
         let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
         let tm = t.master(self.master_tables(), tp)?;
         let (class, height) = (tm.class, t.position().z());
@@ -337,7 +335,7 @@ impl World {
         Ok(Notify::own(
             unit.id,
             NotifyKind::ACTION_FAILED,
-            [ActionKind::Enter.value(), 0, 0],
+            [AiAction::Enter.value(), 0, 0],
         ))
     }
 

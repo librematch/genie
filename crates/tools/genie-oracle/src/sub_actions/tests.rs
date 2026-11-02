@@ -14,10 +14,9 @@ use genie_core::movement::move_to::MoveTo;
 use genie_core::objects::Graphics;
 use genie_core::objects::Voice;
 use genie_core::objects::layers::{UnreadDefault, Unstartable};
-use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
-use genie_core::objects::masters::action_type::{HUNT_RANGE, MAKE_OBJECT, MAKE_TECH};
 use genie_core::objects::masters::ids::VILLAGER_MALE;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::players::Amount;
@@ -66,7 +65,7 @@ fn building_production_holds_its_slots_and_make_action() {
     b.production_queue = vec![slot(), slot()];
     b.production_queue_count = 1;
     b.production_queue_enabled = 1;
-    b.production_queue_actions = action_list(vec![(MAKE_OBJECT, make())]);
+    b.production_queue_actions = action_list(vec![(ActionKind::MAKE_OBJECT, make())]);
     let p = production(&town_centre).unwrap().unwrap();
     assert_eq!(p.queue.slots.len(), 2);
     assert_eq!(p.queue.slots[1].serial.get(), 1);
@@ -97,7 +96,7 @@ fn research_is_production_action_too() {
         ..Action::default()
     };
     building_mut(&mut university).production_queue_actions =
-        action_list(vec![(MAKE_TECH, research)]);
+        action_list(vec![(ActionKind::MAKE_TECH, research)]);
     let p = production(&university).unwrap().unwrap();
     assert!(
         matches!(p.action, Some(Making::Research(r)) if r.tech == TechId::try_from(22).unwrap() && !r.paid && r.state == MakeTechState::New)
@@ -112,7 +111,8 @@ fn make_action_in_state_of_none_fails() {
     if let Some(m) = made.tribe_action_make_obj.as_deref_mut() {
         m.rge_action.state = 2;
     }
-    building_mut(&mut barracks).production_queue_actions = action_list(vec![(MAKE_OBJECT, made)]);
+    building_mut(&mut barracks).production_queue_actions =
+        action_list(vec![(ActionKind::MAKE_OBJECT, made)]);
     assert!(production(&barracks).is_err());
 }
 
@@ -132,7 +132,7 @@ fn research_in_state_of_none_fails() {
         ..Action::default()
     };
     building_mut(&mut university).production_queue_actions =
-        action_list(vec![(MAKE_TECH, research)]);
+        action_list(vec![(ActionKind::MAKE_TECH, research)]);
     assert!(production(&university).is_err());
 }
 
@@ -169,8 +169,8 @@ fn building_without_anything_to_make_has_no_production() {
 #[test]
 fn another_production_action_is_unsupported() {
     for (kind, action) in [
-        (MAKE_OBJECT, Action::default()),
-        (MAKE_TECH, Action::default()),
+        (ActionKind::MAKE_OBJECT, Action::default()),
+        (ActionKind::MAKE_TECH, Action::default()),
         (EXPLORE, make()),
     ] {
         let mut building = building_object(13, 109);
@@ -222,7 +222,7 @@ fn the_default_task_starts_what_the_table_names() {
     ));
     assert!(matches!(start(&table(DefaultAction::None)), Ok(None)));
     assert!(matches!(
-        start(&table(DefaultAction::Type(HUNT_RANGE))),
+        start(&table(DefaultAction::Type(ActionKind::HUNT_RANGE))),
         Ok(None)
     ));
     let enter = ENTER;
@@ -272,7 +272,7 @@ fn static_object_has_no_default_task() {
 }
 
 /// An Attack (type 9) of range 5 in state `state`, its sub-actions `subs`.
-fn attack(state: u8, subs: Vec<(ActionType, Action)>) -> Action {
+fn attack(state: u8, subs: Vec<(ActionKind, Action)>) -> Action {
     Action {
         rge_action_by_type: Some(Box::new(RgeActionByType {
             rge_action_attack: Some(Box::new(RgeActionAttack {

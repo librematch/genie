@@ -12,9 +12,6 @@ use crate::objects::lifecycle::death_parts::{count_class, forget_resource};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::master_type::ANIMATED;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::Notify;
@@ -79,11 +76,11 @@ pub(crate) fn released_fields(
         || u.life.state == ObjectState::Undead;
     // The first master type whose slot 0x180 is not the static object's (`FUN_141197d00`, types 10
     // and 15): the animated object's (`FUN_141071ea0`, types 20 to 40) only counts a worker less.
-    if kind < ANIMATED && u.workers == WorkerCount::ZERO && alive {
+    if kind < MasterKind::ANIMATED && u.workers == WorkerCount::ZERO && alive {
         u.life.goto_sleep = true;
     }
     // a combat object's (types 50 and up) unit AI
-    (COMBAT <= kind && !by.id.is_recyclable()).then(|| Notify {
+    (MasterKind::COMBAT <= kind && !by.id.is_recyclable()).then(|| Notify {
         caller: Some(by.id),
         recipient: u.id,
         kind: NotifyKind::NO_LONGER_ON_ME,
@@ -104,7 +101,7 @@ impl World {
         self.track_remove(p, gone.id, gone.life.master_id)?;
         let master = gone.master(MasterTables::new(&self.masters, &self.parts.own_master), p)?;
         forget_resource(&mut self.spatial, Some(master), gone.id, gone.position())?;
-        if COMBAT <= master.kind {
+        if MasterKind::COMBAT <= master.kind {
             count_class(&mut self.players.player_mut(p)?.attributes, master, -1.0);
         }
         let recyclable = master.recyclable;
@@ -135,7 +132,7 @@ impl World {
         };
         let unit = self.players.live(p, i)?;
         let master = unit.master(self.master_tables(), p)?;
-        if !matches!(master.kind, COMBAT | BUILDING) {
+        if !matches!(master.kind, MasterKind::COMBAT | MasterKind::BUILDING) {
             return Ok(());
         }
         let master = master.clone();
@@ -160,7 +157,7 @@ impl World {
         let unit = self.players.live(p, i)?;
         let combat = matches!(
             unit.master(self.master_tables(), p)?.kind,
-            COMBAT | BUILDING
+            MasterKind::COMBAT | MasterKind::BUILDING
         );
         if combat {
             let u = self.players.live_mut(p, i)?;

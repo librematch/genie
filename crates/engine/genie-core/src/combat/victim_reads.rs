@@ -12,10 +12,9 @@ use crate::objects::HitPoints;
 use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::objects::masters::action_type::LOOT;
-use crate::objects::masters::master_type::{BUILDING, RGE_COMBAT};
+use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::AmountRate;
@@ -104,7 +103,7 @@ pub(crate) fn victim_of(
             )
         })
     };
-    let tasks = |kind: ActionType| master.tasks.iter().any(|t| t.action_type == kind);
+    let tasks = |kind: ActionKind| master.tasks.iter().any(|t| t.action_kind == kind);
     Victim {
         id: u.id,
         // the caller's, which holds the tile lists
@@ -145,7 +144,7 @@ pub(crate) fn victim_of(
             area_effect: master.area_effect,
             blast_level: master.blast_level,
             area_damage: master.area_damage,
-            charge_type: master.charge_type,
+            charge_kind: master.charge_kind,
             max_charge: master.max_charge,
             charge_target: master.charge_target,
             special_attack: master.special_attack,
@@ -154,7 +153,7 @@ pub(crate) fn victim_of(
             attack_powerup: combat.attack_powerup,
             mode_680,
             player: p,
-            kill_bonus_tasks: tasks(LOOT),
+            kill_bonus_tasks: tasks(ActionKind::LOOT),
             // a missile's own (its part): its own strike sets it ([`Unit::own_strike`])
             fired_from: None,
         },
@@ -163,11 +162,11 @@ pub(crate) fn victim_of(
         bonus_tasks: master
             .tasks
             .iter()
-            .filter(|t| t.action_type == BONUS_DAMAGE)
+            .filter(|t| t.action_kind == BONUS_DAMAGE)
             .copied()
             .collect(),
         // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)
-        armored: (RGE_COMBAT <= kind).then(|| Armored {
+        armored: (MasterKind::RGE_COMBAT <= kind).then(|| Armored {
             armors: master.armors.clone(),
             base_armor: master.base_armor,
             terrain_bonus: master.terrain_bonus,
@@ -185,7 +184,7 @@ pub(crate) fn victim_of(
             kill_tasks: master
                 .tasks
                 .iter()
-                .any(|t| t.action_type == REMOVAL_REWARD && 1e-7 < t.work_val1.get()),
+                .any(|t| t.action_kind == REMOVAL_REWARD && 1e-7 < t.work_val1.get()),
             busy: actions.top_action_kind().is_some() || unread.is_some(),
             unit_ai,
             alert_idle: None,
@@ -194,7 +193,7 @@ pub(crate) fn victim_of(
         damaged: Vec::new(),
         killed: None,
         // a building's slot 0xe8 is FUN_1411cea90
-        building: (kind == BUILDING).then(|| DamageBuilding {
+        building: (kind == MasterKind::BUILDING).then(|| DamageBuilding {
             main: building.annex_of,
             // the caller's, which holds the world's annex links
             annexes: Vec::new(),

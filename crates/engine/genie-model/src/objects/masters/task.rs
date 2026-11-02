@@ -1,7 +1,7 @@
 //! A master's task: what its unit can do to a target (the `.dat`'s task list, FD-046).
 
 use crate::map::Distance;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::SoundEvents;
@@ -22,7 +22,7 @@ pub struct Task {
     /// `+0xa`.
     pub id: TaskId,
     /// `+0xe`: the action the task makes the unit do.
-    pub action_type: ActionType,
+    pub action_kind: ActionKind,
     /// `+0x10`: the target class the task is for, none (−1) for any.
     pub object_group: Option<ClassId>,
     /// `+0x12`: the target master, -1 for any.
@@ -85,7 +85,7 @@ impl Default for Task {
     fn default() -> Self {
         Self {
             id: TaskId::default(),
-            action_type: ActionType::default(),
+            action_kind: ActionKind::default(),
             object_group: None,
             object_id: None,
             combat_level: 0,

@@ -10,9 +10,9 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::MOVING;
 use crate::orders::Dispatch;
 use crate::orders::{
     Interact, LISTED, MoveOrder, Place, Split, Work, grid_point, ignore_unit, offset_point,
@@ -43,7 +43,7 @@ struct GroupsOrder {
 /// task filter, and the retargeting byte the handler makes of the unit AI's (`+0x1d6` is 0:
 /// MOVE passes it as is, INTERACT its opposite).
 struct FirstTarget {
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     disable_retargeting: fn(bool) -> bool,
 }
 
@@ -86,8 +86,8 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
-        let still =
-            master.kind < MOVING || (master.class != class::CLASS_54 && speed <= Speed::ZERO);
+        let still = master.kind < MasterKind::MOVING
+            || (master.class != class::CLASS_54 && speed <= Speed::ZERO);
         if still {
             // an object that does not move takes slot 0x128 at once with 1 (no carried-resource
             // test, any task) at the order's point, z 0; a queued order then goes on as a mover's

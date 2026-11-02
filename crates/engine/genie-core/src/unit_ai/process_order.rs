@@ -10,7 +10,7 @@ use crate::objects::ObjectKey;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
@@ -134,14 +134,14 @@ impl UnitAi {
             OrderKind::Wait => {
                 // case 0x2d8: the wait's action value, leaving a patrol order, then the order
                 // itself; the tail finds it the AI's already
-                self.current_action = Some(ActionKind::Wait);
+                self.current_action = Some(AiAction::Wait);
                 self.leave_patrol_timers(ai);
                 self.current_order = Some(OrderKind::Wait);
                 true
             }
             OrderKind::Scout => {
                 let explored = self.explore_at(o.point.tile(), true, side, ai)?;
-                self.set_action(Some(ActionKind::Scout));
+                self.set_action(Some(AiAction::Scout));
                 explored
             }
             OrderKind::OnTarget | OrderKind::OnTarget2 => {
@@ -150,7 +150,7 @@ impl UnitAi {
             }
             OrderKind::AutoScout => {
                 let explored = self.explore_at(o.point.tile(), true, side, ai)?;
-                self.set_action(Some(ActionKind::AutoScout));
+                self.set_action(Some(AiAction::AutoScout));
                 explored
             }
             // the patrol order (0x2c7) and the orders the switch has no case for
@@ -230,9 +230,9 @@ impl UnitAi {
             }
             (OrderKind::Heal | OrderKind::Convert | OrderKind::Repair, Some(t)) => {
                 let (action, command) = match o.order {
-                    OrderKind::Heal => (ActionKind::Heal, UnitCommand::Heal(t)),
-                    OrderKind::Convert => (ActionKind::Convert, UnitCommand::Convert(t)),
-                    _ => (ActionKind::Repair, UnitCommand::Repair(t)),
+                    OrderKind::Heal => (AiAction::Heal, UnitCommand::Heal(t)),
+                    OrderKind::Convert => (AiAction::Convert, UnitCommand::Convert(t)),
+                    _ => (AiAction::Repair, UnitCommand::Repair(t)),
                 };
                 self.work_object(t, true, (action, command), (at, side))?
             }
@@ -240,7 +240,7 @@ impl UnitAi {
             (OrderKind::Hunt | OrderKind::AutoBoarLuring, target) => {
                 let hunts = self.hunt_order(target, at, side, rng)?;
                 if o.order == OrderKind::AutoBoarLuring {
-                    self.set_action(Some(ActionKind::BoarLuring));
+                    self.set_action(Some(AiAction::BoarLuring));
                 }
                 hunts
             }
@@ -249,7 +249,7 @@ impl UnitAi {
                     Some(t) => self.wait_for_foundation(t, true, side)?,
                     None => false,
                 };
-                self.set_action(Some(ActionKind::WaitSolidify));
+                self.set_action(Some(AiAction::WaitSolidify));
                 waits
             }
             _ => false,
@@ -458,7 +458,7 @@ impl UnitAi {
         if !self.attack_command(target, true, at, side)? {
             return Ok(false);
         }
-        self.set_action(Some(ActionKind::Attack));
+        self.set_action(Some(AiAction::Attack));
         self.target_at(Some(target), Some(class), position);
         Ok(true)
     }

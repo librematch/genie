@@ -8,12 +8,11 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::objects::ObjectState;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::action_type;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::ACTION;
 use crate::pathing::tile_path::Found;
 
 use crate::map::spatial::Spatial;
@@ -180,7 +179,7 @@ pub(crate) fn drop_site_search<'u>(
     sites: &[MasterId],
     at: Position,
     mut seeker: Option<Seeker<'_, '_>>,
-    (outside, at_work): (bool, Option<ActionType>),
+    (outside, at_work): (bool, Option<ActionKind>),
     by_id: ObjectsRef<'_>,
 ) -> Result<Option<DropSiteId>, GenieError> {
     let (mut x, mut y) = (at.x(), at.y());
@@ -210,14 +209,14 @@ pub(crate) fn drop_site_search<'u>(
             continue;
         }
         let busy = at_work.is_some_and(|at_work| {
-            ACTION <= master.kind
+            MasterKind::ACTION <= master.kind
                 && by_id
                     .actions(o.id)
                     .and_then(Action::top_action_kind)
                     .is_some_and(|k| {
                         // The action types the Gather's drop-site searches pass over (`FUN_1411671e0`'s
                         // argument 8 `0x7d`, which takes `0x7c` with it).
-                        k == at_work || (at_work == action_type::UNPACK && k == action_type::PACK)
+                        k == at_work || (at_work == ActionKind::UNPACK && k == ActionKind::PACK)
                     })
         });
         if busy || (outside && o.life.inside.is_some()) {
@@ -304,13 +303,13 @@ mod tests {
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::Master;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::TaskId;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
     use crate::objects::masters::ids;
-    use crate::objects::masters::master_type;
     use crate::pathing::Pathing;
     use crate::pathing::zones::ZoneMap;
     use crate::players::PlayerId;
@@ -348,7 +347,7 @@ mod tests {
     fn masters() -> Masters {
         let master = |id, class, radius| Master {
             id,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class,
             radius: Footprint::new(radius, radius),
             ..Master::default()
@@ -394,7 +393,7 @@ mod tests {
             class,
             player: PlayerId::new(1),
             master: ids::FARM,
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: false,

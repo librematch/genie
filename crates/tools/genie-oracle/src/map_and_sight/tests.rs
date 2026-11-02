@@ -115,10 +115,10 @@ mod spatial {
     use genie_core::map::Radii;
     use genie_core::map::Tile;
     use genie_core::map::spatial::Spatial;
+    use genie_core::objects::masters::MasterKind;
     use genie_core::objects::masters::class;
     use genie_core::objects::masters::ids::VILLAGER_MALE;
-    use genie_core::objects::masters::master_type::{BUILDING, COMBAT};
-    use genie_core::objects::masters::{ObstructionClass, ObstructionType};
+    use genie_core::objects::masters::{ObstructionClass, ObstructionKind};
     use genie_core::ownership::CaptureKind;
     use genie_core::players::PlayerId;
     use genie_core::players::{ByPlayer, UnitRelation};
@@ -206,13 +206,13 @@ mod spatial {
         let obstruction = unit.obstruction.unwrap();
         assert_eq!(
             (obstruction.kind, obstruction.class),
-            (ObstructionType::TYPE_2, ObstructionClass::BUILDING)
+            (ObstructionKind::TYPE_2, ObstructionClass::BUILDING)
         );
         assert_eq!(out.tile_list(Tile::new(1, 1)), [object_id(10)]);
         let seer = out.sight.as_ref().unwrap().seer(object_id(10)).unwrap();
         assert_eq!(
             (seer.kind, seer.capture, seer.umv),
-            (COMBAT, CaptureKind::of_data(5), 0)
+            (MasterKind::COMBAT, CaptureKind::of_data(5), 0)
         );
         assert!(seer.explored && seer.building.is_none());
         assert_eq!(
@@ -230,7 +230,7 @@ mod spatial {
         let out = placed();
         let sight = out.sight.as_ref().unwrap();
         let standing = sight.seer(object_id(11)).unwrap();
-        assert_eq!(standing.kind, BUILDING);
+        assert_eq!(standing.kind, MasterKind::BUILDING);
         assert!(standing.explored);
         assert!(standing.building.is_some_and(|b| b.built && !b.started));
         assert!(out.get(object_id(11)).unwrap().obstruction.is_some());

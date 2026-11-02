@@ -7,7 +7,8 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::{master_type, player_master};
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
@@ -25,7 +26,7 @@ use crate::technology::TechId;
 use crate::technology::TechMode;
 use crate::technology::effect::{ATTRIBUTE_39, MODE_TESTED_MASTER};
 use crate::technology::{EffectCommand, ObjectsKind, Party};
-use crate::technology::{Location, TechDef, TechState, TechType, factors};
+use crate::technology::{Location, TechDef, TechKind, TechState, factors};
 use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::World;
@@ -112,7 +113,7 @@ impl World {
             // FUN_1413d1020 tests the whole id
             tech.whole()
                 .and_then(|d| self.techs.get(d.index()))
-                .is_some_and(|d| d.kind == TechType::SHARED)
+                .is_some_and(|d| d.kind == TechKind::SHARED)
         };
         // the player's own enable for one building and upgrade of the object (kinds 2 and 3),
         // the disable of a shared technology, the object's kinds 203 to 206
@@ -233,7 +234,7 @@ impl World {
     ) -> Result<i32, GenieError> {
         let mut counted = 0;
         let def = self.techs.checked(d)?;
-        if !def.required.contains(&Some(t)) || def.kind == TechType::SHARED {
+        if !def.required.contains(&Some(t)) || def.kind == TechKind::SHARED {
             return Ok(counted);
         }
         let Some(state) = self.players.player(p)?.techs.get(d) else {
@@ -391,10 +392,10 @@ impl World {
         if held.is_some_and(|t| {
             self.techs
                 .get(t)
-                .is_some_and(|d| d.kind == TechType::SHARED)
+                .is_some_and(|d| d.kind == TechKind::SHARED)
         }) {
             let building = match object.and_then(|id| self.object(id)) {
-                Some((q, u)) => u.master(self.master_tables(), q)?.kind == master_type::BUILDING,
+                Some((q, u)) => u.master(self.master_tables(), q)?.kind == MasterKind::BUILDING,
                 None => false,
             };
             if building {
@@ -408,7 +409,7 @@ impl World {
             let (Some(def), Some(state)) = (defs.get(t), states.get_mut(t)) else {
                 return;
             };
-            if def.kind == TechType::REENABLED {
+            if def.kind == TechKind::REENABLED {
                 state.state = ResearchState::Available;
             // A researched technology's state, which a disable command keeps (`FUN_1413cdb00`).
             } else if state.state != ResearchState::Researched {
@@ -461,7 +462,7 @@ impl World {
         }
         if let (true, Some(id)) = (one, object) {
             let building = match self.object(id) {
-                Some((q, u)) => u.master(self.master_tables(), q)?.kind == master_type::BUILDING,
+                Some((q, u)) => u.master(self.master_tables(), q)?.kind == MasterKind::BUILDING,
                 None => false,
             };
             if building {

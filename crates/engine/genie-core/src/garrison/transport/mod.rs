@@ -25,7 +25,7 @@ use crate::map::Tile;
 use crate::movement::move_to::{MoveDefaults, MoveToReads};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::sprite::Graphic;
 use crate::pathing::zones::ZoneId;
 use genie_diff::Diff;
@@ -54,7 +54,7 @@ use crate::math::rng::Well512;
 use crate::objects::masters::TaskId;
 
 /// The Transport action's type, which word 9 adds.
-pub const TRANSPORT: ActionType = ActionType::named(12);
+pub const TRANSPORT: ActionKind = ActionKind::named(12);
 /// A Transport's update without its action in the unit's list.
 pub(crate) const NO_TRANSPORT: GenieError =
     GenieError::unreachable("a Transport's update without its action");

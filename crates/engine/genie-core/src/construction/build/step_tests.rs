@@ -16,10 +16,10 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::players::Amount;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
@@ -45,10 +45,10 @@ use crate::objects::actions::ActionList;
 use crate::objects::layers::{Action, Building, Motion, Static};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
-use crate::objects::masters::master_type;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -59,7 +59,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::unit_ai::CIVILIAN;
 use crate::unit_ai::task_finder::{DropSite, DropTarget};
-use crate::unit_ai::{ActionKind, OrderKind, QueuedOrder, UnitAi};
+use crate::unit_ai::{AiAction, OrderKind, QueuedOrder, UnitAi};
 use crate::vision::visibility::Visibility;
 use crate::world::FrameSeed;
 use crate::world::parts::Object;
@@ -113,7 +113,7 @@ const fn placed(at: Position, r: f32, class: ClassId, master: MasterId) -> Place
         class,
         player: PlayerId::new(1),
         master,
-        obstruction_type: ObstructionType::TYPE_2,
+        obstruction_kind: ObstructionKind::TYPE_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -131,7 +131,7 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionType::TYPE_2,
+            kind: ObstructionKind::TYPE_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -247,7 +247,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     t.spatial
         .insert(HOUSE, placed(AT_HOUSE, 1.0, class::BUILDING, ids::HOUSE));
     let me = Placed {
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         ..placed(at, 0.2, class, ids::VILLAGER_MALE)
     };
     t.spatial.insert(BUILDER, me);
@@ -266,7 +266,7 @@ fn plan(t: &mut World) {
 }
 
 /// The builder's top action right after its update: its type and target.
-type Top = (Option<ActionType>, Option<ObjectId>);
+type Top = (Option<ActionKind>, Option<ObjectId>);
 
 /// One update of the builder's Build of `dt` ms (its part of the unit's update,
 /// [`Unit::build_part`]), its code and the builder's top action right after it (the work it
@@ -343,10 +343,8 @@ fn heard(t: &World) -> Vec<(NotifyKind, [i32; 3])> {
 }
 
 /// The notify 0x202 a Build without a target posts to its unit AI.
-const SEARCH: (NotifyKind, [i32; 3]) = (
-    NotifyKind::REQUIRES_SEARCH,
-    [ActionKind::Build.value(), 0, 0],
-);
+const SEARCH: (NotifyKind, [i32; 3]) =
+    (NotifyKind::REQUIRES_SEARCH, [AiAction::Build.value(), 0, 0]);
 
 /// The house's builders, workers and state.
 fn house(t: &World) -> (u8, i32, ObjectState) {
@@ -676,7 +674,7 @@ fn builder_on_its_footprint_faces_it_then_walks_to_free_tile_beside_it() {
         ),
     );
     let me = Placed {
-        obstruction_type: ObstructionType::CIRCLE,
+        obstruction_kind: ObstructionKind::CIRCLE,
         ..placed(
             Position::new(30.0, 89.0, 0.0),
             0.2,
@@ -953,7 +951,7 @@ fn build_other_cases_end_walk_to_point_go_back_or_wait() {
 fn stump(t: &mut World) {
     let m = Master {
         id: master_id(349),
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         class: class::TREE,
         radius: Footprint::new(0.5, 0.5),
         height: Distance::new(1.0),
@@ -985,7 +983,7 @@ fn stump(t: &mut World) {
         Placed {
             player: PlayerId::new(0),
             obstruction: Some(Obstruction {
-                kind: ObstructionType::TYPE_2,
+                kind: ObstructionKind::TYPE_2,
                 class: ObstructionClass::NONE,
             }),
             ..placed(
@@ -1149,7 +1147,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
     let v = own(&mut t, BUILDER);
     (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(7.0));
     let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
-    (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(ActionKind::Build));
+    (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(AiAction::Build));
     assert_eq!(code(&mut t, 20), HeadCode::Deletes);
     let b = build(&t);
     assert_eq!(
@@ -1158,7 +1156,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
     );
     let built = (
         NotifyKind::PASTURE_BUILT,
-        [ActionKind::Build.value(), 10031, 0],
+        [AiAction::Build.value(), 10031, 0],
     );
     assert_eq!(heard(&t), [built]);
     let ai = t.parts.unit_ai.get(builder(&t).id).unwrap();
@@ -1176,7 +1174,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
 /// the update does nothing (the default case).
 #[test]
 fn halted_build_fails_and_its_failure_removes_it() {
-    let failed = (NotifyKind::ACTION_FAILED, [ActionKind::Build.value(), 0, 0]);
+    let failed = (NotifyKind::ACTION_FAILED, [AiAction::Build.value(), 0, 0]);
     let halted = BuildAction {
         state: BuildState::Halted,
         target: None,
@@ -1440,7 +1438,7 @@ fn builder_drop_off_walks_to_the_drop_site_its_search_found() {
             AT_HOUSE
         )
     );
-    let no_site = (NotifyKind::NO_DROP_SITE, [ActionKind::Build.value(), 0, 0]);
+    let no_site = (NotifyKind::NO_DROP_SITE, [AiAction::Build.value(), 0, 0]);
     assert_eq!((mill(&t), heard(&t)), (0, vec![no_site]));
     let b = drop(&mut t, DropSearch::Empty);
     assert_eq!(
@@ -1715,7 +1713,7 @@ fn drop_off_whose_site_went_past_state_6_searches_again() {
         ),
         (Some(HOUSE), BuildState::Move { move_to: None }, None)
     );
-    let no_site = (NotifyKind::NO_DROP_SITE, [ActionKind::Build.value(), 0, 0]);
+    let no_site = (NotifyKind::NO_DROP_SITE, [AiAction::Build.value(), 0, 0]);
     assert_eq!(heard(&t), [no_site]);
 }
 
@@ -1844,7 +1842,7 @@ fn builder_on_an_annex_walks_off_it() {
     t.spatial
         .insert(HOUSE, placed(AT_HOUSE, 1.0, class::BUILDING, ids::HOUSE));
     let me = Placed {
-        obstruction_type: ObstructionType::CIRCLE,
+        obstruction_kind: ObstructionKind::CIRCLE,
         ..placed(
             Position::new(12.4, 10.5, 0.0),
             0.2,

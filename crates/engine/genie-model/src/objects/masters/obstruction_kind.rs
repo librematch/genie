@@ -9,9 +9,9 @@ use std::fmt::{Display, Error, Formatter};
 /// simulation does not tell apart, so the type is a newtype: the named ones are those its tests
 /// name.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ObstructionType(u8);
+pub struct ObstructionKind(u8);
 
-impl ObstructionType {
+impl ObstructionKind {
     /// Type 0: no record and no mesh shape.
     pub const NONE: Self = Self(0);
     /// Type 1: a record that stays filed when the object's marks clear.
@@ -81,20 +81,20 @@ impl ObstructionType {
     }
 }
 
-impl From<u8> for ObstructionType {
+impl From<u8> for ObstructionKind {
     /// The type a master's byte holds: every value is one.
     fn from(value: u8) -> Self {
         Self(value)
     }
 }
 
-impl Display for ObstructionType {
+impl Display for ObstructionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
 
-impl genie_diff::Diff for ObstructionType {
+impl genie_diff::Diff for ObstructionKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         d.equal(self, other);
     }
@@ -102,33 +102,33 @@ impl genie_diff::Diff for ObstructionType {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
 
     /// 0 and 12 get no record; 10 is filed as 2; the boxes and the circle are tested; the types
     /// 0, 1, 2, 10, 11 and 13 mark their tiles.
     #[test]
     fn the_types_record_file_test_and_mark_as_the_game_does() {
-        let types = |f: fn(ObstructionType) -> bool| -> Vec<u8> {
+        let types = |f: fn(ObstructionKind) -> bool| -> Vec<u8> {
             (0..16)
-                .map(ObstructionType::from)
+                .map(ObstructionKind::from)
                 .filter(|&t| f(t))
-                .map(ObstructionType::get)
+                .map(ObstructionKind::get)
                 .collect()
         };
         assert_eq!(
-            types(ObstructionType::recorded),
+            types(ObstructionKind::recorded),
             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15]
         );
-        assert_eq!(ObstructionType::TYPE_10.filed(), ObstructionType::TYPE_2);
-        assert_eq!(ObstructionType::CIRCLE.filed(), ObstructionType::CIRCLE);
-        assert_eq!(types(ObstructionType::tested), [2, 3, 5, 11, 13]);
-        assert_eq!(types(ObstructionType::marks_tiles), [0, 1, 2, 10, 11, 13]);
+        assert_eq!(ObstructionKind::TYPE_10.filed(), ObstructionKind::TYPE_2);
+        assert_eq!(ObstructionKind::CIRCLE.filed(), ObstructionKind::CIRCLE);
+        assert_eq!(types(ObstructionKind::tested), [2, 3, 5, 11, 13]);
+        assert_eq!(types(ObstructionKind::marks_tiles), [0, 1, 2, 10, 11, 13]);
     }
 
     /// An effect keeps the table's types and the bytes past it and makes the others 0.
     #[test]
     fn an_effect_sets_the_tables_types_and_clears_the_others() {
-        let set: Vec<u8> = (0..16).map(|b| ObstructionType::set(b).get()).collect();
+        let set: Vec<u8> = (0..16).map(|b| ObstructionKind::set(b).get()).collect();
         assert_eq!(set, [0, 1, 2, 3, 0, 5, 0, 0, 0, 0, 10, 11, 12, 13, 14, 15]);
     }
 }

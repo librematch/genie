@@ -26,7 +26,7 @@ use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::unit_ai::OrderPriority;
 use genie_core::unit_ai::best_target::AttackCategory;
-use genie_core::unit_ai::{ActionKind, OrderKind};
+use genie_core::unit_ai::{AiAction, OrderKind};
 use genie_core::unit_ai::{
     Attackers, Home, Notify, OrderRecord, PatrolPath, QueuedOrder, UnitAi, UnitAiType, UnitStance,
     notify_capacity,
@@ -119,7 +119,7 @@ pub(super) fn lifecycle(
 /// # Errors
 ///
 /// An order or action value no order or action holds ([`OrderKind::try_from`],
-/// [`ActionKind::try_from`]), in the current or last one, the history or a queue.
+/// [`AiAction::try_from`]), in the current or last one, the history or a queue.
 pub(super) fn unit_ai(
     object: &genie_save::Object,
     own: ObjectId,
@@ -132,7 +132,7 @@ pub(super) fn unit_ai(
         ai_type: UnitAiType::of_value(combat.need_unit_ai as u32),
         current_order: OrderKind::of_field(ai.current_order_value)?,
         order_priority: OrderPriority::of_data(ai.current_order_priority_value),
-        current_action: ActionKind::of_field(ai.current_action_value)?,
+        current_action: AiAction::of_field(ai.current_action_value)?,
         current_target: ObjectId::of_field(ai.current_target_value),
         target_class: ClassId::of_param(ai.current_target_type_value)?,
         target_point: Position::new(
@@ -143,7 +143,7 @@ pub(super) fn unit_ai(
         desired_distance: Distance::new(ai.desired_target_distance_value),
         defend_target: ObjectId::of_field(ai.defend_target_value),
         last_order: OrderKind::of_field(ai.last_order_value)?,
-        last_action: ActionKind::of_field(ai.last_action_value)?,
+        last_action: AiAction::of_field(ai.last_action_value)?,
         last_target: ObjectId::of_field(ai.last_target_value),
         last_target_class: ClassId::of_param(ai.last_target_type_value)?,
         idle_timer: Millis::new(ai.idle_timer_value),
@@ -232,7 +232,7 @@ fn order_history(ai: &UnitAiModule) -> Result<Vec<OrderRecord>, GenieError> {
         .map(|e| {
             Ok(OrderRecord {
                 order: OrderKind::of_field(e.new_oh_order)?,
-                action: ActionKind::of_field(e.new_oh_action)?,
+                action: AiAction::of_field(e.new_oh_action)?,
                 time: WorldTime::from_millis(e.new_oh_time),
                 // the save's 12 bytes are the game's vector, x, height, y
                 position: vec3(&e.new_oh_position),

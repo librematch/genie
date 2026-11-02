@@ -32,8 +32,8 @@ use genie_model::objects::SpriteId;
 use genie_model::objects::WorkRate;
 use genie_model::objects::facing::SpriteFacets;
 use genie_model::objects::masters::CarryCapacity;
+use genie_model::objects::masters::ChargeKind;
 use genie_model::objects::masters::ChargeTarget;
-use genie_model::objects::masters::ChargeType;
 use genie_model::objects::masters::ClassAmount;
 use genie_model::objects::masters::CombatAbility;
 use genie_model::objects::masters::CostAmount;
@@ -55,7 +55,7 @@ use genie_model::objects::masters::TaskTerrain;
 use genie_model::objects::masters::VolleySpread;
 use genie_model::objects::masters::WorkValue;
 use genie_model::objects::masters::{
-    ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
+    ActionKind, ClassId, MasterId, ObstructionClass, ObstructionKind,
 };
 use genie_model::objects::masters::{
     AttackPriority, BuildableOn, DamageAmount, DamageGraphic, DamageSpriteMode, HpPercent, Masters,
@@ -188,7 +188,7 @@ pub fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
     ])?;
     Ok(Task {
         id: TaskId::of_task(t.id),
-        action_type: ActionType::try_from(t.action_type)?,
+        action_kind: ActionKind::try_from(t.action_type)?,
         object_group: ClassId::of_field(t.object_group)?,
         object_id: MasterId::of_data(t.object_id),
         combat_level: t.combat_level,
@@ -233,7 +233,7 @@ pub fn work_masters(
         work.radius = Footprint::new(s.radius_x, s.radius_y);
         work.tall = 0.0 < s.radius_z;
         work.height = Distance::new(s.radius_z);
-        work.obstruction_type = ObstructionType::from(s.obstruction_type);
+        work.obstruction_kind = ObstructionKind::from(s.obstruction_type);
         work.buildable_on = BuildableOn::of_data(s.can_be_built_on);
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
         work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
@@ -264,7 +264,7 @@ pub fn work_masters(
                 .train_location
                 .first()
                 .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-            work.charge_type = ChargeType::of_data(c.charge_type);
+            work.charge_kind = ChargeKind::of_data(c.charge_type);
             work.formation_category = FormationClass::of_data(c.temp_formation_category);
             work.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
             work.volley_fire = Firepower::new(c.volley_fire_amount);
@@ -360,7 +360,7 @@ pub fn work_masters(
             .and_then(|r| r.rge_master_missile_object.as_deref())
         {
             work.missile_stats = Some(MissileStats {
-                projectile_type: MasterId::of_data(s.copy_id())
+                projectile_kind: MasterId::of_data(s.copy_id())
                     .and_then(|m| table.projectile_type(civ, m))
                     .unwrap_or_default(),
                 smart_mode: SmartMode::from_bits_retain(mm.targetting_type),
@@ -533,7 +533,7 @@ pub struct Placement {
     /// The master's class.
     pub class: ClassId,
     /// How the object obstructs others.
-    pub obstruction_type: ObstructionType,
+    pub obstruction_kind: ObstructionKind,
     /// The obstruction's class.
     pub obstruction_class: ObstructionClass,
     /// What may be built on the object.
@@ -552,7 +552,7 @@ pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placeme
         return Some(Placement {
             radius: Radii::new(own.radius_x, own.radius_y, own.radius_z),
             class: ClassId::of_master(own.read_temp_2),
-            obstruction_type: ObstructionType::from(own.obstruction_type),
+            obstruction_kind: ObstructionKind::from(own.obstruction_type),
             obstruction_class: ObstructionClass::from(own.obstruction_class),
             buildable_on: BuildableOn::of_data(own.can_be_built_on),
             los: Distance::new(own.los),
@@ -562,7 +562,7 @@ pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placeme
     Some(Placement {
         radius: Radii::new(m.radius_x, m.radius_y, m.radius_z),
         class: ClassId::of_master(m.read_temp_5),
-        obstruction_type: ObstructionType::from(m.obstruction_type),
+        obstruction_kind: ObstructionKind::from(m.obstruction_type),
         obstruction_class: ObstructionClass::from(m.obstruction_class),
         buildable_on: BuildableOn::of_data(m.can_be_built_on),
         los: Distance::new(m.los),

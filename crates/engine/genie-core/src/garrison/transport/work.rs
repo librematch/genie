@@ -12,7 +12,7 @@ use crate::objects::masters::class;
 use crate::objects::masters::ids::MARKET;
 use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
@@ -138,7 +138,7 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(id) {
             ai.notify_work(
                 Some(OrderKind::Transport),
-                Some(ActionKind::Transport),
+                Some(AiAction::Transport),
                 named,
                 point,
                 clears,
@@ -147,7 +147,7 @@ impl World {
             self.remember_order(
                 p,
                 i,
-                (Some(OrderKind::Transport), Some(ActionKind::Transport)),
+                (Some(OrderKind::Transport), Some(AiAction::Transport)),
             )?;
         }
         Ok(())

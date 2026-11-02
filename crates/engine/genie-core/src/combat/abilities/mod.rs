@@ -41,15 +41,13 @@ use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Task, player_master};
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -69,21 +67,20 @@ use crate::combat::attack::ATTACK;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::math::image::abilities::{EPSILON as ABILITIES_EPSILON, ONE as ABILITIES_ONE};
-use crate::objects::masters::action_type::COMBAT as ACTION_TYPE_COMBAT;
 use crate::world::index::Place;
 
 /// The action type of a generation task (151): the Feitoria's trickle and the like.
-pub const GENERATE: ActionType = ActionType::named(0x97);
+pub const GENERATE: ActionKind = ActionKind::named(0x97);
 /// The action type of a movement damage task (152).
-pub const MOVEMENT_DAMAGE: ActionType = ActionType::named(0x98);
+pub const MOVEMENT_DAMAGE: ActionKind = ActionKind::named(0x98);
 /// The action type of a terrain look task (159).
-pub const TERRAIN_LOOK: ActionType = ActionType::named(0x9f);
+pub const TERRAIN_LOOK: ActionKind = ActionKind::named(0x9f);
 /// The action type of a removal reward task (161).
-pub const REMOVAL_REWARD: ActionType = ActionType::named(0xa1);
+pub const REMOVAL_REWARD: ActionKind = ActionKind::named(0xa1);
 
 /// The top action types a generation task's test passes (`FUN_140a7be70`): the Attack (9),
 /// type 7, the Gather (5) and the Hunt (0x6e).
-const WORKING_ACTIONS: [ActionType; 4] = [ATTACK, ACTION_TYPE_COMBAT, GATHER, HUNT];
+const WORKING_ACTIONS: [ActionKind; 4] = [ATTACK, ActionKind::COMBAT, GATHER, HUNT];
 /// The action state of an action at work (`+0x18`).
 const WORKING: ActionState = ActionState::new(7);
 
@@ -168,7 +165,7 @@ pub fn alive(hp: HitPoints) -> bool {
 }
 
 /// The action types the routine acts on.
-pub const ACTIONS: [ActionType; 4] = [GENERATE, MOVEMENT_DAMAGE, TERRAIN_LOOK, REMOVAL_REWARD];
+pub const ACTIONS: [ActionKind; 4] = [GENERATE, MOVEMENT_DAMAGE, TERRAIN_LOOK, REMOVAL_REWARD];
 
 /// What the routine reads of the object's master (`+0xa0`: its own one, else its player's).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -214,13 +211,13 @@ impl World {
         let unit = &self.players.live(p, i)?;
         let master = unit.master(self.master_tables(), p)?;
         // The object types the routine runs on: a combat unit (`'F'`) and a building (`'P'`).
-        if !matches!(master.kind, COMBAT | BUILDING) {
+        if !matches!(master.kind, MasterKind::COMBAT | MasterKind::BUILDING) {
             return Ok(Vec::new());
         }
         let tasks: Vec<Task> = master
             .tasks
             .iter()
-            .filter(|t| ACTIONS.contains(&t.action_type))
+            .filter(|t| ACTIONS.contains(&t.action_kind))
             .copied()
             .collect();
         if tasks.is_empty() {
@@ -238,7 +235,7 @@ impl World {
                 return Ok(rewards);
             }
             for task in &tasks {
-                if task.action_type == REMOVAL_REWARD && task.work_range < Distance::new(EPSILON) {
+                if task.action_kind == REMOVAL_REWARD && task.work_range < Distance::new(EPSILON) {
                     let held = self.players.player(owner)?;
                     let multiplier = (task.attribute_type2).and_then(|a| held.attribute(a));
                     let cost = player_master(&self.masters, owner, own.id)
@@ -249,7 +246,7 @@ impl World {
             return Ok(rewards);
         }
         for task in &tasks {
-            match task.action_type {
+            match task.action_kind {
                 GENERATE => self.generate((p, i), owner, own, task)?,
                 MOVEMENT_DAMAGE => self.movement_damage((p, i), owner, own, task)?,
                 // the terrain mask's throw ends the game

@@ -23,8 +23,7 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::master_type::COMBAT;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::Seconds;
 use crate::world::World;
@@ -45,11 +44,8 @@ const MAX_MEMBERS: usize = 70;
 const FIRST_CAPACITY: i32 = 10;
 /// The unit AI's actions and orders `AddUnit` clears (`FUN_1410083c0`): actions 0x259, 0x2bf and
 /// 0x2c0, the defend order (and orders 0x323 and 0x324, which no order holds, [`OrderKind`]).
-const CLEARED_ACTIONS: [ActionKind; 3] = [
-    ActionKind::Defend,
-    ActionKind::MoveAside,
-    ActionKind::GroupAside,
-];
+const CLEARED_ACTIONS: [AiAction; 3] =
+    [AiAction::Defend, AiAction::MoveAside, AiAction::GroupAside];
 
 /// What a group reads of a unit's master for its formation.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -69,7 +65,7 @@ impl FormationUnit {
     pub(crate) fn of(master: &Master) -> Self {
         let full =
             Distance::ZERO < master.height && 0.0 < master.radius.x() && 0.0 < master.radius.y();
-        let radius = if COMBAT <= master.kind && full {
+        let radius = if MasterKind::COMBAT <= master.kind && full {
             master.spacing_modifier.get() * master.radius.x()
         } else {
             DEFAULT_RADIUS
@@ -450,7 +446,7 @@ mod tests {
     use crate::objects::ListIndex;
     use crate::objects::ObjectId;
     use crate::objects::masters::FormationClass;
-    use crate::objects::masters::master_type;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
@@ -528,7 +524,7 @@ mod tests {
         .with_motions([(object_id(11), Motion::Moving(mover))]);
         let master = |id: MasterId, category: u8| Master {
             id,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             formation_category: FormationClass::of_data(category),
             ..Master::default()
         };
@@ -640,13 +636,13 @@ mod tests {
             let extra = [
                 Master {
                     id: ids::ID_7,
-                    kind: master_type::MISSILE,
+                    kind: MasterKind::MISSILE,
                     formation_category: FormationClass::of_data(1),
                     ..Master::default()
                 },
                 Master {
                     id: master_id(8),
-                    kind: master_type::COMBAT,
+                    kind: MasterKind::COMBAT,
                     formation_category: FormationClass::of_data(2),
                     ..Master::default()
                 },

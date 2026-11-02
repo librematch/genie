@@ -16,8 +16,6 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::world::Seconds;
@@ -95,10 +93,9 @@ impl Attack {
                 .move_algorithm
                 .contains(MoveAlgorithm::ALTERNATES_SPRITES)
         });
-        let special = r
-            .swing_sprites
-            .special
-            .filter(|_| COMBAT <= f.own.kind && damage::charge_hit(&f.own.source, &f.victim));
+        let special = r.swing_sprites.special.filter(|_| {
+            MasterKind::COMBAT <= f.own.kind && damage::charge_hit(&f.own.source, &f.victim)
+        });
         let chosen = if let Some(look) = r.swing_sprites.look {
             Some(look)
         } else if let Some(special) = special {
@@ -180,7 +177,7 @@ impl Attack {
             return Worked::default();
         };
         if Distance::ZERO < unit.area_effect
-            && target.kind == BUILDING
+            && target.kind == MasterKind::BUILDING
             && let Some(m) = main
         {
             target = m;

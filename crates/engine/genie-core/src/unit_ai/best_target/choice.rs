@@ -8,8 +8,8 @@ use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, UnitRelation};
@@ -17,7 +17,7 @@ use crate::unit_ai::best_target::{
     Ask, AttackCategory, Battlefield, EPSILON, EntryCount, STATISTICS, Searcher, Statistics, Thing,
     category,
 };
-use crate::unit_ai::{ActionKind, OrderKind};
+use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::slots::CheckedIndex;
@@ -95,14 +95,11 @@ pub(super) fn tested(
     if !may_attack(me, (id, &t), relation, world)? {
         return Ok(None);
     }
-    let gaia_taken = !me.scenario && t.owner == PlayerId::GAIA && COMBAT <= t.kind;
+    let gaia_taken = !me.scenario && t.owner == PlayerId::GAIA && MasterKind::COMBAT <= t.kind;
     if gaia_taken && t.capture {
         return Ok(None);
     }
-    if !t.targetable
-        || (!t.attackable && me.action == Some(ActionKind::Attack))
-        || world.shuns(id)?
-    {
+    if !t.targetable || (!t.attackable && me.action == Some(AiAction::Attack)) || world.shuns(id)? {
         return Ok(None);
     }
     Ok(kept_by_owner_and_class(me, ask, &t).then_some(t))
@@ -125,7 +122,7 @@ pub(super) fn may_attack(
     {
         return Ok(false);
     }
-    if me.kind == COMBAT && !world.spares_friends(id)? {
+    if me.kind == MasterKind::COMBAT && !world.spares_friends(id)? {
         return Ok(false);
     }
     if relation == UnitRelation::NEUTRAL && !world.attacks_neutral(t.class)? {
@@ -142,7 +139,7 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing) -> bo
     if !ask.any_class && NOT_ANY.contains(&t.class) {
         return false;
     }
-    let captured = COMBAT <= t.kind && t.capture;
+    let captured = MasterKind::COMBAT <= t.kind && t.capture;
     // nothing held (`+0x310` at most 0) and not taken by sight
     let free = t.held <= Amount::ZERO && !captured;
     if me.player_type.is_computer() && t.owner == PlayerId::GAIA && !free {

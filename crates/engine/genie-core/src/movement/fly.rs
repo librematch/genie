@@ -17,7 +17,7 @@ use crate::movement::{Me, Mover};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::Voice;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskSprites;
@@ -28,7 +28,7 @@ use crate::world::step::Step;
 use genie_diff::Diff;
 
 /// The Fly action's type, which word 9 adds.
-pub const FLY: ActionType = ActionType::named(10);
+pub const FLY: ActionKind = ActionKind::named(10);
 
 use crate::math::image::fly::{DEGREE as FLY_DEGREE, EPSILON as FLY_EPSILON, HEIGHT as FLY_HEIGHT};
 pub use crate::movement::fly_state::FlyState;
@@ -454,7 +454,7 @@ mod tests {
             timer: Seconds::new(timer),
             home: Point::new(78.5, 103.5),
             task: Task {
-                action_type: FLY,
+                action_kind: FLY,
                 object_group: None,
                 work_val2: WorkValue::new(0.0),
                 sprites: TaskSprites::of_data([846, 1595, 846, -1]),
@@ -808,7 +808,7 @@ mod tests {
     #[test]
     fn bird_default_fly_takes_its_master_default_task() {
         let task = Task {
-            action_type: FLY,
+            action_kind: FLY,
             wait_time: Seconds::new(3.0),
             ..Task::default()
         };

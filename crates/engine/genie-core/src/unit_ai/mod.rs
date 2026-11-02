@@ -15,8 +15,8 @@
 //! ([`QueuedOrder`]), on its owner's turn and between turns ([`UnitAi::off_turn`]). What the AI
 //! does to its unit comes back as [`Effect`]s, in order.
 
-mod action_kind;
 mod actions;
+mod ai_action;
 pub mod ai_kinds;
 mod ai_type;
 mod attack_orders;
@@ -56,7 +56,7 @@ mod unit_stance;
 mod update;
 pub(crate) mod world_view;
 
-pub use self::action_kind::ActionKind;
+pub use self::ai_action::AiAction;
 pub use self::ai_type::UnitAiType;
 pub(crate) use self::attack_pick::spares_friends;
 pub use self::attack_pick::{
@@ -445,7 +445,7 @@ pub struct UnitAi {
     /// `+0x40`, the current order's priority (−1 for none): a queued order sets it.
     pub order_priority: OrderPriority,
     /// `+0x44`, −1 for none.
-    pub current_action: Option<ActionKind>,
+    pub current_action: Option<AiAction>,
     /// `+0x48`.
     pub current_target: Option<ObjectId>,
     /// `+0x4c`, the target's class (−1 for none), and `+0x50`..`+0x58`, its point.
@@ -461,7 +461,7 @@ pub struct UnitAi {
     /// current ones.
     pub last_order: Option<OrderKind>,
     /// `+0x68`: the action before the current one.
-    pub last_action: Option<ActionKind>,
+    pub last_action: Option<AiAction>,
     /// `+0x6c`: the target before the current one.
     pub last_target: Option<ObjectId>,
     /// `+0x70`: that target's class.
@@ -561,7 +561,7 @@ pub struct OrderRecord {
     /// The order (`mOrder`), None for the −1 of an order recorded without one.
     pub order: Option<OrderKind>,
     /// The action (`mAction`), None for −1.
-    pub action: Option<ActionKind>,
+    pub action: Option<AiAction>,
     /// The world time it was given (`mTime`).
     pub time: WorldTime,
     /// The unit's slot 0x520 then (`mPosition`: where it last moved to).

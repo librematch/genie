@@ -47,20 +47,19 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::layers::Static;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::SpecialAttack;
-use crate::objects::masters::action_type::{DEPOSIT, PICK_UP};
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
@@ -74,7 +73,7 @@ use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::{QueuedOrder, SOLDIER_AI};
@@ -146,7 +145,7 @@ fn world() -> World {
     let master = Master {
         id: master_id(4),
         terrain_restriction: Some(RestrictionId::named(0)),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(60),
         line_of_sight: Distance::new(4.0),
@@ -372,23 +371,23 @@ fn relic_carriers_keep_their_command_pending() {
     let mut t = world();
     let relic = Master {
         id: ids::RELIC,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::RELIC,
         ..Master::default()
     };
     let monastery = Master {
         id: ids::MONASTERY,
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         ..Master::default()
     };
     let task = |action| Task {
-        action_type: action,
+        action_kind: action,
         ..Task::default()
     };
     let monk = |tasks: Vec<Task>| Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::MONK,
         tasks,
         ..Master::default()
@@ -405,7 +404,7 @@ fn relic_carriers_keep_their_command_pending() {
         [r, m].map(|u| Object::with_ai(u, soldier_ai())),
     )
     .unwrap();
-    let ai = |t: &mut World, order: Option<OrderKind>, action: Option<ActionKind>, target: i32| {
+    let ai = |t: &mut World, order: Option<OrderKind>, action: Option<AiAction>, target: i32| {
         let a = t
             .parts
             .unit_ai
@@ -416,27 +415,27 @@ fn relic_carriers_keep_their_command_pending() {
         a.current_target = ObjectId::of_field(target);
     };
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x84);
-    set_masters(&mut t, vec![task(PICK_UP)]);
+    set_masters(&mut t, vec![task(ActionKind::PICK_UP)]);
     ai(&mut t, Some(OrderKind::OnTarget), None, 40);
     assert!(t.target_pending(group_id(1)).unwrap());
-    ai(&mut t, None, Some(ActionKind::OnTarget), 40);
+    ai(&mut t, None, Some(AiAction::OnTarget), 40);
     assert!(t.target_pending(group_id(1)).unwrap());
     ai(&mut t, None, None, 40);
     assert!(!t.target_pending(group_id(1)).unwrap());
     ai(&mut t, Some(OrderKind::OnTarget), None, -1);
     assert!(!t.target_pending(group_id(1)).unwrap());
-    set_masters(&mut t, vec![task(DEPOSIT)]);
+    set_masters(&mut t, vec![task(ActionKind::DEPOSIT)]);
     assert!(t.target_pending(group_id(1)).unwrap());
     ai(&mut t, Some(OrderKind::OnTarget), None, 41);
     assert!(!t.target_pending(group_id(1)).unwrap());
     // the delivery: on the monastery, with either task
     t.groups.get_mut(group_id(1)).unwrap().current_command = GroupCommandKind::named(0x88);
     assert!(t.target_pending(group_id(1)).unwrap());
-    set_masters(&mut t, vec![task(PICK_UP)]);
+    set_masters(&mut t, vec![task(ActionKind::PICK_UP)]);
     assert!(t.target_pending(group_id(1)).unwrap());
     set_masters(&mut t, vec![task(GATHER)]);
     assert!(!t.target_pending(group_id(1)).unwrap());
-    set_masters(&mut t, vec![task(DEPOSIT)]);
+    set_masters(&mut t, vec![task(ActionKind::DEPOSIT)]);
     ai(&mut t, Some(OrderKind::OnTarget), None, 40);
     assert!(!t.target_pending(group_id(1)).unwrap());
 }
@@ -448,7 +447,7 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
     let mut t = world();
     assert!(t.member_idle(object_id(10)).unwrap());
     assert!(!t.member_idle(object_id(99)).unwrap());
-    let ai = |t: &mut World, order: Option<OrderKind>, action: Option<ActionKind>| {
+    let ai = |t: &mut World, order: Option<OrderKind>, action: Option<AiAction>| {
         let a = t
             .parts
             .unit_ai
@@ -457,13 +456,13 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
         a.current_order = order;
         a.current_action = action;
     };
-    ai(&mut t, None, Some(ActionKind::Move));
+    ai(&mut t, None, Some(AiAction::Move));
     assert!(!t.member_idle(object_id(10)).unwrap());
-    ai(&mut t, Some(OrderKind::Wait), Some(ActionKind::GroupAside));
+    ai(&mut t, Some(OrderKind::Wait), Some(AiAction::GroupAside));
     assert!(t.member_idle(object_id(10)).unwrap());
-    ai(&mut t, None, Some(ActionKind::Heal));
+    ai(&mut t, None, Some(AiAction::Heal));
     assert!(t.member_idle(object_id(10)).unwrap());
-    ai(&mut t, Some(OrderKind::Move), Some(ActionKind::Heal));
+    ai(&mut t, Some(OrderKind::Move), Some(AiAction::Heal));
     assert!(!t.member_idle(object_id(10)).unwrap());
     ai(&mut t, None, None);
     t.parts
@@ -560,7 +559,7 @@ fn kept_apart_units_leave_unless_busy() {
     t.parts.put_mover(free.id, Some(walking()));
     let attacker = soldier(17, 7.0, 7.0);
     let attacker_ai = UnitAi {
-        current_action: Some(ActionKind::Attack),
+        current_action: Some(AiAction::Attack),
         ..soldier_ai()
     };
     t.extend_live(
@@ -606,7 +605,7 @@ fn deleted_group_lets_its_members_go() {
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(1)].id)
         .unwrap()
-        .current_action = Some(ActionKind::Move);
+        .current_action = Some(AiAction::Move);
     t.players[1].objects[ListIndex::new(2)].group.id = Some(group_id(7));
     t.delete_group(group_id(1)).unwrap();
     assert!(t.groups.get(group_id(1)).is_none());
@@ -649,7 +648,7 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
     let master = |t: &mut World, class: ClassId, sprites: [i16; 3]| {
         let m = Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class,
             hit_points: MasterHitPoints::of_data(60),
             radius: Footprint::new(0.2, 0.2),
@@ -794,9 +793,9 @@ fn each_line_takes_its_units_least_range() {
     };
     t.masters = vec![
         Masters::new([
-            combat(master_id(4), master_type::COMBAT, Distance::new(3.0)),
-            combat(master_id(5), master_type::COMBAT, Distance::new(1.5)),
-            combat(ids::ID_6, master_type::MOVING, Distance::new(2.0))
+            combat(master_id(4), MasterKind::COMBAT, Distance::new(3.0)),
+            combat(master_id(5), MasterKind::COMBAT, Distance::new(1.5)),
+            combat(ids::ID_6, MasterKind::MOVING, Distance::new(2.0))
         ]);
         4
     ];
@@ -1078,7 +1077,7 @@ fn standing_group_move_ends_or_goes_on() {
     // none in place but no free unit: the formation locks to its kind, the command ends
     let mut t = world();
     for u in &mut t.players[1].objects {
-        t.parts.unit_ai.get_mut(u.id).unwrap().current_action = Some(ActionKind::Move);
+        t.parts.unit_ai.get_mut(u.id).unwrap().current_action = Some(AiAction::Move);
     }
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::MOVE;
@@ -1110,7 +1109,7 @@ fn units_out_of_their_places_get_paths() {
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(1)].id)
         .unwrap()
-        .current_action = Some(ActionKind::Move);
+        .current_action = Some(AiAction::Move);
     t.groups.get_mut(group_id(1)).unwrap().current_formation = Some(Formation {
         slots: vec![
             slot(None, SlotState::Steering),
@@ -1166,7 +1165,7 @@ fn member_moved_aside_waits_out_its_timer() {
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(1)].id)
         .unwrap()
-        .current_action = Some(ActionKind::Move);
+        .current_action = Some(AiAction::Move);
     t.specific_moves_step(group_id(1)).unwrap();
     let g = t.groups.get(group_id(1)).unwrap();
     assert_eq!(g.members[0].specific_move.timer, Seconds::new(0.25));
@@ -1236,7 +1235,7 @@ fn member_own_move_walks_its_path() {
             class: class::CLASS_6,
             player: PlayerId::new(1),
             master: master_id(4),
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: true,
@@ -1500,7 +1499,7 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
     assert_eq!(of(&moving, 10), Ok(Some(GroupSpeed::Aside)));
     let busy = t.object(object_id(11)).unwrap().1.clone();
     let mut busy_ai = t.parts.unit_ai.get(busy.id).unwrap().clone();
-    busy_ai.current_action = Some(ActionKind::Attack);
+    busy_ai.current_action = Some(AiAction::Attack);
     assert_eq!(
         busy.group_speed(
             (t.parts.actions_of(busy.id), t.parts.unread.get(busy.id)),
@@ -1748,7 +1747,7 @@ fn grounded() -> World {
                     class: class::CLASS_6,
                     player: p,
                     master: master_id(4),
-                    obstruction_type: ObstructionType::NONE,
+                    obstruction_kind: ObstructionKind::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: true,
                     moves: false,
@@ -1932,7 +1931,7 @@ fn register(t: &mut World) {
                     class: m.class,
                     player: p,
                     master: m.id,
-                    obstruction_type: ObstructionType::NONE,
+                    obstruction_kind: ObstructionKind::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: false,
                     moves: false,
@@ -2118,7 +2117,7 @@ fn gate_world() -> World {
     let m4 = t.masters[2].get(master_id(4)).unwrap().clone();
     let gate = Master {
         id: master_id(5),
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::GATE,
         radius: Footprint::new(0.5, 0.5),
         standing_sprite: None,

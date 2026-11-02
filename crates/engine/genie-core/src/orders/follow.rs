@@ -25,15 +25,15 @@ use crate::movement::move_to::{
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::MOVING;
 use crate::orders::{Followed, GUARD_RANGE, follow_axis, follow_spread, ignore_unit};
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{OrderPriority, OrderTargetType, QueuedOrder};
@@ -199,7 +199,7 @@ impl World {
         };
         let master = u.master(self.master_tables(), p)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
-        let moves = MOVING <= master.kind && below_or_unordered(0.0, speed.get());
+        let moves = MasterKind::MOVING <= master.kind && below_or_unordered(0.0, speed.get());
         Ok(moves.then_some(u.position().ground()))
     }
 
@@ -259,7 +259,7 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
             if !taken {
                 ai.set_order(Some(OrderKind::Follow), rng);
-                ai.set_action(Some(ActionKind::Follow));
+                ai.set_action(Some(AiAction::Follow));
             }
             let (t, class) = followed
                 .class
@@ -303,7 +303,7 @@ impl World {
         let rng = self.streams.get(Stream::Ai);
         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
             ai.set_order(Some(OrderKind::Move), rng);
-            ai.set_action(Some(ActionKind::Move));
+            ai.set_action(Some(AiAction::Move));
             let (t, class) = followed
                 .class
                 .map_or((None, None), |c| (Some(followed.id), c.or_none()));
@@ -483,7 +483,7 @@ impl World {
             | Some(
                 MOVE_TO
                 | EXPLORE
-                | action_type::BUILD
+                | ActionKind::BUILD
                 | ATTACK
                 | ENTER
                 | FLY

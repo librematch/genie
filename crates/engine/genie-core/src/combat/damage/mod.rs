@@ -72,8 +72,8 @@ use crate::objects::Relics;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::CarryCapacity;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ChargeTarget;
-use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::FogVisibility;
@@ -392,7 +392,7 @@ pub struct Attacker {
     pub area_damage: DamageShare,
     /// Its master's `charge_type`, `max_charge`, `charge_target` and `special_attack_flag`; its
     /// charge (`+0x9e0`) and `mHitSomethingValidForChargeAttack` (`+0x8a8`), which its hits set.
-    pub charge_type: ChargeType,
+    pub charge_kind: ChargeKind,
     /// Its master's `max_charge`.
     pub max_charge: Charge,
     /// Its master's `charge_target`.

@@ -9,7 +9,7 @@ use crate::map::Tile;
 use crate::map::spatial::{QUERY_HITS, RecordId, Spatial};
 use crate::map::{Rect, Segment};
 use crate::math::fmath::below_or_unordered;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::pathing::tile_path::SegmentTest;
 use crate::world::index::ObjectsRef;
@@ -75,7 +75,7 @@ impl Spatial {
         }
         self.check_known_records(grown)?;
         let walk = Segment { from: a, to: b };
-        let meets = |kind: ObstructionType, bx: Rect| {
+        let meets = |kind: ObstructionKind, bx: Rect| {
             walk_box.overlaps(bx.grown(g)) && record_meets_segment(kind, bx, g, walk)
         };
         let level = self.grid.level(0);
@@ -85,7 +85,7 @@ impl Spatial {
             let bx = Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0);
             if self.visits_cell(level, x >> shift, y >> shift, grown)
                 && !ignore.contains(&id)
-                && meets(ObstructionType::TYPE_3, bx)
+                && meets(ObstructionKind::TYPE_3, bx)
             {
                 hits.push(Hit { id, bounds: bx });
                 if first || MOST_HITS <= hits.len() {
@@ -109,7 +109,7 @@ impl Spatial {
             if !meets(kind, bx) {
                 continue;
             }
-            if kind == ObstructionType::TYPE_11 {
+            if kind == ObstructionKind::TYPE_11 {
                 return Err(GenieError::unsupported(
                     "a pather query meeting a record of kind 11 (its own radii)",
                 ));
@@ -347,12 +347,12 @@ pub(super) fn box_meets_segment(b: Rect, r: Distance, walk: Segment) -> bool {
 /// (kind 5, `FUN_141051630` and `FUN_141053130`) reads its box as it stands for the inside tests;
 /// the others' (kinds 2, 3, 11, 13) order it ([`box_meets_segment`]).
 pub(super) fn record_meets_segment(
-    kind: ObstructionType,
+    kind: ObstructionKind,
     b: Rect,
     r: Distance,
     walk: Segment,
 ) -> bool {
-    if kind == ObstructionType::CIRCLE {
+    if kind == ObstructionKind::CIRCLE {
         segment_meets_box(b, r.get(), walk, b)
     } else {
         box_meets_segment(b, r, walk)

@@ -21,12 +21,10 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::RELIC;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::{BUILDING, COMBAT};
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::{
@@ -55,7 +53,7 @@ pub struct Near {
     /// Its master's `can_be_built_on` (`+0x5e9`).
     pub buildable_on: BuildableOn,
     /// Its master's `obstruction_type` (`+0x651`).
-    pub obstruction_type: ObstructionType,
+    pub obstruction_kind: ObstructionKind,
     /// Its master's `enable_auto_gather` (`+0x681`).
     pub auto_gather: bool,
     /// Its state (`+0x640`) and, for a building, its `desolid_flag` (`+0xc60`).
@@ -91,7 +89,7 @@ impl Near {
     /// 40, 41, 58, 61) or from state 3 on (7, 8, 15, 32, 48, 63).
     #[must_use]
     pub fn stays(&self) -> bool {
-        if self.kind == BUILDING
+        if self.kind == MasterKind::BUILDING
             || (self.class == class::TREE && ObjectState::Alive < self.state)
             || self.master == RELIC
         {
@@ -293,10 +291,10 @@ fn static_scans_find(
         let listed = !site.own.contains(&o.id)
             && o.state < ObjectState::Removed
             && !o.buildable_on.passed()
-            && (o.kind != BUILDING || !o.desolid);
+            && (o.kind != MasterKind::BUILDING || !o.desolid);
         let tall = o.tall
             || (site.class == class::TREE && o.class == class::FARM)
-            || (o.kind == BUILDING && o.obstruction_type != ObstructionType::NONE);
+            || (o.kind == MasterKind::BUILDING && o.obstruction_kind != ObstructionKind::NONE);
         listed.then_some(tall)
     };
     if !overlapping(map, p, site.radius, &first)?.is_empty() {
@@ -306,12 +304,12 @@ fn static_scans_find(
         let listed = !site.own.contains(&o.id)
             && o.state < ObjectState::Removed
             && !o.buildable_on.passed()
-            && o.kind != COMBAT
-            && (o.kind != BUILDING
+            && o.kind != MasterKind::COMBAT
+            && (o.kind != MasterKind::BUILDING
                 || o.class == class::CLASS_51
                 || o.class == class::CLASS_54
                 || !o.desolid);
-        let tall = o.tall || (o.kind == BUILDING && o.obstruction_type.recorded());
+        let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall)
     };
     Ok(!overlapping(map, p, site.radius, &second)?.is_empty())
@@ -420,7 +418,7 @@ pub(super) fn build_sees(
         if fog == FogVisibility::INVISIBLE {
             let masks = map.vision(player);
             let shown = o.class != class::FARM
-                && master_type::RGE_COMBAT <= o.kind
+                && MasterKind::RGE_COMBAT <= o.kind
                 && o.fog_mask
                     .is_some_and(|m| m.intersects(masks.explored) && m.intersects(masks.visible));
             if !shown && (o.player != player || !map.allied(o.player, player, true)) {
@@ -444,14 +442,17 @@ pub(super) fn blocks_build(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near, a
         return false;
     }
     let (or, tall) =
-        if (ObstructionType::TYPE_11..=ObstructionType::TYPE_13).contains(&o.obstruction_type) {
+        if (ObstructionKind::TYPE_11..=ObstructionKind::TYPE_13).contains(&o.obstruction_kind) {
             let oz = o.outline.z();
             (
                 o.outline.ground(),
-                0.0 < oz || (oz == 0.0 && (o.kind == BUILDING || o.holds)),
+                0.0 < oz || (oz == 0.0 && (o.kind == MasterKind::BUILDING || o.holds)),
             )
         } else {
-            (o.radius, o.tall || o.kind == BUILDING || o.holds)
+            (
+                o.radius,
+                o.tall || o.kind == MasterKind::BUILDING || o.holds,
+            )
         };
     let r = site.radius;
     0.0 < or.x()
@@ -466,11 +467,11 @@ pub(super) fn blocks_build(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near, a
 /// that is not an ally both ways.
 pub(super) fn build_ignores(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -> bool {
     let player = site.player;
-    let alive =
-        o.state < ObjectState::Dying || (o.kind != BUILDING && o.state < ObjectState::Removed);
-    let standing = site.obstructs || o.kind < master_type::MOVING || !o.moving;
+    let alive = o.state < ObjectState::Dying
+        || (o.kind != MasterKind::BUILDING && o.state < ObjectState::Removed);
+    let standing = site.obstructs || o.kind < MasterKind::MOVING || !o.moving;
     let gate_wall = site.class == class::GATE && o.class == class::WALL && o.player == player;
-    let foundation = o.kind == BUILDING
+    let foundation = o.kind == MasterKind::BUILDING
         && !matches!(o.class, class::CLASS_51 | class::CLASS_54)
         && o.desolid
         && !(map.allied(player, o.player, true) && map.allied(o.player, player, true));
@@ -483,7 +484,7 @@ pub(super) fn build_passes(site: &BuildSite<'_>, map: &dyn PlaceMap, o: &Near) -
     let player = site.player;
     // a moving unit of the player, of Gaia or of a mutual ally passes (the game type
     // 7's own test of allies is not modelled)
-    let passes = master_type::MOVING <= o.kind
+    let passes = MasterKind::MOVING <= o.kind
         && o.state == ObjectState::Alive
         && o.moving
         && (o.player == player
@@ -564,10 +565,11 @@ pub fn placement(
             let counts = |o: &Near| {
                 let listed = o.state < ObjectState::Removed
                     && !o.buildable_on.passed()
-                    && (o.kind != BUILDING || !o.desolid);
+                    && (o.kind != MasterKind::BUILDING || !o.desolid);
                 let tall = o.tall
                     || (me.class == class::TREE && o.class == class::FARM)
-                    || (o.kind == BUILDING && o.obstruction_type != ObstructionType::NONE);
+                    || (o.kind == MasterKind::BUILDING
+                        && o.obstruction_kind != ObstructionKind::NONE);
                 listed.then_some(tall && me.tall)
             };
             let found = if me.tall {
@@ -585,11 +587,11 @@ pub fn placement(
     let counts = |o: &Near| {
         let listed = o.state < ObjectState::Removed
             && !o.buildable_on.passed()
-            && (o.kind != BUILDING
+            && (o.kind != MasterKind::BUILDING
                 || o.class == class::CLASS_51
                 || o.class == class::CLASS_54
                 || !o.desolid);
-        let tall = o.tall || (o.kind == BUILDING && o.obstruction_type.recorded());
+        let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall && me.tall)
     };
     let found = if me.tall && (0.0 < rx || 0.0 < ry) {

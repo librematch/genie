@@ -18,8 +18,8 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
@@ -99,7 +99,7 @@ impl Spatial {
         let area = Rect::new(x0 as f32, y0 as f32, (x1 + 1) as f32, (y1 + 1) as f32);
         let unsure = self.frozen().any(|(id, q)| {
             q.unknown.is_some_and(|u| {
-                let counts = v.seer(id).is_some_and(|s| s.kind == COMBAT)
+                let counts = v.seer(id).is_some_and(|s| s.kind == MasterKind::COMBAT)
                     && !out(q.player.index())
                     && !KEPT.contains(&q.class);
                 // the box grown by the unknown reach (`bx1 + u`: the sum only meets a
@@ -125,7 +125,10 @@ impl Spatial {
             .flat_map(|ty| (x0..=x1).flat_map(move |tx| self.objects_on(Tile::new(tx, ty))));
         for (id, q) in on_tiles {
             let Some(s) = v.seer(id) else { continue };
-            if s.kind != COMBAT || s.state != ObjectState::Alive || KEPT.contains(&q.class) {
+            if s.kind != MasterKind::COMBAT
+                || s.state != ObjectState::Alive
+                || KEPT.contains(&q.class)
+            {
                 continue;
             }
             if (q.player == PlayerId::GAIA && s.capture.any()) || out(q.player.index()) {

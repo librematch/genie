@@ -6,13 +6,11 @@ use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskFlags;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -28,7 +26,7 @@ use crate::{GenieError, math::fmath};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TopWork {
     /// The action's type.
-    pub kind: ActionType,
+    pub kind: ActionKind,
     /// The action's state.
     pub state: ActionState,
     /// Its target.
@@ -63,11 +61,15 @@ pub fn generates(
     built: bool,
 ) -> bool {
     match kind {
-        COMBAT if task.combat_level_flag.contains(TaskFlags::UNITS_ALWAYS) => return true,
-        BUILDING if task.combat_level_flag.contains(TaskFlags::BUILDINGS_ALWAYS) => return true,
+        MasterKind::COMBAT if task.combat_level_flag.contains(TaskFlags::UNITS_ALWAYS) => {
+            return true;
+        }
+        MasterKind::BUILDING if task.combat_level_flag.contains(TaskFlags::BUILDINGS_ALWAYS) => {
+            return true;
+        }
         _ => {}
     }
-    if master_kind == COMBAT
+    if master_kind == MasterKind::COMBAT
         && let Some(top) = top
         && WORKING_ACTIONS.contains(&top.kind)
         && top.state == WORKING
@@ -77,7 +79,7 @@ pub fn generates(
     {
         return true;
     }
-    master_kind == BUILDING && built
+    master_kind == MasterKind::BUILDING && built
 }
 
 /// What a generation task makes in an update (`0x141207fc4`): the world's dt (`world+0x164`)
@@ -129,10 +131,10 @@ impl World {
         let unit = self.players.live(p, i)?;
         let flags = task.combat_level_flag;
         let short_cut = match master.kind {
-            COMBAT => flags.contains(TaskFlags::UNITS_ALWAYS),
+            MasterKind::COMBAT => flags.contains(TaskFlags::UNITS_ALWAYS),
             _ => flags.contains(TaskFlags::BUILDINGS_ALWAYS),
         };
-        let top = if short_cut || master.kind != COMBAT {
+        let top = if short_cut || master.kind != MasterKind::COMBAT {
             None
         } else {
             if let Some(e) = self.parts.unread.get(unit.id).map(Unread::error) {
@@ -161,7 +163,7 @@ impl World {
                 None => None,
             }
         };
-        let built = master.kind == BUILDING
+        let built = master.kind == MasterKind::BUILDING
             && self
                 .spatial
                 .sight

@@ -3,8 +3,8 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::{Tile, TileOffset, TileRect};
 use crate::objects::ObjectState;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerType;
 use crate::test_ids::object_id;
@@ -41,7 +41,7 @@ fn unit(player: PlayerId, los: Distance) -> Seer {
         building: None,
         umv: 0,
         capture: CaptureKind::NONE,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
     }
 }
 

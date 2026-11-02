@@ -2,7 +2,6 @@
 
 use crate::map::Distance;
 use crate::objects::masters::MasterAttribute;
-use crate::objects::masters::attribute as a;
 use genie_diff::Diff;
 
 /// A master's `volley_x_spread`, `volley_y_spread` and `volley_start_spread_adjustment`
@@ -22,8 +21,8 @@ impl VolleySpread {
     /// The value an effect's attribute changes: its width, its length, else its randomness.
     pub const fn lane_mut(&mut self, attribute: MasterAttribute) -> &mut Distance {
         match attribute {
-            a::SPAWNING_AREA_WIDTH => &mut self.x,
-            a::SPAWNING_AREA_LENGTH => &mut self.y,
+            MasterAttribute::SPAWNING_AREA_WIDTH => &mut self.x,
+            MasterAttribute::SPAWNING_AREA_LENGTH => &mut self.y,
             _ => &mut self.start,
         }
     }
@@ -32,16 +31,16 @@ impl VolleySpread {
 #[cfg(test)]
 mod tests {
     use crate::map::Distance;
+    use crate::objects::masters::MasterAttribute;
     use crate::objects::masters::VolleySpread;
-    use crate::objects::masters::attribute as a;
 
     /// Each spawning area attribute changes its own value.
     #[test]
     fn each_spawning_area_attribute_changes_its_value() {
         let mut s = VolleySpread::default();
-        *s.lane_mut(a::SPAWNING_AREA_LENGTH) = Distance::new(2.0);
-        *s.lane_mut(a::SPAWNING_AREA_RANDOMNESS) = Distance::new(3.0);
-        *s.lane_mut(a::SPAWNING_AREA_WIDTH) = Distance::new(1.0);
+        *s.lane_mut(MasterAttribute::SPAWNING_AREA_LENGTH) = Distance::new(2.0);
+        *s.lane_mut(MasterAttribute::SPAWNING_AREA_RANDOMNESS) = Distance::new(3.0);
+        *s.lane_mut(MasterAttribute::SPAWNING_AREA_WIDTH) = Distance::new(1.0);
         assert_eq!(
             s,
             VolleySpread {

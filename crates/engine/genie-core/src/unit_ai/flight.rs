@@ -13,7 +13,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
@@ -54,7 +54,7 @@ impl UnitAi {
         let _ = self.attackers.add(n.caller);
         side.set_under_attack(true);
         // the game also tests the action values 0x25f and 0x268 here, which no unit AI holds
-        // ([`ActionKind`])
+        // ([`AiAction`])
         // The class of the king's branch of the hunted animal's idle check (`-0xe71` raw).
         let uncon = at.class != Some(class::KING);
         let _ = self.run_away(uncon, at, player_type, ai_rng, side)?;
@@ -245,7 +245,7 @@ impl UnitAi {
             return Ok(GO_ON);
         };
         let villager = attacker.class == class::VILLAGER;
-        let furious = if self.current_action == Some(ActionKind::Attack) {
+        let furious = if self.current_action == Some(AiAction::Attack) {
             let _ = self.attack_object(target, false, false, at, side)?;
             true
         } else {
@@ -342,12 +342,12 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
         match self.current_action {
-            Some(ActionKind::Hunt) => return self.hunter_search(n, at, player_type, side, rng),
-            Some(ActionKind::Shepherd) => {
-                return Err(VILLAGER_NOTIFY.with("action", ActionKind::Shepherd.value()));
+            Some(AiAction::Hunt) => return self.hunter_search(n, at, player_type, side, rng),
+            Some(AiAction::Shepherd) => {
+                return Err(VILLAGER_NOTIFY.with("action", AiAction::Shepherd.value()));
             }
-            Some(ActionKind::Gather) => return self.gatherer_search(n, at, player_type, side, rng),
-            Some(ActionKind::Build) => {
+            Some(AiAction::Gather) => return self.gatherer_search(n, at, player_type, side, rng),
+            Some(AiAction::Build) => {
                 if let Some(found) = side.foundation_search()?
                     && side.reaches(found, FOUNDATION_REACH)?
                 {
@@ -362,18 +362,17 @@ impl UnitAi {
                 side.effect_now(Effect::Stop, self, rng)?;
                 return Ok(BREAK);
             }
-            Some(ActionKind::Explore) => closest_undiscovered_tile()?,
+            Some(AiAction::Explore) => closest_undiscovered_tile()?,
             _ => {}
         }
-        if (n.p[0] == ActionKind::Gather.value() || n.p[0] == ActionKind::Hunt.value())
-            && n.p[1] != 10
+        if (n.p[0] == AiAction::Gather.value() || n.p[0] == AiAction::Hunt.value()) && n.p[1] != 10
         {
             return Err(VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", n.kind, n.p)));
         }
         if n.kind != NotifyKind::REQUIRES_SEARCH
             && !matches!(
                 self.current_action,
-                Some(ActionKind::Shepherd | ActionKind::Repair)
+                Some(AiAction::Shepherd | AiAction::Repair)
             )
         {
             self.remove_target();

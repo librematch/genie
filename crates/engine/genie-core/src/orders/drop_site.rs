@@ -14,12 +14,11 @@ use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::orders::Dispatch;
 use crate::orders::object_gone;
 use crate::orders::{HUNTED_LOADS, NO_POINT, Work, nearest_table_site};
@@ -68,7 +67,7 @@ impl World {
         let Some(site) = site else {
             return Ok(());
         };
-        if kind < COMBAT {
+        if kind < MasterKind::COMBAT {
             return Ok(());
         }
         let filter = if held.is_some_and(|h| HUNTED_LOADS.contains(&h)) {
@@ -103,7 +102,7 @@ impl World {
         let by_id = ObjectsRef::new(&self.players, &self.index, &self.masters, &self.parts);
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
-        let seeks = master.kind < COMBAT
+        let seeks = master.kind < MasterKind::COMBAT
             || (!master
                 .drop_sites
                 .iter()
@@ -326,7 +325,7 @@ impl World {
             let m = o.master(self.master_tables(), op)?;
             Ok(Some(RecordTarget {
                 id: t,
-                building: m.kind == BUILDING,
+                building: m.kind == MasterKind::BUILDING,
                 class: m.class,
                 built: self
                     .parts

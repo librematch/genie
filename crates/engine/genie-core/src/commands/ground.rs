@@ -11,12 +11,10 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MOVING;
 use crate::players::PlayerId;
 use crate::world::WholeSeconds;
 use crate::world::slots::CheckedIndex;
@@ -35,7 +33,7 @@ use crate::math::image::unit_ai::RADIUS_SCALE as UNIT_AI_RADIUS_SCALE;
 use crate::objects::lifecycle::death_parts::clear_look_of;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::{Master, player_master};
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::vision::visibility::{BuildingSight, Seer, capture_kind};
@@ -75,7 +73,7 @@ impl World {
                 continue;
             };
             let master = u.master(self.master_tables(), owner)?;
-            if master.kind < MOVING
+            if master.kind < MasterKind::MOVING
                 || u.life.state != ObjectState::Alive
                 || self.parts.actions_of(u.id).top_target() == Some(foundation.id())
             {
@@ -97,13 +95,16 @@ impl World {
             let busy = self.parts.unit_ai.get(u.id).is_none_or(|ai| {
                 matches!(
                     ai.current_action,
-                    Some(ActionKind::MoveAside | ActionKind::GroupAside)
+                    Some(AiAction::MoveAside | AiAction::GroupAside)
                 )
             });
             if !stands || busy {
                 continue;
             }
-            if owner == site_owner && COMBAT <= master.kind && master.formation_category.grouped() {
+            if owner == site_owner
+                && MasterKind::COMBAT <= master.kind
+                && master.formation_category.grouped()
+            {
                 together.push(id);
                 continue;
             }
@@ -175,7 +176,7 @@ impl World {
             };
             let z = self.players.live(q, i)?.position().z();
             if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, i)?.id) {
-                ai.set_action(Some(ActionKind::MoveAside));
+                ai.set_action(Some(AiAction::MoveAside));
             }
             self.move_point_order(q, i, Position::new(x, y, z))?;
         }
@@ -186,7 +187,7 @@ impl World {
             let unit = self.players.live_mut(q, i)?;
             let state = unit.life.state;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
-                && ai.current_action != Some(ActionKind::MoveAside)
+                && ai.current_action != Some(AiAction::MoveAside)
             {
                 ai.post(
                     Notify::own(id, NotifyKind::SENT_OFF_GROUP, [0, 0, 0]),
@@ -349,7 +350,7 @@ impl World {
         desolid: bool,
     ) -> Result<(), GenieError> {
         let record = Obstruction {
-            kind: made.obstruction_type,
+            kind: made.obstruction_kind,
             class: made.obstruction_class,
         };
         let placed = Placed {
@@ -358,7 +359,7 @@ impl World {
             class: made.class,
             player,
             master: made.id,
-            obstruction_type: made.obstruction_type,
+            obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
             tall: made.tall,
             moves: false,
@@ -389,7 +390,7 @@ impl World {
                     building: Some(BuildingSight::default()),
                     umv: umv as u8,
                     capture: capture_kind(player, made.class, made.id),
-                    kind: master_type::BUILDING,
+                    kind: MasterKind::BUILDING,
                 },
             );
         }

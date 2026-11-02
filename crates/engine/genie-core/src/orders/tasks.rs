@@ -15,13 +15,13 @@ use crate::movement::move_to::{MoveToReads, WalkTo};
 use crate::objects::ListIndex;
 use crate::objects::Voice;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::orders::gather::HuntOrder;
 use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::RepairOrder;
 use crate::world::World;
@@ -166,17 +166,13 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Build),
-                Some(ActionKind::Build),
+                Some(AiAction::Build),
                 Some((target, class)),
                 point,
                 clears,
                 self.streams.get(Stream::Ai),
             )?;
-            self.remember_order(
-                player,
-                idx,
-                (Some(OrderKind::Build), Some(ActionKind::Build)),
-            )?;
+            self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
         self.clear_actions(player, idx)?;
         self.parts
@@ -243,7 +239,7 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Repair),
-                Some(ActionKind::Repair),
+                Some(AiAction::Repair),
                 Some((target, class)),
                 point,
                 clears,
@@ -252,7 +248,7 @@ impl World {
             self.remember_order(
                 player,
                 idx,
-                (Some(OrderKind::Repair), Some(ActionKind::Repair)),
+                (Some(OrderKind::Repair), Some(AiAction::Repair)),
             )?;
         }
         self.clear_actions(player, idx)?;
@@ -318,7 +314,7 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Repair),
-                Some(ActionKind::Repair),
+                Some(AiAction::Repair),
                 Some((target, class)),
                 point,
                 clears,
@@ -327,7 +323,7 @@ impl World {
             self.remember_order(
                 player,
                 idx,
-                (Some(OrderKind::Repair), Some(ActionKind::Repair)),
+                (Some(OrderKind::Repair), Some(AiAction::Repair)),
             )?;
         }
         Ok(())
@@ -434,17 +430,13 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Build),
-                Some(ActionKind::Build),
+                Some(AiAction::Build),
                 Some((target, class)),
                 point,
                 clears,
                 self.streams.get(Stream::Ai),
             )?;
-            self.remember_order(
-                player,
-                idx,
-                (Some(OrderKind::Build), Some(ActionKind::Build)),
-            )?;
+            self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
         Ok(())
     }
@@ -594,7 +586,7 @@ impl World {
             return Ok(None);
         };
         let kind = f.master(self.master_tables(), p)?.kind;
-        Ok(Some(if kind == BUILDING {
+        Ok(Some(if kind == MasterKind::BUILDING {
             self.parts
                 .building_of(f.id)
                 .annex_of

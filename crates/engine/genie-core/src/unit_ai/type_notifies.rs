@@ -9,7 +9,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ObjectFlags;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
@@ -57,7 +57,7 @@ impl UnitAi {
         match n.kind {
             NotifyKind::DAMAGED => self.boar_damaged(n, time, at, ai_rng, side),
             NotifyKind::ACTION_COMPLETED => {
-                if self.current_action == Some(ActionKind::MoveAside) {
+                if self.current_action == Some(AiAction::MoveAside) {
                     self.idle_timeout = self.adjusted_idle_timeout.wrapping_add(Millis::new(1));
                     self.remove_target();
                     if let Some(home) = self.home.as_mut() {
@@ -86,7 +86,7 @@ impl UnitAi {
     ) -> Result<u32, GenieError> {
         match n.kind {
             NotifyKind::ACTION_COMPLETED => {
-                if n.p[0] == ActionKind::Attack.value() {
+                if n.p[0] == AiAction::Attack.value() {
                     // FUN_140c41bc0 with 1000: the idle timeout, then slot 0x1a8
                     self.set_idle_timeout(LION_ATTACKED_TIMEOUT, ai_rng);
                     self.remove_target();
@@ -170,13 +170,13 @@ impl UnitAi {
             NotifyKind::ACTION_INVALIDATED
             | NotifyKind::TARGET_MOVED
             | NotifyKind::REQUIRES_SEARCH
-                if self.current_action == Some(ActionKind::Attack) =>
+                if self.current_action == Some(AiAction::Attack) =>
             {
                 if n.kind == NotifyKind::TARGET_MOVED && self.stop_after_kill {
                     let failed = Notify::own(
                         at.id,
                         NotifyKind::ACTION_FAILED,
-                        [ActionKind::Attack.value(), 0, 0],
+                        [AiAction::Attack.value(), 0, 0],
                     );
                     self.post(failed, at.state)?;
                     return Ok(GO_ON);
@@ -188,7 +188,7 @@ impl UnitAi {
             | NotifyKind::REQUIRES_SEARCH => self.villager_search(n, at, player_type, side, ai_rng),
             // a completion or a failure of its action (0x1fa, 0x1f9) stops it
             NotifyKind::ACTION_COMPLETED | NotifyKind::ACTION_FAILED => {
-                if ActionKind::field(self.current_action) == n.p[0] {
+                if AiAction::field(self.current_action) == n.p[0] {
                     self.remove_target();
                     self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
@@ -227,7 +227,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
-        if (n.p[0] == ActionKind::Build.value() || n.p[0] == ActionKind::Hunt.value())
+        if (n.p[0] == AiAction::Build.value() || n.p[0] == AiAction::Hunt.value())
             && let Some(made) = Self::world_object(ObjectId::of_field(n.p[1]), at, side)?
         {
             side.effect_now(
@@ -316,7 +316,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         match n.kind {
-            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(ActionKind::Build) => {
+            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Build) => {
                 self.fishing_builder_search(at, player_type, side, ai_rng)
             }
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
@@ -350,7 +350,7 @@ impl UnitAi {
             NotifyKind::ACTION_EXECUTED
                 if player_type.is_computer() && self.keeps_distance(at, ai_rng) =>
             {
-                if self.current_action == Some(ActionKind::Attack) {
+                if self.current_action == Some(AiAction::Attack) {
                     back_up()
                 } else {
                     Ok(GO_ON)
@@ -403,7 +403,7 @@ impl UnitAi {
             {
                 Err(GenieError::unsupported("a computer soldier's notify"))
             }
-            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(ActionKind::Heal) => {
+            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Heal) => {
                 Err(GenieError::unsupported("a healer's search notify"))
             }
             _ => self.base_notify(n, time, at, player_type, ai_rng, side),

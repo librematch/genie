@@ -35,7 +35,7 @@ use crate::players::PlayerId;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::{ByPlayer, NO_RELATIONS, Relations};
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
@@ -449,7 +449,7 @@ impl Unit {
             &mut c.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
             [
-                ActionKind::Gather.value(),
+                AiAction::Gather.value(),
                 i32::from(ClassId::field(class)),
                 site,
             ],

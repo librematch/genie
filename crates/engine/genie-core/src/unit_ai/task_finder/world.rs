@@ -10,7 +10,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Building;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters};
@@ -160,11 +160,11 @@ pub(crate) fn task_search<'m>(
     t: &TaskTarget<'_>,
     general: &TaskTarget<'_>,
     terrain: Option<TerrainId>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> Result<Option<(Task, Option<&'m Master>)>, GenieError> {
     let own = actor.master;
-    let find = |list: &Master, filter: Option<ActionType>| {
+    let find = |list: &Master, filter: Option<ActionKind>| {
         find_task(list, actor, Some(t), Some(general), terrain, filter, dip)
             .map(Option::<&Task>::copied)
     };

@@ -11,14 +11,13 @@ use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::action_type;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::CaptureKind;
@@ -61,7 +60,7 @@ impl Unit {
         // an object others take over by seeing it (`+0x924` 1) gives it to the first player that
         // sees it ([`crate::vision::visibility::sight_taker`]) when that one has its master
         let mut captured = captured;
-        let combat = COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
+        let combat = MasterKind::COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
         if combat
             && let Some(mask) =
                 c.w.spatial
@@ -151,7 +150,7 @@ impl Unit {
             search_radius: master.map_or(Distance::ZERO, |m| m.search_radius),
             weapon_range: master.map_or(Distance::ZERO, |m| m.weapon_range),
             interruptible,
-            task_0x99: master.is_some_and(|m| m.tasks.iter().any(|t| t.action_type == CART_TASK)),
+            task_0x99: master.is_some_and(|m| m.tasks.iter().any(|t| t.action_kind == CART_TASK)),
             garrisoned: self.life.inside.is_some(),
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
@@ -161,7 +160,7 @@ impl Unit {
             master: self.life.master_id,
             scenario: c.w.settings.game_mode.scenario(),
             task_0x69: master
-                .is_some_and(|m| m.tasks.iter().any(|t| t.action_type == action_type::HEAL)),
+                .is_some_and(|m| m.tasks.iter().any(|t| t.action_kind == ActionKind::HEAL)),
             // a new owner sees the target with its own map
             target: self.ai_target(c, view.player)?,
             under_attack: self.under_attack,

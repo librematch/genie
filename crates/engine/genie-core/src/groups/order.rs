@@ -14,7 +14,7 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::BVector;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::world::Seconds;
 use crate::world::World;
 
@@ -35,7 +35,7 @@ pub struct CommandArgs {
     /// `param_7`.
     pub disable_retargeting: bool,
     /// `param_8`.
-    pub filter: Option<ActionType>,
+    pub filter: Option<ActionKind>,
 }
 
 impl World {
@@ -221,7 +221,7 @@ impl World {
             point: BVector::new(point.x(), 0.0, point.y()),
             approved,
             disable_retargeting: u8::from(order.disable_retargeting),
-            approved_2: ActionType::field(order.filter).cast_unsigned(),
+            approved_2: ActionKind::field(order.filter).cast_unsigned(),
         };
         if order.queued {
             g.queue_command(entry(u8::from(order.direct)));

@@ -12,7 +12,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
@@ -414,7 +414,7 @@ impl UnitAi {
     }
 
     /// `FUN_140c64b50`.
-    pub(crate) const fn set_action(&mut self, action: Option<ActionKind>) {
+    pub(crate) const fn set_action(&mut self, action: Option<AiAction>) {
         self.last_action = self.current_action;
         self.current_action = action;
     }
@@ -462,7 +462,7 @@ impl UnitAi {
     pub fn notify_work(
         &mut self,
         order: Option<OrderKind>,
-        action: Option<ActionKind>,
+        action: Option<AiAction>,
         target: Option<(ObjectId, ClassId)>,
         point: Position,
         clears: bool,
@@ -490,7 +490,7 @@ impl UnitAi {
     ) {
         if moved {
             self.set_order(Some(OrderKind::Move), ai);
-            self.set_action(Some(ActionKind::Move));
+            self.set_action(Some(AiAction::Move));
             self.forget_targets();
         }
         let (id, class) = target.map_or((None, None), |(id, class)| (Some(id), class.or_none()));
@@ -502,7 +502,7 @@ impl UnitAi {
     /// (`FUN_140c64be0`); the target it had becomes its last as [`UnitAi::set_target`] does.
     pub fn notify_grid_move(&mut self, cell: Point, ai: &mut Well512) {
         self.set_order(Some(OrderKind::Move), ai);
-        self.set_action(Some(ActionKind::Move));
+        self.set_action(Some(AiAction::Move));
         self.set_target(None, None, cell.with_height(0.0));
     }
 
@@ -516,7 +516,7 @@ impl UnitAi {
         if !m.force && self.current_action.is_some() {
             return None;
         }
-        self.set_action(Some(ActionKind::Move));
+        self.set_action(Some(AiAction::Move));
         // FUN_140c64c10 with -1: the world holds no object -1
         self.target_at(None, None, m.point);
         Some(m)

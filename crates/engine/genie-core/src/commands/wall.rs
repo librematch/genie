@@ -26,12 +26,11 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::math::image::wall::{HALF as WALL_HALF, MAP_MARGIN as WALL_MAP_MARGIN, ONE as WALL_ONE};
 use crate::objects::ObjectId;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::BUILDER;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{MasterId, player_master};
 use crate::orders::readiness;
 use crate::players::PlayerId;
@@ -244,7 +243,7 @@ impl World {
             return Ok(());
         };
         // The buildings' master type: a wall of another type does nothing.
-        if site.kind != BUILDING {
+        if site.kind != MasterKind::BUILDING {
             return Ok(());
         }
         let (radius, trained_at) = (site.radius, site.trained_at.clone());
@@ -418,7 +417,7 @@ impl World {
                 .iter()
                 // The builder the train locations name for every villager (`FUN_141262270`: `0x76`).
                 // The action type of the task another unit builds with (`FUN_141262270`: `0x65`).
-                .find(|t| t.action_type == action_type::BUILD)
+                .find(|t| t.action_kind == ActionKind::BUILD)
                 .is_some_and(|t| t.object_id == Some(building)));
         }
         Ok(trained_at.contains(&BUILDER) || trained_at.contains(&m.id))

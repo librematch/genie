@@ -10,11 +10,10 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids::VILLAGER_MALE;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Masters, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::NO_QUEUE;
@@ -95,7 +94,7 @@ impl World {
         let (rooms, loads, total_room) = self.rooms_and_loads(&found, unit, per)?;
         let mut amount = i32::from(q.amount.get()).min(i32::from(total_room as i16));
         if 0 < amount {
-            if unit.kind < COMBAT {
+            if unit.kind < MasterKind::COMBAT {
                 return Ok(());
             }
             let Some(paid) = affordable(owner, masters, unit, amount)? else {
@@ -245,7 +244,7 @@ impl World {
         };
         let is_building = |id: Option<ObjectId>| -> Result<bool, GenieError> {
             match self.object(id) {
-                Some((q, u)) => Ok(u.master(self.master_tables(), q)?.kind == BUILDING),
+                Some((q, u)) => Ok(u.master(self.master_tables(), q)?.kind == MasterKind::BUILDING),
                 None => Ok(false),
             }
         };
@@ -427,7 +426,7 @@ impl World {
             (b.life.master_id, b.id)
         };
         let time = made
-            .filter(|m| COMBAT <= m.kind)
+            .filter(|m| MasterKind::COMBAT <= m.kind)
             .map(|m| train_time(&m.train_locations, building, button));
         let production = self.production_or_new(id)?;
         if let Some(last) = production.queue.last()

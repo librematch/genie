@@ -18,7 +18,7 @@ use crate::objects::Voice;
 use crate::objects::sprite::Graphic;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
-use crate::unit_ai::{ActionKind, Inbox};
+use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
 
 /// A sub-action `MoveTo` that is not quiet letting its target go: its release (slot 0x180) would
@@ -169,7 +169,7 @@ impl MoveToAction {
         if self.voice.is_quiet() {
             return Ok(());
         }
-        inbox.post(kind, [ActionKind::Move.value(), 0, 0])
+        inbox.post(kind, [AiAction::Move.value(), 0, 0])
     }
 
     /// A quiet sub-action `MoveTo` in `state` to (0, 0, 0) without a sprite, for a test that

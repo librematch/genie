@@ -9,12 +9,15 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::CostAmount;
+use crate::objects::masters::CostSlot;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::cost_resource;
 use crate::objects::masters::ids::{self, RELIC, VILLAGER_FEMALE, VILLAGER_MALE};
-use crate::objects::masters::{CostSlot, Master, master_type, player_master};
+use crate::objects::masters::player_master;
 use crate::objects::unit::Unit;
 use crate::ownership::change::DEAD_COPY_TYPES;
 use crate::players::Amount;
@@ -247,7 +250,7 @@ impl World {
         let has = |q: usize, id: MasterId| self.masters.get(q).is_some_and(|m| m.get(id).is_some());
         let building = at
             .and_then(|at| player_master(&self.masters, p, at))
-            .is_some_and(|m| m.kind == master_type::BUILDING);
+            .is_some_and(|m| m.kind == MasterKind::BUILDING);
         let (Some(master), Some(at)) = (master, at) else {
             return Ok(());
         };
@@ -364,7 +367,7 @@ impl World {
                 CostUnits::Master(id) => m.id == id,
                 CostUnits::Class(class) => m.class == class,
             };
-            if !named || m.kind < master_type::COMBAT {
+            if !named || m.kind < MasterKind::COMBAT {
                 continue;
             }
             let wanted = match edit {

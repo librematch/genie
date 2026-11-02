@@ -10,7 +10,6 @@ use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
@@ -143,10 +142,10 @@ pub fn sub_formation(
     hero_flag: HeroFlags,
     formation_category: FormationClass,
 ) -> Option<FormationCategory> {
-    if kind < COMBAT {
+    if kind < MasterKind::COMBAT {
         return None;
     }
-    if kind == COMBAT && hero_flag.grants(HeroFlags::PROTECTED_FORMATION) {
+    if kind == MasterKind::COMBAT && hero_flag.grants(HeroFlags::PROTECTED_FORMATION) {
         return Some(FormationCategory::PROTECTED);
     }
     match formation_category.get() {

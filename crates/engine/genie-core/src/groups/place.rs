@@ -437,7 +437,7 @@ mod tests {
     use crate::objects::layers::Static;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::class;
     #[cfg(test)]
     use crate::objects::masters::{Master, Masters};
@@ -533,13 +533,13 @@ mod tests {
                     class: class::CLASS_6,
                     player: PlayerId::new(0),
                     master: master_id(4),
-                    obstruction_type: ObstructionType::NONE,
+                    obstruction_kind: ObstructionKind::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: true,
                     moves: false,
                     unknown: None,
                     obstruction: Some(Obstruction {
-                        kind: ObstructionType::CIRCLE,
+                        kind: ObstructionKind::CIRCLE,
                         class: ObstructionClass::UNIT,
                     }),
                 },

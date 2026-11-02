@@ -28,12 +28,11 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::DOPPELGANGER;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
@@ -98,7 +97,7 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     );
     let master = |id: MasterId, category: u8| Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         formation_category: FormationClass::of_data(category),
         terrain_restriction: Some(RestrictionId::named(0)),
         radius: Footprint::new(0.2, 0.2),
@@ -145,13 +144,13 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
                 class: class::CLASS_6,
                 player: PlayerId::new(1),
                 master: u.life.master_id,
-                obstruction_type: ObstructionType::NONE,
+                obstruction_kind: ObstructionKind::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
                 unknown: None,
                 obstruction: Some(Obstruction {
-                    kind: ObstructionType::CIRCLE,
+                    kind: ObstructionKind::CIRCLE,
                     class: ObstructionClass::UNIT,
                 }),
             },
@@ -246,21 +245,21 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
         *masters = Masters::new([
             Master {
                 id: master_id(4),
-                kind: master_type::COMBAT,
+                kind: MasterKind::COMBAT,
                 formation_category: FormationClass::of_data(1),
                 hero_flag: HeroFlags::PROTECTED_FORMATION,
                 ..Master::default()
             },
             Master {
                 id: ids::ID_35,
-                kind: master_type::COMBAT,
+                kind: MasterKind::COMBAT,
                 class: class::SIEGE,
                 formation_category: FormationClass::of_data(2),
                 ..Master::default()
             },
             Master {
                 id: GHOST_MASTER,
-                kind: DOPPELGANGER,
+                kind: MasterKind::DOPPELGANGER,
                 formation_category: FormationClass::of_data(1),
                 ..Master::default()
             },
@@ -675,7 +674,7 @@ fn the_passability_tests_with_the_world_object_of_the_lead_id() {
         for masters in &mut t.masters {
             let ghost = Master {
                 id: GHOST_MASTER,
-                kind: DOPPELGANGER,
+                kind: MasterKind::DOPPELGANGER,
                 terrain_restriction: Some(RestrictionId::named(1)),
                 ..Master::default()
             };
@@ -957,7 +956,7 @@ fn type_world(paths: Vec<PathData>) -> World {
     );
     let masters = Masters::new([Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         formation_category: FormationClass::of_data(1),
         ..Master::default()
     }]);
@@ -1056,7 +1055,7 @@ fn lock_or_given_type_overrides_the_groups_own_choice() {
     assert_eq!(own(&t), FormationKind::LINE);
     t.masters[1] = Masters::new([Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         ..Master::default()
     }]);
     assert_eq!(own(&t), FormationKind::HORDE);

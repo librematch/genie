@@ -19,9 +19,9 @@ use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::action_type;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -234,7 +234,7 @@ impl HuntAction {
     }
 
     /// Slot 9 (`0x140ac97c0`), the work command's new target for the hunt it keeps: true when the
-    /// hunt takes it. A building whose top action is an Unpack ([`action_type::UNPACK`], 125) takes it to `set_state` 15,
+    /// hunt takes it. A building whose top action is an Unpack ([`ActionKind::UNPACK`], 125) takes it to `set_state` 15,
     /// not modelled. Its own player's drop site (one of its master's, `drops_here`,
     /// `FUN_14109d4f0`) while it carries something (`held`) takes the load there: the target goes
     /// (slot 0x68 with none; the caller releases it), the timer and the point clear, the drop site
@@ -259,7 +259,7 @@ impl HuntAction {
         let held = walks.held.amount;
         // A building's master type (`'P'`).
         // A building whose top action is an Unpack takes a hunt sent to it to `set_state` 15.
-        if target.kind == BUILDING && target.top_action == Some(action_type::UNPACK) {
+        if target.kind == MasterKind::BUILDING && target.top_action == Some(ActionKind::UNPACK) {
             return Err(GenieError::unsupported(
                 "a hunt sent to a building whose top action is an Unpack (set_state 15)",
             ));

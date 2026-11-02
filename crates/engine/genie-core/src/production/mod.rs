@@ -19,8 +19,8 @@
 use crate::GenieError;
 use crate::objects::ActionState;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Master, TrainLocation};
 use crate::players::Amount;
 use crate::players::attribute::{self, AttributeId};
@@ -364,7 +364,7 @@ impl MakeObj {
     pub fn time(&self, master: Option<&Master>, building: MasterId) -> WholeSeconds {
         // The first master type that is a `TRIBE_Master_Combat_Object` (the dynamic casts of
         // `FUN_1411cbc40` and `FUN_140acf280`).
-        let Some(m) = master.filter(|m| COMBAT <= m.kind) else {
+        let Some(m) = master.filter(|m| MasterKind::COMBAT <= m.kind) else {
             return WholeSeconds::ZERO;
         };
         if m.object_flags.contains(ObjectFlags::OWN_TRAIN_TIME) {
@@ -483,9 +483,9 @@ mod tests {
     use crate::gathering::QueueCount;
     use crate::objects::masters::CostAmount;
     use crate::objects::masters::CostSlot;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
     use crate::objects::masters::ids;
-    use crate::objects::masters::master_type;
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     #[cfg(test)]
@@ -740,7 +740,7 @@ mod tests {
             WholeSeconds::ZERO
         );
         let mut m = Master {
-            kind: COMBAT,
+            kind: MasterKind::COMBAT,
             train_locations: locations.to_vec(),
             ..Master::default()
         };
@@ -759,7 +759,7 @@ mod tests {
             make.time(Some(&m), ids::TOWN_CENTRE),
             WholeSeconds::of_data(99)
         );
-        m.kind = master_type::MISSILE;
+        m.kind = MasterKind::MISSILE;
         assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), WholeSeconds::ZERO);
         make.button = QueueButton::NONE;
         assert_eq!(
@@ -894,7 +894,7 @@ mod tests {
     #[test]
     fn refund_gives_back_what_the_entry_paid() {
         let m = Master {
-            kind: COMBAT,
+            kind: MasterKind::COMBAT,
             cost: costs(&[
                 (attribute::FOOD, 60, true),
                 (attribute::GOLD, 20, true),
@@ -915,7 +915,7 @@ mod tests {
         .unwrap();
         assert_eq!(held.0, amounts([46.0, 1.0, 1.0, 1.0, 1.0]));
         let low = Master {
-            kind: master_type::MISSILE,
+            kind: MasterKind::MISSILE,
             ..m.clone()
         };
         refund(
@@ -953,7 +953,7 @@ mod tests {
     fn villager(cost: &[(AttributeId, i16, bool)]) -> Master {
         Master {
             id: ids::VILLAGER_MALE,
-            kind: COMBAT,
+            kind: MasterKind::COMBAT,
             cost: costs(cost),
             ..Master::default()
         }
@@ -1021,7 +1021,7 @@ mod tests {
         assert!(cost_test(&ms, ids::VILLAGER_MALE, CostCount::new(f32::NAN), false, &h).unwrap());
         assert!(!cost_test(&ms, ids::MARKET, CostCount::ONE, false, &h).unwrap());
         let low = Masters::new([Master {
-            kind: master_type::MISSILE,
+            kind: MasterKind::MISSILE,
             ..villager(&[])
         }]);
         assert!(!cost_test(&low, ids::VILLAGER_MALE, CostCount::ONE, false, &h).unwrap());
@@ -1055,7 +1055,7 @@ mod tests {
         use crate::objects::masters::BuildingMaster;
         let building = |id: i16, head: i16, stack: i16, cost: &[(AttributeId, i16, bool)]| Master {
             id: master_id(id),
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             cost: costs(cost),
             building: Some(BuildingMaster {
                 head_unit: opt_master(head),

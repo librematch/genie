@@ -124,7 +124,7 @@ mod tests {
     use crate::objects::layers::Static;
     use crate::objects::lifecycle::Lifecycle;
     #[cfg(test)]
-    use crate::objects::masters::master_type::ANIMATED;
+    use crate::objects::masters::MasterKind;
     #[cfg(test)]
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
@@ -199,7 +199,7 @@ mod tests {
     fn with_flares(t: &mut World) {
         let flare = Master {
             id: FLARE4,
-            kind: ANIMATED,
+            kind: MasterKind::ANIMATED,
             standing_sprite: None,
             ..Master::default()
         };

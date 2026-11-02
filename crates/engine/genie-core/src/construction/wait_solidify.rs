@@ -15,7 +15,7 @@ use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Task;
 use crate::players::Amount;
 use crate::unit_ai::task_finder::Actor;
@@ -27,7 +27,7 @@ use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
 
 /// The action type (`+0x8`, 0x9a).
-pub const WAIT_SOLIDIFY: ActionType = ActionType::named(0x9a);
+pub const WAIT_SOLIDIFY: ActionKind = ActionKind::named(0x9a);
 
 pub use crate::construction::wait_solidify_state::WaitSolidifyState;
 use crate::math::image::wait_solidify::SOLID_FROM as WAIT_SOLIDIFY_SOLID_FROM;
@@ -178,7 +178,7 @@ impl UnitView<'_, '_> {
 mod tests {
     use super::*;
     #[cfg(test)]
-    use crate::objects::masters::action_type::BUILD;
+    use crate::objects::masters::ActionKind;
     use crate::test_ids::object_id;
     use crate::test_ids::task_id;
 
@@ -189,7 +189,7 @@ mod tests {
     fn task() -> Task {
         Task {
             id: task_id(3),
-            action_type: BUILD,
+            action_kind: ActionKind::BUILD,
             ..Task::default()
         }
     }

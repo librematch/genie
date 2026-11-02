@@ -14,7 +14,7 @@ use crate::objects::ActionState;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::pathing::ShortFound;
@@ -191,18 +191,18 @@ fn ray_meets_the_nearest_box_side_toward_it() {
     assert_eq!((at.y(), k, side), (5.0, 1, 0));
 }
 
-fn placed(x: f32, y: f32, r: f32, kind: ObstructionType) -> Placed {
+fn placed(x: f32, y: f32, r: f32, kind: ObstructionKind) -> Placed {
     Placed {
         position: Position::new(x, y, 0.0),
         radius: Footprint::new(r, r),
-        class: if kind == ObstructionType::CIRCLE {
+        class: if kind == ObstructionKind::CIRCLE {
             class::VILLAGER
         } else {
             class::PREDATOR
         },
         player: PlayerId::new(1),
         master: ids::ID_0,
-        obstruction_type: kind,
+        obstruction_kind: kind,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -223,15 +223,15 @@ fn the_quick_path_goes_around_one_square_obstruction() {
     // a villager, a tree in its way and its target past the tree
     w.insert(
         object_id(9171),
-        placed(2.0, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(2.0, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(48),
-        placed(5.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(5.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     w.insert(
         object_id(9149),
-        placed(10.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(10.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut pather = HullPather::new(
         (&mut w, ObjectsRef::empty()),
@@ -322,15 +322,15 @@ fn unit_short_reach_is_its_old_short_path_length() {
     );
     w.insert(
         object_id(9171),
-        placed(2.0, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(2.0, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(48),
-        placed(5.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(5.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     w.insert(
         object_id(9149),
-        placed(10.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(10.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let at = Position::new(2.0, 5.5, 0.0);
     let mut mover = walker();
@@ -1007,7 +1007,7 @@ fn tall(x: f32, y: f32, r: f32, class: ClassId) -> Placed {
         class,
         player: PlayerId::new(1),
         master: ids::ID_0,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -1537,15 +1537,15 @@ fn unit_quick_reach_is_its_quick_path_alone() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
-        placed(2.0, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(2.0, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(48),
-        placed(5.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(5.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     w.insert(
         object_id(9149),
-        placed(10.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(10.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let by = 5.5 - 0.7 * SQRT_2;
     let length = quick_reach_from(
@@ -1605,7 +1605,7 @@ fn unit_quick_reach_is_its_quick_path_alone() {
     // a second obstruction in the way: the quick path is blocked (3)
     w.insert(
         object_id(49),
-        placed(7.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(7.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     assert_eq!(
         quick_reach_from(
@@ -1630,7 +1630,7 @@ fn new_pather_holds_the_constructor_state() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
-        placed(2.0, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(2.0, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     let p = HullPather::new(
         (&mut w, ObjectsRef::empty()),
@@ -1795,11 +1795,11 @@ fn walled(wall_x: usize, unit: Point) -> Spatial {
     ));
     w.insert(
         object_id(9171),
-        placed(unit.x(), unit.y(), 0.2, ObstructionType::CIRCLE),
+        placed(unit.x(), unit.y(), 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(9149),
-        placed(12.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(12.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     w
 }
@@ -1870,7 +1870,7 @@ fn start_inside_hull_leaves_it_by_its_exit_paths() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     w.insert(
         object_id(48),
-        placed(5.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(5.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut p = HullPather::new(
         (&mut w, ObjectsRef::empty()),
@@ -2179,15 +2179,15 @@ fn goal_at_the_map_edge_needs_its_target_on_it() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
-        placed(15.0, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(15.0, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(9149),
-        placed(19.9, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(19.9, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     w.insert(
         object_id(9150),
-        placed(20.5, 7.5, 0.5, ObstructionType::TYPE_2),
+        placed(20.5, 7.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut p = HullPather::new(
         (&mut w, ObjectsRef::empty()),
@@ -2351,11 +2351,11 @@ fn node_beyond_the_area_grows_it_once() {
     ));
     w.insert(
         object_id(9171),
-        placed(5.0, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(5.0, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(9149),
-        placed(8.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(8.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut p = HullPather::new(
         (&mut w, ObjectsRef::empty()),
@@ -2403,10 +2403,10 @@ fn the_ignore_list_takes_the_ids_then_the_tiles_of_one_tile_objects_on_centre() 
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), classes),
     );
-    w.insert(object_id(1), placed(3.5, 3.5, 0.5, ObstructionType::TYPE_2));
-    w.insert(object_id(2), placed(5.5, 5.5, 0.5, ObstructionType::TYPE_2));
-    w.insert(object_id(3), placed(3.5, 3.6, 0.5, ObstructionType::TYPE_2));
-    w.insert(object_id(4), placed(7.5, 7.5, 0.4, ObstructionType::TYPE_2));
+    w.insert(object_id(1), placed(3.5, 3.5, 0.5, ObstructionKind::TYPE_2));
+    w.insert(object_id(2), placed(5.5, 5.5, 0.5, ObstructionKind::TYPE_2));
+    w.insert(object_id(3), placed(3.5, 3.6, 0.5, ObstructionKind::TYPE_2));
+    w.insert(object_id(4), placed(7.5, 7.5, 0.4, ObstructionKind::TYPE_2));
     let p = HullPather::for_list(
         (&mut w, ObjectsRef::empty()),
         &[
@@ -2530,7 +2530,7 @@ fn goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
     let mut w = walled(6, Point::new(2.0, 5.5));
     w.insert(
         object_id(48),
-        placed(10.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(10.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut p = HullPather::for_list(
         (&mut w, ObjectsRef::empty()),
@@ -2578,7 +2578,7 @@ fn goal_on_an_object_takes_it_as_the_target_but_finds_no_path() {
     // a second object holding the goal
     w.insert(
         object_id(49),
-        placed(11.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(11.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut r = HullPather::for_list(
         (&mut w, ObjectsRef::empty()),
@@ -2608,11 +2608,11 @@ fn an_included_moving_unit_blocks_the_line_tests() {
     let mut w = open_world();
     w.insert(
         object_id(9171),
-        placed(2.0, 5.5, 0.6, ObstructionType::CIRCLE),
+        placed(2.0, 5.5, 0.6, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(50),
-        placed(6.0, 5.5, 0.3, ObstructionType::CIRCLE),
+        placed(6.0, 5.5, 0.3, ObstructionKind::CIRCLE),
     );
     objects.set_gait(
         object_id(50),
@@ -2803,11 +2803,11 @@ fn unit_within_range_needs_no_path() {
     );
     w.insert(
         object_id(9171),
-        placed(9.75, 5.5, 0.2, ObstructionType::CIRCLE),
+        placed(9.75, 5.5, 0.2, ObstructionKind::CIRCLE),
     );
     w.insert(
         object_id(9149),
-        placed(10.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(10.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut pather = HullPather::new(
         (&mut w, ObjectsRef::empty()),
@@ -3074,7 +3074,7 @@ fn goal_in_the_start_hull_is_walked_to_within_it() {
     let mut w = walled(8, Point::new(4.9, 5.5));
     w.insert(
         object_id(48),
-        placed(5.5, 5.5, 0.5, ObstructionType::TYPE_2),
+        placed(5.5, 5.5, 0.5, ObstructionKind::TYPE_2),
     );
     let mut p = HullPather::new(
         (&mut w, ObjectsRef::empty()),

@@ -9,7 +9,7 @@ use genie_core::commands::{
 };
 use genie_core::map::Axis;
 use genie_core::objects::ObjectId;
-use genie_core::objects::masters::{ActionType, MasterId};
+use genie_core::objects::masters::{ActionKind, MasterId};
 use genie_core::technology::TechId;
 use genie_rec::de::command::{self as packets, Command as Packet};
 
@@ -230,7 +230,7 @@ macro_rules! interact_packet {
             field_0x13: u8::from($o.queued),
             field_0x14: u8::from($o.direct),
             field_0x15: u8::from($o.human),
-            field_0x16: ActionType::field($o.filter).cast_unsigned(),
+            field_0x16: ActionKind::field($o.filter).cast_unsigned(),
             ids: ids(&$units.ids, packets::$kind::FIXED)?,
         })
     };

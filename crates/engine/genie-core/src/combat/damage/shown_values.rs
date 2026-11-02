@@ -6,26 +6,25 @@ use crate::combat::damage::{
 };
 use crate::map::Distance;
 use crate::objects::HitPoints;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::DamageAmount;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::players::attribute::AttributeId;
 use crate::{GenieError, math::fmath};
 
 /// The action type of a bonus damage task (`FUN_14107ce60`).
-pub const BONUS_DAMAGE: ActionType = ActionType::named(0xa0);
+pub const BONUS_DAMAGE: ActionKind = ActionKind::named(0xa0);
 
 impl Victim {
     /// A combat unit or building (types 70 and 80, `TRIBE_Combat_Object` and
     /// `TRIBE_Building_Object`): its powerups and charges count; a combat object of type 50 or
     /// 60 (`RGE_Combat_Object`) answers 0 for them.
     pub(super) const fn tribe(&self) -> bool {
-        matches!(self.kind, COMBAT | BUILDING)
+        matches!(self.kind, MasterKind::COMBAT | MasterKind::BUILDING)
     }
 
     /// Slot 0xc0, its hit points as a share reads them: a combat unit's or building's
@@ -82,12 +81,12 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim) -> f32 {
     for t in attacker
         .bonus_tasks
         .iter()
-        .filter(|t| t.action_type == BONUS_DAMAGE)
+        .filter(|t| t.action_kind == BONUS_DAMAGE)
     {
         let any = t.object_id.is_none()
             && t.object_group.is_none()
             && (matches!(target.class, class::CLASS_51 | class::CLASS_54)
-                || target.kind < BUILDING);
+                || target.kind < MasterKind::BUILDING);
         if !(any || t.object_id == Some(target.master_id) || t.for_class(target.class)) {
             continue;
         }
@@ -170,7 +169,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
     let a = &v.source;
     let charge = charge_shown(v, s.target);
     if charge
-        && a.charge_type.ranged()
+        && a.charge_kind.ranged()
         && let Some(weapons) = s.projectile
     {
         return best_attack(weapons, true);
@@ -190,7 +189,7 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>) -> DamageAmount {
     if let Some(t) = s.target {
         attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, t)));
     }
-    if charge && a.charge_type.adds_to_attack() {
+    if charge && a.charge_kind.adds_to_attack() {
         attack = attack.plus(DamageAmount::of_effect(a.charge.get()));
     }
     attack
@@ -221,7 +220,7 @@ pub fn shown_melee_armor(v: &Victim) -> Result<DamageAmount, GenieError> {
 pub fn shown_range(v: &Victim, s: &Shown<'_>) -> Distance {
     let a = &v.source;
     let mut range = a.weapon_range;
-    if a.charge_type.ranged() && charge_shown(v, s.target) {
+    if a.charge_kind.ranged() && charge_shown(v, s.target) {
         range += s.charge_event.range();
     }
     let powerup = if v.tribe() {

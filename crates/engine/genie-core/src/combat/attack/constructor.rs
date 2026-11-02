@@ -430,7 +430,7 @@ pub fn engagement(
     them: &Placed,
     world_time: WorldTime,
 ) -> Result<Engagement, GenieError> {
-    if master.charge_type.ranged() {
+    if master.charge_kind.ranged() {
         return Err(GenieError::unsupported(
             "an attacker whose charge adds to its range (slot 0x2f8)",
         ));

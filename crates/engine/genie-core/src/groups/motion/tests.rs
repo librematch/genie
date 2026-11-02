@@ -16,7 +16,7 @@ use crate::movement::WaypointLevel;
 use crate::objects::actions::ActionList;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::pathing::DelayCount;
@@ -596,7 +596,7 @@ fn target_at(y: f32) -> Placed {
         class: class::CLASS_0,
         player: PlayerId::new(0),
         master: ids::ID_0,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: false,
         moves: false,
@@ -1136,7 +1136,7 @@ fn placed_at(x: f32, y: f32) -> Placed {
         position: Position::new(x, y, 0.0),
         radius: Footprint::new(0.2, 0.2),
         obstruction: Some(Obstruction {
-            kind: ObstructionType::CIRCLE,
+            kind: ObstructionKind::CIRCLE,
             class: ObstructionClass::UNIT,
         }),
         ..target_at(y)

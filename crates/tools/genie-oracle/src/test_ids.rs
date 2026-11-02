@@ -2,7 +2,7 @@
 
 use genie_core::groups::GroupId;
 use genie_core::objects::ObjectId;
-use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::ClassId;
 
 /// The object id `value` (not −1).
@@ -22,8 +22,8 @@ pub(crate) const fn group_id(value: i32) -> GroupId {
 }
 
 /// The action type `value` (0 or more).
-pub(crate) const fn action_type(value: i16) -> ActionType {
-    match ActionType::of_data(value) {
+pub(crate) const fn action_type(value: i16) -> ActionKind {
+    match ActionKind::of_data(value) {
         Some(kind) => kind,
         None => panic!("a test's action type is 0 or more"),
     }

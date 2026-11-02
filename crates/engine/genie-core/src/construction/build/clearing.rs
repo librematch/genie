@@ -13,8 +13,6 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::players::PlayerId;
 use std::collections::BTreeMap;
 
@@ -236,9 +234,10 @@ pub(super) fn clearing_takes(
     // the destroy's death part (FUN_14121cc40 below state 3) drops the record and sets +0x686
     // first; then FUN_141189670: COMISS 0 against the height, JC drops the record (a NaN too),
     // else the record held (`+0x658`) does
-    let dies = COMBAT <= seen.kind && seen.state < ObjectState::Dying && !seen.roo_called;
-    let destroy_drops =
-        dies && (seen.kind < BUILDING || (!seen.desolid && Distance::ZERO < seen.height));
+    let dies =
+        MasterKind::COMBAT <= seen.kind && seen.state < ObjectState::Dying && !seen.roo_called;
+    let destroy_drops = dies
+        && (seen.kind < MasterKind::BUILDING || (!seen.desolid && Distance::ZERO < seen.height));
     let roo_drops = site.trees
         && !seen.roo_called
         && !dies

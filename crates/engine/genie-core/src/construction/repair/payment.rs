@@ -15,7 +15,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
@@ -140,10 +139,10 @@ pub fn repair_building(
     for annex in o.annexes.clone() {
         let a = find(set, annex)?;
         match set.checked(a)?.kind {
-            master_type::COMBAT => {
+            MasterKind::COMBAT => {
                 let _ = repair_unit(set, a, amount, payer)?;
             }
-            master_type::BUILDING => {
+            MasterKind::BUILDING => {
                 let _ = repair_building(set, a, amount, false, payer)?;
             }
             _ => {}

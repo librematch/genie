@@ -18,10 +18,8 @@ use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MISSILE;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::slots::CheckedIndex;
@@ -47,7 +45,7 @@ pub(super) fn damage(
 ) -> Result<(), GenieError> {
     let d = armor_damage(t, weapons, factor, &src.source, bonus_damage(src, t))?;
     if blast_taken < d {
-        if COMBAT <= src.kind {
+        if MasterKind::COMBAT <= src.kind {
             let hit = charge_hit(&src.source, t);
             src.source.charge_hit = hit;
             if hit && src.source.area_effect <= Distance::ZERO {
@@ -56,16 +54,19 @@ pub(super) fn damage(
         }
         lose(t, d - blast_taken);
     }
-    let marks = t.kind == COMBAT
-        || (t.kind == BUILDING && matches!(t.class, class::CLASS_51 | class::CLASS_54));
-    if MISSILE <= src.kind && src.source.ability.contains(CombatAbility::MARKS_TARGET) && marks {
+    let marks = t.kind == MasterKind::COMBAT
+        || (t.kind == MasterKind::BUILDING && matches!(t.class, class::CLASS_51 | class::CLASS_54));
+    if MasterKind::MISSILE <= src.kind
+        && src.source.ability.contains(CombatAbility::MARKS_TARGET)
+        && marks
+    {
         return Err(GenieError::unsupported(
             "an attacker whose combat ability marks its target (FUN_141206250)",
         ));
     }
     let master_hp = i32::from(t.master_hp.get());
     if src.source.class != ELEPHANT_ARCHER {
-        let sender = if src.kind == MISSILE {
+        let sender = if src.kind == MasterKind::MISSILE {
             src.source.fired_from.map(ShooterId::id)
         } else {
             Some(src.id)
@@ -87,7 +88,7 @@ pub(super) fn damage(
             attacker_class: src.class,
             // The livestock class, which goes to Gaia when killed.
             // The artifact class (1), which no blast reaches.
-            to_gaia: t.kind == COMBAT
+            to_gaia: t.kind == MasterKind::COMBAT
                 && t.class == class::LIVESTOCK
                 && t.player != PlayerId::new(0),
         });
@@ -171,7 +172,7 @@ pub fn blast(
         .iter_mut()
         // The building type (`'P'`): its slot 0xe8 is `FUN_1411cea90` ([`take_building`]).
         // The wall class (27): its razing counts nothing.
-        .filter(|t| t.kind == BUILDING && blast.on_tiles(t))
+        .filter(|t| t.kind == MasterKind::BUILDING && blast.on_tiles(t))
     {
         if let Some(b) = t.building.as_mut() {
             b.blast_taken = HitPoints::ZERO;
@@ -246,13 +247,13 @@ pub(super) fn blast_one(
         return Ok(());
     }
     let t = &mut **targets.checked_mut(i)?;
-    if RAMS.contains(&a.master_id) && t.kind != BUILDING && !is_main {
+    if RAMS.contains(&a.master_id) && t.kind != MasterKind::BUILDING && !is_main {
         return Ok(());
     }
     let Some(d2) = blast_distance2(t, b.center, b.r.get()) else {
         return Ok(());
     };
-    if COMBAT <= t.kind && shield(t, false) {
+    if MasterKind::COMBAT <= t.kind && shield(t, false) {
         return Ok(());
     }
     let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), is_main);
@@ -283,7 +284,7 @@ pub(super) fn blast_one(
 /// is not a building.
 pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> Result<Option<usize>, GenieError> {
     let t = &**targets.checked(i)?;
-    if t.kind != BUILDING {
+    if t.kind != MasterKind::BUILDING {
         return Ok(None);
     }
     t.building.as_ref().and_then(|b| b.main).map_or_else(
@@ -362,7 +363,7 @@ pub(super) fn blast_falloff(
     is_main: bool,
 ) -> f32 {
     let mut f = elevation_factor(attacker.position.z(), attacker.attack_elevation, t);
-    if COMBAT <= t.kind && (t.player == attacker.player || t.allied.by_target) {
+    if MasterKind::COMBAT <= t.kind && (t.player == attacker.player || t.allied.by_target) {
         f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire.get());
     }
     if a.missile.is_none() {
@@ -370,7 +371,7 @@ pub(super) fn blast_falloff(
             f *= (r - fmath::sqrt(d2)) / r;
         }
     } else {
-        let d = if !is_main || t.kind != BUILDING {
+        let d = if !is_main || t.kind != MasterKind::BUILDING {
             fmath::sqrt(d2)
         } else {
             0.0
@@ -428,7 +429,10 @@ pub(super) fn fixed_blast(
         if Amount::of_master(t.capacity) < t.amount {
             t.amount = Amount::of_master(t.capacity);
         }
-        if HitPoints::new(1.0) <= before && t.player != PlayerId::GAIA && t.kind == COMBAT {
+        if HitPoints::new(1.0) <= before
+            && t.player != PlayerId::GAIA
+            && t.kind == MasterKind::COMBAT
+        {
             t.killed = Some(Kill {
                 attacker: attacker.id,
                 attacker_player: attacker.player,

@@ -156,7 +156,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::lifecycle::Lifecycle;
     #[cfg(test)]
-    use crate::objects::masters::master_type::ANIMATED;
+    use crate::objects::masters::MasterKind;
     #[cfg(test)]
     use crate::objects::masters::{Master, Masters};
     #[cfg(test)]
@@ -290,7 +290,7 @@ mod tests {
         t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
         let flare = Master {
             id: FLARE4,
-            kind: ANIMATED,
+            kind: MasterKind::ANIMATED,
             standing_sprite: None,
             ..Master::default()
         };

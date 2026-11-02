@@ -24,7 +24,7 @@ use crate::pathing::zones::ZoneId;
 use crate::players::PlayerType;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
@@ -545,7 +545,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let (r, Left { stands, posted, .. }) = run(&mut t, &s, &mut c);
     let failed = (
         NotifyKind::ACTION_FAILED,
-        [ActionKind::Transport.value(), 0, 0],
+        [AiAction::Transport.value(), 0, 0],
     );
     assert_eq!(
         (r, stands, posted),

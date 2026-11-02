@@ -17,7 +17,7 @@ use crate::orders::Dispatch;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -96,7 +96,7 @@ impl UnitAi {
             // UCOMISS: a NaN keeps moving): the current order goes to the queue's end (slot 0x30
             // neither immediate nor in front), the action stops (slot 0xb0 with 1) and it runs
             // from its attackers (slot 0x160 with 1 and no unit)
-            if self.current_action == Some(ActionKind::Move)
+            if self.current_action == Some(AiAction::Move)
                 && at.anim_speed.ok_or(NO_ANIM_SPEED)? != Speed::ZERO
             {
                 return Ok(BREAK);
@@ -235,12 +235,12 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
-        if self.current_action == Some(ActionKind::Trade) {
+        if self.current_action == Some(AiAction::Trade) {
             return Err(GenieError::unsupported(
                 "a trader's search for another dock or market (slot 0xf8, its Trade action)",
             ));
         }
-        if self.current_action == Some(ActionKind::Explore) {
+        if self.current_action == Some(AiAction::Explore) {
             closest_undiscovered_tile()?;
         }
         self.remove_target();
@@ -289,7 +289,7 @@ impl UnitAi {
         if self.current_order.is_some() {
             return Ok(GO_ON);
         }
-        if self.current_action != Some(ActionKind::Move) {
+        if self.current_action != Some(AiAction::Move) {
             self.queue_current(at)?;
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         }
@@ -331,7 +331,7 @@ impl UnitAi {
         if self.current_order.is_some() {
             return Ok(GO_ON);
         }
-        if self.current_action != Some(ActionKind::Move) {
+        if self.current_action != Some(AiAction::Move) {
             self.queue_current(at)?;
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             let _ = self.run_away(true, at, player_type, ai_rng, side)?;
@@ -390,7 +390,7 @@ impl UnitAi {
                 Notify::own(
                     at.id,
                     NotifyKind::ACTION_COMPLETED,
-                    [ActionKind::Build.value(), 0, 0],
+                    [AiAction::Build.value(), 0, 0],
                 ),
                 at.state,
             )?;
@@ -511,7 +511,7 @@ impl UnitAi {
     ) -> Result<(), GenieError> {
         self.stop_current(StopOrder::Keep, at, side, rng)?;
         side.effect_now(Effect::Command(AiCommand::HuntObject(target)), self, rng)?;
-        self.set_action(Some(ActionKind::Hunt));
+        self.set_action(Some(AiAction::Hunt));
         self.set_target(Some(target), class.or_none(), point);
         Ok(())
     }

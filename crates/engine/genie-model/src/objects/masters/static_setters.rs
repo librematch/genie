@@ -6,6 +6,7 @@ use crate::math::fmath::at_most_or_unordered;
 use crate::movement::Speed;
 use crate::objects::MasterHitPoints;
 use crate::objects::WorkRate;
+use crate::objects::masters::AttributeWorld;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::CombatLevel;
@@ -16,19 +17,28 @@ use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
+use crate::objects::masters::MISSILE_SPEED_CAP;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MinimapMode;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Occlusion;
+use crate::objects::masters::ROUND;
 use crate::objects::masters::RunPattern;
+use crate::objects::masters::SPEED_CAP;
 use crate::objects::masters::SelectionEffect;
-use crate::objects::masters::{
-    AttributeWorld, MISSILE_SPEED_CAP, Master, ROUND, SPEED_CAP, add_short, add_sprite, attribute,
-    insert_damage_graphic, low8, low16, master_type, multiply_short, resize_damage_graphics,
-    select_entry, set_sprite,
-};
+use crate::objects::masters::add_short;
+use crate::objects::masters::add_sprite;
+use crate::objects::masters::insert_damage_graphic;
+use crate::objects::masters::low8;
+use crate::objects::masters::low16;
+use crate::objects::masters::multiply_short;
+use crate::objects::masters::resize_damage_graphics;
+use crate::objects::masters::select_entry;
+use crate::objects::masters::set_sprite;
 use crate::objects::masters::{MasterField, MasterId};
 use crate::objects::masters::{TrailDensity, TrailMode};
 use crate::players::Amount;
@@ -43,58 +53,73 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si_64;
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::HIT_POINTS => self.hit_points = MasterHitPoints::of_data(low16(v)),
-            a::LINE_OF_SIGHT => self.line_of_sight = Distance::new(v),
-            a::GARRISON_CAPACITY => self.garrison = GarrisonCapacity::of_data(low8(v)),
-            a::SIZE_X => self.radius = self.radius.with_x(v),
-            a::SIZE_Y => self.radius = self.radius.with_y(v),
-            a::CARRY_CAPACITY => self.capacity = CarryCapacity::of_data(low16(v)),
-            a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
+            MasterAttribute::HIT_POINTS => self.hit_points = MasterHitPoints::of_data(low16(v)),
+            MasterAttribute::LINE_OF_SIGHT => self.line_of_sight = Distance::new(v),
+            MasterAttribute::GARRISON_CAPACITY => {
+                self.garrison = GarrisonCapacity::of_data(low8(v));
+            }
+            MasterAttribute::SIZE_X => self.radius = self.radius.with_x(v),
+            MasterAttribute::SIZE_Y => self.radius = self.radius.with_y(v),
+            MasterAttribute::CARRY_CAPACITY => self.capacity = CarryCapacity::of_data(low16(v)),
+            MasterAttribute::STORAGE_1
+            | MasterAttribute::STORAGE_2
+            | MasterAttribute::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
                     *amount = Amount::new(f32::from(low16(v)));
                 }
             }
-            a::FOG_VISIBILITY => self.fog_visibility = FogVisibility::of_data(low8(v)),
-            a::OCCLUSION_MODE => self.occlusion = Occlusion::of_data(low8(v)),
-            a::SIZE_Z => self.height = Distance::new(v),
-            a::CAN_BE_BUILT_ON | a::BLAST_DEFENSE_LEVEL => {
+            MasterAttribute::FOG_VISIBILITY => {
+                self.fog_visibility = FogVisibility::of_data(low8(v));
+            }
+            MasterAttribute::OCCLUSION_MODE => self.occlusion = Occlusion::of_data(low8(v)),
+            MasterAttribute::SIZE_Z => self.height = Distance::new(v),
+            MasterAttribute::CAN_BE_BUILT_ON | MasterAttribute::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense = BlastDefense::new(low8(v));
             }
-            a::TERRAIN_RESTRICTION_ID => {
+            MasterAttribute::TERRAIN_RESTRICTION_ID => {
                 self.terrain_restriction = RestrictionId::of_data(low16(v));
             }
             // `CVTTSS2SI RAX`, the low 32 bits
-            a::UNIT_TRAIT => {
+            MasterAttribute::UNIT_TRAIT => {
                 self.object_flags = ObjectFlags::from_bits_retain(cvttss2si_64(v) as u32);
             }
-            a::TRAIT_PIECE => {
+            MasterAttribute::TRAIT_PIECE => {
                 self.object_flags = ObjectFlags::from_bits_retain(
                     ((cvttss2si_64(v) as u32) << 16) | (self.object_flags.bits() & 0xffff),
                 );
             }
-            a::DEAD_UNIT_ID => self.death_spawns[0] = MasterId::of_data(low16(v)),
-            a::BLOOD_UNIT => self.death_spawns[1] = MasterId::of_data(low16(v)),
-            a::STANDING_GRAPHIC | a::STANDING_GRAPHIC_2 | a::DYING_GRAPHIC | a::UNDEAD_GRAPHIC => {
+            MasterAttribute::DEAD_UNIT_ID => self.death_spawns[0] = MasterId::of_data(low16(v)),
+            MasterAttribute::BLOOD_UNIT => self.death_spawns[1] = MasterId::of_data(low16(v)),
+            MasterAttribute::STANDING_GRAPHIC
+            | MasterAttribute::STANDING_GRAPHIC_2
+            | MasterAttribute::DYING_GRAPHIC
+            | MasterAttribute::UNDEAD_GRAPHIC => {
                 self.set_static_sprite(attribute, v, world);
             }
-            a::OBSTRUCTION_TYPE => {
-                self.obstruction_type = ObstructionType::set(low8(v));
+            MasterAttribute::OBSTRUCTION_TYPE => {
+                self.obstruction_kind = ObstructionKind::set(low8(v));
             }
-            a::BLOCKAGE_CLASS => self.obstruction_class = ObstructionClass::from(low8(v)),
-            a::SELECTION_EFFECT => self.selection_effect = SelectionEffect::of_data(low8(v)),
-            a::DAMAGE_GRAPHIC
-            | a::DAMAGE_GRAPHICS_ENTRY_MOD
-            | a::DAMAGE_GRAPHICS_TOTAL_NUM
-            | a::DAMAGE_GRAPHIC_PERCENT
-            | a::DAMAGE_GRAPHIC_APPLY_MODE => self.set_damage_graphic(attribute, v, world),
-            a::AVAILABLE_UNIT_FLAG
-            | a::DISABLED_UNIT_FLAG
-            | a::INTERFACE_KIND
-            | a::COMBAT_LEVEL
-            | a::INTERACTION_MODE
-            | a::MINIMAP_MODE => self.set_static_level(attribute, v),
+            MasterAttribute::BLOCKAGE_CLASS => {
+                self.obstruction_class = ObstructionClass::from(low8(v));
+            }
+            MasterAttribute::SELECTION_EFFECT => {
+                self.selection_effect = SelectionEffect::of_data(low8(v));
+            }
+            MasterAttribute::DAMAGE_GRAPHIC
+            | MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD
+            | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM
+            | MasterAttribute::DAMAGE_GRAPHIC_PERCENT
+            | MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE => {
+                self.set_damage_graphic(attribute, v, world);
+            }
+            MasterAttribute::AVAILABLE_UNIT_FLAG
+            | MasterAttribute::DISABLED_UNIT_FLAG
+            | MasterAttribute::INTERFACE_KIND
+            | MasterAttribute::COMBAT_LEVEL
+            | MasterAttribute::INTERACTION_MODE
+            | MasterAttribute::MINIMAP_MODE => self.set_static_level(attribute, v),
             // the icon (25), the name and description (50, 51) and the sounds (92 to 99) are the
             // interface's
             _ => {}
@@ -104,15 +129,17 @@ impl Master {
     /// [`Master::set_static`]'s flags and levels (`FUN_141126400`): available, disabled, the
     /// interface kind, the combat level, the interaction and minimap modes.
     pub(super) fn set_static_level(&mut self, attribute: MasterAttribute, v: f32) {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
             // the save's byte, which the slice holds as its test against 0
-            a::AVAILABLE_UNIT_FLAG => self.available = low8(v) != 0,
-            a::DISABLED_UNIT_FLAG => self.disabled = low8(v) != 0,
-            a::INTERFACE_KIND => self.unit_level = InterfaceKind::of_data(low8(v)),
-            a::COMBAT_LEVEL => self.combat_level = CombatLevel::of_data(low8(v)),
-            a::INTERACTION_MODE => self.select_level = InteractionMode::of_data(low8(v)),
-            a::MINIMAP_MODE => self.map_draw_level = MinimapMode::of_data(low8(v)),
+            MasterAttribute::AVAILABLE_UNIT_FLAG => self.available = low8(v) != 0,
+            MasterAttribute::DISABLED_UNIT_FLAG => self.disabled = low8(v) != 0,
+            MasterAttribute::INTERFACE_KIND => self.unit_level = InterfaceKind::of_data(low8(v)),
+            MasterAttribute::COMBAT_LEVEL => self.combat_level = CombatLevel::of_data(low8(v)),
+            MasterAttribute::INTERACTION_MODE => {
+                self.select_level = InteractionMode::of_data(low8(v));
+            }
+            MasterAttribute::MINIMAP_MODE => self.map_draw_level = MinimapMode::of_data(low8(v)),
             _ => {}
         }
     }
@@ -126,12 +153,20 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si;
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::STANDING_GRAPHIC => set_sprite(&mut self.standing_sprite, cvttss2si(v), world),
-            a::STANDING_GRAPHIC_2 => set_sprite(&mut self.standing_sprite_2, cvttss2si(v), world),
-            a::DYING_GRAPHIC => set_sprite(&mut self.death_sprite, cvttss2si(v), world),
-            a::UNDEAD_GRAPHIC => set_sprite(&mut self.undead_sprite, cvttss2si(v), world),
+            MasterAttribute::STANDING_GRAPHIC => {
+                set_sprite(&mut self.standing_sprite, cvttss2si(v), world);
+            }
+            MasterAttribute::STANDING_GRAPHIC_2 => {
+                set_sprite(&mut self.standing_sprite_2, cvttss2si(v), world);
+            }
+            MasterAttribute::DYING_GRAPHIC => {
+                set_sprite(&mut self.death_sprite, cvttss2si(v), world);
+            }
+            MasterAttribute::UNDEAD_GRAPHIC => {
+                set_sprite(&mut self.undead_sprite, cvttss2si(v), world);
+            }
             _ => {}
         }
     }
@@ -145,31 +180,31 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si;
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::DAMAGE_GRAPHIC => {
+            MasterAttribute::DAMAGE_GRAPHIC => {
                 if let Some(g) = self.damage_graphic_mut() {
                     set_sprite(&mut g.sprite, cvttss2si(v), world);
                 }
             }
-            a::DAMAGE_GRAPHICS_ENTRY_MOD => {
+            MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD => {
                 if let Some(n) = select_entry(self.damage_graphics.len(), cvttss2si(v)) {
                     self.damage_graphic_entry = DamageGraphicEntry::of_selected(n);
                 }
             }
-            a::DAMAGE_GRAPHICS_TOTAL_NUM => {
+            MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
                 resize_damage_graphics(
                     &mut self.damage_graphics,
                     &mut self.damage_graphic_entry,
                     v,
                 );
             }
-            a::DAMAGE_GRAPHIC_PERCENT => {
+            MasterAttribute::DAMAGE_GRAPHIC_PERCENT => {
                 if let Some(g) = self.damage_graphic_mut() {
                     g.percent = HpPercent::of_data(low8(v));
                 }
             }
-            a::DAMAGE_GRAPHIC_APPLY_MODE => {
+            MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE => {
                 if let Some(g) = self.damage_graphic_mut() {
                     g.apply_mode = DamageSpriteMode::of_data(low8(v));
                 }
@@ -186,56 +221,67 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si_64;
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::HIT_POINTS => {
+            MasterAttribute::HIT_POINTS => {
                 self.hit_points =
                     MasterHitPoints::of_data(add_short(self.hit_points.get(), v, world.capped));
             }
-            a::LINE_OF_SIGHT => self.line_of_sight += Distance::new(v),
-            a::GARRISON_CAPACITY => self.garrison = self.garrison.plus(low8(v)),
-            a::SIZE_X => self.radius = self.radius.with_x(self.radius.x() + v),
-            a::SIZE_Y => self.radius = self.radius.with_y(self.radius.y() + v),
-            a::CARRY_CAPACITY => {
+            MasterAttribute::LINE_OF_SIGHT => self.line_of_sight += Distance::new(v),
+            MasterAttribute::GARRISON_CAPACITY => self.garrison = self.garrison.plus(low8(v)),
+            MasterAttribute::SIZE_X => self.radius = self.radius.with_x(self.radius.x() + v),
+            MasterAttribute::SIZE_Y => self.radius = self.radius.with_y(self.radius.y() + v),
+            MasterAttribute::CARRY_CAPACITY => {
                 self.capacity =
                     CarryCapacity::of_data(add_short(self.capacity.get(), v, world.capped));
             }
-            a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
+            MasterAttribute::STORAGE_1
+            | MasterAttribute::STORAGE_2
+            | MasterAttribute::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
                     *amount += Amount::new(f32::from(low16(v)));
                 }
             }
-            a::OCCLUSION_MODE => self.occlusion = self.occlusion.plus(low8(v)),
-            a::SIZE_Z => self.height += Distance::new(v),
-            a::CAN_BE_BUILT_ON | a::BLAST_DEFENSE_LEVEL => {
+            MasterAttribute::OCCLUSION_MODE => self.occlusion = self.occlusion.plus(low8(v)),
+            MasterAttribute::SIZE_Z => self.height += Distance::new(v),
+            MasterAttribute::CAN_BE_BUILT_ON | MasterAttribute::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense =
                     BlastDefense::new(self.blast_defense.get().wrapping_add(low8(v)));
             }
-            a::UNIT_TRAIT => {
+            MasterAttribute::UNIT_TRAIT => {
                 self.object_flags = ObjectFlags::from_bits_retain(
                     self.object_flags
                         .bits()
                         .wrapping_add(cvttss2si_64(v) as u32),
                 );
             }
-            a::STANDING_GRAPHIC | a::STANDING_GRAPHIC_2 | a::DYING_GRAPHIC | a::UNDEAD_GRAPHIC => {
+            MasterAttribute::STANDING_GRAPHIC
+            | MasterAttribute::STANDING_GRAPHIC_2
+            | MasterAttribute::DYING_GRAPHIC
+            | MasterAttribute::UNDEAD_GRAPHIC => {
                 self.add_static_sprite(attribute, v, world);
             }
-            a::DAMAGE_GRAPHIC
-            | a::DAMAGE_GRAPHICS_ENTRY_MOD
-            | a::DAMAGE_GRAPHICS_TOTAL_NUM
-            | a::DAMAGE_GRAPHIC_PERCENT
-            | a::DAMAGE_GRAPHIC_APPLY_MODE => self.add_damage_graphic(attribute, v, world),
-            a::AVAILABLE_UNIT_FLAG => {
+            MasterAttribute::DAMAGE_GRAPHIC
+            | MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD
+            | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM
+            | MasterAttribute::DAMAGE_GRAPHIC_PERCENT
+            | MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE => {
+                self.add_damage_graphic(attribute, v, world);
+            }
+            MasterAttribute::AVAILABLE_UNIT_FLAG => {
                 self.available = u8::from(self.available).wrapping_add(low8(v)) != 0;
             }
-            a::DISABLED_UNIT_FLAG => {
+            MasterAttribute::DISABLED_UNIT_FLAG => {
                 self.disabled = u8::from(self.disabled).wrapping_add(low8(v)) != 0;
             }
-            a::INTERFACE_KIND => self.unit_level = self.unit_level.plus(low8(v)),
-            a::COMBAT_LEVEL => self.combat_level = self.combat_level.plus(low8(v)),
-            a::INTERACTION_MODE => self.select_level = self.select_level.plus(low8(v)),
-            a::MINIMAP_MODE => self.map_draw_level = self.map_draw_level.plus(low8(v)),
+            MasterAttribute::INTERFACE_KIND => self.unit_level = self.unit_level.plus(low8(v)),
+            MasterAttribute::COMBAT_LEVEL => self.combat_level = self.combat_level.plus(low8(v)),
+            MasterAttribute::INTERACTION_MODE => {
+                self.select_level = self.select_level.plus(low8(v));
+            }
+            MasterAttribute::MINIMAP_MODE => {
+                self.map_draw_level = self.map_draw_level.plus(low8(v));
+            }
             // the sounds (92, 94, 96, 98, through slot 0x18) are the interface's
             _ => {}
         }
@@ -249,12 +295,14 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::STANDING_GRAPHIC => add_sprite(&mut self.standing_sprite, v, world),
-            a::STANDING_GRAPHIC_2 => add_sprite(&mut self.standing_sprite_2, v, world),
-            a::DYING_GRAPHIC => add_sprite(&mut self.death_sprite, v, world),
-            a::UNDEAD_GRAPHIC => add_sprite(&mut self.undead_sprite, v, world),
+            MasterAttribute::STANDING_GRAPHIC => add_sprite(&mut self.standing_sprite, v, world),
+            MasterAttribute::STANDING_GRAPHIC_2 => {
+                add_sprite(&mut self.standing_sprite_2, v, world);
+            }
+            MasterAttribute::DYING_GRAPHIC => add_sprite(&mut self.death_sprite, v, world),
+            MasterAttribute::UNDEAD_GRAPHIC => add_sprite(&mut self.undead_sprite, v, world),
             _ => {}
         }
     }
@@ -268,21 +316,21 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si;
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::DAMAGE_GRAPHIC => {
+            MasterAttribute::DAMAGE_GRAPHIC => {
                 if let Some(g) = self.damage_graphic_mut() {
                     add_sprite(&mut g.sprite, v, world);
                 }
             }
-            a::DAMAGE_GRAPHICS_ENTRY_MOD => {
+            MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD => {
                 let n = cvttss2si(f32::from(self.damage_graphic_entry.get()) + v);
                 if let Some(n) = select_entry(self.damage_graphics.len(), n) {
                     self.damage_graphic_entry = DamageGraphicEntry::of_selected(n);
                 }
             }
             // the game's: the selected entry plus the amount, not the count
-            a::DAMAGE_GRAPHICS_TOTAL_NUM => {
+            MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
                 let count = f32::from(self.damage_graphic_entry.get()) + v;
                 resize_damage_graphics(
                     &mut self.damage_graphics,
@@ -290,12 +338,12 @@ impl Master {
                     count,
                 );
             }
-            a::DAMAGE_GRAPHIC_PERCENT => {
+            MasterAttribute::DAMAGE_GRAPHIC_PERCENT => {
                 if let Some(g) = self.damage_graphic_mut() {
                     g.percent = g.percent.plus(low8(v));
                 }
             }
-            a::DAMAGE_GRAPHIC_APPLY_MODE => {
+            MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE => {
                 if let Some(g) = self.damage_graphic_mut() {
                     g.apply_mode = g.apply_mode.plus(low8(v));
                 }
@@ -311,44 +359,46 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::HIT_POINTS => {
+            MasterAttribute::HIT_POINTS => {
                 self.hit_points = MasterHitPoints::of_data(multiply_short(
                     self.hit_points.get(),
                     v,
                     world.capped,
                 ));
             }
-            a::LINE_OF_SIGHT => self.line_of_sight *= v,
-            a::GARRISON_CAPACITY => {
+            MasterAttribute::LINE_OF_SIGHT => self.line_of_sight *= v,
+            MasterAttribute::GARRISON_CAPACITY => {
                 self.garrison =
                     GarrisonCapacity::of_data(low8(f32::from(self.garrison.get()) * v + ROUND));
             }
-            a::SIZE_X => self.radius = self.radius.with_x(self.radius.x() * v),
-            a::SIZE_Y => self.radius = self.radius.with_y(self.radius.y() * v),
-            a::CARRY_CAPACITY => {
+            MasterAttribute::SIZE_X => self.radius = self.radius.with_x(self.radius.x() * v),
+            MasterAttribute::SIZE_Y => self.radius = self.radius.with_y(self.radius.y() * v),
+            MasterAttribute::CARRY_CAPACITY => {
                 self.capacity =
                     CarryCapacity::of_data(multiply_short(self.capacity.get(), v, world.capped));
             }
-            a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 => {
+            MasterAttribute::STORAGE_1
+            | MasterAttribute::STORAGE_2
+            | MasterAttribute::STORAGE_3 => {
                 if let Some(amount) = self.storage_mut(attribute) {
                     *amount = Amount::new(f32::from(low16(v * amount.get() + ROUND)));
                 }
             }
-            a::SIZE_Z => self.height *= v,
+            MasterAttribute::SIZE_Z => self.height *= v,
             // without the rounding
-            a::BLAST_DEFENSE_LEVEL => {
+            MasterAttribute::BLAST_DEFENSE_LEVEL => {
                 self.blast_defense =
                     BlastDefense::new(low8(f32::from(self.blast_defense.get()) * v));
             }
-            a::AVAILABLE_UNIT_FLAG => {
+            MasterAttribute::AVAILABLE_UNIT_FLAG => {
                 self.available = low8(f32::from(u8::from(self.available)) * v + ROUND) != 0;
             }
-            a::DAMAGE_GRAPHICS_ENTRY_MOD => {
+            MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD => {
                 insert_damage_graphic(&mut self.damage_graphics, &mut self.damage_graphic_entry, v);
             }
-            a::DAMAGE_GRAPHICS_TOTAL_NUM => {
+            MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
                 let count = self.damage_graphics.len() as f32 * v;
                 resize_damage_graphics(
                     &mut self.damage_graphics,
@@ -363,7 +413,7 @@ impl Master {
     /// The speed's cap (`FUN_1410a8b60`, `FUN_1410a8c00`): capped, a speed above it (`COMISS`,
     /// `JBE`: not a NaN) takes it, 20 for a missile master, else 4.5.
     pub(super) fn cap_speed(&mut self, capped: bool) {
-        let cap = if self.kind == master_type::MISSILE {
+        let cap = if self.kind == MasterKind::MISSILE {
             MISSILE_SPEED_CAP
         } else {
             SPEED_CAP
@@ -380,7 +430,7 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if attribute == attribute::MOVEMENT_SPEED {
+        if attribute == MasterAttribute::MOVEMENT_SPEED {
             self.max_speed = Speed::new(v);
         } else {
             self.set_static(attribute, v, world);
@@ -394,7 +444,7 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if attribute == attribute::MOVEMENT_SPEED {
+        if attribute == MasterAttribute::MOVEMENT_SPEED {
             self.max_speed += Speed::new(v);
             self.cap_speed(world.capped);
         } else {
@@ -409,7 +459,7 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if attribute == attribute::MOVEMENT_SPEED {
+        if attribute == MasterAttribute::MOVEMENT_SPEED {
             self.max_speed *= v;
             self.cap_speed(world.capped);
         } else {
@@ -425,14 +475,18 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         use crate::math::conversions::cvttss2si;
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed = Seconds::new(v),
-            a::WALKING_GRAPHIC => set_sprite(&mut self.move_sprite, cvttss2si(v), world),
-            a::RUNNING_GRAPHIC => set_sprite(&mut self.run_sprite, cvttss2si(v), world),
-            a::TRAILING_UNIT => self.trail.unit = MasterField::of_data(low16(v)),
-            a::TRAIL_MODE => self.trail.mode = TrailMode::of_data(low8(v)),
-            a::TRAIL_DENSITY => self.trail.density = TrailDensity::new(v),
+            MasterAttribute::ROTATION_SPEED => self.turn_speed = Seconds::new(v),
+            MasterAttribute::WALKING_GRAPHIC => {
+                set_sprite(&mut self.move_sprite, cvttss2si(v), world);
+            }
+            MasterAttribute::RUNNING_GRAPHIC => {
+                set_sprite(&mut self.run_sprite, cvttss2si(v), world);
+            }
+            MasterAttribute::TRAILING_UNIT => self.trail.unit = MasterField::of_data(low16(v)),
+            MasterAttribute::TRAIL_MODE => self.trail.mode = TrailMode::of_data(low8(v)),
+            MasterAttribute::TRAIL_DENSITY => self.trail.density = TrailDensity::new(v),
             _ => self.set_animated(attribute, v, world),
         }
     }
@@ -444,16 +498,16 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
-            a::WALKING_GRAPHIC => add_sprite(&mut self.move_sprite, v, world),
-            a::RUNNING_GRAPHIC => add_sprite(&mut self.run_sprite, v, world),
-            a::TRAILING_UNIT => {
+            MasterAttribute::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
+            MasterAttribute::WALKING_GRAPHIC => add_sprite(&mut self.move_sprite, v, world),
+            MasterAttribute::RUNNING_GRAPHIC => add_sprite(&mut self.run_sprite, v, world),
+            MasterAttribute::TRAILING_UNIT => {
                 self.trail.unit = self.trail.unit.plus(low16(v));
             }
-            a::TRAIL_MODE => self.trail.mode = self.trail.mode.plus(low8(v)),
-            a::TRAIL_DENSITY => self.trail.density += TrailDensity::new(v),
+            MasterAttribute::TRAIL_MODE => self.trail.mode = self.trail.mode.plus(low8(v)),
+            MasterAttribute::TRAIL_DENSITY => self.trail.density += TrailDensity::new(v),
             _ => self.add_animated(attribute, v, world),
         }
     }
@@ -466,8 +520,8 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::ROTATION_SPEED => self.turn_speed *= v,
-            attribute::TRAIL_DENSITY => self.trail.density *= v,
+            MasterAttribute::ROTATION_SPEED => self.turn_speed *= v,
+            MasterAttribute::TRAIL_DENSITY => self.trail.density *= v,
             _ => self.multiply_animated(attribute, v, world),
         }
     }
@@ -480,14 +534,14 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::WORK_RATE => self.work_rate = WorkRate::new(v),
-            attribute::SEARCH_RADIUS => self.search_radius = Distance::new(v),
-            attribute::RUN_PATTERN => self.run_pattern = RunPattern::of_data(low8(v)),
+            MasterAttribute::WORK_RATE => self.work_rate = WorkRate::new(v),
+            MasterAttribute::SEARCH_RADIUS => self.search_radius = Distance::new(v),
+            MasterAttribute::RUN_PATTERN => self.run_pattern = RunPattern::of_data(low8(v)),
             // the command and move sounds (132 to 135) are the interface's
-            attribute::COMMAND_SOUND
-            | attribute::COMMAND_SOUND_EVENT
-            | attribute::MOVE_SOUND
-            | attribute::MOVE_SOUND_EVENT => {}
+            MasterAttribute::COMMAND_SOUND
+            | MasterAttribute::COMMAND_SOUND_EVENT
+            | MasterAttribute::MOVE_SOUND
+            | MasterAttribute::MOVE_SOUND_EVENT => {}
             _ => self.set_moving(attribute, v, world),
         }
     }
@@ -500,11 +554,11 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::WORK_RATE => self.work_rate += WorkRate::new(v),
-            attribute::SEARCH_RADIUS => self.search_radius += Distance::new(v),
-            attribute::RUN_PATTERN => self.run_pattern = self.run_pattern.plus(low8(v)),
+            MasterAttribute::WORK_RATE => self.work_rate += WorkRate::new(v),
+            MasterAttribute::SEARCH_RADIUS => self.search_radius += Distance::new(v),
+            MasterAttribute::RUN_PATTERN => self.run_pattern = self.run_pattern.plus(low8(v)),
             // the command and move sounds (through slot 0x18) are the interface's
-            attribute::COMMAND_SOUND | attribute::MOVE_SOUND => {}
+            MasterAttribute::COMMAND_SOUND | MasterAttribute::MOVE_SOUND => {}
             _ => self.add_moving(attribute, v, world),
         }
     }
@@ -517,8 +571,8 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            attribute::WORK_RATE => self.work_rate *= v,
-            attribute::SEARCH_RADIUS => self.search_radius *= v,
+            MasterAttribute::WORK_RATE => self.work_rate *= v,
+            MasterAttribute::SEARCH_RADIUS => self.search_radius *= v,
             _ => self.multiply_moving(attribute, v, world),
         }
     }

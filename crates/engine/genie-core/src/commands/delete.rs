@@ -24,9 +24,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
-use crate::objects::masters::master_type::ACTION;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -103,7 +100,7 @@ impl World {
         {
             return Ok(());
         }
-        if master.kind == BUILDING {
+        if master.kind == MasterKind::BUILDING {
             self.delete_building(owner, id)
         } else {
             self.delete_unit(owner, id)
@@ -154,7 +151,7 @@ impl World {
                         .building_of(u.id)
                         .construction
                         .is_some_and(|c| c.desolid);
-                    if kind != BUILDING
+                    if kind != MasterKind::BUILDING
                         || !desolid
                         || !self.spatial.sees_and_explored(owner, Tile::new(tx, ty))
                     {
@@ -287,7 +284,7 @@ impl World {
         let (_, u) = self.object(id).ok_or(NOT_HELD)?;
         let state = u.life.state;
         let master = u.master(self.master_tables(), owner)?.clone();
-        if master.kind == BUILDING {
+        if master.kind == MasterKind::BUILDING {
             if state == ObjectState::Alive {
                 self.storage_leaves(owner, id, &master)?;
             }
@@ -295,13 +292,13 @@ impl World {
                 self.clear_treaty_zones()?;
             }
         }
-        if ACTION <= master.kind
+        if MasterKind::ACTION <= master.kind
             && let Some(Place::Live(p, i)) = self.place(id)
         {
             self.clear_actions(p, i)?;
         }
         self.base_destroy(owner, id)?;
-        if master.kind == BUILDING {
+        if master.kind == MasterKind::BUILDING {
             self.unwatch(owner, id)?;
         }
         Ok(())
@@ -371,8 +368,8 @@ impl World {
         ))?;
         let master = u.master(self.master_tables(), owner)?.clone();
         match master.kind {
-            BUILDING => self.building_set_state(owner, id, new, &master),
-            COMBAT => self.combat_set_state(owner, id, new, &master),
+            MasterKind::BUILDING => self.building_set_state(owner, id, new, &master),
+            MasterKind::COMBAT => self.combat_set_state(owner, id, new, &master),
             _ => self.base_set_state(owner, id, new, &master),
         }
     }
@@ -394,7 +391,7 @@ impl World {
         let annexes = self.objects().annexes(id);
         for annex in annexes.ids() {
             if let Some((q, a)) = self.object(annex)
-                && a.master(self.master_tables(), q)?.kind == BUILDING
+                && a.master(self.master_tables(), q)?.kind == MasterKind::BUILDING
             {
                 // the annexes come from the spatial index's raw ids yet (T9's spatial keys)
                 self.set_state(q, annex, new)?;
@@ -597,7 +594,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::layers::Building;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::ids;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
@@ -629,7 +626,7 @@ mod tests {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionType::TYPE_2,
+                    kind: ObstructionKind::TYPE_2,
                     class: ObstructionClass::NONE,
                 },
                 snow: Snow::None,
@@ -689,20 +686,20 @@ mod tests {
             Master {
                 id: ids::VILLAGER_MALE,
                 class: class::VILLAGER,
-                kind: COMBAT,
+                kind: MasterKind::COMBAT,
                 ..Master::default()
             },
             Master {
                 id: ids::HOUSE,
                 class: class::BUILDING,
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 cost: costs(&[(attribute::WOOD, 25, true), (attribute::HEADROOM, 1, false)]),
                 ..Master::default()
             },
             Master {
                 id: master_id(594),
                 class: class::LIVESTOCK,
-                kind: COMBAT,
+                kind: MasterKind::COMBAT,
                 ..Master::default()
             },
         ]);
@@ -815,9 +812,9 @@ mod clearing_tests {
     use crate::objects::masters::BuildableOn;
     #[cfg(test)]
     use crate::objects::masters::BuildingMaster;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ObstructionType;
-    use crate::objects::masters::master_type;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::masters::{MasterId, ids};
     use crate::objects::unit::Unit;
@@ -856,7 +853,7 @@ mod clearing_tests {
             class: m.class,
             player,
             master: m.id,
-            obstruction_type: m.obstruction_type,
+            obstruction_kind: m.obstruction_kind,
             buildable_on: m.buildable_on,
             tall: m.tall,
             moves: false,
@@ -872,7 +869,7 @@ mod clearing_tests {
     fn masters() -> Masters {
         let deco = |id| Master {
             id,
-            kind: master_type::STATIC,
+            kind: MasterKind::STATIC,
             class: class::CLASS_5,
             radius: Footprint::new(0.5, 0.5),
             buildable_on: BuildableOn::YES,
@@ -881,7 +878,7 @@ mod clearing_tests {
         Masters::new([
             Master {
                 id: ids::HOUSE,
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 class: class::BUILDING,
                 radius: Footprint::new(1.0, 1.0),
                 ..Master::default()
@@ -890,7 +887,7 @@ mod clearing_tests {
             deco(master_id(1358)),
             Master {
                 id: master_id(43),
-                kind: master_type::MOVING,
+                kind: MasterKind::MOVING,
                 class: class::CLASS_11,
                 radius: Footprint::new(0.2, 0.2),
                 buildable_on: BuildableOn::YES,
@@ -899,18 +896,18 @@ mod clearing_tests {
             },
             Master {
                 id: master_id(254),
-                kind: COMBAT,
+                kind: MasterKind::COMBAT,
                 class: class::CLASS_40,
                 radius: Footprint::new(0.5, 0.5),
                 height: Distance::new(1.0),
                 tall: true,
-                obstruction_type: ObstructionType::TYPE_2,
+                obstruction_kind: ObstructionKind::TYPE_2,
                 buildable_on: BuildableOn::YES,
                 ..Master::default()
             },
             Master {
                 id: ids::ID_357,
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 class: class::CLASS_11,
                 radius: Footprint::new(1.5, 1.5),
                 buildable_on: BuildableOn::YES,
@@ -964,9 +961,9 @@ mod clearing_tests {
             for u in all {
                 let m = ms.get(u.life.master_id).expect("a test master");
                 let mut at = placed(&u, m, p);
-                if m.obstruction_type == ObstructionType::TYPE_2 {
+                if m.obstruction_kind == ObstructionKind::TYPE_2 {
                     at.obstruction = Some(Obstruction {
-                        kind: ObstructionType::TYPE_2,
+                        kind: ObstructionKind::TYPE_2,
                         class: ObstructionClass::NONE,
                     });
                 }
@@ -1144,7 +1141,7 @@ mod clearing_tests {
     #[test]
     fn death_refunds_its_paid_cost_by_its_type() {
         let unit = Master {
-            kind: COMBAT,
+            kind: MasterKind::COMBAT,
             cost: costs(&[
                 (attribute::FOOD, 50, true),
                 (attribute::GOLD, 20, true),
@@ -1161,7 +1158,7 @@ mod clearing_tests {
         );
         let house = Master {
             id: ids::HOUSE,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             ..unit
         };
         assert_eq!(

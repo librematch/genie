@@ -4,9 +4,9 @@
 /// its missile flies. Type 0 flies straight along its unit direction, type 3 takes its whole way
 /// in one step; types 1 and 2 are not modelled.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ProjectileType(u8);
+pub struct ProjectileKind(u8);
 
-impl ProjectileType {
+impl ProjectileKind {
     /// Type 0: straight along its unit direction, its timer counting the way.
     pub const STRAIGHT: Self = Self(0);
     /// Type 3: the whole way in one step.
@@ -31,7 +31,7 @@ impl ProjectileType {
     }
 }
 
-impl genie_diff::Diff for ProjectileType {
+impl genie_diff::Diff for ProjectileKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
     }
@@ -39,15 +39,15 @@ impl genie_diff::Diff for ProjectileType {
 
 #[cfg(test)]
 mod tests {
-    use crate::combat::missile::ProjectileType;
+    use crate::combat::missile::ProjectileKind;
 
     /// Types 0 to 2 meet the objects on the way; type 3 does not.
     #[test]
     fn types_up_to_two_meet_the_objects_on_the_way() {
-        assert!(ProjectileType::STRAIGHT.meets_on_the_way());
-        assert!(ProjectileType::of_data(2).meets_on_the_way());
-        assert!(!ProjectileType::WHOLE_WAY.meets_on_the_way());
-        assert_eq!(ProjectileType::of_data(3), ProjectileType::WHOLE_WAY);
-        assert_eq!(ProjectileType::default().get(), 0);
+        assert!(ProjectileKind::STRAIGHT.meets_on_the_way());
+        assert!(ProjectileKind::of_data(2).meets_on_the_way());
+        assert!(!ProjectileKind::WHOLE_WAY.meets_on_the_way());
+        assert_eq!(ProjectileKind::of_data(3), ProjectileKind::WHOLE_WAY);
+        assert_eq!(ProjectileKind::default().get(), 0);
     }
 }

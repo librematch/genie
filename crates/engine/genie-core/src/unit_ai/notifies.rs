@@ -7,7 +7,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi, UnitSide};
@@ -118,7 +118,7 @@ impl UnitAi {
         self.notifies.iter().any(|n| {
             n.kind == NotifyKind::ACTION_COMPLETED
                 && self.current_order.is_none()
-                && ActionKind::field(self.current_action) == n.p[0]
+                && AiAction::field(self.current_action) == n.p[0]
         })
     }
 
@@ -186,14 +186,14 @@ impl UnitAi {
         let taken = match n.kind {
             // "That unit is not attacking me, so I'm ignoring it."
             NotifyKind::NO_LONGER_ON_ME => self.attackers.contains(n.caller),
-            NotifyKind::ACTION_INVALIDATED => n.p[0] == ActionKind::field(action),
+            NotifyKind::ACTION_INVALIDATED => n.p[0] == AiAction::field(action),
             NotifyKind::ACTION_COMPLETED => {
                 // ignored (and handled) for a non-movement action
-                // the game's list also holds 0x268, which no unit AI holds ([`ActionKind`])
-                if n.p[0] == ActionKind::Move.value()
+                // the game's list also holds 0x268, which no unit AI holds ([`AiAction`])
+                if n.p[0] == AiAction::Move.value()
                     && !matches!(
                         action,
-                        Some(ActionKind::Move | ActionKind::MoveAside | ActionKind::GroupAside)
+                        Some(AiAction::Move | AiAction::MoveAside | AiAction::GroupAside)
                     )
                 {
                     return true;

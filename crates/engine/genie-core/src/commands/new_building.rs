@@ -35,12 +35,12 @@ use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::lifecycle::static_storage;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::PASTURE_1889;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
@@ -102,7 +102,7 @@ impl World {
         }
         let _ = self.streams.get(Stream::Object).rand15();
         if let Some(m) = player_master(&self.masters, player, master)
-            .filter(|m| m.kind == BUILDING && !m.trained_at.is_empty())
+            .filter(|m| m.kind == MasterKind::BUILDING && !m.trained_at.is_empty())
         {
             let paid: i32 = cost_entries(&m.cost)
                 .filter(|&(_, _, paid)| paid)
@@ -330,7 +330,7 @@ impl World {
                 hit_points: made.hit_points,
                 build_time: made.build_time,
                 record: Obstruction {
-                    kind: made.obstruction_type,
+                    kind: made.obstruction_kind,
                     class: made.obstruction_class,
                 },
                 snow,

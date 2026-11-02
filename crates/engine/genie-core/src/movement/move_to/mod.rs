@@ -19,7 +19,7 @@ use crate::movement::{MoveStats, PathAsk};
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::layers::{self, Static};
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
@@ -50,7 +50,7 @@ use crate::objects::masters::Master;
 use crate::world::WALKER_UNMOVING;
 
 /// The `MoveTo` action's type, which word 9 adds when it is a unit's top action.
-pub const MOVE_TO: ActionType = ActionType::named(1);
+pub const MOVE_TO: ActionKind = ActionKind::named(1);
 
 /// The `MoveTo`'s state (`+0x18`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
@@ -566,13 +566,13 @@ mod tests {
     use crate::objects::UpdateCode;
     use crate::objects::Voice;
     use crate::objects::masters::BuildableOn;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::class;
     use crate::players::PlayerId;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     #[cfg(test)]
-    use crate::unit_ai::{ActionKind, Inbox, NotifyKind, UnitAi};
+    use crate::unit_ai::{AiAction, Inbox, NotifyKind, UnitAi};
 
     /// A `MoveTo` sub-action ([`MoveToAction::sub_update`]) on house 10028 within 0.1 (the
     /// walker 0.8 off it) with [`WalkRig`]'s walker: a start asks for its path (a `MoveTo` that
@@ -700,7 +700,7 @@ mod tests {
             class: class::PREDATOR,
             player: PlayerId::new(1),
             master: master_id(594),
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -800,7 +800,7 @@ mod tests {
             };
             // a moving unit's AI: an invalidation of its move joins its queue
             let mut ai = Some(UnitAi {
-                current_action: Some(ActionKind::Move),
+                current_action: Some(AiAction::Move),
                 ..UnitAi::default()
             });
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
@@ -876,7 +876,7 @@ mod tests {
                 ..MoveToAction::sub_in(state)
             };
             let mut ai = Some(UnitAi {
-                current_action: Some(ActionKind::Move),
+                current_action: Some(AiAction::Move),
                 ..UnitAi::default()
             });
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);

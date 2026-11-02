@@ -31,18 +31,21 @@ pub fn follow_moving(
     graphics: &Graphics,
     terrain: Option<&Terrain>,
 ) {
-    use crate::objects::masters::attribute as a;
+    use crate::objects::masters::MasterAttribute;
     match attribute {
-        a::SIZE_X | a::SIZE_Y | a::SIZE_Z => {
+        MasterAttribute::SIZE_X | MasterAttribute::SIZE_Y | MasterAttribute::SIZE_Z => {
             stats.radius = master.radius.with_height(master.height.get());
         }
-        a::MOVEMENT_SPEED | a::STANDING_GRAPHIC | a::WALKING_GRAPHIC | a::RUNNING_GRAPHIC => {
+        MasterAttribute::MOVEMENT_SPEED
+        | MasterAttribute::STANDING_GRAPHIC
+        | MasterAttribute::WALKING_GRAPHIC
+        | MasterAttribute::RUNNING_GRAPHIC => {
             stats.base = master.max_speed;
             let run = master.run_sprite.or(master.move_sprite);
             stats.speed = sprite_speed(master.max_speed, run, graphics);
         }
-        a::ROTATION_SPEED => stats.turn_time = master.turn_speed,
-        a::TERRAIN_RESTRICTION_ID => {
+        MasterAttribute::ROTATION_SPEED => stats.turn_time = master.turn_speed,
+        MasterAttribute::TERRAIN_RESTRICTION_ID => {
             // a restriction below 0 has no mask; the stats keep theirs
             if let Some(r) = master.terrain_restriction {
                 stats.restriction = r;
@@ -51,19 +54,19 @@ pub fn follow_moving(
                 }
             }
         }
-        a::UNIT_TRAIT | a::TRAIT_PIECE => {
+        MasterAttribute::UNIT_TRAIT | MasterAttribute::TRAIT_PIECE => {
             stats.fast_turn = master.object_flags.contains(ObjectFlags::SHIP);
         }
-        a::MAXIMUM_RANGE => stats.weapon_range = master.weapon_range,
+        MasterAttribute::MAXIMUM_RANGE => stats.weapon_range = master.weapon_range,
         _ => {}
     }
     if matches!(
         attribute,
-        a::STANDING_GRAPHIC
-            | a::STANDING_GRAPHIC_2
-            | a::WALKING_GRAPHIC
-            | a::RUNNING_GRAPHIC
-            | a::ATTACK_GRAPHIC
+        MasterAttribute::STANDING_GRAPHIC
+            | MasterAttribute::STANDING_GRAPHIC_2
+            | MasterAttribute::WALKING_GRAPHIC
+            | MasterAttribute::RUNNING_GRAPHIC
+            | MasterAttribute::ATTACK_GRAPHIC
     ) {
         stats.facets = master.sprite_facets(graphics);
     }
@@ -79,27 +82,29 @@ pub fn follow(
     graphics: &Graphics,
     terrain: Option<&Terrain>,
 ) {
-    use crate::objects::masters::attribute as a;
+    use crate::objects::masters::MasterAttribute;
     match attribute {
-        a::SIZE_X | a::SIZE_Y | a::SIZE_Z => {
+        MasterAttribute::SIZE_X | MasterAttribute::SIZE_Y | MasterAttribute::SIZE_Z => {
             master.tall = Distance::ZERO < master.height;
             if let Some(m) = master.missile_stats.as_mut() {
                 m.radius = master.radius.with_height(master.height.get());
             }
         }
-        a::MOVEMENT_SPEED => {
+        MasterAttribute::MOVEMENT_SPEED => {
             if let Some(m) = master.missile_stats.as_mut() {
                 m.speed = master.max_speed;
             }
         }
-        a::DAMAGE_GRAPHICS_ENTRY_MOD | a::DAMAGE_GRAPHICS_TOTAL_NUM => {
+        MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
             master.damage_sprites = !master.damage_graphics.is_empty();
         }
-        a::SPECIAL_GRAPHIC => master.special_graphic = master.special_sprite.is_some(),
-        a::TRAIN_LOCATION
-        | a::TRAIN_TIME
-        | a::TRAIN_LOCATIONS_ENTRY_MOD
-        | a::TRAIN_LOCATIONS_TOTAL_NUM => {
+        MasterAttribute::SPECIAL_GRAPHIC => {
+            master.special_graphic = master.special_sprite.is_some();
+        }
+        MasterAttribute::TRAIN_LOCATION
+        | MasterAttribute::TRAIN_TIME
+        | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
+        | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
             master.trained_at = master
                 .train_locations
                 .iter()

@@ -12,14 +12,14 @@ use crate::objects::layers::Static;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
-use crate::objects::masters::ChargeType;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassAmount;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, MasterTables};
 use crate::objects::object_list::ObjectList;
 use crate::ownership::CaptureKind;
@@ -101,13 +101,13 @@ fn harmless(master: Master) -> bool {
         held: None,
         top_action: None,
         master: ids::VILLAGER_MALE,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: Some(class::VILLAGER),
         attack_priority: AttackPriority::PRIORITY_0,
         missile: None,
         range: Distance::ZERO,
         min_range: Distance::ZERO,
-        charge_type: ChargeType::NONE,
+        charge_kind: ChargeKind::NONE,
         area_effect: Distance::ZERO,
         blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
@@ -152,7 +152,7 @@ fn harmless(master: Master) -> bool {
 fn ward_nearest_attacker_is_its_closest_held_one() {
     let master = |id, radius| Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         radius,
         ..Master::default()
     };
@@ -210,13 +210,13 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
         held: None,
         top_action: None,
         master: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: Some(class::CLASS_6),
         attack_priority: AttackPriority::PRIORITY_0,
         missile: None,
         range: Distance::ZERO,
         min_range: Distance::ZERO,
-        charge_type: ChargeType::NONE,
+        charge_kind: ChargeKind::NONE,
         area_effect: Distance::ZERO,
         blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),
@@ -276,7 +276,7 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
     let villager = Master {
         id: ids::VILLAGER_MALE,
         copy_id: Some(ids::VILLAGER_MALE),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         object_flags: ObjectFlags::SCOUT,
         hit_points: MasterHitPoints::of_data(25),
@@ -316,7 +316,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     use crate::unit_ai::AttackPicker;
     let master = |id, class, weapons| Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class,
         radius: Footprint::new(0.3, 0.3),
         weapons,
@@ -365,13 +365,13 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         held: None,
         top_action: None,
         master: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: Some(class::CLASS_6),
         attack_priority: AttackPriority::PRIORITY_0,
         missile: None,
         range: Distance::new(0.5),
         min_range: Distance::ZERO,
-        charge_type: ChargeType::NONE,
+        charge_kind: ChargeKind::NONE,
         area_effect: Distance::ZERO,
         blast_level: BlastLevel::NONE,
         los: Distance::new(4.0),

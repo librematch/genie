@@ -13,8 +13,7 @@ use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
 use crate::objects::masters::Master;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::RGE_COMBAT;
+use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
 use crate::orders::{
@@ -23,7 +22,7 @@ use crate::orders::{
 };
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::OrderKind;
 use crate::world::Millis;
@@ -266,7 +265,7 @@ impl World {
                 continue;
             };
             let master = u.master(self.master_tables(), p)?;
-            if master.kind < COMBAT
+            if master.kind < MasterKind::COMBAT
                 || !master.formation_category.grouped()
                 || split.far.contains(&id)
             {
@@ -384,7 +383,7 @@ impl World {
             }
         }
         // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep)
-        if RGE_COMBAT <= kind
+        if MasterKind::RGE_COMBAT <= kind
             && let Some(Place::Live(p, idx)) = self.place(id)
         {
             let walk = AiMove {
@@ -411,7 +410,7 @@ impl World {
                 }),
                 rng,
             );
-            ai.set_action(Some(ActionKind::Move));
+            ai.set_action(Some(AiAction::Move));
             ai.set_target(None, None, shown.with_height(z));
         }
         Ok(())

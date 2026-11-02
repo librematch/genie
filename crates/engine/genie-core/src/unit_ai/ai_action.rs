@@ -6,13 +6,13 @@ use crate::unit_ai::OrderKind;
 use genie_diff::Diff;
 
 /// An action value a unit AI holds (`+0x44`, the last one `+0x68`). Where an order serves it,
-/// the value is that order's less 100 ([`ActionKind::order`]), and the variant takes the
+/// the value is that order's less 100 ([`AiAction::order`]), and the variant takes the
 /// order's name. The value setter's (`FUN_140c64b50`) 44 calls give no other value (these, −1,
 /// or a value saved or read before), nor do the unit AI's own stores, nor the work command's
-/// notify (`FUN_14106e4e0`); a save's raw value converts fallibly ([`ActionKind::try_from`]).
+/// notify (`FUN_14106e4e0`); a save's raw value converts fallibly ([`AiAction::try_from`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Diff)]
 #[repr(i32)]
-pub enum ActionKind {
+pub enum AiAction {
     /// 600: attacking.
     Attack = 0x258,
     /// `0x259`: defending.
@@ -76,7 +76,7 @@ pub enum ActionKind {
     HeroPower = 0x2c2,
 }
 
-impl ActionKind {
+impl AiAction {
     /// Every action value, by value.
     pub const ALL: [Self; 30] = [
         Self::Attack,
@@ -143,7 +143,7 @@ impl ActionKind {
     }
 }
 
-impl TryFrom<i32> for ActionKind {
+impl TryFrom<i32> for AiAction {
     type Error = GenieError;
 
     /// The action of value `value`.
@@ -161,20 +161,20 @@ impl TryFrom<i32> for ActionKind {
 #[cfg(test)]
 mod tests {
     use crate::ErrorKind;
-    use crate::unit_ai::{ActionKind, OrderKind};
+    use crate::unit_ai::{AiAction, OrderKind};
 
     /// Every action value converts back from its value; the values are 30 distinct ones.
     #[test]
     fn every_action_converts_back_from_its_value() {
-        for a in ActionKind::ALL {
-            assert_eq!(ActionKind::try_from(a.value()), Ok(a));
+        for a in AiAction::ALL {
+            assert_eq!(AiAction::try_from(a.value()), Ok(a));
         }
-        let mut values: Vec<i32> = ActionKind::ALL.iter().map(|a| a.value()).collect();
+        let mut values: Vec<i32> = AiAction::ALL.iter().map(|a| a.value()).collect();
         values.sort_unstable();
         values.dedup();
         assert_eq!(values.len(), 30);
         assert_eq!(
-            (ActionKind::Attack.value(), ActionKind::HeroPower.value()),
+            (AiAction::Attack.value(), AiAction::HeroPower.value()),
             (600, 0x2c2)
         );
     }
@@ -184,29 +184,29 @@ mod tests {
     fn value_no_action_names_is_an_error() {
         for v in [0, 0x25e, 0x263, 0x2c1, 0x2c6, 700 + 100] {
             assert_eq!(
-                ActionKind::try_from(v).map_err(|e| e.kind()),
+                AiAction::try_from(v).map_err(|e| e.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
-        assert_eq!(ActionKind::of_field(-1), Ok(None));
-        assert_eq!(ActionKind::of_field(0x262), Ok(Some(ActionKind::Move)));
-        assert_eq!(ActionKind::field(None), -1);
-        assert_eq!(ActionKind::field(Some(ActionKind::Hunt)), 0x265);
+        assert_eq!(AiAction::of_field(-1), Ok(None));
+        assert_eq!(AiAction::of_field(0x262), Ok(Some(AiAction::Move)));
+        assert_eq!(AiAction::field(None), -1);
+        assert_eq!(AiAction::field(Some(AiAction::Hunt)), 0x265);
     }
 
     /// An action's order is the value 100 above it: the move's, the trade's, the hero power's;
     /// the make, research and the two moves aside have none.
     #[test]
     fn an_action_order_is_100_above_it() {
-        assert_eq!(ActionKind::Move.order(), Some(OrderKind::Move));
-        assert_eq!(ActionKind::Trade.order(), Some(OrderKind::Trade));
-        assert_eq!(ActionKind::HeroPower.order(), Some(OrderKind::HeroPower));
-        assert_eq!(ActionKind::OnTarget.order(), Some(OrderKind::OnTarget));
+        assert_eq!(AiAction::Move.order(), Some(OrderKind::Move));
+        assert_eq!(AiAction::Trade.order(), Some(OrderKind::Trade));
+        assert_eq!(AiAction::HeroPower.order(), Some(OrderKind::HeroPower));
+        assert_eq!(AiAction::OnTarget.order(), Some(OrderKind::OnTarget));
         for a in [
-            ActionKind::Make,
-            ActionKind::Research,
-            ActionKind::MoveAside,
-            ActionKind::GroupAside,
+            AiAction::Make,
+            AiAction::Research,
+            AiAction::MoveAside,
+            AiAction::GroupAside,
         ] {
             assert_eq!(a.order(), None, "{a:?}");
         }

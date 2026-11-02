@@ -20,7 +20,6 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::{ActiveSprite, new_sprite};
 use crate::objects::unit::Unit;
@@ -30,7 +29,7 @@ use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::best_target::category;
@@ -100,7 +99,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (order, action): (Option<OrderKind>, Option<ActionKind>),
+        (order, action): (Option<OrderKind>, Option<AiAction>),
     ) -> Result<(), GenieError> {
         let u = &self.players.live(player, idx)?;
         let Some(target) = self
@@ -272,7 +271,7 @@ impl World {
     /// special-object list (`+0x30c` bit 0, `FUN_141677380`) is not held.
     pub(super) fn shut_in_gate(&mut self, id: ObjectId) -> Result<(), GenieError> {
         /// The first master type whose slot 0xd8 is `FUN_141211340` (`TRIBE_Combat_Object`).
-        const TRIBE_COMBAT: MasterKind = master_type::COMBAT;
+        const TRIBE_COMBAT: MasterKind = MasterKind::COMBAT;
         /// The class `FUN_141211340` always spares.
         const SPARED: ClassId = class::RELIC;
         let Some((p, u)) = self.object(id) else {
@@ -438,7 +437,7 @@ pub(crate) fn switch_master(
             placed.radius = next.radius;
             placed.class = next.class;
             placed.master = new;
-            placed.obstruction_type = next.obstruction_type;
+            placed.obstruction_kind = next.obstruction_kind;
             placed.buildable_on = next.buildable_on;
             placed.tall = next.tall;
             placed.moves = next.moves();
@@ -452,7 +451,7 @@ pub(crate) fn switch_master(
                 }
             } else {
                 if let Some(o) = placed.obstruction.as_mut() {
-                    o.kind = next.obstruction_type;
+                    o.kind = next.obstruction_kind;
                     o.class = next.obstruction_class;
                 }
                 world.pathing.removed(id);

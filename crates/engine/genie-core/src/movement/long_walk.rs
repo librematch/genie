@@ -4,7 +4,7 @@ use crate::map::Distance;
 use crate::map::Tile;
 use crate::movement::StepPlans;
 use crate::objects::ObjectId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::pathing::long_path::gate_lets_pass;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -236,10 +236,10 @@ pub(crate) fn tile_plan_for(
     let target_box = target.and_then(|t| t.obstruction).is_some_and(|o| {
         matches!(
             o.kind,
-            ObstructionType::TYPE_2
-                | ObstructionType::TYPE_10
-                | ObstructionType::TYPE_11
-                | ObstructionType::TYPE_13
+            ObstructionKind::TYPE_2
+                | ObstructionKind::TYPE_10
+                | ObstructionKind::TYPE_11
+                | ObstructionKind::TYPE_13
         )
     });
     let req = Request {
@@ -319,7 +319,7 @@ pub(super) fn include_kept(
             let p = world
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a kept hit without a place"))?;
-            if p.obstruction_type == ObstructionType::TYPE_11 {
+            if p.obstruction_kind == ObstructionKind::TYPE_11 {
                 return Err(GenieError::unsupported(
                     "a kept hit of obstruction type 11 (its outline)",
                 ));

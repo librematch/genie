@@ -2,9 +2,8 @@
 
 use crate::GenieError;
 use crate::construction::repair::REPAIR;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::action_type;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, MasterId, Masters, Task};
 use crate::players::PlayerId;
@@ -100,7 +99,7 @@ pub fn work_master<'m>(
     masters: &'m Masters,
     actor: &Actor<'_>,
     on: &TaskOn<'_, '_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> Result<Option<(MasterId, &'m Task)>, GenieError> {
     let own = actor.master;
@@ -110,7 +109,7 @@ pub fn work_master<'m>(
     let own_task = find_task(
         own_list, actor, on.target, on.general, on.terrain, filter, dip,
     )?;
-    if own_task.is_none_or(|t| t.action_type == action_type::COMBAT)
+    if own_task.is_none_or(|t| t.action_kind == ActionKind::COMBAT)
         && own.task_by_group != TaskGroup::NONE
     {
         let (mut by_class, mut generic) = (None, None);
@@ -125,7 +124,7 @@ pub fn work_master<'m>(
                 candidate, actor, on.target, on.general, on.terrain, filter, dip,
             )?;
             let Some(task) = found else { continue };
-            if own_task.is_some_and(|t| t.action_type == task.action_type) {
+            if own_task.is_some_and(|t| t.action_kind == task.action_kind) {
                 continue;
             }
             // a gather task for a point has no target: the game reads none there, as the
@@ -144,7 +143,7 @@ pub fn work_master<'m>(
                 )
             });
             let Some(target) = listed.filter(|t| {
-                task.action_type == REPAIR
+                task.action_kind == REPAIR
                     && (filter.is_none() || filter == Some(REPAIR))
                     && task.object_id != Some(t.master.id)
             }) else {

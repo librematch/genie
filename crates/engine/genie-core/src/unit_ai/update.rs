@@ -8,14 +8,13 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
@@ -222,7 +221,7 @@ impl UnitAi {
         };
         let captured_again = at.player == PlayerId::GAIA
             && t.owner == PlayerId::GAIA
-            && COMBAT <= t.kind
+            && MasterKind::COMBAT <= t.kind
             && t.capture == CaptureKind::AGAIN;
         let action = if captured_again {
             None
@@ -230,8 +229,8 @@ impl UnitAi {
             self.current_action
         };
         let untargeted = t.pasture.is_none()
-            && (t.untargetable || (!t.attackable && action == Some(ActionKind::Attack)))
-            && action != Some(ActionKind::Trade);
+            && (t.untargetable || (!t.attackable && action == Some(AiAction::Attack)))
+            && action != Some(AiAction::Trade);
         if captured_again {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, rng)?;
@@ -319,16 +318,16 @@ impl UnitAi {
         match at.target {
             None => {
                 self.current_target = None;
-                if action == Some(ActionKind::Attack) {
+                if action == Some(AiAction::Attack) {
                     self.idle_timer = self.idle_timeout;
                 }
             }
             Some(t) => {
                 if at.state == ObjectState::Alive
                     && ObjectState::Alive < t.state
-                    && t.kind != BUILDING
+                    && t.kind != MasterKind::BUILDING
                 {
-                    let attack_over = action == Some(ActionKind::Attack)
+                    let attack_over = action == Some(AiAction::Attack)
                         && at
                             .action_state
                             .ok_or(GenieError::unsupported(
@@ -341,10 +340,9 @@ impl UnitAi {
                         || attack_over
                     {
                         self.stop_after_kill = false;
-                        if action == Some(ActionKind::Attack) {
+                        if action == Some(AiAction::Attack) {
                             self.next_after_kill(at, player_type, ai, side)?;
-                        } else if !matches!(action, Some(ActionKind::Hunt | ActionKind::BoarLuring))
-                        {
+                        } else if !matches!(action, Some(AiAction::Hunt | AiAction::BoarLuring)) {
                             self.remove_target();
                             self.stop_current(StopOrder::Keep, at, side, ai)?;
                         }
@@ -367,7 +365,7 @@ impl UnitAi {
                 // target's distance: no order holds 0x262 ([`OrderKind`])
             }
         }
-        if self.current_action == Some(ActionKind::BoarLuring) {
+        if self.current_action == Some(AiAction::BoarLuring) {
             return Err(GenieError::unsupported("action 0x2be's target check"));
         }
         Ok(())
@@ -569,7 +567,7 @@ impl UnitAi {
             self,
             rng,
         )?;
-        self.set_action(Some(ActionKind::Gather));
+        self.set_action(Some(AiAction::Gather));
         self.set_target(Some(found.id), found.class.or_none(), found.position);
         Ok(())
     }

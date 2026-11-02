@@ -23,10 +23,10 @@ use crate::objects::SpriteId;
 use crate::objects::layers::Action;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
@@ -262,7 +262,7 @@ impl Unit {
             engagement,
             arms,
             idle,
-            special_graphic: if master.kind == COMBAT && master.special_graphic {
+            special_graphic: if master.kind == MasterKind::COMBAT && master.special_graphic {
                 Some(
                     master
                         .special_sprite

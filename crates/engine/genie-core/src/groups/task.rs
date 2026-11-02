@@ -10,11 +10,10 @@ use crate::map::Point;
 use crate::math::image::group::MEMBER_MIN_HP;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskGroup;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters, Task};
 use crate::players::Amount;
 use crate::unit_ai::task_finder::TaskTarget;
@@ -25,26 +24,26 @@ use crate::world::slots::PlayerSlots;
 
 /// The task whose target range is the target's owner's attribute 90 (`+0x2d0` of its attribute
 /// table), `TRIBE_Action_Repair`'s neighbour 0x69 in the command table.
-const OWNER_RANGE_TASK: ActionType = ActionType::named(0x69);
+const OWNER_RANGE_TASK: ActionKind = ActionKind::named(0x69);
 /// The task `slot38` leaves the range of to the unit's own slot 0x230 (the attack path never
 /// reads it).
-const OWN_RANGE_TASK: ActionType = ActionType::named(0x68);
+const OWN_RANGE_TASK: ActionKind = ActionKind::named(0x68);
 /// The player attribute that bounds a [`OWNER_RANGE_TASK`]'s range.
 const OWNER_RANGE_ATTRIBUTE: usize = 90;
 /// The task `FUN_1415c60b0` looks for in a unit's master before it asks the player's transport
 /// commands (`FUN_14160e090`).
-const BOARD_TASK: ActionType = ActionType::named(0x84);
+const BOARD_TASK: ActionKind = ActionKind::named(0x84);
 /// The same for `FUN_14160e140`.
-const UNBOARD_TASK: ActionType = ActionType::named(0x88);
+const UNBOARD_TASK: ActionKind = ActionKind::named(0x88);
 /// A master of this type or above (`0x27` below) may hold the board tasks.
-const FIRST_ACTING_KIND: MasterKind = master_type::ACTION;
+const FIRST_ACTING_KIND: MasterKind = MasterKind::ACTION;
 
 /// What a member's slot 0x130 gives a group's command: the task's action type (the command the
 /// group runs) and how near the target the work is done.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TargetTask {
     /// The task's action type (`+0xe`), the command.
-    pub(crate) command: ActionType,
+    pub(crate) command: ActionKind,
     /// The range the work is done at (`*param_6`): the task's (`+0x30`), the target owner's
     /// attribute 90 for [`OWNER_RANGE_TASK`]. None for [`OWN_RANGE_TASK`], where the routine
     /// asks the unit's slot 0x230 for it and `BUnitGroup::command` never reads it.
@@ -60,7 +59,7 @@ pub(crate) struct TaskQuery {
     /// The order's point.
     pub(crate) point: Point,
     /// The order's task filter (`+0x16`), `-1` for any.
-    pub(crate) filter: Option<ActionType>,
+    pub(crate) filter: Option<ActionKind>,
     /// The order is queued.
     pub(crate) queued: bool,
     /// A unit with a unit AI takes the order at once.
@@ -190,7 +189,7 @@ impl World {
         task: &Task,
         target: &TaskTarget<'_>,
     ) -> Result<TargetTask, GenieError> {
-        let range = match task.action_type {
+        let range = match task.action_kind {
             OWN_RANGE_TASK => None,
             OWNER_RANGE_TASK => Some(Distance::new(
                 self.players
@@ -207,7 +206,7 @@ impl World {
             _ => Some(task.work_range),
         };
         Ok(TargetTask {
-            command: task.action_type,
+            command: task.action_kind,
             range,
         })
     }
@@ -220,5 +219,5 @@ fn holds_board_task(master: &Master) -> bool {
         && master
             .tasks
             .iter()
-            .any(|t| matches!(t.action_type, BOARD_TASK | UNBOARD_TASK))
+            .any(|t| matches!(t.action_kind, BOARD_TASK | UNBOARD_TASK))
 }

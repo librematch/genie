@@ -171,7 +171,7 @@ impl Unit {
             at,
             (&mut c.w.spatial, Some(&mut c.w.pathing)),
         )?;
-        if stats.projectile_type.meets_on_the_way() {
+        if stats.projectile_kind.meets_on_the_way() {
             let fired = Fired {
                 charge: missile.charge,
                 by: missile.fired_from,

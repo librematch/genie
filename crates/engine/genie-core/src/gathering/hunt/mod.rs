@@ -16,7 +16,7 @@ use crate::movement::move_to::MoveDefaults;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkRate;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
@@ -65,7 +65,7 @@ pub use crate::movement::move_to::Shown;
 use crate::objects::masters::WorkValue;
 
 /// The Hunt action's type, which word 9 adds.
-pub const HUNT: ActionType = ActionType::named(110);
+pub const HUNT: ActionKind = ActionKind::named(110);
 
 /// Own livestock farther than this squared from its drop site is led there first
 /// (`DAT_142ecccc4`).
@@ -262,7 +262,7 @@ pub struct Quarry {
     /// the ally flag).
     pub allied: bool,
     /// Its top action's type (a building's `+0x880` list).
-    pub top_action: Option<ActionType>,
+    pub top_action: Option<ActionKind>,
     /// The hunter's master has its master (a building annex's main building's, `+0xbb8`) among
     /// its drop sites (`FUN_14109d4f0`), which the start reads of its own player's object.
     pub drop_site: bool,

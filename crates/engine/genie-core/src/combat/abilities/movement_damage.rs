@@ -22,9 +22,6 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::DOPPELGANGER;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::allied;
@@ -121,7 +118,7 @@ pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander) -> bool {
     if b.id == hitter.id || b.allied || b.player == PlayerId::GAIA {
         return false;
     }
-    if b.kind == BUILDING && !STRUCK_BUILDING_CLASSES.contains(&b.class) {
+    if b.kind == MasterKind::BUILDING && !STRUCK_BUILDING_CLASSES.contains(&b.class) {
         return false;
     }
     if ObjectState::Alive < b.state {
@@ -193,7 +190,7 @@ impl World {
             .mover_of(unit.id)
             .and_then(|m| m.velocity.as_ref())
             .is_some_and(|v| 0.0 < fmath::length(v.velocity));
-        if master.kind != COMBAT || !moving {
+        if master.kind != MasterKind::COMBAT || !moving {
             return Ok(());
         }
         let hitter = Hitter {
@@ -263,7 +260,7 @@ impl World {
                     id,
                     player: q,
                     allied: allied(q),
-                    kind: DOPPELGANGER,
+                    kind: MasterKind::DOPPELGANGER,
                     class: m.class,
                     state: g.state,
                     blast_defense: m.blast_defense,
@@ -283,7 +280,7 @@ impl World {
         owner: PlayerId,
         damage: HitPoints,
     ) -> Result<(), GenieError> {
-        if b.kind == DOPPELGANGER {
+        if b.kind == MasterKind::DOPPELGANGER {
             return Ok(());
         }
         let Some((q, u)) = self.object(b.id) else {
@@ -313,7 +310,7 @@ impl World {
         if let Some(a) = v.armored.as_ref() {
             self.parts.combat_mut(b.id)?.hp_powerup = a.hp_powerup;
         }
-        if killed && b.kind == COMBAT {
+        if killed && b.kind == MasterKind::COMBAT {
             self.count_kill(b.id, owner)?;
         }
         Ok(())

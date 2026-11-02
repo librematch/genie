@@ -21,7 +21,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, second_target_checked};
 use crate::players::Amount;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
@@ -282,7 +282,7 @@ impl Unit {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
-            [ActionKind::Hunt.value(), 0, 0],
+            [AiAction::Hunt.value(), 0, 0],
         )?;
         Ok(HeadCode::of(UpdateCode::FAILED))
     }

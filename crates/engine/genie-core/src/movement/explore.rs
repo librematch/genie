@@ -20,13 +20,13 @@ use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::unit::{Unit, object_master};
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
 use crate::world::slots::PlayerSlots;
@@ -34,7 +34,7 @@ use crate::world::step::Step;
 use genie_diff::Diff;
 
 /// The Explore action's type.
-pub const EXPLORE: ActionType = ActionType::named(4);
+pub const EXPLORE: ActionKind = ActionKind::named(4);
 
 use crate::combat::abilities::Look;
 #[cfg(test)]
@@ -640,7 +640,7 @@ impl Unit {
             Owner::WantsPoint => self.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
-                [ActionKind::Explore.value(), 0, 0],
+                [AiAction::Explore.value(), 0, 0],
             )?,
             Owner::Standing => {}
         }

@@ -20,7 +20,7 @@ use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::pathing::DelayCount;
 use crate::players::PlayerId;
 use crate::unit_ai::UnitStance;
@@ -328,7 +328,7 @@ pub struct TargetData {
     /// `mDisableRetargeting`.
     pub disable_retargeting: u8,
     /// `mCertainAction`: the action type the attack asks of its units, none for −1 (any).
-    pub certain_action: Option<ActionType>,
+    pub certain_action: Option<ActionKind>,
 }
 
 /// An order of the group's queue (`newOrder`).

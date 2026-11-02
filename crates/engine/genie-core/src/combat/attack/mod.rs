@@ -24,7 +24,7 @@ use crate::movement::move_to::{MoveDefaults, TargetMoved};
 use crate::objects::ObjectId;
 use crate::objects::Voice;
 use crate::objects::layers::MotionMut;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::Master;
@@ -90,7 +90,7 @@ use crate::unit_ai::NotifyKind;
 use crate::world::index::ObjectsRef;
 
 /// The Attack action's type, which word 9 adds.
-pub const ATTACK: ActionType = ActionType::named(9);
+pub const ATTACK: ActionKind = ActionKind::named(9);
 
 /// An Attack whose target the map does not hold (none, or one gone).
 pub(super) const TARGET_GONE: GenieError =

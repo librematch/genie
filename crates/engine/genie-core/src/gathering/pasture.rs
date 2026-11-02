@@ -21,7 +21,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
 use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::attribute::{PASTURE_FOOD, PASTURE_LIVESTOCK, PASTURE_WORKERS};
 use crate::technology::Attributes;
@@ -242,7 +242,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
         let building = match self.object(named) {
-            Some((q, b)) => b.master(self.master_tables(), q)?.kind == BUILDING,
+            Some((q, b)) => b.master(self.master_tables(), q)?.kind == MasterKind::BUILDING,
             None => false,
         };
         if building && let Some((_, layer)) = self.object_and_layer_mut(named)? {

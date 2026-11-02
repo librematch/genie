@@ -47,22 +47,21 @@ use crate::objects::actions::ActionList;
 use crate::objects::layers::{Action, Motion, MotionMut, Static};
 use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::Lifecycle;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
@@ -84,7 +83,7 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
@@ -258,7 +257,7 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
         t.masters[0].get(master_id(1243)).unwrap().clone(),
         Master {
             id: ids::PASTURE,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         },
@@ -324,7 +323,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         class: class::BUILDING,
         player: PlayerId::new(0),
         master,
-        obstruction_type: ObstructionType::TYPE_2,
+        obstruction_kind: ObstructionKind::TYPE_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -383,7 +382,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionType::TYPE_2,
+                    kind: ObstructionKind::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -419,7 +418,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         t.masters = vec![Masters::new([
             Master {
                 id: ids::VILLAGER_MALE,
-                kind: master_type::COMBAT,
+                kind: MasterKind::COMBAT,
                 class: class::VILLAGER,
                 radius: Footprint::new(0.2, 0.2),
                 // no sprites (the world's sprites' table is empty)
@@ -430,14 +429,14 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
             },
             Master {
                 id: ids::HOUSE,
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 class: class::BUILDING,
                 radius: Footprint::new(1.0, 1.0),
                 ..Master::default()
             },
             Master {
                 id: master_id(68),
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 class: class::BUILDING,
                 radius: Footprint::new(1.0, 1.0),
                 ..Master::default()
@@ -795,7 +794,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
         (ai.current_order, ai.current_action, ai.current_target),
         (
             Some(OrderKind::Attack),
-            Some(ActionKind::Attack),
+            Some(AiAction::Attack),
             Some(object_id(61))
         )
     );
@@ -816,7 +815,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
         (record.order, record.action, record.time, record.target),
         (
             Some(OrderKind::Attack),
-            Some(ActionKind::Attack),
+            Some(AiAction::Attack),
             WorldTime::from_millis(1730),
             Some(object_id(61))
         )
@@ -897,14 +896,14 @@ fn annexed(t: &mut World) {
         wolf,
         Master {
             id: master_id(200),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             fog_visibility: FogVisibility::VISIBLE,
             ..Master::default()
         },
         Master {
             id: master_id(201),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::TOWER,
             fog_visibility: FogVisibility::VISIBLE,
             ..Master::default()
@@ -999,7 +998,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
     soldier.moving = Some(walker.stats);
     t.masters[0] = Masters::new([Master {
         id: master_id(126),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::PREDATOR,
         ..Master::default()
     }]);
@@ -1025,7 +1024,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         class,
         player,
         master,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -1064,7 +1063,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         }),
     );
     let task = Task {
-        action_type: ATTACK_TASK,
+        action_kind: ATTACK_TASK,
         sprites: TaskSprites::NONE,
         ..Task::default()
     };
@@ -1119,7 +1118,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
     let master = |id, formation_category| Master {
         id,
         terrain_restriction: Some(RestrictionId::named(0)),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         formation_category,
         move_sprite: None,
         standing_sprite: None,
@@ -1627,12 +1626,12 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
     t.masters[1] = Masters::new([
         Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             ..Master::default()
         },
         Master {
             id: master_id(79),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             ..Master::default()
         },
     ]);
@@ -1691,7 +1690,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
     let mut t = soldiers(&units, &[]);
     let master = |id, build_time| Master {
         id,
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         hit_points: MasterHitPoints::of_data(100),
         build_time,
         volley_fire: Firepower::new(f32::from(build_time.get() / 15)),
@@ -1725,7 +1724,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
                     hit_points: MasterHitPoints::of_data(100),
                     build_time: WholeSeconds::of_data(10),
                     record: Obstruction {
-                        kind: ObstructionType::TYPE_2,
+                        kind: ObstructionKind::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -1784,7 +1783,7 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
     let run = |queued| {
         let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
         if let Some(m) = t.masters[1].get_mut(ids::VILLAGER_MALE) {
-            m.kind = BUILDING;
+            m.kind = MasterKind::BUILDING;
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         (unit.pasture, unit.my_pasture) = (None, None);
@@ -1821,7 +1820,7 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
         unit.id,
         Some(UnitAi {
             current_order: Some(OrderKind::Move),
-            current_action: Some(ActionKind::Move),
+            current_action: Some(AiAction::Move),
             current_target: Some(object_id(99)),
             orders: vec![QueuedOrder {
                 order: OrderKind::Move,
@@ -2002,7 +2001,7 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
 #[test]
 fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargeting() {
     let task = |action_type, attribute_type| Task {
-        action_type,
+        action_kind: action_type,
         attribute_type,
         ..Task::default()
     };
@@ -2139,7 +2138,7 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
     t.reindex();
     let scout = Master {
         id: ids::ID_448,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_12,
         object_flags: ObjectFlags::SCOUT,
         // no sprites: the Explore's MoveTo takes none (the world's sprites' table holds none)
@@ -2152,7 +2151,7 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
         scout,
         Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             ..Master::default()
         },
     ]);
@@ -2206,7 +2205,7 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
 fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
     let attacking = UnitAi {
         current_order: Some(OrderKind::Attack),
-        current_action: Some(ActionKind::Attack),
+        current_action: Some(AiAction::Attack),
         current_target: Some(object_id(40)),
         target_class: class_of(6),
         ..UnitAi::default()
@@ -2227,7 +2226,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
     );
     assert_eq!(
         (ai.current_action, ai.current_target),
-        (Some(ActionKind::Attack), Some(object_id(40)))
+        (Some(AiAction::Attack), Some(object_id(40)))
     );
     assert_eq!(fx, []);
     set_stance(
@@ -2258,7 +2257,7 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
     t.reindex();
     t.masters.push(Masters::new([Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_54,
         ..Master::default()
     }]));
@@ -2316,7 +2315,7 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
 fn master_change_inside_building_keeps_to_its_record() {
     let old = Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(40),
         radius: Footprint::new(0.2, 0.2),
@@ -2325,7 +2324,7 @@ fn master_change_inside_building_keeps_to_its_record() {
     };
     let next = Master {
         id: master_id(5),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.3, 0.3),
@@ -2341,7 +2340,7 @@ fn master_change_inside_building_keeps_to_its_record() {
             class: class::CLASS_6,
             player: PlayerId::new(1),
             master: master_id(4),
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: false,
@@ -2413,13 +2412,13 @@ fn switched_in_the_open(
             class: old.class,
             player: PlayerId::new(1),
             master: old.id,
-            obstruction_type: old.obstruction_type,
+            obstruction_kind: old.obstruction_kind,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionType::CIRCLE,
+                kind: ObstructionKind::CIRCLE,
                 class: ObstructionClass::UNIT,
             }),
         },
@@ -2463,7 +2462,7 @@ fn switched_in_the_open(
 fn switch_masters() -> (Master, Master) {
     let old = Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(40),
         radius: Footprint::new(0.2, 0.2),
@@ -2479,7 +2478,7 @@ fn switch_masters() -> (Master, Master) {
     };
     let next = Master {
         id: master_id(5),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.3, 0.3),
@@ -2489,7 +2488,7 @@ fn switch_masters() -> (Master, Master) {
             (Some(AttributeId::numbered(14)), Amount::new(1.0), 16),
         ],
         volley_fire: Firepower::new(3.0),
-        obstruction_type: ObstructionType::TYPE_3,
+        obstruction_kind: ObstructionKind::TYPE_3,
         obstruction_class: ObstructionClass::RESOURCE,
         ..Master::default()
     };
@@ -2549,17 +2548,17 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
     );
     assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(11)));
     assert_eq!(
-        (record.master, record.radius, record.obstruction_type),
+        (record.master, record.radius, record.obstruction_kind),
         (
             master_id(5),
             Footprint::new(0.3, 0.3),
-            ObstructionType::TYPE_3
+            ObstructionKind::TYPE_3
         )
     );
     assert_eq!(
         record.obstruction,
         Some(Obstruction {
-            kind: ObstructionType::TYPE_3,
+            kind: ObstructionKind::TYPE_3,
             class: ObstructionClass::RESOURCE
         })
     );
@@ -2805,7 +2804,7 @@ fn followers() -> World {
     let walker = walker();
     t.masters[1] = Masters::new([Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         moving: Some(walker.stats),
         ..Master::default()
     }]);
@@ -2825,7 +2824,7 @@ fn followers() -> World {
     t.reindex();
     t.masters.push(Masters::new([Master {
         id: master_id(5),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         radius: Footprint::new(0.5, 0.5),
         ..Master::default()
@@ -2853,7 +2852,7 @@ fn followers() -> World {
             class: class::CLASS_6,
             player: PlayerId::new(2),
             master: master_id(5),
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: false,
@@ -2886,7 +2885,7 @@ fn guard_gives_its_units_the_defend_order_at_once() {
             .unwrap();
         assert_eq!(
             (ai.current_order, ai.current_action, ai.order_priority.get()),
-            (Some(OrderKind::Defend), Some(ActionKind::Defend), 100)
+            (Some(OrderKind::Defend), Some(AiAction::Defend), 100)
         );
         assert_eq!(
             (ai.current_target, ai.defend_target, ai.desired_distance),
@@ -2912,7 +2911,7 @@ fn follower_takes_the_follow_order_and_walks_to_its_target() {
     let ai = t.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action),
-        (Some(OrderKind::Follow), Some(ActionKind::Follow))
+        (Some(OrderKind::Follow), Some(AiAction::Follow))
     );
     assert_eq!(
         (ai.current_target, ai.target_class),
@@ -2953,7 +2952,7 @@ fn followers_side_by_side_take_their_offsets_from_the_target() {
         let ai = t.parts.unit_ai.get(unit.id).unwrap();
         assert_eq!(
             (ai.current_order, ai.current_action),
-            (Some(OrderKind::Move), Some(ActionKind::Move))
+            (Some(OrderKind::Move), Some(AiAction::Move))
         );
         assert_eq!(
             (ai.current_target, ai.target_point),
@@ -3003,7 +3002,7 @@ fn builder_leaves_the_main_building_of_an_annex() {
     let mut t = soldiers(&units, &[]);
     t.masters[1] = Masters::new([Master {
         id: master_id(79),
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         ..Master::default()
     }]);
     let construction = Construction {
@@ -3013,7 +3012,7 @@ fn builder_leaves_the_main_building_of_an_annex() {
         hit_points: MasterHitPoints::of_data(100),
         build_time: WholeSeconds::of_data(10),
         record: Obstruction {
-            kind: ObstructionType::TYPE_2,
+            kind: ObstructionKind::TYPE_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -3103,7 +3102,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
     let mut t = soldiers(&units, &[]);
     t.masters[0] = Masters::new([Master {
         id: master_id(66),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         ..Master::default()
     }]);
     let deer = |id, state, workers| Unit {
@@ -3196,12 +3195,12 @@ fn build_new_target_leaves_the_old_foundation_builders() {
     t.masters[1] = Masters::new([
         Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             ..Master::default()
         },
         Master {
             id: master_id(79),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             ..Master::default()
         },
     ]);
@@ -3224,7 +3223,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
                     hit_points: MasterHitPoints::of_data(100),
                     build_time: WholeSeconds::of_data(10),
                     record: Obstruction {
-                        kind: ObstructionType::TYPE_2,
+                        kind: ObstructionKind::TYPE_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -3337,10 +3336,10 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
         ..Master::default()
     };
     t.masters[1] = Masters::new([
-        master(master_id(4), master_type::COMBAT, class::CLASS_6),
-        master(ids::ID_42, master_type::COMBAT, class::RELIC),
-        master(master_id(58), master_type::COMBAT, class::LIVESTOCK),
-        master(master_id(10), master_type::STATIC, class::CLASS_5),
+        master(master_id(4), MasterKind::COMBAT, class::CLASS_6),
+        master(ids::ID_42, MasterKind::COMBAT, class::RELIC),
+        master(master_id(58), MasterKind::COMBAT, class::LIVESTOCK),
+        master(master_id(10), MasterKind::STATIC, class::CLASS_5),
     ]);
     let unit = |id, master, amount| Unit {
         id,
@@ -3385,7 +3384,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     let units = [(11, 83, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
     let task = |action_type, object_id| Task {
-        action_type,
+        action_kind: action_type,
         object_group: None,
         object_id,
         work_val1: WorkValue::new(1.0),
@@ -3393,7 +3392,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     };
     let villager = |id, tasks| Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: MasterHitPoints::of_data(25),
@@ -3402,10 +3401,10 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     };
     t.masters[1] = Masters::new([
         villager(ids::VILLAGER_MALE, vec![task(GATHER, Some(master_id(53)))]),
-        villager(ids::BUILDER, vec![task(action_type::BUILD, None)]),
+        villager(ids::BUILDER, vec![task(ActionKind::BUILD, None)]),
         Master {
             id: ids::HOUSE,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(550),
             ..Master::default()
@@ -3436,7 +3435,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             false,
         )
         .unwrap();
-    assert_eq!(found.map(|t| t.action_type), Some(action_type::BUILD));
+    assert_eq!(found.map(|t| t.action_kind), Some(ActionKind::BUILD));
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].life.master_id,
         ids::VILLAGER_MALE
@@ -3450,7 +3449,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             true,
         )
         .unwrap();
-    assert_eq!(found.map(|t| t.action_type), Some(action_type::BUILD));
+    assert_eq!(found.map(|t| t.action_kind), Some(ActionKind::BUILD));
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].life.master_id,
         ids::BUILDER
@@ -3493,7 +3492,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     let walker = walker();
     let sheep_master = Master {
         id: master_id(594),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
         moving: Some(walker.stats),
@@ -3503,7 +3502,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         sheep_master.clone(),
         Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             radius: Footprint::new(1.5, 1.5),
             ..Master::default()
         },
@@ -3544,7 +3543,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         class: class::LIVESTOCK,
         player,
         master,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: false,
         moves: true,
@@ -3685,7 +3684,7 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
     .with_ais([10, 20].map(|id| (object_id(id), UnitAi::default())));
     let master = |id, class| Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class,
         weapon_range: Distance::new(5.0),
         min_range: Distance::new(2.0),
@@ -3706,7 +3705,7 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
                 class,
                 player: PlayerId::from(player),
                 master: master_id(4),
-                obstruction_type: ObstructionType::NONE,
+                obstruction_kind: ObstructionKind::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: false,
                 moves: false,
@@ -3860,7 +3859,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     let unit = |id, grouped, position: Position| Splittable {
         id: object_id(id),
         group: None,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         grouped,
         turns: false,
         speed: Speed::new(1.2),
@@ -4118,7 +4117,7 @@ fn lone_unit_patrols_to_its_waypoint() {
     let ai = t.parts.unit_ai.get(u.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.last_order, ai.current_action),
-        (Some(OrderKind::Patrol), None, Some(ActionKind::Move))
+        (Some(OrderKind::Patrol), None, Some(AiAction::Move))
     );
     assert_eq!(
         (ai.current_target, ai.target_class, ai.target_point),
@@ -4180,11 +4179,11 @@ fn move_runs_the_stop_of_pending_completion_first() {
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
-    ai.current_action = Some(ActionKind::Move);
+    ai.current_action = Some(AiAction::Move);
     ai.notifies = vec![Notify::own(
         object_id(11),
         NotifyKind::ACTION_COMPLETED,
-        [ActionKind::Move.value(), 0, 0],
+        [AiAction::Move.value(), 0, 0],
     )];
     assert_eq!(
         t.move_to_point(
@@ -4198,7 +4197,7 @@ fn move_runs_the_stop_of_pending_completion_first() {
     let ai = t.parts.unit_ai.get(u.id).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action, ai.notifies.len()),
-        (None, Some(ActionKind::Move), 0)
+        (None, Some(AiAction::Move), 0)
     );
     assert_eq!(
         t.parts
@@ -4255,7 +4254,7 @@ fn lone_unit_attack_moves_to_its_waypoint() {
         (ai.current_order, ai.current_action, ai.target_point),
         (
             Some(OrderKind::AttackMove),
-            Some(ActionKind::Move),
+            Some(AiAction::Move),
             Position::new(30.0, 20.0, 0.0)
         )
     );
@@ -4479,7 +4478,7 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
         t.masters[1].get_mut(master_id(4)).unwrap().line_of_sight = Distance::new(5.0);
         t.masters[0] = Masters::new([Master {
             id: ids::HOUSE,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         }]);
@@ -4758,7 +4757,7 @@ fn gather_takes_farm_but_no_other_building() {
         .unwrap();
     t.masters[1] = Masters::new(t.masters[1].iter().cloned().chain([Master {
         id: ids::FARM,
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::FARM,
         radius: Footprint::new(1.5, 1.5),
         ..Master::default()
@@ -5202,7 +5201,7 @@ fn work_command_finds_its_master_and_task_on_target() {
         .unwrap()
         .expect("the Gather task");
     assert_eq!(
-        (with, task.id, task.action_type),
+        (with, task.id, task.action_kind),
         (master_id(120), task_id(2), GATHER)
     );
     assert_eq!(
@@ -5244,7 +5243,7 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
         (ai.current_order, ai.current_action, ai.current_target),
         (
             Some(OrderKind::Gather),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Some(object_id(601))
         )
     );
@@ -5267,7 +5266,7 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
         (ai.current_order, ai.current_action, ai.current_target),
         (
             Some(OrderKind::Hunt),
-            Some(ActionKind::Hunt),
+            Some(AiAction::Hunt),
             Some(object_id(501))
         )
     );
@@ -5280,7 +5279,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
         for masters in &mut t.masters {
             let m84 = Master {
                 id: ids::MARKET,
-                kind: master_type::COMBAT,
+                kind: MasterKind::COMBAT,
                 class: class::PREY,
                 ..Master::default()
             };
@@ -5382,7 +5381,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             wait: MoveWait::default(),
         }));
     let moving = Task {
-        action_type: MOVE_TO,
+        action_kind: MOVE_TO,
         ..task
     };
     assert_eq!(
@@ -5410,7 +5409,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             build,
         )));
     let building = Task {
-        action_type: action_type::BUILD,
+        action_kind: ActionKind::BUILD,
         ..task
     };
     assert_eq!(
@@ -5453,7 +5452,7 @@ fn work_command_factory_starts_the_task_action() {
         ))
     );
     let unknown = Task {
-        action_type: ActionType::named(0x55),
+        action_kind: ActionKind::named(0x55),
         ..task
     };
     assert_eq!(
@@ -5500,7 +5499,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
     t.reindex();
     let building = Master {
         id: ids::HOUSE,
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         radius: Footprint::new(2.0, 2.0),
         hit_points: MasterHitPoints::of_data(550),
@@ -5508,7 +5507,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
     };
     let soldier = Master {
         tasks: vec![Task {
-            action_type: action_type::COMBAT,
+            action_kind: ActionKind::COMBAT,
             owner_type: TargetOwner::ENEMY,
             object_group: Some(class::BUILDING),
             ..Task::default()

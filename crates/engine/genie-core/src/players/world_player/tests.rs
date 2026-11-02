@@ -12,7 +12,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::BUILDER;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{BuildingMaster, Master, Masters};
 use crate::objects::unit::Unit;
 use crate::players::CivId;
@@ -227,8 +226,8 @@ fn the_trickles_give_sixtieth_of_their_rate_each_second() {
 fn mill_livestock_makes_food() {
     let mut t = world();
     let masters = Masters::new([
-        master(master_id(68), master_type::BUILDING, class::BUILDING),
-        master(master_id(5), master_type::COMBAT, class::LIVESTOCK),
+        master(master_id(68), MasterKind::BUILDING, class::BUILDING),
+        master(master_id(5), MasterKind::COMBAT, class::LIVESTOCK),
     ]);
     t.masters = vec![masters.clone(), masters.clone(), masters.clone(), masters];
     let mill = object(10, master_id(68), ObjectState::Alive);
@@ -326,24 +325,24 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
 #[test]
 fn player_without_an_object_that_keeps_it_loses() {
     let masters = Masters::new([
-        master(ids::VILLAGER_MALE, master_type::COMBAT, class::VILLAGER),
-        master(master_id(117), master_type::BUILDING, class::WALL),
-        master(ids::FARM, master_type::BUILDING, class::FARM),
-        master(ids::TOWN_CENTRE, master_type::BUILDING, class::BUILDING),
-        master(master_id(12), master_type::BUILDING, class::BUILDING),
-        master(ids::ID_331, master_type::COMBAT, class::CLASS_51),
-        master(ids::WONDER, master_type::BUILDING, class::BUILDING),
+        master(ids::VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER),
+        master(master_id(117), MasterKind::BUILDING, class::WALL),
+        master(ids::FARM, MasterKind::BUILDING, class::FARM),
+        master(ids::TOWN_CENTRE, MasterKind::BUILDING, class::BUILDING),
+        master(master_id(12), MasterKind::BUILDING, class::BUILDING),
+        master(ids::ID_331, MasterKind::COMBAT, class::CLASS_51),
+        master(ids::WONDER, MasterKind::BUILDING, class::BUILDING),
         Master {
             storage: vec![
                 (Some(POPULATION), Amount::new(1.0), 0x20),
                 (None, Amount::ZERO, 0),
                 (None, Amount::ZERO, 0),
             ],
-            ..master(master_id(900), master_type::COMBAT, class::CLASS_11)
+            ..master(master_id(900), MasterKind::COMBAT, class::CLASS_11)
         },
         Master {
             trained_at: vec![ids::TOWN_CENTRE],
-            ..master(ids::MARKET, master_type::COMBAT, class::VILLAGER)
+            ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
         },
     ]);
     let keeps = |objects: Vec<Unit>, game_mode: i32| {
@@ -486,8 +485,8 @@ fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
 #[test]
 fn sudden_death_and_regicide_end_player_their_ways() {
     let masters = Masters::new([
-        master(ids::VILLAGER_MALE, master_type::COMBAT, class::VILLAGER),
-        master(ids::TOWN_CENTRE, master_type::BUILDING, class::BUILDING),
+        master(ids::VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER),
+        master(ids::TOWN_CENTRE, MasterKind::BUILDING, class::BUILDING),
     ]);
     let tc_key = Key {
         master: Some(ids::TOWN_CENTRE),
@@ -552,30 +551,30 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
     let masters = Masters::new([
         Master {
             trained_at: vec![ids::TOWN_CENTRE],
-            ..master(ids::VILLAGER_MALE, master_type::COMBAT, class::VILLAGER)
+            ..master(ids::VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
             trained_at: vec![ids::TOWN_CENTRE],
             available: false,
-            ..master(ids::MARKET, master_type::COMBAT, class::VILLAGER)
+            ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
             trained_at: vec![ids::TOWN_CENTRE],
             disabled: true,
-            ..master(master_id(85), master_type::COMBAT, class::VILLAGER)
+            ..master(master_id(85), MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
             trained_at: vec![ids::TOWN_CENTRE],
-            ..master(master_id(86), master_type::MISSILE, class::VILLAGER)
+            ..master(master_id(86), MasterKind::MISSILE, class::VILLAGER)
         },
         Master {
             trained_at: vec![master_id(12)],
-            ..master(master_id(74), master_type::COMBAT, class::CLASS_6)
+            ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
         },
-        master(ids::TOWN_CENTRE, master_type::BUILDING, class::BUILDING),
+        master(ids::TOWN_CENTRE, MasterKind::BUILDING, class::BUILDING),
         Master {
             building: Some(site),
-            ..master(ids::TOWN_CENTRE_621, master_type::BUILDING, class::BUILDING)
+            ..master(ids::TOWN_CENTRE_621, MasterKind::BUILDING, class::BUILDING)
         },
     ]);
     t.masters = vec![masters.clone(); 4];
@@ -686,14 +685,14 @@ fn the_upgradable_count_follows_the_tech_tree() {
         Master {
             trained_at: vec![master_id(12)],
             available: false,
-            ..master(master_id(74), master_type::COMBAT, class::CLASS_6)
+            ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
         },
         Master {
             trained_at: vec![master_id(12)],
             available: false,
-            ..master(master_id(75), master_type::COMBAT, class::CLASS_6)
+            ..master(master_id(75), MasterKind::COMBAT, class::CLASS_6)
         },
-        master(master_id(12), master_type::BUILDING, class::BUILDING),
+        master(master_id(12), MasterKind::BUILDING, class::BUILDING),
     ]);
     t.masters = vec![masters; 4];
     t.players[1].civ = CivId::new(0);

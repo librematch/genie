@@ -9,13 +9,12 @@ use crate::map::Position;
 use crate::objects::RelicCount;
 use crate::objects::Relics;
 use crate::objects::facing::offset_in_facets;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ChargeTarget;
-use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 
 /// Slot 0x1f0 of a combat object (`FUN_14120d780`) at height `z` whose player has `own` as
 /// attributes 211 and 212: a hit from higher up gains 25% and attributes 211 and the target's
@@ -50,7 +49,7 @@ pub fn building_elevation_factor(
     } else if RelicCount::ZERO < relics.count {
         f *= RELIC_BOOST;
     }
-    if kind == BUILDING {
+    if kind == MasterKind::BUILDING {
         if RelicCount::ZERO < victim_relics.specific {
             return f / SPECIFIC_RELIC_BOOST;
         }
@@ -84,14 +83,16 @@ pub fn facing_offset(at: Position, facing: Facing, other: Position) -> f32 {
 #[must_use]
 pub fn charge_works(
     charge_target: ChargeTarget,
-    charge_type: ChargeType,
+    charge_type: ChargeKind,
     class: ClassId,
     kind: MasterKind,
 ) -> bool {
     if charge_target == ChargeTarget::EVERY
-        || charge_type == ChargeType::EVERY_TARGET
+        || charge_type == ChargeKind::EVERY_TARGET
         || (charge_target == ChargeTarget::ALL_BUT_BUILDINGS
-            && !(BUILDING <= kind && class != class::CLASS_51 && class != class::CLASS_54))
+            && !(MasterKind::BUILDING <= kind
+                && class != class::CLASS_51
+                && class != class::CLASS_54))
     {
         return true;
     }
@@ -128,7 +129,7 @@ pub fn charge_works(
 /// and 3, else at least 1.
 #[must_use]
 pub fn charged(a: &Attacker) -> bool {
-    if a.charge_type.adds_to_attack() {
+    if a.charge_kind.adds_to_attack() {
         a.max_charge <= a.charge
     } else {
         Charge::new(1.0) <= a.charge
@@ -139,8 +140,8 @@ pub fn charged(a: &Attacker) -> bool {
 /// that works on `v` ([`charge_works`]) and is ready.
 #[must_use]
 pub fn charge_hit(a: &Attacker, v: &Victim) -> bool {
-    a.charge_type.adds_to_attack()
-        && charge_works(a.charge_target, a.charge_type, v.class, v.kind)
+    a.charge_kind.adds_to_attack()
+        && charge_works(a.charge_target, a.charge_kind, v.class, v.kind)
         && charged(a)
 }
 
@@ -171,7 +172,7 @@ pub(super) fn charge_damage(a: &Attacker) -> Result<f32, GenieError> {
 /// 0x308, `FUN_141203b50`) that works on `t` ([`charge_works`]) and is ready ([`charged`]).
 #[must_use]
 pub fn range_charge_hit(a: &Attacker, t: &Victim) -> bool {
-    a.charge_type.ranged()
-        && charge_works(a.charge_target, a.charge_type, t.class, t.kind)
+    a.charge_kind.ranged()
+        && charge_works(a.charge_target, a.charge_kind, t.class, t.kind)
         && charged(a)
 }

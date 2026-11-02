@@ -9,7 +9,7 @@ use crate::math::conversions::cvttss2si;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::world::Millis;
@@ -37,7 +37,7 @@ pub struct CheckpointObject {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TopAction {
     /// The type (virtual slot 166).
-    pub kind: ActionType,
+    pub kind: ActionKind,
     /// The state (virtual slot 86).
     pub state: ActionState,
 }
@@ -48,7 +48,7 @@ pub struct TopAction {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ActionTerm {
     /// The type, none for −1.
-    pub kind: Option<ActionType>,
+    pub kind: Option<ActionKind>,
     /// The state.
     pub state: ActionState,
 }
@@ -105,7 +105,7 @@ pub fn player_block(player: &PlayerState) -> [u32; 11] {
 fn action_checksum(o: &CheckpointObject) -> u32 {
     let (kind, state) = o
         .top_action
-        .map_or((-1, 0), |t| (ActionType::field(t.kind), t.state.get()));
+        .map_or((-1, 0), |t| (ActionKind::field(t.kind), t.state.get()));
     (i32::from(kind) as u32)
         .wrapping_add(u32::from(state))
         .wrapping_add(o.retarget_timer.map_or(0, Millis::get))

@@ -47,8 +47,8 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
 use genie_core::objects::lines::UnitLines;
 use genie_core::objects::masters::MasterId;
+use genie_core::objects::masters::MasterKind;
 use genie_core::objects::masters::Masters;
-use genie_core::objects::masters::master_type::COMBAT;
 use genie_core::objects::unit::Unit;
 use genie_core::pathing::zones::{ZoneMap, Zones};
 use genie_core::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
@@ -436,7 +436,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                 .iter()
                 .skip(1)
                 .flat_map(Masters::iter)
-                .filter(|m| m.kind == COMBAT)
+                .filter(|m| m.kind == MasterKind::COMBAT)
         };
         turns.spatial.fastest = all()
             .filter_map(|m| m.moving.as_ref().map(|s| s.speed.get()))
@@ -617,7 +617,7 @@ fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
         };
         let share = masters
             .get(u.life.master_id)
-            .filter(|m| m.kind == COMBAT)
+            .filter(|m| m.kind == MasterKind::COMBAT)
             .and_then(|me| {
                 let bm = masters.get(b.life.master_id)?;
                 let rate = attack_rate(bm, masters, turns.parts.combat_of(b.id).reload_powerup);

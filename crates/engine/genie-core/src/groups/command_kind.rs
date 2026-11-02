@@ -2,7 +2,7 @@
 //! task the group's members carry out.
 
 use crate::combat::attack::ATTACK as COMBAT_ATTACK;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 
 /// A group command's kind (`mCommand` of an order or of a queued command, the group's
 /// `mCurrentCommand` at `+0x3a8`): a move (1), a follow (2), or the action type of the task the
@@ -29,7 +29,7 @@ impl GroupCommandKind {
 
     /// The command of a task of action type `action` (its value widened).
     #[must_use]
-    pub const fn of_action(action: ActionType) -> Self {
+    pub const fn of_action(action: ActionKind) -> Self {
         Self(action.get() as i32)
     }
 
@@ -55,14 +55,14 @@ impl GroupCommandKind {
 #[cfg(test)]
 mod tests {
     use crate::groups::GroupCommandKind;
-    use crate::objects::masters::ActionType;
+    use crate::objects::masters::ActionKind;
 
     /// A task's action type is its command's value; none is −1, a move 1, a follow 2, and a
     /// zeroed command 0.
     #[test]
     fn task_command_is_its_action_type() {
         assert_eq!(
-            GroupCommandKind::of_action(ActionType::named(0x84)),
+            GroupCommandKind::of_action(ActionKind::named(0x84)),
             GroupCommandKind::named(0x84)
         );
         assert_eq!(

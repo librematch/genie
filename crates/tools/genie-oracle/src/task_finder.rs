@@ -8,7 +8,7 @@ use genie_core::objects::HitPoints;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
 use genie_core::objects::lifecycle::Held;
-use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::PlayersMasters;
 use genie_core::objects::masters::{MasterId, Masters};
 use genie_core::players::Amount;
@@ -65,7 +65,7 @@ pub struct FinderObject {
     /// The main building of an annex (`+0xbb8`), if it is one.
     pub annex_of: Option<ObjectId>,
     /// Its top action's type, if it has one.
-    pub top_action: Option<ActionType>,
+    pub top_action: Option<ActionKind>,
     /// Its place.
     pub position: Position,
 }
@@ -229,7 +229,7 @@ fn finder_object(
         top_action: o
             .actions()
             .and_then(|a| a.entries().next())
-            .map(|(kind, _)| ActionType::try_from(kind))
+            .map(|(kind, _)| ActionKind::try_from(kind))
             .transpose()?,
         position: Position::new(s.tx, s.ty, s.tz),
     })

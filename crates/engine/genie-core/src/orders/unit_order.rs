@@ -15,12 +15,11 @@ use crate::movement::move_to::WalkTo;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::TOWN_CENTRE;
-use crate::objects::masters::master_type::ACTION;
-use crate::objects::masters::master_type::BUILDING;
 use crate::orders::object_gone;
 use crate::orders::{HERD_MOST, NO_POINT};
 use crate::players::Amount;
@@ -54,7 +53,7 @@ impl World {
             "an Artifact's move to an object the slice does not hold",
         ))?;
         let target_master = t.master(self.master_tables(), tp)?;
-        let to_building = livestock && target_master.kind == BUILDING;
+        let to_building = livestock && target_master.kind == MasterKind::BUILDING;
         let to_town_centre = livestock && target_master.id == TOWN_CENTRE;
         let at = self
             .spatial
@@ -219,7 +218,7 @@ impl World {
             };
             let unit = &self.players.live(p, idx)?;
             if unit.life.state != ObjectState::Alive
-                || unit.master(self.master_tables(), p)?.kind < BUILDING
+                || unit.master(self.master_tables(), p)?.kind < MasterKind::BUILDING
             {
                 continue;
             }
@@ -270,7 +269,7 @@ impl World {
             let unit = &self.players.live(p, idx)?;
             let kind = unit.master(self.master_tables(), p)?.kind;
             if unit.life.state != ObjectState::Alive
-                || kind < ACTION
+                || kind < MasterKind::ACTION
                 || unit.life.amount <= Amount::ZERO
             {
                 continue;
@@ -313,7 +312,7 @@ impl World {
                     g.task.resource,
                 )
             }),
-            Some(action_type::BUILD) => self.parts.actions_of(unit.id).list.build().map(|b| {
+            Some(ActionKind::BUILD) => self.parts.actions_of(unit.id).list.build().map(|b| {
                 (
                     DropOffBy::Build,
                     b.target.map(FoundationId::id),

@@ -17,11 +17,10 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::orders::Work;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
@@ -173,7 +172,7 @@ impl World {
         }
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (building_at, building_radius) = (b.position(), bm.radius);
-        if bm.kind == BUILDING
+        if bm.kind == MasterKind::BUILDING
             && let Some(v) = self.spatial.sight.as_mut()
         {
             v.sight_off_los(
@@ -193,8 +192,8 @@ impl World {
         })?;
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
         placed.obstruction =
-            (made.obstruction_type != ObstructionType::NONE && solid).then_some(Obstruction {
-                kind: made.obstruction_type,
+            (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
+                kind: made.obstruction_kind,
                 class: made.obstruction_class,
             });
         let world_time = self.world_time;
@@ -237,7 +236,7 @@ impl World {
         made: &Master,
         bm: &Master,
     ) -> Result<Option<Firepower>, GenieError> {
-        if made.kind != COMBAT {
+        if made.kind != MasterKind::COMBAT {
             return Ok(None);
         }
         let (Some(own), Some(theirs)) = (self.masters.of(player), self.masters.of(up)) else {
@@ -347,8 +346,8 @@ impl World {
         self.spatial.remove(id);
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
         placed.obstruction =
-            (made.obstruction_type != ObstructionType::NONE && solid).then_some(Obstruction {
-                kind: made.obstruction_type,
+            (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
+                kind: made.obstruction_kind,
                 class: made.obstruction_class,
             });
         let world_time = self.world_time;

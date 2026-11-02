@@ -30,13 +30,12 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::ids::HOUSE;
 use crate::objects::masters::ids::MONASTERY;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -74,7 +73,7 @@ impl Unit {
     /// A link to an object the world does not file.
     pub(crate) fn let_removed_links_go(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        if master.kind != BUILDING || walls_branch(master) {
+        if master.kind != MasterKind::BUILDING || walls_branch(master) {
             return Ok(());
         }
         let (players, index) = (&c.w.players, &c.w.index);
@@ -361,7 +360,7 @@ impl Unit {
                 continue;
             };
             let kind = u.master(c.w.master_tables(), c.player)?.kind;
-            if kind == COMBAT && c.w.parts.combat_of(u.id).raider_countdown.runs() {
+            if kind == MasterKind::COMBAT && c.w.parts.combat_of(u.id).raider_countdown.runs() {
                 return Err(GenieError::unsupported(
                     "a unit inside whose raider_build_countdown runs (FUN_1411e7220)",
                 ));
@@ -573,7 +572,7 @@ pub(crate) const DEATH_BLAST_FACTOR: f32 = TURN_DEATH_BLAST_FACTOR;
 /// [`DEATH_BLAST_MASTERS`] or [`DEATH_BLAST_CLASSES`] below [`DEATH_BLAST_HP`] hit points in state
 /// 2. The update runs for the combat objects and buildings (types 70 and 80).
 pub(crate) fn blasts_at_death(master: &Master, life: &Lifecycle) -> bool {
-    COMBAT <= master.kind
+    MasterKind::COMBAT <= master.kind
         && life.hp < HitPoints::new(DEATH_BLAST_HP)
         && life.state == ObjectState::Alive
         && (DEATH_BLAST_MASTERS.contains(&master.id) || DEATH_BLAST_CLASSES.contains(&master.class))

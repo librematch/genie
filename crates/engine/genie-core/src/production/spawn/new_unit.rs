@@ -16,10 +16,10 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MONASTERY;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
@@ -41,11 +41,11 @@ use crate::combat::missile::grounded;
 use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
 use crate::objects::layers::{Action, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::death_parts::count_class;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::objects::masters::action_type::ACTION_156;
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::technology::Attributes;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::{NewObject, Notify, UnitAi};
 use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::visibility::{Seer, capture_kind};
@@ -129,7 +129,7 @@ impl World {
                 Notify::own(
                     building_id,
                     NotifyKind::ACTION_COMPLETED,
-                    [ActionKind::Make.value(), 0, 0],
+                    [AiAction::Make.value(), 0, 0],
                 ),
                 state,
             )?;
@@ -148,7 +148,7 @@ impl World {
             .master(p, now)?
             .tasks
             .iter()
-            .any(|t| t.action_type == ACTION_156)
+            .any(|t| t.action_kind == ActionKind::ACTION_156)
         {
             return Err(GenieError::unsupported(
                 "a new unit's task that spawns more units",
@@ -189,7 +189,7 @@ impl World {
                     tm == MONASTERY && ai.is_some_and(|ai| ai.orders.iter().any(relic_order));
                 let target_master = self.master(tp, tm)?;
                 if !keeps
-                    && COMBAT <= target_master.kind
+                    && MasterKind::COMBAT <= target_master.kind
                     && target_master.garrison.holds()
                     // a queued order's target −1 is a point: it takes nothing in
                     && o.target
@@ -338,14 +338,14 @@ impl World {
             class: made.class,
             player: p,
             master,
-            obstruction_type: made.obstruction_type,
+            obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
             tall: made.tall,
             moves: made.moves(),
             unknown: None,
-            obstruction: (made.obstruction_type != ObstructionType::NONE && solid).then_some(
+            obstruction: (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(
                 Obstruction {
-                    kind: made.obstruction_type,
+                    kind: made.obstruction_kind,
                     class: made.obstruction_class,
                 },
             ),
@@ -435,7 +435,7 @@ impl World {
                 // livestock's default task, the Artifact, starts once its action list is empty
                 default_task: if made
                     .default_task()
-                    .is_some_and(|t| t.action_type == ARTIFACT_TYPE)
+                    .is_some_and(|t| t.action_kind == ARTIFACT_TYPE)
                 {
                     DefaultTask::Artifact
                 } else {

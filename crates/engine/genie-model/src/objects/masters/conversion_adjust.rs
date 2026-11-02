@@ -1,7 +1,6 @@
 //! A master's adjustments of a conversion ([`ConversionAdjust`]).
 
 use crate::objects::masters::MasterAttribute;
-use crate::objects::masters::attribute as a;
 use genie_diff::Diff;
 
 /// A master's `mMinConversionTimeAdj`, `mMaxConversionTimeAdj` and `mConversionChanceAdj`
@@ -22,8 +21,8 @@ impl ConversionAdjust {
     /// chance's.
     pub const fn lane_mut(&mut self, attribute: MasterAttribute) -> &mut f32 {
         match attribute {
-            a::MIN_CONVERSION_TIME_MODIFIER => &mut self.min_time,
-            a::MAX_CONVERSION_TIME_MODIFIER => &mut self.max_time,
+            MasterAttribute::MIN_CONVERSION_TIME_MODIFIER => &mut self.min_time,
+            MasterAttribute::MAX_CONVERSION_TIME_MODIFIER => &mut self.max_time,
             _ => &mut self.chance,
         }
     }
@@ -32,15 +31,15 @@ impl ConversionAdjust {
 #[cfg(test)]
 mod tests {
     use crate::objects::masters::ConversionAdjust;
-    use crate::objects::masters::attribute as a;
+    use crate::objects::masters::MasterAttribute;
 
     /// Each conversion attribute changes its own value.
     #[test]
     fn each_conversion_attribute_changes_its_value() {
         let mut c = ConversionAdjust::default();
-        *c.lane_mut(a::CONVERSION_CHANCE_MODIFIER) = 3.0;
-        *c.lane_mut(a::MAX_CONVERSION_TIME_MODIFIER) = 2.0;
-        *c.lane_mut(a::MIN_CONVERSION_TIME_MODIFIER) = 1.0;
+        *c.lane_mut(MasterAttribute::CONVERSION_CHANCE_MODIFIER) = 3.0;
+        *c.lane_mut(MasterAttribute::MAX_CONVERSION_TIME_MODIFIER) = 2.0;
+        *c.lane_mut(MasterAttribute::MIN_CONVERSION_TIME_MODIFIER) = 1.0;
         assert_eq!(
             c,
             ConversionAdjust {

@@ -5,8 +5,8 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::master_type::MOVING;
 use crate::orders::{Interact, MAX_UNGROUPED, Split, Splittable, centroid, splits_together};
 use crate::pathing::tile_path::Found;
 use crate::pathing::tile_path::{Path, Request};
@@ -325,7 +325,7 @@ impl World {
             };
             let master = u.master(self.master_tables(), p)?;
             let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
-            if (MOVING <= master.kind && Speed::ZERO < speed) || queued {
+            if (MasterKind::MOVING <= master.kind && Speed::ZERO < speed) || queued {
                 points.push(u.position().ground());
             }
         }

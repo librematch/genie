@@ -2,10 +2,12 @@
 //! the loader's defaults and the selected entries.
 
 use crate::movement::Speed;
+use crate::objects::masters::AttributeWorld;
+use crate::objects::masters::DamageGraphic;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
-use crate::objects::masters::{
-    AttributeWorld, DamageGraphic, Master, TrainLocation, attribute, master_type,
-};
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::TrainLocation;
 use crate::players::Amount;
 use crate::world::Seconds;
 
@@ -25,13 +27,13 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match self.kind {
-            master_type::BUILDING => self.set_building(attribute, v, world),
-            master_type::COMBAT => self.set_tribe_combat(attribute, v, world),
-            master_type::MISSILE => self.set_missile(attribute, v, world),
-            master_type::RGE_COMBAT => self.set_combat(attribute, v, world),
-            master_type::ACTION => self.set_action(attribute, v, world),
-            master_type::MOVING => self.set_moving(attribute, v, world),
-            master_type::ANIMATED | master_type::DOPPELGANGER => {
+            MasterKind::BUILDING => self.set_building(attribute, v, world),
+            MasterKind::COMBAT => self.set_tribe_combat(attribute, v, world),
+            MasterKind::MISSILE => self.set_missile(attribute, v, world),
+            MasterKind::RGE_COMBAT => self.set_combat(attribute, v, world),
+            MasterKind::ACTION => self.set_action(attribute, v, world),
+            MasterKind::MOVING => self.set_moving(attribute, v, world),
+            MasterKind::ANIMATED | MasterKind::DOPPELGANGER => {
                 self.set_animated(attribute, v, world);
             }
             _ => self.set_static(attribute, v, world),
@@ -48,13 +50,13 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match self.kind {
-            master_type::BUILDING => self.add_building(attribute, v, world),
-            master_type::COMBAT => self.add_tribe_combat(attribute, v, world),
-            master_type::MISSILE => self.add_missile(attribute, v, world),
-            master_type::RGE_COMBAT => self.add_combat(attribute, v, world),
-            master_type::ACTION => self.add_action(attribute, v, world),
-            master_type::MOVING => self.add_moving(attribute, v, world),
-            master_type::ANIMATED | master_type::DOPPELGANGER => {
+            MasterKind::BUILDING => self.add_building(attribute, v, world),
+            MasterKind::COMBAT => self.add_tribe_combat(attribute, v, world),
+            MasterKind::MISSILE => self.add_missile(attribute, v, world),
+            MasterKind::RGE_COMBAT => self.add_combat(attribute, v, world),
+            MasterKind::ACTION => self.add_action(attribute, v, world),
+            MasterKind::MOVING => self.add_moving(attribute, v, world),
+            MasterKind::ANIMATED | MasterKind::DOPPELGANGER => {
                 self.add_animated(attribute, v, world);
             }
             _ => self.add_static(attribute, v, world),
@@ -71,13 +73,13 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match self.kind {
-            master_type::BUILDING => self.multiply_building(attribute, v, world),
-            master_type::COMBAT => self.multiply_tribe_combat(attribute, v, world),
-            master_type::MISSILE => self.multiply_missile(attribute, v, world),
-            master_type::RGE_COMBAT => self.multiply_combat(attribute, v, world),
-            master_type::ACTION => self.multiply_action(attribute, v, world),
-            master_type::MOVING => self.multiply_moving(attribute, v, world),
-            master_type::ANIMATED | master_type::DOPPELGANGER => {
+            MasterKind::BUILDING => self.multiply_building(attribute, v, world),
+            MasterKind::COMBAT => self.multiply_tribe_combat(attribute, v, world),
+            MasterKind::MISSILE => self.multiply_missile(attribute, v, world),
+            MasterKind::RGE_COMBAT => self.multiply_combat(attribute, v, world),
+            MasterKind::ACTION => self.multiply_action(attribute, v, world),
+            MasterKind::MOVING => self.multiply_moving(attribute, v, world),
+            MasterKind::ANIMATED | MasterKind::DOPPELGANGER => {
                 self.multiply_animated(attribute, v, world);
             }
             _ => self.multiply_static(attribute, v, world),
@@ -109,36 +111,39 @@ impl Master {
     /// from the default. None when the master holds it.
     #[must_use]
     pub fn unloaded_for(&self, attribute: MasterAttribute) -> Option<&'static str> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         let moving = self.moving.as_ref();
         match attribute {
-            a::MOVEMENT_SPEED | a::STANDING_GRAPHIC | a::WALKING_GRAPHIC | a::RUNNING_GRAPHIC
+            MasterAttribute::MOVEMENT_SPEED
+            | MasterAttribute::STANDING_GRAPHIC
+            | MasterAttribute::WALKING_GRAPHIC
+            | MasterAttribute::RUNNING_GRAPHIC
                 if self.max_speed == Speed::ZERO
                     && moving.is_some_and(|m| m.speed != Speed::ZERO) =>
             {
                 Some("a master's speed (+0x740) the loader did not fill")
             }
-            a::ROTATION_SPEED
+            MasterAttribute::ROTATION_SPEED
                 if self.turn_speed == Seconds::ZERO
                     && moving.is_some_and(|m| m.turn_time != Seconds::ZERO) =>
             {
                 Some("a master's turn speed (+0x758) the loader did not fill")
             }
-            a::TRAIN_LOCATION
-            | a::TRAIN_BUTTON
-            | a::HOTKEY_ID
-            | a::TRAIN_TIME
-            | a::TRAIN_LOCATIONS_ENTRY_MOD
-            | a::TRAIN_LOCATIONS_TOTAL_NUM
+            MasterAttribute::TRAIN_LOCATION
+            | MasterAttribute::TRAIN_BUTTON
+            | MasterAttribute::HOTKEY_ID
+            | MasterAttribute::TRAIN_TIME
+            | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
+            | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM
                 if self.train_locations.is_empty() && !self.trained_at.is_empty() =>
             {
                 Some("a master's train locations (+0x898) the loader did not fill")
             }
-            a::DAMAGE_GRAPHIC
-            | a::DAMAGE_GRAPHICS_ENTRY_MOD
-            | a::DAMAGE_GRAPHICS_TOTAL_NUM
-            | a::DAMAGE_GRAPHIC_PERCENT
-            | a::DAMAGE_GRAPHIC_APPLY_MODE
+            MasterAttribute::DAMAGE_GRAPHIC
+            | MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD
+            | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM
+            | MasterAttribute::DAMAGE_GRAPHIC_PERCENT
+            | MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE
                 if self.damage_graphics.is_empty() && self.damage_sprites =>
             {
                 Some("a master's damage sprites (+0x638) the loader did not fill")
@@ -150,8 +155,8 @@ impl Master {
     /// The resource storage `attribute` (21, 26, 27) names: the first, second or third entry.
     pub(super) fn storage_mut(&mut self, attribute: MasterAttribute) -> Option<&mut Amount> {
         let i = match attribute {
-            attribute::STORAGE_1 => 0,
-            attribute::STORAGE_2 => 1,
+            MasterAttribute::STORAGE_1 => 0,
+            MasterAttribute::STORAGE_2 => 1,
             _ => 2,
         };
         self.storage.get_mut(i).map(|e| &mut e.1)

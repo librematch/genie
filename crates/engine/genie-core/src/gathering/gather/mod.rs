@@ -25,7 +25,7 @@ use crate::movement::move_to::MoveDefaults;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkRate;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
@@ -66,7 +66,7 @@ use crate::objects::WorkerCount;
 use crate::unit_ai::UnitStance;
 
 /// The Gather action's type, which word 9 adds.
-pub const GATHER: ActionType = ActionType::named(5);
+pub const GATHER: ActionKind = ActionKind::named(5);
 
 /// `set_state(3)`'s timer: the search asks again once it counted up to 0 (`0xc1200000`, an
 /// immediate in `0x140a8cd40`).

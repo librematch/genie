@@ -13,7 +13,7 @@ use crate::objects::ObjectId;
 use crate::objects::actions;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::DefaultTask;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::{ARTIFACT_TYPE, Artifact};
 use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
@@ -77,7 +77,7 @@ impl Action {
 
     /// The type of its top action, if it has one.
     #[must_use]
-    pub fn top_action_kind(&self) -> Option<ActionType> {
+    pub fn top_action_kind(&self) -> Option<ActionKind> {
         self.top_action().map(|a| a.kind)
     }
 

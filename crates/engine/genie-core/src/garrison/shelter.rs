@@ -23,10 +23,9 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
 use crate::orders::object_gone;
@@ -104,7 +103,7 @@ impl World {
             let Some((p, u)) = self.object(id) else {
                 continue;
             };
-            if COMBAT <= u.master(self.master_tables(), p)?.kind {
+            if MasterKind::COMBAT <= u.master(self.master_tables(), p)?.kind {
                 units.push(id);
             }
         }
@@ -112,7 +111,7 @@ impl World {
             self.shelters_near(tp, target, target_master)?
         } else {
             let tm = self.master(tp, target_master)?;
-            if tm.kind < BUILDING {
+            if tm.kind < MasterKind::BUILDING {
                 Shelters {
                     buildings: Vec::new(),
                     transports: vec![ContainerId::new(target)],
@@ -168,7 +167,7 @@ impl World {
                 continue;
             };
             let m = u.master(self.master_tables(), p)?;
-            if m.class == class::VILLAGER && m.kind == COMBAT {
+            if m.class == class::VILLAGER && m.kind == MasterKind::COMBAT {
                 units.push(id);
             }
             if m.id == MASTER_1808 {
@@ -183,7 +182,7 @@ impl World {
                 .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
             if b.life.state == ObjectState::Alive
                 && b.life.inside.is_none()
-                && m.kind == BUILDING
+                && m.kind == MasterKind::BUILDING
                 && takes_villagers
             {
                 buildings.push(ContainerId::new(b.id));
@@ -228,7 +227,7 @@ impl World {
                 continue;
             }
             let om = o.master(self.master_tables(), op)?;
-            if om.kind < BUILDING {
+            if om.kind < MasterKind::BUILDING {
                 shelters.transports.push(ContainerId::new(id));
             } else if om.class != class::GATE && self.parts.building_of(o.id).annex_of.is_none() {
                 shelters.buildings.push(ContainerId::new(id));
@@ -288,7 +287,7 @@ impl World {
                 .object(building)
                 .ok_or(GenieError::unsupported("a garrison's building is gone"))?;
             let bm = b.master(self.master_tables(), bp)?;
-            capacities.push((bm.kind == BUILDING, bm.garrison, bm.class));
+            capacities.push((bm.kind == MasterKind::BUILDING, bm.garrison, bm.class));
         }
         let first_transport = shelters.buildings.len();
         for (i, &id) in units.iter().enumerate() {
@@ -355,7 +354,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
     ) -> Result<bool, GenieError> {
-        if b.master(self.master_tables(), bp)?.kind < COMBAT {
+        if b.master(self.master_tables(), bp)?.kind < MasterKind::COMBAT {
             return Ok(false);
         }
         self.takes_in(ContainerId::new(b.id), player, Some(master))
@@ -404,7 +403,7 @@ impl World {
             let unit = self.players.live(p, idx)?;
             let kind = unit.master(self.master_tables(), p)?.kind;
             if (ObjectState::Alive < unit.life.state && unit.life.state != ObjectState::Undead)
-                || kind < COMBAT
+                || kind < MasterKind::COMBAT
             {
                 continue;
             }

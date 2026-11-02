@@ -2,7 +2,7 @@
 //! class groups the masters the game treats alike (villagers, siege, gates, farms); the obfuscated
 //! build stores a class as its value minus `0xeac`, the values here are the decoded ones. Import
 //! the module and name a class as `class::VILLAGER`: several names also stand for a master type
-//! ([`crate::objects::masters::master_type`]).
+//! ([`crate::objects::masters::MasterKind`]'s constants).
 
 use crate::objects::masters::ClassId;
 

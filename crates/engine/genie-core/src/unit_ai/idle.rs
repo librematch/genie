@@ -10,7 +10,6 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::OrderKind;
@@ -159,7 +158,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        let searches = !at.scenario && COMBAT <= at.kind && !at.capture.any();
+        let searches = !at.scenario && MasterKind::COMBAT <= at.kind && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }
@@ -339,7 +338,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        let searches = !at.scenario && COMBAT <= at.kind && !at.capture.any();
+        let searches = !at.scenario && MasterKind::COMBAT <= at.kind && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }

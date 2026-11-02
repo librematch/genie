@@ -26,8 +26,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
 use crate::players::PlayerSet;
 use crate::vision::VisionBits;
@@ -44,7 +42,7 @@ const UNWATCHED_CLASSES: [ClassId; 2] = [class::CLASS_51, class::CLASS_54];
 const TERRAIN_ORIGINALS: [MasterId; 2] = [MasterId::named(357), MasterId::named(1188)];
 /// The type from which an object's entry and its ghost follow its footprint's UMV entry
 /// (`FUN_141090430`, `FUN_14108f9b0`: master type above 0x31).
-const MASKED_KIND: MasterKind = master_type::RGE_COMBAT;
+const MASKED_KIND: MasterKind = MasterKind::RGE_COMBAT;
 
 /// What an entry of a watched list follows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -310,7 +308,7 @@ impl World {
                 }
                 // a building's load constructor (FUN_1411ac170, type 80 only): FUN_1411cc980
                 // before the rehook links its annexes
-                if kind == BUILDING && self.watches_building_at(p, id, false)? {
+                if kind == MasterKind::BUILDING && self.watches_building_at(p, id, false)? {
                     let _ = self.watch(p, id, tile)?;
                 }
             }
@@ -689,11 +687,11 @@ mod tests {
     use crate::objects::MasterHitPoints;
     #[cfg(test)]
     use crate::objects::layers::Static;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::ids;
     use crate::objects::masters::ids::HOUSE;
-    use crate::objects::masters::master_type::DOPPELGANGER;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
     use crate::ownership::CaptureKind;
@@ -725,26 +723,26 @@ mod tests {
             Master {
                 id: GHOST_MASTER,
                 // The type of a ghost (`+0xf`).
-                kind: DOPPELGANGER,
+                kind: MasterKind::DOPPELGANGER,
                 recyclable,
                 ..Master::default()
             },
             Master {
                 id: MINE,
-                kind: master_type::MOVING,
+                kind: MasterKind::MOVING,
                 ghost_on_death: GhostMode::LEAVES,
                 ..Master::default()
             },
             Master {
                 id: HOUSE,
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 class: class::BUILDING,
                 ghost_on_death: GhostMode::LEAVES,
                 ..Master::default()
             },
             Master {
                 id: TREE,
-                kind: master_type::MOVING,
+                kind: MasterKind::MOVING,
                 ..Master::default()
             },
         ])
@@ -804,7 +802,7 @@ mod tests {
                 building: None,
                 umv: 1,
                 capture: CaptureKind::NONE,
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
             },
         );
         t.spatial.sight = Some(sight);
@@ -1287,25 +1285,25 @@ mod tests {
         let mut t = world(true);
         let gate = Master {
             id: master_id(88),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::GATE,
             ..Master::default()
         };
         let annex_master = Master {
             id: master_id(89),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         };
         let wonder = Master {
             id: ids::WONDER,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::CLASS_51,
             ..Master::default()
         };
         let skipped = Master {
             id: MASTER_1808,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         };
@@ -1367,7 +1365,7 @@ mod tests {
             hit_points: MasterHitPoints::of_data(0),
             build_time: WholeSeconds::ZERO,
             record: Obstruction {
-                kind: ObstructionType::TYPE_2,
+                kind: ObstructionKind::TYPE_2,
                 class: ObstructionClass::UNIT,
             },
             snow: Snow::None,

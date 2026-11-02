@@ -21,7 +21,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::lifecycle::death_parts::FarmBonus;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
@@ -275,14 +275,14 @@ impl Completion<'_> {
             // the game mode is not the editor's (4) in a game
             part.pasture = matches!(master.id, ids::PASTURE_MANGROVE | ids::PASTURE);
         }
-        part.cart = self.ai && master.tasks.iter().any(|t| t.action_type == CART_TASK);
+        part.cart = self.ai && master.tasks.iter().any(|t| t.action_kind == CART_TASK);
         Ok(part)
     }
 }
 
 /// The action type of the mule cart's tasks (its moves to resources, `0x99`): the action
 /// factory makes no action of it.
-pub const CART_TASK: ActionType = ActionType::named(0x99);
+pub const CART_TASK: ActionKind = ActionKind::named(0x99);
 
 /// A completed building's stack unit (`FUN_1411dbb70`'s block for `+0x986`): the master its
 /// owner's slot 0x1c0 makes (`FUN_14162ce00` with its flag set), the place, and the hit points
@@ -478,9 +478,9 @@ mod stack_tests {
     use crate::objects::lifecycle::{Class, Lifecycle};
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::FlyMode;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ObstructionType;
-    use crate::objects::masters::master_type;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{BuildingMaster, Masters};
     use crate::objects::unit::Unit;
     use crate::players::attribute::{self, AttributeId};
@@ -500,7 +500,7 @@ mod stack_tests {
     /// time `bt`, hit points `hp`, an annex of `head`, with `annexes` at their offsets.
     fn building(
         id: i16,
-        (r, z, kind): (f32, f32, ObstructionType),
+        (r, z, kind): (f32, f32, ObstructionKind),
         (bt, hp): (i16, i16),
         head: i16,
         annexes: &[(i16, GroundOffset)],
@@ -513,12 +513,12 @@ mod stack_tests {
         }
         Master {
             id: master_id(id),
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             radius: Footprint::new(r, r),
             height: Distance::new(z),
             tall: 0.0 < z,
-            obstruction_type: kind,
+            obstruction_kind: kind,
             obstruction_class: ObstructionClass::UNIT,
             build_time: WholeSeconds::of_data(bt),
             trained_at: vec![master_id(9999)],
@@ -545,7 +545,7 @@ mod stack_tests {
     fn masters() -> Masters {
         let mut foundation = building(
             621,
-            (2.0, 4.0, ObstructionType::TYPE_2),
+            (2.0, 4.0, ObstructionKind::TYPE_2),
             (150, 2400),
             -1,
             &[],
@@ -556,7 +556,7 @@ mod stack_tests {
         }
         let mut tc = building(
             109,
-            (2.0, 0.0, ObstructionType::NONE),
+            (2.0, 0.0, ObstructionKind::NONE),
             (100, 2400),
             621,
             &[
@@ -574,7 +574,7 @@ mod stack_tests {
         tc.volley_missile = Some(master_id(54));
         let mut empty = building(
             890,
-            (0.0, 4.0, ObstructionType::CIRCLE),
+            (0.0, 4.0, ObstructionKind::CIRCLE),
             (-10, -1),
             109,
             &[],
@@ -585,14 +585,14 @@ mod stack_tests {
             tc,
             building(
                 618,
-                (1.0, 3.0, ObstructionType::TYPE_2),
+                (1.0, 3.0, ObstructionKind::TYPE_2),
                 (100, 2400),
                 621,
                 &[],
             ),
             building(
                 619,
-                (1.5, 0.0, ObstructionType::NONE),
+                (1.5, 0.0, ObstructionKind::NONE),
                 (100, 2400),
                 621,
                 &[
@@ -602,12 +602,12 @@ mod stack_tests {
             ),
             building(
                 620,
-                (1.0, 0.0, ObstructionType::NONE),
+                (1.0, 0.0, ObstructionKind::NONE),
                 (100, 2400),
                 621,
                 &[],
             ),
-            building(1649, (0.0, 0.0, ObstructionType::NONE), (0, 1), 619, &[]),
+            building(1649, (0.0, 0.0, ObstructionKind::NONE), (0, 1), 619, &[]),
             empty,
         ])
     }
@@ -638,7 +638,7 @@ mod stack_tests {
                 hit_points: MasterHitPoints::of_data(2400),
                 build_time: WholeSeconds::of_data(150),
                 record: Obstruction {
-                    kind: ObstructionType::TYPE_2,
+                    kind: ObstructionKind::TYPE_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -686,13 +686,13 @@ mod stack_tests {
                 class: class::BUILDING,
                 player: PlayerId::new(1),
                 master: ids::TOWN_CENTRE_621,
-                obstruction_type: ObstructionType::TYPE_2,
+                obstruction_kind: ObstructionKind::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
                 unknown: None,
                 obstruction: Some(Obstruction {
-                    kind: ObstructionType::TYPE_2,
+                    kind: ObstructionKind::TYPE_2,
                     class: ObstructionClass::UNIT,
                 }),
             },
@@ -717,7 +717,7 @@ mod stack_tests {
         for ms in &mut t.masters {
             let castle = building(
                 82,
-                (2.0, 4.0, ObstructionType::TYPE_2),
+                (2.0, 4.0, ObstructionKind::TYPE_2),
                 (150, 2400),
                 -1,
                 &[],
@@ -845,13 +845,13 @@ mod stack_tests {
     fn new_building_without_height_gets_no_record() {
         for (height, record) in [
             (0.0, None),
-            (1.0, Some((ObstructionType::CIRCLE, ObstructionClass::UNIT))),
+            (1.0, Some((ObstructionKind::CIRCLE, ObstructionClass::UNIT))),
         ] {
             let mut t = world();
             for ms in &mut t.masters {
                 let m = ms.get_mut(ids::TOWN_CENTRE).unwrap();
                 m.build_time = WholeSeconds::ZERO;
-                m.obstruction_type = ObstructionType::CIRCLE;
+                m.obstruction_kind = ObstructionKind::CIRCLE;
                 m.obstruction_class = ObstructionClass::UNIT;
                 m.height = Distance::new(height);
                 m.building.as_mut().unwrap().annexes = [None; 4];

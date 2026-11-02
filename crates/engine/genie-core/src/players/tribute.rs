@@ -127,9 +127,9 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::class;
     use crate::objects::masters::ids;
-    use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
     #[cfg(test)]
     use crate::players::PlayerType;
@@ -205,7 +205,7 @@ mod tests {
         );
         let masters = Masters::new([Master {
             id: ids::MARKET,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         }]);

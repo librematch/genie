@@ -10,10 +10,11 @@ use crate::math::image::masters::{
 };
 use crate::objects::Graphics;
 use crate::objects::SpriteId;
+use crate::objects::masters::DamageGraphic;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::TrainLocation;
 use crate::objects::masters::{ClassAmount, DamageClass, DamageGraphicEntry, TrainLocationEntry};
-use crate::objects::masters::{DamageGraphic, TrainLocation, attribute};
 use crate::players::attribute::{self as players_attribute, AttributeId};
 use std::fmt::{Debug, Error, Formatter};
 
@@ -143,10 +144,10 @@ pub(super) fn handicapped(handicap: Option<f32>, class: DamageClass) -> Option<f
 #[must_use]
 pub const fn cost_resource(attribute: MasterAttribute) -> Option<AttributeId> {
     match attribute {
-        attribute::FOOD_COSTS => Some(players_attribute::FOOD),
-        attribute::WOOD_COSTS => Some(players_attribute::WOOD),
-        attribute::GOLD_COSTS => Some(players_attribute::GOLD),
-        attribute::STONE_COSTS => Some(players_attribute::STONE),
+        MasterAttribute::FOOD_COSTS => Some(players_attribute::FOOD),
+        MasterAttribute::WOOD_COSTS => Some(players_attribute::WOOD),
+        MasterAttribute::GOLD_COSTS => Some(players_attribute::GOLD),
+        MasterAttribute::STONE_COSTS => Some(players_attribute::STONE),
         _ => None,
     }
 }

@@ -21,7 +21,7 @@ use crate::players::ai_module::InfoModule;
 use crate::players::ai_module::search::RING_SLACK;
 use crate::players::ai_module::{AiModule, SearchUnit};
 use crate::unit_ai::world_view::{UnitView, owner_view, town_centre_unit};
-use crate::unit_ai::{ActionKind, Notify, alert_owner};
+use crate::unit_ai::{AiAction, Notify, alert_owner};
 
 /// The world time (ms) before which an explorer's wait slot of -1 sends the search around the
 /// player's town centre instead of straight to the unit's place.
@@ -82,8 +82,8 @@ impl UnitView<'_, '_> {
         n: Notify,
     ) -> Result<Heard, GenieError> {
         let explore = [
-            ActionKind::Explore.value(),
-            ActionKind::ExploreAndDestroy.value(),
+            AiAction::Explore.value(),
+            AiAction::ExploreAndDestroy.value(),
         ];
         if !explore.contains(&n.p[0]) {
             return Ok(Heard::Nothing);

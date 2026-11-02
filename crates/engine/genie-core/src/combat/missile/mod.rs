@@ -18,7 +18,7 @@ use crate::math::Angle;
 use crate::math::fmath;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::HitChance;
@@ -35,7 +35,7 @@ use genie_model::combat::missile::missile_modes;
 mod missile_state;
 use genie_model::combat::missile::missile_stats;
 mod missile_target;
-use genie_model::combat::missile::projectile_type;
+use genie_model::combat::missile::projectile_kind;
 mod shooter_id;
 mod strike_result;
 pub(crate) mod unit;
@@ -47,7 +47,7 @@ pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
 pub use self::missile_stats::MissileStats;
 pub use self::missile_target::{MissileTarget, MissileTargetId};
-pub use self::projectile_type::ProjectileType;
+pub use self::projectile_kind::ProjectileKind;
 pub use self::shooter_id::{Shooter, ShooterId};
 pub use self::strike_result::StrikeResult;
 use crate::combat::{AttackCount, Firepower, MissileCount};
@@ -61,7 +61,7 @@ use crate::math::image::missile::{
 use crate::movement::Acceleration;
 
 /// The missile action's type, which word 9 adds when it is the top action.
-pub const MISSILE: ActionType = ActionType::named(8);
+pub const MISSILE: ActionKind = ActionKind::named(8);
 
 /// A target's height counts a third of its master's height radius (`FUN_140a9c600`,
 /// `DAT_142eb1c98`).
@@ -377,8 +377,8 @@ impl MissileAction {
                 "a smart missile leading its target",
             ));
         }
-        let angle = match stats.projectile_type {
-            ProjectileType::STRAIGHT => {
+        let angle = match stats.projectile_kind {
+            ProjectileKind::STRAIGHT => {
                 self.direction = if way <= 0.0 {
                     Offset::ZERO
                 } else {
@@ -390,7 +390,7 @@ impl MissileAction {
                     self.direction.x(),
                 )))
             }
-            ProjectileType::WHOLE_WAY => {
+            ProjectileKind::WHOLE_WAY => {
                 self.direction = Offset::new(dx, dy, dz);
                 Some(Angle::new(fmath::atan2(dy, dx)))
             }
@@ -435,8 +435,8 @@ impl MissileAction {
         max_range: Distance,
         stats: &MissileStats,
     ) -> Result<(Offset, bool), GenieError> {
-        let mut step = match stats.projectile_type {
-            ProjectileType::STRAIGHT => {
+        let mut step = match stats.projectile_kind {
+            ProjectileKind::STRAIGHT => {
                 let way = stats.speed * dt;
                 let d = self.direction.scaled(way.get());
                 self.timer += way;
@@ -447,7 +447,7 @@ impl MissileAction {
                 }
                 d
             }
-            ProjectileType::WHOLE_WAY => {
+            ProjectileKind::WHOLE_WAY => {
                 self.distance = Distance::ZERO;
                 self.direction
             }
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn spear_arcs_to_its_point() {
         let stats = MissileStats {
-            projectile_type: ProjectileType::STRAIGHT,
+            projectile_kind: ProjectileKind::STRAIGHT,
             arc: ArcRatio::new(-0.06),
             speed: Speed::new(7.0),
             radius: Radii::new(0.1, 0.1, 0.0),

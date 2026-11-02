@@ -6,8 +6,8 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
 use crate::players::Amount;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
@@ -240,7 +240,7 @@ fn soldier() -> Searcher {
         action: None,
         master: master_id(74),
         class: Some(class::CLASS_6),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         attack_priority: AttackPriority::PRIORITY_1,
         can_move: true,
         sight: Distance::new(12.0),
@@ -260,7 +260,7 @@ fn enemy(id: i32, class: ClassId, distance: Distance, hp: HitPoints) -> (Thing, 
             has_ai: true,
             master: master_id(4),
             class,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             targetable: true,
             attackable: true,
             distance,
@@ -654,7 +654,7 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
         (false, vec!['a', 'f', 'n'])
     );
     let building = Searcher {
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         ..soldier()
     };
     assert_eq!(

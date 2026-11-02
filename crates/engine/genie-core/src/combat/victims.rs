@@ -11,8 +11,8 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -583,7 +583,7 @@ impl World {
 /// `FUN_140fde380`: `master` is of type 70 and up, of class 51 or 54, with a weapon (`+0x810`
 /// above 0): a trebuchet, packed or not, whose kill counts as a unit's.
 pub(crate) fn is_trebuchet(master: &Master) -> bool {
-    COMBAT <= master.kind
+    MasterKind::COMBAT <= master.kind
         && matches!(master.class, class::CLASS_51 | class::CLASS_54)
         && !master.weapons.is_empty()
 }

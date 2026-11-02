@@ -9,9 +9,9 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::action_type;
 use crate::players::PlayerId;
 
 use crate::gathering::gather::Walks;
@@ -223,7 +223,7 @@ impl Unit {
             | Some(
                 MOVE_TO
                 | EXPLORE
-                | action_type::BUILD
+                | ActionKind::BUILD
                 | ATTACK
                 | ENTER
                 | FLY

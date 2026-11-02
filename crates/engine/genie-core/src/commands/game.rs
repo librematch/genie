@@ -404,10 +404,12 @@ mod tests {
     /// a player outside the world changes nothing.
     #[test]
     fn the_queue_sub_commands_buy_and_give_back_for_their_player() {
-        use crate::objects::masters::{Master, Masters, master_type};
+        use crate::objects::masters::Master;
+        use crate::objects::masters::MasterKind;
+        use crate::objects::masters::Masters;
         let costing = |id, wood| Master {
             id,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             cost: costs(&[(attribute::WOOD, wood, true)]),
             ..Master::default()
         };

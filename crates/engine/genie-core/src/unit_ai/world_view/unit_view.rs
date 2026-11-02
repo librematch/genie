@@ -8,7 +8,7 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, MasterTables};
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
@@ -136,7 +136,7 @@ impl UnitView<'_, '_> {
             let tm = t.master(self.c.w.master_tables(), tq)?;
             let gap = footprint_gap_squared(u.position(), m.radius, t.position(), tm.radius);
             let in_range = gap <= m.weapon_range.squared() && m.min_range.squared() <= gap;
-            let spared = patrolling && tm.kind == BUILDING && tm.weapons.is_empty();
+            let spared = patrolling && tm.kind == MasterKind::BUILDING && tm.weapons.is_empty();
             if in_range && !spared {
                 return Ok(false);
             }

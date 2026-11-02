@@ -31,10 +31,10 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FISH_TRAP;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
@@ -91,7 +91,7 @@ impl World {
             let unit = &self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
             let class = master.class;
-            let building = master.kind == BUILDING;
+            let building = master.kind == MasterKind::BUILDING;
             let cart_task = building && self.has_task(p, unit.life.master_id, CART_TASK)?;
             let Some(start) = start_of(class, building, cart_task) else {
                 i = i.next();

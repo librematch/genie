@@ -8,10 +8,10 @@ use crate::map::spatial::{RecordId, Spatial, WalkQuery};
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::layers::Building;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::unit::Unit;
@@ -38,7 +38,7 @@ pub fn lets_pass(
         .building
         .as_ref()
         .is_some_and(|b| b.transform_unit.is_some());
-    master.kind == BUILDING
+    master.kind == MasterKind::BUILDING
         && gate.life.state < ObjectState::Dying
         && master.class == class::GATE
         && transforms
@@ -174,7 +174,7 @@ impl World {
                 let id = self.players.live(q, i)?.id;
                 if self.spatial.get(id).is_some_and(|g| {
                     g.obstruction
-                        .is_some_and(|o| o.kind == ObstructionType::TYPE_10)
+                        .is_some_and(|o| o.kind == ObstructionKind::TYPE_10)
                 }) {
                     return Err(GenieError::unsupported(
                         "a gate of obstruction kind 10 opens (FUN_140f65580)",
@@ -221,7 +221,7 @@ impl World {
                     continue;
                 };
                 let record = Obstruction {
-                    kind: m.obstruction_type,
+                    kind: m.obstruction_kind,
                     class: m.obstruction_class,
                 };
                 // a gate part of obstruction kind 0 (the gate's middle, master 91) gets none

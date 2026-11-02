@@ -201,7 +201,7 @@ fn missile_without_its_action_keeps_flying() {
 /// combat layer's) added to the master's work rate.
 #[test]
 fn build_work_rate_takes_the_builder_powerup() {
-    use genie_core::objects::masters::action_type::BUILD;
+    use genie_core::objects::masters::ActionKind;
     use genie_save::generated::world::{Task, TaskList, TaskListEntry1, TribeActionBuild};
     let mut master = combat_master(83);
     let acting = &mut master
@@ -216,7 +216,7 @@ fn build_work_rate_takes_the_builder_powerup() {
         list: vec![TaskListEntry1 {
             task_type: 1,
             task: Task {
-                action_type: BUILD.get(),
+                action_type: ActionKind::BUILD.get(),
                 ..Task::default()
             },
         }],
@@ -236,7 +236,8 @@ fn build_work_rate_takes_the_builder_powerup() {
         })),
         ..Action::default()
     };
-    combat.rge_combat_object.rge_action_object.actions = action_list(vec![(BUILD, build)]);
+    combat.rge_combat_object.rge_action_object.actions =
+        action_list(vec![(ActionKind::BUILD, build)]);
     let o = object(
         &builder,
         &with_masters(vec![master]),
@@ -258,7 +259,7 @@ fn build_work_rate_takes_the_builder_powerup() {
 /// unit's.
 #[test]
 fn the_back_to_work_actions_import_as_their_kinds() {
-    use genie_core::unit_ai::ActionKind;
+    use genie_core::unit_ai::AiAction;
     let mut object = combat_object(5, 4);
     let c = combat_mut(&mut object);
     c.town_bell_flag = 1;
@@ -277,7 +278,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     assert!(bell.flag);
     assert_eq!(
         (bell.work.action, bell.before_building.action),
-        (Some(ActionKind::Gather), None)
+        (Some(AiAction::Gather), None)
     );
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
     let o = whole(&object);

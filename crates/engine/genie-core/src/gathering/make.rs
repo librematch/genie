@@ -12,13 +12,13 @@
 use crate::GenieError;
 use crate::objects::HitPoints;
 use crate::objects::lifecycle::Lifecycle;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
@@ -29,7 +29,7 @@ use crate::world::step::Step;
 use genie_diff::Diff;
 
 /// The action type (`+0x8`, 0x15).
-pub const MAKE: ActionType = ActionType::named(21);
+pub const MAKE: ActionKind = ActionKind::named(21);
 
 pub use crate::gathering::make_state::MakeState;
 use crate::objects::layers::Action;
@@ -156,7 +156,7 @@ impl MakeAction {
                     && farm.life.amount <= Amount::ZERO
                     // The first master type whose slot 0xd8 is `FUN_141211340` (70, `TRIBE_Combat_Object`, and 80);
                     // below it slot 0xd8 is `FUN_14118f580` itself.
-                    && (master.kind < COMBAT || master.class != NEVER_EXHAUSTED_CLASS) =>
+                    && (master.kind < MasterKind::COMBAT || master.class != NEVER_EXHAUSTED_CLASS) =>
             {
                 farm.life.hp = HitPoints::ZERO;
             }
@@ -191,10 +191,10 @@ mod tests {
     use crate::objects::ObjectState;
     use crate::objects::WorkRate;
     use crate::objects::masters::CarryCapacity;
+    use crate::objects::masters::MasterKind;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
     use crate::objects::masters::ids;
-    use crate::objects::masters::master_type;
     use crate::objects::masters::{Master, Masters};
     use crate::players::PlayerId;
     use crate::players::attribute;
@@ -212,7 +212,7 @@ mod tests {
     /// The farm's default task in build 158041's `.dat` (master 50, task 0).
     fn farm_task() -> Task {
         Task {
-            action_type: MAKE,
+            action_kind: MAKE,
             attribute_type: Some(attribute::FARM_FOOD),
             attribute_type2: Some(attribute::FOOD),
             work_val1: WorkValue::new(1.0),
@@ -224,7 +224,7 @@ mod tests {
     fn farm_master(id: MasterId) -> Master {
         Master {
             id,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::FARM,
             work_rate: WorkRate::new(0.4),
             capacity: CarryCapacity::of_data(15),

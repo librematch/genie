@@ -38,8 +38,7 @@ use crate::movement::move_to::MoveToAction;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::RoleId;
-use crate::objects::masters::ActionType;
-use crate::objects::masters::action_type;
+use crate::objects::masters::ActionKind;
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::ownership::artifact::Artifact;
 use genie_diff::Diff;
@@ -141,10 +140,10 @@ action_kinds! {
 impl Action {
     /// The action's type (`+0x8`, `FUN_140a7be70`), as word 9 of a checkpoint adds it.
     #[must_use]
-    pub const fn kind(&self) -> ActionType {
+    pub const fn kind(&self) -> ActionKind {
         match self {
             Self::Artifact(_) => ARTIFACT_TYPE,
-            Self::Build(_) => action_type::BUILD,
+            Self::Build(_) => ActionKind::BUILD,
             Self::Repair(_) => REPAIR,
             Self::MoveTo(_) => MOVE_TO,
             Self::Fly(_) => FLY,
@@ -244,13 +243,13 @@ impl ActionList {
 
     /// `get_action` (`FUN_140a986a0`): the first action of type `kind`, if the list holds one.
     #[must_use]
-    pub fn of_kind(&self, kind: ActionType) -> Option<&Action> {
+    pub fn of_kind(&self, kind: ActionKind) -> Option<&Action> {
         self.0.iter().find(|a| a.kind() == kind)
     }
 
     /// `have_action` (`FUN_140a98740`): whether the list holds an action of type `kind`.
     #[must_use]
-    pub fn holds(&self, kind: ActionType) -> bool {
+    pub fn holds(&self, kind: ActionKind) -> bool {
         self.of_kind(kind).is_some()
     }
 

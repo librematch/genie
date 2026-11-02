@@ -35,9 +35,9 @@ use crate::GenieError;
 use crate::objects::ObjectId;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{ClassId, class};
 use crate::players::PlayerId;
 use crate::production::QueuedUnits;
@@ -190,7 +190,7 @@ pub fn key(masters: Option<&Masters>, lines: &UnitLines, master: MasterId) -> Ke
     let mut out = Key::NONE;
     let mut classed = true;
     // The buildings' type, which wait in the pending lists.
-    let id = if m.kind == BUILDING {
+    let id = if m.kind == MasterKind::BUILDING {
         let building = m.building.as_ref();
         if building.is_some_and(|b| b.head_unit.is_some() && b.annexes[0].is_none()) {
             classed = false;
@@ -434,7 +434,7 @@ impl World {
                         }
                     }
                 }
-                let building = u.master(self.master_tables(), p)?.kind == BUILDING;
+                let building = u.master(self.master_tables(), p)?.kind == MasterKind::BUILDING;
                 if building
                     && self
                         .parts
@@ -562,10 +562,10 @@ mod tests {
     use crate::objects::layers::Building;
     use crate::objects::lines::LineId;
     use crate::objects::lines::UnitLine;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::ids;
-    use crate::objects::masters::master_type;
     use crate::objects::masters::{BuildingMaster, Master};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
@@ -579,7 +579,7 @@ mod tests {
     fn building(id: i16, class: ClassId, stack: i16, head: i16, annex: i16) -> Master {
         Master {
             id: master_id(id),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class,
             building: Some(BuildingMaster {
                 stack_unit: opt_master(stack),
@@ -594,7 +594,7 @@ mod tests {
     fn unit(id: MasterId, class: ClassId) -> Master {
         Master {
             id,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class,
             ..Master::default()
         }
@@ -921,7 +921,7 @@ mod tests {
                         hit_points: MasterHitPoints::of_data(2400),
                         build_time: WholeSeconds::of_data(150),
                         record: Obstruction {
-                            kind: ObstructionType::NONE,
+                            kind: ObstructionKind::NONE,
                             class: ObstructionClass::NONE,
                         },
                         snow: Snow::None,

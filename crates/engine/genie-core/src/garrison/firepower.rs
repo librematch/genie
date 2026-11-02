@@ -12,9 +12,9 @@ use crate::math::image::garrison::{
 };
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::objects::masters::{Master, Masters};
 use crate::world::Seconds;
@@ -163,7 +163,7 @@ pub fn share(
             // `SEEK_SHELTER`'s villagers: class 4 of type 70.
             // The type of a combat unit: the master a transforming master names (`+0x656`), and a unit a
             // transport takes in (`FUN_14120eb10`).
-            && m.kind == COMBAT
+            && m.kind == MasterKind::COMBAT
         {
             floor = firepower(m, masters, reload_powerup).over(rate);
         }

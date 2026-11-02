@@ -26,11 +26,9 @@ use crate::movement::Speed;
 use crate::objects::ObjectState;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::ACTION;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::UnitRelation;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::{Memory, Pick, Search, search_area, type_attacks_neutral};
 use crate::world::Seconds;
 use crate::world::Unread;
@@ -214,7 +212,7 @@ impl World {
                     .map_or(Speed::ZERO, |m| m.stats.speed),
                 range: weapon_range(master),
                 under_attack: u.under_attack,
-                attacking: ai.current_action == Some(ActionKind::Attack),
+                attacking: ai.current_action == Some(AiAction::Attack),
             };
             self.member_objects(id, &mut objects)?;
             if far && self.far_from_slot(group, &view, largest)? {
@@ -456,7 +454,7 @@ impl World {
         }
         let (p, u) = self.object(view.id).ok_or_else(|| member_gone(view.id))?;
         // The types of action objects (`RGE_Action_Object`), whose action list slot 0x538 reads.
-        if u.master(self.master_tables(), p)?.kind >= ACTION {
+        if u.master(self.master_tables(), p)?.kind >= MasterKind::ACTION {
             if let Some(e) = self.parts.unread.get(u.id).map(Unread::error) {
                 return Err(e);
             }
@@ -510,10 +508,10 @@ impl World {
 /// The master types of the combat objects (`RGE_Combat_Object` and its subclasses: combat,
 /// missile, TRIBE combat and building), whose slot 0x230 is `FUN_14108d960`.
 pub(in crate::groups) const COMBAT_KINDS: [MasterKind; 4] = [
-    master_type::RGE_COMBAT,
-    master_type::MISSILE,
-    master_type::COMBAT,
-    master_type::BUILDING,
+    MasterKind::RGE_COMBAT,
+    MasterKind::MISSILE,
+    MasterKind::COMBAT,
+    MasterKind::BUILDING,
 ];
 
 /// [`World::statistics_only`]'s totals: the group's statistics reset, then the members' views
@@ -603,8 +601,8 @@ mod tests {
     use crate::map::Position;
     use crate::objects::ListIndex;
     use crate::objects::masters::ChargeEvent;
+    use crate::objects::masters::ChargeKind;
     use crate::objects::masters::ChargeTarget;
-    use crate::objects::masters::ChargeType;
     use crate::objects::masters::FormationClass;
     use crate::objects::masters::{ClassId, class};
     use crate::objects::masters::{Master, Masters};
@@ -654,8 +652,8 @@ mod tests {
         let mut t = searched_world();
         let charging = |t: &mut World, charge_type: i16, charge_target: i16| {
             let m = t.masters[1].get_mut(master_id(4)).unwrap();
-            (m.charge_type, m.charge_target, m.charge_event) = (
-                ChargeType::of_data(charge_type),
+            (m.charge_kind, m.charge_target, m.charge_event) = (
+                ChargeKind::of_data(charge_type),
                 ChargeTarget::of_data(charge_target),
                 ChargeEvent::of_data(2),
             );
@@ -735,7 +733,7 @@ mod tests {
         .with_ais([(object_id(10), soldier_ai)]);
         let master = |id: MasterId, class: ClassId| Master {
             id,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class,
             formation_category: FormationClass::of_data(1),
             line_of_sight: Distance::new(4.0),
@@ -912,7 +910,7 @@ mod tests {
         for masters in &mut t.masters {
             let archer = Master {
                 id: ids::ID_7,
-                kind: master_type::COMBAT,
+                kind: MasterKind::COMBAT,
                 class: class::CLASS_0,
                 weapon_range: Distance::new(6.0),
                 radius: Footprint::new(0.3, 0.3),

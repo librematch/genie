@@ -12,15 +12,18 @@ use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::masters::AttributeWorld;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::follow;
 use crate::objects::masters::follow_moving;
-use crate::objects::masters::{AttributeWorld, Master, master_type, player_master};
+use crate::objects::masters::player_master;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::players::PlayerId;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
@@ -83,7 +86,7 @@ impl World {
             };
             let master = u.master(self.master_tables(), p)?;
             let (kind, master_id, master_class) = (master.kind, master.id, master.class);
-            if matches!(kind, master_type::COMBAT | master_type::BUILDING) {
+            if matches!(kind, MasterKind::COMBAT | MasterKind::BUILDING) {
                 self.garrison_volleys(p, id, after)?;
             }
             if after
@@ -125,7 +128,7 @@ impl World {
                 continue;
             };
             let m = unit.master(self.master_tables(), q)?;
-            if m.kind == master_type::COMBAT {
+            if m.kind == MasterKind::COMBAT {
                 shares.push(share(
                     m,
                     self.masters.checked(q.index())?,
@@ -161,13 +164,13 @@ impl World {
         id: ObjectId,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         let Some((_, u)) = self.object(id) else {
             return Ok(());
         };
         let master = u.master(self.master_tables(), p)?.clone();
         let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(id)).copied();
-        if master.kind < master_type::ACTION
+        if master.kind < MasterKind::ACTION
             || !has_actions(
                 self.parts.actions_of(u.id),
                 self.parts.production.get(u.id),
@@ -175,8 +178,8 @@ impl World {
             )
         {
             let sprite = match (attribute, u.idle_variant) {
-                (a::STANDING_GRAPHIC, 0) => master.standing_sprite,
-                (a::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,
+                (MasterAttribute::STANDING_GRAPHIC, 0) => master.standing_sprite,
+                (MasterAttribute::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,
                 _ => return Ok(()),
             };
             // slot 0x68 with no sprite (a second standing sprite the table lacks) shows none,
@@ -205,7 +208,7 @@ impl World {
             standing: g(master.standing_sprite),
             idle_attack: g(master.idle_attack_sprite),
             second: g(master.attack_sprite2),
-            combat: master_type::COMBAT <= master.kind,
+            combat: MasterKind::COMBAT <= master.kind,
         };
         // the object the read above found: its action layer
         let actions = self.parts.actions_mut(id)?;
@@ -254,9 +257,7 @@ impl World {
                 continue;
             }
             let annexes = match self.object(id) {
-                Some((_, u))
-                    if u.master(self.master_tables(), p)?.kind == master_type::BUILDING =>
-                {
+                Some((_, u)) if u.master(self.master_tables(), p)?.kind == MasterKind::BUILDING => {
                     self.parts.building_of(u.id).annexes
                 }
                 _ => continue,
@@ -266,7 +267,7 @@ impl World {
                     continue;
                 };
                 let am = a.master(self.master_tables(), p)?;
-                let own_annexes = am.kind == master_type::BUILDING
+                let own_annexes = am.kind == MasterKind::BUILDING
                     && self.parts.building_of(a.id).annexes.ids().next().is_some();
                 if !own_annexes && am.class == class {
                     let _ = self.change_object(annex, change, v, attribute)?;
@@ -323,7 +324,7 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         let master = self.master(p, unit)?.clone();
         let (done, pending) = self.tracked_master(p, &master)?;
         let mut kept = Vec::new();
@@ -334,23 +335,23 @@ impl World {
             let kind = master.kind;
             let unrecorded = match attribute {
                 // a char compare of the new type with the object's master's
-                a::OBSTRUCTION_TYPE => {
-                    ObstructionType::from(cvttss2si(v) as u8) != master.obstruction_type
+                MasterAttribute::OBSTRUCTION_TYPE => {
+                    ObstructionKind::from(cvttss2si(v) as u8) != master.obstruction_kind
                 }
-                a::SIZE_Z => true,
+                MasterAttribute::SIZE_Z => true,
                 _ => false,
             };
             if unrecorded {
                 self.take_record(id, u.life.inside.is_some(), &master);
                 kept.push(id);
-            } else if attribute == a::HERO_STATUS && master_type::COMBAT <= kind {
+            } else if attribute == MasterAttribute::HERO_STATUS && MasterKind::COMBAT <= kind {
                 let _ = self.change_object(id, change, v, attribute)?;
                 kept.push(id);
             } else {
                 let _ = self.change_object(id, change, v, attribute)?;
             }
         }
-        if master_type::BUILDING <= master.kind {
+        if MasterKind::BUILDING <= master.kind {
             for id in pending {
                 let _ = self.change_object(id, change, v, attribute)?;
             }
@@ -359,19 +360,19 @@ impl World {
         let master = self.master(p, unit)?.clone();
         for id in kept {
             match attribute {
-                a::SIZE_Z => {
+                MasterAttribute::SIZE_Z => {
                     let desolid = self
                         .object(id)
                         .and_then(|(_, u)| self.parts.building_of(u.id).construction.as_ref())
                         .is_some_and(|c| c.desolid);
-                    if master.kind == master_type::BUILDING
+                    if master.kind == MasterKind::BUILDING
                         && !desolid
                         && Distance::ZERO < master.height
                     {
                         self.give_record(id, &master);
                     }
                 }
-                a::OBSTRUCTION_TYPE => self.give_record(id, &master),
+                MasterAttribute::OBSTRUCTION_TYPE => self.give_record(id, &master),
                 _ => {
                     if self.object(id).is_some_and(|(_, u)| u.group.id.is_some()) {
                         return Err(GenieError::unsupported(
@@ -416,7 +417,7 @@ impl World {
             return;
         }
         let record = Obstruction {
-            kind: master.obstruction_type,
+            kind: master.obstruction_kind,
             class: master.obstruction_class,
         };
         if record.recorded() {
@@ -468,7 +469,7 @@ impl World {
         id: MasterId,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         let Some(master) = player_master(&self.masters, p, id).cloned() else {
             return Ok(());
         };
@@ -490,22 +491,26 @@ impl World {
                 }
             }
             match attribute {
-                a::DYING_GRAPHIC => {
+                MasterAttribute::DYING_GRAPHIC => {
                     u.life.dying_sprite = master.death_sprite;
                 }
-                a::DEAD_UNIT_ID => u.life.death_spawn = master.death_spawns[0].is_some(),
+                MasterAttribute::DEAD_UNIT_ID => {
+                    u.life.death_spawn = master.death_spawns[0].is_some();
+                }
                 _ => {}
             }
             if let Some(c) = self.parts.building_mut(u.id)?.construction.as_mut() {
                 match attribute {
-                    a::HIT_POINTS => c.hit_points = master.hit_points,
-                    a::TRAIN_TIME
-                    | a::TRAIN_LOCATION
-                    | a::TRAIN_LOCATIONS_ENTRY_MOD
-                    | a::TRAIN_LOCATIONS_TOTAL_NUM => c.build_time = master.build_time,
-                    a::OBSTRUCTION_TYPE | a::BLOCKAGE_CLASS => {
+                    MasterAttribute::HIT_POINTS => c.hit_points = master.hit_points,
+                    MasterAttribute::TRAIN_TIME
+                    | MasterAttribute::TRAIN_LOCATION
+                    | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
+                    | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
+                        c.build_time = master.build_time;
+                    }
+                    MasterAttribute::OBSTRUCTION_TYPE | MasterAttribute::BLOCKAGE_CLASS => {
                         c.record = Obstruction {
-                            kind: master.obstruction_type,
+                            kind: master.obstruction_kind,
                             class: master.obstruction_class,
                         };
                     }
@@ -515,12 +520,12 @@ impl World {
         }
         for id in ids {
             match attribute {
-                a::LINE_OF_SIGHT => {
+                MasterAttribute::LINE_OF_SIGHT => {
                     if let Some(s) = self.spatial.sight.as_mut().and_then(|v| v.seer_mut(id)) {
                         s.los = master.line_of_sight;
                     }
                 }
-                a::SIZE_Z => self.spatial.set_tall(id, master.tall),
+                MasterAttribute::SIZE_Z => self.spatial.set_tall(id, master.tall),
                 _ => {}
             }
         }

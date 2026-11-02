@@ -12,8 +12,8 @@ use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::objects::layers::{Building, Combat};
 use crate::objects::lines::UnitLines;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::release::{Releaser, released, released_fields};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
@@ -394,7 +394,7 @@ impl Lets<'_> {
     /// building, else the object itself.
     fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> Result<ObjectId, GenieError> {
         // The building master type RESEARCH asks for (`'P'`, 80).
-        Ok(if f.master(self.masters, p)?.kind == BUILDING {
+        Ok(if f.master(self.masters, p)?.kind == MasterKind::BUILDING {
             self.buildings
                 .get(f.id)
                 .and_then(|b| b.annex_of)

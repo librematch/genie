@@ -6,8 +6,8 @@ use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::fmath::log;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type::BUILDING;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
@@ -57,7 +57,7 @@ impl World {
             let building = unit
                 .master(self.master_tables(), owner)
                 // The buildings' type (the object's `+0xf`, `'P'`).
-                .is_ok_and(|m| m.kind == BUILDING);
+                .is_ok_and(|m| m.kind == MasterKind::BUILDING);
             if building {
                 sum += self.parts.building_of(unit.id).livestock_summation.get();
             }

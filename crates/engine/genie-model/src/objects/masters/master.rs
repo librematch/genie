@@ -28,8 +28,8 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::COST_SLOTS;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ChargeEvent;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ChargeTarget;
-use crate::objects::masters::ChargeType;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
@@ -59,7 +59,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::MinimapMode;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Occlusion;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::RestrictionField;
@@ -73,7 +73,6 @@ use crate::objects::masters::TaskIndex;
 use crate::objects::masters::Trail;
 use crate::objects::masters::TrainLocationEntry;
 use crate::objects::masters::VolleySpread;
-use crate::objects::masters::master_type;
 use crate::objects::{Frame, Regeneration};
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -105,10 +104,10 @@ impl Master {
     #[must_use]
     pub fn sprite_facets(&self, graphics: &Graphics) -> Option<SpriteFacets> {
         let mut sprites = vec![self.standing_sprite, self.standing_sprite_2];
-        if master_type::MOVING <= self.kind {
+        if MasterKind::MOVING <= self.kind {
             sprites.extend([self.move_sprite, self.run_sprite]);
         }
-        if master_type::RGE_COMBAT <= self.kind {
+        if MasterKind::RGE_COMBAT <= self.kind {
             sprites.push(self.attack_sprite);
         }
         for t in &self.tasks {
@@ -198,7 +197,7 @@ pub struct Master {
     /// which a placement test reads.
     pub terrain_restriction: Option<RestrictionId>,
     /// `obstruction_type` (`+0x651`) and `can_be_built_on` (`+0x5e9`).
-    pub obstruction_type: ObstructionType,
+    pub obstruction_kind: ObstructionKind,
     /// `can_be_built_on` (`+0x5e9`): a new building deletes an object of it off its footprint.
     pub buildable_on: BuildableOn,
     /// `obstruction_class` (`+0x652`).
@@ -236,7 +235,7 @@ pub struct Master {
     pub min_range: Distance,
     /// `charge_type` (`+0x922`): 6 and 7 add `charge_event` (`+0x920`) to the range against some
     /// targets (slot 0x2f8).
-    pub charge_type: ChargeType,
+    pub charge_kind: ChargeKind,
     /// `+0x61c`, `attribute_max_amount`: how much an object of this master carries.
     pub capacity: CarryCapacity,
     /// `+0x8bc`, `mFormationCategory`: 0 (villagers) keeps a unit out of the groups an order's

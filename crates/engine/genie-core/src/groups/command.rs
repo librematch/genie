@@ -29,8 +29,8 @@ use crate::movement::PlanTries;
 use crate::movement::Speed;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
-use crate::objects::masters::ActionType;
-use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::pathing::tile_path::Path;
 use crate::world::Seconds;
@@ -141,7 +141,7 @@ impl World {
         for m in &g.members {
             if let Some((p, u)) = self.object(m.id) {
                 let master = u.master(self.master_tables(), p)?;
-                if COMBAT <= master.kind && master.formation_category.grouped() {
+                if MasterKind::COMBAT <= master.kind && master.formation_category.grouped() {
                     return Ok(false);
                 }
             }
@@ -513,7 +513,7 @@ impl World {
                 let target = held_id(node.target_id)?;
                 let order = AttackOrder {
                     disable_retargeting: node.disable_retargeting != 0,
-                    filter: ActionType::of_data(node.approved_2.cast_signed()),
+                    filter: ActionKind::of_data(node.approved_2.cast_signed()),
                 };
                 let _ = self.command_attack(group, target, order)?;
                 Ok(true)
@@ -711,7 +711,7 @@ mod tests {
         );
         let master = Master {
             id: master_id(4),
-            kind: COMBAT,
+            kind: MasterKind::COMBAT,
             formation_category: FormationClass::of_data(1),
             ..Master::default()
         };

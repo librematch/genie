@@ -16,7 +16,7 @@ use crate::players::PlayerType;
 use crate::unit_ai::best_target::Candidate;
 use crate::unit_ai::best_target::OrderWeight;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
-use crate::unit_ai::{ActionKind, OrderKind};
+use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::WorldTime;
 use crate::world::{Percent, TargetingMode};
 
@@ -35,7 +35,7 @@ pub struct Searcher {
     /// The AI's order (`+0x3c`) and action (`+0x44`).
     pub order: Option<OrderKind>,
     /// The AI's action (`+0x44`).
-    pub action: Option<ActionKind>,
+    pub action: Option<AiAction>,
     /// The unit's master's id, class and type (`+0x5d7`, `+0x98f`, the master's `+0x8`).
     pub master: MasterId,
     /// Its master's class.

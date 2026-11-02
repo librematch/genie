@@ -7,9 +7,9 @@ use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::objects::masters::action_type;
-use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::MasterKind;
 use crate::objects::unit::{TAKEN_OUT, Unit};
 
 use crate::combat::AttackTargetId;
@@ -21,7 +21,7 @@ use crate::movement::Me;
 use crate::objects::WorkerCount;
 use crate::objects::layers::{Action, Building};
 use crate::ownership::artifact::ARTIFACT_TYPE;
-use crate::unit_ai::{ActionKind, OrderKind, UnitAi};
+use crate::unit_ai::{AiAction, OrderKind, UnitAi};
 use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
 
@@ -50,7 +50,7 @@ impl Unit {
     /// building (type 80) below state 2 whose master has a stack unit (`+0x986`), and the taker's
     /// player is not allied with its owner (`FUN_141663d90` with 1: `allied` false).
     pub(crate) fn lists_taker(&self, master: &Master, allied: bool) -> bool {
-        master.kind == BUILDING
+        master.kind == MasterKind::BUILDING
             && self.life.state < ObjectState::Alive
             && master.building.is_some_and(|b| b.stack_unit.is_some())
             && !allied
@@ -91,7 +91,7 @@ impl Unit {
                 format_args!(
                     "order {} action {} target {}",
                     OrderKind::field(ai.current_order),
-                    ActionKind::field(ai.current_action),
+                    AiAction::field(ai.current_action),
                     ObjectId::field(ai.current_target)
                 ),
             );
@@ -157,8 +157,8 @@ impl Action {
             return Ok(true);
         };
         Ok(match (kind, state.get()) {
-            (action_type::ACTION_126, _) => false,
-            (action_type::TRADE, 4) => {
+            (ActionKind::ACTION_126, _) => false,
+            (ActionKind::TRADE, 4) => {
                 return Err(GenieError::unsupported("slot 0x2d0 of a trade in state 4"));
             }
             (_, 0 | 1 | 3 | 0xd | 0xe) => true,

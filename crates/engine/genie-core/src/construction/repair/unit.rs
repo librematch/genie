@@ -22,13 +22,10 @@ use crate::objects::ObjectId;
 use crate::objects::RoleId;
 use crate::objects::layers::Action;
 use crate::objects::masters::BlastLevel;
-use crate::objects::masters::ChargeType;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::{AttackPriority, MasterTables};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -136,7 +133,7 @@ impl Unit {
             missile: master.and_then(|m| m.missile.master()),
             range: master.map_or(Distance::ZERO, |m| m.weapon_range),
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
-            charge_type: master.map_or(ChargeType::NONE, |m| m.charge_type),
+            charge_kind: master.map_or(ChargeKind::NONE, |m| m.charge_kind),
             area_effect: master.map_or(Distance::ZERO, |m| m.area_effect),
             blast_level: master.map_or(BlastLevel::NONE, |m| m.blast_level),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
@@ -206,9 +203,10 @@ fn repairee_of(
         position: t.position(),
         radius: tm.radius,
         class: tm.class,
-        moves: MOVING <= tm.kind && tm.moving.as_ref().is_some_and(|m| Speed::ZERO < m.speed),
+        moves: MasterKind::MOVING <= tm.kind
+            && tm.moving.as_ref().is_some_and(|m| Speed::ZERO < m.speed),
     };
-    let counting = if tm.kind == BUILDING {
+    let counting = if tm.kind == MasterKind::BUILDING {
         c.w.parts
             .building_of(t.id)
             .annex_of
@@ -245,7 +243,7 @@ pub(crate) fn repair_target(
         && let Some((q, t)) = others.find(target)
     {
         let tm = repair_master(MasterTables::new(&c.w.masters, &c.w.parts.own_master), q, t)?;
-        for id in reached_ids(c.w.objects(), target, tm.kind == BUILDING) {
+        for id in reached_ids(c.w.objects(), target, tm.kind == MasterKind::BUILDING) {
             let Some(o) = others.find(id) else {
                 continue;
             };
@@ -271,8 +269,8 @@ pub(crate) fn repair_target(
         attributes: &mut paid,
     };
     let answer = match kind {
-        BUILDING => repair_building(&mut set, 0, amount, true, &mut payer),
-        master_type::COMBAT => repair_unit(&mut set, 0, amount, &mut payer),
+        MasterKind::BUILDING => repair_building(&mut set, 0, amount, true, &mut payer),
+        MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer),
         // the task finder repairs buildings and combat units of its classes alone
         _ => Err(GenieError::unreachable(
             "a repaired object of a type below 70 (slot 0x110)",
@@ -330,13 +328,14 @@ fn repaired(
             .map_or(&[][..], |p| &p.attributes[..])
     };
     let rate = |k: usize| attributes.get(k).copied().unwrap_or(Amount::ZERO);
-    let annexes = if om.kind == BUILDING && c.w.parts.building_of(o.id).annex_of.is_none() {
-        let mut a: Vec<ObjectId> = c.w.parts.building_of(o.id).annexes.ids().collect();
-        a.sort_unstable();
-        a
-    } else {
-        Vec::new()
-    };
+    let annexes =
+        if om.kind == MasterKind::BUILDING && c.w.parts.building_of(o.id).annex_of.is_none() {
+            let mut a: Vec<ObjectId> = c.w.parts.building_of(o.id).annexes.ids().collect();
+            a.sort_unstable();
+            a
+        } else {
+            Vec::new()
+        };
     Ok(Repaired {
         id,
         kind: om.kind,
@@ -345,7 +344,7 @@ fn repaired(
         master_hp: om.hit_points,
         hp: o.life.hp,
         hp_powerup: c.w.parts.combat_of(o.id).hp_powerup,
-        main: if om.kind == BUILDING {
+        main: if om.kind == MasterKind::BUILDING {
             c.w.parts.building_of(o.id).annex_of
         } else {
             None

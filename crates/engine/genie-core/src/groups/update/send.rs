@@ -21,8 +21,6 @@ use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
@@ -37,7 +35,7 @@ const TRAVEL_MS: i32 = 2000;
 /// The span of a unit that does not move ([`Travel::Any`]): the immediate `1000`.
 const STANDING_SPAN: Millis = Millis::new(1000);
 /// A combat unit of this type (`'F'`) gets the charge's speed.
-const CHARGER: MasterKind = master_type::COMBAT;
+const CHARGER: MasterKind = MasterKind::COMBAT;
 
 /// What a unit sent at a target draws its retarget timer for ([`World::set_travel_timer`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -177,7 +175,7 @@ impl World {
             .zip(self.world_object(target))
             .ok_or_else(|| member_gone(id))?;
         let master = self.master(t.player(), t.master_id())?;
-        if master.kind != BUILDING
+        if master.kind != MasterKind::BUILDING
             || master.class != class::GATE
             || self.in_weapon_range(unit, t)?
         {

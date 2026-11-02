@@ -16,8 +16,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
 use genie_core::objects::Voice;
 use genie_core::objects::layers;
-use genie_core::objects::masters::action_type::BUILD;
-use genie_core::objects::masters::{ActionType, Task};
+use genie_core::objects::masters::{ActionKind, Task};
 use genie_core::objects::sprite::Graphic;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::world::Seconds;
@@ -75,7 +74,7 @@ pub(super) fn saved_actions(
         .map(ActionList::entries)
         .ok_or(NO_ACTIONS)?;
     let (kind, action) = entries.next().ok_or(NO_ACTIONS)?;
-    let kind = ActionType::try_from(kind)?;
+    let kind = ActionKind::try_from(kind)?;
     if let Some((below, _)) = entries.next() {
         return Err(not_imported().with("below the head", below));
     }
@@ -101,7 +100,7 @@ pub(super) fn saved_actions(
         MISSILE => import_missile(&saved, actions),
         MAKE => import_make(&saved, &task_at, actions),
         FLY => import_fly(&saved, &fly_task, actions),
-        BUILD => import_build(&saved, &work, actions),
+        ActionKind::BUILD => import_build(&saved, &work, actions),
         REPAIR => import_repair(&saved, &task_at, actions),
         HUNT => import_hunt(&saved, &task_at, actions),
         GATHER => import_gather(&saved, &task_at, actions),
@@ -127,17 +126,17 @@ const fn not_imported() -> GenieError {
 /// # Errors
 ///
 /// A negative action type.
-pub(crate) fn first_action(list: &ActionList) -> Result<Option<(ActionType, &Action)>, GenieError> {
+pub(crate) fn first_action(list: &ActionList) -> Result<Option<(ActionKind, &Action)>, GenieError> {
     list.entries()
         .next()
-        .map(|(kind, action)| Ok((ActionType::try_from(kind)?, action)))
+        .map(|(kind, action)| Ok((ActionKind::try_from(kind)?, action)))
         .transpose()
 }
 
 /// The second target (+0x34): only the Hunt, the Gather and the Build (their drop site), the
 /// missile (its shooter) and the Attack hold one in the slice.
-const fn holds_second_target(kind: ActionType) -> bool {
-    matches!(kind, HUNT | GATHER | MISSILE | ATTACK | BUILD)
+const fn holds_second_target(kind: ActionKind) -> bool {
+    matches!(kind, HUNT | GATHER | MISSILE | ATTACK | ActionKind::BUILD)
 }
 
 /// What a saved top action's import reads: the object, its static part, its player's objects,

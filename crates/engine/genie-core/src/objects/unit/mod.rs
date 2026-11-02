@@ -8,8 +8,6 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::WONDER;
-use crate::objects::masters::master_type::MISSILE;
-use crate::objects::masters::master_type::TREE;
 use crate::players::PlayerId;
 use crate::world::WorldTime;
 use genie_diff::Diff;
@@ -233,12 +231,12 @@ pub(crate) fn missed_passes(
     target: Option<ObjectId>,
     blast_level: BlastLevel,
 ) -> bool {
-    if player == c.player || kind == MISSILE {
+    if player == c.player || kind == MasterKind::MISSILE {
         return true;
     }
     let other = Some(id) != target;
     c.w.spatial.allied_with(c.player, player)
-        || (other && player == PlayerId::new(0) && TREE < kind)
+        || (other && player == PlayerId::new(0) && MasterKind::TREE < kind)
         || (other && !blast_level.reaches(level))
 }
 

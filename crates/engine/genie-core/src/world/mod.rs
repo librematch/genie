@@ -44,13 +44,12 @@ use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::ids::VILLAGER_FEMALE;
 use crate::objects::masters::ids::VILLAGER_MALE;
-use crate::objects::masters::master_type;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -97,7 +96,6 @@ use crate::math::image::turn::{
     TREE_SEARCH_WITHIN as TURN_TREE_SEARCH_WITHIN,
 };
 use crate::objects::lines::UnitLines;
-use crate::objects::masters::action_type::{ACTION_123, PACK, UNPACK};
 use crate::objects::{Graphics, RelicCount};
 use crate::pathing::zones::Zones;
 use crate::players::Team;
@@ -183,10 +181,11 @@ pub(crate) const GATE_QUERY_RECORDS: usize = 10;
 pub(crate) const GATE_COUNT_CAP: usize = 25;
 
 /// The building top actions that keep RESEARCH from a building (`FUN_141227a00`: 0x7b to 0x7d).
-pub(crate) const BLOCKS_RESEARCH: [ActionType; 3] = [ACTION_123, PACK, UNPACK];
+pub(crate) const BLOCKS_RESEARCH: [ActionKind; 3] =
+    [ActionKind::ACTION_123, ActionKind::PACK, ActionKind::UNPACK];
 /// The first master type whose slot 0x128 (a work at an object) does something: the action
 /// objects' (`FUN_14106c590`) and up; below it `FUN_141071bd0` returns at once.
-pub(crate) const STATIC_TYPES_END: MasterKind = master_type::ACTION;
+pub(crate) const STATIC_TYPES_END: MasterKind = MasterKind::ACTION;
 /// The masters whose restrictions the world's load gives planners (`World::load_world`'s two
 /// calls of `FUN_140f7d310`: Gaia's entries `+0x298` and `+0x10b8`).
 const PLANNED_MASTERS: [MasterId; 2] = [MasterId::named(83), MasterId::named(535)];

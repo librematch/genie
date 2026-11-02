@@ -38,12 +38,12 @@ use crate::unit_ai::task_finder::{Actor, Diplomacy, TaskTarget};
 /// The task types the action list's factory makes an action of: the TRIBE factory's
 /// (`FUN_140aca4b0`) and the RGE factory's it falls back on (`FUN_140a97e00`). A default task of
 /// any other type starts nothing (wild animals' Explore, type 6).
-pub const ACTION_FACTORY_TYPES: [ActionType; 28] = action_type::types([
+pub const ACTION_FACTORY_TYPES: [ActionKind; 28] = action_kind::types([
     3, 0xc, 0xe, 0x65, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6e, 0x6f, 0x78, 0x79, 0x7a, 0x7b, 0x7d,
     0x83, 0x84, 0x87, 0x88, 0x95, 0x9a, 4, 5, 7, 10, 0xd, 0x15,
 ]);
 
-pub use genie_model::objects::masters::action_type;
+pub use genie_model::objects::masters::action_kind;
 use genie_model::objects::masters::adjacent_mode;
 use genie_model::objects::masters::attack_priority;
 pub use genie_model::objects::masters::attribute;
@@ -51,8 +51,8 @@ use genie_model::objects::masters::blast_level;
 use genie_model::objects::masters::buildable_on;
 use genie_model::objects::masters::carry_capacity;
 use genie_model::objects::masters::charge_event;
+use genie_model::objects::masters::charge_kind;
 use genie_model::objects::masters::charge_target;
-use genie_model::objects::masters::charge_type;
 pub use genie_model::objects::masters::class;
 use genie_model::objects::masters::class_id;
 mod class_mask;
@@ -80,11 +80,10 @@ use genie_model::objects::masters::invulnerability;
 use genie_model::objects::masters::master;
 use genie_model::objects::masters::master_id;
 use genie_model::objects::masters::master_kind;
-pub use genie_model::objects::masters::master_type;
 use genie_model::objects::masters::minimap_mode;
 use genie_model::objects::masters::object_flags;
 use genie_model::objects::masters::obstruction_class;
-use genie_model::objects::masters::obstruction_type;
+use genie_model::objects::masters::obstruction_kind;
 use genie_model::objects::masters::occlusion;
 use genie_model::objects::masters::placement_terrains;
 use genie_model::objects::masters::run_pattern;
@@ -98,7 +97,7 @@ use genie_model::objects::masters::task_sprites;
 use genie_model::objects::masters::volley_spread;
 use genie_model::objects::masters::work_value;
 
-pub use self::action_type::ActionType;
+pub use self::action_kind::ActionKind;
 pub use self::adjacent_mode::AdjacentMode;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;
@@ -106,8 +105,8 @@ pub use self::blast_level::{BlastDefense, BlastLevel};
 pub use self::buildable_on::BuildableOn;
 pub use self::carry_capacity::CarryCapacity;
 pub use self::charge_event::ChargeEvent;
+pub use self::charge_kind::ChargeKind;
 pub use self::charge_target::ChargeTarget;
-pub use self::charge_type::ChargeType;
 pub use self::class_id::ClassId;
 pub use self::class_mask::ClassMask;
 pub use self::combat_ability::CombatAbility;
@@ -141,7 +140,7 @@ pub use self::master_kind::MasterKind;
 pub use self::minimap_mode::MinimapMode;
 pub use self::object_flags::ObjectFlags;
 pub use self::obstruction_class::ObstructionClass;
-pub use self::obstruction_type::ObstructionType;
+pub use self::obstruction_kind::ObstructionKind;
 pub use self::occlusion::Occlusion;
 pub use self::placement_terrains::PlacementTerrains;
 pub use self::run_pattern::RunPattern;

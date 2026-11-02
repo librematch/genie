@@ -20,7 +20,7 @@ use crate::movement::gate_gap;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::FogVisibility;
-use crate::objects::masters::master_type::MOVING;
+use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
@@ -125,7 +125,7 @@ impl Attack {
         } else {
             gap
         };
-        let mobile = MOVING <= f.own.kind && Speed::ZERO < speed;
+        let mobile = MasterKind::MOVING <= f.own.kind && Speed::ZERO < speed;
         if !skip_ready && self.ready_at_once(t.position, near, mobile || r.volley_under_way) {
             return self.face(
                 (at, g.motion.mover_mut()),

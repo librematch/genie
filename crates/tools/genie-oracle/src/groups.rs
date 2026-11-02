@@ -28,7 +28,7 @@ use genie_save::generated::world as saved;
 
 use crate::{object_ids, path_level, vec3};
 use genie_core::movement::PathData;
-use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ActionKind;
 use genie_core::pathing::DelayCount;
 use std::collections::BTreeMap;
 
@@ -225,7 +225,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
             range: Distance::new(t.range),
             target_radius: Distance::new(t.target_radius),
             disable_retargeting: t.disable_retargeting,
-            certain_action: ActionType::of_data(t.certain_action),
+            certain_action: ActionKind::of_data(t.certain_action),
         },
         attack_plan_type: g.attack_plan_type,
         idle_timer: Millis::new(g.idle_timer),
@@ -436,7 +436,7 @@ flat_value!(
     ObjectId,
     GroupId,
     GroupTarget,
-    ActionType,
+    ActionKind,
     FormationKind,
     SlotState,
     UnitStance

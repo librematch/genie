@@ -20,7 +20,7 @@ use crate::math::fmath;
 use crate::math::fmath::{BVector, below_or_unordered};
 use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ObjectId;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -28,7 +28,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::Seconds;
@@ -71,7 +70,7 @@ const CATEGORY_LIST_CLASSES: [ClassId; 12] = [
     class::CLASS_61,
 ];
 /// The task whose range adds the player's attribute 280 (`FUN_1415cd0d0` with the filter `0x68`).
-const CONVERSION_TASK: ActionType = ActionType::named(0x68);
+const CONVERSION_TASK: ActionKind = ActionKind::named(0x68);
 /// The player attribute a [`CONVERSION_TASK`]'s range adds (`+0x8c0` of the attribute table).
 const CONVERSION_RANGE_ATTRIBUTE: usize = 280;
 /// What a task range is before a task gives one (`DAT_14330ec20`).
@@ -88,7 +87,7 @@ pub(crate) struct AttackOrder {
     pub(crate) disable_retargeting: bool,
     /// The order's task filter (`+0x16`), `-1` for any, which the group keeps in its target
     /// (`+0x3de`).
-    pub(crate) filter: Option<ActionType>,
+    pub(crate) filter: Option<ActionKind>,
 }
 
 impl UnitGroup {
@@ -188,7 +187,7 @@ impl World {
     /// the object itself.
     fn main_object(&self, target: ObjectId) -> Result<ObjectId, GenieError> {
         let (player, unit) = self.object(target).ok_or_else(|| member_gone(target))?;
-        let building = unit.master(self.master_tables(), player)?.kind == BUILDING;
+        let building = unit.master(self.master_tables(), player)?.kind == MasterKind::BUILDING;
         Ok(self
             .parts
             .building_of(unit.id)
@@ -303,7 +302,7 @@ impl World {
         &self,
         player: PlayerId,
         master: MasterId,
-        filter: Option<ActionType>,
+        filter: Option<ActionKind>,
     ) -> Result<f32, GenieError> {
         let Some(filter) = filter else {
             return Ok(NO_RANGE);
@@ -312,7 +311,7 @@ impl World {
             return Ok(0.0);
         };
         for task in &master.tasks {
-            if filter == CONVERSION_TASK && task.action_type == CONVERSION_TASK {
+            if filter == CONVERSION_TASK && task.action_kind == CONVERSION_TASK {
                 let bonus = self
                     .players
                     .player(player)?
@@ -324,7 +323,7 @@ impl World {
                     ))?;
                 return Ok(bonus.get() + task.work_range.get());
             }
-            if task.action_type == filter {
+            if task.action_kind == filter {
                 return Ok(task.work_range.get());
             }
         }
@@ -440,11 +439,11 @@ impl World {
         master: &Master,
         target: &WorldObject<'_>,
     ) -> Result<bool, GenieError> {
-        if !master.charge_type.ranged() {
+        if !master.charge_kind.ranged() {
             return Ok(false);
         }
         let tm = self.master(target.player(), target.master_id())?;
-        let works = charge_works(master.charge_target, master.charge_type, tm.class, tm.kind);
+        let works = charge_works(master.charge_target, master.charge_kind, tm.class, tm.kind);
         Ok(works && Charge::new(1.0) <= self.parts.combat_of(u.id).charge)
     }
 }

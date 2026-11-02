@@ -20,15 +20,11 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::CombatAbility;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::WONDER;
-use crate::objects::masters::master_type::ACTION;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MISSILE;
-use crate::objects::masters::master_type::RGE_COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::{self, AttributeId};
@@ -56,9 +52,13 @@ pub fn take(
     blast_taken: HitPoints,
 ) -> Result<(), GenieError> {
     match t.kind {
-        COMBAT => take_unit(t, src, others, weapons, factor, blast_taken),
-        RGE_COMBAT | MISSILE => damage(t, src, weapons, factor, blast_taken),
-        BUILDING => take_building(t, src, others, weapons, factor, true, blast_taken).map(|_| ()),
+        MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken),
+        MasterKind::RGE_COMBAT | MasterKind::MISSILE => {
+            damage(t, src, weapons, factor, blast_taken)
+        }
+        MasterKind::BUILDING => {
+            take_building(t, src, others, weapons, factor, true, blast_taken).map(|_| ())
+        }
         _ => {
             take_static(t, &src.source, weapons, factor);
             Ok(())
@@ -200,7 +200,7 @@ pub(super) fn take_building(
     for a in others.iter_mut().filter(|a| annexes.contains(&a.id)) {
         a.hp = t.hp;
     }
-    if forward && RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
+    if forward && MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
         attack_effects(&src.source, t)?;
     }
     Ok(true)
@@ -239,7 +239,7 @@ fn forward_to_main(
 /// killed: its master's tasks of action type 0x9a pay their owner's attributes, research
 /// technologies and run effects (not modelled); an attacker without one does nothing.
 pub(super) fn kill_bonus(src: &Attacker) -> Result<(), GenieError> {
-    if ACTION <= src.kind && src.kill_bonus_tasks {
+    if MasterKind::ACTION <= src.kind && src.kill_bonus_tasks {
         return Err(GenieError::unsupported(
             "an attacker's kill bonus task (action type 0x9a)",
         ));
@@ -284,7 +284,7 @@ impl Victim {
 pub(super) fn take_static(t: &mut Victim, src: &Attacker, weapons: &[ClassAmount], factor: f32) {
     // slot 0x2f0 of a TRIBE attacker (types 70, 80; [`charge_hit`]) starts the sum at its raw
     // charge (slot 0x310, `+0x9e0`) plus 0
-    let mut damage = if COMBAT <= src.kind && charge_hit(src, t) {
+    let mut damage = if MasterKind::COMBAT <= src.kind && charge_hit(src, t) {
         src.charge.get() + 0.0
     } else {
         0.0f32
@@ -392,7 +392,7 @@ pub(super) fn retaliates(
         return Ok(false);
     }
     let mut f = elevation_factor(t.position.z(), t.attack_elevation, src);
-    if src.kind == COMBAT && special_charge_ready(&src.source)? {
+    if src.kind == MasterKind::COMBAT && special_charge_ready(&src.source)? {
         f *= RETALIATION_SCALE;
     }
     let w = t.weapons.clone();
@@ -439,7 +439,7 @@ pub(super) fn after_hit(
     if ONE > t.hp.get() {
         kill_bonus(&src.source)?;
     }
-    if RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
+    if MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
         attack_effects(&src.source, t)?;
     }
     Ok(())

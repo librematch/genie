@@ -12,7 +12,7 @@ use genie_core::map::terrain::Terrain;
 use genie_core::map::{Footprint, Point};
 use genie_core::objects::ListIndex;
 use genie_core::objects::ObjectId;
-use genie_core::objects::masters::master_type::DOPPELGANGER;
+use genie_core::objects::masters::MasterKind;
 use genie_core::players::PlayerId;
 use genie_core::vision::VisionBits;
 use genie_core::vision::registry::{Registry, SLOTS};
@@ -142,7 +142,7 @@ pub fn ghost_pool_from_dump(text: &str) -> Result<Vec<ObjectId>, Error> {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words[..] {
             ["pool", k, _] => kind = Some(k.parse::<i32>().map_err(|_| Error::BadPoolDump)?),
-            [id, _] if kind == Some(i32::from(DOPPELGANGER.get())) => {
+            [id, _] if kind == Some(i32::from(MasterKind::DOPPELGANGER.get())) => {
                 ghosts.push(pooled_id(id)?);
             }
             [_, _] if kind.is_some() => {}

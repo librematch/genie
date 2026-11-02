@@ -3,7 +3,7 @@
 //! conversion from a raw value.
 
 use crate::GenieError;
-use crate::unit_ai::{ActionKind, ai_kinds};
+use crate::unit_ai::{AiAction, ai_kinds};
 use genie_diff::Diff;
 
 /// An order a unit AI holds: a case of its order handler (`FUN_140c5c170`, slot 0x230), named
@@ -142,8 +142,8 @@ impl OrderKind {
     /// Whether `action` is the order's own action value, the order's less 100 (the notify
     /// handlers' `action + 100 == order`; no action, −1, is no order's).
     #[must_use]
-    pub fn owns(self, action: Option<ActionKind>) -> bool {
-        action.and_then(ActionKind::order) == Some(self)
+    pub fn owns(self, action: Option<AiAction>) -> bool {
+        action.and_then(AiAction::order) == Some(self)
     }
 
     /// The order of a raw field that holds −1 for none (`+0x3c`, `+0x64`).
@@ -192,7 +192,7 @@ impl Default for OrderKind {
 #[cfg(test)]
 mod tests {
     use crate::ErrorKind;
-    use crate::unit_ai::{ActionKind, OrderKind};
+    use crate::unit_ai::{AiAction, OrderKind};
 
     /// Every order converts back from its value; the values are 33 distinct ones.
     #[test]
@@ -233,10 +233,10 @@ mod tests {
     /// `0x264`; no action is no order's.
     #[test]
     fn an_order_owns_the_action_100_below_it() {
-        assert!(OrderKind::Move.owns(Some(ActionKind::Move)));
-        assert!(OrderKind::Follow.owns(Some(ActionKind::Follow)));
-        assert!(!OrderKind::Move.owns(Some(ActionKind::Follow)));
+        assert!(OrderKind::Move.owns(Some(AiAction::Move)));
+        assert!(OrderKind::Follow.owns(Some(AiAction::Follow)));
+        assert!(!OrderKind::Move.owns(Some(AiAction::Follow)));
         assert!(!OrderKind::Attack.owns(None));
-        assert!(OrderKind::Defend.owns(Some(ActionKind::Defend)));
+        assert!(OrderKind::Defend.owns(Some(AiAction::Defend)));
     }
 }

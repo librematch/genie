@@ -28,14 +28,14 @@ use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::{Action, Motion};
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::CostAmount;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::WorkValue;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -68,7 +68,7 @@ use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::{adds, amounts};
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::world::Millis;
@@ -148,7 +148,7 @@ fn game() -> World {
         object_id(9),
         UnitAi {
             current_order: None,
-            current_action: Some(ActionKind::Make),
+            current_action: Some(AiAction::Make),
             current_target: None,
             ..UnitAi::default()
         },
@@ -157,13 +157,13 @@ fn game() -> World {
         Master {
             id: ids::TOWN_CENTRE,
             class: class::BUILDING,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             ..Master::default()
         },
         Master {
             id: ids::VILLAGER_MALE,
             class: class::VILLAGER,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             cost: costs(&[(attribute::FOOD, 46, true), (attribute::HEADROOM, 1, false)]),
             storage: vec![
                 (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
@@ -373,7 +373,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     t.set_motion(object_id(33), Some(Motion::Moving(walker())));
     assert_eq!(t.halt_other(PlayerId::new(1), gather, GATHER), Ok(true));
     assert_eq!(
-        t.halt_other(PlayerId::new(1), build, action_type::BUILD),
+        t.halt_other(PlayerId::new(1), build, ActionKind::BUILD),
         Ok(true)
     );
     assert_eq!(t.halt_other(PlayerId::new(1), repair, REPAIR), Ok(true));
@@ -421,7 +421,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         Some(ArtifactState::Check)
     );
     assert!(
-        t.halt_other(PlayerId::new(1), gather, ActionType::named(99))
+        t.halt_other(PlayerId::new(1), gather, ActionKind::named(99))
             .is_err()
     );
 }
@@ -468,7 +468,7 @@ fn stopped_hunter_keeps_its_halted_hunt() {
     hunter.unit.my_pasture = None;
     let ai = UnitAi {
         current_order: Some(OrderKind::Hunt),
-        current_action: Some(ActionKind::Hunt),
+        current_action: Some(AiAction::Hunt),
         current_target: None,
         ..UnitAi::default()
     };
@@ -777,7 +777,7 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
     let ms = &mut t.masters[1];
     *ms = Masters::new(ms.iter().cloned().chain([Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         cost: costs(&[
             (attribute::WOOD, 25, true),
             (attribute::GOLD, 45, true),
@@ -1059,7 +1059,7 @@ fn cancel_in_game_mode_16_clears_the_military_flag() {
         *ms = Masters::new(ms.iter().cloned().chain([Master {
             id: master_id(4),
             class: class::CLASS_6,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             ..Master::default()
         }]));
         let tc = t
@@ -1109,7 +1109,7 @@ fn resignation_cancels_the_queues_and_the_last_side_wins() {
     let ai = t.parts.unit_ai.get(tc.id).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
-        (None, Some(ActionKind::Make))
+        (None, Some(AiAction::Make))
     );
     assert_eq!(ai.notifies.len(), 1);
     assert_eq!(t.game_state, PlayState::of_data(0));

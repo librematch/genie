@@ -12,13 +12,13 @@ use crate::math::image::unit_ai::{
 };
 use crate::math::rng::Well512;
 use crate::objects::ActionState;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::action_type::HUNT_RANGE;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::players::Amount;
@@ -27,8 +27,8 @@ use crate::players::Posture;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    ARTIFACT_AI, ActionKind, AiMove, BOAR_AI, CIVILIAN, FISHING_AI, PRIEST_AI, QueuedOrder,
-    SIEGE_AI, SIEGE_TOWER_AI, SOLDIER_AI, Surroundings, TOWER_AI, TRADE_AI,
+    ARTIFACT_AI, AiAction, AiMove, BOAR_AI, CIVILIAN, FISHING_AI, PRIEST_AI, QueuedOrder, SIEGE_AI,
+    SIEGE_TOWER_AI, SOLDIER_AI, Surroundings, TOWER_AI, TRADE_AI,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -185,16 +185,16 @@ pub(super) const WALK_BACK: f32 = RUN_ONE;
 
 /// The action values the full update resets once the unit's actions ended (`0x140c66b10`, the
 /// unit's slot 0x430 false).
-pub(super) const ENDED_ACTIONS: [ActionKind; 9] = [
-    ActionKind::Attack,
-    ActionKind::Gather,
-    ActionKind::Move,
-    ActionKind::Hunt,
-    ActionKind::Enter,
-    ActionKind::Make,
-    ActionKind::Research,
-    ActionKind::BoarLuring,
-    ActionKind::MoveAside,
+pub(super) const ENDED_ACTIONS: [AiAction; 9] = [
+    AiAction::Attack,
+    AiAction::Gather,
+    AiAction::Move,
+    AiAction::Hunt,
+    AiAction::Enter,
+    AiAction::Make,
+    AiAction::Research,
+    AiAction::BoarLuring,
+    AiAction::MoveAside,
 ];
 /// A human player's unit on the attack order with a range above this does not retarget
 /// (processMisc).
@@ -335,7 +335,7 @@ impl NewObject {
                 .tasks
                 .iter()
                 .rev()
-                .find(|t| t.action_type == HUNT_RANGE)
+                .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
             player_type: PlayerType::HUMAN,
             posture: Posture::AGGRESSIVE,

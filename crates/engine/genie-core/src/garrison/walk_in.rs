@@ -24,7 +24,7 @@ use crate::objects::UpdateCode;
 #[cfg(test)]
 use crate::objects::Voice;
 use crate::objects::layers::Action;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
@@ -39,7 +39,7 @@ use crate::world::step::Step;
 use genie_diff::Diff;
 
 /// The Enter action's type (`RGE_Action_Enter`, vtable `0x142ed4db8`), which word 9 adds.
-pub const ENTER: ActionType = ActionType::named(3);
+pub const ENTER: ActionKind = ActionKind::named(3);
 
 /// An Enter whose target died or is not allied: the update lets it go and turns to state 11
 /// (`FUN_140a87320` case 11: a quiet `MoveTo` to the meeting point), which is not modelled.

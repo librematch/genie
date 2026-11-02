@@ -20,14 +20,14 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::actions::Action;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::step::Step;
@@ -102,12 +102,12 @@ pub struct Artifact {
 }
 
 /// The action type the checkpoint adds for an Artifact action.
-pub const ARTIFACT_TYPE: ActionType = ActionType::named(107);
+pub const ARTIFACT_TYPE: ActionKind = ActionKind::named(107);
 
 use crate::garrison::EnterAction;
 use crate::math::image::artifact::TOWN_CENTRE_OFFSET as ARTIFACT_TOWN_CENTRE_OFFSET;
 use crate::objects::layers::Action as LayersAction;
-use crate::objects::masters::master_type::COMBAT;
+use crate::objects::masters::MasterKind;
 pub use crate::ownership::artifact_state::ArtifactState;
 pub use crate::ownership::artifact_sub::ArtifactSub;
 use crate::unit_ai::NotifyKind;
@@ -426,7 +426,7 @@ impl Artifact {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 notify,
-                [ActionKind::Move.value(), 0, 0],
+                [AiAction::Move.value(), 0, 0],
             )?;
         }
         Ok(())
@@ -588,7 +588,7 @@ impl Unit {
                 .as_ref()
                 .and_then(|v| v.seer(self.id))
                 .map(|s| s.capture);
-        let combat = COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
+        let combat = MasterKind::COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
         let r = ArtifactReads {
             searches: !(combat && capture == Some(CaptureKind::NONE)),
             by,
@@ -1166,7 +1166,7 @@ mod tests {
         rig.mover_mut().animated.speed = Speed::new(1.0);
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
-        let failed = (NotifyKind::ACTION_FAILED, [ActionKind::Move.value(), 0, 0]);
+        let failed = (NotifyKind::ACTION_FAILED, [AiAction::Move.value(), 0, 0]);
         assert_eq!((a.move_to().copied(), rig.posted()), (None, vec![failed]));
         assert_eq!(rig.mover().animated.speed, Speed::new(0.0));
     }
@@ -1484,7 +1484,7 @@ mod tests {
         });
         rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
-        let failed = (NotifyKind::ACTION_FAILED, [ActionKind::Move.value(), 0, 0]);
+        let failed = (NotifyKind::ACTION_FAILED, [AiAction::Move.value(), 0, 0]);
         assert_eq!(
             (rig.workers(77, PlayerId::new(1)), rig.posted()),
             (Some(0), vec![failed])

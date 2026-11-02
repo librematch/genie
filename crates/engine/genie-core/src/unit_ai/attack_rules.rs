@@ -14,16 +14,15 @@ use crate::math::image::unit_ai::{
     STAND_GROUND_PATROL_LEASH as UNIT_AI_STAND_GROUND_PATROL_LEASH,
 };
 use crate::objects::ObjectState;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
-use crate::objects::masters::action_type::{CONVERT, PACK, UNPACK};
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
@@ -131,7 +130,11 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool) -> bool 
         return false;
     }
     let mut task = None;
-    for k in p.tasks.iter().filter(|k| k.action_type == CONVERT) {
+    for k in p
+        .tasks
+        .iter()
+        .filter(|k| k.action_kind == ActionKind::CONVERT)
+    {
         if k.object_group.is_none() && k.object_id.is_none() {
             task = Some(k);
         }
@@ -395,17 +398,17 @@ pub fn siege_can_attack(
     {
         return Ok(false);
     }
-    let takes_by_sight = !me.scenario && COMBAT <= me.kind && !me.capture.any();
+    let takes_by_sight = !me.scenario && MasterKind::COMBAT <= me.kind && !me.capture.any();
     if me.player == PlayerId::GAIA && !takes_by_sight {
         return Ok(false);
     }
-    if (t.kind == BUILDING && t.desolid) || me.state < ObjectState::Alive {
+    if (t.kind == MasterKind::BUILDING && t.desolid) || me.state < ObjectState::Alive {
         return Ok(false);
     }
     if !me.player_type.is_computer() && !any && me.class == Some(PACKED_UNIT_CLASS) {
         return Ok(false);
     }
-    if matches!(me.top_action, Some(PACK | UNPACK)) {
+    if matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
         return Ok(false);
     }
     Ok(any || siege_chooses(me, s, t))
@@ -463,7 +466,7 @@ pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target) -> bool {
     }
     if SIEGE_BUILDING_MASTERS.contains(&me.master)
         && s.target.is_some()
-        && s.target_kind == Some(BUILDING)
+        && s.target_kind == Some(MasterKind::BUILDING)
     {
         return priority == AttackPriority::PRIORITY_1 || priority.past_3();
     }

@@ -24,7 +24,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, Masters, class, player_master};
 use crate::objects::unit::Unit;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneId, Zones};
@@ -212,7 +212,7 @@ fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<us
         let m = player_master(masters, o.player, o.master).ok_or(GenieError::unsupported(
             "an object on a tile of a master the slice lacks",
         ))?;
-        n += usize::from(m.kind == BUILDING);
+        n += usize::from(m.kind == MasterKind::BUILDING);
     }
     Ok(n)
 }
@@ -453,7 +453,7 @@ pub(crate) fn enter_view(
     range: Distance,
     by_id: ObjectsRef<'_>,
 ) -> Result<(EnterTarget, WalkStart), GenieError> {
-    let building = tm.kind == BUILDING;
+    let building = tm.kind == MasterKind::BUILDING;
     let stats = mover.map(|m| m.stats).ok_or(NO_SPEED)?;
     let moved_at = mover.map_or_else(|| unit.position(), |m| m.moved_at);
     let target_mover = if building { None } else { target_mover };
@@ -521,7 +521,7 @@ impl Meeting<'_> {
     /// A unit without movement state ([`NO_SPEED`]), and what the meeting does not model.
     pub(crate) fn point(self, by_id: ObjectsRef<'_>) -> Result<(Point, u8), GenieError> {
         let at = self.target.position();
-        if self.master.kind == BUILDING {
+        if self.master.kind == MasterKind::BUILDING {
             return Ok((at.ground(), 0));
         }
         let stats = self.mover.map(|m| m.stats).ok_or(NO_SPEED)?;

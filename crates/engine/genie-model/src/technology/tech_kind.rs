@@ -4,9 +4,9 @@
 /// the shared research (0x20) and the type a disable command makes available instead (0x21);
 /// every other value is a type the simulation does not tell apart.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct TechType(i16);
+pub struct TechKind(i16);
 
-impl TechType {
+impl TechKind {
     /// The type whose research the buildings that may do it share (`FUN_1413d1020`).
     pub const SHARED: Self = Self(0x20);
     /// The type that a disable command makes available instead of disabled (`FUN_1413cdb00`).
@@ -19,7 +19,7 @@ impl TechType {
     }
 }
 
-impl From<i16> for TechType {
+impl From<i16> for TechKind {
     /// The type a `.dat` technology holds: every value is one.
     fn from(value: i16) -> Self {
         Self(value)
@@ -28,13 +28,13 @@ impl From<i16> for TechType {
 
 #[cfg(test)]
 mod tests {
-    use crate::technology::TechType;
+    use crate::technology::TechKind;
 
     /// A `.dat` value is its type; the shared and the re-enabled types are 0x20 and 0x21.
     #[test]
     fn dat_value_is_its_type() {
-        assert_eq!(TechType::from(0x20), TechType::SHARED);
-        assert_eq!(TechType::REENABLED.get(), 0x21);
-        assert_eq!(TechType::default().get(), 0);
+        assert_eq!(TechKind::from(0x20), TechKind::SHARED);
+        assert_eq!(TechKind::REENABLED.get(), 0x21);
+        assert_eq!(TechKind::default().get(), 0);
     }
 }

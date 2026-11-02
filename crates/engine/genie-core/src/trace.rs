@@ -34,7 +34,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
-use crate::unit_ai::{ActionKind, OrderKind, UnitAi};
+use crate::unit_ai::{AiAction, OrderKind, UnitAi};
 use crate::world::Tick;
 use std::panic::Location;
 
@@ -179,7 +179,7 @@ impl Watch {
             order: ai.map(|ai| {
                 [
                     OrderKind::field(ai.current_order),
-                    ActionKind::field(ai.current_action),
+                    AiAction::field(ai.current_action),
                     ObjectId::field(ai.current_target),
                 ]
             }),

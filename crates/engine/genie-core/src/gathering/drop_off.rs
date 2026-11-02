@@ -18,8 +18,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
-use crate::objects::masters::ActionType;
-use crate::objects::masters::action_type;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::{Graphic, new_sprite};
@@ -493,7 +492,7 @@ impl Unit {
                         sites,
                         self.position(),
                         None,
-                        (true, Some(action_type::UNPACK)),
+                        (true, Some(ActionKind::UNPACK)),
                         by_id,
                     )?,
                 };
@@ -531,7 +530,7 @@ impl Unit {
             c,
             others,
             state,
-            (outside, by_path, Some(action_type::UNPACK)),
+            (outside, by_path, Some(ActionKind::UNPACK)),
             by_id,
         )
     }
@@ -544,7 +543,7 @@ impl Unit {
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
-        (outside, by_path, at_work): (bool, bool, Option<ActionType>),
+        (outside, by_path, at_work): (bool, bool, Option<ActionKind>),
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let masters = c.masters.table.ok_or(GenieError::unsupported(

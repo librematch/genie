@@ -13,9 +13,8 @@ mod stops;
 mod victory;
 
 use crate::math::image::game_status::ONE_UNIT_AGE as GAME_STATUS_ONE_UNIT_AGE;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::action_type::{PACK, UNPACK};
 use crate::players::PlayerId;
 use crate::players::Relation;
 #[cfg(test)]
@@ -115,7 +114,7 @@ const DEFEAT_IDS: usize = 25;
 /// The first of the attributes a defeat's event reads (300 + a player's id).
 const KILLS_OF: usize = 300;
 /// The action types whose stop keeps a value of the unit's (`+0x88a`, `FUN_14106fa60`).
-const KEEPING_TYPES: [ActionType; 2] = [PACK, UNPACK];
+const KEEPING_TYPES: [ActionKind; 2] = [ActionKind::PACK, ActionKind::UNPACK];
 /// The buildings a stop leaves alone (`FUN_1411e6290`).
 const UNSTOPPED_BUILDINGS: [MasterId; 4] = [
     MasterId::named(50),

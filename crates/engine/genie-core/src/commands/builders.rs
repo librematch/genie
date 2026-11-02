@@ -18,12 +18,10 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::action_type;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MOVING;
 use crate::objects::masters::player_master;
 use crate::objects::masters::work_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
@@ -31,7 +29,7 @@ use crate::orders::Dispatch;
 use crate::orders::{Work, readiness};
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::task_finder::world::{TaskWorld, point_terrain, task_search, task_target_with};
@@ -81,7 +79,7 @@ impl World {
             let m = unit.master(self.master_tables(), q)?;
             let speed = m.moving.map_or(Speed::ZERO, |s| s.speed);
             let kind = m.kind;
-            let moves = MOVING <= kind && below_or_unordered(0.0, speed.get());
+            let moves = MasterKind::MOVING <= kind && below_or_unordered(0.0, speed.get());
             if !moves && !queued {
                 continue;
             }
@@ -161,7 +159,7 @@ impl World {
         idx: ListIndex,
         kind: MasterKind,
     ) -> Result<(), GenieError> {
-        if COMBAT <= kind
+        if MasterKind::COMBAT <= kind
             && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
         {
             ai.orders.clear();
@@ -232,7 +230,7 @@ impl World {
         let (with, task) = work_master(masters, &actor, &on, None, &world)?.ok_or(
             GenieError::unsupported("a builder with no task for its foundation"),
         )?;
-        if task.action_type != action_type::BUILD {
+        if task.action_kind != ActionKind::BUILD {
             return Err(GenieError::unsupported(
                 "a builder whose task for its foundation is not Build",
             ));
@@ -338,17 +336,13 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.notify_work(
                 Some(OrderKind::Build),
-                Some(ActionKind::Build),
+                Some(AiAction::Build),
                 Some((foundation.id(), site_class)),
                 Position::new(position.x(), position.y(), 0.0),
                 true,
                 self.streams.get(Stream::Ai),
             )?;
-            self.remember_order(
-                player,
-                idx,
-                (Some(OrderKind::Build), Some(ActionKind::Build)),
-            )?;
+            self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
         }
         // the install (slot 0x808): the action list clears (its actions' teardowns), then
         // holds the Build
@@ -405,7 +399,7 @@ impl World {
             .parts
             .actions_of(self.players.live(player, idx)?.id)
             .top_action_kind()
-            == Some(action_type::BUILD)
+            == Some(ActionKind::BUILD)
         {
             let _ = self.build_take(player, idx, foundation.id())?;
             return Ok(true);

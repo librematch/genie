@@ -11,7 +11,7 @@ use crate::map::spatial::{
 use crate::map::{Rect, Segment};
 use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, PlayerSet};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
@@ -41,7 +41,7 @@ pub struct WalkQuery<'a> {
 
 impl Spatial {
     /// Each obstruction record: the object's id, the record's kind and box.
-    pub fn records(&self) -> impl Iterator<Item = (ObjectId, ObstructionType, Rect)> + '_ {
+    pub fn records(&self) -> impl Iterator<Item = (ObjectId, ObstructionKind, Rect)> + '_ {
         self.objects
             .iter()
             .filter_map(|(id, p)| Some((id, p.obstruction?.kind, p.bounds())))
@@ -59,16 +59,16 @@ impl Spatial {
     /// cell x, y. Its box's tiles, held on the map; a box of kind 2 (10), 11 or 13 whose centre
     /// sits on a half tile ends 0.001 short on both axes. The level is the finest whose cell holds
     /// both corners' tiles, the cell the one of the low corner's tile.
-    pub(super) fn filed(&self, p: &Placed, kind: ObstructionType) -> (i32, i32, i32) {
+    pub(super) fn filed(&self, p: &Placed, kind: ObstructionKind) -> (i32, i32, i32) {
         let b = p.bounds();
         let (x0, y0, mut x1, mut y1) = (b.x0(), b.y0(), b.x1(), b.y1());
         let (x, y) = (p.position.x(), p.position.y());
         let half_tile_box = matches!(
             kind,
-            ObstructionType::TYPE_2
-                | ObstructionType::TYPE_10
-                | ObstructionType::TYPE_11
-                | ObstructionType::TYPE_13
+            ObstructionKind::TYPE_2
+                | ObstructionKind::TYPE_10
+                | ObstructionKind::TYPE_11
+                | ObstructionKind::TYPE_13
         );
         if half_tile_box && x % 0.5 < 0.001 && y % 0.5 < 0.001 {
             x1 -= 0.001;
@@ -89,7 +89,7 @@ impl Spatial {
     /// visits the cell an object's record of kind `kind` is filed in ([`Spatial::filed`]): the
     /// query's tiles run from the low corner's (at least 0) to the high corner's (at most the
     /// map's size), and on each level it visits the cells they cover.
-    pub(super) fn visits(&self, p: &Placed, kind: ObstructionType, rect: Rect) -> bool {
+    pub(super) fn visits(&self, p: &Placed, kind: ObstructionKind, rect: Rect) -> bool {
         let (level, cx, cy) = self.filed(p, kind);
         self.visits_cell(level, cx, cy, rect)
     }
@@ -402,7 +402,7 @@ impl Spatial {
         }
         self.check_known_records(query)?;
         let walk = Segment { from, to };
-        let meets = |kind: ObstructionType, bx: Rect| {
+        let meets = |kind: ObstructionKind, bx: Rect| {
             rect.overlaps(bx.grown(grow)) && record_meets_segment(kind, bx, grow, walk)
         };
         if tiles {
@@ -413,7 +413,7 @@ impl Spatial {
                 let bx = Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0);
                 if self.visits_cell(level, x >> shift, y >> shift, query)
                     && !ignore.contains(&id)
-                    && meets(ObstructionType::TYPE_3, bx)
+                    && meets(ObstructionKind::TYPE_3, bx)
                 {
                     hits.push(id);
                     if MOST_HITS <= hits.len() {

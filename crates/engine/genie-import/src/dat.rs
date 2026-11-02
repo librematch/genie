@@ -5,7 +5,7 @@
 
 use genie_dat::de::DatFile;
 use genie_model::GenieError;
-use genie_model::combat::missile::ProjectileType;
+use genie_model::combat::missile::ProjectileKind;
 use genie_model::map::TerrainFlags;
 use genie_model::movement::MoveAlgorithm;
 use genie_model::objects::FacetCount;
@@ -16,7 +16,7 @@ use genie_model::objects::lifecycle::MasterData;
 use genie_model::objects::masters as work;
 use genie_model::objects::masters::CostAmount;
 use genie_model::objects::masters::FlyMode;
-use genie_model::objects::masters::{ActionType, MasterId};
+use genie_model::objects::masters::{ActionKind, MasterId};
 use genie_model::players::AmountRate;
 use genie_model::players::CivId;
 use genie_model::players::attribute::AttributeId;
@@ -45,7 +45,7 @@ use genie_model::objects::sprite::Graphic;
 use genie_model::objects::{Graphics, SpriteFlags};
 use genie_model::players::history::HISTORY_PERIOD;
 use genie_model::players::history::HistoryUpdates;
-use genie_model::technology::{Cost, EffectCommand, Linked, TechDef, TechMode, TechType};
+use genie_model::technology::{Cost, EffectCommand, Linked, TechDef, TechKind, TechMode};
 use genie_model::unit_ai::task_finder::DropSite;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -61,7 +61,7 @@ pub enum DefaultAction {
     /// The master has no default task.
     None,
     /// The default task's action type (107 is the Artifact action).
-    Type(ActionType),
+    Type(ActionKind),
     /// The default task id names no task in the master's list; what the game starts then is not
     /// read yet.
     NoSuchTask,
@@ -71,7 +71,7 @@ pub enum DefaultAction {
 /// are `(id, action type)` pairs (DE keeps the tasks in each unit's own list).
 pub fn default_action(
     default_task_id: i16,
-    mut tasks: impl Iterator<Item = (i16, ActionType)>,
+    mut tasks: impl Iterator<Item = (i16, ActionKind)>,
 ) -> DefaultAction {
     if default_task_id < 0 {
         return DefaultAction::None;
@@ -126,7 +126,7 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
             let tasks = b
                 .tasks
                 .iter()
-                .map(|t| Ok((t.id, ActionType::try_from(t.action_type)?)))
+                .map(|t| Ok((t.id, ActionKind::try_from(t.action_type)?)))
                 .collect::<Result<Vec<_>, GenieError>>()?;
             default_action(b.default_task_id, tasks.into_iter())
         }
@@ -142,10 +142,10 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
             move_algorithm: MoveAlgorithm::from_bits_retain(d.old_move_algorithm),
             min_collision_size_multiplier: d.min_collision_size_multiplier,
         }),
-        projectile_type: unit
+        projectile_kind: unit
             .projectile
             .as_ref()
-            .map(|p| ProjectileType::of_data(p.projectile_type)),
+            .map(|p| ProjectileKind::of_data(p.projectile_type)),
         fly_mode: FlyMode::of_data(unit.fly_mode),
     })
 }
@@ -160,7 +160,7 @@ struct Row {
     turning: Option<Turning>,
     /// A missile master's `projectile_type` (`+0x880`) and every master's `fly_mode` (`+0x608`),
     /// which the save does not hold.
-    projectile_type: Option<ProjectileType>,
+    projectile_kind: Option<ProjectileKind>,
     fly_mode: FlyMode,
 }
 
@@ -315,7 +315,7 @@ fn tech_def(dat: &DatFile, t: &Tech) -> Result<TechDef, GenieError> {
         .map_or_else(|| Ok(Vec::new()), effect_commands)?;
     Ok(TechDef {
         costs: tech_costs(t)?,
-        kind: TechType::from(t.kind),
+        kind: TechKind::from(t.kind),
         effect_id: EffectId::of_data(t.effect_id),
         effect,
         required: t.required_techs.map(TechId::of_data),
@@ -505,7 +505,7 @@ impl MasterTable {
                             default_action,
                             work: None,
                             turning: None,
-                            projectile_type: None,
+                            projectile_kind: None,
                             fly_mode: FlyMode::default(),
                         },
                     )
@@ -550,10 +550,10 @@ impl MasterTable {
 
     /// A missile master's `projectile_type` (`+0x880`).
     #[must_use]
-    pub fn projectile_type(&self, civ: CivId, master: MasterId) -> Option<ProjectileType> {
+    pub fn projectile_type(&self, civ: CivId, master: MasterId) -> Option<ProjectileKind> {
         self.rows
             .get(&(civ, master))
-            .and_then(|r| r.projectile_type)
+            .and_then(|r| r.projectile_kind)
     }
 
     /// A master's `fly_mode` (`+0x608`): 0 keeps its objects on the ground, 1 above it.
@@ -585,7 +585,7 @@ impl MasterTable {
             default_action: DefaultAction::None,
             work: None,
             turning,
-            projectile_type: None,
+            projectile_kind: None,
             fly_mode,
         };
         Self {
@@ -647,7 +647,7 @@ mod tests {
     #[cfg(test)]
     use genie_model::objects::lines::LineId;
     #[cfg(test)]
-    use genie_model::objects::masters::action_type::HUNT_RANGE;
+    use genie_model::objects::masters::ActionKind;
     #[cfg(test)]
     use genie_model::players::AmountRate;
     #[cfg(test)]
@@ -662,7 +662,7 @@ mod tests {
     use std::process::id;
 
     /// The Artifact action's type (genie-core's `ownership::artifact::ARTIFACT_TYPE`).
-    const ARTIFACT_TYPE: ActionType = ActionType::named(107);
+    const ARTIFACT_TYPE: ActionKind = ActionKind::named(107);
 
     /// A directory of its own under the system's temporary one, emptied first.
     fn scratch(name: &str) -> PathBuf {
@@ -770,7 +770,10 @@ mod tests {
     fn the_default_action_is_the_action_type_of_the_default_task() {
         // the cow: default task 0, whose action type is 107 (the Artifact action)
         assert_eq!(
-            default_action(0, [(0, ARTIFACT_TYPE), (1, HUNT_RANGE)].into_iter()),
+            default_action(
+                0,
+                [(0, ARTIFACT_TYPE), (1, ActionKind::HUNT_RANGE)].into_iter()
+            ),
             DefaultAction::Type(ARTIFACT_TYPE)
         );
         assert_eq!(

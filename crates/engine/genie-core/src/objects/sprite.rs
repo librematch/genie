@@ -27,9 +27,9 @@ use crate::movement::Speed;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::{AnimateState, Frame};
 use crate::world::Seconds;
@@ -322,7 +322,7 @@ pub fn trade_sprite(master: &Master) -> Option<SpriteId> {
         // A trade cart's class (`FUN_14106a940`, decoded 0x13).
         // The trade task whose carrying sprite a trade cart with goods shows (`FUN_1412028a0`: action
         // type 0x6f, `object_id` 0x54).
-        .find(|t| t.action_type == action_type::TRADE && t.object_id == Some(TRADE_TARGET))
+        .find(|t| t.action_kind == ActionKind::TRADE && t.object_id == Some(TRADE_TARGET))
         .and_then(|t| t.sprites.carrying)
 }
 
@@ -408,8 +408,8 @@ mod tests {
     use crate::gathering::hunt::tests::walker;
     use crate::movement::Speed;
     use crate::objects::FacetCount;
+    use crate::objects::masters::MasterKind;
     use crate::objects::masters::TaskSprites;
-    use crate::objects::masters::master_type;
     #[cfg(test)]
     use crate::objects::masters::{BuildingMaster, Task};
     use crate::test_ids::master_id;
@@ -676,7 +676,7 @@ mod tests {
     fn barracks() -> Master {
         Master {
             id: master_id(12),
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             standing_sprite: Some(SpriteId::named(2575)),
             death_sprite: Some(SpriteId::named(2573)),
@@ -727,7 +727,7 @@ mod tests {
     #[test]
     fn loaded_trade_cart_shows_its_trade_task_carrying_sprite() {
         let trade = Task {
-            action_type: action_type::TRADE,
+            action_kind: ActionKind::TRADE,
             object_id: Some(master_id(0x54)),
             sprites: TaskSprites::of_data([1, 2, 3, 4]),
             ..Task::default()

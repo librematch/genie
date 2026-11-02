@@ -33,12 +33,12 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::GarrisonCapacity;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{BuildingMaster, Task};
 use crate::objects::masters::{CostSlot, Master, Masters};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -60,7 +60,7 @@ use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::TechMode;
-use crate::technology::{ResearchCap, TechType};
+use crate::technology::{ResearchCap, TechKind};
 use crate::test_ids::costs;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
@@ -293,7 +293,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
                 class: class::CLASS_0,
                 player: PlayerId::new(0),
                 master: ids::HOUSE,
-                obstruction_type: ObstructionType::TYPE_2,
+                obstruction_kind: ObstructionKind::TYPE_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
@@ -305,7 +305,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     let master = Master {
         id: ids::HOUSE,
         height: Distance::new(2.0),
-        obstruction_type: ObstructionType::TYPE_2,
+        obstruction_kind: ObstructionKind::TYPE_2,
         obstruction_class: ObstructionClass::UNIT,
         ..Master::default()
     };
@@ -314,7 +314,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     }
     let record = |t: &World, id: ObjectId| t.spatial.get(id).and_then(|p| p.obstruction);
     let wall = Some(Obstruction {
-        kind: ObstructionType::TYPE_2,
+        kind: ObstructionKind::TYPE_2,
         class: ObstructionClass::UNIT,
     });
     assert_eq!(
@@ -422,7 +422,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
     );
     t.masters = vec![Masters::new([Master {
         id: ids::VILLAGER_MALE,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         hit_points: MasterHitPoints::of_data(25),
         armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
@@ -464,7 +464,7 @@ fn built() -> Construction {
         hit_points: MasterHitPoints::of_data(1),
         build_time: WholeSeconds::of_data(1),
         record: Obstruction {
-            kind: ObstructionType::NONE,
+            kind: ObstructionKind::NONE,
             class: ObstructionClass::NONE,
         },
         snow: Snow::None,
@@ -494,7 +494,7 @@ fn unit_of(id: i32, master: MasterId, hp: HitPoints) -> Unit {
 fn combat(id: MasterId, class: ClassId, hit_points: i16) -> Master {
     Master {
         id,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class,
         hit_points: MasterHitPoints::of_data(hit_points),
         ..Master::default()
@@ -510,7 +510,7 @@ fn attribute(kind: u8, a: i16, b: i16, c: i16, d: f32) -> EffectCommand {
 /// scale by a multiply's; an object the world lacks changes nothing.
 #[test]
 fn total_missiles_change_sets_adds_or_scales_the_volleys() {
-    use crate::objects::masters::attribute::TOTAL_MISSILES;
+    use crate::objects::masters::MasterAttribute;
     let player = Player {
         objects: vec![unit_of(1, master_id(4), HitPoints::new(30.0))].into(),
         ..Player::default()
@@ -530,14 +530,19 @@ fn total_missiles_change_sets_adds_or_scales_the_volleys() {
         (Change::Multiply, 0.5, 2.5),
     ] {
         assert!(
-            t.change_object(object_id(1), change, v, TOTAL_MISSILES)
+            t.change_object(object_id(1), change, v, MasterAttribute::TOTAL_MISSILES)
                 .unwrap()
         );
         assert_eq!(fire(&t).to_bits(), f32::to_bits(after), "{change:?}");
     }
     assert!(
-        !t.change_object(object_id(9), Change::Set, 1.0, TOTAL_MISSILES)
-            .unwrap()
+        !t.change_object(
+            object_id(9),
+            Change::Set,
+            1.0,
+            MasterAttribute::TOTAL_MISSILES
+        )
+        .unwrap()
     );
 }
 
@@ -623,7 +628,7 @@ fn change_moves_the_shares_of_the_units_inside_building() {
         },
     )]);
     let mut tower_master = combat(master_id(79), class::TOWER, 1020);
-    tower_master.kind = master_type::BUILDING;
+    tower_master.kind = MasterKind::BUILDING;
     tower_master.reload = Seconds::new(2.0);
     tower_master.weapon_range = Distance::new(8.0);
     tower_master.weapons = vec![ClassAmount::new(3, 5)];
@@ -685,7 +690,7 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
     .with_buildings([(object_id(20), main_layer), (object_id(21), annex_layer)]);
     let building = |id: i16, hit_points, head_unit: i16, annexes| Master {
         id: master_id(id),
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         hit_points,
         building: Some(BuildingMaster {
@@ -834,7 +839,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
         );
         let stone = Master {
             id: ids::FARM,
-            kind: master_type::STATIC,
+            kind: MasterKind::STATIC,
             class: class::CLASS_11,
             hit_points: MasterHitPoints::of_data(10),
             line_of_sight: Distance::new(2.0),
@@ -867,7 +872,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             building: None,
             umv: 0,
             capture: CaptureKind::NONE,
-            kind: master_type::STATIC,
+            kind: MasterKind::STATIC,
         };
         v.add_seer(object_id(1), seer);
         let position = Position::new(10.5, 10.5, 0.0);
@@ -888,7 +893,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
                 class: class::CLASS_11,
                 player: PlayerId::new(0),
                 master: ids::FARM,
-                obstruction_type: ObstructionType::NONE,
+                obstruction_kind: ObstructionKind::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: false,
                 moves: false,
@@ -958,7 +963,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
 /// at the master's running speed.
 #[test]
 fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
-    use crate::objects::masters::attribute as a;
+    use crate::objects::masters::MasterAttribute;
     let fast = Graphic {
         id: SpriteId::named(7),
         frames: Frame::of_data(1),
@@ -992,8 +997,12 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     (m.max_speed, m.move_sprite, m.run_sprite, m.standing_sprite) =
         (Speed::new(1.5), None, None, None);
     t.masters = vec![Masters::new([m])];
-    t.master_followers(PlayerId::new(0), master_id(4), a::MOVEMENT_SPEED)
-        .unwrap();
+    t.master_followers(
+        PlayerId::new(0),
+        master_id(4),
+        MasterAttribute::MOVEMENT_SPEED,
+    )
+    .unwrap();
     let speeds = |u: &Unit| {
         t.parts
             .mover_of(u.id)
@@ -1015,7 +1024,7 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
 /// seer's line of sight; another master's objects and a master the player lacks keep theirs.
 #[test]
 fn an_object_copies_of_its_master_follow_its_change() {
-    use crate::objects::masters::attribute as a;
+    use crate::objects::masters::MasterAttribute;
     let site = unit_of(1, master_id(4), HitPoints::new(30.0));
     let player = Player {
         objects: vec![site, unit_of(3, master_id(5), HitPoints::new(30.0))].into(),
@@ -1035,9 +1044,9 @@ fn an_object_copies_of_its_master_follow_its_change() {
         Some(SpriteId::named(7)),
         [Some(master_id(0)), Some(master_id(9))],
     );
-    (m.build_time, m.obstruction_type, m.obstruction_class) = (
+    (m.build_time, m.obstruction_kind, m.obstruction_class) = (
         WholeSeconds::of_data(33),
-        ObstructionType::CIRCLE,
+        ObstructionKind::CIRCLE,
         ObstructionClass::UNIT,
     );
     (m.line_of_sight, m.tall) = (Distance::new(6.0), true);
@@ -1051,7 +1060,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
                 class: class::CLASS_6,
                 player: PlayerId::new(0),
                 master: master_id(4),
-                obstruction_type: ObstructionType::NONE,
+                obstruction_kind: ObstructionKind::NONE,
                 buildable_on: BuildableOn::NO,
                 tall: false,
                 moves: false,
@@ -1077,19 +1086,19 @@ fn an_object_copies_of_its_master_follow_its_change() {
         building: None,
         umv: 0,
         capture: CaptureKind::NONE,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
     };
     v.add_seer(object_id(1), seer);
     v.add_seer(object_id(3), seer);
     t.spatial.sight = Some(v);
     let all = [
-        a::DYING_GRAPHIC,
-        a::DEAD_UNIT_ID,
-        a::BLOOD_UNIT,
-        a::TRAIN_TIME,
-        a::OBSTRUCTION_TYPE,
-        a::SIZE_Z,
-        a::LINE_OF_SIGHT,
+        MasterAttribute::DYING_GRAPHIC,
+        MasterAttribute::DEAD_UNIT_ID,
+        MasterAttribute::BLOOD_UNIT,
+        MasterAttribute::TRAIN_TIME,
+        MasterAttribute::OBSTRUCTION_TYPE,
+        MasterAttribute::SIZE_Z,
+        MasterAttribute::LINE_OF_SIGHT,
     ];
     for attribute in all {
         t.master_followers(PlayerId::new(0), master_id(4), attribute)
@@ -1117,7 +1126,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
     assert_eq!(
         c.record,
         Obstruction {
-            kind: ObstructionType::CIRCLE,
+            kind: ObstructionKind::CIRCLE,
             class: ObstructionClass::UNIT
         }
     );
@@ -1130,8 +1139,12 @@ fn an_object_copies_of_its_master_follow_its_change() {
     );
     // a dying sprite below 0 is none
     t.masters[0].get_mut(master_id(4)).unwrap().death_sprite = None;
-    t.master_followers(PlayerId::new(0), master_id(4), a::DYING_GRAPHIC)
-        .unwrap();
+    t.master_followers(
+        PlayerId::new(0),
+        master_id(4),
+        MasterAttribute::DYING_GRAPHIC,
+    )
+    .unwrap();
     assert_eq!(
         t.players[0].objects[ListIndex::new(0)].life.dying_sprite,
         None
@@ -1248,7 +1261,7 @@ fn farm_food_change_grows_the_farms_food() {
     .with_buildings([(object_id(5), built_layer())])
     .with_actions([(object_id(5), layer)]);
     let mut master = combat(ids::FARM, class::FARM, 480);
-    master.kind = master_type::BUILDING;
+    master.kind = MasterKind::BUILDING;
     t.masters = vec![Masters::new([master])];
     t.players[0].attributes[31] = Amount::new(1.0);
     t.players[0].attributes[36] = Amount::new(175.0);
@@ -1579,7 +1592,7 @@ fn spawns_and_cost_entries() {
         vec![player],
     );
     let mut tc = combat(ids::TOWN_CENTRE, ClassId::of_master(80), 2400);
-    tc.kind = master_type::BUILDING;
+    tc.kind = MasterKind::BUILDING;
     let mut serjeant = combat(master_id(1658), class::CLASS_6, 60);
     serjeant.cost = costs(&[(attribute::FOOD, 60, true), (attribute::STONE, 35, true)]);
     t.masters = vec![Masters::new([tc, serjeant])];
@@ -1901,7 +1914,7 @@ fn the_technology_commands_disable_and_adjust_costs() {
         vec![Millis::ZERO],
         vec![player],
     );
-    let kind = |k: TechType| TechDef {
+    let kind = |k: TechKind| TechDef {
         kind: k,
         costs: [
             Cost {
@@ -1919,10 +1932,10 @@ fn the_technology_commands_disable_and_adjust_costs() {
         ..TechDef::default()
     };
     t.techs = vec![
-        kind(TechType::default()),
-        kind(TechType::default()),
-        kind(TechType::REENABLED),
-        kind(TechType::SHARED),
+        kind(TechKind::default()),
+        kind(TechKind::default()),
+        kind(TechKind::REENABLED),
+        kind(TechKind::SHARED),
     ];
     let command = |kind: u8, a: i16, b: i16, c: i16, d: f32| {
         EffectCommand::of_data(kind, a, b, c, d).unwrap()
@@ -2196,11 +2209,11 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
         combat(master_id(4), class::CLASS_6, 60),
         Master {
             id: ids::HOUSE,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(550),
             radius: Footprint::new(0.5, 0.5),
-            obstruction_type: ObstructionType::TYPE_2,
+            obstruction_kind: ObstructionKind::TYPE_2,
             obstruction_class: ObstructionClass::UNIT,
             ..Master::default()
         },
@@ -2214,7 +2227,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             class: class::BUILDING,
             player: PlayerId::new(0),
             master: ids::HOUSE,
-            obstruction_type: ObstructionType::TYPE_2,
+            obstruction_kind: ObstructionKind::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -2229,7 +2242,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     assert_eq!(
         record(&t),
         Some(Obstruction {
-            kind: ObstructionType::TYPE_2,
+            kind: ObstructionKind::TYPE_2,
             class: ObstructionClass::UNIT
         })
     );
@@ -2238,7 +2251,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     assert_eq!(
         record(&t),
         Some(Obstruction {
-            kind: ObstructionType::TYPE_3,
+            kind: ObstructionKind::TYPE_3,
             class: ObstructionClass::UNIT
         })
     );

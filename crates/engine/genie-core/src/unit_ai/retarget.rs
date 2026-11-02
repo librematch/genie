@@ -9,11 +9,11 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
@@ -64,7 +64,7 @@ impl UnitAi {
         // without an order, the order whose own action the current one is (`action + 100`)
         let order = self
             .current_order
-            .or_else(|| self.current_action.and_then(ActionKind::order));
+            .or_else(|| self.current_action.and_then(AiAction::order));
         if order == Some(OrderKind::Defend) && self.defend_misc(at, player_type, ai, side)? {
             return Ok(false);
         }
@@ -156,7 +156,7 @@ impl UnitAi {
             && self.patrol_path.is_none()
             && !matches!(
                 self.current_action,
-                Some(ActionKind::MoveAside | ActionKind::GroupAside)
+                Some(AiAction::MoveAside | AiAction::GroupAside)
             )
         {
             // stand ground's: the squared gap against the range plus 0.25 (ADDSS, then COMISS
@@ -245,14 +245,14 @@ impl UnitAi {
         }
         let mut id = found.id;
         if let Some(n) = new {
-            if n.kind == BUILDING {
+            if n.kind == MasterKind::BUILDING {
                 let farm_rule =
                     current.is_none_or(|c| c.class != class::FARM) || n.class == class::FARM;
                 if !matches!(n.class, class::CLASS_51 | class::CLASS_54) && farm_rule {
                     return Ok(10);
                 }
             }
-            if BUILDING <= n.kind
+            if MasterKind::BUILDING <= n.kind
                 && let Some(main) = n.main
             {
                 id = Some(main.id());
@@ -392,11 +392,11 @@ impl UnitAi {
             }
             defended = held.map(|t| (target, t));
         }
-        let toward_it = self.current_action == Some(ActionKind::Move)
+        let toward_it = self.current_action == Some(AiAction::Move)
             && Self::top_target_live(at, side)?.map(|t| t.id) == self.defend_target;
         if matches!(
             self.current_action,
-            Some(ActionKind::Attack | ActionKind::MoveAside)
+            Some(AiAction::Attack | AiAction::MoveAside)
         ) || toward_it
         {
             return Ok(false);
@@ -467,7 +467,7 @@ impl UnitAi {
         };
         if matches!(
             self.current_action,
-            Some(ActionKind::MoveAside | ActionKind::GroupAside)
+            Some(AiAction::MoveAside | AiAction::GroupAside)
         ) {
             self.target_point = self.target_point.with_x(-1.0).with_y(-1.0);
             return Ok(false);
@@ -515,7 +515,7 @@ impl UnitAi {
             self,
             rng,
         )?;
-        self.set_action(Some(ActionKind::Move));
+        self.set_action(Some(AiAction::Move));
         self.target_at(Some(id), Some(class), position);
         Ok(())
     }

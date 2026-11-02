@@ -23,7 +23,7 @@ use crate::movement::{
 use crate::objects::ObjectId;
 use crate::objects::SpriteFlags;
 use crate::objects::facing::SpriteFacets;
-use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::MasterKind;
 use crate::pathing::tile_path::Path;
 use crate::players::PlayerType;
 use crate::world::Seconds;
@@ -356,7 +356,7 @@ impl World {
         )?;
         if !id.is_recyclable()
             // The types of action objects (`RGE_Action_Object`) and of buildings (`TRIBE_Building_Object`).
-            && kind < BUILDING
+            && kind < MasterKind::BUILDING
             && speed == Speed::ZERO
             && (LINKED_RADIUS < radius.x() || LINKED_RADIUS < radius.y())
             && let Some(v) = self.spatial.sight.as_mut()

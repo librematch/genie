@@ -13,10 +13,9 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::orders::object_gone;
 use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
@@ -28,7 +27,7 @@ use crate::math::image::garrison::{
 use crate::objects::unit::Unit;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{Issuer, NotifyKind, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::World;
@@ -99,16 +98,16 @@ impl World {
             // and its sound); a combat unit is no longer under the town bell (`+0x9dc`), and its
             // unit AI's orders go (`FUN_140c5e010`)
             if let Some((c, kind)) = container
-                && BUILDING <= kind
+                && MasterKind::BUILDING <= kind
             {
                 self.leave_building(c.id(), id, point)?;
                 continue;
             }
             let unit = self.players.live(player, idx)?;
             let master = unit.master(self.master_tables(), player)?;
-            if master.kind < BUILDING {
+            if master.kind < MasterKind::BUILDING {
                 let transport = container
-                    .filter(|&(_, kind)| COMBAT <= kind)
+                    .filter(|&(_, kind)| MasterKind::COMBAT <= kind)
                     .map(|(c, _)| c);
                 if matches!(pick, UnloadPick::Object(_)) || transport.is_some() {
                     self.drop_out(player, idx, transport, pick.object(), &mut last)?;
@@ -150,7 +149,7 @@ impl World {
             .master(self.master_tables(), up)?
             .kind;
         let u = self.players.live_mut(up, ui)?;
-        if COMBAT <= kind {
+        if MasterKind::COMBAT <= kind {
             self.parts.set_town_bell_flag(u.id, false);
         }
         if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
@@ -209,7 +208,7 @@ impl World {
                 .kind;
             let u = self.players.live_mut(up, ui)?;
             // a unit (type 70) is no longer under the town bell (`+0x9dc`)
-            if COMBAT <= kind {
+            if MasterKind::COMBAT <= kind {
                 self.parts.set_town_bell_flag(u.id, false);
             }
             if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
@@ -279,7 +278,7 @@ impl World {
                 set_stance(ai, stance, place, side, rng)
             })?;
         }
-        if COMBAT <= made.kind {
+        if MasterKind::COMBAT <= made.kind {
             let id = self.players.live(up, ui)?.id;
             self.parts.set_town_bell_flag(id, false);
         }
@@ -357,7 +356,7 @@ impl World {
                 ));
             };
             let b = self.players.live(p, idx)?;
-            if b.master(self.master_tables(), p)?.kind != BUILDING {
+            if b.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
                 continue;
             }
             let mut i = b.garrison.len();
@@ -372,7 +371,9 @@ impl World {
                     continue;
                 };
                 let m = u.master(self.master_tables(), up)?;
-                if COMBAT <= m.kind && (m.class == class::VILLAGER || m.id == MASTER_1808) {
+                if MasterKind::COMBAT <= m.kind
+                    && (m.class == class::VILLAGER || m.id == MASTER_1808)
+                {
                     let _ = self.back_to_work(Some((p, idx)), inside)?;
                 }
             }
@@ -414,7 +415,7 @@ impl World {
             let m = o.master(self.master_tables(), op)?;
             Ok(Some(RecordTarget {
                 id: t,
-                building: m.kind == BUILDING,
+                building: m.kind == MasterKind::BUILDING,
                 class: m.class,
                 built: self
                     .parts
@@ -434,7 +435,7 @@ impl World {
                 &mut self.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
                 [
-                    ActionKind::field(record.action),
+                    AiAction::field(record.action),
                     i32::from(ClassId::field(record.target_class)),
                     ObjectId::field(record.target),
                 ],

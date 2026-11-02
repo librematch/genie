@@ -22,7 +22,7 @@ use crate::players::attribute;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
-use crate::unit_ai::{ActionKind, NotifyKind};
+use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::Seconds;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
@@ -167,7 +167,7 @@ impl BuildAction {
             &mut c.w.parts.unit_ai,
             NotifyKind::PASTURE_BUILT,
             [
-                ActionKind::Build.value(),
+                AiAction::Build.value(),
                 // the notify's record holds the stack unit's id, 0 for none
                 reads.stack_made.map_or(0, ObjectId::get),
                 0,
@@ -328,7 +328,7 @@ impl BuildAction {
         builder.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
-            [ActionKind::Build.value(), 0, 0],
+            [AiAction::Build.value(), 0, 0],
         )?;
         self.halt_in(c, builder, reads)?;
         Ok(HeadCode::Deletes)

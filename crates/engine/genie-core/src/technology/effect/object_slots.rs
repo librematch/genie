@@ -13,9 +13,12 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::{Master, Masters, master_type, player_master};
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::Masters;
+use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
@@ -89,12 +92,12 @@ impl World {
             .filter(of_master)
             .collect();
         let mut pending = Vec::new();
-        if master_type::BUILDING <= master.kind {
+        if MasterKind::BUILDING <= master.kind {
             let stack = master.building.as_ref().and_then(|b| b.stack_unit);
             let key = stack
                 .and_then(|stack| player_master(&self.masters, p, stack))
                 .filter(|s| {
-                    s.kind == master_type::BUILDING
+                    s.kind == MasterKind::BUILDING
                         && s.building
                             .as_ref()
                             .is_some_and(|b| b.head_unit == Some(master.id))
@@ -128,10 +131,10 @@ impl World {
         };
         let master = u.master(self.master_tables(), owner)?.clone();
         match master.kind {
-            master_type::BUILDING => {
+            MasterKind::BUILDING => {
                 self.change_building(owner, id, &master, change, v, attribute)?;
             }
-            master_type::COMBAT => self.change_combat(owner, id, &master, change, v, attribute)?,
+            MasterKind::COMBAT => self.change_combat(owner, id, &master, change, v, attribute)?,
             _ => self.change_static(owner, id, &master, change, v, attribute)?,
         }
         Ok(true)
@@ -153,9 +156,9 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match attribute {
-            a::HIT_POINTS => {
+            MasterAttribute::HIT_POINTS => {
                 let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
                 let full = HitPoints::of_master(master.hit_points).get();
                 let hp = u.life.hp.get();
@@ -172,7 +175,7 @@ impl World {
                     Change::Multiply => short(v * hp + ROUND),
                 });
             }
-            a::LINE_OF_SIGHT => {
+            MasterAttribute::LINE_OF_SIGHT => {
                 let los = match change {
                     Change::Set => v,
                     Change::Add => v + master.line_of_sight.get(),
@@ -180,10 +183,14 @@ impl World {
                 };
                 self.sight_again(id, SightTiles::of(Distance::new(los)))?;
             }
-            a::STORAGE_1 | a::STORAGE_2 | a::STORAGE_3 if change == Change::Set => {
+            MasterAttribute::STORAGE_1
+            | MasterAttribute::STORAGE_2
+            | MasterAttribute::STORAGE_3
+                if change == Change::Set =>
+            {
                 let j = match attribute {
-                    a::STORAGE_1 => 0,
-                    a::STORAGE_2 => 1,
+                    MasterAttribute::STORAGE_1 => 0,
+                    MasterAttribute::STORAGE_2 => 1,
                     _ => 2,
                 };
                 if let Some(&(Some(kind), amount, flag)) = master.storage.get(j)
@@ -247,17 +254,17 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match (attribute, change) {
-            (a::HERO_STATUS, Change::Set | Change::Add) => Ok(()),
-            (a::MAXIMUM_CHARGE, _) => {
+            (MasterAttribute::HERO_STATUS, Change::Set | Change::Add) => Ok(()),
+            (MasterAttribute::MAXIMUM_CHARGE, _) => {
                 let _ = self.object(id).ok_or(OBJECT_GONE)?;
                 let combat = self.parts.combat_mut(id)?;
                 combat.charge = charge_after(combat.charge, master.max_charge, change, v);
                 Ok(())
             }
-            (a::TOTAL_MISSILES, _) => self.change_firepower(id, change, v),
-            (a::POPULATION, Change::Set) => self.population_storage(p, master, v),
+            (MasterAttribute::TOTAL_MISSILES, _) => self.change_firepower(id, change, v),
+            (MasterAttribute::POPULATION, Change::Set) => self.population_storage(p, master, v),
             _ => self.change_static(p, id, master, change, v, attribute),
         }
     }
@@ -318,10 +325,10 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> Result<(), GenieError> {
-        use crate::objects::masters::attribute as a;
+        use crate::objects::masters::MasterAttribute;
         match (attribute, change) {
-            (a::BUILDING_ICON_OVERRIDE, Change::Set) => Ok(()),
-            (a::TRAIN_TIME, _) => {
+            (MasterAttribute::BUILDING_ICON_OVERRIDE, Change::Set) => Ok(()),
+            (MasterAttribute::TRAIN_TIME, _) => {
                 let (_, layer) = self.object_and_layer_mut(id)?.ok_or(OBJECT_GONE)?;
                 if let Some(c) = layer.construction.as_mut() {
                     c.progress = build_points_after(c.progress, master.build_time, change, v);

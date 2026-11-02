@@ -15,8 +15,8 @@ use crate::objects::ObjectState;
 use crate::objects::Voice;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
@@ -27,7 +27,7 @@ use crate::combat::{AttackCount, AttackTargetId};
 use crate::gathering::HuntTargetId;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters, Task};
 use crate::objects::sprite::new_sprite;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Notify;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
@@ -216,7 +216,7 @@ impl World {
         ))?;
         let tm = t.master(self.master_tables(), owner)?;
         // A building's master type (`'P'`); types below 30 do not move.
-        let aimed = if tm.kind == BUILDING {
+        let aimed = if tm.kind == MasterKind::BUILDING {
             self.parts
                 .building_of(t.id)
                 .annex_of
@@ -253,7 +253,7 @@ impl World {
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            ai.set_action(Some(ActionKind::Attack));
+            ai.set_action(Some(AiAction::Attack));
             ai.set_target(Some(aim.aimed), aim.aimed_class.or_none(), aim.at);
         }
         self.take(target, self.releaser(player, idx)?)?;
@@ -262,7 +262,7 @@ impl World {
             ai.last_retarget_time = world_time;
             ai.notify_work(
                 Some(OrderKind::Attack),
-                Some(ActionKind::Attack),
+                Some(AiAction::Attack),
                 Some((target, aim.class)),
                 point,
                 clears,
@@ -271,7 +271,7 @@ impl World {
             self.remember_order(
                 player,
                 idx,
-                (Some(OrderKind::Attack), Some(ActionKind::Attack)),
+                (Some(OrderKind::Attack), Some(AiAction::Attack)),
             )?;
         }
         Ok(())

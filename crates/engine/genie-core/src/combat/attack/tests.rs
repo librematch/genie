@@ -48,20 +48,19 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::DamageShare;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, RelicCount, WorkerCount};
 use crate::players::PlayerId;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::BOAR_AI;
 use crate::unit_ai::Home;
 use crate::unit_ai::LION_AI;
@@ -226,7 +225,7 @@ fn stop_ends_the_attack_and_the_unit_stands() {
 fn mark(id: i32, x: f32) -> Mark {
     Mark {
         id: object_id(id),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::PREY,
         state: ObjectState::Alive,
         position: Position::new(x, 10.0, 0.5),
@@ -383,7 +382,7 @@ fn an_attack_that_cannot_follow_keeps_target_only_in_reach() {
 #[test]
 fn an_area_effect_attack_takes_building_main_building() {
     let annex = Mark {
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         ..mark(30, 11.0)
     };
@@ -602,7 +601,7 @@ pub(crate) fn reads() -> AttackReads {
 pub(crate) fn soldier() -> Victim {
     Victim {
         id: object_id(1),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         player: PlayerId::new(1),
         ..Victim::default()
@@ -662,7 +661,7 @@ impl Rig {
     fn with_unit(mut t: World, victim: Victim, own: Victim) -> Self {
         let master = Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::CLASS_6,
             move_sprite: None,
             standing_sprite: None,
@@ -675,7 +674,7 @@ impl Rig {
         t.parts.set_unit_ai(
             unit.id,
             Some(UnitAi {
-                current_action: Some(ActionKind::Attack),
+                current_action: Some(AiAction::Attack),
                 ..UnitAi::default()
             }),
         );
@@ -861,7 +860,7 @@ fn struck_building(id: i32, at: Position, building: damage::Building) -> Victim 
     Victim {
         id: object_id(id),
         hp: HitPoints::new(100.0),
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         player: PlayerId::new(2),
         position: at,
@@ -902,12 +901,12 @@ fn strike_on_an_annex_hits_its_main_building() {
     )];
     let mut own = Victim {
         id: object_id(1),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         player: PlayerId::new(1),
         source: damage::Attacker {
             id: object_id(1),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::CLASS_6,
             missile: None,
             player: PlayerId::new(1),
@@ -951,13 +950,13 @@ fn building_relic_raises_its_missile_hit() {
         );
         let mut own = Victim {
             id: object_id(1),
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::TOWER,
             player: PlayerId::new(1),
             position: Position::new(8.0, 10.0, 2.0),
             source: damage::Attacker {
                 id: object_id(1),
-                kind: BUILDING,
+                kind: MasterKind::BUILDING,
                 class: class::TOWER,
                 missile: Some(ids::FARM),
                 player: PlayerId::new(1),
@@ -1027,7 +1026,7 @@ fn trample_hit_leaves_out_its_building_target_blast_so_far() {
             weapons: vec![ClassAmount::new(4, 10)],
             source: damage::Attacker {
                 id: object_id(1),
-                kind: master_type::COMBAT,
+                kind: MasterKind::COMBAT,
                 class: class::CLASS_6,
                 missile: None,
                 player: PlayerId::new(1),
@@ -1102,7 +1101,7 @@ fn trample_reads_building_blast_so_far_or_its_main_building_s() {
         Err(NOT_HELD)
     );
     let unit = Victim {
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         ..Victim::default()
     };
     assert_eq!(blast_so_far(&unit, &[]), Ok(HitPoints::ZERO));
@@ -1119,7 +1118,7 @@ fn world_with(id: i32, player: PlayerId, class: ClassId, at: Position) -> Spatia
             class,
             player,
             master: master_id(4),
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: false,
@@ -2518,7 +2517,7 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
     t.parts.set_unit_ai(
         centre.id,
         Some(UnitAi {
-            current_action: Some(ActionKind::Attack),
+            current_action: Some(AiAction::Attack),
             ..UnitAi::default()
         }),
     );

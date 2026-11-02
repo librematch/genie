@@ -25,20 +25,18 @@ use crate::objects::ActionState;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::layers::Action;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MONASTERY;
-use crate::objects::masters::master_type::ACTION;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MOVING;
 use crate::objects::sprite::{new_sprite, running, standing, walking};
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::world::Unread;
@@ -85,7 +83,7 @@ impl World {
                     .parts
                     .unit_ai
                     .get(u.id)
-                    .is_some_and(|ai| ai.current_action == Some(ActionKind::Attack))
+                    .is_some_and(|ai| ai.current_action == Some(AiAction::Attack))
             {
                 let master = u.master(self.master_tables(), p)?;
                 // The relics' master class (`FUN_141017c70`'s test of the target's class).
@@ -93,7 +91,7 @@ impl World {
                 // The master types from which an object moves (`RGE_Moving_Object`), acts
                 // (`RGE_Action_Object`) and is a TRIBE combat unit.
                 // The trade cart's and the trade boat's master classes (`FUN_141017f00`).
-                let search = if master.kind < ACTION {
+                let search = if master.kind < MasterKind::ACTION {
                     master.line_of_sight
                 } else {
                     master.search_radius
@@ -148,7 +146,7 @@ impl World {
         let WorldObject::Unit(p, u, _) = object else {
             return Ok(false);
         };
-        if u.master(self.master_tables(), p)?.kind < ACTION {
+        if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
             return Ok(false);
         }
         if let Some(group) = u.group.id
@@ -203,7 +201,7 @@ impl World {
         let WorldObject::Unit(p, u, _) = object else {
             return Ok(None);
         };
-        if u.master(self.master_tables(), p)?.kind < ACTION {
+        if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
             return Ok(None);
         }
         if let Some(e) = self.parts.unread.get(u.id).map(Unread::error) {
@@ -319,7 +317,7 @@ impl World {
             };
             if g.current_command == PICK_UP_RELIC
                 && (ai.current_order == Some(OrderKind::OnTarget)
-                    || ai.current_action == Some(ActionKind::OnTarget))
+                    || ai.current_action == Some(AiAction::OnTarget))
                 && ((picks && relic) || (delivers && (relic || target.is_none())))
             {
                 return Ok(true);
@@ -347,7 +345,7 @@ impl World {
                 .is_some_and(|t| t.master_id() == MONASTERY);
             if g.current_command == DELIVER_RELIC
                 && (ai.current_order == Some(OrderKind::OnTarget)
-                    || ai.current_action == Some(ActionKind::OnTarget))
+                    || ai.current_action == Some(AiAction::OnTarget))
                 && monastery
                 && (delivers || picks)
             {
@@ -367,14 +365,14 @@ impl World {
         &self,
         player: PlayerId,
         master: MasterId,
-        action: ActionType,
+        action: ActionKind,
     ) -> Result<bool, GenieError> {
         let Some(masters) = self.masters.of(player) else {
             return self.master(player, master).map(|_| false);
         };
-        Ok(masters
-            .get(master)
-            .is_some_and(|m| ACTION <= m.kind && m.tasks.iter().any(|t| t.action_type == action)))
+        Ok(masters.get(master).is_some_and(|m| {
+            MasterKind::ACTION <= m.kind && m.tasks.iter().any(|t| t.action_kind == action)
+        }))
     }
 
     /// `FUN_141188ea0` of `object` for player `player`: its tile (`CVTTSS2SI` of its x and y)
@@ -406,7 +404,7 @@ impl World {
     /// state (slot 0x2b0; 0 without one, and for an object below type 40): above 1, state 2 is
     /// free for a trade cart (class 19) or a trade boat (2) and not for an Attack (slot 0x530,
     /// type 9), and states 3, 13 and 14 go on to the unit AI, any other is not free. A unit AI
-    /// whose action is not `0x2c0` ([`ActionKind::GroupAside`]) is not free while
+    /// whose action is not `0x2c0` ([`AiAction::GroupAside`]) is not free while
     /// its action (its order for action `0x25b`) is not -1; without a unit AI it is free.
     ///
     /// # Errors
@@ -486,18 +484,22 @@ impl World {
             return Ok(None);
         };
         let master = u.master(self.master_tables(), p)?;
-        if master.kind < MOVING {
+        if master.kind < MasterKind::MOVING {
             return Ok(None);
         }
         let trade_cart = match shown {
-            Shown::Standing => master.kind == COMBAT && master.class == class::TRADE_CART,
-            Shown::Walking => ACTION <= master.kind && master.class == class::TRADE_CART,
+            Shown::Standing => {
+                master.kind == MasterKind::COMBAT && master.class == class::TRADE_CART
+            }
+            Shown::Walking => {
+                MasterKind::ACTION <= master.kind && master.class == class::TRADE_CART
+            }
             Shown::Running => false,
         };
         if trade_cart {
             return Err(TRADE_CART_SPRITES);
         }
-        if ACTION <= master.kind
+        if MasterKind::ACTION <= master.kind
             && let Some(e) = self.parts.unread.get(u.id).map(Unread::error)
         {
             return Err(e);
@@ -581,7 +583,7 @@ impl Action {
         ai: Option<&UnitAi>,
     ) -> Result<bool, GenieError> {
         let actions = self;
-        let state = if master.kind < ACTION {
+        let state = if master.kind < MasterKind::ACTION {
             ActionState::NO_ACTION
         } else {
             if let Some(e) = unread {
@@ -606,9 +608,9 @@ impl Action {
         }
         if let Some(ai) = ai {
             let action = ai.current_action;
-            if action != Some(ActionKind::GroupAside) {
+            if action != Some(AiAction::GroupAside) {
                 // on the chosen action the order decides
-                let busy = if action == Some(ActionKind::Heal) {
+                let busy = if action == Some(AiAction::Heal) {
                     ai.current_order.is_some()
                 } else {
                     action.is_some()

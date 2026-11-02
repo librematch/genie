@@ -14,7 +14,7 @@ use crate::test_ids::object_id;
 use crate::movement::move_to::TargetMoved;
 use crate::objects::WorkerCount;
 use crate::ownership::artifact::{ArtifactState, ArtifactSub};
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
 use crate::world::World;
@@ -45,7 +45,7 @@ fn walking_forager() -> World {
     let ai = t.parts.unit_ai.get_mut(u.id).unwrap();
     (ai.current_order, ai.current_action, ai.current_target) = (
         Some(OrderKind::Move),
-        Some(ActionKind::Move),
+        Some(AiAction::Move),
         Some(object_id(600)),
     );
     t
@@ -95,7 +95,7 @@ fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     );
     assert_eq!(
         (ai.last_order, ai.last_action),
-        (Some(OrderKind::Move), Some(ActionKind::Move))
+        (Some(OrderKind::Move), Some(AiAction::Move))
     );
     // livestock's unit AI, and one on action 0x2c2, keep their order and target
     let (o, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
@@ -110,7 +110,7 @@ fn capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
         .unit_ai
         .get_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
-        .current_action = Some(ActionKind::HeroPower);
+        .current_action = Some(AiAction::HeroPower);
     let (o, _) = stopped(t, class::VILLAGER).unwrap();
     assert_eq!(
         kept(o.parts.unit_ai.as_ref().unwrap()),

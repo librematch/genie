@@ -4,11 +4,11 @@
 use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{GroupState, SINGLE_VOLLEY, Surroundings, UnitAi, UnitSide, group_lets_idle};
 use crate::world::Millis;
@@ -51,7 +51,7 @@ impl UnitAi {
         if matches!(at.class, Some(class::BUILDING | class::TOWER))
             && matches!(
                 self.current_action,
-                Some(ActionKind::Make | ActionKind::Research)
+                Some(AiAction::Make | AiAction::Research)
             )
         {
             return self.making_idle_part(at, player_type, ai, side);
@@ -79,7 +79,7 @@ impl UnitAi {
         if self.adjusted_idle_timeout == Millis::new(750) {
             self.update_adjusted_idle_timeout(ai);
         }
-        if Self::top_target_live(at, side)?.is_some_and(|t| t.kind == BUILDING) {
+        if Self::top_target_live(at, side)?.is_some_and(|t| t.kind == MasterKind::BUILDING) {
             return Ok(());
         }
         let _ = self.process_idle(at, player_type, ai, side)?;
@@ -109,7 +109,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
         if self.current_target.is_some()
-            && at.kind == BUILDING
+            && at.kind == MasterKind::BUILDING
             && !at.ranged
             && at.firepower <= SINGLE_VOLLEY
         {
@@ -139,16 +139,16 @@ impl UnitAi {
         if matches!(class, Some(class::BUILDING | class::TOWER))
             && matches!(
                 self.current_action,
-                Some(ActionKind::Make | ActionKind::Research)
+                Some(AiAction::Make | AiAction::Research)
             )
         {
             return Err(GenieError::unsupported(
                 "a unit of class 3 or 52 on action 0x26b/0x26c",
             ));
         }
-        if self.current_action == Some(ActionKind::GroupAside) {
+        if self.current_action == Some(AiAction::GroupAside) {
             if group.is_none_or(|g| !g.moving) {
-                self.last_action = Some(ActionKind::GroupAside);
+                self.last_action = Some(AiAction::GroupAside);
                 self.current_action = None;
             }
             return Ok(());

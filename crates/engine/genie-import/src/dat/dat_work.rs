@@ -14,7 +14,7 @@ use genie_model::objects::MasterHitPoints;
 use genie_model::objects::SpriteId;
 use genie_model::objects::WorkRate;
 use genie_model::objects::masters as work;
-use genie_model::objects::masters::ActionType;
+use genie_model::objects::masters::ActionKind;
 use genie_model::objects::masters::AdjacentMode;
 use genie_model::objects::masters::CarryCapacity;
 use genie_model::objects::masters::CombatLevel;
@@ -28,7 +28,7 @@ use genie_model::objects::masters::HillMode;
 use genie_model::objects::masters::MasterId;
 use genie_model::objects::masters::ObjectFlags;
 use genie_model::objects::masters::ObstructionClass;
-use genie_model::objects::masters::ObstructionType;
+use genie_model::objects::masters::ObstructionKind;
 use genie_model::objects::masters::PlacementTerrains;
 use genie_model::objects::masters::RestrictionField;
 use genie_model::objects::masters::SoundEvents;
@@ -88,7 +88,7 @@ fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
     ])?;
     Ok(work::Task {
         id: TaskId::of_task(t.id),
-        action_type: ActionType::try_from(t.action_type)?,
+        action_kind: ActionKind::try_from(t.action_type)?,
         object_group: ClassId::of_field(t.class_id)?,
         object_id: MasterId::of_data(t.unit_id),
         combat_level: t.enable_targeting,
@@ -158,7 +158,7 @@ pub(super) fn dat_work(
         radius: Radii::from(unit.collision_size).ground(),
         tall: 0.0 < Radii::from(unit.collision_size).z(),
         height: Distance::new(Radii::from(unit.collision_size).z()),
-        obstruction_type: ObstructionType::from(unit.obstruction_type),
+        obstruction_kind: ObstructionKind::from(unit.obstruction_type),
         buildable_on: BuildableOn::of_data(unit.can_be_built_on),
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
         object_flags: ObjectFlags::NONE,

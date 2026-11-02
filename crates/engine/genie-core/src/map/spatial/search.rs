@@ -17,7 +17,7 @@ use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::players::PlayerId;
@@ -71,7 +71,7 @@ impl Spatial {
         }
         self.check_known_records(query)?;
         let walk = Segment { from, to };
-        let meets = |kind: ObstructionType, bx: Rect| {
+        let meets = |kind: ObstructionKind, bx: Rect| {
             rect.overlaps(bx.grown(grow)) && record_meets_segment(kind, bx, grow, walk)
         };
         let level = self.grid.level(0);
@@ -80,7 +80,7 @@ impl Spatial {
             self.visits_cell(level, x >> shift, y >> shift, query)
                 && !ignore.contains(&tile_record_id(Tile::new(x, y)))
                 && meets(
-                    ObstructionType::TYPE_3,
+                    ObstructionKind::TYPE_3,
                     Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0),
                 )
         });

@@ -2,7 +2,7 @@
 
 use crate::combat::missile::ArcRatio;
 use crate::combat::missile::HitMode;
-use crate::combat::missile::ProjectileType;
+use crate::combat::missile::ProjectileKind;
 use crate::combat::missile::SmartMode;
 use crate::combat::missile::VanishMode;
 use crate::map::Radii;
@@ -19,7 +19,7 @@ use genie_diff::Diff;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct MissileStats {
     /// `projectile_type` (`+0x880`).
-    pub projectile_type: ProjectileType,
+    pub projectile_kind: ProjectileKind,
     /// `smart_mode`.
     pub smart_mode: SmartMode,
     /// `hit_mode` (`missile_hit_info`).

@@ -14,11 +14,9 @@ use crate::objects::Frame;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::Relics;
-use crate::objects::masters::ChargeType;
+use crate::objects::masters::ChargeKind;
 use crate::objects::masters::HitChance;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MISSILE;
+use crate::objects::masters::MasterKind;
 use crate::world::Seconds;
 use crate::{GenieError, combat::damage};
 
@@ -108,7 +106,7 @@ pub(crate) fn strike(
     hit: Hit,
     object_rng: &mut Well512,
 ) -> Result<Struck, GenieError> {
-    if victim.kind == COMBAT && damage::shield(victim, hit.missile) {
+    if victim.kind == MasterKind::COMBAT && damage::shield(victim, hit.missile) {
         let master_hp = i32::from(own.master_hp.get());
         victim
             .damaged
@@ -123,15 +121,15 @@ pub(crate) fn strike(
         result: StrikeResult::HIT,
         executed: None,
     };
-    if MISSILE <= a.kind
+    if MasterKind::MISSILE <= a.kind
         && Distance::ZERO < a.area_effect
-        && (a.charge_type != ChargeType::AREA || damage::charge_hit(&a, victim))
+        && (a.charge_kind != ChargeKind::AREA || damage::charge_hit(&a, victim))
     {
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
         let _ = damage::blast(own, hit.at, None, Some(main), &mut targets, 1.0)?;
-        if a.charge_type == ChargeType::AREA {
+        if a.charge_kind == ChargeKind::AREA {
             own.source.charge = Charge::ZERO;
         }
         return Ok(struck);
@@ -166,7 +164,11 @@ pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> Result<HitPoi
     // The livestock (58, `0x3a`) and farm (49, `0x31`) classes: the ally test spares an Attack on
     // one that was its unit's player's when the Attack took it ([`Attack::same_owner`]).
     // A building's master type (`'P'`), whose main building (`+0xbb8`) an area effect attacks.
-    let Some(b) = victim.building.as_ref().filter(|_| victim.kind == BUILDING) else {
+    let Some(b) = victim
+        .building
+        .as_ref()
+        .filter(|_| victim.kind == MasterKind::BUILDING)
+    else {
         return Ok(HitPoints::ZERO);
     };
     let Some(main) = b.main else {

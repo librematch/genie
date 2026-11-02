@@ -25,7 +25,8 @@ use genie_core::objects::Voice;
 use genie_core::objects::WorkRate;
 use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ACTION_FACTORY_TYPES;
-use genie_core::objects::masters::{ActionType, MasterId, action_type};
+use genie_core::objects::masters::ActionKind;
+use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::{Master as MastersMaster, Task};
 use genie_core::objects::sprite::ActiveSprite;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
@@ -208,7 +209,7 @@ pub(super) fn fly_task(
         let entry = tasks
             .list
             .iter()
-            .find(|e| ActionType::of_data(e.task.action_type) == Some(fly))
+            .find(|e| ActionKind::of_data(e.task.action_type) == Some(fly))
             .ok_or(GenieError::unsupported(
                 "a bird whose master has no Fly task",
             ))?;
@@ -216,7 +217,7 @@ pub(super) fn fly_task(
     }
     masters
         .and_then(|t| t.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.tasks.iter().find(|t| t.action_type == fly))
+        .and_then(|w| w.tasks.iter().find(|t| t.action_kind == fly))
         .copied()
         .ok_or(GenieError::unsupported(
             "a bird whose Fly task is not in the data file",
@@ -237,12 +238,12 @@ pub(super) fn master_build_task(
             .tasks
             .as_deref()
     });
-    let build = action_type::BUILD;
+    let build = ActionKind::BUILD;
     if let Some(tasks) = saved {
         let entry = tasks
             .list
             .iter()
-            .find(|e| ActionType::of_data(e.task.action_type) == Some(build))
+            .find(|e| ActionKind::of_data(e.task.action_type) == Some(build))
             .ok_or(GenieError::unsupported(
                 "a builder whose master has no Build task",
             ))?;
@@ -250,7 +251,7 @@ pub(super) fn master_build_task(
     }
     masters
         .and_then(|t| t.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.tasks.iter().find(|t| t.action_type == build))
+        .and_then(|w| w.tasks.iter().find(|t| t.action_kind == build))
         .copied()
         .ok_or(GenieError::unsupported(
             "a builder whose Build task is not in the data file",
@@ -303,7 +304,7 @@ pub(super) fn production(object: &genie_save::Object) -> Result<Option<Productio
         .collect::<Result<Vec<Entry>, GenieError>>()?;
     let action = match first_action(&building.production_queue_actions)? {
         None => None,
-        Some((action_type::MAKE_OBJECT, action)) => {
+        Some((ActionKind::MAKE_OBJECT, action)) => {
             let make = action
                 .tribe_action_make_obj
                 .as_deref()
@@ -323,7 +324,7 @@ pub(super) fn production(object: &genie_save::Object) -> Result<Option<Productio
                 train_time: WholeSeconds::of_data(make.train_time),
             }))
         }
-        Some((action_type::MAKE_TECH, action)) => {
+        Some((ActionKind::MAKE_TECH, action)) => {
             let tech = action
                 .tribe_action_make_tech
                 .as_deref()

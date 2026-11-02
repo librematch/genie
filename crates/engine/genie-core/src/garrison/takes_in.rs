@@ -8,15 +8,14 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{Task, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
@@ -95,10 +94,10 @@ pub fn garrison_type_takes(
 /// `FUN_1415c9240`: the master's task list holds a task of action type `action` on objects of
 /// class `class`, both bytes the game widens to compare with the task's ushorts (`+0xe`,
 /// `+0x10`). A building's test asks for 3 on its own class (a transport) or on buildings (3).
-pub(super) fn has_garrison_task(tasks: &[Task], action: ActionType, class: ClassId) -> bool {
+pub(super) fn has_garrison_task(tasks: &[Task], action: ActionKind, class: ClassId) -> bool {
     let byte = |v: i16| u16::from(v.to_le_bytes()[0]);
     tasks.iter().any(|t| {
-        t.action_type.get().cast_unsigned() == byte(action.get())
+        t.action_kind.get().cast_unsigned() == byte(action.get())
             && ClassId::field(t.object_group).cast_unsigned() == byte(class.get())
     })
 }
@@ -106,7 +105,7 @@ pub(super) fn has_garrison_task(tasks: &[Task], action: ActionType, class: Class
 /// A garrison task (action type 3) on buildings (class 3).
 #[must_use]
 pub fn is_garrison_task(task: &Task) -> bool {
-    task.action_type == GARRISON && task.object_group == Some(class::BUILDING)
+    task.action_kind == GARRISON && task.object_group == Some(class::BUILDING)
 }
 
 impl World {
@@ -180,14 +179,15 @@ impl World {
         }
         let own = b.master(self.master_tables(), bp)?;
         if own.object_flags.contains(ObjectFlags::GARRISON)
-            && (unit.kind == COMBAT || class_has_flags(unit.class, ClassFlags::TRANSPORTED))
+            && (unit.kind == MasterKind::COMBAT
+                || class_has_flags(unit.class, ClassFlags::TRANSPORTED))
         {
             if !has_garrison_task(&unit.tasks, GARRISON, own.class) {
                 return Ok(false);
             }
             return Ok(unchecked || self.has_room(bp, b, None)?);
         }
-        if unit.kind < COMBAT || own.kind != BUILDING {
+        if unit.kind < MasterKind::COMBAT || own.kind != MasterKind::BUILDING {
             return Ok(false);
         }
         let (bp, b) = match self.parts.building_of(b.id).annex_of {
@@ -233,7 +233,7 @@ impl World {
             .object(building)
             .map(|(bp, b)| {
                 b.master(self.master_tables(), bp)
-                    .map(|m| m.kind == BUILDING)
+                    .map(|m| m.kind == MasterKind::BUILDING)
             })
             .transpose()?
             .unwrap_or(false);
@@ -245,7 +245,7 @@ impl World {
                 }
                 let kind = u.master(self.master_tables(), p)?.kind;
                 if is_building
-                    && kind == COMBAT
+                    && kind == MasterKind::COMBAT
                     && self.parts.combat_of(u.id).raider_countdown.is_set()
                 {
                     return Err(GenieError::unsupported(

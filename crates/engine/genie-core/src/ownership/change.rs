@@ -13,8 +13,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE_1889;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, MasterTables, player_master};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -80,7 +78,7 @@ impl World {
             .masters
             .first()
             .and_then(|m| m.get(master_id))
-            .is_some_and(|m| m.kind == BUILDING)
+            .is_some_and(|m| m.kind == MasterKind::BUILDING)
             && self
                 .parts
                 .building_of(unit.unit.id)
@@ -264,7 +262,7 @@ impl World {
     /// `master`'s obstruction come again (`FUN_141056460`).
     pub(crate) fn record_again(&mut self, id: ObjectId, master: &Master) {
         let record = Obstruction {
-            kind: master.obstruction_type,
+            kind: master.obstruction_kind,
             class: master.obstruction_class,
         };
         if record.recorded() {
@@ -292,7 +290,7 @@ impl World {
             let Some((q, a)) = self.object(annex) else {
                 continue;
             };
-            if a.master(self.master_tables(), q)?.kind != BUILDING {
+            if a.master(self.master_tables(), q)?.kind != MasterKind::BUILDING {
                 continue;
             }
             let annex_watched = self
@@ -472,12 +470,12 @@ impl World {
 /// The master types whose death-spawn master an ownership change copies (`FUN_14120f800`'s
 /// switch on the master's `+0x8`): static to moving objects, combat units and buildings.
 pub(crate) const DEAD_COPY_TYPES: [MasterKind; 6] = [
-    master_type::STATIC,
-    master_type::ANIMATED,
-    master_type::MOVING,
-    master_type::ACTION,
-    master_type::COMBAT,
-    BUILDING,
+    MasterKind::STATIC,
+    MasterKind::ANIMATED,
+    MasterKind::MOVING,
+    MasterKind::ACTION,
+    MasterKind::COMBAT,
+    MasterKind::BUILDING,
 ];
 
 /// The dead master an ownership change of `u` from player `old` makes, unless it holds one

@@ -17,14 +17,14 @@ use crate::objects::Voice;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::SoundEvents;
 use crate::objects::masters::TaskFlags;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::TaskTerrain;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerType;
@@ -39,9 +39,9 @@ use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
 
-fn task(action_type: ActionType) -> Task {
+fn task(action_type: ActionKind) -> Task {
     Task {
-        action_type,
+        action_kind: action_type,
         ..Task::default()
     }
 }
@@ -84,20 +84,62 @@ fn task_with_its_type_flag_bit_generates_always() {
     // bit 1 for an object of type 70, bit 2 for one of type 80
     let mut t = feitoria_food();
     t.combat_level_flag = TaskFlags::UNITS_ALWAYS;
-    assert!(generates(&t, COMBAT, COMBAT, None, false));
-    assert!(!generates(&t, BUILDING, BUILDING, None, false));
+    assert!(generates(
+        &t,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
+        None,
+        false
+    ));
+    assert!(!generates(
+        &t,
+        MasterKind::BUILDING,
+        MasterKind::BUILDING,
+        None,
+        false
+    ));
     t.combat_level_flag = TaskFlags::BUILDINGS_ALWAYS;
-    assert!(generates(&t, BUILDING, BUILDING, None, false));
-    assert!(!generates(&t, COMBAT, COMBAT, None, false));
+    assert!(generates(
+        &t,
+        MasterKind::BUILDING,
+        MasterKind::BUILDING,
+        None,
+        false
+    ));
+    assert!(!generates(
+        &t,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
+        None,
+        false
+    ));
 }
 
 #[test]
 fn building_generates_once_built() {
     let t = feitoria_food();
-    assert!(!generates(&t, BUILDING, BUILDING, None, false));
-    assert!(generates(&t, BUILDING, BUILDING, None, true));
+    assert!(!generates(
+        &t,
+        MasterKind::BUILDING,
+        MasterKind::BUILDING,
+        None,
+        false
+    ));
+    assert!(generates(
+        &t,
+        MasterKind::BUILDING,
+        MasterKind::BUILDING,
+        None,
+        true
+    ));
     // a combat unit's master is not a building's
-    assert!(!generates(&t, COMBAT, COMBAT, None, true));
+    assert!(!generates(
+        &t,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
+        None,
+        true
+    ));
 }
 
 #[test]
@@ -116,37 +158,43 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         })
     };
     // the Attack (9), type 7, the Gather (5) and the Hunt (0x6e), in state 7
-    for kind in [ATTACK, ACTION_TYPE_COMBAT, GATHER, HUNT] {
+    for kind in [ATTACK, ActionKind::COMBAT, GATHER, HUNT] {
         assert!(generates(
             &t,
-            COMBAT,
-            COMBAT,
+            MasterKind::COMBAT,
+            MasterKind::COMBAT,
             top(kind, ActionState::new(7), Some(target)),
             false
         ));
     }
     assert!(!generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(MOVE_TO, ActionState::new(7), Some(target)),
         false
     ));
     assert!(!generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(ATTACK, ActionState::new(6), Some(target)),
         false
     ));
     assert!(!generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), None),
         false
     ));
-    assert!(!generates(&t, COMBAT, COMBAT, None, false));
+    assert!(!generates(
+        &t,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
+        None,
+        false
+    ));
     // another class
     let other = WorkTarget {
         class: class::CLASS_6,
@@ -154,8 +202,8 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
     };
     assert!(!generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(other)),
         false
     ));
@@ -167,8 +215,8 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
     };
     assert!(generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(dead)),
         false
     ));
@@ -179,8 +227,8 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
     };
     assert!(!generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(empty)),
         false
     ));
@@ -191,8 +239,8 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
     };
     assert!(!generates(
         &t,
-        COMBAT,
-        COMBAT,
+        MasterKind::COMBAT,
+        MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(nan)),
         false
     ));
@@ -310,7 +358,7 @@ fn bystander() -> Bystander {
         id: object_id(2),
         player: PlayerId::new(2),
         allied: false,
-        kind: COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         state: ObjectState::Alive,
         blast_defense: BlastDefense::new(1),
@@ -358,7 +406,7 @@ fn movement_damage_strikes_enemies_in_reach() {
     ));
     // buildings only of classes 51 and 54
     let building = Bystander {
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         ..b
     };
@@ -681,7 +729,7 @@ fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Poin
             class: class::CLASS_0,
             player: p,
             master: m,
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
             moves: false,
@@ -733,7 +781,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
             }),
             umv: 0,
             capture: CaptureKind::NONE,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
         },
     );
     t.spatial.sight = Some(v);
@@ -746,9 +794,9 @@ fn built_feitoria_trickles_food_through_its_player_store() {
     give_master(
         &mut t,
         master_id(1021),
-        BUILDING,
+        MasterKind::BUILDING,
         class::BUILDING,
-        vec![task(ActionType::named(6)), feitoria_food()],
+        vec![task(ActionKind::named(6)), feitoria_food()],
     );
     put(
         &mut t,
@@ -785,7 +833,7 @@ fn keshik(t: &mut World) {
     give_master(
         t,
         master_id(1228),
-        COMBAT,
+        MasterKind::COMBAT,
         class::CLASS_12,
         vec![keshik_gold()],
     );
@@ -837,7 +885,13 @@ fn keshik(t: &mut World) {
 fn keshik_makes_gold_while_it_fights_target_of_its_task_class() {
     let mut t = world();
     keshik(&mut t);
-    give_master(&mut t, master_id(4), COMBAT, class::CLASS_0, Vec::new());
+    give_master(
+        &mut t,
+        master_id(4),
+        MasterKind::COMBAT,
+        class::CLASS_0,
+        Vec::new(),
+    );
     put(
         &mut t,
         PlayerId::new(2),
@@ -874,7 +928,13 @@ fn trampler(t: &mut World) {
         work_val2: WorkValue::new(3.0),
         ..task(MOVEMENT_DAMAGE)
     };
-    give_master(t, master_id(9), COMBAT, class::CLASS_12, vec![trample]);
+    give_master(
+        t,
+        master_id(9),
+        MasterKind::COMBAT,
+        class::CLASS_12,
+        vec![trample],
+    );
     put(
         t,
         PlayerId::new(1),
@@ -896,7 +956,13 @@ fn trampler(t: &mut World) {
 fn moving_unit_movement_damage_hits_the_enemies_about_it() {
     let mut t = world();
     trampler(&mut t);
-    give_master(&mut t, master_id(4), COMBAT, class::CLASS_6, Vec::new());
+    give_master(
+        &mut t,
+        master_id(4),
+        MasterKind::COMBAT,
+        class::CLASS_6,
+        Vec::new(),
+    );
     // an enemy in reach, one out of it, one of its own player, one of Gaia
     put(
         &mut t,
@@ -971,7 +1037,13 @@ fn moving_unit_movement_damage_hits_the_enemies_about_it() {
 fn movement_damage_kill_leaves_0_hit_points_and_counts_the_kill() {
     let mut t = world();
     trampler(&mut t);
-    give_master(&mut t, master_id(4), COMBAT, class::CLASS_6, Vec::new());
+    give_master(
+        &mut t,
+        master_id(4),
+        MasterKind::COMBAT,
+        class::CLASS_6,
+        Vec::new(),
+    );
     put(
         &mut t,
         PlayerId::new(2),
@@ -1036,7 +1108,7 @@ fn longboat_takes_its_task_look_on_its_terrains_and_its_master_off_them() {
     give_master(
         &mut t,
         master_id(250),
-        COMBAT,
+        MasterKind::COMBAT,
         class::WARSHIP,
         vec![longboat_look()],
     );
@@ -1090,7 +1162,7 @@ fn dead_object_that_leaves_issues_its_removal_rewards() {
     give_master(
         &mut t,
         master_id(5),
-        COMBAT,
+        MasterKind::COMBAT,
         class::CLASS_6,
         vec![bounty(), far, bounty()],
     );
@@ -1121,7 +1193,7 @@ fn an_object_of_another_type_has_no_abilities() {
     give_master(
         &mut t,
         ids::ID_7,
-        master_type::MOVING,
+        MasterKind::MOVING,
         class::CLASS_6,
         vec![bounty()],
     );

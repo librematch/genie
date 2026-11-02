@@ -15,7 +15,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::StopOrder;
@@ -44,7 +44,7 @@ impl UnitAi {
         let Some(t) = Self::world_object(target, at, side)? else {
             return Ok(false);
         };
-        self.set_action(Some(ActionKind::Defend));
+        self.set_action(Some(AiAction::Defend));
         self.target_at(Some(target), Some(t.class), t.position);
         self.desired_distance = range;
         self.defend_target = Some(target);
@@ -65,7 +65,7 @@ impl UnitAi {
         if !force && self.current_action.is_some() {
             return false;
         }
-        self.set_action(Some(ActionKind::Defend));
+        self.set_action(Some(AiAction::Defend));
         self.target_at(None, None, point.with_height(at.position.z()));
         self.desired_distance = range;
         self.defend_target = None;
@@ -92,11 +92,11 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
-        if (!force && self.current_action == Some(ActionKind::Build)) || !side.builds(target)? {
+        if (!force && self.current_action == Some(AiAction::Build)) || !side.builds(target)? {
             return Ok(false);
         }
         side.effect_now(Effect::Command(AiCommand::BuildObject(target)), self, rng)?;
-        self.set_action(Some(ActionKind::Build));
+        self.set_action(Some(AiAction::Build));
         match Self::world_object(target, at, side)? {
             Some(t) => self.set_target(Some(target.id()), t.class.or_none(), t.position),
             None => self.set_target(Some(target.id()), None, Position::ORIGIN),
@@ -114,7 +114,7 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         force: bool,
-        (action, command): (ActionKind, UnitCommand),
+        (action, command): (AiAction, UnitCommand),
         (at, side): (&Surroundings, &mut dyn UnitSide),
     ) -> Result<bool, GenieError> {
         if !force && self.current_action == Some(action) {
@@ -201,7 +201,7 @@ impl UnitAi {
         let Some(t) = Self::world_object(target, at, side)? else {
             return Ok(false);
         };
-        self.set_action(Some(ActionKind::Follow));
+        self.set_action(Some(AiAction::Follow));
         self.target_at(Some(target), Some(t.class), t.position);
         self.desired_distance = range;
         if range.squared() < t.gap_squared {
@@ -243,7 +243,7 @@ impl UnitAi {
         if !side.command(UnitCommand::Enter(target))? {
             return Ok(false);
         }
-        self.set_action(Some(ActionKind::Enter));
+        self.set_action(Some(AiAction::Enter));
         self.target_at(
             Some(target),
             held.map(|t| t.class),
@@ -268,7 +268,7 @@ impl UnitAi {
         if !side.command(UnitCommand::Transport(point))? {
             return Ok(false);
         }
-        self.set_action(Some(ActionKind::Transport));
+        self.set_action(Some(AiAction::Transport));
         self.target_at(None, None, point);
         Ok(true)
     }
@@ -292,9 +292,9 @@ impl UnitAi {
             return Ok(false);
         }
         self.set_action(Some(if over_wall {
-            ActionKind::UnloadOverWall
+            AiAction::UnloadOverWall
         } else {
-            ActionKind::Unload
+            AiAction::Unload
         }));
         self.set_target(Some(at.id), at.class, at.position);
         Ok(true)
@@ -318,7 +318,7 @@ impl UnitAi {
         if !self.attack_command(target, force, at, side)? {
             return Ok(false);
         }
-        self.set_action(Some(ActionKind::SeekAndDestroy));
+        self.set_action(Some(AiAction::SeekAndDestroy));
         let class = Self::world_object(target, at, side)?.map(|t| t.class);
         self.target_at(
             Some(target),
@@ -344,7 +344,7 @@ impl UnitAi {
         }
         let point = Point::new(tile.x() as f32, tile.y() as f32);
         side.effect_now(Effect::Explore(point), self, rng)?;
-        self.set_action(Some(ActionKind::ExploreAndDestroy));
+        self.set_action(Some(AiAction::ExploreAndDestroy));
         self.target_at(None, None, point.with_height(EXPLORE_Z));
         Ok(true)
     }
@@ -444,7 +444,7 @@ impl UnitAi {
 
     /// Slot 0x108 (`FUN_140c68a60`), with `force` (its argument 3) or without an action value:
     /// the unit's slot 0x388 on the foundation `target` ([`UnitSide::wait_solidify`]); on its 1
-    /// the action value becomes [`ActionKind::WaitSolidify`], the old one the last. True when it
+    /// the action value becomes [`AiAction::WaitSolidify`], the old one the last. True when it
     /// waits.
     pub(super) fn wait_for_foundation(
         &mut self,
@@ -458,7 +458,7 @@ impl UnitAi {
         if !side.wait_solidify(target)? {
             return Ok(false);
         }
-        self.set_action(Some(ActionKind::WaitSolidify));
+        self.set_action(Some(AiAction::WaitSolidify));
         Ok(true)
     }
 
@@ -478,7 +478,7 @@ impl UnitAi {
         }
         let point = tile.corner();
         side.effect_now(Effect::Explore(point), self, rng)?;
-        self.last_action = self.current_action.replace(ActionKind::Explore);
+        self.last_action = self.current_action.replace(AiAction::Explore);
         self.target_at(None, None, point.with_height(EXPLORE_Z));
         Ok(true)
     }

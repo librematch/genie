@@ -10,8 +10,6 @@ use crate::objects::masters::CombatAbility;
 use crate::objects::masters::DamageShare;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::COMBAT;
-use crate::objects::masters::master_type::MISSILE;
 use crate::objects::masters::{ClassAmount, DamageAmount, DamageClass};
 
 /// `FUN_141085450`, a combat object's melee armor as its master holds it: its best armor of
@@ -122,7 +120,7 @@ pub(super) fn weapon_armor(
             continue;
         }
         let own_slot = OwnSlot::of(e.class);
-        if MISSILE <= attacker.kind
+        if MasterKind::MISSILE <= attacker.kind
             && own_slot.is_some()
             && attacker.ability.contains(CombatAbility::IGNORES_ARMOR)
             && !a.ability.contains(CombatAbility::RESISTS_IGNORING)
@@ -131,7 +129,7 @@ pub(super) fn weapon_armor(
             continue;
         }
         armor = e.amount;
-        if let Some(slot) = own_slot.filter(|_| COMBAT <= kind) {
+        if let Some(slot) = own_slot.filter(|_| MasterKind::COMBAT <= kind) {
             armor = class_armor(a, slot, own_class, state);
         }
     }
@@ -144,10 +142,10 @@ pub(super) fn weapon_armor(
 pub(super) fn charges(attacker: &Attacker, own_class: ClassId, kind: MasterKind) -> bool {
     charge_works(
         attacker.charge_target,
-        attacker.charge_type,
+        attacker.charge_kind,
         own_class,
         kind,
-    ) && attacker.charge_type.adds_to_attack()
+    ) && attacker.charge_kind.adds_to_attack()
         && attacker.max_charge <= attacker.charge
 }
 
@@ -197,7 +195,7 @@ pub fn armor_damage(
             DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
         );
         let mut resist = 1.0f32;
-        if COMBAT <= attacker.kind {
+        if MasterKind::COMBAT <= attacker.kind {
             let charge =
                 !charged && 0.0 < attack && pierce_or_melee && charges(attacker, own_class, kind);
             let c = if charge {

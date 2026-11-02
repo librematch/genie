@@ -17,19 +17,19 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{ClassId, Master, MasterTables, Task};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
@@ -234,7 +234,7 @@ impl World {
             "a hunt's target the slice does not hold",
         ))?;
         let tm = t.master(self.master_tables(), tp)?;
-        let main = if tm.kind == BUILDING {
+        let main = if tm.kind == MasterKind::BUILDING {
             self.parts
                 .building_of(t.id)
                 .annex_of
@@ -471,7 +471,7 @@ impl World {
         };
         ai.notify_work(
             Some(OrderKind::Gather),
-            Some(ActionKind::Gather),
+            Some(AiAction::Gather),
             Some(target),
             point,
             clears,
@@ -480,7 +480,7 @@ impl World {
         self.remember_order(
             player,
             idx,
-            (Some(OrderKind::Gather), Some(ActionKind::Gather)),
+            (Some(OrderKind::Gather), Some(AiAction::Gather)),
         )
     }
 
@@ -536,10 +536,10 @@ impl World {
         (tp, t): (PlayerId, &Unit),
         tm: &Master,
     ) -> Result<bool, GenieError> {
-        if tm.kind == BUILDING {
+        if tm.kind == MasterKind::BUILDING {
             // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
             // (`FUN_140a903a0`).
-            if self.parts.actions_of(t.id).top_action_kind() == Some(action_type::UNPACK)
+            if self.parts.actions_of(t.id).top_action_kind() == Some(ActionKind::UNPACK)
                 || self.parts.unread.contains(t.id)
             {
                 return Err(GenieError::unsupported(
@@ -590,13 +590,13 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id).filter(|_| notify) {
             ai.notify_work(
                 Some(OrderKind::Hunt),
-                Some(ActionKind::Hunt),
+                Some(AiAction::Hunt),
                 Some((target, quarry.class)),
                 point,
                 clears,
                 self.streams.get(Stream::Ai),
             )?;
-            self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(ActionKind::Hunt)))?;
+            self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
         }
         self.clear_actions(player, idx)?;
         self.begin_hunt(player, idx, (task, &quarry))

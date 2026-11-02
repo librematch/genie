@@ -2,7 +2,7 @@
 //! saves (FD-044), so a test builds the few fields its routine reads and leaves the rest zero.
 
 use flate2::write::DeflateEncoder;
-use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ActionKind;
 use genie_rec::de::Op;
 use genie_save::Header;
 use genie_save::Positioned;
@@ -279,7 +279,7 @@ pub(crate) fn building_mut(object: &mut Object) -> &mut TribeBuildingObject {
 }
 
 /// An action list of `actions` (type, action), its end after them.
-pub(crate) fn action_list(actions: Vec<(ActionType, Action)>) -> ActionList {
+pub(crate) fn action_list(actions: Vec<(ActionKind, Action)>) -> ActionList {
     ActionList {
         action_type_list: actions
             .into_iter()

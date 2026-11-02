@@ -9,8 +9,8 @@ use crate::technology::EffectCommand;
 use crate::technology::EffectId;
 use crate::technology::Party;
 use crate::technology::TechId;
+use crate::technology::TechKind;
 use crate::technology::TechMode;
-use crate::technology::TechType;
 use crate::world::WholeSeconds;
 
 /// How a group of the game's `linkedTechs.json` links its technologies: the `+4` byte of the
@@ -55,7 +55,7 @@ pub struct TechDef {
     /// `+0x2a`, `+0x30`, `+0x36`: the cost entries' attributes, amounts and paid flags.
     pub costs: [Cost; 3],
     /// `+0x3c`, the technology's type.
-    pub kind: TechType,
+    pub kind: TechKind,
     /// Its effect (`+0x3a`) and the effect's commands (the world's effect table `+0x128`).
     pub effect_id: EffectId,
     /// The effect's commands.

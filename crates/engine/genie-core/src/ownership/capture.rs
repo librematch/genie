@@ -10,12 +10,11 @@ use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::action_type::TRADE;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::orders::object_gone;
@@ -23,7 +22,7 @@ use crate::ownership::CaptureKind;
 use crate::ownership::change::change_hands;
 use crate::ownership::change::dead_master_of;
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::StopOrder;
 use crate::world::lets::{release, torn_down};
 use crate::world::others::OthersRef;
@@ -130,7 +129,7 @@ impl Unit {
                 .parts
                 .unit_ai
                 .get(self.id)
-                .is_some_and(|ai| ai.current_action != Some(ActionKind::HeroPower))
+                .is_some_and(|ai| ai.current_action != Some(AiAction::HeroPower))
         {
             let place = (self.place.position().ground(), Some(class));
             // slot 0xb0 with 0, its stopAction a call on the unit at once
@@ -200,7 +199,7 @@ impl Unit {
         new: PlayerId,
     ) -> Result<bool, GenieError> {
         let master = self.master(c.w.master_tables(), c.player);
-        if master.is_ok_and(|m| m.kind == BUILDING) {
+        if master.is_ok_and(|m| m.kind == MasterKind::BUILDING) {
             c.building_handover = true;
             return Ok(c
                 .w
@@ -242,7 +241,7 @@ pub(crate) const HANDS_LEFT: GenieError = GenieError::unsupported(
 
 /// The trade action's type (slot 0x438), whose load keeps a captured unit's unit AI going
 /// (`FUN_14108c050`).
-pub(crate) const TRADE_ACTION: ActionType = TRADE;
+pub(crate) const TRADE_ACTION: ActionKind = ActionKind::TRADE;
 
 /// `FUN_140aab570`'s scan after a livestock's capture: Gaia's livestock in state 2 whose tile
 /// the new owner sees (`FUN_141663500`), within 3 tiles of `at` (x outer, y inner); each is taken

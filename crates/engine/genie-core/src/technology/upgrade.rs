@@ -19,10 +19,12 @@ use crate::objects::SpriteId;
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::HpPercent;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::Task;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::class;
-use crate::objects::masters::{Master, Task, master_type, player_master};
+use crate::objects::masters::player_master;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
@@ -57,7 +59,7 @@ const SAME_AI_CLASSES: [(ClassId, ClassId); 3] = [
 /// (below state 4) rather than a master of its own.
 #[must_use]
 pub fn upgradable(kind: MasterKind, state: ObjectState) -> bool {
-    kind < master_type::COMBAT || state < ObjectState::DyingSprite
+    kind < MasterKind::COMBAT || state < ObjectState::DyingSprite
 }
 
 /// `FUN_1415c6aa0` on player `p`'s masters `new` and `old` (by id): the unit's new class needs
@@ -117,29 +119,29 @@ impl World {
         keep: bool,
     ) -> Result<(), GenieError> {
         let kind = old.kind;
-        if master_type::BUILDING <= kind {
+        if MasterKind::BUILDING <= kind {
             let (from, to) = (
                 old.building.as_ref().and_then(|b| b.construction_sprite),
                 new.building.as_ref().and_then(|b| b.construction_sprite),
             );
             self.show_if(place, from, to)?;
         }
-        let class_changed = master_type::COMBAT <= kind
+        let class_changed = MasterKind::COMBAT <= kind
             && class_changes(
                 player_master(&self.masters, p, new.id),
                 player_master(&self.masters, p, old.id),
             );
-        if master_type::COMBAT <= kind {
+        if MasterKind::COMBAT <= kind {
             let id = self.object_at_mut(place)?.id;
             self.parts.combat_mut(id)?.firepower += new.volley_fire - old.volley_fire;
         }
-        if master_type::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
+        if MasterKind::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
             self.show_if(place, old.attack_sprite, new.attack_sprite)?;
         }
-        if master_type::ACTION <= kind {
+        if MasterKind::ACTION <= kind {
             self.upgrade_actions(place, (old, new), keep)?;
         }
-        if master_type::MOVING <= kind {
+        if MasterKind::MOVING <= kind {
             self.upgrade_moving_sprite(place, (old, new))?;
         }
         // the static object's part
@@ -150,7 +152,7 @@ impl World {
         self.upgrade_hit_points(place, (old, new))?;
         if !keep {
             self.object_at_mut(place)?.life.master_id = new.id;
-            if master_type::COMBAT <= kind {
+            if MasterKind::COMBAT <= kind {
                 count_class(&mut self.players.player_mut(p)?.attributes, new, 1.0);
             }
         }
@@ -175,7 +177,7 @@ impl World {
                 .parts
                 .actions_of(self.object_at(place)?.id)
                 .top_action_kind()
-            && !new.tasks.iter().any(|t| t.action_type == top)
+            && !new.tasks.iter().any(|t| t.action_kind == top)
             && let Place::Live(q, i) = place
         {
             self.object_stop(q, i)?;
@@ -215,11 +217,11 @@ impl World {
     /// goes to its player (slot 0xf8 with 1 and 1, the foods as food).
     fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> Result<(), GenieError> {
         let kind = old.kind;
-        if master_type::COMBAT <= kind {
+        if MasterKind::COMBAT <= kind {
             count_class(&mut self.players.player_mut(p)?.attributes, old, -1.0);
         }
         let u = self.object_at(place)?;
-        if master_type::COMBAT <= kind
+        if MasterKind::COMBAT <= kind
             // The villager class (4), whose load an upgrade without its master kept goes to its player.
             && old.class == class::VILLAGER
             && Amount::ZERO < u.life.amount
@@ -332,10 +334,10 @@ impl World {
             .iter()
             .find(|&&(from, _)| from.is_some() && shown == from)
             .map(|&(_, to)| to);
-        if master_type::COMBAT <= kind
-            && master_type::COMBAT <= new.kind
-            && old.charge_type.charges()
-            && new.charge_type.charges()
+        if MasterKind::COMBAT <= kind
+            && MasterKind::COMBAT <= new.kind
+            && old.charge_kind.charges()
+            && new.charge_kind.charges()
         {
             let more = (new.max_charge - old.max_charge).abs();
             if Charge::ZERO < more {
@@ -441,7 +443,7 @@ impl World {
                 .iter()
                 .rev()
                 .find(|t| {
-                    t.action_type == task.action_type
+                    t.action_kind == task.action_kind
                         && t.object_group == task.object_group
                         && t.object_id == task.object_id
                 })
@@ -456,7 +458,7 @@ impl World {
             standing: g(new.standing_sprite),
             idle_attack: g(new.idle_attack_sprite),
             second: g(new.attack_sprite2),
-            combat: master_type::COMBAT <= new.kind,
+            combat: MasterKind::COMBAT <= new.kind,
         };
         let id = self.object_at(place)?.id;
         // an object the table holds no layer of has no actions to follow the master
@@ -568,14 +570,14 @@ mod tests {
     use crate::objects::lifecycle::Held;
     #[cfg(test)]
     use crate::objects::lifecycle::Lifecycle;
+    use crate::objects::masters::ActionKind;
     use crate::objects::masters::BuildableOn;
-    use crate::objects::masters::ChargeType;
+    use crate::objects::masters::ChargeKind;
     use crate::objects::masters::DamageSpriteMode;
-    use crate::objects::masters::ObstructionType;
+    use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::masters::WorkValue;
-    use crate::objects::masters::action_type;
     use crate::objects::masters::{BuildingMaster, DamageGraphic, Masters};
     use crate::objects::masters::{MasterId, ids};
     #[cfg(test)]
@@ -626,7 +628,7 @@ mod tests {
     fn building(id: i16, hp: i16, mode: DamageSpriteMode, dead: i16) -> Master {
         Master {
             id: master_id(id),
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(hp),
             standing_sprite: Some(SpriteId::named(id + 1000)),
@@ -796,10 +798,10 @@ mod tests {
     /// 18/43 and 43/18 (the new class first).
     #[test]
     fn who_takes_an_upgrade_and_who_new_unit_ai() {
-        assert!(upgradable(master_type::BUILDING, ObjectState::Dying));
-        assert!(!upgradable(master_type::BUILDING, ObjectState::DyingSprite));
-        assert!(!upgradable(master_type::COMBAT, ObjectState::Removed));
-        assert!(upgradable(master_type::ACTION, ObjectState::Removed));
+        assert!(upgradable(MasterKind::BUILDING, ObjectState::Dying));
+        assert!(!upgradable(MasterKind::BUILDING, ObjectState::DyingSprite));
+        assert!(!upgradable(MasterKind::COMBAT, ObjectState::Removed));
+        assert!(upgradable(MasterKind::ACTION, ObjectState::Removed));
         let m = |class| Master {
             class,
             ..Master::default()
@@ -849,7 +851,7 @@ mod tests {
         let rubble = |id: i16, copy: i16| Master {
             id: master_id(id),
             copy_id: opt_master(copy),
-            kind: master_type::STATIC,
+            kind: MasterKind::STATIC,
             ..Master::default()
         };
         let mut house = object(10, ids::HOUSE, ObjectState::Alive, HitPoints::new(275.0));
@@ -931,7 +933,7 @@ mod tests {
     fn an_upgrade_to_another_master_moves_the_class_counters_and_the_load() {
         let old = Master {
             id: ids::VILLAGER_MALE,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             hit_points: MasterHitPoints::of_data(25),
             volley_fire: Firepower::new(1.0),
@@ -939,7 +941,7 @@ mod tests {
         };
         let new = Master {
             id: ids::ID_6,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::CLASS_6,
             hit_points: MasterHitPoints::of_data(50),
             volley_fire: Firepower::new(3.0),
@@ -1012,7 +1014,7 @@ mod tests {
         use crate::objects::masters::Task;
         let task = |id, action_type, object_group, work_range| Task {
             id,
-            action_type,
+            action_kind: action_type,
             object_group,
             work_range,
             work_val1: WorkValue::new((work_range * 2.0).get()),
@@ -1025,7 +1027,7 @@ mod tests {
         let mut old = t.masters[1].get(master_id(120)).unwrap().clone();
         old.tasks.push(task(
             task_id(3),
-            action_type::BUILD,
+            ActionKind::BUILD,
             Some(class_id(3)),
             Distance::new(0.25),
         ));
@@ -1040,7 +1042,7 @@ mod tests {
                     sprites: TaskSprites::of_data([12, -1, -1, -1]),
                     ..task(
                         task_id(7),
-                        action_type::BUILD,
+                        ActionKind::BUILD,
                         Some(class_id(3)),
                         Distance::new(1.5),
                     )
@@ -1163,7 +1165,7 @@ mod tests {
     fn upgrade_world() -> World {
         let soldier = |id, hit_points| Master {
             id,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::CLASS_6,
             hit_points,
             ..Master::default()
@@ -1431,7 +1433,7 @@ mod tests {
     fn an_upgrade_hands_villager_load_to_its_player() {
         let villager = Master {
             id: ids::VILLAGER_MALE,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             hit_points: MasterHitPoints::of_data(25),
             ..Master::default()
@@ -1521,7 +1523,7 @@ mod tests {
                     class: class::CLASS_6,
                     player: PlayerId::new(0),
                     master: master_id(4),
-                    obstruction_type: ObstructionType::NONE,
+                    obstruction_kind: ObstructionKind::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: true,
                     moves: false,
@@ -1552,7 +1554,7 @@ mod tests {
                     building: None,
                     umv: 0,
                     capture: CaptureKind::NONE,
-                    kind: master_type::COMBAT,
+                    kind: MasterKind::COMBAT,
                 },
             );
             t.spatial.sight = Some(v);
@@ -1596,13 +1598,13 @@ mod tests {
     fn an_upgrade_carries_the_hit_points_share_the_sprites_and_the_charge() {
         let old = Master {
             id: master_id(4),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             hit_points: MasterHitPoints::of_data(40),
             standing_sprite: Some(SpriteId::named(300)),
             standing_sprite_2: Some(SpriteId::named(301)),
             death_sprite: Some(SpriteId::named(302)),
             undead_sprite: Some(SpriteId::named(303)),
-            charge_type: ChargeType::ATTACK,
+            charge_kind: ChargeKind::ATTACK,
             max_charge: Charge::new(2.0),
             ..Master::default()
         };
@@ -1654,7 +1656,7 @@ mod tests {
         };
         assert_eq!(upgraded(&none, &new, 304).0, HitPoints::ZERO);
         let uncharged = Master {
-            charge_type: ChargeType::NONE,
+            charge_kind: ChargeKind::NONE,
             ..new
         };
         assert_eq!(upgraded(&old, &uncharged, 304).2, Charge::ZERO);

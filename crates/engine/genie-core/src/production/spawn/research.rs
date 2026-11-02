@@ -13,8 +13,8 @@ use crate::production::{Entry, Production, refund_tech};
 use crate::production::{MakeTech, MakeTechState, Making};
 use crate::technology::ResearchState;
 use crate::technology::TechId;
-use crate::technology::{Location, ResearchCount, TechDef, TechType, is_age};
-use crate::unit_ai::ActionKind;
+use crate::technology::{Location, ResearchCount, TechDef, TechKind, is_age};
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::world::PlayState;
@@ -107,7 +107,7 @@ impl World {
             self.parts.combat_of(building.id).work_rate_powerup + self.master(p, master)?.work_rate;
         let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, false);
-        let shared = def.kind == TechType::SHARED;
+        let shared = def.kind == TechKind::SHARED;
         let time_modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
         let location = state
             .location(master)
@@ -194,7 +194,7 @@ impl World {
                 Notify::own(
                     id,
                     NotifyKind::ACTION_COMPLETED,
-                    [ActionKind::Research.value(), 0, 0],
+                    [AiAction::Research.value(), 0, 0],
                 ),
                 state,
             )?;
@@ -240,7 +240,7 @@ impl World {
                 Notify::own(
                     id,
                     NotifyKind::ACTION_FAILED,
-                    [ActionKind::Research.value(), 0, 0],
+                    [AiAction::Research.value(), 0, 0],
                 ),
                 state,
             )?;
@@ -274,7 +274,7 @@ impl World {
         let def = self.techs.checked(t)?;
         let owner = self.players.player(p)?;
         let state = owner.techs.checked(t)?;
-        if def.kind == TechType::SHARED {
+        if def.kind == TechKind::SHARED {
             let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
             state.state = ResearchState::Available;
             state.times_researched = ResearchCount::ZERO;

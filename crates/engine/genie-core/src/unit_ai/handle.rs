@@ -5,9 +5,9 @@ use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::WorkerCount;
-use crate::objects::masters::master_type::MOVING;
+use crate::objects::masters::MasterKind;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
@@ -84,7 +84,7 @@ impl UnitAi {
             NotifyKind::ACTION_FAILED
             | NotifyKind::ACTION_COMPLETED
             | NotifyKind::ACTION_INVALIDATED => self.current_order.map_or_else(
-                || ActionKind::field(self.current_action) == n.p[0],
+                || AiAction::field(self.current_action) == n.p[0],
                 |o| o.owns(self.current_action),
             ),
             // "Target is still visible.": the world holds the target, which its owner sees
@@ -214,7 +214,7 @@ impl UnitAi {
             // move (FUN_140fdd080: a master of type 30 and up with speed) gives the order up
             NotifyKind::OUT_OF_REACH => {
                 if self.current_order == Some(OrderKind::Attack)
-                    && !(MOVING <= at.kind && Speed::ZERO < at.speed)
+                    && !(MasterKind::MOVING <= at.kind && Speed::ZERO < at.speed)
                 {
                     self.current_order = None;
                 }
@@ -227,7 +227,7 @@ impl UnitAi {
             NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng),
             // a unit of a group sent off a footprint: the action value 0x2c0
             NotifyKind::SENT_OFF_GROUP => {
-                self.set_action(Some(ActionKind::GroupAside));
+                self.set_action(Some(AiAction::GroupAside));
                 Ok(GO_ON)
             }
             // "Unit #%d is no longer doing an action on me.": an attacker leaves the set

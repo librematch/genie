@@ -13,20 +13,19 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::Master;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::PASTURE;
 use crate::objects::masters::ids::PASTURE_MANGROVE;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::MOVING;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::PASTURE_WORKERS;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
@@ -83,7 +82,7 @@ impl World {
             .live(player, idx)?
             .master(self.master_tables(), player)?;
         let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
-        if master.kind < MOVING || speed <= Speed::ZERO {
+        if master.kind < MasterKind::MOVING || speed <= Speed::ZERO {
             if order.queued {
                 return Err(GenieError::unsupported(
                     "a queued move of an object that does not move",
@@ -446,7 +445,7 @@ impl World {
         };
         let target = self.task_target(on, 0)?;
         let pasture = master.class == class::VILLAGER
-            && target.master.kind == BUILDING
+            && target.master.kind == MasterKind::BUILDING
             && matches!(target.master.id, PASTURE_MANGROVE | PASTURE);
         if !pasture {
             return Ok(PastureAfter::Tends(None));
@@ -479,7 +478,7 @@ impl World {
             let search = Notify::own(
                 id,
                 NotifyKind::REQUIRES_SEARCH,
-                [ActionKind::Hunt.value(), i32::from(class::FARM.get()), -1],
+                [AiAction::Hunt.value(), i32::from(class::FARM.get()), -1],
             );
             let _ = ai.accept(search, state);
         }

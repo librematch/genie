@@ -20,7 +20,7 @@ use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
-use crate::unit_ai::{ActionKind, OrderKind};
+use crate::unit_ai::{AiAction, OrderKind};
 
 use crate::construction::{BuilderCount, FoundationId};
 use crate::movement::Mover;
@@ -287,7 +287,7 @@ impl BuildAction {
         builder.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
-            [ActionKind::Build.value(), 0, 0],
+            [AiAction::Build.value(), 0, 0],
         )?;
         Self::stand(c, builder)
     }
@@ -361,7 +361,7 @@ impl BuildAction {
             builder.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
-                [ActionKind::Build.value(), 0, 0],
+                [AiAction::Build.value(), 0, 0],
             )?;
             Self::stand(c, builder)?;
         }

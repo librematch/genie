@@ -27,11 +27,11 @@ use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -42,7 +42,7 @@ use crate::players::attribute;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
@@ -246,11 +246,11 @@ fn sheep(state: ObjectState) -> Near {
         position: Position::new(106.68481, 47.14652, 0.0),
         radius: Footprint::new(0.35, 0.35),
         tall: true,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         master: master_id(705),
         buildable_on: BuildableOn::NO,
-        obstruction_type: ObstructionType::CIRCLE,
+        obstruction_kind: ObstructionKind::CIRCLE,
         auto_gather: false,
         state,
         desolid: false,
@@ -271,7 +271,7 @@ fn livestock_stays_alive_tree_only_once_dead() {
     assert!(!sheep(ObjectState::Unfinished).stays());
     let tree = Near {
         class: class::TREE,
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         ..sheep(ObjectState::Alive)
     };
     assert!(!tree.stays());
@@ -331,10 +331,10 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         id: object_id(500),
         position: Position::new(20.5, 20.5, 0.0),
         radius: Footprint::new(1.0, 1.0),
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         master: ids::HOUSE,
-        obstruction_type: ObstructionType::TYPE_2,
+        obstruction_kind: ObstructionKind::TYPE_2,
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::Alive,
@@ -535,7 +535,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         .unwrap()
         .notifies
         .iter()
-        .any(|n| n.kind == NotifyKind::ACTION_COMPLETED && n.p == [ActionKind::Make.value(), 0, 0]);
+        .any(|n| n.kind == NotifyKind::ACTION_COMPLETED && n.p == [AiAction::Make.value(), 0, 0]);
     assert!(completed);
     // the centre's command queue goes to the new unit
     let mut t = world();
@@ -877,7 +877,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
     let ai = u.parts.unit_ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
-        (Some(OrderKind::Move), Some(ActionKind::Move), None)
+        (Some(OrderKind::Move), Some(AiAction::Move), None)
     );
     assert_eq!(ai.target_point, Position::new(40.0, 80.0, 0.0));
     assert_eq!(ai.orders, []);
@@ -981,7 +981,7 @@ fn remains_world() -> World {
     }
     let static_remains = Master {
         id: master_id(800),
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         death_sprite: Some(SpriteId::named(20)),
         standing_sprite: None,
         storage: vec![
@@ -992,7 +992,7 @@ fn remains_world() -> World {
     };
     let moving_remains = Master {
         id: master_id(801),
-        kind: master_type::MOVING,
+        kind: MasterKind::MOVING,
         standing_sprite: Some(SpriteId::named(21)),
         moving: Some(walker().stats),
         ..Master::default()
@@ -1072,13 +1072,13 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
     };
     let unchanged = |_: &mut Master| {};
     assert_eq!(
-        reason(&|m| m.kind = master_type::COMBAT, Facing::Drawn),
+        reason(&|m| m.kind = MasterKind::COMBAT, Facing::Drawn),
         "remains of a type other than 10 and 20 to 39"
     );
     assert_eq!(
         reason(
             &|m| {
-                m.kind = master_type::STATIC;
+                m.kind = MasterKind::STATIC;
                 m.hit_points = MasterHitPoints::of_data(5);
             },
             Facing::Drawn
@@ -1299,7 +1299,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
     let site = house_site(&site_values, true);
     let flat = Flat(Vec::new());
     let house = Near {
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         moving: false,
         player: PlayerId::new(2),
@@ -1316,7 +1316,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
         }
     ));
     let unit = Near {
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         state: ObjectState::Undead,
         ..house
     };
@@ -1378,7 +1378,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     let site = house_site(&site_values, true);
     let flat = Flat(Vec::new());
     let walker = Near {
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         moving: true,
         player: PlayerId::new(1),
@@ -1413,7 +1413,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     }));
     let stump = Near {
         class: class::TREE,
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         hp: HitPoints::new(1.0),
         ..still
     };
@@ -1442,10 +1442,10 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         id: object_id(500),
         position: Position::new(20.5, 20.5, 0.0),
         radius: Footprint::new(1.0, 1.0),
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         master: ids::HOUSE,
-        obstruction_type: ObstructionType::TYPE_2,
+        obstruction_kind: ObstructionKind::TYPE_2,
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::Alive,
@@ -1460,7 +1460,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
             ..house
         },
         Near {
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             player: PlayerId::new(1),
             moving: true,
             ..house
@@ -1471,7 +1471,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         },
         Near {
             class: class::TREE,
-            kind: master_type::STATIC,
+            kind: MasterKind::STATIC,
             hp: HitPoints::new(1.0),
             ..house
         },
@@ -1501,7 +1501,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
     // a negative height, passes; a height of 0 counts as 1 for a building
     let outlined = |outline| Near {
         position: Position::new(22.6, 21.0, 0.0),
-        obstruction_type: ObstructionType::TYPE_11,
+        obstruction_kind: ObstructionKind::TYPE_11,
         outline,
         ..house
     };
@@ -1520,12 +1520,12 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
         id: object_id(600),
         position: Position::new(21.5, 21.5, 0.0),
         radius: Footprint::new(1.0, 1.0),
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::DyingSprite,
-        obstruction_type: ObstructionType::TYPE_2,
+        obstruction_kind: ObstructionKind::TYPE_2,
         ..sheep(ObjectState::Alive)
     };
     let build_values = Restriction::new(vec![1.0]);

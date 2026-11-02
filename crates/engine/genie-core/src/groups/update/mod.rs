@@ -9,7 +9,7 @@ use crate::groups::MotionFlags;
 use crate::groups::UnitGroup;
 use crate::map::Distance;
 use crate::movement::PathFlags;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::world::Millis;
 
 mod attack;
@@ -28,21 +28,20 @@ use crate::math::image::facing::QUARTER_PI;
 use crate::math::image::group::{CLOSE as GROUP_CLOSE, FARTHEST as GROUP_FARTHEST, FRONT_SHARE};
 use crate::math::image::missile::VOLLEY_REACH_MARGIN;
 use crate::math::image::movement::LOOK_AHEAD;
-use crate::objects::masters::action_type::BUILD as ACTION_TYPE_BUILD;
 
 /// The group's current command (`mCurrentCommand`, `+0x3a8`) without one.
 const NO_COMMAND: GroupCommandKind = GroupCommandKind::NONE;
 /// The group commands the update tells apart: an attack, a build, a repair, a relic's pick-up
 /// and its delivery.
 const ATTACK: GroupCommandKind = GroupCommandKind::ATTACK;
-const BUILD: GroupCommandKind = GroupCommandKind::of_action(ACTION_TYPE_BUILD);
+const BUILD: GroupCommandKind = GroupCommandKind::of_action(ActionKind::BUILD);
 const REPAIR: GroupCommandKind = GroupCommandKind::of_action(CONSTRUCTION_REPAIR);
 const PICK_UP_RELIC: GroupCommandKind = GroupCommandKind::named(0x84);
 const DELIVER_RELIC: GroupCommandKind = GroupCommandKind::named(0x88);
 /// The action types of the tasks that pick up and deliver relics (`FUN_1415c60b0`'s third
 /// argument, as the commands).
-const RELIC_PICKUP_ACTION: ActionType = ActionType::named(0x84);
-const RELIC_DELIVERY_ACTION: ActionType = ActionType::named(0x88);
+const RELIC_PICKUP_ACTION: ActionKind = ActionKind::named(0x84);
+const RELIC_DELIVERY_ACTION: ActionKind = ActionKind::named(0x88);
 /// The nearest member's target starts this far (`FUN_141007ca0`, `DAT_14330ebf4`).
 const FARTHEST: f32 = GROUP_FARTHEST;
 /// A follow (`mCurrentCommand` 2).

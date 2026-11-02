@@ -10,12 +10,12 @@ use crate::movement::Speed;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::WONDER;
-use crate::objects::masters::master_type::MISSILE;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
@@ -142,7 +142,7 @@ impl UnitAi {
         player_type: PlayerType,
         held_by_group: bool,
     ) -> bool {
-        if matches!(self.current_action, Some(ActionKind::Attack))
+        if matches!(self.current_action, Some(AiAction::Attack))
             && self.current_target == Some(attacker_id)
         {
             return true;
@@ -226,7 +226,7 @@ impl UnitAi {
             if reaches {
                 return self.strike_back(attacker_id, at, ai_rng, side);
             }
-            if self.current_action != Some(ActionKind::Move) {
+            if self.current_action != Some(AiAction::Move) {
                 let _ = self.run_away(true, at, player_type, ai_rng, side)?;
             }
             return Ok(BREAK);
@@ -256,7 +256,7 @@ impl UnitAi {
         let attacker_id = attacker.id;
         if target.master == WONDER
             || (target.class == class::TOWER && attacker.class == class::TOWER)
-            || attacker.kind == MISSILE
+            || attacker.kind == MasterKind::MISSILE
             || (attacker.class == class::TOWER
                 && !matches!(
                     at.class,
@@ -415,7 +415,7 @@ impl UnitAi {
     /// Slot 0x148 (`FUN_140c4d0d0`), the move off a footprint: with its force flag (`m.force`)
     /// or without an action value, the unit's slot 0x340 takes the move with the same
     /// arguments ([`AiCommand::MoveAside`], which the caller runs after the update); on its 1 the
-    /// action value becomes [`ActionKind::MoveAside`], the old one the last, and the target stays.
+    /// action value becomes [`AiAction::MoveAside`], the old one the last, and the target stays.
     /// The caller's slot 0x340 is `FUN_1410866e0`, which always gives 1, but for classes 51 and
     /// 54 (`FUN_141216c50`, their packing), which it does not run. The move gives the unit its
     /// `MoveTo` at once: the update's later checks see it busy. True when it moves.
@@ -429,7 +429,7 @@ impl UnitAi {
             return Ok(false);
         }
         side.effect_now(Effect::Command(AiCommand::MoveAside(m)), self, rng)?;
-        self.set_action(Some(ActionKind::MoveAside));
+        self.set_action(Some(AiAction::MoveAside));
         Ok(true)
     }
 
@@ -439,10 +439,10 @@ impl UnitAi {
         matches!(
             self.current_action,
             Some(
-                ActionKind::Explore
-                    | ActionKind::ExploreAndDestroy
-                    | ActionKind::Scout
-                    | ActionKind::AutoScout
+                AiAction::Explore
+                    | AiAction::ExploreAndDestroy
+                    | AiAction::Scout
+                    | AiAction::AutoScout
             )
         )
     }
@@ -472,7 +472,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         let action = self.current_action;
-        let auto = action == Some(ActionKind::AutoScout);
+        let auto = action == Some(AiAction::AutoScout);
         // a computer player's unit AI finds no tile (slot 0x90 gives 0 without a draw)
         if !auto && !player_type.is_computer() {
             closest_undiscovered_tile()?;
@@ -499,8 +499,7 @@ impl UnitAi {
                     // FUN_14162dab0: no case for it but the old short pather's hulled area, a
                     // computer player's AI would hear it); processing breaks
                     side.make_scout_map()?;
-                    if player_type.is_computer()
-                        && self.current_action == Some(ActionKind::AutoScout)
+                    if player_type.is_computer() && self.current_action == Some(AiAction::AutoScout)
                     {
                         return Err(GenieError::unsupported(
                             "a computer player's AI told its scout found nothing (0x202)",
@@ -508,7 +507,7 @@ impl UnitAi {
                     }
                     return Ok(BREAK);
                 };
-                if self.current_action == Some(ActionKind::AutoScout) {
+                if self.current_action == Some(AiAction::AutoScout) {
                     let _ = self.explore_at(t, true, side, ai_rng)?;
                 }
                 self.current_action = action;

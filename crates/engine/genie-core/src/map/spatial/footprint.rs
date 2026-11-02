@@ -134,15 +134,15 @@ impl Spatial {
         obstructs: bool,
         looks: &BTreeMap<ObjectId, ClearLook>,
     ) -> Result<Vec<ObjectId>, GenieError> {
-        use crate::objects::masters::master_type::BUILDING;
+        use crate::objects::masters::MasterKind;
         let (sx, sy) = (site.position.x(), site.position.y());
         let (rx, ry) = (site.radius.x(), site.radius.y());
         self.check_known(Rect::new(sx - rx, sy - ry, sx + rx, sy + ry))?;
         let counts = |id: ObjectId, o: &Placed| {
             looks.get(&id).is_none_or(|l| {
                 let alive = l.state < ObjectState::Dying
-                    || (l.kind != BUILDING && l.state < ObjectState::Removed);
-                let foundation = l.kind == BUILDING && l.desolid;
+                    || (l.kind != MasterKind::BUILDING && l.state < ObjectState::Removed);
+                let foundation = l.kind == MasterKind::BUILDING && l.desolid;
                 alive
                     && (!foundation
                         || (self.allied(site.player, o.player)

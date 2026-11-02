@@ -22,7 +22,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::WorkRate;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -35,7 +35,7 @@ use crate::players::PlayerType;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::task_finder::TaskTarget;
@@ -110,7 +110,7 @@ pub struct Interact {
     /// `+0x15`: each unit's last human order time is set (`FUN_140e5e780`).
     pub human: bool,
     /// `+0x16`: the work command's task filter, -1 for any.
-    pub filter: Option<ActionType>,
+    pub filter: Option<ActionKind>,
 }
 
 /// MOVE's fields past its units (`+0x4`..`+0x15`).
@@ -142,7 +142,7 @@ pub(crate) struct Work {
     pub target: Option<ObjectId>,
     pub point: Position,
     pub carry_test: bool,
-    pub filter: Option<ActionType>,
+    pub filter: Option<ActionKind>,
     pub notified: bool,
 }
 
@@ -173,9 +173,9 @@ const LISTED: usize = 60;
 /// The range of GUARD's defend order (`DAT_142eb3634`, [`World::guard`]).
 const GUARD_RANGE: f32 = ORDER_GUARD_RANGE;
 /// The task filter of garrisoning (3).
-pub(crate) const GARRISON: ActionType = ActionType::named(3);
+pub(crate) const GARRISON: ActionKind = ActionKind::named(3);
 /// A task's action type of attacking (7), whose factory makes an Attack (type 9).
-const ATTACK_TASK: ActionType = ActionType::named(7);
+const ATTACK_TASK: ActionKind = ActionKind::named(7);
 
 /// What the order splitter reads of a unit: its master's type, formation category (not 0),
 /// object flags' bit 1, its top speed (slot 0x208), its place and where it last moved to (slot
@@ -566,7 +566,7 @@ pub(crate) fn set_stance(
     ai.state_position = place.0;
     if state == UnitStance::NO_ATTACK
         && (ai.current_order == Some(OrderKind::Attack)
-            || ai.current_action == Some(ActionKind::Attack))
+            || ai.current_action == Some(AiAction::Attack))
     {
         ai.stop_with(StopOrder::Keep, Some(place), side, rng)?;
         ai.remove_target();

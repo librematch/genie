@@ -19,12 +19,12 @@ use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::FARM;
 use crate::objects::masters::ids::FISH_TRAP;
 use crate::objects::masters::ids::TOWN_CENTRE_621;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -184,7 +184,7 @@ impl World {
             return Ok(false);
         };
         let mut base = m.base_id;
-        if based.kind == BUILDING
+        if based.kind == MasterKind::BUILDING
             && let Some(head) = based.building.as_ref().and_then(|b| b.head_unit)
         {
             let Some(h) = ms.get(head) else {
@@ -272,7 +272,7 @@ impl World {
         {
             own.push(target.id());
             let is_building = match self.object(target) {
-                Some((q, t)) => t.master(self.master_tables(), q)?.kind == BUILDING,
+                Some((q, t)) => t.master(self.master_tables(), q)?.kind == MasterKind::BUILDING,
                 None => false,
             };
             if is_building {
@@ -420,8 +420,10 @@ mod tests {
     #[cfg(test)]
     use crate::objects::masters::BuildingMaster;
     use crate::objects::masters::ClassId;
+    use crate::objects::masters::Master;
+    use crate::objects::masters::MasterKind;
+    use crate::objects::masters::Masters;
     use crate::objects::masters::ids;
-    use crate::objects::masters::{Master, Masters, master_type};
     use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::test_ids::costs;
@@ -439,7 +441,7 @@ mod tests {
     fn master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
         Master {
             id,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             cost: costs(cost),
             ..Master::default()
         }
@@ -559,7 +561,7 @@ mod tests {
     ) -> Master {
         Master {
             id,
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             class,
             base_id: Some(base),
             available,

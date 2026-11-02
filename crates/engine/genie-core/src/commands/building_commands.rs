@@ -12,15 +12,15 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::CostAmount;
-use crate::objects::masters::master_type::BUILDING;
+use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
-use crate::technology::{Attributes, TechState, TechType, factors};
-use crate::unit_ai::ActionKind;
+use crate::technology::{Attributes, TechKind, TechState, factors};
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
 use crate::world::GameMode;
@@ -222,7 +222,7 @@ impl World {
             let Some(ai) = self.parts.unit_ai.get(unit.id) else {
                 continue;
             };
-            let building = unit.master(self.master_tables(), p)?.kind == BUILDING;
+            let building = unit.master(self.master_tables(), p)?.kind == MasterKind::BUILDING;
             let mut queued = Vec::new();
             if building
                 && let Some(g) = self.parts.gather_point.get(unit.id).copied()
@@ -327,7 +327,7 @@ impl World {
         let owner = self.players.player(player)?;
         let state = owner.techs.checked(tech)?;
         let repeatable = state.repeatable(def, false);
-        if def.kind == TechType::SHARED {
+        if def.kind == TechKind::SHARED {
             return Err(GenieError::unsupported(
                 "RESEARCH of the shared kind (FUN_1411c3fd0 over the packet's buildings)",
             ));
@@ -356,7 +356,7 @@ impl World {
             }
             let building = self.players.live_mut(player, i)?;
             if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
-                ai.set_action(Some(ActionKind::Research));
+                ai.set_action(Some(AiAction::Research));
             }
         }
         Ok(())
@@ -393,7 +393,7 @@ impl World {
             .locations
             .iter()
             .any(|l| l.building == Some(building.life.master_id));
-        if master.kind != BUILDING || building.life.state != ObjectState::Alive || !at {
+        if master.kind != MasterKind::BUILDING || building.life.state != ObjectState::Alive || !at {
             return Ok(None);
         }
         if owner.kind.is_computer() {

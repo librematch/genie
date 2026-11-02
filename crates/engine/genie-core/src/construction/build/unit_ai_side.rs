@@ -10,9 +10,9 @@ use crate::map::Point;
 use crate::map::Tile;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::action_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -42,7 +42,7 @@ impl UnitView<'_, '_> {
             return Ok(false);
         }
         // The Build action's type, which word 9 adds.
-        if self.actions.top_action_kind() == Some(action_type::BUILD) {
+        if self.actions.top_action_kind() == Some(ActionKind::BUILD) {
             return Ok(true);
         }
         self.build_found(foundation)
@@ -165,7 +165,7 @@ impl UnitView<'_, '_> {
                     continue;
                 };
                 let kind = u.master(every, player)?.kind;
-                if BUILDING <= kind && u.life.state == ObjectState::Foundation {
+                if MasterKind::BUILDING <= kind && u.life.state == ObjectState::Foundation {
                     return Ok(Some(id));
                 }
             }

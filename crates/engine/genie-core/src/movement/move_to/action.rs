@@ -24,11 +24,11 @@ use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ids::TOWN_CENTRE;
-use crate::objects::masters::master_type;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, standing, walking};
 use crate::unit_ai::NotifyKind;
-use crate::unit_ai::{ActionKind, Inbox};
+use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
 use crate::world::WALKER_UNMOVING;
 use genie_diff::Diff;
@@ -113,7 +113,7 @@ pub fn object_range(range: Distance, master: Option<&Master>) -> Distance {
         return range;
     }
     let cart = master.is_some_and(|m| {
-        m.kind == master_type::BUILDING && m.tasks.iter().any(|t| t.action_type == CART_TASK)
+        m.kind == MasterKind::BUILDING && m.tasks.iter().any(|t| t.action_kind == CART_TASK)
     });
     if cart {
         Distance::new(CART_MOVE_RANGE)
@@ -441,7 +441,7 @@ impl MoveToAction {
                 }
                 inbox.post(
                     NotifyKind::ACTION_INVALIDATED,
-                    [ActionKind::Move.value(), -1, 0],
+                    [AiAction::Move.value(), -1, 0],
                 )?;
                 Ok(Some(UpdateCode::CODE_4))
             }
@@ -806,23 +806,25 @@ mod tests {
     /// stays.
     #[test]
     fn move_to_an_object_without_range_takes_mule_cart_s() {
-        use crate::objects::masters::{Master, Task, master_type::BUILDING};
+        use crate::objects::masters::Master;
+        use crate::objects::masters::MasterKind;
+        use crate::objects::masters::Task;
         let cart_task = Task {
-            action_type: CART_TASK,
+            action_kind: CART_TASK,
             ..Task::default()
         };
         let cart = Master {
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             tasks: vec![Task::default(), cart_task],
             ..Master::default()
         };
         let building = Master {
-            kind: BUILDING,
+            kind: MasterKind::BUILDING,
             tasks: vec![Task::default()],
             ..Master::default()
         };
         let unit = Master {
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             ..cart.clone()
         };
         assert_eq!(

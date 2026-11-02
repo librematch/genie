@@ -29,7 +29,7 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::Voice;
 use genie_core::objects::WorkRate;
 use genie_core::objects::layers;
-use genie_core::objects::masters::ActionType;
+use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::ClassId;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TargetOwner;
@@ -38,7 +38,6 @@ use genie_core::objects::masters::TaskId;
 use genie_core::objects::masters::TaskSprites;
 use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::WorkValue;
-use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
 use genie_core::objects::{Graphics, SpeedMultiplier};
@@ -56,7 +55,7 @@ use genie_save::generated::world::{
 fn task(id: i16, range: f32) -> Task {
     Task {
         id: TaskId::of_task(id),
-        action_type: action_type(0),
+        action_kind: action_type(0),
         object_group: Some(class_id(3)),
         object_id: None,
         combat_level: 0,
@@ -126,13 +125,13 @@ fn move_to(state: u8, range: f32) -> Action {
 }
 
 /// `b` with the sub-action `sub` of type `kind`.
-fn with_sub(mut b: RgeAction, kind: ActionType, sub: Action) -> RgeAction {
+fn with_sub(mut b: RgeAction, kind: ActionKind, sub: Action) -> RgeAction {
     b.sub_actions = action_list(vec![(kind, sub)]);
     b
 }
 
 /// Unit 5 (master 83) acting `action` of type `kind`.
-fn acting(kind: ActionType, action: Action) -> genie_save::Object {
+fn acting(kind: ActionKind, action: Action) -> genie_save::Object {
     let mut object = combat_object(5, 83);
     combat_mut(&mut object)
         .rge_combat_object
@@ -181,7 +180,7 @@ fn import_drawn(
 }
 
 /// Unit 5's top action `action` of type `kind` imported, its player without masters.
-fn imported(kind: ActionType, action: Action) -> Result<layers::Action, GenieError> {
+fn imported(kind: ActionKind, action: Action) -> Result<layers::Action, GenieError> {
     import(&acting(kind, action), &PlayerObjects::default())
 }
 
@@ -642,7 +641,7 @@ fn build_takes_its_task_move_to_and_site() {
     b.target2_id = 31;
     let objects = PlayerObjects::default();
     let walking = with_sub(b.clone(), MOVE_TO, move_to(4, 0.75));
-    let a = import(&acting(BUILD, build(walking)), &objects)
+    let a = import(&acting(ActionKind::BUILD, build(walking)), &objects)
         .unwrap()
         .list
         .build()
@@ -688,16 +687,20 @@ fn build_takes_its_task_move_to_and_site() {
         flags: SpriteFlags::ANIMATED,
     };
     let graphics = Graphics::from([(carried.id, carried)]);
-    let a = import_drawn(&acting(BUILD, build(dropping)), &objects, Some(&graphics))
-        .unwrap()
-        .list
-        .build()
-        .copied()
-        .unwrap();
+    let a = import_drawn(
+        &acting(ActionKind::BUILD, build(dropping)),
+        &objects,
+        Some(&graphics),
+    )
+    .unwrap()
+    .list
+    .build()
+    .copied()
+    .unwrap();
     let walk = a.state.move_to().copied().unwrap();
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(walk.sprite, Some(carried));
-    let a = imported(BUILD, build(b.clone()))
+    let a = imported(ActionKind::BUILD, build(b.clone()))
         .unwrap()
         .list
         .build()
@@ -707,7 +710,11 @@ fn build_takes_its_task_move_to_and_site() {
     // without a MoveTo, the task's moving sprite for the next
     assert_eq!(a.task.moving, Some(SpriteId::named(9)));
     assert_eq!(
-        imported(BUILD, build(with_sub(b, EXPLORE, explore(base(3))))).unwrap_err(),
+        imported(
+            ActionKind::BUILD,
+            build(with_sub(b, EXPLORE, explore(base(3))))
+        )
+        .unwrap_err(),
         OTHER_SUB_ACTION
     );
 }

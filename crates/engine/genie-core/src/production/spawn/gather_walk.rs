@@ -12,8 +12,8 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Voice;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::class;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
 use crate::players::PlayerId;
@@ -21,7 +21,7 @@ use crate::world::slots::PlayerSlots;
 
 use crate::garrison::ENTER;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
 
@@ -91,7 +91,7 @@ impl World {
             }
             ai.notify_work(
                 Some(OrderKind::Move),
-                Some(ActionKind::Move),
+                Some(AiAction::Move),
                 None,
                 point,
                 notified,
@@ -239,7 +239,7 @@ impl World {
         let (owner, t) = self.object(target).ok_or(GenieError::unreachable(
             "unreachable: a gather point's target found",
         ))?;
-        let on_building = t.master(self.master_tables(), owner)?.kind == BUILDING;
+        let on_building = t.master(self.master_tables(), owner)?.kind == MasterKind::BUILDING;
         if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {
             m.waiting = 1;
         }

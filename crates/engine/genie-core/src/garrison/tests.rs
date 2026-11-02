@@ -50,7 +50,7 @@ use crate::objects::UpdateCode;
 use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Animated;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
@@ -59,13 +59,12 @@ use crate::objects::masters::FlyMode;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterField;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::TaskTerrain;
-use crate::objects::masters::action_type::{COMBAT, DEPOSIT};
 use crate::objects::masters::class;
-use crate::objects::masters::master_type;
 use crate::objects::masters::{MasterId, ids};
 use crate::objects::sprite::Graphic;
 use crate::objects::teardown::HeadCode;
@@ -93,7 +92,7 @@ use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::test_ids::unit_list;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetType;
@@ -129,9 +128,9 @@ pub(crate) const ARCHER: MasterId = MasterId::named(4);
 const SHIP: MasterId = MasterId::named(545);
 const GATE: MasterId = MasterId::named(88);
 
-fn task(action_type: ActionType, object_group: i16) -> Task {
+fn task(action_type: ActionKind, object_group: i16) -> Task {
     Task {
-        action_type,
+        action_kind: action_type,
         object_group: class_of(object_group),
         ..Task::default()
     }
@@ -143,7 +142,7 @@ fn garrison_masters() -> Masters {
     Masters::new([
         Master {
             id: TC,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::TOWER,
             hit_points: MasterHitPoints::of_data(2400),
             garrison: GarrisonCapacity::of_data(15),
@@ -157,7 +156,7 @@ fn garrison_masters() -> Masters {
         },
         Master {
             id: VILLAGER,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             copy_id: Some(VILLAGER),
             tasks: vec![task(GARRISON, 3), task(GARRISON, 20)],
@@ -169,14 +168,14 @@ fn garrison_masters() -> Masters {
         },
         Master {
             id: ARCHER,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::CLASS_0,
-            tasks: vec![task(COMBAT, 3)],
+            tasks: vec![task(ActionKind::COMBAT, 3)],
             ..Master::default()
         },
         Master {
             id: SHIP,
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::TRANSPORT,
             object_flags: ObjectFlags::GARRISON,
             garrison: GarrisonCapacity::of_data(1),
@@ -188,7 +187,7 @@ fn garrison_masters() -> Masters {
         },
         Master {
             id: GATE,
-            kind: master_type::BUILDING,
+            kind: MasterKind::BUILDING,
             class: class::GATE,
             hit_points: MasterHitPoints::of_data(2750),
             garrison: GarrisonCapacity::of_data(0),
@@ -1009,7 +1008,7 @@ fn walled_map(
         class: class::CLASS_0,
         player: PlayerId::new(1),
         master,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: false,
         moves: false,
@@ -1201,13 +1200,13 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
     // volley missile 54 every 2 s; its 7 villagers made its firepower 1 + 7
     let arrow = Master {
         id: master_id(54),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         weapons: vec![ClassAmount::new(3, 5)],
         ..Master::default()
     };
     let tc = Master {
         id: ids::TOWN_CENTRE,
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         reload: Seconds::new(2.0),
         weapon_range: Distance::new(6.0),
@@ -1219,7 +1218,7 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
     };
     let villager = Master {
         id: ids::VILLAGER_MALE,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         reload: Seconds::new(2.0),
         weapons: vec![
@@ -1264,7 +1263,7 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
 fn town_center() -> Master {
     Master {
         id: ids::TOWN_CENTRE,
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         reload: Seconds::new(2.0),
         weapon_range: Distance::new(6.0),
@@ -1281,7 +1280,7 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     // value gives no rate, as one at the limit does
     let arrow = Master {
         id: master_id(54),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         weapons: vec![
             ClassAmount::new(3, 5),
             ClassAmount::new(4, 7),
@@ -1329,13 +1328,13 @@ fn volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
     // missile; a null slot or one without weapons adds nothing, with no fallback
     let missile = Master {
         id: ids::FARM,
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         weapons: vec![ClassAmount::new(3, 6)],
         ..Master::default()
     };
     let volley = Master {
         id: master_id(54),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         weapons: vec![
             ClassAmount::new(3, 2),
             ClassAmount::new(38, 1),
@@ -1345,12 +1344,12 @@ fn volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
     };
     let unarmed = Master {
         id: master_id(55),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         ..Master::default()
     };
     let archer = |volley_missile| Master {
         id: master_id(4),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 4)],
         missile: MasterField::of(Some(ids::FARM)),
@@ -1393,13 +1392,13 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
     // wraps: amount 1 adds -2^31, amount 2 adds 0
     let volley = |amount| Master {
         id: master_id(54),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         weapons: vec![ClassAmount::new(3, amount)],
         ..Master::default()
     };
     let tower = Master {
         id: master_id(79),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         reload: Seconds::new(1.0),
         garrison_firepower: Firepower::new(1.0),
         volley_fire: Firepower::new(1e10),
@@ -1434,7 +1433,7 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
     // its upper half, +0x656) a master of type 70: that master's firepower over the rate
     let foot = Master {
         id: master_id(1120),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_0,
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 2)],
@@ -1444,7 +1443,7 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
     };
     let mounted = Master {
         id: master_id(1122),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::CLASS_36,
         reload: Seconds::new(2.0),
         weapons: vec![ClassAmount::new(3, 6)],
@@ -1472,7 +1471,7 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
     );
     // a named master not of type 70, or none, gives the floor 0.0; flag 3 clear names none
     let building = Master {
-        kind: master_type::BUILDING,
+        kind: MasterKind::BUILDING,
         ..mounted
     };
     let masters_80 = Masters::new([foot.clone(), building]);
@@ -1546,7 +1545,7 @@ fn garrison_task_compares_the_bytes_the_game_passes_widened() {
         class::NO_CLASS
     ));
     assert!(!has_garrison_task(
-        &[task(COMBAT, 3)],
+        &[task(ActionKind::COMBAT, 3)],
         GARRISON,
         class::BUILDING
     ));
@@ -1637,7 +1636,7 @@ fn transport_takes_combat_unit_with_task_on_its_class_and_room() {
     let mut masters = garrison_masters();
     masters = Masters::new(masters.iter().cloned().chain([Master {
         id: master_id(1500),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         class: class::SIEGE,
         tasks: vec![task(GARRISON, 20)],
         ..Master::default()
@@ -1707,7 +1706,7 @@ fn unload_picks_the_units_its_flag_names_of_any_player() {
     let mut relic = garrison_masters();
     relic = Masters::new(relic.iter().cloned().chain([Master {
         id: ids::RELIC,
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: WHOLE_SHARE_CLASS,
         ..Master::default()
     }]));
@@ -1844,13 +1843,13 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
             class: class::TOWER,
             player: PlayerId::new(1),
             master: TC,
-            obstruction_type: ObstructionType::TYPE_2,
+            obstruction_kind: ObstructionKind::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionType::TYPE_2,
+                kind: ObstructionKind::TYPE_2,
                 class: ObstructionClass::UNIT,
             }),
         },
@@ -1922,7 +1921,7 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
             class: class::VILLAGER,
             player: PlayerId::new(1),
             master: VILLAGER,
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -1991,7 +1990,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
         class: class::VILLAGER,
         player: PlayerId::new(1),
         master: VILLAGER,
-        obstruction_type: ObstructionType::NONE,
+        obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -2073,7 +2072,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
             let v = m.get_mut(VILLAGER).unwrap();
             v.tasks.push(Task {
                 object_id: Some(TC),
-                ..task(DEPOSIT, -1)
+                ..task(ActionKind::DEPOSIT, -1)
             });
         }
     };
@@ -2106,7 +2105,7 @@ pub(crate) fn inside_tc(t: &mut World, p: PlayerId, id: i32, m: MasterId) {
             class: class::VILLAGER,
             player: p,
             master: m,
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -2212,9 +2211,9 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
 fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
     use crate::orders::town_bell::BackToWork;
     for (action, class, searches) in [
-        (Some(ActionKind::Gather), 5, true),
+        (Some(AiAction::Gather), 5, true),
         (None, 5, false),
-        (Some(ActionKind::Gather), -1, false),
+        (Some(AiAction::Gather), -1, false),
     ] {
         let mut t = let_out_world();
         inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
@@ -2238,12 +2237,12 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
         let ai = t.parts.unit_ai.get(object_id(1000)).unwrap();
         let heard: Vec<_> = ai.notifies.iter().map(|n| (n.kind, n.p)).collect();
         if searches {
-            assert_eq!(ai.current_action, Some(ActionKind::Gather));
+            assert_eq!(ai.current_action, Some(AiAction::Gather));
             assert_eq!(
                 heard,
                 [(
                     NotifyKind::REQUIRES_SEARCH,
-                    [ActionKind::Gather.value(), 5, 7]
+                    [AiAction::Gather.value(), 5, 7]
                 )]
             );
         } else {
@@ -2263,7 +2262,7 @@ fn unit_ais_test_takes_building_or_transport_that_takes_its_unit_in() {
     let mut masters = garrison_masters();
     masters = Masters::new(masters.iter().cloned().chain([Master {
         id: master_id(59),
-        kind: master_type::MISSILE,
+        kind: MasterKind::MISSILE,
         class: class::BUILDING,
         garrison: GarrisonCapacity::of_data(5),
         ..Master::default()
@@ -2337,7 +2336,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
             class: class::VILLAGER,
             player: p,
             master: m,
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: true,
@@ -2367,13 +2366,13 @@ pub(crate) fn building_at(
             class: class::TOWER,
             player: PlayerId::new(1),
             master: m,
-            obstruction_type: ObstructionType::TYPE_2,
+            obstruction_kind: ObstructionKind::TYPE_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionType::TYPE_2,
+                kind: ObstructionKind::TYPE_2,
                 class: ObstructionClass::UNIT,
             }),
         },
@@ -2537,7 +2536,7 @@ fn ship_at(t: &mut World, at: Point) {
             class: class::TRANSPORT,
             player: PlayerId::new(1),
             master: SHIP,
-            obstruction_type: ObstructionType::NONE,
+            obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: true,
@@ -2770,7 +2769,7 @@ fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
         (ai.current_order, ai.current_action, ai.current_target),
         (
             Some(OrderKind::Enter),
-            Some(ActionKind::Enter),
+            Some(AiAction::Enter),
             Some(object_id(200))
         )
     );
@@ -3040,7 +3039,7 @@ fn an_unload_command_sends_transport_toward_the_shore() {
         (ai.current_order, ai.current_action, ai.current_target),
         (
             Some(OrderKind::Unload),
-            Some(ActionKind::Unload),
+            Some(AiAction::Unload),
             Some(object_id(200))
         )
     );
@@ -3106,7 +3105,7 @@ fn transport_task_world() -> (World, ListIndex) {
         if let Some(s) = m.get_mut(SHIP) {
             s.tasks.push(Task {
                 id: task_id(7),
-                action_type: transport::TRANSPORT,
+                action_kind: transport::TRANSPORT,
                 object_group: None,
                 object_id: None,
                 terrain: TaskTerrain::of_data(0),
@@ -3173,11 +3172,7 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
     let ai = t.parts.unit_ai.get(ship.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
-        (
-            Some(OrderKind::Transport),
-            Some(ActionKind::Transport),
-            None
-        )
+        (Some(OrderKind::Transport), Some(AiAction::Transport), None)
     );
     t.order_work(
         PlayerId::new(1),
@@ -3553,7 +3548,7 @@ fn villager_beside_ship_enters_it_at_once() {
         BackToWork {
             target: Some(object_id(200)),
             target_class: None,
-            action: Some(ActionKind::Enter),
+            action: Some(AiAction::Enter),
             target2: None,
             point: Point::new(5.5, 20.5),
         }
@@ -3775,7 +3770,7 @@ fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
     t.parts.set_unit_ai(
         object_id(1000),
         Some(UnitAi {
-            current_action: Some(ActionKind::Gather),
+            current_action: Some(AiAction::Gather),
             current_target: Some(object_id(77)),
             stance: UnitStance::DEFENSIVE,
             ..UnitAi::default()
@@ -3801,7 +3796,7 @@ fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
             ai.stance.get(),
             ai.last_action
         ),
-        (None, None, 1, Some(ActionKind::Gather))
+        (None, None, 1, Some(AiAction::Gather))
     );
     assert_eq!(ai.state_position, v.position().ground());
 }
@@ -3849,7 +3844,7 @@ fn buildings_count_takes_relics_in_and_leaves_raiders_unmodelled() {
     let mut masters = garrison_masters();
     masters = Masters::new(masters.iter().cloned().chain([Master {
         id: ids::RELIC,
-        kind: master_type::ANIMATED,
+        kind: MasterKind::ANIMATED,
         class: class::ARTIFACT,
         ..Master::default()
     }]));
@@ -3983,7 +3978,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
         heard,
         [(
             NotifyKind::ACTION_FAILED,
-            [ActionKind::Transport.value(), 0, 0]
+            [AiAction::Transport.value(), 0, 0]
         )]
     );
     // off the shore its MoveTo starts: the walk the unit AI asked for moves on
@@ -4086,7 +4081,7 @@ fn let_out_beside_second_centre(
     t.parts.set_unit_ai(
         object_id(1000),
         Some(UnitAi {
-            current_action: Some(ActionKind::Gather),
+            current_action: Some(AiAction::Gather),
             current_target: Some(object_id(77)),
             stance: UnitStance::DEFENSIVE,
             ..UnitAi::default()

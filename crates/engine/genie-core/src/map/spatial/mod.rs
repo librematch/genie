@@ -25,7 +25,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObstructionClass;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::pathing::tile_path::PlanRect;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, QueryRelation};
@@ -229,7 +229,7 @@ pub struct Placed {
     /// The master's id.
     pub master: MasterId,
     /// The master's `obstruction_type` (`+0x651`), whether or not the object has its record yet.
-    pub obstruction_type: ObstructionType,
+    pub obstruction_kind: ObstructionKind,
     /// The master's `can_be_built_on` (`+0x5e9`): a foundation clears such objects off its
     /// footprint.
     pub buildable_on: BuildableOn,
@@ -255,7 +255,7 @@ pub struct Placed {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
 pub struct Obstruction {
     /// The record's kind (`obstruction_type`).
-    pub kind: ObstructionType,
+    pub kind: ObstructionKind,
     /// The master's `obstruction_class`.
     pub class: ObstructionClass,
 }

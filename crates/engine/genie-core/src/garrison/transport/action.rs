@@ -33,7 +33,7 @@ use crate::objects::masters::{Master, TaskId};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::PlayerType;
-use crate::unit_ai::{ActionKind, UnitAi};
+use crate::unit_ai::{AiAction, UnitAi};
 use crate::unit_ai::{NotifyKind, alert_owner};
 use crate::world::World;
 use crate::world::parts::PartTable;
@@ -318,7 +318,7 @@ impl TransportAction {
                 unit.post_own(
                     ais,
                     NotifyKind::ACTION_FAILED,
-                    [ActionKind::Transport.value(), 0, 0],
+                    [AiAction::Transport.value(), 0, 0],
                 )?;
                 return Ok(Updated::Code(UpdateCode::FAILED));
             }

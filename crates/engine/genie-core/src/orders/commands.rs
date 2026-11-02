@@ -9,14 +9,14 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::sprite::new_sprite;
 use crate::orders::{lock_gate, set_stance};
 use crate::players::PlayerId;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::unit_ai::{Issuer, OrderPriority, UnitStance};
@@ -98,7 +98,7 @@ impl World {
         if p != player && !self.settings.cheats_enabled {
             return Ok(());
         }
-        if unit.master(self.master_tables(), p)?.kind != BUILDING {
+        if unit.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
             return Ok(());
         }
         let now = self.world_time;
@@ -167,7 +167,7 @@ impl World {
                 .parts
                 .unit_ai
                 .get(unit.id)
-                .is_some_and(|ai| ai.current_action == Some(ActionKind::AutoScout));
+                .is_some_and(|ai| ai.current_action == Some(AiAction::AutoScout));
             let order = QueuedOrder {
                 issuer: Some(Issuer::Player(p)),
                 order: if scouts {

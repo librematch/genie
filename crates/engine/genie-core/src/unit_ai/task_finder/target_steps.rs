@@ -8,9 +8,9 @@ use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::Held;
-use crate::objects::masters::ActionType;
+use crate::objects::masters::ActionKind;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::masters::action_type;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::{Master, Task};
@@ -18,7 +18,6 @@ use crate::orders::GARRISON;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Actor;
-use crate::unit_ai::task_finder::BUILDING;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::Finding;
 use crate::unit_ai::task_finder::TaskTarget;
@@ -33,14 +32,17 @@ pub(super) fn on_target<'m>(
     list: &'m Master,
     actor: &Actor<'_>,
     t: &TaskTarget<'_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> Result<Finding<'m>, GenieError> {
     if let Finding::Answer(task) = drop_off_finding(list, actor, t, filter, dip) {
         return Ok(Finding::Answer(task));
     }
     // LAB_1412795f5: building its player's foundation
-    if t.player == actor.player && t.master.kind == BUILDING && t.state == ObjectState::Foundation {
+    if t.player == actor.player
+        && t.master.kind == MasterKind::BUILDING
+        && t.state == ObjectState::Foundation
+    {
         return Ok(Finding::Answer(build_task(list, t, filter)));
     }
     if t.master.id == ids::FISH_TRAP {
@@ -72,7 +74,7 @@ pub(super) fn on_target<'m>(
 fn trade_task<'m>(
     list: &'m Master,
     t: &TaskTarget<'_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
 ) -> Option<&'m Task> {
     let trades =
         t.state < ObjectState::Dying && (t.master.id == ids::ID_45 || t.master.id == ids::MARKET);
@@ -80,7 +82,7 @@ fn trade_task<'m>(
         .then(|| {
             first(list, |task| {
                 // The trade task's action type (`0x6f`).
-                task.action_type == action_type::TRADE
+                task.action_kind == ActionKind::TRADE
                     && (task.object_id == Some(t.master.id) || task.for_class(t.master.class))
                     && wanted(filter, task)
             })
@@ -96,7 +98,7 @@ pub(super) fn drop_off_finding<'m>(
     list: &'m Master,
     actor: &Actor<'_>,
     t: &TaskTarget<'_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> Finding<'m> {
     let Held {
@@ -111,18 +113,20 @@ pub(super) fn drop_off_finding<'m>(
         && t.player == actor.player
         && dip.drops_at(t.master.id, actor)
     {
-        let farm_at_work = t.master.kind == BUILDING && t.top_action == Some(action_type::UNPACK);
+        let farm_at_work =
+            t.master.kind == MasterKind::BUILDING && t.top_action == Some(ActionKind::UNPACK);
         if let Some(task) = first(list, |task| {
-            let gathers = matches!(task.action_type, GATHER | HUNT);
+            let gathers = matches!(task.action_kind, GATHER | HUNT);
             !(farm_at_work && gathers)
                 && task.attribute_type == held_kind
-                && matches!(task.action_type, GATHER | HUNT | action_type::TRADE)
+                && matches!(task.action_kind, GATHER | HUNT | ActionKind::TRADE)
                 && wanted(filter, task)
         }) {
             return Finding::Answer(Some(task));
         }
         if filter.is_none()
-            && (t.master.kind != BUILDING || t.top_action.is_some_and(|a| a != action_type::UNPACK))
+            && (t.master.kind != MasterKind::BUILDING
+                || t.top_action.is_some_and(|a| a != ActionKind::UNPACK))
         {
             return Finding::Answer(None);
         }
@@ -138,7 +142,7 @@ pub(super) fn garrison_into<'m>(
     list: &'m Master,
     actor: &Actor<'_>,
     t: &TaskTarget<'_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> (Finding<'m>, bool) {
     let own = actor.master;
@@ -158,7 +162,7 @@ pub(super) fn garrison_into<'m>(
             || filter == Some(ENTER))
     {
         if let Some(task) = first(list, |task| {
-            task.action_type == GARRISON && task.for_class(t.master.class) && wanted(filter, task)
+            task.action_kind == GARRISON && task.for_class(t.master.class) && wanted(filter, task)
         }) {
             return (Finding::Answer(Some(task)), false);
         }
@@ -178,13 +182,13 @@ pub(super) fn repair_finding<'m>(
     list: &'m Master,
     actor: &Actor<'_>,
     t: &TaskTarget<'_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> Finding<'m> {
     let repairable = t.player == actor.player
         || t.player == PlayerId::GAIA
         || dip.allied(actor.player, t.player, true);
-    let repair_class = t.master.kind == BUILDING
+    let repair_class = t.master.kind == MasterKind::BUILDING
         || [
             class::TRANSPORT,
             class::FISHING_SHIP,
@@ -204,7 +208,7 @@ pub(super) fn repair_finding<'m>(
         let mut any = None;
         let mut by_class = None;
         for task in &list.tasks {
-            if task.action_type != REPAIR || !wanted(filter, task) {
+            if task.action_kind != REPAIR || !wanted(filter, task) {
                 continue;
             }
             if task.object_group.is_none() && task.object_id.is_none() {
@@ -236,13 +240,13 @@ pub(super) fn repair_finding<'m>(
 fn build_task<'m>(
     list: &'m Master,
     t: &TaskTarget<'_>,
-    filter: Option<ActionType>,
+    filter: Option<ActionKind>,
 ) -> Option<&'m Task> {
     let (mut by_class, mut generic) = (None, None);
     for task in list
         .tasks
         .iter()
-        .filter(|t| t.action_type == action_type::BUILD && wanted(filter, t))
+        .filter(|t| t.action_kind == ActionKind::BUILD && wanted(filter, t))
     {
         if task.object_id == Some(t.master.id) {
             return (task.work_val1.positive()).then_some(task);

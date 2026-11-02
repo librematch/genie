@@ -12,8 +12,8 @@ use crate::objects::facing::facet_of_angle;
 use crate::objects::layers::Action;
 use crate::objects::lifecycle::death_parts::forget_resource;
 use crate::objects::masters::GhostMode;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
-use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::{Outcome, Unit};
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -139,7 +139,7 @@ impl Unit {
         if ObjectState::Dying < after
             && after != before
             && !(before == ObjectState::DyingSprite && after == ObjectState::Dead)
-            && self.master(c.w.master_tables(), c.player)?.kind == BUILDING
+            && self.master(c.w.master_tables(), c.player)?.kind == MasterKind::BUILDING
         {
             let annexes = c.w.parts.building_of(self.id).annexes;
             for annex in annexes.ids() {
@@ -192,7 +192,7 @@ impl Unit {
     ) -> Result<(), GenieError> {
         c.w.parts.set_anim_speed(self.id, Speed::ZERO);
         let master = self.master(c.w.master_tables(), c.player)?;
-        if master.kind < BUILDING
+        if master.kind < MasterKind::BUILDING
             && let Some(remains) = master.death_spawns[1]
         {
             let facet =

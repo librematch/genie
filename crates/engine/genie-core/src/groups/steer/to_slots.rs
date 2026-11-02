@@ -17,7 +17,7 @@ use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
-use crate::objects::masters::master_type::ACTION;
+use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -157,7 +157,7 @@ impl World {
         u: &Unit,
         actions: &Action,
     ) -> Result<(bool, ActionState), GenieError> {
-        if u.master(self.master_tables(), p)?.kind < ACTION {
+        if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
         if let Some(e) = self.parts.unread.get(u.id) {

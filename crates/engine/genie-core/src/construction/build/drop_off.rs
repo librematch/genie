@@ -19,7 +19,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::orders::nearest_table_site;
 use crate::players::Amount;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::world::task_target_with;
@@ -190,7 +190,7 @@ impl BuildAction {
             builder.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::NO_DROP_SITE,
-                [ActionKind::Build.value(), 0, 0],
+                [AiAction::Build.value(), 0, 0],
             )?;
             return self.restart(c, builder);
         };

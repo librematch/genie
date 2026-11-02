@@ -7,7 +7,7 @@ fn building_relics_scale_its_elevation_factor() {
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             Relics::new(RelicCount::of_data(5), RelicCount::of_data(5))
         )
         .to_bits(),
@@ -17,7 +17,7 @@ fn building_relics_scale_its_elevation_factor() {
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(3), RelicCount::of_data(1)),
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(0))
         )
         .to_bits(),
@@ -27,7 +27,7 @@ fn building_relics_scale_its_elevation_factor() {
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(3), RelicCount::of_data(0)),
-            master_type::COMBAT,
+            MasterKind::COMBAT,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(0))
         )
         .to_bits(),
@@ -37,7 +37,7 @@ fn building_relics_scale_its_elevation_factor() {
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(3), RelicCount::of_data(0)),
-            BUILDING,
+            MasterKind::BUILDING,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(2))
         )
         .to_bits(),
@@ -47,7 +47,7 @@ fn building_relics_scale_its_elevation_factor() {
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
-            BUILDING,
+            MasterKind::BUILDING,
             Relics::new(RelicCount::of_data(1), RelicCount::of_data(-1))
         )
         .to_bits(),
@@ -58,7 +58,7 @@ fn building_relics_scale_its_elevation_factor() {
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1)),
-            BUILDING,
+            MasterKind::BUILDING,
             Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1))
         )
         .to_bits(),
@@ -77,12 +77,11 @@ use crate::objects::RelicCount;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::DamageAmount;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::WorkValue;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
-use crate::objects::masters::master_type;
-use crate::objects::masters::master_type::BUILDING;
 use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_of;
@@ -94,7 +93,7 @@ fn sheep() -> Victim {
     Victim {
         id: object_id(9520),
         hp: HitPoints::new(14.0),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         master_id: master_id(705),
         player: PlayerId::new(1),
@@ -118,14 +117,14 @@ fn hunter() -> Victim {
     Victim {
         id: object_id(10029),
         hp: HitPoints::new(25.0),
-        kind: master_type::COMBAT,
+        kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         master_id: master_id(592),
         player: PlayerId::new(1),
         position: Position::new(10.5, 11.0, 0.0),
         source: Attacker {
             id: object_id(10029),
-            kind: master_type::COMBAT,
+            kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             master_id: master_id(592),
             missile: None,
@@ -192,12 +191,12 @@ fn static_object_takes_ready_charge_first() {
     let tree = || Victim {
         hp: HitPoints::new(100.0),
         class: class::TREE,
-        kind: master_type::STATIC,
+        kind: MasterKind::STATIC,
         ..Victim::default()
     };
     let charging = Attacker {
-        kind: master_type::COMBAT,
-        charge_type: ChargeType::ATTACK,
+        kind: MasterKind::COMBAT,
+        charge_kind: ChargeKind::ATTACK,
         charge_target: ChargeTarget::EVERY,
         charge: Charge::new(5.0),
         max_charge: Charge::new(5.0),
@@ -208,7 +207,7 @@ fn static_object_takes_ready_charge_first() {
     assert_eq!(t.hp, HitPoints::new(100.0 - (5.0 + 3.0)));
     let mut t = tree();
     let plain = Attacker {
-        charge_type: ChargeType::NONE,
+        charge_kind: ChargeKind::NONE,
         ..charging
     };
     take_static(&mut t, &plain, &[ClassAmount::new(4, 3)], 1.0);
@@ -223,7 +222,7 @@ fn moving_object_takes_hit_as_static_one() {
     let bird = |hp: HitPoints| Victim {
         hp,
         amount: Amount::new(50.0),
-        kind: master_type::ACTION,
+        kind: MasterKind::ACTION,
         class: class::CLASS_38,
         goto_sleep: true,
         ..Victim::default()
@@ -371,7 +370,7 @@ fn hit_point_share_reads_the_powerups_and_the_master() {
     v.hp = HitPoints::new(40.0);
     assert_eq!(v.hp_share(false), 1.0);
     let mut rge = hunter();
-    rge.kind = master_type::RGE_COMBAT;
+    rge.kind = MasterKind::RGE_COMBAT;
     rge.hp = HitPoints::new(10.0);
     rge.armored.as_mut().unwrap().hp_powerup = HpPowerup {
         taken: HitPoints::new(2.0),
@@ -399,7 +398,7 @@ fn hit_point_share_reads_the_powerups_and_the_master() {
 fn bonus_damage_counts_whole_steps_of_hit_point_share() {
     let task =
         |object_group: i16, object_id: Option<MasterId>, range: Distance, lacking: i16| Task {
-            action_type: BONUS_DAMAGE,
+            action_kind: BONUS_DAMAGE,
             object_group: class_of(object_group),
             object_id,
             work_range: range,
@@ -424,14 +423,14 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
         task(3, Some(ids::ID_0), Distance::ZERO, 0),
         task(-1, Some(master_id(9)), Distance::ZERO, 0),
         Task {
-            action_type: REMOVAL_REWARD,
+            action_kind: REMOVAL_REWARD,
             ..task(-1, None, Distance::ZERO, 0)
         },
     ];
     assert_eq!(bonus_damage(&hunter, &sheep), 16.0);
     // a building of another class than 51 and 54 needs its class or master
     let mut tc = sheep.clone();
-    (tc.kind, tc.class) = (BUILDING, class::BUILDING);
+    (tc.kind, tc.class) = (MasterKind::BUILDING, class::BUILDING);
     hunter.bonus_tasks = vec![task(-1, None, Distance::ZERO, 0)];
     assert_eq!(bonus_damage(&hunter, &tc), 0.0);
     tc.class = class::CLASS_51;
@@ -484,11 +483,11 @@ fn combat_object_shows_its_attack_armor_and_range() {
     let mut far = v.clone();
     far.weapons = vec![ClassAmount::new(13, 6), ClassAmount::new(11, -2)];
     assert_eq!(shown_attack(&far, &none), DamageAmount::new(7));
-    far.kind = master_type::RGE_COMBAT;
+    far.kind = MasterKind::RGE_COMBAT;
     assert_eq!(shown_attack(&far, &none), DamageAmount::new(6));
     // the bonus against its attack's target
     v.bonus_tasks = vec![Task {
-        action_type: BONUS_DAMAGE,
+        action_kind: BONUS_DAMAGE,
         attribute_type4: Some(attribute::FOOD),
         work_val1: WorkValue::new(1.5),
         work_val2: WorkValue::new(0.5),
@@ -501,8 +500,8 @@ fn combat_object_shows_its_attack_armor_and_range() {
     assert_eq!(shown_attack(&v, &at_sheep), DamageAmount::new(4 + 3));
     v.bonus_tasks.clear();
     // a ready charge of type 1 for every target, or for its target's class group
-    (v.source.charge_type, v.source.max_charge, v.source.charge) =
-        (ChargeType::ATTACK, Charge::new(5.0), Charge::new(5.5));
+    (v.source.charge_kind, v.source.max_charge, v.source.charge) =
+        (ChargeKind::ATTACK, Charge::new(5.0), Charge::new(5.5));
     v.source.charge_target = ChargeTarget::EVERY;
     assert_eq!(shown_attack(&v, &none), DamageAmount::new(4 + 5));
     v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
@@ -510,7 +509,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     assert_eq!(shown_attack(&v, &at_sheep), DamageAmount::new(4 + 5));
     // a ready charge of type 6 shows the projectile's best fighting attack, and its range
     // the charge event
-    (v.source.charge_type, v.source.charge_target) = (ChargeType::of_data(6), ChargeTarget::EVERY);
+    (v.source.charge_kind, v.source.charge_target) = (ChargeKind::of_data(6), ChargeTarget::EVERY);
     let projectile = [
         ClassAmount::new(13, 20),
         ClassAmount::new(3, 9),
@@ -528,7 +527,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     v.source.charge = Charge::new(0.5);
     assert_eq!(shown_attack(&v, &shot), DamageAmount::new(4));
     assert_eq!(shown_range(&v, &shot), Distance::new(5.0));
-    v.kind = master_type::RGE_COMBAT;
+    v.kind = MasterKind::RGE_COMBAT;
     v.source.charge = Charge::new(1.0);
     assert_eq!(shown_range(&v, &shot), Distance::new(4.0));
     // the melee armor: its best of class 4 plus the powerup; a wall foundation none; type 50
@@ -538,7 +537,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(2)));
     (a.class, a.state) = (class::WALL, ObjectState::Foundation);
     assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(0)));
-    a.kind = master_type::RGE_COMBAT;
+    a.kind = MasterKind::RGE_COMBAT;
     a.armored.as_mut().unwrap().armors = vec![ClassAmount::new(3, 5), ClassAmount::new(11, 7)];
     assert_eq!(shown_melee_armor(&a), Ok(DamageAmount::new(7)));
     a.armored.as_mut().unwrap().armors.clear();
@@ -552,13 +551,13 @@ fn combat_object_shows_its_attack_armor_and_range() {
 #[test]
 fn range_charge_hits_target_its_class_group_names() {
     let (sheep, mut v) = (sheep(), hunter());
-    (v.source.charge_type, v.source.max_charge, v.source.charge) =
-        (ChargeType::of_data(7), Charge::new(5.0), Charge::new(1.0));
+    (v.source.charge_kind, v.source.max_charge, v.source.charge) =
+        (ChargeKind::of_data(7), Charge::new(5.0), Charge::new(1.0));
     v.source.charge_target = ChargeTarget::ALL_BUT_BUILDINGS;
     assert!(range_charge_hit(&v.source, &sheep));
     v.source.charge = Charge::new(0.5);
     assert!(!range_charge_hit(&v.source, &sheep));
-    (v.source.charge_type, v.source.charge) = (ChargeType::ATTACK, Charge::new(9.0));
+    (v.source.charge_kind, v.source.charge) = (ChargeKind::ATTACK, Charge::new(9.0));
     assert!(!range_charge_hit(&v.source, &sheep));
 }
 
@@ -583,7 +582,7 @@ fn terrain_defense_bonus_scales_the_damage() {
 #[test]
 fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
     let (mut sheep, mut hunter) = (sheep(), hunter());
-    hunter.source.charge_type = ChargeType::ATTACK;
+    hunter.source.charge_kind = ChargeKind::ATTACK;
     hunter.source.charge_target = ChargeTarget::EVERY;
     hunter.source.max_charge = Charge::new(5.0);
     hunter.source.charge = Charge::new(5.0);
@@ -622,52 +621,52 @@ fn charge_target_picks_the_class_groups() {
     // 0: everything but buildings outside classes 51 and 54
     assert!(charge_works(
         ChargeTarget::ALL_BUT_BUILDINGS,
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         class::CLASS_6,
-        master_type::COMBAT
+        MasterKind::COMBAT
     ));
     assert!(!charge_works(
         ChargeTarget::ALL_BUT_BUILDINGS,
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         class::BUILDING,
-        BUILDING
+        MasterKind::BUILDING
     ));
     assert!(charge_works(
         ChargeTarget::ALL_BUT_BUILDINGS,
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         class::CLASS_51,
-        master_type::COMBAT
+        MasterKind::COMBAT
     ));
     // bit 0 infantry (6), bit 8 buildings (3)
     assert!(charge_works(
         ChargeTarget::of_data(1),
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         class::CLASS_6,
-        master_type::COMBAT
+        MasterKind::COMBAT
     ));
     assert!(!charge_works(
         ChargeTarget::of_data(1),
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         class::CLASS_12,
-        master_type::COMBAT
+        MasterKind::COMBAT
     ));
     assert!(charge_works(
         ChargeTarget::of_data(0x100),
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         class::BUILDING,
-        BUILDING
+        MasterKind::BUILDING
     ));
     assert!(!charge_works(
         ChargeTarget::of_data(0x100),
-        ChargeType::ATTACK,
+        ChargeKind::ATTACK,
         ClassId::of_master(99),
-        master_type::COMBAT
+        MasterKind::COMBAT
     ));
     assert!(charge_works(
         ChargeTarget::of_data(0x10),
-        ChargeType::EVERY_TARGET,
+        ChargeKind::EVERY_TARGET,
         ClassId::of_master(99),
-        master_type::COMBAT
+        MasterKind::COMBAT
     ));
 }
 
@@ -675,7 +674,7 @@ fn charge_target_picks_the_class_groups() {
 #[test]
 fn shield_spends_charge_per_blocked_hit() {
     let mut sheep = sheep();
-    sheep.source.charge_type = ChargeType::MELEE_SHIELD;
+    sheep.source.charge_kind = ChargeKind::MELEE_SHIELD;
     sheep.source.charge = Charge::new(1.5);
     assert!(!shield(&mut sheep, true));
     assert!(shield(&mut sheep, false));
@@ -1003,7 +1002,7 @@ fn house() -> Victim {
     Victim {
         id: object_id(500),
         hp: HitPoints::new(550.0),
-        kind: BUILDING,
+        kind: MasterKind::BUILDING,
         class: class::BUILDING,
         master_id: ids::HOUSE,
         player: PlayerId::new(2),
@@ -1800,7 +1799,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
         blast_falloff(&attacker, &missile, &main, (1.0, d2), true),
         1.0
     );
-    main.kind = BUILDING;
+    main.kind = MasterKind::BUILDING;
     assert_eq!(
         blast_falloff(&attacker, &missile, &main, (1.0, d2), false),
         0.5

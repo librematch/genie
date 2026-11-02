@@ -17,7 +17,7 @@ use crate::movement::Speed;
 use crate::objects::IdTable;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::ObstructionType;
+use crate::objects::masters::ObstructionKind;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::pathing::tile_path::PlanRect;
 use crate::players::ByPlayer;
@@ -135,13 +135,13 @@ impl Spatial {
         let Some(p) = self.objects.get(id).copied() else {
             return false;
         };
-        let kind = p.obstruction_type;
+        let kind = p.obstruction_kind;
         if !kind.recorded() {
             return false;
         }
         if kind.marks_tiles() {
             self.unmark(&p, id);
-            if kind == ObstructionType::TYPE_1 {
+            if kind == ObstructionKind::TYPE_1 {
                 return true;
             }
         }
@@ -503,13 +503,13 @@ impl Spatial {
                 matches!(
                     kind,
                     Some(
-                        ObstructionType::TYPE_2
-                            | ObstructionType::TYPE_11
-                            | ObstructionType::TYPE_13
+                        ObstructionKind::TYPE_2
+                            | ObstructionKind::TYPE_11
+                            | ObstructionKind::TYPE_13
                     )
                 ) && !ignore.contains(&RecordId::from(id))
                     && test.meets(p.bounds())
-                    && self.visits(p, kind.unwrap_or(ObstructionType::NONE), test.query)
+                    && self.visits(p, kind.unwrap_or(ObstructionKind::NONE), test.query)
             })
     }
 

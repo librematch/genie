@@ -14,8 +14,7 @@ use genie_core::map::spatial::Spatial;
 use genie_core::map::terrain::Terrain;
 use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
-use genie_core::objects::masters::ObstructionType;
-use genie_core::objects::masters::master_type::{BUILDING, COMBAT};
+use genie_core::objects::masters::ObstructionKind;
 use genie_core::objects::masters::{MasterId, MasterKind};
 use genie_core::ownership::CaptureKind;
 use genie_core::players::PlayerId;
@@ -240,9 +239,9 @@ pub(super) fn spatial(
                     ),
                     // the object's type: the save's factory types 70 and 80, any other below
                     kind: if o.tribe_combat_object.is_some() {
-                        COMBAT
+                        MasterKind::COMBAT
                     } else if building.is_some() {
-                        BUILDING
+                        MasterKind::BUILDING
                     } else {
                         MasterKind::of_data(0)
                     },
@@ -254,8 +253,8 @@ pub(super) fn spatial(
                 .is_some_and(|b| b.desolid_flag != 0);
             let solid = m.radius.sized() && !desolid;
             let obstruction =
-                (m.obstruction_type != ObstructionType::NONE && solid).then_some(Obstruction {
-                    kind: m.obstruction_type,
+                (m.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
+                    kind: m.obstruction_kind,
                     class: m.obstruction_class,
                 });
             out.insert(
@@ -266,7 +265,7 @@ pub(super) fn spatial(
                     class: m.class,
                     player,
                     master,
-                    obstruction_type: m.obstruction_type,
+                    obstruction_kind: m.obstruction_kind,
                     buildable_on: m.buildable_on,
                     tall: 0.0 < m.radius.z(),
                     moves: 0.0 < moving_speed(o, s, section.objects()),

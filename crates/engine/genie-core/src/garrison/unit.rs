@@ -26,14 +26,13 @@ use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::action_type::DEPOSIT;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::MASTER_1808;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -45,7 +44,7 @@ use crate::pathing::zones::Zones;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
@@ -193,7 +192,7 @@ impl Unit {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
-            [ActionKind::Enter.value(), 0, 0],
+            [AiAction::Enter.value(), 0, 0],
         )?;
         for _ in 0..2 {
             self.entered(actions, c)?;
@@ -317,7 +316,7 @@ impl Unit {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
-            [ActionKind::Enter.value(), 0, 0],
+            [AiAction::Enter.value(), 0, 0],
         )
     }
 
@@ -380,7 +379,7 @@ impl Unit {
         };
         if drops_at(&c.w.drop_sites, bm.id, &actor)
             && Amount::ZERO < self.life.amount
-            && bm.kind == BUILDING
+            && bm.kind == MasterKind::BUILDING
         {
             // the building takes food for the foods a unit carries (15 to 17), the four resources
             // and the ore themselves, nothing else
@@ -406,7 +405,7 @@ impl Unit {
                 self.life.amount = Amount::ZERO;
             }
         }
-        if bm.kind == BUILDING
+        if bm.kind == MasterKind::BUILDING
             && hp <= HitPoints::new(HitPoints::of_master(bm.hit_points).get() * ENTER_HP_SHARE)
         {
             return Err(GenieError::unsupported(
@@ -416,7 +415,7 @@ impl Unit {
         if me
             .tasks
             .iter()
-            .find(|t| t.action_type == DEPOSIT)
+            .find(|t| t.action_kind == ActionKind::DEPOSIT)
             .is_some_and(|t| t.object_id == Some(bm.id))
         {
             return Err(GenieError::unsupported(
@@ -430,7 +429,7 @@ impl Unit {
         self.post_own(
             &mut c.w.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
-            [ActionKind::Enter.value(), 0, 0],
+            [AiAction::Enter.value(), 0, 0],
         )?;
         self.entered(actions, c)?;
         Ok(true)
@@ -524,7 +523,7 @@ impl Unit {
         bm: &Master,
     ) -> Result<(), GenieError> {
         let masters = c.w.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
-        let firepower = if me.kind == COMBAT {
+        let firepower = if me.kind == MasterKind::COMBAT {
             let own = c.w.masters.of(bp).unwrap_or(masters);
             let rate = attack_rate(bm, own, reload);
             share(
@@ -575,7 +574,7 @@ impl Unit {
             r.entries.get_or_insert_with(id, Entry::default)?.mask = VisionBits::NONE;
         }
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
-        if bm.kind == BUILDING {
+        if bm.kind == MasterKind::BUILDING {
             let _ = v.sight_on_los(
                 target.id(),
                 at,
@@ -619,7 +618,7 @@ impl Unit {
                 point: at.ground(),
             });
         }
-        if bm.kind == BUILDING
+        if bm.kind == MasterKind::BUILDING
             && state == ObjectState::Alive
             && bm
                 .building

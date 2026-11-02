@@ -5,7 +5,8 @@ use crate::GenieError;
 use crate::math::fmath::below_or_unordered;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
-use crate::objects::masters::{master_type, player_master};
+use crate::objects::masters::MasterKind;
+use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -94,7 +95,7 @@ impl World {
                 .map(|(_, u)| u.life.master_id)
                 .and_then(|m| player_master(&self.masters, p, m))
                 .map(|m| m.kind);
-            if matches!(kind, Some(master_type::COMBAT | master_type::BUILDING)) {
+            if matches!(kind, Some(MasterKind::COMBAT | MasterKind::BUILDING)) {
                 self.garrison_volleys(p, id, after)?;
             }
         }
@@ -226,7 +227,7 @@ impl World {
             let Some((q, u)) = self.object(id) else {
                 continue;
             };
-            if u.master(self.master_tables(), q)?.kind < master_type::ACTION {
+            if u.master(self.master_tables(), q)?.kind < MasterKind::ACTION {
                 continue;
             }
             let held = u.life.amount;

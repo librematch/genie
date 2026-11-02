@@ -6,7 +6,7 @@ use crate::math::fmath::below_or_unordered;
 use crate::objects::ListIndex;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
-use crate::objects::masters::action_type;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::player_master;
 use crate::orders::NO_QUEUE;
 use crate::players::Amount;
@@ -19,8 +19,8 @@ use crate::production::{
 };
 use crate::production::{NO_COSTS, QueueLength, refund_master};
 use crate::technology::ResearchState;
-use crate::technology::{TechType, factors};
-use crate::unit_ai::ActionKind;
+use crate::technology::{TechKind, factors};
+use crate::unit_ai::AiAction;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::world::PlayState;
@@ -102,11 +102,11 @@ impl World {
                 .is_some_and(|k| {
                     matches!(
                         k,
-                        action_type::MAKE_OBJECT
-                            | action_type::MAKE_TECH
-                            | action_type::ACTION_123
-                            | action_type::PACK
-                            | action_type::UNPACK
+                        ActionKind::MAKE_OBJECT
+                            | ActionKind::MAKE_TECH
+                            | ActionKind::ACTION_123
+                            | ActionKind::PACK
+                            | ActionKind::UNPACK
                     )
                 });
         if let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id) {
@@ -171,7 +171,7 @@ impl World {
                     return Ok(false);
                 }
                 if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, i)?.id) {
-                    ai.set_action(Some(ActionKind::Make));
+                    ai.set_action(Some(AiAction::Make));
                 }
                 Making::Unit(MakeObj::for_entry(&first))
             } else {
@@ -194,7 +194,7 @@ impl World {
             && self
                 .techs
                 .get(tech.index())
-                .is_some_and(|d| d.kind == TechType::SHARED)
+                .is_some_and(|d| d.kind == TechKind::SHARED)
             && tech.index() < self.players.player(p)?.techs.len()
             && let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id)
         {
@@ -413,7 +413,7 @@ impl World {
                 Notify::own(
                     id,
                     NotifyKind::ACTION_COMPLETED,
-                    [ActionKind::Make.value(), 0, 0],
+                    [AiAction::Make.value(), 0, 0],
                 ),
                 state,
             )?;

@@ -10,8 +10,8 @@ use crate::objects::actions::Action;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::{Action as LayersAction, Building};
 use crate::objects::lifecycle::Class;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::masters::master_type::ACTION;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit, loses_actions};
@@ -305,7 +305,7 @@ impl Unit {
     /// more where it stands, moving or not.
     pub(crate) fn refresh_pathing(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let m = self.master(c.w.master_tables(), c.player)?;
-        if ACTION <= m.kind
+        if MasterKind::ACTION <= m.kind
             && let Some(p) = c.w.spatial.get(self.id).copied()
         {
             let moving = c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving);

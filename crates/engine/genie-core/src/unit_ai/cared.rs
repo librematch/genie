@@ -14,7 +14,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::class;
 use crate::players::PlayerType;
-use crate::unit_ai::ActionKind;
+use crate::unit_ai::AiAction;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::{
     BOAR_AI, FISHING_AI, HUNTED_SIGHT_GROWTH, LION_AI, LIVESTOCK_AI, PREDATOR_AI, PRIEST_AI,
@@ -233,13 +233,13 @@ pub(crate) fn search_area(
 
 /// The action values that need a live target (the target block's mask `0x4002080d` over the
 /// value − `0x259`).
-pub(super) const LIVE_TARGET_ACTIONS: [ActionKind; 6] = [
-    ActionKind::Defend,
-    ActionKind::Heal,
-    ActionKind::Convert,
-    ActionKind::Follow,
-    ActionKind::Repair,
-    ActionKind::OnTarget,
+pub(super) const LIVE_TARGET_ACTIONS: [AiAction; 6] = [
+    AiAction::Defend,
+    AiAction::Heal,
+    AiAction::Convert,
+    AiAction::Follow,
+    AiAction::Repair,
+    AiAction::OnTarget,
 ];
 
 /// The radius of the search `bestUnitToAttack` runs (`FUN_140c63e20`): the larger of the unit's

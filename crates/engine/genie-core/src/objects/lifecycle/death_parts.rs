@@ -14,13 +14,12 @@ use crate::objects::layers::Combat;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
+use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::class;
 use crate::objects::masters::ids::CASTLE;
 use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::ids::WONDER;
-use crate::objects::masters::master_type::BUILDING;
-use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::{OwnerMasters, cost_entries};
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
@@ -119,14 +118,14 @@ pub(crate) fn combat_dies(
         return Ok(());
     }
     let desolid = layer.construction.is_some_and(|c| c.desolid);
-    if master.kind < BUILDING || (!desolid && Distance::ZERO < master.height) {
+    if master.kind < MasterKind::BUILDING || (!desolid && Distance::ZERO < master.height) {
         pathing.removed(u.id);
         spatial.drop_record(u.id);
     }
-    if COMBAT <= master.kind {
+    if MasterKind::COMBAT <= master.kind {
         spatial.set_tall(u.id, false);
     }
-    if master.kind == BUILDING
+    if master.kind == MasterKind::BUILDING
         && layer.annex_of.is_none()
         && u.life.inside.is_none()
         && let Some(v) = spatial.sight.as_mut()
@@ -153,7 +152,7 @@ pub(crate) fn refund_of(
             cost += amount.as_f32();
         }
     }
-    if master.kind != BUILDING {
+    if master.kind != MasterKind::BUILDING {
         return vec![
             (attribute::TOTAL_VALUE, Amount::new(cost)),
             (attribute::UNITS_VALUE, Amount::new(cost)),

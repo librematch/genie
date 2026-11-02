@@ -122,7 +122,7 @@ impl World {
         let mut kinds = Vec::new();
         let mut cart_class = None;
         for t in &master.tasks {
-            if t.action_type == CART_TASK {
+            if t.action_kind == CART_TASK {
                 cart_class = t.object_group;
             }
             let kind = match cart_class {
