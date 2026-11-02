@@ -86,7 +86,7 @@
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::large_enum_variant": {
-  "crates/engine/genie-core/src/objects/layers/mod.rs": 1
+  "crates/engine/genie-core/src/objects/layers/motion.rs": 1
  },
  "clippy::literal_string_with_formatting_args": {
   "Cargo.toml": 1

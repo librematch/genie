@@ -22,12 +22,16 @@ use crate::world::step::Step;
 const BELOW_HEAD: &str = "an action below the head of the list (its idle update, FUN_140a78470)";
 
 impl Unit {
-    pub(crate) fn update(&mut self, c: &mut Step<'_>) -> Result<Outcome, GenieError> {
-        let Some(leaves) = self.update_to_actions(c)? else {
+    pub(crate) fn update(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<Outcome, GenieError> {
+        let Some(leaves) = self.update_to_actions(actions, c)? else {
             return Ok(Outcome::Sleep);
         };
-        let captured = self.update_actions(c)?;
-        self.ai_part(c, (captured, leaves))
+        let captured = self.update_actions(actions, c)?;
+        self.ai_part(actions, c, (captured, leaves))
     }
 
     /// `RGE_Static_Object::update` and the combat object's steps before the actions: the death
@@ -37,9 +41,10 @@ impl Unit {
     /// animation and the actions past the unit's life.
     pub(crate) fn update_to_actions(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
     ) -> Result<Option<Outcome>, GenieError> {
-        self.death_blast(c)?;
+        self.death_blast(actions, c)?;
         if self.go_to_sleep(
             c.w.parts.mover_of(self.id),
             c.w.parts.unit_ai.contains(self.id),
@@ -48,17 +53,17 @@ impl Unit {
         }
         self.take_sprite_facets(c.w.parts.mover_mut(self.id));
         self.let_removed_links_go(c)?;
-        self.gate_update(c)?;
-        self.complete_on_update(c)?;
+        self.gate_update(actions, c)?;
+        self.complete_on_update(actions, c)?;
         self.building_seconds(c)?;
         // a new object's combat layer (none in the table) has no timer to run down
         if let Some(combat) = c.w.parts.combat.get_mut(self.id) {
             crate::combat::attack::run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
         }
-        self.motion_step(c)?;
-        let leaves = self.life_step(c)?;
+        self.motion_step(actions, c)?;
+        let leaves = self.life_step(actions, c)?;
         self.animate(c);
-        self.actions_past_life(c)?;
+        self.actions_past_life(actions, c)?;
         Ok(Some(leaves))
     }
 
@@ -69,16 +74,17 @@ impl Unit {
     /// follows the actions; the Artifact's capture, which the unit AI's part reads.
     pub(crate) fn update_actions(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
     ) -> Result<Option<crate::ownership::capture::Captured>, GenieError> {
-        let started = self.start_default_task(c)?;
+        let started = self.start_default_task(actions, c)?;
         let captured = if started {
             None
         } else if self.life.inside.is_some() {
-            self.inside_update(c)?;
+            self.inside_update(actions, c)?;
             None
         } else {
-            self.update_head(c)?
+            self.update_head(actions, c)?
         };
         self.after_actions(c)?;
         Ok(captured)
@@ -89,12 +95,13 @@ impl Unit {
     /// one.
     fn update_head(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
     ) -> Result<Option<crate::ownership::capture::Captured>, GenieError> {
-        let me = self.me();
+        let me = self.me(actions);
         let mut captured = None;
-        let code = self.head_part(c, me, &mut captured)?;
-        self.end_head_update(c, code)?;
+        let code = self.head_part(actions, c, me, &mut captured)?;
+        self.end_head_update(actions, c, code)?;
         Ok(captured)
     }
 
@@ -102,34 +109,35 @@ impl Unit {
     /// `captured`.
     fn head_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         captured: &mut Option<crate::ownership::capture::Captured>,
     ) -> Result<HeadCode, GenieError> {
-        match self.actions.list.head() {
+        match actions.list.head() {
             None => Ok(HeadCode::Keeps),
-            Some(Action::Artifact(_)) => self.artifact_part(c, me).map(|found| {
+            Some(Action::Artifact(_)) => self.artifact_part(actions, c, me).map(|found| {
                 *captured = found;
                 HeadCode::Keeps
             }),
-            Some(Action::Build(_)) => self.build_part(c, me),
-            Some(Action::Repair(_)) => self.repair_part(c, me),
-            Some(Action::Enter(_)) => self.enter_part(c, me),
-            Some(Action::Transport(_)) => self.transport_update(c, me),
-            Some(Action::WaitSolidify(_)) => Ok(self.wait_solidify_part(
+            Some(Action::Build(_)) => self.build_part(actions, c, me),
+            Some(Action::Repair(_)) => self.repair_part(actions, c, me),
+            Some(Action::Enter(_)) => self.enter_part(actions, c, me),
+            Some(Action::Transport(_)) => self.transport_update(actions, c, me),
+            Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                 OthersRef::of(&c.w.players, &c.w.index, c.player)?,
                 &c.w.parts.building,
             )),
-            Some(Action::Missile(_)) => self.fly(c).map(|()| HeadCode::Keeps),
-            Some(Action::MoveTo(_)) => self.move_to_part(c, me),
-            Some(Action::Explore(_)) => self.explore_part(c, me).map(|()| HeadCode::Keeps),
-            Some(Action::Fly(_)) => self.fly_part(c, me).map(|()| HeadCode::Keeps),
-            Some(Action::Make(_)) => self.make_part(c),
-            Some(Action::Gather(_)) => self.gather_update(c, me),
-            Some(Action::Hunt(_)) => self.hunter_update(c, me),
+            Some(Action::Missile(_)) => self.fly(actions, c).map(|()| HeadCode::Keeps),
+            Some(Action::MoveTo(_)) => self.move_to_part(actions, c, me),
+            Some(Action::Explore(_)) => self.explore_part(actions, c, me).map(|()| HeadCode::Keeps),
+            Some(Action::Fly(_)) => self.fly_part(actions, c, me).map(|()| HeadCode::Keeps),
+            Some(Action::Make(_)) => self.make_part(actions, c),
+            Some(Action::Gather(_)) => self.gather_update(actions, c, me),
+            Some(Action::Hunt(_)) => self.hunter_update(actions, c, me),
             Some(Action::Attack(_)) => {
-                let own = self.own_victim(c)?;
-                self.attack_part(c, me, own)
+                let own = self.own_victim(actions, c)?;
+                self.attack_part(actions, c, me, own)
             }
         }
     }
@@ -143,41 +151,32 @@ impl Unit {
     /// An action below the head, and the deletion's.
     pub(crate) fn end_head_update(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         code: HeadCode,
     ) -> Result<(), GenieError> {
-        if self.actions.list.iter().nth(1).is_some() {
+        if actions.list.iter().nth(1).is_some() {
             return Err(GenieError::unreachable(BELOW_HEAD));
         }
         if code == HeadCode::Deletes {
-            self.delete_own_head(c)?;
+            self.delete_own_head(actions, c)?;
         }
         Ok(())
-    }
-
-    /// The wait for a foundation in its update (`FUN_140ae8b70`) on its build points, none when
-    /// the world does not hold it; its 1 deletes it (its destructor lets no target go).
-    fn wait_solidify_part(
-        &self,
-        others: OthersRef<'_>,
-        buildings: &crate::world::parts::PartTable<crate::objects::layers::Building>,
-    ) -> HeadCode {
-        let ended = self
-            .actions
-            .list
-            .wait_solidify()
-            .is_some_and(|w| w.update(wait_progress(w.target, others, buildings)));
-        HeadCode::ended(ended)
     }
 
     /// The Hunt's update (`0x140ac7a00`): its targets' check ([`Unit::hunt_targets`]), then its
     /// part by state ([`Unit::hunt_part`]) with the hunter as a combat object, which its hits
     /// read and change.
-    fn hunter_update(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        self.hunt_targets(c)?;
-        let mut own = self.own_victim(c)?;
-        let tree_lost = self.tree_lost(c);
-        self.hunt_part(c, me, &mut own, tree_lost)
+    fn hunter_update(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<HeadCode, GenieError> {
+        self.hunt_targets(actions, c)?;
+        let mut own = self.own_victim(actions, c)?;
+        let tree_lost = self.tree_lost(actions, c);
+        self.hunt_part(actions, c, me, &mut own, tree_lost)
     }
 
     /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops
@@ -239,9 +238,12 @@ impl Unit {
     /// `RGE_Action_Object::update` (`0x14106ac90`) after the moving update: an object past state
     /// 2 (the Wonder past state 5) loses its action list (`FUN_140a98620`). An alive object with
     /// an action the slice does not model fails here.
-    pub(crate) fn actions_past_life(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        if let Some(e) = self
-            .actions
+    pub(crate) fn actions_past_life(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
+        if let Some(e) = actions
             .unmodelled_action
             .clone()
             .filter(|_| self.life.state == ObjectState::Alive)
@@ -252,6 +254,7 @@ impl Unit {
             let by = self.releaser(c)?;
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.clear_own_actions(
+                actions,
                 c.w.parts.motion.layer_mut(self.id),
                 &mut releases,
                 &mut leaves,
@@ -303,5 +306,21 @@ impl Unit {
             c.w.pathing.refresh(self.id, &p, moving, m.outline);
         }
         Ok(())
+    }
+}
+
+impl crate::objects::layers::Action {
+    /// The wait for a foundation in its update (`FUN_140ae8b70`) on its build points, none when
+    /// the world does not hold it; its 1 deletes it (its destructor lets no target go).
+    fn wait_solidify_part(
+        &self,
+        others: OthersRef<'_>,
+        buildings: &crate::world::parts::PartTable<crate::objects::layers::Building>,
+    ) -> HeadCode {
+        let ended = self
+            .list
+            .wait_solidify()
+            .is_some_and(|w| w.update(wait_progress(w.target, others, buildings)));
+        HeadCode::ended(ended)
     }
 }

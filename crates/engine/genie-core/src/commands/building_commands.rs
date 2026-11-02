@@ -402,8 +402,13 @@ impl World {
                 "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)",
             ));
         }
-        let top = building.top_action_kind();
-        if building.actions.unmodelled_action.is_some() {
+        let top = self.parts.actions_of(building.id).top_action_kind();
+        if self
+            .parts
+            .actions_of(building.id)
+            .unmodelled_action
+            .is_some()
+        {
             return Err(GenieError::unsupported(
                 "RESEARCH at a building with an unmodelled action",
             ));

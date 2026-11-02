@@ -543,10 +543,15 @@ impl Unit {
     /// it had go, `FUN_140a98620`, and the new one starts, `FUN_140a977e0`). A `MoveTo` of the
     /// Explore that goes stops the unit (its teardown, slot 0x5d0); other actions it would
     /// replace are not modelled.
-    pub(crate) fn explore_to(&mut self, point: Point, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn explore_to(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        point: Point,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let at = Position::new(point.x(), point.y(), self.position().z());
         let walk = self.explore_move(c);
-        let owner = if let Some(e) = self.actions.list.explore_mut() {
+        let owner = if let Some(e) = actions.list.explore_mut() {
             let walked = e.move_to.is_some();
             let owner = e.take_point(at, &walk)?;
             if walked {
@@ -554,13 +559,13 @@ impl Unit {
             }
             owner
         } else {
-            if self.top_action().is_some() || self.actions.unmodelled_action.is_some() {
+            if actions.top_action().is_some() || actions.unmodelled_action.is_some() {
                 return Err(GenieError::unsupported(
                     "an Explore replacing another action",
                 ));
             }
             let (e, owner) = ExploreAction::new(at, &walk)?;
-            self.actions.list.set_explore(Some(e));
+            actions.list.set_explore(Some(e));
             owner
         };
         self.explore_owner(owner, c)

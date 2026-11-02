@@ -837,8 +837,10 @@ fn keshik(t: &mut World) {
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         same_owner: false,
     };
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .set_attack(Some(attack));
     t.players[1].attributes[213] = Amount::new(0.5);
@@ -865,8 +867,10 @@ fn a_keshik_makes_gold_while_it_fights_a_target_of_its_task_s_class() {
     assert_eq!(t.players[1].attributes[169], Amount::new(given));
     assert_eq!(t.players[1].generated[3], Amount::ZERO);
     // in another state, nothing
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .attack_mut()
         .unwrap()

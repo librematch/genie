@@ -497,10 +497,7 @@ mod tests {
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), player],
         )
-        .with_motions([(
-            object_id(11),
-            crate::objects::layers::MotionLayer::Moving(mover),
-        )]);
+        .with_motions([(object_id(11), crate::objects::layers::Motion::Moving(mover))]);
         let master = |id: MasterId, category: u8| Master {
             id,
             kind: master_type::COMBAT,

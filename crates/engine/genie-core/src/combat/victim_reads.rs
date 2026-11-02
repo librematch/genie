@@ -6,6 +6,7 @@ use crate::combat::victims::{is_trebuchet, paid_cost};
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::objects::HitPoints;
+use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
 use crate::objects::masters::ActionType;
@@ -23,14 +24,14 @@ use crate::unit_ai::task_finder::Diplomacy;
 /// `spatial` holds it as unknown, or not at all), its place in its tile's list and a building's
 /// annexes (the world's links).
 pub(crate) fn victim_in(
-    (u, unit_ai, building, combat): (&Unit, bool, &Building, &Combat),
+    (u, unit_ai, building, combat, actions): (&Unit, bool, &Building, &Combat, &Action),
     (p, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: crate::world::Mode680,
 ) -> Victim {
     let mut v = victim_of(
-        (u, unit_ai, building, combat),
+        (u, unit_ai, building, combat, actions),
         master,
         attributes,
         p,
@@ -47,13 +48,14 @@ pub(crate) fn victim_in(
 }
 
 /// What a hit reads of the object `u` of player `p` ([`Victim`]), whether it has a unit AI
-/// (`unit_ai`), its building layer (`building`) and its combat layer (`combat`): its master's values and its own, its
+/// (`unit_ai`), its building layer (`building`), its combat layer (`combat`) and its action
+/// layer (`actions`): its master's values and its own, its
 /// player's elevation attributes, the terrain defense of its tile (`terrain`, the map's;
 /// 1 for an object inside another, which has no tile) and the game's setting `mode_680`. Its
 /// relations to an attacker (`allied`) and whether its place is a guess (`uncertain`) are the
 /// caller's. The slice holds neither its unit AI's alert mode and attackers nor its facing.
 pub(crate) fn victim_of(
-    (u, unit_ai, building, combat): (&Unit, bool, &Building, &Combat),
+    (u, unit_ai, building, combat, actions): (&Unit, bool, &Building, &Combat, &Action),
     master: &Master,
     attributes: &[Amount],
     p: PlayerId,
@@ -162,7 +164,7 @@ pub(crate) fn victim_of(
                 t.action_type == crate::combat::abilities::REMOVAL_REWARD
                     && 1e-7 < t.work_val1.get()
             }),
-            busy: u.top_action_kind().is_some() || u.actions.unmodelled_action.is_some(),
+            busy: actions.top_action_kind().is_some() || actions.unmodelled_action.is_some(),
             unit_ai,
             alert_idle: None,
             facing: None,

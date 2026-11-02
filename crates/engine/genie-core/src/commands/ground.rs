@@ -68,7 +68,7 @@ impl World {
             let master = u.master(self.master_tables(), owner)?;
             if master.kind < MOVING
                 || u.life.state != ObjectState::Alive
-                || u.top_target() == Some(foundation.id())
+                || self.parts.actions_of(u.id).top_target() == Some(foundation.id())
             {
                 continue;
             }

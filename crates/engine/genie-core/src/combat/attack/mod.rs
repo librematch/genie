@@ -464,7 +464,7 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat, motions),
+                (&parts.building, &parts.combat, &parts.actions, motions),
             ),
             motion: MotionMut::new(motion),
         }

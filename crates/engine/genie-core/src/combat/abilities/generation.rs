@@ -133,15 +133,20 @@ impl World {
         let top = if short_cut || master.kind != COMBAT {
             None
         } else {
-            if let Some(e) = unit.actions.unmodelled_action.clone() {
+            if let Some(e) = self.parts.actions_of(unit.id).unmodelled_action.clone() {
                 return Err(e);
             }
-            match unit.top_action() {
+            match self.parts.actions_of(unit.id).top_action() {
                 Some(a) => {
                     // FUN_140a78450: an id below 0 names no object; the target only matters
                     // to an action of the test's at work
                     let works = WORKING_ACTIONS.contains(&a.kind) && a.state == WORKING;
-                    let target = match unit.top_target().filter(|t| works && !t.is_recyclable()) {
+                    let target = match self
+                        .parts
+                        .actions_of(unit.id)
+                        .top_target()
+                        .filter(|t| works && !t.is_recyclable())
+                    {
                         Some(t) => self.work_target(t)?,
                         None => None,
                     };

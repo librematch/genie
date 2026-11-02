@@ -186,6 +186,8 @@ pub(crate) struct UnitView<'u, 's> {
     pub(crate) c: &'u mut Step<'s>,
     /// The unit, without its unit AI.
     pub(crate) unit: &'u mut Unit,
+    /// The unit's action layer, out of the table with it.
+    pub(crate) actions: &'u mut crate::objects::layers::Action,
     /// What the attack check of a search reads of the unit.
     pub(crate) attacker: crate::unit_ai::Attacker,
     /// The owner, as the AI runs (a captured unit's new one): its diplomacy, attributes and

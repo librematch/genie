@@ -88,6 +88,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         f: &Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
@@ -115,7 +116,9 @@ impl HuntAction {
                             let (player, sheep) = (c.player, self.target);
                             // the hunt faces its livestock target here
                             if let Some(sheep) = sheep {
-                                c.lend(unit, |w| w.lead_herd(player, sheep, site))?;
+                                c.lend((&mut *unit, &mut *actions), |w| {
+                                    w.lead_herd(player, sheep, site)
+                                })?;
                             }
                         }
                         self.lead.moved = true;

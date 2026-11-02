@@ -295,6 +295,10 @@ impl World {
             id,
             crate::world::parts::Part::Motion(g.parts.motion.clone().map(Box::new)),
         )?;
+        self.set_part(
+            id,
+            crate::world::parts::Part::Actions(Box::new(g.parts.actions.clone())),
+        )?;
         let unit = &self.players.live(p, i)?;
         let mut forced = g.unit.clone();
         keep_unsaved(unit, &mut forced);
@@ -539,7 +543,7 @@ mod tests {
         game.players[1][0].parts.town_bell.flag = true;
         let mut walker = crate::gathering::hunt::tests::walker();
         walker.waiting = 3;
-        let motion = crate::objects::layers::MotionLayer::Moving(walker);
+        let motion = crate::objects::layers::Motion::Moving(walker);
         game.players[1][0].parts.motion = Some(motion.clone());
         let notes = t.force(&game);
         assert!(notes.is_empty(), "{notes:?}");

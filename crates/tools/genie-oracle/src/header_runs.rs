@@ -6,7 +6,6 @@ use crate::{Decoder, Error, Frame, frames, hunted_origins, listed, player_totals
 use genie_core::GenieError;
 use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
-use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 use genie_core::production::Production;
 use genie_core::world::Tick;
@@ -159,22 +158,22 @@ pub(super) fn lane_block(
             amount_held: unit.life.amount,
             position: unit.position(),
             retarget_timer: parts.unit_ai.get(unit.id).map(|ai| ai.retarget_timer),
-            top_action: checkpoint_action(unit, parts.production.get(unit.id)),
+            top_action: checkpoint_action(parts.actions_of(unit.id), parts.production.get(unit.id)),
         })
         .collect();
     player_block(&state)
 }
 
-/// What word 9 reads of a unit's actions: its top action's type (slot 166), and its top
+/// What word 9 reads of a unit's action layer `actions`: its top action's type (slot 166), and its top
 /// action's state (slot 86), but a building's (`TRIBE_Building_Object::actionState`,
 /// `0x1411cb7e0`) prefers the state of its production list's action (`+0xbf8`): a town centre
 /// that attacks while it trains counts its Attack's type with its make action's state.
 pub(super) fn checkpoint_action(
-    unit: &Unit,
+    actions: &genie_core::objects::layers::Action,
     production: Option<&Production>,
 ) -> Option<ActionTerm> {
     let making = production.and_then(|p| p.action).map(|a| a.state());
-    match (top_action(unit), making) {
+    match (top_action(actions), making) {
         (Some(top), Some(state)) => Some(ActionTerm {
             kind: Some(top.kind),
             state,
@@ -184,9 +183,9 @@ pub(super) fn checkpoint_action(
     }
 }
 
-/// A unit's top action as the slice models it, type and state.
-pub(super) fn top_action(unit: &Unit) -> Option<TopAction> {
-    unit.top_action()
+/// An object's top action as the slice models it, type and state, from its action layer.
+pub(super) fn top_action(actions: &genie_core::objects::layers::Action) -> Option<TopAction> {
+    actions.top_action()
 }
 
 /// One live object's word-9 terms in the slice after a number of ticks: its id, the top action's
@@ -229,12 +228,18 @@ pub fn word9_terms(
         .iter()
         .map(|unit| Word9Terms {
             id: unit.id.get().cast_unsigned(),
-            action: unit
-                .actions
+            action: turns
+                .parts
+                .actions_of(unit.id)
                 .list
                 .artifact()
                 .map_or(-1, |_| i32::from(ARTIFACT_TYPE.get())),
-            state: unit.actions.list.artifact().map_or(0, |a| a.state.get()),
+            state: turns
+                .parts
+                .actions_of(unit.id)
+                .list
+                .artifact()
+                .map_or(0, |a| a.state.get()),
             retarget: ais
                 .get(unit.id)
                 .map_or(0, |ai| ai.retarget_timer.get() as i32),

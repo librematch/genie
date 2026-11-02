@@ -100,7 +100,7 @@ impl World {
                 .unit_ai
                 .get(unit.id)
                 .is_some_and(|ai| ai.orders.is_empty());
-            if !idle || !unit.interruptible()? {
+            if !idle || !self.parts.actions_of(unit.id).interruptible()? {
                 i = i.next();
                 continue;
             }
@@ -214,7 +214,7 @@ impl World {
             my_pasture: unit.my_pasture,
             min_state: ObjectState::Alive,
         };
-        let me_walk = unit.me();
+        let me_walk = unit.me(self.parts.actions_of(unit.id));
         Ok((seeker, me_walk))
     }
 
@@ -250,6 +250,7 @@ impl World {
             (
                 &self.parts.building,
                 &self.parts.combat,
+                &self.parts.actions,
                 self.parts.motion.unlent(),
             ),
         );

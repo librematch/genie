@@ -412,30 +412,28 @@ impl World {
             pasture: None,
             my_pasture: None,
             sprite: Some(sprite),
-            actions: crate::objects::layers::ActionLayer {
+            ..Unit::default()
+        };
+        let parts = ObjectParts {
+            actions: crate::objects::layers::Action {
                 // livestock's default task, the Artifact, starts once its action list is empty
                 default_artifact: made
                     .default_task()
                     .is_some_and(|t| t.action_type == crate::ownership::artifact::ARTIFACT_TYPE),
                 ..Default::default()
             },
-            ..Unit::default()
-        };
-        let parts = ObjectParts {
             unit_ai: ai,
             combat,
             // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
             // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            motion: Some(crate::objects::layers::MotionLayer::Moving(
-                Mover::new_object(
-                    moving,
-                    Some(&standing),
-                    position,
-                    self.world_time,
-                    angle,
-                    Some(facets),
-                ),
-            )),
+            motion: Some(crate::objects::layers::Motion::Moving(Mover::new_object(
+                moving,
+                Some(&standing),
+                position,
+                self.world_time,
+                angle,
+                Some(facets),
+            ))),
             ..ObjectParts::default()
         };
         let idx = self.push_live(p, Object { unit, parts })?;

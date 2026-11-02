@@ -169,7 +169,9 @@ impl UnitView<'_, '_> {
             switch: switch.map(|m| m.id),
         };
         self.c
-            .lend_at(self.unit, |w, p, i| w.wait_for_foundation(p, i, wait))?;
+            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
+                w.wait_for_foundation(p, i, wait)
+            })?;
         Ok(true)
     }
 }

@@ -67,7 +67,7 @@ impl World {
             .ok_or(crate::construction::build::NOT_HELD)?;
         let to = crate::movement::move_to::WalkTo { at, ..to };
         let unit = self.players.live_mut(player, idx)?;
-        let (targets, gone) = match unit.actions.list.artifact_mut() {
+        let (targets, gone) = match self.parts.actions_mut(unit.id)?.list.artifact_mut() {
             Some(a) => a.take_object(to, (to_building, to_town_centre), &reads)?,
             None => Default::default(),
         };
@@ -152,7 +152,7 @@ impl World {
                     if q != p
                         || u.life.state != ObjectState::Alive
                         || u.master(self.master_tables(), q)?.class != class::LIVESTOCK
-                        || !u.top_action_idle()?
+                        || !self.parts.actions_of(u.id).top_action_idle()?
                         || listed.contains(&id)
                     {
                         continue;
@@ -265,7 +265,7 @@ impl World {
             {
                 continue;
             }
-            if unit.actions.unmodelled_action.is_some() {
+            if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
                 return Err(GenieError::unsupported(
                     "a UNIT_ORDER drop-off of an action not held",
                 ));
@@ -289,20 +289,27 @@ impl World {
         (asks, way_back): (bool, bool),
     ) -> Result<Option<DropOffAsk>, GenieError> {
         let unit = self.players.live(p, idx)?;
-        let top = if asks { unit.top_action_kind() } else { None };
+        let top = if asks {
+            self.parts.actions_of(unit.id).top_action_kind()
+        } else {
+            None
+        };
         let found = match top {
-            Some(crate::gathering::gather::GATHER) => unit
-                .actions
+            Some(crate::gathering::gather::GATHER) => self
+                .parts
+                .actions_of(unit.id)
                 .list
                 .gather()
                 .map(|g| (DropOffBy::Gather, g.target, g.point, g.task.resource)),
-            Some(action_type::BUILD) => unit
-                .actions
+            Some(action_type::BUILD) => self
+                .parts
+                .actions_of(unit.id)
                 .list
                 .build()
                 .map(|b| (DropOffBy::Build, b.target, b.point, b.task.resource)),
-            Some(HUNT) => unit
-                .actions
+            Some(HUNT) => self
+                .parts
+                .actions_of(unit.id)
                 .list
                 .hunt()
                 .map(|h| (DropOffBy::Hunt, h.target, h.point, h.task.resource)),
@@ -361,7 +368,9 @@ impl World {
         idx: ListIndex,
         by: DropOffBy,
     ) -> Result<(), GenieError> {
-        let mut unit = self.take_out(p, idx)?;
+        let unit = self.take_out(p, idx)?;
+        // its action layer goes out of the table with it, as the updating object's
+        let mut actions = self.parts.take_actions(unit.id);
         let player = &self.players.player(p)?;
         let (mover, by_id) = self
             .parts
@@ -378,10 +387,11 @@ impl World {
         };
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         let result = if by == DropOffBy::Hunt {
-            unit.drop_off_in(mover, world, others, &self.graphics, by_id)
+            unit.drop_off_in(&mut actions, mover, world, others, &self.graphics, by_id)
         } else {
-            unit.gather_drop_off_in(mover, world, others, &self.graphics, by_id)
+            unit.gather_drop_off_in(&mut actions, mover, world, others, &self.graphics, by_id)
         };
+        self.parts.put_actions(unit.id, actions);
         let idx = self.put_back_own(p, unit)?;
         if let Some(site) = result? {
             self.take(site, self.releaser(p, idx)?)?;

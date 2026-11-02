@@ -40,6 +40,7 @@ impl Unit {
     /// object, taken).
     pub(crate) fn hunt_strike(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         own: &mut Option<Victim>,
@@ -50,7 +51,7 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.masters.of(c.player),
         )?;
-        let mut hunt = *self.actions.list.hunt().ok_or(NO_HUNT)?;
+        let mut hunt = *actions.list.hunt().ok_or(NO_HUNT)?;
         let victim = hunt_victim(c, &hunt)?;
         let own = own.take().ok_or(crate::world::HUNTER_MASTER)?;
         let herd = self.herd_for(
@@ -63,20 +64,21 @@ impl Unit {
         let r = self.hunt_reads(c, master, &hunt, herd, tree_lost)?;
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
-        let next = hunt.update(c, self, me, &mut f, &r);
-        if let Some(h) = self.actions.list.hunt_mut() {
+        let next = hunt.update(c, self, actions, me, &mut f, &r);
+        if let Some(h) = actions.list.hunt_mut() {
             *h = hunt;
         }
         let next = next?;
         // the retaliation's kill of the unit itself, which follows its step
         if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
-            file_kill(c, self, KillLeft::own(self.id, k))?;
+            let own = KillLeft::own(self.id, k);
+            file_kill(c, (self, actions), own)?;
         }
         match next {
             HuntNext::Stay => Ok(()),
-            HuntNext::Drop => self.hunt_drop_off(c),
-            HuntNext::Search => self.hunt_set_search(c),
-            HuntNext::AttackFailed => self.hunt_attack_failed(c),
+            HuntNext::Drop => self.hunt_drop_off(actions, c),
+            HuntNext::Search => self.hunt_set_search(actions, c),
+            HuntNext::AttackFailed => self.hunt_attack_failed(actions, c),
         }
     }
 
@@ -146,20 +148,24 @@ impl Unit {
     /// 0) takes the next tree within 5 of it ([`Unit::hunt_tree_search`]); any other, or one
     /// that finds none, searches (`set_state(3)` with the target kept,
     /// [`Unit::hunt_search_state`]).
-    pub(crate) fn hunt_attack_failed(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn hunt_attack_failed(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let tree = c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
             let class = ai
                 .target_class
-                .or_else(|| self.actions.list.hunt().and_then(|h| h.target_class));
+                .or_else(|| actions.list.hunt().and_then(|h| h.target_class));
             class == Some(class::TREE)
         });
-        if tree && self.hunt_tree_search(c, None, Some(TREE_NEAR))? {
+        if tree && self.hunt_tree_search(actions, c, None, Some(TREE_NEAR))? {
             return Ok(());
         }
-        let hunt = self.actions.list.hunt_mut().ok_or(NO_HUNT)?;
+        let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         hunt.tear_down(c.w.parts.mover_mut(self.id))?;
         hunt.state = HuntState::Search;
-        self.hunt_search_state(c)
+        self.hunt_search_state(actions, c)
     }
 
     /// What `set_state(6)` on live livestock reads (`0x140ac60e0` case 6), and the lead's update
@@ -237,7 +243,7 @@ impl Unit {
         // the animal's top action without a target or a point (slots 0x190, 0x288)
         let animal = others.get(action.target);
         let idle = match animal {
-            Some(u) => u.top_action_idle()?,
+            Some(u) => c.w.parts.actions_of(u.id).top_action_idle()?,
             None => false,
         };
         Ok(Some(Herd {

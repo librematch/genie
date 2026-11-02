@@ -69,6 +69,7 @@ impl World {
                 self.parts.unit_ai.contains(u.id),
                 self.parts.building_of(u.id),
                 self.parts.combat_of(u.id),
+                self.parts.actions.of(u.id),
             ),
             master,
             &held.attributes,
@@ -185,7 +186,7 @@ impl World {
         cmd: &crate::combat::attack::AttackCommand<'_>,
     ) -> Result<(), GenieError> {
         let (mut attack, posted) =
-            self.run_on_step(player, idx, |unit, c| Attack::command(c, unit, cmd))?;
+            self.run_on_step(player, idx, |unit, _, c| Attack::command(c, unit, cmd))?;
         // the start's notifies go to the unit AI (the unit's slot 0x328 -> the AI's slot 0x38)
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);
@@ -195,7 +196,11 @@ impl World {
             }
         }
         attack.target2 = Some(target);
-        unit.actions.list.set_attack(Some(attack));
+        self.parts
+            .actions
+            .of_mut(unit.id)?
+            .list
+            .set_attack(Some(attack));
         self.take(target, self.releaser(player, idx)?)?;
         Ok(())
     }
@@ -282,9 +287,8 @@ impl World {
         let quarry = self.quarry(player, target)?;
         let engagement = self.engagement(player, idx, target)?;
         let task = self
-            .players
-            .live(player, idx)?
-            .actions
+            .parts
+            .actions_of(self.players.live(player, idx)?.id)
             .list
             .hunt()
             .map(|h| h.task)
@@ -302,8 +306,9 @@ impl World {
             .iter()
             .any(|&d| Some(d) == target_master);
         let unit = self.players.live_mut(player, idx)?;
-        let old = unit
-            .actions
+        let old = self
+            .parts
+            .actions_of(unit.id)
             .list
             .hunt()
             .map(|h| h.target)
@@ -317,9 +322,10 @@ impl World {
                 self.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
         )?;
-        let (Some(hunt), Some(mover)) =
-            (unit.actions.list.hunt_mut(), self.parts.mover_mut(unit.id))
-        else {
+        let (Some(hunt), Some(mover)) = (
+            self.parts.actions.of_mut(unit.id)?.list.hunt_mut(),
+            self.parts.motion.mover_mut(unit.id),
+        ) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -340,7 +346,7 @@ impl World {
                 crate::combat::attack::show_arrived(
                     &arms,
                     &mut unit.sprite,
-                    self.parts.motion_mut(unit.id),
+                    self.parts.motion.layer_mut(unit.id),
                     self.streams.get(Stream::Sprite),
                 )?;
             }

@@ -138,7 +138,8 @@ impl World {
         let (mut releases, mut builder_leaves) = (Vec::new(), Vec::new());
         let unit = self.players.live_mut(player, idx)?;
         unit.clear_own_actions(
-            self.parts.motion_mut(unit.id),
+            self.parts.actions.of_mut(unit.id)?,
+            self.parts.motion.layer_mut(unit.id),
             &mut releases,
             &mut builder_leaves,
             by,

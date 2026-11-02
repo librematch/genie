@@ -262,7 +262,7 @@ pub(crate) fn unit_with_gait(id: ObjectId, gait: Gait) -> crate::world::parts::O
     };
     unit.group.id = gait.group;
     assert_eq!(
-        unit.gait(Some(&mover)),
+        unit.gait(&crate::objects::layers::Action::default(), Some(&mover)),
         Some(gait),
         "the unit gives the gait"
     );
@@ -2202,7 +2202,7 @@ fn a_level_without_a_path_marks_its_waypoint_pauses_or_waits() {
 /// tiles ([`tiled_world`]) with the pather's mesh, a fresh Object stream and no unit groups.
 pub(crate) struct WalkRig {
     pub(crate) place: crate::objects::layers::Static,
-    pub(crate) motion: crate::objects::layers::MotionLayer,
+    pub(crate) motion: crate::objects::layers::Motion,
     pub(crate) world: Spatial,
     pathing: Pathing,
     object: Well512,
@@ -2215,7 +2215,7 @@ impl WalkRig {
         pathing.start_mesh(120);
         Self {
             place: crate::objects::layers::Static::at(Position::new(28.0, 89.0, 0.0)),
-            motion: crate::objects::layers::MotionLayer::Moving(builder_9177()),
+            motion: crate::objects::layers::Motion::Moving(builder_9177()),
             world: tiled_world(vec![4; 120 * 120]),
             pathing,
             object: Well512::default(),

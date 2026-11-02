@@ -23,6 +23,7 @@
 //!
 //! [`Mover::step_velocity`]: crate::movement::Mover::step_velocity
 
+mod action_parts;
 pub mod checkpoint;
 pub mod index;
 pub(crate) mod lets;

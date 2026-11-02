@@ -118,7 +118,9 @@ impl World {
                 by_id,
             );
         }
-        let state = unit
+        let state = self
+            .parts
+            .actions_of(unit.id)
             .top_action()
             .map_or(ActionState::NO_ACTION, |a| a.state);
         let player = &self.players.player(p)?;
@@ -137,7 +139,7 @@ impl World {
         };
         let others = crate::world::others::OthersRef::of(&self.players, &self.index, p)?;
         player.live(idx)?.drop_site_with(
-            self.parts.mover_of(unit.id),
+            (self.parts.actions_of(unit.id), self.parts.mover_of(unit.id)),
             &mut world,
             others,
             state,
@@ -186,8 +188,9 @@ impl World {
         use crate::construction::build::DropSearch;
         let by = self.releaser(p, idx)?;
         let unit = &self.players.live(p, idx)?;
-        let task_range = unit
-            .actions
+        let task_range = self
+            .parts
+            .actions_of(unit.id)
             .list
             .build()
             .ok_or(GenieError::unreachable(
@@ -216,12 +219,12 @@ impl World {
         };
         // the Build's set_state(8) on the builder's step: its prelude leaves the builders, its
         // second targets and its notify go to the world and the unit AI at once
-        self.run_on_step(p, idx, |unit, c| {
-            let mut build = *unit.actions.list.build().ok_or(GenieError::unreachable(
+        self.run_on_step(p, idx, |unit, actions, c| {
+            let mut build = *actions.list.build().ok_or(GenieError::unreachable(
                 "a drop-off order without its Build",
             ))?;
             let dropped = build.set_drop(c, unit, search, by);
-            if let Some(b) = unit.actions.list.build_mut() {
+            if let Some(b) = actions.list.build_mut() {
                 *b = build;
             }
             dropped

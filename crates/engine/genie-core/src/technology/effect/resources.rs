@@ -9,7 +9,6 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::technology::ResourceChange;
-use crate::technology::effect::OBJECT_GONE;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -229,9 +228,8 @@ impl World {
             if u.master(self.master_tables(), q)?.kind < master_type::ACTION {
                 continue;
             }
-            let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
             let held = u.life.amount;
-            let Some(make) = u.actions.list.make_mut() else {
+            let Some(make) = self.parts.actions_mut(id)?.list.make_mut() else {
                 continue;
             };
             let f = (held + make.remaining).get();

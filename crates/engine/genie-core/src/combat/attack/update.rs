@@ -141,6 +141,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         f: &mut Fight,
         r: &AttackReads,
@@ -178,7 +179,7 @@ impl Attack {
                 self.walk(c, unit, me, f, r, (t.position, t.radius))
             }
             AttackState::Ready => self.ready_step(c, unit, f, r, alive),
-            AttackState::Swing => self.swing(c, unit, f, r),
+            AttackState::Swing => self.swing(c, unit, actions, f, r),
             AttackState::Killed => self.killed_step(c, unit),
             // case 0xc: a failed attack posts 0x1f9 with 600 every update (quiet or not), the
             // unit's animation stops and the update returns 3

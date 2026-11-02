@@ -16,6 +16,7 @@ use crate::movement::Speed;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::masters::{Master, Masters, class, player_master};
@@ -206,24 +207,27 @@ fn buildings_on(spatial: &Spatial, masters: &[Masters], tile: Tile) -> Result<us
     Ok(n)
 }
 
-/// [`MeetingTarget`] of the target `t` with its mover `t_mover` (of master `tm`) with `room` for
+/// [`MeetingTarget`] of the target `t` with its action layer `t_actions` and its mover `t_mover`
+/// (of master `tm`) with `room` for
 /// the unit: its top speed ([`crate::movement::MoveStats::speed`]), its top action's state and
 /// its point (`+0x38`, `+0x3c`): a `MoveTo`'s
 /// ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An action the slice
 /// does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    (t, t_mover): (&crate::objects::unit::Unit, Option<&Mover>),
+    (t, t_actions, t_mover): (&crate::objects::unit::Unit, &Action, Option<&Mover>),
     tm: &Master,
     room: bool,
 ) -> Result<MeetingTarget, GenieError> {
-    if let Some(e) = t.actions.unmodelled_action.clone() {
+    if let Some(e) = t_actions.unmodelled_action.clone() {
         return Err(e);
     }
-    let action_point = match (t.top_action_kind(), t.actions.list.move_to().copied()) {
+    let action_point = match (
+        t_actions.top_action_kind(),
+        t_actions.list.move_to().copied(),
+    ) {
         (Some(crate::movement::move_to::MOVE_TO), Some(m)) => Ok(m.point.ground()),
         // the Transport's point (+0x38, +0x3c), where it sails
-        (Some(crate::garrison::transport::TRANSPORT), _) => t
-            .actions
+        (Some(crate::garrison::transport::TRANSPORT), _) => t_actions
             .list
             .transport()
             .map(|tr| tr.point.ground())
@@ -233,7 +237,9 @@ pub(crate) fn meeting_target(
     Ok(MeetingTarget {
         room,
         speed: t_mover.map_or(Speed::ZERO, |m| m.stats.speed),
-        state: t.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
+        state: t_actions
+            .top_action()
+            .map_or(ActionState::NO_ACTION, |a| a.state),
         class: tm.class,
         position: t.position().ground(),
         action_point,
@@ -483,6 +489,8 @@ pub(crate) struct Meeting<'a> {
     pub(crate) zones: &'a mut crate::pathing::zones::Zones,
     /// The target.
     pub(crate) target: &'a crate::objects::unit::Unit,
+    /// The target's action layer.
+    pub(crate) target_actions: &'a Action,
     /// The target's master.
     pub(crate) master: &'a Master,
     /// The target has room for the unit (slot 0x198).
@@ -511,7 +519,11 @@ impl Meeting<'_> {
             return Ok((at.ground(), 0));
         }
         let stats = self.mover.map(|m| m.stats).ok_or(NO_SPEED)?;
-        let t = meeting_target((self.target, self.target_mover), self.master, self.room)?;
+        let t = meeting_target(
+            (self.target, self.target_actions, self.target_mover),
+            self.master,
+            self.room,
+        )?;
         meeting_point(
             &t,
             (self.unit.id, self.unit.position(), &stats),
@@ -524,9 +536,10 @@ impl Meeting<'_> {
 
 /// A transport's slot 0x3d8 (`FUN_14114ffc0`) for an Enter: whether `ship` reaches within
 /// [`ENTER_NEAR`] of the point's tile (the point truncated), [`crate::movement::Mover::reaches`]
-/// from where it last moved to; one without movement state does not.
+/// from where it last moved to (`actions`, its action layer); one without movement state does
+/// not.
 pub(crate) fn ship_reaches(
-    (ship, mover): (&crate::objects::unit::Unit, Option<&Mover>),
+    (ship, actions, mover): (&crate::objects::unit::Unit, &Action, Option<&Mover>),
     world: &mut Spatial,
     plan: &mut crate::movement::Planning<'_>,
     to: Position,
@@ -535,7 +548,7 @@ pub(crate) fn ship_reaches(
     let Some(m) = mover else {
         return Ok(false);
     };
-    let me = ship.me();
+    let me = ship.me(actions);
     let goal = Point::new(cvttss2si(to.x()) as f32, cvttss2si(to.y()) as f32);
     m.reaches(
         (ship.position(), &me),

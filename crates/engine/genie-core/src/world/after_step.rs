@@ -36,7 +36,11 @@ impl World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         (dt, turn, full): (Millis, Option<Millis>, bool),
-        f: impl FnOnce(&mut Unit, &mut Step<'_>) -> Result<Outcome, GenieError>,
+        f: impl FnOnce(
+            &mut Unit,
+            &mut crate::objects::layers::Action,
+            &mut Step<'_>,
+        ) -> Result<Outcome, GenieError>,
     ) -> Result<Stepped, GenieError> {
         let id = self.players.live(p, i)?.id;
         let outcome = self.run_object((p, i), (dt, turn), f)?;

@@ -6,7 +6,7 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
-use crate::objects::layers::{MotionLayer, MotionMut};
+use crate::objects::layers::{Motion, MotionMut};
 use crate::world::parts::{PartTable, Parts};
 
 /// A part table read with at most one entry lent out to change ([`PartTable::lend`]): the
@@ -97,17 +97,17 @@ impl<T> PartTable<T> {
     }
 }
 
-impl PartTable<MotionLayer> {
+impl PartTable<Motion> {
     /// Object `id`'s mover, none for an object that does not move (or that the table does not
     /// hold: a static object).
     #[must_use]
     pub fn mover(&self, id: ObjectId) -> Option<&Mover> {
-        self.get(id).and_then(MotionLayer::mover)
+        self.get(id).and_then(Motion::mover)
     }
 
     /// Object `id`'s mover to change, none for an object that does not move.
     pub(crate) fn mover_mut(&mut self, id: ObjectId) -> Option<&mut Mover> {
-        self.get_mut(id).and_then(MotionLayer::mover_mut)
+        self.get_mut(id).and_then(Motion::mover_mut)
     }
 
     /// Object `id`'s motion layer to change ([`MotionMut`], none for a static object), beside
@@ -193,7 +193,7 @@ impl Parts {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &self.own_master),
-                (&self.building, &self.combat, motions),
+                (&self.building, &self.combat, &self.actions, motions),
             ),
         )
     }
@@ -239,9 +239,9 @@ impl Parts {
     pub(crate) fn take_mover(&mut self, id: ObjectId) -> Option<Mover> {
         let motion = self.motion.get_mut(id)?;
         let animated = *motion.animated();
-        match std::mem::replace(motion, MotionLayer::Animated(animated)) {
-            MotionLayer::Moving(m) => Some(m),
-            animated @ MotionLayer::Animated(_) => {
+        match std::mem::replace(motion, Motion::Animated(animated)) {
+            Motion::Moving(m) => Some(m),
+            animated @ Motion::Animated(_) => {
                 *motion = animated;
                 None
             }
@@ -254,7 +254,7 @@ impl Parts {
     /// lists, which this borrow leaves alone.
     pub(crate) fn put_mover(&mut self, id: ObjectId, mover: Option<Mover>) {
         let animated = self.motion.get(id).map(|m| *m.animated());
-        match MotionLayer::of(animated, mover) {
+        match Motion::of(animated, mover) {
             Some(motion) => {
                 let _ = self.motion.insert(id, motion);
             }
@@ -268,7 +268,7 @@ impl Parts {
 #[cfg(test)]
 mod tests {
     use crate::movement::Speed;
-    use crate::objects::layers::{Animated, MotionLayer};
+    use crate::objects::layers::{Animated, Motion};
     use crate::test_ids::object_id;
     use crate::world::parts::Parts;
 
@@ -278,12 +278,12 @@ mod tests {
         let mut parts = Parts::default();
         let mut walker = crate::movement::tests::builder_9177();
         walker.animated = Animated::new(Speed::new(1.0));
-        let _ = parts.motion.insert(id, MotionLayer::Moving(walker));
+        let _ = parts.motion.insert(id, Motion::Moving(walker));
         let taken = parts.take_mover(id);
         assert!(taken.is_some());
         assert_eq!(
             parts.motion.get(id),
-            Some(&MotionLayer::Animated(Animated::new(Speed::new(1.0))))
+            Some(&Motion::Animated(Animated::new(Speed::new(1.0))))
         );
         parts.set_anim_speed(id, Speed::ZERO);
         parts.put_mover(id, taken);
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(parts.anim_speed_of(object_id(1)), None);
         let _ = parts
             .motion
-            .insert(object_id(2), MotionLayer::Animated(Animated::default()));
+            .insert(object_id(2), Motion::Animated(Animated::default()));
         parts.set_anim_speed(object_id(2), Speed::new(1.0));
         assert_eq!(parts.anim_speed_of(object_id(2)), Some(Speed::new(1.0)));
         assert_eq!(parts.mover_of(object_id(2)), None);

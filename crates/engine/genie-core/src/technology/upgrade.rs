@@ -336,7 +336,10 @@ impl World {
     ) -> Result<(), GenieError> {
         self.actions_take_master(place, old, new)?;
         if !keep
-            && let Some(top) = self.object_at(place)?.top_action_kind()
+            && let Some(top) = self
+                .parts
+                .actions_of(self.object_at(place)?.id)
+                .top_action_kind()
             && !new.tasks.iter().any(|t| t.action_type == top)
             && let Place::Live(q, i) = place
         {
@@ -619,14 +622,15 @@ impl World {
             second: g(new.attack_sprite2),
             combat: master_type::COMBAT <= new.kind,
         };
-        let u = match place {
-            Place::Live(q, i) => self.players.live_mut(q, i)?,
-            Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
+        let id = self.object_at(place)?.id;
+        // an object the table holds no layer of has no actions to follow the master
+        let Some(actions) = self.parts.actions.get_mut(id) else {
+            return Ok(());
         };
-        if let Some(attack) = u.actions.list.attack_mut() {
+        if let Some(attack) = actions.list.attack_mut() {
             crate::technology::effect::follow_master(&mut attack.arms, None, &sprites);
         }
-        if let Some(hunt) = u.actions.list.hunt_mut()
+        if let Some(hunt) = actions.list.hunt_mut()
             && let Some(t) = old_task(hunt.task.id).as_ref().and_then(find)
         {
             hunt.task = crate::gathering::hunt::HuntTask::of(&t);
@@ -635,32 +639,32 @@ impl World {
                 crate::technology::effect::follow_master(&mut attack.arms, Some(task), &sprites);
             }
         }
-        if let Some(gather) = u.actions.list.gather_mut()
+        if let Some(gather) = actions.list.gather_mut()
             && let Some(t) = old_task(gather.task.id).as_ref().and_then(find)
         {
             gather.task = crate::gathering::hunt::HuntTask::of(&t);
         }
-        if let Some(make) = u.actions.list.make_mut()
+        if let Some(make) = actions.list.make_mut()
             && let Some(t) = find(&make.task)
         {
             make.task = t;
         }
-        if let Some(fly) = u.actions.list.fly_mut()
+        if let Some(fly) = actions.list.fly_mut()
             && let Some(t) = find(&fly.task)
         {
             fly.task = t;
         }
-        if let Some(w) = u.actions.list.wait_solidify_mut()
+        if let Some(w) = actions.list.wait_solidify_mut()
             && let Some(t) = find(&w.task)
         {
             w.task = t;
         }
-        if let Some(r) = u.actions.list.repair_mut()
+        if let Some(r) = actions.list.repair_mut()
             && let Some(t) = old_task(r.task.id).as_ref().and_then(find)
         {
             r.task = crate::construction::repair::RepairTask::of(&t);
         }
-        if let Some(b) = u.actions.list.build_mut()
+        if let Some(b) = actions.list.build_mut()
             && let Some(t) = old_task(b.task.id).as_ref().and_then(find)
         {
             b.task = crate::construction::build::BuildTask::of(&t, b.task.work_rate);
@@ -1244,23 +1248,26 @@ mod tests {
             id: TaskId::test(3),
             moving: None,
         };
-        u.actions
-            .list
-            .set_build(Some(crate::construction::build::tests::started(
+        t.parts.actions.of_mut(u.id).unwrap().list.set_build(Some(
+            crate::construction::build::tests::started(
                 object_id(10028),
                 Position::new(30.0, 88.0, 0.0),
                 Distance::new(1.0),
                 build,
-            )));
-        u.actions
-            .list
-            .set_make(Some(crate::gathering::make::MakeAction {
+            ),
+        ));
+        t.parts.actions.of_mut(u.id).unwrap().list.set_make(Some(
+            crate::gathering::make::MakeAction {
                 state: MakeState::New,
                 remaining: Amount::ZERO,
                 total: Amount::ZERO,
                 task: make,
-            }));
-        u.actions
+            },
+        ));
+        t.parts
+            .actions
+            .of_mut(u.id)
+            .unwrap()
             .list
             .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify {
                 state: WaitSolidifyState::Waiting,
@@ -1271,11 +1278,17 @@ mod tests {
             .unwrap();
         let u = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
-            u.actions.list.gather().copied().unwrap().task,
+            t.parts
+                .actions_of(u.id)
+                .list
+                .gather()
+                .copied()
+                .unwrap()
+                .task,
             HuntTask::of(&new.tasks[1])
         );
         assert_eq!(
-            u.actions.list.build().copied().unwrap().task,
+            t.parts.actions_of(u.id).list.build().copied().unwrap().task,
             BuildTask {
                 range: Distance::new(1.5),
                 work_value: crate::objects::masters::WorkValue::new(3.0),
@@ -1285,13 +1298,29 @@ mod tests {
                 moving: Some(SpriteId::named(12)),
             }
         );
-        assert_eq!(u.actions.list.make().copied().unwrap().task, new.tasks[3]);
         assert_eq!(
-            u.actions.list.wait_solidify().copied().unwrap().task,
+            t.parts.actions_of(u.id).list.make().copied().unwrap().task,
+            new.tasks[3]
+        );
+        assert_eq!(
+            t.parts
+                .actions_of(u.id)
+                .list
+                .wait_solidify()
+                .copied()
+                .unwrap()
+                .task,
             waiting
         );
         // a Gather whose task the old master lacks keeps it
-        let gather = u.actions.list.gather().copied().unwrap().task;
+        let gather = t
+            .parts
+            .actions_of(u.id)
+            .list
+            .gather()
+            .copied()
+            .unwrap()
+            .task;
         let mut bare = old.clone();
         bare.tasks.clear();
         t.actions_take_master(
@@ -1301,8 +1330,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            t.players[1].objects[ListIndex::new(0)]
-                .actions
+            t.parts
+                .actions_of(t.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
                 .copied()
@@ -1514,8 +1543,8 @@ mod tests {
         let mut kept = t.clone();
         kept.upgrade_actions(place, (&old, &bare), true).unwrap();
         assert!(
-            kept.players[1].objects[ListIndex::new(0)]
-                .actions
+            kept.parts
+                .actions_of(kept.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
                 .is_some()
@@ -1523,16 +1552,16 @@ mod tests {
         let mut same = t.clone();
         same.upgrade_actions(place, (&old, &old), false).unwrap();
         assert!(
-            same.players[1].objects[ListIndex::new(0)]
-                .actions
+            same.parts
+                .actions_of(same.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
                 .is_some()
         );
         t.upgrade_actions(place, (&old, &bare), false).unwrap();
         assert!(
-            t.players[1].objects[ListIndex::new(0)]
-                .actions
+            t.parts
+                .actions_of(t.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
                 .is_none()

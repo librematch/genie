@@ -84,7 +84,7 @@ impl World {
             },
         )?;
         let state = match self.object(id) {
-            Some((p, u)) => self.action_list(p, u)?.1,
+            Some((p, u)) => self.action_list(p, u, self.parts.actions_of(u.id))?.1,
             None => ActionState::NO_ACTION,
         };
         if matches!(state.get(), 6 | 7) {

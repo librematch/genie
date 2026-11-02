@@ -15,7 +15,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
-use crate::objects::layers::{Animated, MotionLayer};
+use crate::objects::layers::{Animated, Motion};
 use crate::objects::lifecycle::{Class, Lifecycle};
 use crate::objects::masters::TaskId;
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -102,13 +102,18 @@ fn an_animated_object_s_sprite_runs_by_the_update_s_dt() {
         // a static object has no animation speed, so no clock
         let (id, before) = (u.id, u.sprite);
         let motion =
-            speed.map(|speed| Box::new(MotionLayer::Animated(Animated::new(Speed::new(speed)))));
+            speed.map(|speed| Box::new(Motion::Animated(Animated::new(Speed::new(speed)))));
         t.set_part(id, crate::world::parts::Part::Motion(motion))
             .unwrap();
-        in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
-            u.animate(c);
-            Ok(())
-        })
+        in_update(
+            &mut t,
+            (PlayerId::new(1), ListIndex::new(0)),
+            50,
+            |u, _, c| {
+                u.animate(c);
+                Ok(())
+            },
+        )
         .unwrap();
         (before, t.players[1].objects[ListIndex::new(0)].sprite)
     };
@@ -125,16 +130,21 @@ fn an_object_past_state_2_loses_its_actions() {
     let mut t = forage_world();
     let u = &mut t.players[1].objects[ListIndex::new(0)];
     u.life.state = ObjectState::Dying;
-    u.actions.list.set_move_to(Some(MoveToAction {
-        sprite: None,
-        state: MoveTo::Moving,
-        point: Position::new(40.0, 80.0, 0.0),
-        target: None,
-        range: Distance::ZERO,
-        quiet: false,
-        on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-        wait: MoveWait::default(),
-    }));
+    t.parts
+        .actions
+        .of_mut(u.id)
+        .unwrap()
+        .list
+        .set_move_to(Some(MoveToAction {
+            sprite: None,
+            state: MoveTo::Moving,
+            point: Position::new(40.0, 80.0, 0.0),
+            target: None,
+            range: Distance::ZERO,
+            quiet: false,
+            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+            wait: MoveWait::default(),
+        }));
     in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -143,14 +153,16 @@ fn an_object_past_state_2_loses_its_actions() {
     )
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(u.actions.list.move_to().copied(), None);
+    assert_eq!(t.parts.actions_of(u.id).list.move_to().copied(), None);
     assert_eq!(
         t.parts.mover_of(u.id).unwrap().animated.speed,
         Speed::new(0.0)
     );
     let mut t = forage_world();
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .unmodelled_action = Some(GenieError::unsupported("an action"));
     let r = in_update(
         &mut t,
@@ -183,25 +195,30 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
         (object_id(601), Seconds::new(0.5)),
         (object_id(4242), Seconds::new(0.5)),
     ];
-    let paused = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
-        u.after_actions(c)?;
-        let (_, bush) = OthersRef::of(&c.w.players, &c.w.index, c.player)
-            .unwrap()
-            .find(object_id(600))
-            .unwrap();
-        let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
-        Ok((
-            level,
-            crate::world::index::ObjectsRef::new(
-                &c.w.players,
-                &c.w.index,
-                &c.w.masters,
-                &c.w.parts,
-            )
-            .gait(object_id(600))
-            .and_then(|g| g.pause),
-        ))
-    })
+    let paused = in_update(
+        &mut t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |u, _, c| {
+            u.after_actions(c)?;
+            let (_, bush) = OthersRef::of(&c.w.players, &c.w.index, c.player)
+                .unwrap()
+                .find(object_id(600))
+                .unwrap();
+            let level = c.w.parts.mover_of(bush.id).unwrap().paths[0].pause_time;
+            Ok((
+                level,
+                crate::world::index::ObjectsRef::new(
+                    &c.w.players,
+                    &c.w.index,
+                    &c.w.masters,
+                    &c.w.parts,
+                )
+                .gait(object_id(600))
+                .and_then(|g| g.pause),
+            ))
+        },
+    )
     .unwrap();
     assert_eq!(paused, (Seconds::new(0.5), Some(Seconds::new(0.5))));
     let u = &t.players[1].objects[ListIndex::new(0)];
@@ -212,9 +229,12 @@ fn after_its_actions_the_units_a_walk_met_take_their_pauses() {
         .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .in_the_way = vec![object_id(600)];
-    let r = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
-        u.after_actions(c)
-    });
+    let r = in_update(
+        &mut t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |u, _, c| u.after_actions(c),
+    );
     assert_eq!(
         r.unwrap_err().reason(),
         "a walk's unit in the way (notify 0x215) the action does not pass on"
@@ -261,8 +281,10 @@ fn the_actions_update_runs_the_action_held() {
     )
     .unwrap();
     assert!(captured.is_none());
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .set_wait_solidify(Some(gone_foundation()));
     let captured = in_update(
@@ -274,16 +296,17 @@ fn the_actions_update_runs_the_action_held() {
     .unwrap();
     assert!(captured.is_none());
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)]
-            .actions
+        t.parts
+            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .wait_solidify(),
         None
     );
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    let before = t.players[1].objects[ListIndex::new(0)]
-        .actions
+    let before = t
+        .parts
+        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
         .list
         .gather()
         .copied();
@@ -295,8 +318,9 @@ fn the_actions_update_runs_the_action_held() {
     )
     .unwrap();
     assert!(captured.is_none());
-    let after = t.players[1].objects[ListIndex::new(0)]
-        .actions
+    let after = t
+        .parts
+        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
         .list
         .gather()
         .copied();
@@ -322,9 +346,14 @@ fn the_list_s_update_stops_at_an_action_below_its_head() {
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    unit.actions.list.set_wait_solidify(Some(gone_foundation()));
+    t.parts
+        .actions
+        .of_mut(unit.id)
+        .unwrap()
+        .list
+        .set_wait_solidify(Some(gone_foundation()));
     assert_eq!(
-        unit.top_action_kind(),
+        t.parts.actions_of(unit.id).top_action_kind(),
         Some(crate::construction::wait_solidify::WAIT_SOLIDIFY)
     );
     let err = in_update(
@@ -340,8 +369,8 @@ fn the_list_s_update_stops_at_an_action_below_its_head() {
         "an action below the head of the list (its idle update, FUN_140a78470)"
     );
     assert!(
-        t.players[1].objects[ListIndex::new(0)]
-            .actions
+        t.parts
+            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .wait_solidify()
             .is_some()
@@ -368,11 +397,11 @@ fn an_object_inside_another_runs_its_inside_update() {
         Ok(None)
     );
     let unit = &t.players[1].objects[ListIndex::new(0)];
-    assert!(unit.actions.list.is_empty());
+    assert!(t.parts.actions_of(unit.id).list.is_empty());
     assert_eq!(unit.position(), at);
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     unit.life.inside = None;
-    unit.actions.default_artifact = true;
+    t.parts.actions.of_mut(unit.id).unwrap().default_artifact = true;
     assert_eq!(
         in_update(
             &mut t,
@@ -383,8 +412,8 @@ fn an_object_inside_another_runs_its_inside_update() {
         Ok(None)
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)]
-            .actions
+        t.parts
+            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .artifact(),
         Some(&crate::ownership::artifact::Artifact::new(false, None)),
@@ -405,41 +434,33 @@ fn the_top_action_s_object_is_its_target_unless_it_has_none() {
         id: TaskId::of_task(-1),
         moving: None,
     };
-    let building = Unit {
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_build(Some(
-                crate::construction::build::tests::started(
-                    object_id(800),
-                    Position::new(1.0, 2.0, 0.0),
-                    Distance::ZERO,
-                    task,
-                ),
-            )),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let building = crate::objects::layers::Action {
+        list: ActionList::default().with_build(Some(crate::construction::build::tests::started(
+            object_id(800),
+            Position::new(1.0, 2.0, 0.0),
+            Distance::ZERO,
+            task,
+        ))),
+        ..Default::default()
     };
     assert_eq!(building.top_action_object(), Ok(Some(object_id(800))));
     // a wait for a foundation keeps it at +0x68, its +0x30 is −1
-    let waiting = Unit {
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_wait_solidify(Some(
-                crate::construction::wait_solidify::WaitSolidify::new(
-                    crate::objects::masters::Task::default(),
-                    object_id(900),
-                ),
-            )),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let waiting = crate::objects::layers::Action {
+        list: ActionList::default().with_wait_solidify(Some(
+            crate::construction::wait_solidify::WaitSolidify::new(
+                crate::objects::masters::Task::default(),
+                object_id(900),
+            ),
+        )),
+        ..Default::default()
     };
     assert_eq!(waiting.top_action_object(), Ok(None));
-    assert_eq!(Unit::default().top_action_object(), Ok(None));
-    let unmodelled = Unit {
-        actions: crate::objects::layers::ActionLayer {
-            unmodelled_action: Some(GenieError::unsupported("an action")),
-            ..building.actions
-        },
+    assert_eq!(
+        crate::objects::layers::Action::default().top_action_object(),
+        Ok(None)
+    );
+    let unmodelled = crate::objects::layers::Action {
+        unmodelled_action: Some(GenieError::unsupported("an action")),
         ..building
     };
     assert!(unmodelled.top_action_object().is_err());
@@ -457,22 +478,16 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
     };
     let mut hunt = crate::gathering::hunt::tests::hunting(7);
     hunt.move_to = Some(MoveToAction::sub_in(MoveTo::Arrived));
-    let hunter = Unit {
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_hunt(Some(hunt)),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let hunter = crate::objects::layers::Action {
+        list: ActionList::default().with_hunt(Some(hunt)),
+        ..Default::default()
     };
     assert_eq!(hunter.top_sub_action(), Some(walking(ActionState::new(1))));
     let mut idle = hunt;
     idle.move_to = None;
-    let resting = Unit {
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_hunt(Some(idle)),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let resting = crate::objects::layers::Action {
+        list: ActionList::default().with_hunt(Some(idle)),
+        ..Default::default()
     };
     assert_eq!(resting.top_sub_action(), None);
     let mut build = crate::construction::build::tests::started(
@@ -489,15 +504,15 @@ fn the_top_action_s_sub_action_is_its_move_to_or_its_attack() {
         },
     );
     build.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
-    let builder = Unit {
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default().with_build(Some(build)),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let builder = crate::objects::layers::Action {
+        list: ActionList::default().with_build(Some(build)),
+        ..Default::default()
     };
     assert_eq!(builder.top_sub_action(), Some(walking(ActionState::new(4))));
-    assert_eq!(Unit::default().top_sub_action(), None);
+    assert_eq!(
+        crate::objects::layers::Action::default().top_sub_action(),
+        None
+    );
 }
 
 /// The sub-action of each kind of top action: the walk of an Artifact, a Fly, an Attack, an
@@ -513,9 +528,9 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         state: ActionState::new(MoveTo::Moving.number()),
     });
     let of = |action: Action| {
-        let mut u = Unit::default();
-        u.actions.list.put(action);
-        u.top_sub_action()
+        let mut layer = crate::objects::layers::Action::default();
+        layer.list.put(action);
+        layer.top_sub_action()
     };
     let mut artifact = crate::ownership::artifact::Artifact::new(false, None);
     artifact.move_to = Some(MoveToAction::sub_in(MoveTo::Moving));
@@ -636,7 +651,7 @@ fn a_unit_s_own_view_for_its_walk() {
     };
     u.group.id = Some(crate::test_ids::group_id(4));
     assert_eq!(
-        u.me(),
+        u.me(&crate::objects::layers::Action::default()),
         crate::movement::Me {
             id: object_id(5),
             action_state: ActionState::NO_ACTION,

@@ -320,7 +320,7 @@ impl World {
         };
         let parts = crate::world::parts::ObjectParts {
             // an animated one's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            motion: crate::objects::layers::MotionLayer::of(
+            motion: crate::objects::layers::Motion::of(
                 (ANIMATED <= made.kind).then(crate::objects::layers::Animated::default),
                 moving.map(|stats| {
                     Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)

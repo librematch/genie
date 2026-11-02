@@ -312,6 +312,7 @@ impl EnterAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         reads: &EnterReads,
     ) -> Result<HeadCode, GenieError> {
@@ -325,10 +326,10 @@ impl EnterAction {
             EnterState::Wait => {
                 self.timer -= c.dt.seconds();
                 if self.timer <= Seconds::ZERO {
-                    let _ = self.again(c, unit, &t, reads)?;
+                    let _ = self.again(c, unit, actions, &t, reads)?;
                 }
             }
-            EnterState::Walk => self.walk_on(c, unit, me, &t, reads)?,
+            EnterState::Walk => self.walk_on(c, unit, actions, me, &t, reads)?,
             EnterState::WalkPoint => {
                 return Err(GenieError::unsupported("an Enter state not modelled"));
             }
@@ -352,22 +353,25 @@ impl EnterAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         t: &EnterTarget,
         reads: &EnterReads,
     ) -> Result<(), GenieError> {
         let walked_again = self.target_moved(t);
-        let entered = walked_again && self.again(c, unit, t, reads)?;
+        let entered = walked_again && self.again(c, unit, actions, t, reads)?;
         let code = self.move_to_update(c, unit, me, reads)?;
         match code.get() {
             // the walk again's enter put the unit inside, at the target's place: still in reach,
             // it enters again
-            1 | 2 if entered => self.on_unit(unit, |unit| unit.entered_again(c)),
-            1 | 2 if t.in_reach => self.enter_at_once(c, unit),
+            1 | 2 if entered => self.on_unit(unit, actions, |unit, actions| {
+                unit.entered_again(actions, c)
+            }),
+            1 | 2 if t.in_reach => self.enter_at_once(actions, c, unit),
             // a failed MoveTo is none a walk again made in this update
             3 if self.retry => {
                 self.retry = false;
-                self.again(c, unit, t, reads).map(|_| ())
+                self.again(c, unit, actions, t, reads).map(|_| ())
             }
             1..=3 => self.wait(c, unit),
             4 | 5 => Err(ENTER_TARGET_DIED),
@@ -444,6 +448,7 @@ impl EnterAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         t: &EnterTarget,
         reads: &EnterReads,
     ) -> Result<bool, GenieError> {
@@ -471,6 +476,7 @@ impl EnterAction {
                 room: t.room,
                 unit,
                 mover: w.parts.mover_of(unit.id),
+                target_actions: w.parts.actions_of(target.id),
                 target_mover: w.parts.mover_of(target.id),
             };
             let sprites = SpriteReads {
@@ -488,12 +494,16 @@ impl EnterAction {
         };
         match walking {
             Walking::Enter => {
-                self.enter_at_once(c, unit)?;
+                self.enter_at_once(actions, c, unit)?;
                 return Ok(true);
             }
             Walking::Walk(Some(at)) => {
                 let target = self.target;
-                self.on_unit(unit, |unit| c.lend(unit, |w| w.move_transport(target, at)))?;
+                self.on_unit(unit, actions, |unit, actions| {
+                    c.lend((&mut *unit, &mut *actions), |w| {
+                        w.move_transport(target, at)
+                    })
+                })?;
             }
             Walking::Walk(None) => {}
         }
@@ -507,14 +517,21 @@ impl EnterAction {
     /// # Errors
     ///
     /// The enter's.
-    fn enter_at_once(&mut self, c: &mut Step<'_>, unit: &mut Unit) -> Result<(), GenieError> {
+    fn enter_at_once(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        unit: &mut Unit,
+    ) -> Result<(), GenieError> {
         let target = self.target;
-        self.on_unit(unit, |unit| unit.enter_in_update(c, target))
+        self.on_unit(unit, actions, |unit, actions| {
+            unit.enter_in_update(actions, c, target)
+        })
     }
 
-    /// Runs `f` on `unit` with this copy of its Enter written back to it (a routine that reads or
-    /// changes the unit's Enter, or lends the unit to the world), then takes the Enter back as
-    /// `f` left it.
+    /// Runs `f` on `unit` and its action layer `actions` with this copy of its Enter written back
+    /// to the layer (a routine that reads or changes the unit's Enter, or lends the unit to the
+    /// world), then takes the Enter back as `f` left it.
     ///
     /// # Errors
     ///
@@ -522,12 +539,12 @@ impl EnterAction {
     fn on_unit<R>(
         &mut self,
         unit: &mut Unit,
-        f: impl FnOnce(&mut Unit) -> Result<R, GenieError>,
+        actions: &mut crate::objects::layers::Action,
+        f: impl FnOnce(&mut Unit, &mut crate::objects::layers::Action) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        unit.actions.list.set_enter(Some(*self));
-        let answer = f(unit);
-        *self = *unit
-            .actions
+        actions.list.set_enter(Some(*self));
+        let answer = f(unit, actions);
+        *self = *actions
             .list
             .enter()
             .ok_or(GenieError::unreachable("an Enter gone in its own update"))?;

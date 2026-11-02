@@ -126,25 +126,30 @@ impl Rig {
         rig
     }
 
-    /// `f` on the villager's step of `dt` ms, in action state `state`.
+    /// `f` on the villager's step of `dt` ms with its action layer, in action state `state`.
     fn run<R>(
         &mut self,
         state: GatherState,
         dt: u32,
-        f: impl FnOnce(&mut Step<'_>, &mut Unit, Me) -> Result<R, GenieError>,
+        f: impl FnOnce(
+            &mut Step<'_>,
+            &mut Unit,
+            &mut crate::objects::layers::Action,
+            Me,
+        ) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         crate::world::tests::in_update(
             &mut self.t,
             (PlayerId::new(1), ListIndex::new(0)),
             dt,
-            |u, c| {
+            |u, actions, c| {
                 let me = Me {
                     human_order: WorldTime::ZERO,
                     id: u.id,
                     group: None,
                     action_state: ActionState::new(state.get()),
                 };
-                f(c, u, me)
+                f(c, u, actions, me)
             },
         )
     }
@@ -438,7 +443,7 @@ fn a_farm_s_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
         food_sold: Amount::new(1.0),
         ..reads()
     };
-    let gathered = rig.run(GatherState::Work, 500, |c, u, _| {
+    let gathered = rig.run(GatherState::Work, 500, |c, u, _, _| {
         g.gather(c, u, &mut field, &r)
     });
     assert_eq!(gathered, Ok(Next::Stay));
@@ -565,7 +570,7 @@ fn at_its_point_a_human_s_moved_gatherer_idles_and_a_computer_s_is_done() {
             farm_stops: true,
             ..reads()
         };
-        let moved = rig.run(GatherState::Moved, 100, |c, u, me| {
+        let moved = rig.run(GatherState::Moved, 100, |c, u, _, me| {
             g.update_moved(c, u, me, &r)
         });
         assert_eq!(moved, Ok(Next::Stay));
@@ -585,7 +590,7 @@ fn a_gatherer_without_a_target_or_a_load_asks_for_another_every_ten_seconds() {
         let mut rig = Rig::on_the_path();
         rig.set_load(None, 0.0);
         let r = GatherReads { master, ..reads() };
-        rig.run(g.state, dt, |c, u, me| g.update(c, u, me, None, &r))
+        rig.run(g.state, dt, |c, u, _, me| g.update(c, u, me, None, &r))
     };
     let mut g = GatherAction {
         state: GatherState::Walk,
@@ -631,7 +636,7 @@ fn farm_update(
         computer,
         ..reads()
     };
-    rig.run(g.state, dt, |c, u, me| g.update(c, u, me, target, &r))
+    rig.run(g.state, dt, |c, u, _, me| g.update(c, u, me, target, &r))
 }
 
 /// Case 5 (`FUN_141162db0`): a gatherer with a turn time turns a facet a turn time; not yet
@@ -657,7 +662,7 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
     rig.unit_mut().place = crate::objects::layers::Static::at(Position::new(30.0, 40.0, 0.0));
     let id = rig.unit().id;
     rig.t
-        .set_motion(id, Some(crate::objects::layers::MotionLayer::Moving(mover)));
+        .set_motion(id, Some(crate::objects::layers::Motion::Moving(mover)));
     let r = GatherReads {
         master: master_id(259),
         ..reads()
@@ -667,7 +672,7 @@ fn a_gatherer_turning_over_time_faces_its_target_later() {
         position: Position::new(20.0, 40.0, 0.0),
         ..target(10.0)
     };
-    let faced = rig.run(GatherState::Face, 100, |c, u, me| {
+    let faced = rig.run(GatherState::Face, 100, |c, u, _, me| {
         g.update(c, u, me, Some(&mut bush), &r)
     });
     assert_eq!(faced, Ok(Next::Stay));
@@ -691,7 +696,7 @@ fn a_gatherer_s_drop_off_waits_walks_and_drops_its_load_at_the_site() {
     };
     let site = |takes, gap_squared| Some(crate::gathering::hunt::DropOff { takes, gap_squared });
     let drop = |g: &mut GatherAction, rig: &mut Rig, site| {
-        rig.run(GatherState::Drop, 100, |c, u, me| {
+        rig.run(GatherState::Drop, 100, |c, u, _, me| {
             g.update_drop(c, u, me, &reads(), site)
         })
     };
@@ -761,7 +766,7 @@ fn a_drop_off_whose_site_was_let_go_waits_a_random_while() {
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
     let draw = rig.next_wait();
-    let dropped = rig.run(GatherState::Drop, 100, |c, u, me| {
+    let dropped = rig.run(GatherState::Drop, 100, |c, u, _, me| {
         g.update_drop(c, u, me, &reads(), None)
     });
     assert_eq!(dropped, Ok(Dropped::Going));
@@ -782,7 +787,7 @@ fn a_gatherer_walks_to_its_drop_site_and_starts_again_when_it_moved() {
         ..GatherAction::new(task(), &bush(), true, rate()).unwrap()
     };
     let drop = |g: &mut GatherAction, rig: &mut Rig| {
-        rig.run(GatherState::Drop, 100, |c, u, me| {
+        rig.run(GatherState::Drop, 100, |c, u, _, me| {
             g.update_drop(c, u, me, &reads(), None)
         })
     };
@@ -829,7 +834,7 @@ fn a_gatherer_walks_to_its_target_and_faces_it_on_arrival() {
     };
     let walk = |g: &mut GatherAction, rig: &mut Rig, workers| {
         let mut house = house(workers);
-        rig.run(GatherState::Walk, 100, |c, u, me| {
+        rig.run(GatherState::Walk, 100, |c, u, _, me| {
             g.update(c, u, me, Some(&mut house), &reads())
         })
     };
@@ -927,7 +932,7 @@ fn a_gatherer_whose_move_to_lost_its_target_walks_back_to_its_point() {
         position: Position::new(30.0, 88.0, 0.0),
         ..target(10.0)
     };
-    let next = rig.run(GatherState::Walk, 100, |c, u, me| {
+    let next = rig.run(GatherState::Walk, 100, |c, u, _, me| {
         g.update(c, u, me, Some(&mut house), &reads())
     });
     assert_eq!(next, Ok(Next::Stay));
@@ -957,7 +962,7 @@ fn a_walk_to_a_point_ends_on_its_target_let_go_as_on_its_arrival() {
             computer,
             ..reads()
         };
-        rig.run(g.state, 100, |c, u, me| match g.state {
+        rig.run(g.state, 100, |c, u, _, me| match g.state {
             GatherState::WalkBack => g.update_walk_back(c, u, me, &r),
             GatherState::Moved => g.update_moved(c, u, me, &r),
             _ => g.update_reseed_walk(c, u, me, None, &r),
@@ -1016,7 +1021,7 @@ fn a_gatherer_facing_its_target_works_it() {
     };
     let mut r = reads();
     r.sprites.working = Some(working);
-    let next = rig.run(GatherState::Face, 100, |c, u, me| {
+    let next = rig.run(GatherState::Face, 100, |c, u, _, me| {
         g.update(c, u, me, Some(&mut house), &r)
     });
     assert_eq!(next, Ok(Next::Stay));
@@ -1395,7 +1400,9 @@ fn a_forager_gathers_until_its_load_is_full() {
         ..reads()
     };
     let gather = |rig: &mut Rig, bush: &mut Victim| {
-        rig.run(GatherState::Work, 500, |c, u, _| g.gather(c, u, bush, &r))
+        rig.run(GatherState::Work, 500, |c, u, _, _| {
+            g.gather(c, u, bush, &r)
+        })
     };
     let mut bush = target(100.0);
     assert_eq!(gather(&mut rig, &mut bush), Ok(Next::Stay));

@@ -147,29 +147,31 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     (v.class, v.move_sprite, v.standing_sprite) = (class, Some(WALKING), Some(STANDING));
     let mut mover = crate::gathering::hunt::tests::walker();
     mover.moved_at = at;
-    let builder = Unit {
-        id: BUILDER,
-        place: crate::objects::layers::Static::at(at),
-        life: Lifecycle {
-            class: Class::Animated,
-            state: ObjectState::Alive,
-            hp: HitPoints::new(25.0),
-            master_id: ids::VILLAGER_MALE,
-            attribute_type: None,
-            ..Lifecycle::default()
+    let builder = Object::with_actions(
+        Unit {
+            id: BUILDER,
+            place: crate::objects::layers::Static::at(at),
+            life: Lifecycle {
+                class: Class::Animated,
+                state: ObjectState::Alive,
+                hp: HitPoints::new(25.0),
+                master_id: ids::VILLAGER_MALE,
+                attribute_type: None,
+                ..Lifecycle::default()
+            },
+            sprite: Some(ActiveSprite::start(
+                graphic(WALKING),
+                &mut Well512::default(),
+            )),
+            pasture: None,
+            my_pasture: None,
+            ..Unit::default()
         },
-        actions: crate::objects::layers::ActionLayer {
+        crate::objects::layers::Action {
             list: ActionList::default().with_build(Some(build)),
             ..Default::default()
         },
-        sprite: Some(ActiveSprite::start(
-            graphic(WALKING),
-            &mut Well512::default(),
-        )),
-        pasture: None,
-        my_pasture: None,
-        ..Unit::default()
-    };
+    );
     let house = Unit {
         id: HOUSE,
         place: crate::objects::layers::Static::at(AT_HOUSE),
@@ -193,7 +195,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
         vec![
             Player::default(),
             Player {
-                objects: vec![builder, house].into(),
+                objects: vec![builder.unit, house].into(),
                 attributes: vec![Amount::ZERO; 250],
                 relations: relation_row([1, 0]),
                 ..Player::default()
@@ -207,7 +209,8 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             ..Default::default()
         },
     )])
-    .with_motions([(BUILDER, crate::objects::layers::MotionLayer::Moving(mover))])
+    .with_motions([(BUILDER, crate::objects::layers::Motion::Moving(mover))])
+    .with_actions([(BUILDER, builder.parts.actions)])
     .with_ais([(
         BUILDER,
         UnitAi {
@@ -256,16 +259,23 @@ type Top = (Option<ActionType>, Option<ObjectId>);
 /// [`Unit::build_part`]), its code and the builder's top action right after it (the work it
 /// gives within the update, slot 0x7e8, replaces the Build).
 fn update(t: &mut World, dt: u32) -> Result<(HeadCode, Top), GenieError> {
-    in_update(t, (PlayerId::new(1), ListIndex::new(0)), dt, |u, c| {
-        let me = Me {
-            human_order: WorldTime::ZERO,
-            id: u.id,
-            group: u.group.id,
-            action_state: u.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
-        };
-        let code = u.build_part(c, me)?;
-        Ok((code, (u.top_action_kind(), u.top_target())))
-    })
+    in_update(
+        t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        dt,
+        |u, actions, c| {
+            let me = Me {
+                human_order: WorldTime::ZERO,
+                id: u.id,
+                group: u.group.id,
+                action_state: actions
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
+            };
+            let code = u.build_part(actions, c, me)?;
+            Ok((code, (actions.top_action_kind(), actions.top_target())))
+        },
+    )
 }
 
 /// [`update`]'s code alone.
@@ -279,13 +289,18 @@ fn on_build<R>(
     t: &mut World,
     f: impl FnOnce(&mut BuildAction, &mut Step<'_>, &mut Unit, &BuildReads) -> Result<R, GenieError>,
 ) -> Result<R, GenieError> {
-    in_update(t, (PlayerId::new(1), ListIndex::new(0)), 20, |u, c| {
-        let mut b = *u.actions.list.build().unwrap();
-        let reads = u.build_reads(c, b)?;
-        let answer = f(&mut b, c, u, &reads);
-        *u.actions.list.build_mut().unwrap() = b;
-        answer
-    })
+    in_update(
+        t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        20,
+        |u, actions, c| {
+            let mut b = *actions.list.build().unwrap();
+            let reads = u.build_reads(c, b)?;
+            let answer = f(&mut b, c, u, &reads);
+            *actions.list.build_mut().unwrap() = b;
+            answer
+        },
+    )
 }
 
 /// The builder.
@@ -295,7 +310,7 @@ fn builder(t: &World) -> &Unit {
 
 /// The builder's Build.
 fn build(t: &World) -> BuildAction {
-    *builder(t).actions.list.build().unwrap()
+    *t.parts.actions_of(BUILDER).list.build().unwrap()
 }
 
 /// Player 1's object `id`.
@@ -1049,7 +1064,7 @@ fn a_builder_waiting_21_times_on_an_occupied_footprint_gives_up() {
         own(&mut t, BUILDER).footprint_waits = crate::construction::FootprintWaits::of_data(waits);
         let mut other = copy_of(&t, BUILDER);
         other.unit.id = object_id(6);
-        other.unit.actions.list = ActionList::default();
+        other.parts.actions.list = ActionList::default();
         other.unit.place_for_test(Position::new(10.6, 10.6, 0.0));
         let _ = t.push_live(PlayerId::new(1), other).unwrap();
         let me = *t.spatial.get(BUILDER).unwrap();
@@ -1410,8 +1425,9 @@ fn a_builder_s_drop_off_walks_to_the_drop_site_its_search_found() {
     assert_eq!((b.state, walk.state), (BuildState::Drop, MoveTo::Arrived));
     // without one, the Build task's moving sprite
     assert_eq!(walk.sprite.map(|g| g.id), Some(TASK_SPRITE));
-    own(&mut t, BUILDER)
-        .actions
+    t.parts
+        .actions_mut(BUILDER)
+        .unwrap()
         .list
         .build_mut()
         .unwrap()
@@ -1504,7 +1520,13 @@ fn a_builder_at_its_drop_site_gives_its_load_and_walks_back() {
     assert_eq!(wood(&t).0, 10.0);
     let _ = code(&mut t, 250);
     assert_eq!(build(&t).timer, Seconds::new(-2.75));
-    own(&mut t, BUILDER).actions.list.build_mut().unwrap().timer = Seconds::new(-0.1);
+    t.parts
+        .actions_mut(BUILDER)
+        .unwrap()
+        .list
+        .build_mut()
+        .unwrap()
+        .timer = Seconds::new(-0.1);
     let _ = code(&mut t, 250);
     // its search again: the mill out of reach is still the nearest, a MoveTo to it again
     let b = build(&t);
@@ -1662,7 +1684,7 @@ fn camp(t: &mut World, at: Position) {
 fn villager(t: &mut World, at: Position) {
     let mut other = copy_of(t, BUILDER);
     other.unit.id = object_id(6);
-    other.unit.actions.list = ActionList::default();
+    other.parts.actions.list = ActionList::default();
     other.unit.place_for_test(at);
     let _ = t.push_live(PlayerId::new(1), other).unwrap();
     let me = *t.spatial.get(BUILDER).unwrap();

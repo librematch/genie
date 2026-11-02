@@ -68,9 +68,10 @@ impl World {
         clears: bool,
     ) -> Result<bool, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let top = unit.top_action_kind();
-        let attacking = unit
-            .actions
+        let top = self.parts.actions_of(unit.id).top_action_kind();
+        let attacking = self
+            .parts
+            .actions_of(unit.id)
             .list
             .attack()
             .filter(|a| attack_on(top, a, target));
@@ -254,7 +255,10 @@ impl World {
             return Ok(());
         }
         // LAB_1410706a8: an action on the task found takes the new target itself (its slot 9)
-        let top = self.players.live(player, idx)?.top_action_kind();
+        let top = self
+            .parts
+            .actions_of(self.players.live(player, idx)?.id)
+            .top_action_kind();
         let kept = self.retake_task(player, idx, (target, point, clears), &task, same_master)?;
         if carry_test {
             self.carried_resource_test(player, idx, &task)?;
@@ -342,8 +346,8 @@ impl World {
         same_master: bool,
     ) -> Result<bool, GenieError> {
         let unit = &self.players.live(player, idx)?;
-        let top = unit.top_action_kind();
-        Ok(match unit.actions.list.hunt().copied() {
+        let top = self.parts.actions_of(unit.id).top_action_kind();
+        Ok(match self.parts.actions_of(unit.id).list.hunt().copied() {
             Some(h) if task.action_type == HUNT && h.task.id == task.id => {
                 self.retarget_hunt_work(player, idx, (target.ok_or(TERRAIN_TASK)?, point, clears))?;
                 true
@@ -365,8 +369,9 @@ impl World {
             }
             _ if top == Some(GATHER)
                 && task.action_type == GATHER
-                && unit
-                    .actions
+                && self
+                    .parts
+                    .actions_of(unit.id)
                     .list
                     .gather()
                     .is_some_and(|g| g.task.id == task.id) =>

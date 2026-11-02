@@ -170,6 +170,7 @@ impl WorldPicker<'_> {
                 self.parts.unit_ai.contains(t.id),
                 self.parts.building_of(t.id),
                 self.parts.combat_of(t.id),
+                self.parts.actions.of(t.id),
             ),
             tm,
             ta,
@@ -183,6 +184,7 @@ impl WorldPicker<'_> {
                 self.parts.unit_ai.contains(f.id),
                 self.parts.building_of(f.id),
                 self.parts.combat_of(f.id),
+                self.parts.actions.of(f.id),
             ),
             fm,
             fa,
@@ -243,6 +245,7 @@ impl WorldPicker<'_> {
                 self.parts.unit_ai.contains(o.id),
                 self.parts.building_of(o.id),
                 self.parts.combat_of(o.id),
+                self.parts.actions.of(o.id),
             ),
             om,
             attributes,
@@ -250,9 +253,10 @@ impl WorldPicker<'_> {
             terrain,
             self.mode_680,
         );
-        let attacked = (o.top_action_kind() == Some(crate::combat::attack::ATTACK))
-            .then(|| o.top_target())
-            .flatten();
+        let attacked = (self.parts.actions_of(o.id).top_action_kind()
+            == Some(crate::combat::attack::ATTACK))
+        .then(|| self.parts.actions_of(o.id).top_target())
+        .flatten();
         let target = match attacked {
             Some(t) => self.held(t)?.map(|(tq, t, ta, tm)| {
                 victim_of(
@@ -261,6 +265,7 @@ impl WorldPicker<'_> {
                         self.parts.unit_ai.contains(t.id),
                         self.parts.building_of(t.id),
                         self.parts.combat_of(t.id),
+                        self.parts.actions.of(t.id),
                     ),
                     tm,
                     ta,

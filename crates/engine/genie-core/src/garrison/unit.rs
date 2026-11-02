@@ -59,13 +59,18 @@ impl Unit {
     /// # Errors
     ///
     /// The reads' and the update's.
-    pub(crate) fn enter_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let Some(mut enter) = self.actions.list.enter().copied() else {
+    pub(crate) fn enter_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<HeadCode, GenieError> {
+        let Some(mut enter) = actions.list.enter().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.enter_reads(c, &enter)?;
-        let updated = enter.update(c, self, me, &reads);
-        if let Some(e) = self.actions.list.enter_mut() {
+        let updated = enter.update(c, self, actions, me, &reads);
+        if let Some(e) = actions.list.enter_mut() {
             *e = enter;
         }
         updated
@@ -148,6 +153,7 @@ impl Unit {
     /// then the update's own `set_state(1)`).
     pub(crate) fn enter_in_update(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         target: Option<ContainerId>,
     ) -> Result<(), GenieError> {
@@ -158,13 +164,13 @@ impl Unit {
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             target.id(),
         );
-        if !self.enter_building(c, target, inside)? {
+        if !self.enter_building(actions, c, target, inside)? {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",
             ));
         }
         // the update's own set_state(1) after the enter's
-        self.entered(c)
+        self.entered(actions, c)
     }
 
     /// `FUN_140a867b0` on a unit inside its target already (the update's walk again put it in):
@@ -174,14 +180,18 @@ impl Unit {
     /// # Errors
     ///
     /// The notify's and the `set_state(1)`'s.
-    pub(crate) fn entered_again(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn entered_again(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         self.post_own(
             &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_COMPLETED,
             [ActionKind::Enter.value(), 0, 0],
         )?;
         for _ in 0..2 {
-            self.entered(c)?;
+            self.entered(actions, c)?;
         }
         Ok(())
     }
@@ -192,11 +202,11 @@ impl Unit {
     /// start shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
     pub(crate) fn transport_update(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
-        let mut t = *self
-            .actions
+        let mut t = *actions
             .list
             .transport()
             .ok_or(crate::garrison::transport::NO_TRANSPORT)?;
@@ -220,8 +230,8 @@ impl Unit {
                 .copied(),
         };
         // written back before an error too: the stop's context reads the list
-        let code = t.update(c, self, me, &reads);
-        if let Some(own) = self.actions.list.transport_mut() {
+        let code = t.update(c, self, actions, me, &reads);
+        if let Some(own) = actions.list.transport_mut() {
             *own = t;
         }
         Ok(HeadCode::of(code?))
@@ -232,6 +242,7 @@ impl Unit {
     /// `MoveTo`'s teardown) and takes its standing sprite; `motion` is the unit's motion layer.
     pub(crate) fn transport_sail(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         mut motion: MotionMut<'_>,
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut crate::pathing::zones::Zones, &mut Pathing),
@@ -245,8 +256,7 @@ impl Unit {
         ),
     ) -> Result<(), GenieError> {
         let master = self.master_in(masters)?;
-        let task = self
-            .actions
+        let task = actions
             .list
             .transport()
             .ok_or(GenieError::unreachable("a sail without its Transport"))?
@@ -266,8 +276,7 @@ impl Unit {
             restriction,
             self.position(),
         )?;
-        let t = self
-            .actions
+        let t = actions
             .list
             .transport_mut()
             .ok_or(GenieError::unreachable("a sail without its Transport"))?;
@@ -283,14 +292,6 @@ impl Unit {
         Ok(())
     }
 
-    /// The unit's new Enter: its own action, or with `sub` the sub-action of its Artifact on top.
-    pub(crate) fn place_enter(&mut self, action: crate::garrison::EnterAction, sub: bool) {
-        match self.actions.list.artifact_mut().filter(|_| sub) {
-            Some(art) => art.enter = Some(action),
-            None => self.actions.list.set_enter(Some(action)),
-        }
-    }
-
     /// The Enter's `set_state(1)` (`FUN_140a87320` case 1): its sub-actions go (`FUN_140a98620`: a
     /// `MoveTo`'s teardown stops the unit, slot 0x5d0), the unit shows its master's standing
     /// sprite ([`Unit::shows_standing_sprite`]) and, the Enter not being quiet, its unit AI gets
@@ -299,9 +300,12 @@ impl Unit {
     /// # Errors
     ///
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
-    pub(crate) fn entered(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        let enter = self
-            .actions
+    pub(crate) fn entered(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
+        let enter = actions
             .list
             .enter_mut()
             .ok_or(GenieError::unsupported("an entered unit without its Enter"))?;
@@ -347,6 +351,7 @@ impl Unit {
     /// a Gaia building's capture (slot 0x70) are not held.
     pub(crate) fn enter_building(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         target: ContainerId,
         inside: usize,
@@ -438,13 +443,13 @@ impl Unit {
         if bm.garrison.units() <= inside {
             return Ok(false);
         }
-        self.go_inside(c, target, &me, &bm)?;
+        self.go_inside(actions, c, target, &me, &bm)?;
         self.post_own(
             &mut c.w.parts.unit_ai,
             crate::unit_ai::NotifyKind::ACTION_COMPLETED,
             [ActionKind::Enter.value(), 0, 0],
         )?;
-        self.entered(c)?;
+        self.entered(actions, c)?;
         Ok(true)
     }
 
@@ -460,6 +465,7 @@ impl Unit {
     /// `+0x9a8` (the units inside the unit), and a siege building's slot 0x1b0 are not modelled.
     pub(crate) fn go_inside(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         target: ContainerId,
         me: &Master,
@@ -497,7 +503,7 @@ impl Unit {
         // (slot 0x560)
         if let Some(group) = self.group.id {
             if c.w.groups.get(group).is_some() {
-                c.lend(self, |w| {
+                c.lend((&mut *self, &mut *actions), |w| {
                     w.remove_unit(group, id, Some(target.id()), false).map(drop)
                 })?;
             }
@@ -650,15 +656,29 @@ impl Unit {
     /// its 1). A unit its actions got in this update waits for the next. An empty list takes the
     /// default task instead: livestock inside makes its Artifact in one update and loses it in
     /// the next.
-    pub(crate) fn inside_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
-        if !self.actions.list.is_empty() {
-            return self.end_head_update(c, HeadCode::Deletes);
+    pub(crate) fn inside_update(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
+        if !actions.list.is_empty() {
+            return self.end_head_update(actions, c, HeadCode::Deletes);
         }
-        if self.actions.unmodelled_action.is_some() {
+        if actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "the inside update of an action the slice does not hold",
             ));
         }
         Ok(())
+    }
+}
+
+impl crate::objects::layers::Action {
+    /// The unit's new Enter: its own action, or with `sub` the sub-action of its Artifact on top.
+    pub(crate) fn place_enter(&mut self, action: crate::garrison::EnterAction, sub: bool) {
+        match self.list.artifact_mut().filter(|_| sub) {
+            Some(art) => art.enter = Some(action),
+            None => self.list.set_enter(Some(action)),
+        }
     }
 }

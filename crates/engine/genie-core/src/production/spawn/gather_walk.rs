@@ -63,7 +63,7 @@ impl World {
         if let Some(m) = self.parts.mover_mut(unit.id) {
             m.waiting = 1;
         }
-        if unit.top_action_kind().is_some() {
+        if self.parts.actions_of(unit.id).top_action_kind().is_some() {
             return Err(GenieError::unsupported(
                 "a gather point's move of a unit with an action",
             ));
@@ -102,9 +102,8 @@ impl World {
         if villager {
             self.parts.set_town_bell_flag(unit.id, false);
         }
-        unit.actions
-            .list
-            .set_move_to(Some(crate::movement::move_to::MoveToAction {
+        self.parts.actions_mut(unit.id)?.list.set_move_to(Some(
+            crate::movement::move_to::MoveToAction {
                 sprite,
                 state: crate::movement::move_to::MoveTo::Start,
                 point,
@@ -113,7 +112,8 @@ impl World {
                 quiet: false,
                 on_target_moved: crate::movement::move_to::TargetMoved::Follows,
                 wait: crate::movement::move_to::MoveWait::default(),
-            }));
+            },
+        ));
         Ok(())
     }
 

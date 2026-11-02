@@ -57,7 +57,6 @@ impl UnitView<'_, '_> {
             .master(self.c.w.master_tables(), self.player)?
             .clone();
         let master = &own;
-        let unit = &mut *self.unit;
         if matches!(master.class, class::CLASS_51 | class::CLASS_54) {
             return Err(GenieError::unsupported(
                 "the attack command of a unit of class 51 or 54",
@@ -67,7 +66,7 @@ impl UnitView<'_, '_> {
         let Some(t) = self.c.w.spatial.get_known(target)?.copied() else {
             return Ok(no());
         };
-        if unit
+        if self
             .actions
             .list
             .attack()
@@ -141,7 +140,7 @@ impl UnitView<'_, '_> {
         };
         let unit = &mut *self.unit;
         let (attack, posted) = crate::combat::attack::Attack::command(self.c, unit, &cmd)?;
-        unit.actions.list.set_attack(Some(attack));
+        self.actions.list.set_attack(Some(attack));
         self.take(target, by)?;
         Ok(crate::unit_ai::Attacked {
             attacks: true,
@@ -178,7 +177,7 @@ impl UnitView<'_, '_> {
             self.c.w.streams.get(Stream::Sprite),
         )?;
         let target = attack.target;
-        unit.actions.list.set_attack(Some(attack));
+        self.actions.list.set_attack(Some(attack));
         if let Some(target) = target {
             self.take(target, by)?;
         }
@@ -200,6 +199,7 @@ impl UnitView<'_, '_> {
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.unit.tear_down_actions(
+            self.actions,
             self.c.w.parts.motion.layer_mut(self.unit.id),
             &mut releases,
             &mut leaves,
@@ -270,7 +270,7 @@ impl UnitView<'_, '_> {
             radius: master.radius,
         };
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE;
-        let attack = unit
+        let attack = self
             .actions
             .list
             .attack_mut()
@@ -328,6 +328,7 @@ impl UnitView<'_, '_> {
                 self.c.w.parts.unit_ai.contains(t.id),
                 self.c.w.parts.building_of(t.id),
                 self.c.w.parts.combat_of(t.id),
+                self.c.w.parts.actions.of(t.id),
             ),
             (q, master, attributes),
             (self.player, &dip),
@@ -357,6 +358,7 @@ impl UnitView<'_, '_> {
                 self.c.w.parts.unit_ai.contains(unit.id),
                 self.c.w.parts.building_of(unit.id),
                 self.c.w.parts.combat_of(unit.id),
+                &*self.actions,
             ),
             master,
             &self.c.w.players.player(self.player)?.attributes,

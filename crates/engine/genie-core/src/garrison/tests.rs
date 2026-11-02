@@ -473,10 +473,10 @@ fn a_transport_s_enter_walks_to_it_and_sends_it_where_they_meet() {
     );
     assert_eq!(enter.walk_range(false), Distance::ZERO);
     assert_eq!(enter.walk_range(true), Distance::new(1.0));
-    t.object_mut(object_id(200))
-        .unwrap()
-        .1
+    t.parts
         .actions
+        .of_mut(object_id(200))
+        .unwrap()
         .list
         .set_move_to(Some(MoveToAction {
             sprite: None,
@@ -519,10 +519,10 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
             turns: false,
         });
     }
-    t.object_mut(object_id(1000))
-        .unwrap()
-        .1
+    t.parts
         .actions
+        .of_mut(object_id(1000))
+        .unwrap()
         .list
         .set_enter(Some(enter));
     t
@@ -547,23 +547,23 @@ fn ship_enter(point: Position, state: MoveTo) -> EnterAction {
 /// [`Unit::enter_part`]) and its code.
 fn enter_update(t: &mut World, dt: u32) -> Result<HeadCode, GenieError> {
     let v = villager(t);
-    crate::world::tests::in_update(t, (PlayerId::new(1), v), dt, |u, c| {
+    crate::world::tests::in_update(t, (PlayerId::new(1), v), dt, |u, actions, c| {
         let me = crate::movement::Me {
             human_order: WorldTime::ZERO,
             id: u.id,
             group: u.group.id,
-            action_state: u.top_action().map_or(ActionState::NO_ACTION, |a| a.state),
+            action_state: actions
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state),
         };
-        u.enter_part(c, me)
+        u.enter_part(actions, c, me)
     })
 }
 
 /// Villager 1000's Enter.
 fn enter_of(t: &World) -> EnterAction {
-    t.object(object_id(1000))
-        .unwrap()
-        .1
-        .actions
+    t.parts
+        .actions_of(object_id(1000))
         .list
         .enter()
         .copied()
@@ -572,10 +572,8 @@ fn enter_of(t: &World) -> EnterAction {
 
 /// Ship 200's `MoveTo` goal, if it has one.
 fn ship_goal(t: &World) -> Option<Position> {
-    t.object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+    t.parts
+        .actions_of(object_id(200))
         .list
         .move_to()
         .and_then(MoveToAction::goal)
@@ -659,8 +657,10 @@ fn an_enter_s_waiting_move_to_asks_again_at_its_delay() {
         (e.state, e.move_to.map(|m| (m.state, m.wait.timer))),
         (EnterState::Walk, Some((MoveTo::Waiting, Seconds::new(0.5))))
     );
-    let v = t.object_mut(object_id(1000)).unwrap().1;
-    v.actions
+    t.parts
+        .actions
+        .of_mut(object_id(1000))
+        .unwrap()
         .list
         .enter_mut()
         .unwrap()
@@ -728,8 +728,10 @@ fn a_failed_move_walks_again_once_then_waits_and_a_wait_walks_again() {
         (e.retry, e.move_to.map(|m| m.state), e.state),
         (false, Some(MoveTo::Start), EnterState::Walk)
     );
-    let v = t.object_mut(object_id(1000)).unwrap().1;
-    v.actions
+    t.parts
+        .actions
+        .of_mut(object_id(1000))
+        .unwrap()
         .list
         .enter_mut()
         .unwrap()
@@ -1837,8 +1839,8 @@ fn a_gather_point_on_its_own_building_takes_the_new_unit_in() {
         (
             v.life.inside,
             v.life.state,
-            v.actions.list.move_to().is_some(),
-            v.actions.list.enter().is_some()
+            t.parts.actions_of(v.id).list.move_to().is_some(),
+            t.parts.actions_of(v.id).list.enter().is_some()
         ),
         (Some(container_id(100)), state, false, false)
     );
@@ -2420,10 +2422,8 @@ fn a_garrison_near_its_target_reads_the_count_list_at_its_pairs_index() {
             true,
         )
         .unwrap();
-        t.object(object_id(1000))
-            .unwrap()
-            .1
-            .actions
+        t.parts
+            .actions_of(object_id(1000))
             .list
             .enter()
             .map(|e| e.target)
@@ -2452,7 +2452,10 @@ fn a_garrison_through_the_unit_ais_queues_their_enter_orders() {
     )
     .unwrap();
     let v = t.object(object_id(1000)).unwrap().1;
-    assert_eq!(v.actions.list.enter().copied(), None);
+    assert_eq!(
+        t.parts.actions_of(object_id(1000)).list.enter().copied(),
+        None
+    );
     assert_eq!(
         t.parts.unit_ai.get(v.id).unwrap().orders,
         [crate::unit_ai::QueuedOrder {
@@ -2662,10 +2665,8 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
     )
     .unwrap();
     let ship = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .move_to()
         .copied()
@@ -2685,10 +2686,8 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
         )
     );
     let enter = t
-        .object(object_id(1000))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(1000))
         .list
         .enter()
         .copied()
@@ -2723,17 +2722,21 @@ fn a_villager_sent_into_a_ship_meets_it_at_the_shore_on_the_way() {
 fn a_villager_meets_a_moving_ship_where_it_goes() {
     // FUN_140a85f30 on a ship under a MoveTo (state 3): its goal, code 0, no order
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
-    let ship = t.object_mut(object_id(200)).unwrap().1;
-    ship.actions.list.set_move_to(Some(MoveToAction {
-        sprite: None,
-        state: MoveTo::Start,
-        point: Position::new(9.5, 19.5, 0.0),
-        target: None,
-        range: Distance::ZERO,
-        quiet: false,
-        on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-        wait: crate::movement::move_to::MoveWait::default(),
-    }));
+    t.parts
+        .actions
+        .of_mut(object_id(200))
+        .unwrap()
+        .list
+        .set_move_to(Some(MoveToAction {
+            sprite: None,
+            state: MoveTo::Start,
+            point: Position::new(9.5, 19.5, 0.0),
+            target: None,
+            range: Distance::ZERO,
+            quiet: false,
+            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+            wait: crate::movement::move_to::MoveWait::default(),
+        }));
     t.garrison_order(
         player_id(1),
         &object_ids([1000]),
@@ -2743,10 +2746,8 @@ fn a_villager_meets_a_moving_ship_where_it_goes() {
     )
     .unwrap();
     let enter = t
-        .object(object_id(1000))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(1000))
         .list
         .enter()
         .copied()
@@ -2756,10 +2757,8 @@ fn a_villager_meets_a_moving_ship_where_it_goes() {
         (Position::new(9.5, 19.5, 0.0), Some(MoveTo::Start))
     );
     assert_eq!(
-        t.object(object_id(200))
-            .unwrap()
-            .1
-            .actions
+        t.parts
+            .actions_of(object_id(200))
             .list
             .move_to()
             .copied()
@@ -2769,10 +2768,10 @@ fn a_villager_meets_a_moving_ship_where_it_goes() {
     );
     // the same order again: the work command finds the Enter's own task, whose slot 9 (the
     // base's, 0x140a7bf40) takes no new target, so a new Enter replaces it
-    t.object_mut(object_id(1000))
-        .unwrap()
-        .1
+    t.parts
         .actions
+        .of_mut(object_id(1000))
+        .unwrap()
         .list
         .enter_mut()
         .unwrap()
@@ -2786,10 +2785,8 @@ fn a_villager_meets_a_moving_ship_where_it_goes() {
     )
     .unwrap();
     let enter = t
-        .object(object_id(1000))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(1000))
         .list
         .enter()
         .copied()
@@ -2802,8 +2799,10 @@ fn a_villager_meets_a_sailing_transport_where_it_sails() {
     // FUN_140a85f30 on a ship whose Transport sails (state 11): the Transport's point (its
     // +0x38, +0x3c, FUN_140a7be40 and FUN_140a7be50), code 0
     let mut t = shore_world(Point::new(5.5, 12.5), Point::new(5.5, 30.5));
-    let ship = t.object_mut(object_id(200)).unwrap().1;
-    ship.actions
+    t.parts
+        .actions
+        .of_mut(object_id(200))
+        .unwrap()
         .list
         .set_transport(Some(transport::TransportAction {
             state: TransportState::Sail,
@@ -2820,10 +2819,8 @@ fn a_villager_meets_a_sailing_transport_where_it_sails() {
     )
     .unwrap();
     let enter = t
-        .object(object_id(1000))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(1000))
         .list
         .enter()
         .copied()
@@ -2956,8 +2953,9 @@ fn an_unload_command_sends_a_transport_toward_the_shore() {
     .run(&mut t)
     .unwrap();
     let ship = t.object(object_id(200)).unwrap().1;
-    let tr = ship
-        .actions
+    let tr = t
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3004,10 +3002,8 @@ fn an_unload_command_sends_a_transport_toward_the_shore() {
     .run(&mut t)
     .unwrap();
     let again = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3020,10 +3016,8 @@ fn an_unload_command_sends_a_transport_toward_the_shore() {
     t.transport_order(PlayerId::new(1), idx, Position::new(17.5, 10.5, 0.0))
         .unwrap();
     let tr = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3091,8 +3085,9 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
     )
     .unwrap();
     let ship = t.object(object_id(200)).unwrap().1;
-    let tr = ship
-        .actions
+    let tr = t
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3129,10 +3124,8 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
     )
     .unwrap();
     let again = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3150,13 +3143,7 @@ fn a_work_command_on_a_land_point_makes_a_transport_that_sails_there() {
     )
     .unwrap();
     assert_eq!(
-        t.object(object_id(200))
-            .unwrap()
-            .1
-            .actions
-            .list
-            .transport()
-            .copied(),
+        t.parts.actions_of(object_id(200)).list.transport().copied(),
         None
     );
 }
@@ -3186,7 +3173,11 @@ fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
     .unwrap();
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(
-        ship.actions.list.transport().map(|tr| tr.mode),
+        t.parts
+            .actions_of(object_id(200))
+            .list
+            .transport()
+            .map(|tr| tr.mode),
         Some(TransportMode::NEW)
     );
     let ai = t.parts.unit_ai.get(ship.id).unwrap();
@@ -3209,10 +3200,8 @@ fn a_trade_boat_s_work_at_its_own_market_makes_a_new_transport() {
     )
     .unwrap();
     assert_eq!(
-        t.object(object_id(200))
-            .unwrap()
-            .1
-            .actions
+        t.parts
+            .actions_of(object_id(200))
             .list
             .transport()
             .map(|tr| tr.mode),
@@ -3238,10 +3227,8 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
     .run(&mut t)
     .unwrap();
     let tr = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3264,7 +3251,11 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
     assert_eq!(
-        ship.actions.list.transport().map(|t| t.state),
+        t.parts
+            .actions_of(object_id(200))
+            .list
+            .transport()
+            .map(|t| t.state),
         Some(TransportState::Idle)
     );
     // a move to a point: the idle Transport takes it (its slot 8, 0x140aa3e40) and sails
@@ -3272,8 +3263,13 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
     let taken = t
         .move_to_point(PlayerId::new(1), idx, Position::new(5.5, 5.5, 0.0))
         .unwrap();
-    let ship = t.object(object_id(200)).unwrap().1;
-    let tr = ship.actions.list.transport().copied().unwrap();
+    let tr = t
+        .parts
+        .actions_of(object_id(200))
+        .list
+        .transport()
+        .copied()
+        .unwrap();
     assert!(taken);
     assert_eq!(
         (
@@ -3281,7 +3277,7 @@ fn a_transport_beside_the_shore_puts_its_units_ashore() {
             tr.mode,
             tr.point,
             tr.move_to.map(|m| m.state),
-            ship.actions.list.move_to().copied()
+            t.parts.actions_of(object_id(200)).list.move_to().copied()
         ),
         (
             TransportState::Sail,
@@ -3323,10 +3319,8 @@ fn a_transport_without_a_drop_location_sails_on_to_a_new_point() {
     let x = (action.rand15() / 0xccc) as f32 + 15.5 - 5.0;
     let y = (action.rand15() / 0xccc) as f32 + 10.5 - 5.0;
     let tr = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3364,7 +3358,10 @@ fn a_unit_inside_a_transport_unloaded_goes_ashore_about_it() {
     assert!(!t.parts.town_bell_of(v.id).flag);
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
-    assert_eq!(ship.actions.list.transport().copied(), None);
+    assert_eq!(
+        t.parts.actions_of(object_id(200)).list.transport().copied(),
+        None
+    );
     // flag 3 names the unit inside: the ship lets it out the same way
     let mut t = coast_world(Point::new(14.5, 10.5));
     let spot = ashore(&mut t, Point::new(14.5, 10.5), 1.0);
@@ -3471,7 +3468,11 @@ fn a_villager_beside_a_ship_enters_it_at_once() {
     assert_eq!(v.life.inside, Some(container_id(200)));
     assert_eq!(v.position().ground(), Point::new(5.5, 20.5));
     assert_eq!(
-        v.actions.list.enter().map(|e| e.state),
+        t.parts
+            .actions_of(object_id(1000))
+            .list
+            .enter()
+            .map(|e| e.state),
         Some(EnterState::Done)
     );
     assert!(!t.parts.town_bell_of(v.id).flag);
@@ -3535,13 +3536,7 @@ fn a_villager_enters_an_allys_ship_with_its_owners_masters() {
     )
     .unwrap();
     assert_eq!(
-        t.object(object_id(1000))
-            .unwrap()
-            .1
-            .actions
-            .list
-            .enter()
-            .copied(),
+        t.parts.actions_of(object_id(1000)).list.enter().copied(),
         None
     );
 }
@@ -3569,15 +3564,7 @@ fn seek_shelter_sends_the_players_villagers_and_checked_units_to_its_buildings()
     walker(&mut t, PlayerId::new(1), 1001, ARCHER, Point::new(6.5, 5.5));
     t.seek_shelter(player_id(1), &object_ids([1000, 2000, 1001, 4242]))
         .unwrap();
-    let enter = |t: &World, id: ObjectId| {
-        t.object(id)
-            .unwrap()
-            .1
-            .actions
-            .list
-            .enter()
-            .map(|e| e.target)
-    };
+    let enter = |t: &World, id: ObjectId| t.parts.actions_of(id).list.enter().map(|e| e.target);
     assert_eq!(enter(&t, object_id(1000)), Some(Some(container_id(100))));
     // the ally's villager was dropped by the check; the archer is no villager
     assert_eq!(
@@ -3841,10 +3828,10 @@ fn transport_ticked(
     .run(&mut t)
     .unwrap();
     set(t
-        .object_mut(object_id(200))
-        .unwrap()
-        .1
+        .parts
         .actions
+        .of_mut(object_id(200))
+        .unwrap()
         .list
         .transport_mut()
         .unwrap());
@@ -3869,19 +3856,20 @@ fn a_transport_unloads_inside_its_own_update() {
     .run(&mut t)
     .unwrap();
     let i = t.players[1].objects.position_of(object_id(200)).unwrap();
-    let seen = crate::world::tests::in_update(&mut t, (PlayerId::new(1), i), 100, |unit, c| {
-        let me = crate::movement::Me {
-            human_order: WorldTime::ZERO,
-            id: unit.id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
-        let _ = unit.transport_update(c, me)?;
-        let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
-        Ok((inside, unit.actions.list.transport().map(|t| t.state)))
-    });
+    let seen =
+        crate::world::tests::in_update(&mut t, (PlayerId::new(1), i), 100, |unit, actions, c| {
+            let me = crate::movement::Me {
+                human_order: WorldTime::ZERO,
+                id: unit.id,
+                group: unit.group.id,
+                action_state: actions
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
+            };
+            let _ = unit.transport_update(actions, c, me)?;
+            let inside = c.w.object(object_id(1000)).map(|(_, u)| u.life.inside);
+            Ok((inside, actions.list.transport().map(|t| t.state)))
+        });
     assert_eq!(seen, Ok((Some(None), Some(TransportState::Idle))));
 }
 
@@ -3895,7 +3883,11 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     let t = transport_ticked(Point::new(14.5, 10.5), Point::new(15.5, 10.5), |_| ());
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(
-        ship.actions.list.transport().map(|t| t.state),
+        t.parts
+            .actions_of(object_id(200))
+            .list
+            .transport()
+            .map(|t| t.state),
         Some(TransportState::Idle)
     );
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
@@ -3903,7 +3895,10 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     let failed = |tr: &mut transport::TransportAction| tr.state = TransportState::Failed;
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), failed);
     let ship = t.object(object_id(200)).unwrap().1;
-    assert_eq!(ship.actions.list.transport().copied(), None);
+    assert_eq!(
+        t.parts.actions_of(object_id(200)).list.transport().copied(),
+        None
+    );
     let heard: Vec<_> = t
         .parts
         .unit_ai
@@ -3923,10 +3918,8 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     // off the shore its MoveTo starts: the walk the unit AI asked for moves on
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), |_| ());
     let tr = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3943,10 +3936,8 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     };
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), far);
     let tr = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
+        .parts
+        .actions_of(object_id(200))
         .list
         .transport()
         .copied()
@@ -3970,10 +3961,10 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     .run(&mut t)
     .unwrap();
     far(t
-        .object_mut(object_id(200))
-        .unwrap()
-        .1
+        .parts
         .actions
+        .of_mut(object_id(200))
+        .unwrap()
         .list
         .transport_mut()
         .unwrap());
@@ -3988,19 +3979,15 @@ fn a_transport_s_update_unloads_beside_the_shore_and_ends_when_done_or_failed() 
     );
     // the list holds the Transport as the update left it before the error (idle), which the
     // stop's context reads
-    let tr = t
-        .object(object_id(200))
-        .unwrap()
-        .1
-        .actions
-        .list
-        .transport()
-        .copied();
+    let tr = t.parts.actions_of(object_id(200)).list.transport().copied();
     assert_eq!(tr.map(|tr| tr.state), Some(TransportState::Idle));
     let done = |tr: &mut transport::TransportAction| tr.state = TransportState::Done;
     let t = transport_ticked(Point::new(10.5, 10.5), Point::new(17.5, 10.5), done);
     let ship = t.object(object_id(200)).unwrap().1;
-    assert_eq!(ship.actions.list.transport().copied(), None);
+    assert_eq!(
+        t.parts.actions_of(object_id(200)).list.transport().copied(),
+        None
+    );
     assert_eq!(t.parts.unit_ai.get(ship.id).unwrap().notifies, []);
     assert_eq!(
         t.object(object_id(1000)).unwrap().1.life.inside,
@@ -4065,7 +4052,7 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
         t.parts.unit_ai.get(v.id).map(|a| a.current_target),
         Some(Some(object_id(77)))
     );
-    assert_eq!(v.top_action(), None);
+    assert_eq!(t.parts.actions_of(object_id(1000)).top_action(), None);
     let gather = |t: &mut World| {
         let id = t.players[1].objects[ListIndex::new(0)].id;
         t.set_part(
@@ -4087,7 +4074,7 @@ fn a_unit_let_out_works_its_record_or_the_gather_point_s_target() {
         t.parts.unit_ai.get(v.id).map(|a| a.current_target),
         Some(None)
     );
-    assert_eq!(v.top_action(), None);
+    assert_eq!(t.parts.actions_of(object_id(1000)).top_action(), None);
 }
 
 /// A gather point of state 0xff (SET GATHER STATE's) replaces the point a unit is let out toward
@@ -4292,7 +4279,7 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
     );
     let v = villager(&t);
     let mut update = |list: &mut Option<MoveToAction>| {
-        crate::world::tests::in_update(&mut t, (PlayerId::new(1), v), 0, |u, c| {
+        crate::world::tests::in_update(&mut t, (PlayerId::new(1), v), 0, |u, _, c| {
             let me = crate::movement::Me {
                 human_order: WorldTime::ZERO,
                 id: u.id,

@@ -166,12 +166,16 @@ impl MakeAction {
 
 impl Unit {
     /// A farm's Make in its update ([`MakeAction::update`]) and its code: nothing without one.
-    pub(crate) fn make_part(&mut self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
-        let Some(mut make) = self.actions.list.make().copied() else {
+    pub(crate) fn make_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<HeadCode, GenieError> {
+        let Some(mut make) = actions.list.make().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let made = make.update(c, self);
-        if let Some(m) = self.actions.list.make_mut() {
+        if let Some(m) = actions.list.make_mut() {
             *m = make;
         }
         made
@@ -232,7 +236,7 @@ mod tests {
     /// Player 1's farm 600 of `master` holding `amount` of food under `make`, its masters the
     /// farms 50 and 1897 and the class-42 master 7.
     fn farm_world(make: MakeAction, master: MasterId, amount: f32) -> World {
-        let mut farm = Unit {
+        let farm = Unit {
             id: object_id(600),
             life: Lifecycle {
                 state: ObjectState::Alive,
@@ -244,7 +248,8 @@ mod tests {
             },
             ..Unit::default()
         };
-        farm.actions.list.set_make(Some(make));
+        let mut layer = crate::objects::layers::Action::default();
+        layer.list.set_make(Some(make));
         let owner = Player {
             objects: vec![farm].into(),
             attributes: attributes(),
@@ -256,7 +261,8 @@ mod tests {
             PlayerId::new(1),
             vec![Millis::ZERO, Millis::ZERO],
             vec![Player::default(), owner],
-        );
+        )
+        .with_actions([(object_id(600), layer)]);
         let wall = Master {
             class: NEVER_EXHAUSTED_CLASS,
             ..farm_master(ids::ID_7)
@@ -279,7 +285,7 @@ mod tests {
         let farm = &t.players[1].objects[ListIndex::new(0)];
         (
             code,
-            *farm.actions.list.make().unwrap(),
+            *t.parts.actions_of(farm.id).list.make().unwrap(),
             farm.life.amount.get(),
             farm.life.hp.get(),
         )

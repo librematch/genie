@@ -21,7 +21,11 @@ impl Unit {
     /// (`FUN_14119d710`, [`Unit::state_set_off`]): the death, the ghost, the annexes' states,
     /// the sight, the remains and the death spawn. [`Outcome::Leave`] when the object leaves the
     /// world.
-    pub(crate) fn life_step(&mut self, c: &mut Step<'_>) -> Result<Outcome, GenieError> {
+    pub(crate) fn life_step(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<Outcome, GenieError> {
         self.dying_storage_leaves(c)?;
         let before = self.life.state;
         if before == ObjectState::DyingSprite && self.sprite.is_none() {
@@ -42,7 +46,7 @@ impl Unit {
             } else {
                 Outcome::Stay
             };
-        self.state_set_off(c, before)?;
+        self.state_set_off(actions, c, before)?;
         Ok(leaves)
     }
 
@@ -82,30 +86,33 @@ impl Unit {
     /// that holds nothing makes its death spawn ([`Unit::death_spawn_comes`]).
     pub(crate) fn state_set_off(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         before: ObjectState,
     ) -> Result<(), GenieError> {
         let after = self.life.state;
         if before <= ObjectState::Alive && ObjectState::Dying <= after {
-            self.died(c, before)?;
+            self.died(actions, c, before)?;
             if self.master(c.w.master_tables(), c.player)?.ghost_on_death == GhostMode::LEAVES
                 && c.w.game_state.leaves_ghosts()
             {
                 // the ghosts of the death (FUN_14118e990), the object lent to the world
                 let (p, id) = (c.player, self.id);
-                c.lend(self, |w| w.ghosts_at_death(p.index(), id))?;
+                c.lend((&mut *self, &mut *actions), |w| {
+                    w.ghosts_at_death(p.index(), id)
+                })?;
             }
         }
-        self.annexes_follow(c, before, after)?;
+        self.annexes_follow(actions, c, before, after)?;
         self.sight_follows(c, before, after)?;
         if before == ObjectState::DyingSprite && after == ObjectState::Dead {
-            self.dying_sprite_ended(c)?;
+            self.dying_sprite_ended(actions, c)?;
         }
         if matches!(before, ObjectState::Dying | ObjectState::Dead)
             && after == ObjectState::Removed
             && self.life.death_spawn
         {
-            self.death_spawn_comes(c)?;
+            self.death_spawn_comes(actions, c)?;
         }
         Ok(())
     }
@@ -121,6 +128,7 @@ impl Unit {
     /// What an annex's `set_state` does not model.
     pub(crate) fn annexes_follow(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         before: ObjectState,
         after: ObjectState,
@@ -133,7 +141,9 @@ impl Unit {
             let annexes = c.w.parts.building_of(self.id).annexes;
             for annex in annexes.ids() {
                 if let Some((q, _)) = c.w.object(annex) {
-                    c.lend(self, |w| w.set_state(q, annex, after))?;
+                    c.lend((&mut *self, &mut *actions), |w| {
+                        w.set_state(q, annex, after)
+                    })?;
                 }
             }
         }
@@ -172,7 +182,11 @@ impl Unit {
     /// below type 80 leaves its remains (`FUN_1411a4e90`: its master's `death_spawn_obj_id2`,
     /// `+0x5e6`, the `.dat`'s `blood_unit_id`, −1 for none) with its facet (`+0xe`) as its angle
     /// left it ([`crate::objects::facing::facet_of_angle`]).
-    pub(crate) fn dying_sprite_ended(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn dying_sprite_ended(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         c.w.parts.set_anim_speed(self.id, Speed::ZERO);
         let master = self.master(c.w.master_tables(), c.player)?;
         if master.kind < BUILDING
@@ -183,7 +197,9 @@ impl Unit {
                     .mover_of(self.id)
                     .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
             let (p, at) = (c.player, self.position());
-            c.lend(self, |w| w.remains(p, remains, at, facet))?;
+            c.lend((&mut *self, &mut *actions), |w| {
+                w.remains(p, remains, at, facet)
+            })?;
         }
         Ok(())
     }
@@ -192,7 +208,11 @@ impl Unit {
     /// `FUN_1411a5090`: the master's `death_spawn_obj_id` makes an object at its place; a
     /// moving object's override gives it the dead object's facet and that facet's angle). The
     /// spawn's sprite from slot 0x7a8 (the master's undead sprite) is not held.
-    pub(crate) fn death_spawn_comes(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn death_spawn_comes(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let spawn = self.master(c.w.master_tables(), c.player)?.death_spawns[0];
         let spawn = spawn.ok_or(GenieError::missing_data(
             "a death spawn the dead object's master no longer names",
@@ -202,6 +222,8 @@ impl Unit {
                 .mover_of(self.id)
                 .map(|m| crate::objects::facing::facet_of_angle(m.angle, m.stats.facets).0);
         let (p, at) = (c.player, self.position());
-        c.lend(self, |w| w.remains(p, spawn, at, facet))
+        c.lend((&mut *self, &mut *actions), |w| {
+            w.remains(p, spawn, at, facet)
+        })
     }
 }

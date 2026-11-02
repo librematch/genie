@@ -333,7 +333,14 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> crate::world:
         standing,
         &mut crate::math::rng::Well512::default(),
     ));
-    set(v.actions.list.repair_mut().unwrap());
+    set(t
+        .parts
+        .actions
+        .of_mut(v.id)
+        .unwrap()
+        .list
+        .repair_mut()
+        .unwrap());
     t
 }
 
@@ -345,23 +352,28 @@ fn passable(t: &mut crate::world::World) {
 
 /// The repairer's Repair part of 50 ms through its step (`Unit::repair_part`): its code.
 fn repaired(t: &mut crate::world::World) -> Result<HeadCode, GenieError> {
-    crate::world::tests::in_update(t, (PlayerId::new(1), ListIndex::new(0)), 50, |unit, c| {
-        let me = Me {
-            human_order: crate::world::WorldTime::ZERO,
-            id: unit.id,
-            group: unit.group.id,
-            action_state: unit
-                .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
-        };
-        unit.repair_part(c, me)
-    })
+    crate::world::tests::in_update(
+        t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |unit, actions, c| {
+            let me = Me {
+                human_order: crate::world::WorldTime::ZERO,
+                id: unit.id,
+                group: unit.group.id,
+                action_state: actions
+                    .top_action()
+                    .map_or(ActionState::NO_ACTION, |a| a.state),
+            };
+            unit.repair_part(actions, c, me)
+        },
+    )
 }
 
 /// The repairer's Repair after its update.
 fn repair_of(t: &crate::world::World) -> RepairAction {
-    *t.players[1].objects[ListIndex::new(0)]
-        .actions
+    *t.parts
+        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
         .list
         .repair()
         .unwrap()
@@ -523,8 +535,15 @@ fn a_repair_s_walk_to_its_point_shows_its_sprite_as_it_starts() {
     for (task, shown) in [(TASK, 20), (SHOWING, 3)] {
         let mut t = repair_at(NEAR, |r| r.task = task);
         let v = &mut t.players[1].objects[ListIndex::new(0)];
-        let mover = t.parts.mover_mut(v.id);
-        let r = v.actions.list.repair_mut().unwrap();
+        let mover = t.parts.motion.mover_mut(v.id);
+        let r = t
+            .parts
+            .actions
+            .of_mut(v.id)
+            .unwrap()
+            .list
+            .repair_mut()
+            .unwrap();
         let g = graphics();
         let _ = r
             .take_point(Position::new(35.5, 95.5, 0.0), mover, &move_reads(&g))
@@ -676,8 +695,10 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .as_mut()
         .unwrap()
         .builders = crate::construction::BuilderCount::of_data(1);
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .repair_mut()
         .unwrap()
@@ -736,8 +757,10 @@ fn a_repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
         .as_mut()
         .unwrap()
         .builders = crate::construction::BuilderCount::of_data(1);
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .repair_mut()
         .unwrap()
@@ -817,8 +840,10 @@ fn a_move_sends_the_repairer_to_its_point() {
         )
     );
     let mut t = repair_at(NEAR, |a| *a = r);
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .repair_mut()
         .unwrap()

@@ -64,7 +64,7 @@ impl World {
         if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
         }
-        let top = self.top_target_object(unit);
+        let top = self.top_target_object(unit.id);
         let g = self.groups.held(group)?;
         let (retarget, certain) = (
             g.current_target.disable_retargeting,

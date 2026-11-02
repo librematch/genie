@@ -431,7 +431,7 @@ impl World {
                 + self.parts.combat_of(u.id).hp_powerup.max,
             attackable: u.attackable,
             pasture: u.pasture,
-            top_action: u.top_action_kind(),
+            top_action: self.parts.actions_of(u.id).top_action_kind(),
         })
     }
 }

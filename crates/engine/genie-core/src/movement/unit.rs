@@ -32,7 +32,11 @@ impl Unit {
     ///
     /// A unit its group may steer whose master the slice does not have or whose action it does
     /// not model.
-    pub(crate) fn motion_step(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn motion_step(
+        &mut self,
+        actions: &crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
         if c.w.parts.mover_of(self.id).is_some() {
@@ -46,6 +50,7 @@ impl Unit {
             .and_then(|m| m.velocity.as_ref())
         {
             Some(_) => self.group_speed(
+                actions,
                 &c.w.groups,
                 crate::objects::masters::OwnerMasters::new(
                     &c.w.parts.own_master,
@@ -98,6 +103,7 @@ impl Unit {
     /// [`UnitGroup::slot_in_place`]: crate::groups::UnitGroup::slot_in_place
     pub(crate) fn group_speed(
         &self,
+        actions: &crate::objects::layers::Action,
         groups: &crate::groups::UnitGroups,
         masters: crate::objects::masters::OwnerMasters<'_>,
         ai: Option<&UnitAi>,
@@ -109,7 +115,7 @@ impl Unit {
             return Ok(None);
         }
         let master = self.master_in(masters)?;
-        if !self.free_for_group(master, ai)? {
+        if !actions.free_for_group(master, ai)? {
             return Ok(None);
         }
         Ok(Some(match g.member_reason(self.id) {
@@ -126,15 +132,16 @@ impl Unit {
     /// whose deletion lets the target go and stops the unit).
     pub(crate) fn move_to_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
-        if let Some(code) = self.own_move_held(c)? {
+        if let Some(code) = self.own_move_held(actions, c)? {
             return Ok(HeadCode::of(code));
         }
-        let step = self.own_move_step(c, me)?;
+        let step = self.own_move_step(actions, c, me)?;
         if step.gave_up {
-            self.own_move_give_up(c)?;
+            self.own_move_give_up(actions, c)?;
         }
         if step.target_moved {
             self.post_own(&mut c.w.parts.unit_ai, NotifyKind::TARGET_MOVED, [0, 0, 0])?;
@@ -148,7 +155,11 @@ impl Unit {
 
     /// [`Unit::move_to_part`]'s give-up ([`Unit::own_move_gave_up`]): a human player's villager
     /// waits, with its unit AI's stance (aggressive without one).
-    fn own_move_give_up(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    fn own_move_give_up(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let villager = self.master(c.w.master_tables(), c.player)?.class == class::VILLAGER;
         let stance =
             c.w.parts
@@ -156,6 +167,7 @@ impl Unit {
                 .get(self.id)
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
         self.own_move_gave_up(
+            actions,
             c.w.parts.motion.layer_mut(self.id),
             villager && !c.w.players.player(c.player)?.computer,
             stance,
@@ -176,8 +188,12 @@ impl Unit {
     /// ends there (4: the list keeps it).
     ///
     /// [`MoveToAction::check_held`]: crate::movement::move_to::MoveToAction::check_held
-    fn own_move_held(&mut self, c: &mut Step<'_>) -> Result<Option<UpdateCode>, GenieError> {
-        let Some(move_to) = self.actions.list.move_to_mut() else {
+    fn own_move_held(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<Option<UpdateCode>, GenieError> {
+        let Some(move_to) = actions.list.move_to_mut() else {
             return Ok(None);
         };
         let target = move_to.target;
@@ -196,10 +212,11 @@ impl Unit {
     /// its point (the goal, or the target's place); none without a `MoveTo`.
     fn own_move_step(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<crate::movement::move_to::MoveStep, GenieError> {
-        Ok(match self.actions.list.move_to_mut() {
+        Ok(match actions.list.move_to_mut() {
             Some(move_to) => {
                 // its state 3 reads the unit's AI for the path it asks (0x140aa2a70), with its
                 // point: its own, or the target's place (a target gone fails the update first)
@@ -258,24 +275,34 @@ impl Unit {
     }
 
     /// The unit's Explore in its update ([`crate::movement::explore::ExploreAction::update`]): nothing without one.
-    pub(crate) fn explore_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<(), GenieError> {
-        let Some(mut explore) = self.actions.list.explore().copied() else {
+    pub(crate) fn explore_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<(), GenieError> {
+        let Some(mut explore) = actions.list.explore().copied() else {
             return Ok(());
         };
         let explored = explore.update(c, self, me);
-        if let Some(e) = self.actions.list.explore_mut() {
+        if let Some(e) = actions.list.explore_mut() {
             *e = explore;
         }
         explored
     }
 
     /// A bird's Fly in its update ([`crate::movement::fly::Fly::update`]): nothing without one.
-    pub(crate) fn fly_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<(), GenieError> {
-        let Some(mut fly) = self.actions.list.fly().copied() else {
+    pub(crate) fn fly_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<(), GenieError> {
+        let Some(mut fly) = actions.list.fly().copied() else {
             return Ok(());
         };
         let flown = fly.update(c, self, me);
-        if let Some(f) = self.actions.list.fly_mut() {
+        if let Some(f) = actions.list.fly_mut() {
             *f = fly;
         }
         flown

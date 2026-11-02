@@ -17,12 +17,16 @@ impl Unit {
     /// stopAction (slot 0x3c0, `FUN_14108c160`): the action list goes ([`Unit::clear_own_actions`])
     /// and a unit in state 2 takes its standing sprite (slot 0x68 with slot 0x798's,
     /// [`crate::objects::sprite::new_sprite`]) where the slice holds its sprite.
-    pub(crate) fn stop_action(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn stop_action(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
         let sprite = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.stop_with(
-            c.w.parts.motion.layer_mut(self.id),
+            (actions, c.w.parts.motion.layer_mut(self.id)),
             (&mut releases, &mut leaves),
             by,
             crate::objects::masters::OwnerMasters::new(
@@ -37,17 +41,18 @@ impl Unit {
 
     /// [`Unit::stop_action`] on the parts of the world it changes: the targets its actions let
     /// go and the foundations its Build leaves (`by` the unit, [`Unit::clear_own_actions`]), its
-    /// masters and sprites, and the Sprite stream; `motion` is its motion layer.
+    /// masters and sprites, and the Sprite stream; `actions` and `motion` are its action and
+    /// motion layers.
     pub(crate) fn stop_with(
         &mut self,
-        mut motion: MotionMut<'_>,
+        (actions, mut motion): (&mut crate::objects::layers::Action, MotionMut<'_>),
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
         masters: crate::objects::masters::OwnerMasters<'_>,
         graphics: &crate::objects::Graphics,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
-        self.tear_down_actions(motion.reborrow(), releases, builder_leaves, by)?;
+        self.tear_down_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
         if self.life.state == ObjectState::Alive {
             self.show_standing(motion, masters, graphics, sprite)?;
         }
@@ -58,18 +63,19 @@ impl Unit {
     /// ([`Unit::clear_own_actions`]); an action the slice does not hold has a teardown it cannot
     /// run.
     pub(crate) fn tear_down_actions(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        if self.actions.unmodelled_action.is_some() {
+        if actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "a unit AI's stop of an action list the slice does not model",
             ));
         }
-        self.clear_own_actions(motion, releases, builder_leaves, by)
+        self.clear_own_actions(actions, motion, releases, builder_leaves, by)
     }
 
     /// The unit's slot 0x68 with its master's standing sprite (slot 0x798's, the master's
@@ -121,13 +127,14 @@ impl Unit {
     ///
     /// The unit's stop that the motion step does not model, and the list's deletion's.
     pub(crate) fn clear_own_actions(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         motion: MotionMut<'_>,
         releases: &mut Vec<(ObjectId, Releaser)>,
         builder_leaves: &mut Vec<ObjectId>,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        let torn = self.actions.list.delete_all(motion, self.life.state)?;
+        let torn = actions.list.delete_all(motion, self.life.state)?;
         releases.extend(torn.releases.into_iter().map(|t| (t, by)));
         builder_leaves.extend(torn.builder_leaves);
         Ok(())
@@ -142,10 +149,13 @@ impl Unit {
     /// # Errors
     ///
     /// The deletion's, and what it lets go.
-    pub(crate) fn delete_own_head(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn delete_own_head(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
-        let torn = self
-            .actions
+        let torn = actions
             .list
             .delete_head(c.w.parts.motion_mut(self.id), self.life.state)?;
         torn.let_go(c, self, by)
@@ -163,12 +173,13 @@ impl Unit {
     /// [`World::order_on_target`]: crate::world::World::order_on_target
     pub(crate) fn run_effect(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         e: Effect,
         class: Option<ClassId>,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
         match e {
-            Effect::Stop => self.stop_action(c),
+            Effect::Stop => self.stop_action(actions, c),
             Effect::CapHumanOrder(cap) => {
                 self.last_human_order = self.last_human_order.min(cap);
                 Ok(())
@@ -184,19 +195,19 @@ impl Unit {
                         c.w.parts.motion.mover_mut(self.id),
                     ),
                 };
-                m.map_or(Ok(()), |m| self.ai_move(m, class, c))
+                m.map_or(Ok(()), |m| self.ai_move(actions, m, class, c))
             }
-            Effect::OrderOnTarget(order) => {
-                c.lend_at(self, |w, p, i| w.order_on_target(p, i, order))
-            }
-            Effect::Command(command) => self.ai_command(command, c),
-            Effect::ChangeOwner(new) => self.ai_change_owner(new, c),
-            Effect::Explore(point) => self.explore_to(point, c),
+            Effect::OrderOnTarget(order) => c.lend_at((&mut *self, &mut *actions), |w, p, i| {
+                w.order_on_target(p, i, order)
+            }),
+            Effect::Command(command) => self.ai_command(actions, command, c),
+            Effect::ChangeOwner(new) => self.ai_change_owner(actions, new, c),
+            Effect::Explore(point) => self.explore_to(actions, point, c),
             Effect::MoveToObject {
                 target,
                 state,
                 range,
-            } => self.move_to_object((target, state), range, c),
+            } => self.move_to_object(actions, (target, state), range, c),
         }
     }
 
@@ -208,15 +219,22 @@ impl Unit {
     /// # Errors
     ///
     /// The command's and the lend's.
-    fn ai_command(&mut self, command: AiCommand, c: &mut Step<'_>) -> Result<(), GenieError> {
+    fn ai_command(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        command: AiCommand,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         match command {
-            AiCommand::MoveAside(m) => c.lend_at(self, |w, p, i| w.move_aside(p, i, m)),
-            AiCommand::HuntObject(target) => {
-                c.lend_at(self, |w, p, i| w.hunt_command(p, i, target))
+            AiCommand::MoveAside(m) => {
+                c.lend_at((&mut *self, &mut *actions), |w, p, i| w.move_aside(p, i, m))
             }
-            AiCommand::GatherObject(target) => {
-                c.lend_at(self, |w, p, i| w.gather_command(p, i, target))
-            }
+            AiCommand::HuntObject(target) => c.lend_at((&mut *self, &mut *actions), |w, p, i| {
+                w.hunt_command(p, i, target)
+            }),
+            AiCommand::GatherObject(target) => c.lend_at((&mut *self, &mut *actions), |w, p, i| {
+                w.gather_command(p, i, target)
+            }),
             AiCommand::WorkOn { target, point } => {
                 let work = crate::orders::Work {
                     target: Some(target),
@@ -225,14 +243,17 @@ impl Unit {
                     filter: None,
                     notified: false,
                 };
-                c.lend_at(self, |w, p, i| w.order_work(p, i, &work))
+                c.lend_at((&mut *self, &mut *actions), |w, p, i| {
+                    w.order_work(p, i, &work)
+                })
             }
-            AiCommand::BuildObject(target) => {
-                c.lend_at(self, |w, p, i| w.build_command(p, i, target).map(drop))
-            }
-            AiCommand::DropElsewhere { site, back } => {
-                c.lend_at(self, |w, p, i| w.drop_elsewhere(p, i, site, back))
-            }
+            AiCommand::BuildObject(target) => c.lend_at((&mut *self, &mut *actions), |w, p, i| {
+                w.build_command(p, i, target).map(drop)
+            }),
+            AiCommand::DropElsewhere { site, back } => c
+                .lend_at((&mut *self, &mut *actions), |w, p, i| {
+                    w.drop_elsewhere(p, i, site, back)
+                }),
         }
     }
 }

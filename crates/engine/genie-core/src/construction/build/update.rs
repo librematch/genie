@@ -86,6 +86,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
@@ -109,12 +110,12 @@ impl BuildAction {
             self.foundation_done(c, builder, reads)?;
         }
         if self.state == BuildState::Finished {
-            return self.after_work(c, builder, reads);
+            return self.after_work(c, builder, actions, reads);
         }
         if self.state == BuildState::Drop {
             return self.update_drop(c, builder, me, reads);
         }
-        self.update_state(c, builder, me, reads)
+        self.update_state(c, builder, actions, me, reads)
     }
 
     /// The target's id names no object of the world (`FUN_1415417a0`; the builder's player
@@ -232,6 +233,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
@@ -241,12 +243,12 @@ impl BuildAction {
             // case 1: set_state(13); the update returns 0
             BuildState::Halted => self.end(c, builder, BuildState::Failed)?,
             BuildState::Move | BuildState::Clear => self.walking(c, builder, me, reads)?,
-            BuildState::Work => self.face_and_place(c, builder, reads)?,
-            BuildState::Place => self.work(c, builder, reads)?,
+            BuildState::Work => self.face_and_place(c, builder, actions, reads)?,
+            BuildState::Place => self.work(c, builder, actions, reads)?,
             BuildState::WalkPoint => self.walking_to_point(c, builder, me, reads)?,
             // 13 (`0xd`): the Build failed; its next update tells its unit AI and halts it
             BuildState::Failed => return self.failed(c, builder, reads),
-            BuildState::Wait => self.wait_out(c, builder, reads)?,
+            BuildState::Wait => self.wait_out(c, builder, actions, reads)?,
             // the default case (3 with a target, and the bytes without a state, which no step
             // sets): the update returns 0; 8 and 224 returned before the switch
             BuildState::Idle | BuildState::Drop | BuildState::Finished => {}
@@ -335,6 +337,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         self.timer -= c.dt.seconds();
@@ -342,7 +345,7 @@ impl BuildAction {
             return Ok(());
         }
         self.timer = Seconds::ZERO;
-        self.place(c, builder, reads)
+        self.place(c, builder, actions, reads)
     }
 
     /// What the `MoveTo`'s answer to the motion step giving up reads ([`GiveUp`]): a human
@@ -370,6 +373,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         let at = builder.position();
@@ -387,7 +391,7 @@ impl BuildAction {
                 "a builder that turns over time to face its foundation",
             ));
         }
-        self.place(c, builder, reads)
+        self.place(c, builder, actions, reads)
     }
 }
 

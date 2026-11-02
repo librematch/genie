@@ -3,9 +3,10 @@
 
 use crate::movement::Mover;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
-use crate::objects::layers::MotionLayer;
+use crate::objects::layers::Motion;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::unit_ai::UnitAi;
@@ -49,53 +50,50 @@ impl<T> FromIterator<(ObjectId, T)> for PartTable<T> {
 }
 
 impl Object {
-    /// A test's object: row `unit` with the unit AI `ai` (a unit AI, or an `Option` of one).
-    pub(crate) fn with_ai(unit: Unit, ai: impl Into<Option<UnitAi>>) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts {
-                unit_ai: ai.into(),
-                ..ObjectParts::default()
-            },
-        }
+    /// A test's object: row `unit` (or an object, keeping its parts) with the unit AI `ai` (a
+    /// unit AI, or an `Option` of one).
+    pub(crate) fn with_ai(unit: impl Into<Self>, ai: impl Into<Option<UnitAi>>) -> Self {
+        let mut o = unit.into();
+        o.parts.unit_ai = ai.into();
+        o
     }
 
-    /// A test's object: row `unit` with the combat layer `layer`.
-    pub(crate) fn with_combat(unit: Unit, layer: Combat) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts {
-                combat: layer,
-                ..ObjectParts::default()
-            },
-        }
+    /// A test's object: row `unit` (or an object, keeping its other parts) with the combat
+    /// layer `layer`.
+    pub(crate) fn with_combat(unit: impl Into<Self>, layer: Combat) -> Self {
+        let mut o = unit.into();
+        o.parts.combat = layer;
+        o
     }
 
-    /// A test's object: row `unit` with the moving layers of `mover` (its motion part).
-    pub(crate) fn moving(unit: Unit, mover: Mover) -> Self {
-        Self::with_motion(unit, MotionLayer::Moving(mover))
+    /// A test's object: row `unit` (or an object, keeping its other parts) with the moving
+    /// layers of `mover` (its motion part).
+    pub(crate) fn moving(unit: impl Into<Self>, mover: Mover) -> Self {
+        Self::with_motion(unit, Motion::Moving(mover))
     }
 
-    /// A test's object: row `unit` with the motion part `motion`.
-    pub(crate) fn with_motion(unit: Unit, motion: MotionLayer) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts {
-                motion: Some(motion),
-                ..ObjectParts::default()
-            },
-        }
+    /// A test's object: row `unit` (or an object, keeping its other parts) with the motion part
+    /// `motion`.
+    pub(crate) fn with_motion(unit: impl Into<Self>, motion: Motion) -> Self {
+        let mut o = unit.into();
+        o.parts.motion = Some(motion);
+        o
     }
 
-    /// A test's object: row `unit` with the building layer `layer`.
-    pub(crate) fn with_building(unit: Unit, layer: Building) -> Self {
-        Self {
-            unit,
-            parts: ObjectParts {
-                building: layer,
-                ..ObjectParts::default()
-            },
-        }
+    /// A test's object: row `unit` (or an object, keeping its other parts) with the action
+    /// layer `layer`.
+    pub(crate) fn with_actions(unit: impl Into<Self>, layer: Action) -> Self {
+        let mut o = unit.into();
+        o.parts.actions = layer;
+        o
+    }
+
+    /// A test's object: row `unit` (or an object, keeping its other parts) with the building
+    /// layer `layer`.
+    pub(crate) fn with_building(unit: impl Into<Self>, layer: Building) -> Self {
+        let mut o = unit.into();
+        o.parts.building = layer;
+        o
     }
 }
 
@@ -201,7 +199,7 @@ impl World {
     /// # Panics
     ///
     /// An object the world does not hold.
-    pub(crate) fn set_motion(&mut self, id: ObjectId, motion: Option<MotionLayer>) {
+    pub(crate) fn set_motion(&mut self, id: ObjectId, motion: Option<Motion>) {
         self.set_part(id, Part::Motion(motion.map(Box::new)))
             .expect("a motion part of an object the world holds");
     }
@@ -214,11 +212,37 @@ impl World {
     #[must_use]
     pub(crate) fn with_motions(
         mut self,
-        layers: impl IntoIterator<Item = (ObjectId, MotionLayer)>,
+        layers: impl IntoIterator<Item = (ObjectId, Motion)>,
     ) -> Self {
         for (id, layer) in layers {
             self.set_part(id, Part::Motion(Some(Box::new(layer))))
                 .expect("a motion part of an object the world holds");
+        }
+        self
+    }
+
+    /// A test's object `id` takes the action layer `layer` in place of its own.
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    pub(crate) fn set_actions(&mut self, id: ObjectId, layer: Action) {
+        self.set_part(id, Part::Actions(Box::new(layer)))
+            .expect("an action layer of an object the world holds");
+    }
+
+    /// A test's world with the action layers `layers` set on the objects it holds.
+    ///
+    /// # Panics
+    ///
+    /// An object the world does not hold.
+    #[must_use]
+    pub(crate) fn with_actions(
+        mut self,
+        layers: impl IntoIterator<Item = (ObjectId, Action)>,
+    ) -> Self {
+        for (id, layer) in layers {
+            self.set_actions(id, layer);
         }
         self
     }

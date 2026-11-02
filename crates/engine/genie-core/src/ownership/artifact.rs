@@ -457,6 +457,7 @@ impl Unit {
     /// ([`Unit::artifact_handover`]). In the first tick it waits.
     pub(crate) fn artifact_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<Option<Captured>, GenieError> {
@@ -464,9 +465,9 @@ impl Unit {
         if c.w.ticks <= crate::world::Tick::new(1) {
             return Ok(None);
         }
-        self.artifact_enter_part(c, me, by)?;
-        let new = self.artifact_walk_and_check(c, me, by)?;
-        self.artifact_handover(c, new)
+        self.artifact_enter_part(actions, c, me, by)?;
+        let new = self.artifact_walk_and_check(actions, c, me, by)?;
+        self.artifact_handover(actions, c, new)
     }
 
     /// The Artifact's Enter sub-action (an enter command's, `FUN_1410847e0`) updates first
@@ -476,23 +477,19 @@ impl Unit {
     /// unit in stays, and the inside update of the next update deletes the Artifact.
     pub(crate) fn artifact_enter_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         by: Releaser,
     ) -> Result<(), GenieError> {
-        let Some(e) = self
-            .actions
-            .list
-            .artifact_mut()
-            .and_then(|a| a.enter.take())
-        else {
+        let Some(e) = actions.list.artifact_mut().and_then(|a| a.enter.take()) else {
             return Ok(());
         };
-        let own = self.actions.list.take_enter();
-        self.actions.list.set_enter(Some(e));
-        let updated = self.enter_part(c, me);
-        let mut after = self.actions.list.take_enter();
-        self.actions.list.set_enter(own);
+        let own = actions.list.take_enter();
+        actions.list.set_enter(Some(e));
+        let updated = self.enter_part(actions, c, me);
+        let mut after = actions.list.take_enter();
+        actions.list.set_enter(own);
         if updated? == HeadCode::Deletes
             && let Some(e) = after.take()
         {
@@ -501,7 +498,7 @@ impl Unit {
                 .tear_down(c.w.parts.motion_mut(self.id))?
                 .let_go(c, self, by)?;
         }
-        if let Some(art) = self.actions.list.artifact_mut() {
+        if let Some(art) = actions.list.artifact_mut() {
             if let Some(e) = after {
                 art.enter = Some(e);
             } else {
@@ -521,11 +518,12 @@ impl Unit {
     /// none without an Artifact.
     pub(crate) fn artifact_walk_and_check(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         by: Releaser,
     ) -> Result<Option<Handover>, GenieError> {
-        let Some(mut artifact) = self.actions.list.artifact().copied() else {
+        let Some(mut artifact) = actions.list.artifact().copied() else {
             return Ok(None);
         };
         let capture =
@@ -542,7 +540,7 @@ impl Unit {
         };
         // written back before an error too: the stop's context reads the list
         let new = artifact.update(c, self, me, &r);
-        if let Some(own) = self.actions.list.artifact_mut() {
+        if let Some(own) = actions.list.artifact_mut() {
             *own = artifact;
         }
         new
@@ -554,12 +552,13 @@ impl Unit {
     /// nothing.
     pub(crate) fn artifact_handover(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         new: Option<Handover>,
     ) -> Result<Option<Captured>, GenieError> {
         match new {
             Some(Handover::Taken { new, .. }) => {
-                let (main, also) = self.capture(c, new)?;
+                let (main, also) = self.capture(actions, c, new)?;
                 Ok(Some(Captured {
                     new,
                     main,
@@ -569,8 +568,8 @@ impl Unit {
             }
             Some(Handover::ToGaia) => {
                 let class = self.placed_class(c)?;
-                self.capture_stop(c, class)?;
-                let main = self.change_owner(c, PlayerId::GAIA)?;
+                self.capture_stop(actions, c, class)?;
+                let main = self.change_owner(actions, c, PlayerId::GAIA)?;
                 let building = std::mem::take(&mut c.building_handover);
                 Ok((main || building).then(|| Captured {
                     new: PlayerId::new(0),
@@ -654,7 +653,7 @@ mod tests {
             ..to_point
         });
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
-        let found = rig.run(50, |c, u, _, _| a.update(c, u, me(), &reads()));
+        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));
         assert_eq!(found, Ok(None));
         assert_eq!(
             (a.state, a.timer, a.move_to, a.goal),
@@ -1043,14 +1042,14 @@ mod tests {
             .unwrap();
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
         rig.mover_mut().stats.speed = Speed::ZERO;
-        rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(
             (a.move_to.map(|m| m.state), rig.posted()),
             (Some(MoveTo::Failed), vec![])
         );
         rig.mover_mut().animated.speed = Speed::new(1.0);
-        rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         let failed = (
             crate::unit_ai::NotifyKind::ACTION_FAILED,
@@ -1246,7 +1245,7 @@ mod tests {
         (rig.mover_mut().stats.speed, rig.mover_mut().stats.base) = (Speed::ZERO, Speed::ZERO);
         assert_eq!(rig.t.graphics.insert(SpriteId::named(3), graphic(3)), None);
         rig.mover_mut().in_the_way = vec![object_id(77)];
-        rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         let in_the_way = (crate::unit_ai::NotifyKind::IN_THE_WAY, [77, -1, -1]);
         assert_eq!(
@@ -1265,7 +1264,7 @@ mod tests {
         });
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
-        rig.run(50, |c, u, _, _| walking.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| walking.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(
             (walking.move_to.map(|m| m.state), rig.posted()),
@@ -1287,7 +1286,7 @@ mod tests {
         };
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
-        rig.run(50, |c, u, _, _| waiting.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| waiting.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(
             (
@@ -1296,7 +1295,7 @@ mod tests {
             ),
             (Some((MoveTo::Waiting, Seconds::new(0.92 + 0.05))), vec![])
         );
-        rig.run(50, |c, u, _, _| waiting.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| waiting.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(
             waiting.move_to.map(|m| (m.state, m.wait.timer)),
@@ -1310,7 +1309,7 @@ mod tests {
             }),
             ..Artifact::new(false, None)
         };
-        rig.run(50, |c, u, _, _| lost.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| lost.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(lost.move_to.map(|m| ObjectId::field(m.target)), Some(-1));
         // a target that died (state 7) is let go, and the walk ends at once (code 5)
@@ -1327,7 +1326,7 @@ mod tests {
             target: Some(object_id(600)),
             ..Artifact::new(false, None)
         };
-        rig.run(50, |c, u, _, _| dying.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| dying.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!((dying.move_to, dying.target), (None, None));
         assert_eq!(rig.posted(), vec![]);
@@ -1344,7 +1343,7 @@ mod tests {
         a.target = Some(object_id(9149));
         a.goal = Some(Position::new(1.0, 1.0, 0.0));
         a.move_to = Some(to_object(9149, MoveTo::Arrived));
-        rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(
             (a.target, a.goal, rig.workers(9149, PlayerId::new(1))),
@@ -1356,7 +1355,7 @@ mod tests {
             quiet: false,
             ..MoveToAction::sub_in(MoveTo::Failed)
         });
-        rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         let failed = (
             crate::unit_ai::NotifyKind::ACTION_FAILED,
@@ -1367,7 +1366,7 @@ mod tests {
             (Some(0), vec![failed])
         );
         // nothing walking: nothing more
-        rig.run(50, |c, u, _, _| a.walk(c, u, me(), &reads()))
+        rig.run(50, |c, u, _, _, _| a.walk(c, u, me(), &reads()))
             .unwrap();
         assert_eq!(rig.posted().len(), 1);
     }
@@ -1379,7 +1378,7 @@ mod tests {
     fn an_update_checks_after_its_walk_and_lets_go_what_a_handover_drops() {
         let mut a = Artifact::new(false, None);
         let mut rig = Rig::on_the_path(crate::combat::damage::Victim::default());
-        let found = rig.run(50, |c, u, _, _| a.update(c, u, me(), &reads()));
+        let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads()));
         assert_eq!((found, a.state), (Ok(None), ArtifactState::Wait));
         // the step's effects on a handover: the Enter's transport let go, the unit stopped
         let mut e = crate::garrison::EnterAction::new(
@@ -1398,7 +1397,7 @@ mod tests {
             panic!("a handover to player 2: {found:?}");
         };
         assert_eq!(new, PlayerId::new(2));
-        rig.run(50, |c, u, _, _| let_go_gone(c, u, gone, by()))
+        rig.run(50, |c, u, _, _, _| let_go_gone(c, u, gone, by()))
             .unwrap();
         assert_eq!(rig.mover().animated.speed, Speed::new(0.0));
         assert_eq!(rig.workers(11970, PlayerId::new(1)), Some(0));

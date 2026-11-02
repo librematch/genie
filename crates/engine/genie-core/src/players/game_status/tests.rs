@@ -215,10 +215,10 @@ fn a_defeat_names_the_player_with_the_most_of_its_own_attribute() {
 #[test]
 fn each_action_with_its_own_stop_halts_and_answers_true() {
     let mut t = game();
-    let mut add = |unit: Unit| {
-        let mut unit = unit;
-        unit.life.master_id = ids::TOWN_CENTRE;
-        let _ = t.push_live(PlayerId::new(1), unit).unwrap();
+    let mut add = |object: Object| {
+        let mut object = object;
+        object.unit.life.master_id = ids::TOWN_CENTRE;
+        let _ = t.push_live(PlayerId::new(1), object).unwrap();
         t.players[1].objects.last_place().unwrap()
     };
     let task = crate::gathering::hunt::HuntTask {
@@ -247,16 +247,18 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let gather = add(Unit {
-        id: object_id(30),
-        actions: crate::objects::layers::ActionLayer {
+    let gather = add(Object::with_actions(
+        Unit {
+            id: object_id(30),
+            ..Unit::default()
+        },
+        crate::objects::layers::Action {
             list: ActionList::default().with_gather(Some(
                 crate::gathering::gather::GatherAction::new(task, &bush, false, rate).unwrap(),
             )),
             ..Default::default()
         },
-        ..Unit::default()
-    });
+    ));
     let build_task = crate::construction::build::BuildTask {
         range: Distance::ZERO,
         work_value: crate::objects::masters::WorkValue::new(1.0),
@@ -265,9 +267,12 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         id: TaskId::of_task(-1),
         moving: None,
     };
-    let build = add(Unit {
-        id: object_id(31),
-        actions: crate::objects::layers::ActionLayer {
+    let build = add(Object::with_actions(
+        Unit {
+            id: object_id(31),
+            ..Unit::default()
+        },
+        crate::objects::layers::Action {
             list: ActionList::default().with_build(Some(
                 crate::construction::build::tests::started_on(
                     None,
@@ -278,17 +283,19 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             )),
             ..Default::default()
         },
-        ..Unit::default()
-    });
+    ));
     let repair_task = crate::construction::repair::RepairTask {
         id: TaskId::test(0),
         work_value: crate::objects::masters::WorkValue::new(1.0),
         moving: None,
         proceeding: None,
     };
-    let repair = add(Unit {
-        id: object_id(32),
-        actions: crate::objects::layers::ActionLayer {
+    let repair = add(Object::with_actions(
+        Unit {
+            id: object_id(32),
+            ..Unit::default()
+        },
+        crate::objects::layers::Action {
             list: ActionList::default().with_repair(Some(
                 crate::construction::repair::RepairAction::start(
                     crate::movement::move_to::WalkTo {
@@ -314,8 +321,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             )),
             ..Default::default()
         },
-        ..Unit::default()
-    });
+    ));
     let mut attack =
         crate::combat::attack::tests::own_attack(-1, AttackState::Done, Distance::new(1.0));
     attack.arms.idle_sprite = Some(crate::objects::sprite::Graphic {
@@ -327,26 +333,30 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::NONE,
     });
-    let attack = add(Unit {
-        id: object_id(33),
-        actions: crate::objects::layers::ActionLayer {
+    let attack = add(Object::with_actions(
+        Unit {
+            id: object_id(33),
+            ..Unit::default()
+        },
+        crate::objects::layers::Action {
             list: ActionList::default().with_attack(Some(attack)),
             ..Default::default()
         },
-        ..Unit::default()
-    });
-    let artifact = add(Unit {
-        id: object_id(34),
-        actions: crate::objects::layers::ActionLayer {
+    ));
+    let artifact = add(Object::with_actions(
+        Unit {
+            id: object_id(34),
+            ..Unit::default()
+        },
+        crate::objects::layers::Action {
             list: ActionList::default()
                 .with_artifact(Some(crate::ownership::artifact::Artifact::new(false, None))),
             ..Default::default()
         },
-        ..Unit::default()
-    });
+    ));
     t.set_motion(
         object_id(33),
-        Some(crate::objects::layers::MotionLayer::Moving(
+        Some(crate::objects::layers::Motion::Moving(
             crate::gathering::hunt::tests::walker(),
         )),
     );
@@ -374,26 +384,42 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     assert_eq!(t.halt_other(PlayerId::new(1), artifact, kind), Ok(true));
     let objects = &t.players[1].objects;
     assert_eq!(
-        objects[gather].actions.list.gather().map(|g| g.state),
+        t.parts
+            .actions_of(objects[gather].id)
+            .list
+            .gather()
+            .map(|g| g.state),
         Some(GatherState::Idle)
     );
     assert_eq!(
-        objects[build].actions.list.build().map(|b| b.state),
+        t.parts
+            .actions_of(objects[build].id)
+            .list
+            .build()
+            .map(|b| b.state),
         Some(BuildState::Halted)
     );
     assert_eq!(
-        objects[repair].actions.list.repair().map(|r| r.state),
+        t.parts
+            .actions_of(objects[repair].id)
+            .list
+            .repair()
+            .map(|r| r.state),
         Some(RepairState::Halted)
     );
     let a = &objects[attack];
     assert_eq!(
-        a.actions.list.attack().map(|a| a.state),
+        t.parts.actions_of(a.id).list.attack().map(|a| a.state),
         Some(AttackState::Done)
     );
     assert_eq!(t.parts.anim_speed_of(a.id), Some(Speed::new(1.0)));
     assert!(a.sprite.is_some());
     assert_eq!(
-        objects[artifact].actions.list.artifact().map(|a| a.state),
+        t.parts
+            .actions_of(objects[artifact].id)
+            .list
+            .artifact()
+            .map(|a| a.state),
         Some(crate::ownership::artifact::ArtifactState::Check)
     );
     assert!(
@@ -405,9 +431,12 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
 #[test]
 fn a_stopped_hunter_keeps_its_halted_hunt() {
     use crate::gathering::hunt::{HuntAction, HuntTask, Lead};
-    let hunter = Unit {
-        id: object_id(20),
-        actions: crate::objects::layers::ActionLayer {
+    let hunter = Object::with_actions(
+        Unit {
+            id: object_id(20),
+            ..Unit::default()
+        },
+        crate::objects::layers::Action {
             list: ActionList::default().with_hunt(Some(HuntAction {
                 target: None,
                 state: HuntState::Walk,
@@ -435,13 +464,12 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
             })),
             ..Default::default()
         },
-        ..Unit::default()
-    };
+    );
     let mut t = game();
     let mut hunter = hunter;
     // game()'s villager master
-    hunter.life.master_id = ids::TOWN_CENTRE;
-    hunter.my_pasture = None;
+    hunter.unit.life.master_id = ids::TOWN_CENTRE;
+    hunter.unit.my_pasture = None;
     let ai = UnitAi {
         current_order: Some(OrderKind::Hunt),
         current_action: Some(ActionKind::Hunt),
@@ -456,7 +484,7 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
     // the unit AI's stopAction (slot 0x3c0) then empties the list
     t.object_stop(PlayerId::new(1), idx).unwrap();
     let u = &t.players[1].objects[idx];
-    assert_eq!(u.actions.list.hunt().copied(), None);
+    assert_eq!(t.parts.actions_of(u.id).list.hunt().copied(), None);
     assert_eq!(t.parts.unit_ai.get(u.id).unwrap().current_action, None);
     // without a unit AI the halted Hunt stays
     without_ai
@@ -465,11 +493,24 @@ fn a_stopped_hunter_keeps_its_halted_hunt() {
     without_ai.object_stop(PlayerId::new(1), idx).unwrap();
     let u = &without_ai.players[1].objects[idx];
     assert_eq!(
-        u.actions.list.hunt().map(|h| h.state),
+        without_ai
+            .parts
+            .actions_of(u.id)
+            .list
+            .hunt()
+            .map(|h| h.state),
         Some(HuntState::Idle)
     );
     // its target went through slot 0x68 (FUN_140ac7980), which clears the lead
-    assert_eq!(u.actions.list.hunt().map(|h| h.lead), Some(Lead::NEW));
+    assert_eq!(
+        without_ai
+            .parts
+            .actions_of(u.id)
+            .list
+            .hunt()
+            .map(|h| h.lead),
+        Some(Lead::NEW)
+    );
 }
 
 /// records/425906646's player 2 cancels the second villager of its town centre at update

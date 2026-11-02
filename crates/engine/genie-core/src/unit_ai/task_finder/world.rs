@@ -134,7 +134,7 @@ pub(crate) fn task_target_with<'a>(
         max_hp: HitPoints::of_master(master.hit_points) + parts.combat_of(u.id).hp_powerup.max,
         attackable: u.attackable,
         pasture: u.pasture,
-        top_action: u.top_action_kind(),
+        top_action: parts.actions_of(u.id).top_action_kind(),
     }))
 }
 

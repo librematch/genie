@@ -35,6 +35,7 @@ impl Unit {
     /// the standing sprite of a `MoveTo` that fails at its start into the context `c`.
     pub(crate) fn ai_move(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         m: AiMove,
         class: ClassId,
         c: &mut Step<'_>,
@@ -43,6 +44,7 @@ impl Unit {
         let sprite_rng = c.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let sails = self.ai_move_with(
+            actions,
             c.w.parts.motion.layer_mut(self.id),
             m,
             (class, c.player),
@@ -63,6 +65,7 @@ impl Unit {
         if sails {
             let sprite_rng = c.w.streams.get(Stream::Sprite);
             self.transport_sail(
+                actions,
                 c.w.parts.motion.layer_mut(self.id),
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
@@ -103,6 +106,7 @@ impl Unit {
     /// the unit's motion layer.
     pub(crate) fn ai_move_with(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         mut motion: MotionMut<'_>,
         m: AiMove,
         (class, player): (ClassId, PlayerId),
@@ -126,16 +130,13 @@ impl Unit {
             ));
         }
         if !m.force
-            && self.top_action_kind() == Some(crate::movement::move_to::MOVE_TO)
-            && self
-                .actions
-                .list
-                .move_to()
-                .is_some_and(|mt| mt.point == m.point)
+            && actions.top_action_kind() == Some(crate::movement::move_to::MOVE_TO)
+            && actions.list.move_to().is_some_and(|mt| mt.point == m.point)
         {
             return Ok(false);
         }
         match self.head_takes_point(
+            actions,
             motion.reborrow(),
             m.point,
             player,
@@ -158,7 +159,7 @@ impl Unit {
             PointMove::Sails => return Ok(true),
             PointMove::Declined => {}
         }
-        self.clear_own_actions(motion.reborrow(), releases, builder_leaves, by)?;
+        self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
         let sprite = ai_sprite(master, m.walk)
             .or_else(|| point_sprite(master, look, false))
@@ -167,7 +168,7 @@ impl Unit {
         if move_to.shows_standing() {
             self.shows_standing_sprite(motion, masters, graphics, sprite_rng)?;
         }
-        self.actions.list.set_move_to(Some(move_to));
+        actions.list.set_move_to(Some(move_to));
         Ok(false)
     }
 
@@ -190,7 +191,8 @@ impl Unit {
     /// [`Artifact::take_point`]: crate::ownership::artifact::Artifact::take_point
     /// [`HuntAction::take_move`]: crate::gathering::hunt::HuntAction::take_move
     pub(crate) fn head_takes_point(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         mut motion: MotionMut<'_>,
         point: Position,
         player: PlayerId,
@@ -200,12 +202,12 @@ impl Unit {
             Option<&crate::combat::abilities::Look>,
         ),
     ) -> Result<PointMove, GenieError> {
-        if self.actions.unmodelled_action.is_some() {
+        if actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
             ));
         }
-        match self.top_action_kind() {
+        match actions.top_action_kind() {
             None
             | Some(
                 crate::movement::move_to::MOVE_TO
@@ -220,22 +222,22 @@ impl Unit {
             ) => Ok(PointMove::Declined),
             Some(crate::ownership::artifact::ARTIFACT_TYPE) => {
                 let sprites = self.point_sprites(masters, graphics)?;
-                self.artifact_takes_point(motion.mover_mut(), point, &sprites)
+                self.artifact_takes_point(actions, motion.mover_mut(), point, &sprites)
             }
             Some(crate::gathering::hunt::HUNT) => {
                 let sprites = self.point_sprites(masters, graphics)?;
-                self.hunt_takes_point(motion.mover_mut(), point, player, sprites)
+                self.hunt_takes_point(actions, motion.mover_mut(), point, player, sprites)
             }
             Some(crate::gathering::gather::GATHER) => {
                 let sprites = self.point_sprites(masters, graphics)?;
-                self.gather_takes_point(motion.mover_mut(), point, player, sprites)
+                self.gather_takes_point(actions, motion.mover_mut(), point, player, sprites)
             }
             // the Transport's (0x140aa3e40): the caller sails it there
             Some(crate::garrison::transport::TRANSPORT) => Ok(PointMove::Sails),
             Some(crate::construction::repair::REPAIR) => {
                 let move_reads =
                     MoveToReads::of((self, motion.mover()), self.master_in(masters)?, graphics);
-                self.repair_takes_point(motion.mover_mut(), point, &move_reads)
+                actions.repair_takes_point(motion.mover_mut(), point, &move_reads)
             }
             Some(other) => Err(GenieError::unreachable(
                 "a top action of a type top_action never holds",
@@ -263,13 +265,14 @@ impl Unit {
     ///
     /// [`Artifact::take_point`]: crate::ownership::artifact::Artifact::take_point
     fn artifact_takes_point(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         mover: Option<&mut Mover>,
         point: Position,
         sprites: &SpriteReads<'_>,
     ) -> Result<PointMove, GenieError> {
         let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref()));
-        let gone = match self.actions.list.artifact_mut() {
+        let gone = match actions.list.artifact_mut() {
             Some(a) => a.take_point(point, &reads)?,
             None => crate::ownership::artifact::SubActionsGone::default(),
         };
@@ -284,7 +287,8 @@ impl Unit {
     ///
     /// [`HuntAction::take_move`]: crate::gathering::hunt::HuntAction::take_move
     fn hunt_takes_point(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
@@ -292,7 +296,7 @@ impl Unit {
     ) -> Result<PointMove, GenieError> {
         let my_pasture = self.my_pasture;
         let walks = Walks::of(sprites, (self, mover.as_deref()));
-        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), mover) else {
+        let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -318,14 +322,15 @@ impl Unit {
     /// The Gather's slot 0x40 (its move to the point): the target it had is let go; the
     /// `MoveTo` it makes takes `sprites`' default for a sprite the task lacks.
     fn gather_takes_point(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         mover: Option<&mut Mover>,
         point: Position,
         player: PlayerId,
         sprites: SpriteReads<'_>,
     ) -> Result<PointMove, GenieError> {
         let walks = Walks::of(sprites, (self, mover.as_deref()));
-        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), mover) else {
+        let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -333,26 +338,6 @@ impl Unit {
         let old = gather.target;
         gather.take_move(None, point, player, mover, &walks)?;
         Ok(PointMove::Taken(old))
-    }
-
-    /// The Repair's slot 0x40 (`FUN_140ad9700`, [`RepairAction::take_point`]): its point, slot
-    /// 0x68 with none, `set_state(11)`, whose `MoveTo` reads `move_reads`. Returns
-    /// the target let go and the one whose repairers it leaves.
-    ///
-    /// [`RepairAction::take_point`]: crate::construction::repair::RepairAction::take_point
-    fn repair_takes_point(
-        &mut self,
-        mover: Option<&mut Mover>,
-        point: Position,
-        move_reads: &MoveToReads<'_>,
-    ) -> Result<PointMove, GenieError> {
-        let repair = self
-            .actions
-            .list
-            .repair_mut()
-            .ok_or(GenieError::unreachable("a Repair head without its Repair"))?;
-        let (old, counted) = repair.take_point(point, mover, move_reads)?;
-        Ok(PointMove::Repairs(old, old.filter(|_| counted)))
     }
 
     /// The unit's slot 0x348 (`FUN_141086440`), forced, on its unit AI's move to an object (in
@@ -364,11 +349,12 @@ impl Unit {
     /// ([`MoveToAction::to_object`]).
     pub(crate) fn move_to_object(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         (target, state): (ObjectId, crate::objects::ObjectState),
         range: Distance,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        if self.actions.unmodelled_action.is_some() {
+        if actions.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit with an action",
             ));
@@ -390,6 +376,7 @@ impl Unit {
         }
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.clear_own_actions(
+            actions,
             c.w.parts.motion_mut(self.id),
             &mut releases,
             &mut leaves,
@@ -424,7 +411,7 @@ impl Unit {
                 c.w.streams.get(Stream::Sprite),
             )?;
         }
-        self.actions.list.set_move_to(Some(move_to));
+        actions.list.set_move_to(Some(move_to));
         Ok(())
     }
 
@@ -440,6 +427,7 @@ impl Unit {
     /// A unit with a sprite whose master's standing sprite the slice does not hold.
     pub(crate) fn own_move_gave_up(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         motion: MotionMut<'_>,
         waits: bool,
         stance: crate::unit_ai::UnitStance,
@@ -449,7 +437,7 @@ impl Unit {
             &mut Well512,
         ),
     ) -> Result<(), GenieError> {
-        let Some(m) = self.actions.list.move_to_mut() else {
+        let Some(m) = actions.list.move_to_mut() else {
             return Ok(());
         };
         m.state = m.wait.give_up(waits, stance);
@@ -508,4 +496,25 @@ pub(crate) enum PointMove {
     /// The Transport answers 1 (`0x140aa3e40`): it sails to the point, which the caller runs
     /// with the map ([`Unit::transport_sail`]).
     Sails,
+}
+
+impl crate::objects::layers::Action {
+    /// The Repair's slot 0x40 (`FUN_140ad9700`, [`RepairAction::take_point`]): its point, slot
+    /// 0x68 with none, `set_state(11)`, whose `MoveTo` reads `move_reads`. Returns
+    /// the target let go and the one whose repairers it leaves.
+    ///
+    /// [`RepairAction::take_point`]: crate::construction::repair::RepairAction::take_point
+    fn repair_takes_point(
+        &mut self,
+        mover: Option<&mut Mover>,
+        point: Position,
+        move_reads: &MoveToReads<'_>,
+    ) -> Result<PointMove, GenieError> {
+        let repair = self
+            .list
+            .repair_mut()
+            .ok_or(GenieError::unreachable("a Repair head without its Repair"))?;
+        let (old, counted) = repair.take_point(point, mover, move_reads)?;
+        Ok(PointMove::Repairs(old, old.filter(|_| counted)))
+    }
 }

@@ -86,7 +86,7 @@ const STANDING: Graphic = Graphic {
 /// 2).
 fn hull() -> (
     crate::objects::unit::Unit,
-    crate::objects::layers::MotionLayer,
+    crate::objects::layers::Motion,
     PartTable<UnitAi>,
 ) {
     let mut mover = crate::gathering::hunt::tests::walker();
@@ -102,11 +102,7 @@ fn hull() -> (
     };
     unit.life.state = ObjectState::Alive;
     let ais = std::iter::once((unit.id, UnitAi::default())).collect();
-    (
-        unit,
-        crate::objects::layers::MotionLayer::Moving(mover),
-        ais,
-    )
+    (unit, crate::objects::layers::Motion::Moving(mover), ais)
 }
 
 /// What a state change left the hull ([`left`]).
@@ -124,7 +120,7 @@ struct Left {
 fn left(
     (unit, motion, ais): (
         &crate::objects::unit::Unit,
-        &crate::objects::layers::MotionLayer,
+        &crate::objects::layers::Motion,
         &PartTable<UnitAi>,
     ),
 ) -> Left {
@@ -592,7 +588,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     walker.mover_mut().paths.clear();
     let mut t = sailing(Some(MoveTo::Start));
     assert_eq!(
-        walker.run(100, |c, u, _, _| t.walk(c, u, me)),
+        walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
         Ok(UpdateCode::UNDER_WAY)
     );
     assert_eq!(t.move_to.map(|m| m.state), Some(MoveTo::Moving));
@@ -604,7 +600,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     let mut walker = rig();
     let mut t = sailing(Some(MoveTo::Moving));
     assert_eq!(
-        walker.run(100, |c, u, _, _| t.walk(c, u, me)),
+        walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
         Ok(UpdateCode::UNDER_WAY)
     );
     assert_eq!(
@@ -615,7 +611,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     let mut walker = rig();
     let mut t = sailing(Some(MoveTo::Waiting));
     assert_eq!(
-        walker.run(100, |c, u, _, _| t.walk(c, u, me)),
+        walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
         Ok(UpdateCode::UNDER_WAY)
     );
     assert_eq!(
@@ -630,7 +626,7 @@ fn a_sail_s_move_to_asks_for_its_path_then_walks_on() {
     ] {
         let mut walker = rig();
         let mut t = sailing(move_to);
-        assert_eq!(walker.run(100, |c, u, _, _| t.walk(c, u, me)), Ok(code));
+        assert_eq!(walker.run(100, |c, u, _, _, _| t.walk(c, u, me)), Ok(code));
         assert_eq!(walker.posted(), vec![]);
     }
 }

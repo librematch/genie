@@ -24,8 +24,10 @@ use crate::world::others::OthersRef;
 
 /// The unit a drop-site search goes from ([`drop_site_search`]).
 pub(crate) struct Seeker<'a, 'b> {
-    /// The unit, whose top action's target the search reads (slot 0x190).
+    /// The unit.
     pub(crate) unit: &'a Unit,
+    /// Its action layer, whose top action's target the search reads (slot 0x190).
+    pub(crate) actions: &'a crate::objects::layers::Action,
     pub(crate) me: Me,
     pub(crate) mover: &'a Mover,
     pub(crate) plan: &'a mut Planning<'b>,
@@ -117,7 +119,7 @@ impl Seeker<'_, '_> {
         if self.class != class::VILLAGER {
             return Ok(None);
         }
-        let Some(target) = self.unit.top_action_object()? else {
+        let Some(target) = self.actions.top_action_object()? else {
             return Ok(None);
         };
         Ok(self
@@ -199,11 +201,14 @@ pub(crate) fn drop_site_search<'u>(
         }
         let busy = at_work.is_some_and(|at_work| {
             ACTION <= master.kind
-                && o.top_action_kind().is_some_and(|k| {
-                    // The action types the Gather's drop-site searches pass over (`FUN_1411671e0`'s
-                    // argument 8 `0x7d`, which takes `0x7c` with it).
-                    k == at_work || (at_work == action_type::UNPACK && k == action_type::PACK)
-                })
+                && by_id
+                    .actions(o.id)
+                    .and_then(crate::objects::layers::Action::top_action_kind)
+                    .is_some_and(|k| {
+                        // The action types the Gather's drop-site searches pass over (`FUN_1411671e0`'s
+                        // argument 8 `0x7d`, which takes `0x7c` with it).
+                        k == at_work || (at_work == action_type::UNPACK && k == action_type::PACK)
+                    })
         });
         if busy || (outside && o.life.inside.is_some()) {
             continue;
@@ -331,7 +336,7 @@ mod tests {
     }
 
     /// The villager 10 at (20, 20), building the object `target` when there is one.
-    fn villager(target: Option<i32>) -> Unit {
+    fn villager(target: Option<i32>) -> crate::world::parts::Object {
         let task = BuildTask {
             range: Distance::new(0.1),
             work_value: crate::objects::masters::WorkValue::new(1.0),
@@ -340,8 +345,9 @@ mod tests {
             id: TaskId::of_task(-1),
             moving: None,
         };
-        Unit {
-            actions: crate::objects::layers::ActionLayer {
+        crate::world::parts::Object::with_actions(
+            object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0)),
+            crate::objects::layers::Action {
                 list: ActionList::default().with_build(target.map(|t| {
                     crate::construction::build::tests::started(
                         object_id(t),
@@ -350,10 +356,9 @@ mod tests {
                         task,
                     )
                 })),
-                ..object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0)).actions
+                ..Default::default()
             },
-            ..object(10, ids::VILLAGER_MALE, Point::new(20.0, 20.0))
-        }
+        )
     }
 
     /// The map's objects: a farm 800 (class 49) at `farm` and a house 801 (class 3) at (20, 17).
@@ -380,15 +385,16 @@ mod tests {
         s
     }
 
-    /// The search over `units` from `at` with `unit` (of `class`) as the seeker by path, on an open
-    /// map without planners: by path, no object gets a length.
+    /// The search over `units` from `at` with `seeker`'s unit (of `class`) as the seeker by path,
+    /// on an open map without planners: by path, no object gets a length.
     fn search(
         units: &[Unit],
-        unit: &Unit,
+        seeker: &crate::world::parts::Object,
         class: ClassId,
         at: Position,
         spatial: &Spatial,
     ) -> Result<Option<DropSiteId>, GenieError> {
+        let (unit, actions) = (&seeker.unit, &seeker.parts.actions);
         let mover = crate::gathering::hunt::tests::walker();
         // the search writes the obstruction manager's scratch: it runs on the fixture's copy
         let mut spatial = spatial.clone();
@@ -409,6 +415,7 @@ mod tests {
         };
         let seeker = Seeker {
             unit,
+            actions,
             me: Me {
                 human_order: WorldTime::ZERO,
                 id: unit.id,
@@ -496,7 +503,7 @@ mod tests {
             Ok(None)
         );
         let mut unmodelled = villager(None);
-        unmodelled.actions.unmodelled_action = Some(GenieError::unsupported("an action"));
+        unmodelled.parts.actions.unmodelled_action = Some(GenieError::unsupported("an action"));
         assert!(search(&sites(), &unmodelled, class::VILLAGER, at, &near_tc).is_err());
     }
 

@@ -43,13 +43,17 @@ impl Unit {
     /// ([`Unit::missile_lands`]). A dead shooter's weapons going to the missile
     /// (`FUN_14113e170`), the sprite's pitch facet and the projectile types 1 and 2 are not
     /// modelled.
-    pub(crate) fn fly(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn fly(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let Some(mut missile) = c.w.parts.missile.get(self.id).copied() else {
             return Ok(());
         };
-        let mut action = self.actions.list.take_missile();
-        let flown = self.fly_missile(&mut missile, &mut action, c);
-        self.actions.list.set_missile(action);
+        let mut action = actions.list.take_missile();
+        let flown = self.fly_missile(actions, &mut missile, &mut action, c);
+        actions.list.set_missile(action);
         if let Some(own) = c.w.parts.missile.get_mut(self.id) {
             *own = missile;
         }
@@ -106,6 +110,7 @@ impl Unit {
 
     pub(crate) fn fly_missile(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         missile: &mut crate::combat::missile::Missile,
         slot: &mut Option<crate::combat::missile::MissileAction>,
         c: &mut Step<'_>,
@@ -171,10 +176,10 @@ impl Unit {
                 charge: missile.charge,
                 by: missile.fired_from,
             };
-            self.missile_hits(action, &stats, fired, old, c)?;
+            self.missile_hits(actions, action, &stats, fired, old, c)?;
         }
         if ground == at.z() {
-            self.missile_lands(missile, slot, &stats, c)?;
+            self.missile_lands(actions, missile, slot, &stats, c)?;
         }
         Ok(())
     }
@@ -194,6 +199,7 @@ impl Unit {
     /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled.
     pub(crate) fn missile_hits(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         action: &mut crate::combat::missile::MissileAction,
         stats: &crate::combat::missile::MissileStats,
         fired: Fired,
@@ -217,7 +223,7 @@ impl Unit {
                     if Some(id) != action.target {
                         continue;
                     }
-                    let result = self.missile_strike(action, fired, c)?;
+                    let result = self.missile_strike(actions, action, fired, c)?;
                     action.result = result;
                     if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
                         && result != StrikeResult::SHIELDED
@@ -234,7 +240,7 @@ impl Unit {
                             "a missed missile meeting another object than its target",
                         ));
                     }
-                    let result = self.missile_strike(action, fired, c)?;
+                    let result = self.missile_strike(actions, action, fired, c)?;
                     action.result = result;
                     // the master's dying sprite plays there (a sprite of its own, not held)
                     if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
@@ -343,6 +349,7 @@ impl Unit {
     /// is its own (`FUN_1411cc890`, its relics: [`crate::combat::attack::strike`]).
     pub(crate) fn missile_strike(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         action: &crate::combat::missile::MissileAction,
         fired: Fired,
         c: &mut Step<'_>,
@@ -351,7 +358,7 @@ impl Unit {
             return Err(GenieError::unsupported("a charge projectile's own hit"));
         }
         if action.fired_from.is_none() {
-            return self.own_strike(action, fired.by, c);
+            return self.own_strike(actions, action, fired.by, c);
         }
         let mut victim = victim(c, action.target)?;
         let (p, mode_680) = (c.player, c.w.mode_680);
@@ -391,6 +398,7 @@ impl Unit {
                 parts.unit_ai.contains(shooter.id),
                 parts.building_of(shooter.id),
                 parts.combat_of(shooter.id),
+                parts.actions.of(shooter.id),
             ),
             master,
             attributes,
@@ -424,7 +432,7 @@ impl Unit {
                 "a retaliation killing a missile's shooter",
             ));
         }
-        write_strike_back(c, self, victim)?;
+        write_strike_back(c, self, actions, victim)?;
         Ok(struck.result)
     }
 
@@ -438,6 +446,7 @@ impl Unit {
     /// names an owner is not modelled.
     pub(crate) fn own_strike(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         action: &crate::combat::missile::MissileAction,
         fired_from: Option<ShooterId>,
         c: &mut Step<'_>,
@@ -460,6 +469,7 @@ impl Unit {
                 c.w.parts.unit_ai.contains(self.id),
                 c.w.parts.building_of(self.id),
                 c.w.parts.combat_of(self.id),
+                actions,
             ),
             master,
             &c.w.players.player(c.player)?.attributes,
@@ -487,7 +497,7 @@ impl Unit {
         {
             return Err(GenieError::unsupported("a retaliation killing a missile"));
         }
-        write_strike_back(c, self, victim)?;
+        write_strike_back(c, self, actions, victim)?;
         Ok(struck.result)
     }
 
@@ -503,6 +513,7 @@ impl Unit {
     /// shooter go; `FUN_14118f1e0`: its hit points 0 and state 7).
     pub(crate) fn missile_lands(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         missile: &crate::combat::missile::Missile,
         slot: &mut Option<crate::combat::missile::MissileAction>,
         stats: &crate::combat::missile::MissileStats,
@@ -516,7 +527,7 @@ impl Unit {
         let Some(action) = slot.as_mut() else {
             return Ok(());
         };
-        self.missile_lands_on_target(action, fired, stats, c)?;
+        self.missile_lands_on_target(actions, action, fired, stats, c)?;
         if action.state == MissileState::Done {
             return Ok(());
         }
@@ -550,6 +561,7 @@ impl Unit {
     /// the shooter's hit ([`Unit::missile_strike`]) ends it unless a shield blocked it.
     fn missile_lands_on_target(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         action: &mut crate::combat::missile::MissileAction,
         fired: Fired,
         stats: &crate::combat::missile::MissileStats,
@@ -572,7 +584,7 @@ impl Unit {
                 v.radius,
             )
         {
-            let result = self.missile_strike(action, fired, c)?;
+            let result = self.missile_strike(actions, action, fired, c)?;
             action.result = result;
             if result != StrikeResult::SHIELDED {
                 self.end_missile(action);

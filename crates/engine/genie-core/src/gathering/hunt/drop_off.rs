@@ -210,7 +210,11 @@ impl Unit {
     ///
     /// [`HuntAction::set_drop`]: crate::gathering::hunt::HuntAction::set_drop
     /// [`drop_site_search`]: crate::gathering::drop_sites::drop_site_search
-    pub(crate) fn hunt_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn hunt_drop_off(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let (mover, by_id) =
             c.w.parts
                 .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.masters));
@@ -225,7 +229,7 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.drop_off_in(mover, w, others, &c.w.graphics, by_id)? {
+        if let Some(site) = self.drop_off_in(actions, mover, w, others, &c.w.graphics, by_id)? {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;
         }

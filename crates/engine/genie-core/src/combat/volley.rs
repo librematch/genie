@@ -573,10 +573,6 @@ impl Unit {
                 master: made.life,
             },
             place: crate::objects::layers::Static::at(position),
-            actions: crate::objects::layers::ActionLayer {
-                list: ActionList::default().with_missile(Some(action)),
-                ..Default::default()
-            },
             attackable: true,
             pasture: None,
             my_pasture: None,
@@ -599,8 +595,12 @@ impl Unit {
         let missile = crate::world::parts::Object {
             unit: missile,
             parts: crate::world::parts::ObjectParts {
+                actions: crate::objects::layers::Action {
+                    list: ActionList::default().with_missile(Some(action)),
+                    ..Default::default()
+                },
                 missile: Some(own),
-                motion: Some(crate::objects::layers::MotionLayer::Moving(mover)),
+                motion: Some(crate::objects::layers::Motion::Moving(mover)),
                 // its +0x900, the firing object's attack count when fired
                 combat: crate::objects::layers::Combat {
                     attack_count: c.w.parts.combat_of(self.id).attack_count,

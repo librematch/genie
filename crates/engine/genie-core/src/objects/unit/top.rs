@@ -1,4 +1,5 @@
-//! What a unit's actions hold: their taker, its top action, target and gait.
+//! What a unit and its action layer answer: their taker, its context, its gait, whether its top
+//! action may be interrupted and the target it attacks.
 
 use crate::GenieError;
 use crate::math::fmath::BVector;
@@ -6,8 +7,6 @@ use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::actions::Action;
-use crate::objects::masters::ActionType;
 use crate::objects::masters::Master;
 use crate::objects::masters::action_type;
 use crate::objects::masters::master_type::BUILDING;
@@ -69,28 +68,19 @@ impl Unit {
         self.life.goto_sleep = false;
     }
 
-    /// The target of its hunt, which it attacks or gathers from: the first of its actions that
-    /// decides, the Hunt, a Gather with a target, the Attack and a missile with a target (a Hunt
-    /// or an Attack without one decides none).
-    pub(crate) fn attack_target(&self) -> Option<ObjectId> {
-        self.actions
-            .list
-            .hunt()
-            .map(|h| h.target)
-            .or_else(|| self.actions.list.gather().and_then(|g| g.target).map(Some))
-            .or_else(|| self.actions.list.attack().map(|a| a.target))
-            .or_else(|| self.actions.list.missile().and_then(|a| a.target).map(Some))
-            .flatten()
-    }
-
     /// `why` with what this object was doing in its context: its id and master, its top action
     /// (type and state) and its unit AI's (`ai`) order, action and target.
     #[must_use]
-    pub fn in_context(&self, ai: Option<&crate::unit_ai::UnitAi>, why: GenieError) -> GenieError {
+    pub fn in_context(
+        &self,
+        actions: &crate::objects::layers::Action,
+        ai: Option<&crate::unit_ai::UnitAi>,
+        why: GenieError,
+    ) -> GenieError {
         let mut why = why
             .with("object", self.id)
             .with("master", self.life.master_id);
-        if let Some(a) = self.top_action() {
+        if let Some(a) = actions.top_action() {
             why = why.with("action", format_args!("{} state {}", a.kind, a.state));
         }
         if let Some(ai) = ai {
@@ -110,10 +100,10 @@ impl Unit {
     /// The unit as its walk reads it ([`crate::movement::Me`]): its id, its top action's state
     /// (0 without one), its group and its last human order's time.
     #[must_use]
-    pub fn me(&self) -> crate::movement::Me {
+    pub fn me(&self, actions: &crate::objects::layers::Action) -> crate::movement::Me {
         crate::movement::Me {
             id: self.id,
-            action_state: self
+            action_state: actions
                 .top_action()
                 .map_or(ActionState::NO_ACTION, |a| a.state),
             group: self.group.id,
@@ -124,7 +114,11 @@ impl Unit {
     /// What the walk reads of it when it meets it ([`crate::map::spatial::Gait`]), with its
     /// `mover` (none for an object that does not move).
     #[must_use]
-    pub fn gait(&self, mover: Option<&Mover>) -> Option<crate::map::spatial::Gait> {
+    pub fn gait(
+        &self,
+        actions: &crate::objects::layers::Action,
+        mover: Option<&Mover>,
+    ) -> Option<crate::map::spatial::Gait> {
         let m = mover?;
         Some(crate::map::spatial::Gait {
             moving: m
@@ -132,7 +126,7 @@ impl Unit {
                 .as_ref()
                 .is_some_and(|v| 0.0 < crate::math::fmath::length(v.velocity)),
             waits: m.waiting != 0
-                && !self
+                && !actions
                     .top_action()
                     .is_some_and(|a| matches!(a.state.get(), 6 | 7)),
             last_move: m.last_move,
@@ -146,127 +140,16 @@ impl Unit {
             group: self.group.id,
         })
     }
+}
 
-    /// Its slot 0x190 (`FUN_14106d090`, then `FUN_140a78450`): the object its top action targets
-    /// (the action's `+0x30` when not −1); none without a top action.
-    ///
-    /// # Errors
-    ///
-    /// A top action the slice does not model.
-    pub fn top_action_object(&self) -> Result<Option<ObjectId>, GenieError> {
-        if self.actions.unmodelled_action.is_some() {
-            return Err(GenieError::unsupported(
-                "slot 0x190 of an action the slice does not model",
-            ));
-        }
-        Ok(self.top_target())
-    }
-
-    /// Its top action's slots 0x190 and 0x288 (`FUN_14106d090`, `FUN_141082dc0`): the action has
-    /// neither a target nor a point (`+0x30`, `+0x38` −1), or there is none. An Artifact holds
-    /// them while it walks a move ([`crate::ownership::artifact::Artifact::idle`]); a `MoveTo` always holds
-    /// its point.
-    ///
-    /// # Errors
-    ///
-    /// A top action the slice does not model.
-    pub fn top_action_idle(&self) -> Result<bool, GenieError> {
-        if self.actions.unmodelled_action.is_some() {
-            return Err(GenieError::unsupported(
-                "slots 0x190 and 0x288 of an action the slice does not model",
-            ));
-        }
-        match self.top_action_kind() {
-            None => Ok(true),
-            Some(crate::ownership::artifact::ARTIFACT_TYPE) => Ok(self
-                .actions
-                .list
-                .artifact()
-                .is_some_and(crate::ownership::artifact::Artifact::idle)),
-            // a Make has no target, but its point (`+0x38`) is the base constructor's 0.0
-            Some(crate::movement::move_to::MOVE_TO | crate::gathering::make::MAKE) => Ok(false),
-            Some(_) => Err(GenieError::unsupported(
-                "slots 0x190 and 0x288 of an action the slice does not model",
-            )),
-        }
-    }
-
-    /// The type of its top action, if it has one.
-    #[must_use]
-    pub fn top_action_kind(&self) -> Option<ActionType> {
-        self.top_action().map(|a| a.kind)
-    }
-
-    /// Its top action (the list's head) as the slice models it, type and state.
-    #[must_use]
-    pub fn top_action(&self) -> Option<TopAction> {
-        self.actions.list.head().map(|a| TopAction {
-            kind: a.kind(),
-            state: a.state(),
-        })
-    }
-
-    /// The sub-action of its top action as the slice models it, type and state: the `MoveTo`
-    /// (type 1) an action walks with, a Hunt's Attack (9) and an Artifact's Enter (3). None for
-    /// an action without one, or without an action.
-    #[must_use]
-    pub fn top_sub_action(&self) -> Option<TopAction> {
-        use crate::movement::move_to::{MOVE_TO, MoveTo};
-        let walking = |m: Option<MoveTo>| {
-            m.map(|m| TopAction {
-                kind: MOVE_TO,
-                state: ActionState::new(m.number()),
-            })
-        };
-        match self.actions.list.head()? {
-            Action::Artifact(a) => walking(a.move_to.map(|m| m.state)).or_else(|| {
-                a.enter.map(|e| TopAction {
-                    kind: crate::garrison::ENTER,
-                    state: ActionState::new(e.state.get()),
-                })
-            }),
-            Action::Hunt(h) => h
-                .attack
-                .map(|a| TopAction {
-                    kind: crate::combat::attack::ATTACK,
-                    state: ActionState::new(a.state.get()),
-                })
-                .or_else(|| walking(h.move_to.map(|m| m.state))),
-            Action::Build(b) => walking(b.move_to.map(|m| m.state)),
-            Action::Repair(r) => walking(r.move_to.map(|m| m.state)),
-            Action::Fly(f) => walking(f.move_to.map(|m| m.state)),
-            Action::Gather(g) => walking(g.move_to.map(|m| m.state)),
-            Action::Attack(a) => walking(a.move_to.map(|m| m.state)),
-            Action::Explore(e) => walking(e.move_to.map(|m| m.state)),
-            Action::Enter(e) => walking(e.move_to.map(|m| m.state)),
-            Action::Transport(t) => walking(t.move_to.map(|m| m.state)),
-            Action::MoveTo(_) | Action::Missile(_) | Action::Make(_) | Action::WaitSolidify(_) => {
-                None
-            }
-        }
-    }
-
-    /// The target of its top action ([`Unit::top_action`], [`Action::target`]); None without an
-    /// action the slice holds or without a target.
-    #[must_use]
-    pub fn top_target(&self) -> Option<ObjectId> {
-        self.actions.list.head().and_then(Action::target)
-    }
-
-    /// The second target of its top action ([`Action::second_target`]); None without an action
-    /// the slice holds or without a second target.
-    #[must_use]
-    pub fn top_second_target(&self) -> Option<ObjectId> {
-        self.actions.list.head().and_then(Action::second_target)
-    }
-
+impl crate::objects::layers::Action {
     /// Slot 0x2d0 with 0 (`FUN_14106d170`): whether its top action may be interrupted (the group
     /// test first; the slice holds no groups). None may; type `0x7e` never; by state, 0, 1, 3,
     /// 0xd and 0xe may, 2 unless an Attack (9); in any other state only an Artifact (`0x6b`)
     /// without a target or a point (`+0x30`, `+0x38` = −1). A trade (`0x6f`) in state 4 is not
     /// modelled, nor is an action the slice does not hold.
     pub(crate) fn interruptible(&self) -> Result<bool, GenieError> {
-        if self.actions.unmodelled_action.is_some() {
+        if self.unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x2d0 of an action the slice does not model",
             ));
@@ -282,11 +165,23 @@ impl Unit {
             (_, 0 | 1 | 3 | 0xd | 0xe) => true,
             (_, 2) => kind != crate::combat::attack::ATTACK,
             (crate::ownership::artifact::ARTIFACT_TYPE, _) => self
-                .actions
                 .list
                 .artifact()
                 .is_some_and(|a| a.goal.is_none_or(|g| g.x() == -1.0)),
             _ => false,
         })
+    }
+
+    /// The target of its hunt, which it attacks or gathers from: the first of its actions that
+    /// decides, the Hunt, a Gather with a target, the Attack and a missile with a target (a Hunt
+    /// or an Attack without one decides none).
+    pub(crate) fn attack_target(&self) -> Option<ObjectId> {
+        self.list
+            .hunt()
+            .map(|h| h.target)
+            .or_else(|| self.list.gather().and_then(|g| g.target).map(Some))
+            .or_else(|| self.list.attack().map(|a| a.target))
+            .or_else(|| self.list.missile().and_then(|a| a.target).map(Some))
+            .flatten()
     }
 }

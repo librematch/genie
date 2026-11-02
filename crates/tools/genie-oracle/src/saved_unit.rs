@@ -109,25 +109,25 @@ pub(super) fn saved_missile(
     })
 }
 
-/// The slice's view of one saved object's row: its lifecycle and its actions. A save
-/// from the start of a game holds no actions, so an object starts its master's default task in
-/// its first update ([`default_task`]); a save from later in the game holds them, and the slice
-/// imports the ones it models ([`saved_actions`]). A gather point or production lists the save
-/// holds that the slice cannot read are the row's unmodelled part.
-#[cfg(test)]
-pub(super) fn unit(
-    object: &genie_save::Object,
-    objects: &PlayerObjects,
-    paths: &[Path],
-    civ: CivId,
-    masters: Option<&MasterTable>,
-    players: usize,
-) -> Unit {
-    row(object, objects, paths, civ, masters, players).0
+/// The parts of an object the slice cannot read at all: none but its action layer, which holds
+/// `why` as its unmodelled action.
+fn unmodelled(why: GenieError) -> ObjectParts {
+    ObjectParts {
+        actions: genie_core::objects::layers::Action {
+            unmodelled_action: Some(why),
+            ..Default::default()
+        },
+        ..ObjectParts::default()
+    }
 }
 
-/// [`unit`]'s row with the parts it reads: the unit AI and the town bell its unit AI's read gives
-/// (none and a new unit's where the read fails), the building and combat layers.
+/// The slice's view of one saved object: its row (its lifecycle) and the parts it reads, the
+/// unit AI and the town bell its unit AI's read gives (none and a new unit's where the read
+/// fails), the building, combat and motion layers and the action layer. A save from the start
+/// of a game holds no actions, so an object starts its master's default task in its first
+/// update ([`default_task`]); a save from later in the game holds them, and the slice imports
+/// the ones it models into the action layer ([`saved_actions`]). A gather point or production
+/// lists the save holds that the slice cannot read are the object's unmodelled part.
 fn row(
     object: &genie_save::Object,
     objects: &PlayerObjects,
@@ -141,26 +141,22 @@ fn row(
     let (Some(s), Some(id)) = (saved, named) else {
         let unit = Unit {
             id: ObjectId::UNSAVED,
-            actions: genie_core::objects::layers::ActionLayer {
-                unmodelled_action: Some(GenieError::unsupported("an object without a static part")),
-                ..Default::default()
-            },
             ..Unit::default()
         };
-        return (unit, ObjectParts::default());
+        return (
+            unit,
+            unmodelled(GenieError::unsupported("an object without a static part")),
+        );
     };
     let Ok(master) = MasterId::try_from(s.master_obj) else {
         let unit = Unit {
             id,
-            actions: genie_core::objects::layers::ActionLayer {
-                unmodelled_action: Some(GenieError::invalid_input(
-                    "an object's master is negative",
-                )),
-                ..Default::default()
-            },
             ..Unit::default()
         };
-        return (unit, ObjectParts::default());
+        return (
+            unit,
+            unmodelled(GenieError::invalid_input("an object's master is negative")),
+        );
     };
     let saved = object
         .actions()
@@ -339,7 +335,7 @@ fn row(
             a.current_speed,
         ))
     });
-    let mut unit = Unit {
+    let unit = Unit {
         id,
         life,
         attackable: s.unit_attackable_flag != 0,
@@ -358,6 +354,7 @@ fn row(
         roo_called: s.rooalready_called != 0,
         ..Unit::default()
     };
+    let mut actions = genie_core::objects::layers::Action::default();
     let imported = if saved {
         saved_actions(
             object,
@@ -373,38 +370,38 @@ fn row(
             |m| fly_task(objects, civ, masters, m),
             |m, i| task_at(objects, civ, masters, m, i),
             masters.map(|t| &t.graphics),
-            &mut unit,
+            &mut actions,
         )
     } else {
         // an object without actions in a save: its default task's action (an Artifact exists
         // from the load on; a Fly starts in its first update)
         default_task(object, s, objects, civ, masters).map(|d| match d {
-            Some(DefaultStart::Artifact(a)) => unit.actions.list.set_artifact(Some(*a)),
-            Some(DefaultStart::Fly) => unit.actions.default_fly = true,
-            Some(DefaultStart::Make) => unit.actions.default_make = true,
+            Some(DefaultStart::Artifact(a)) => actions.list.set_artifact(Some(*a)),
+            Some(DefaultStart::Fly) => actions.default_fly = true,
+            Some(DefaultStart::Make) => actions.default_make = true,
             None => {}
         })
     };
     // what the default task starts once the action list empties: nothing, a Fly, the Artifact
     // again or something not modelled
-    unit.actions.default_task = match default_task(object, s, objects, civ, masters) {
+    actions.default_task = match default_task(object, s, objects, civ, masters) {
         Ok(None | Some(DefaultStart::Fly | DefaultStart::Make)) => None,
         Ok(Some(DefaultStart::Artifact(_))) => {
-            unit.actions.default_artifact = true;
+            actions.default_artifact = true;
             None
         }
         Err(e) => Some(e),
     };
     if saved {
         // a saved object's Fly is its saved action's: none starts again (it never ends)
-        unit.actions.default_fly = false;
+        actions.default_fly = false;
     }
     let production = production(object).map(|_| ());
     let (mover, moving) = match mover(object, s, objects, paths, civ, masters) {
         Ok(m) => (m, Ok(())),
         Err(e) => (None, Err(e)),
     };
-    unit.actions.unmodelled_action = life_read
+    actions.unmodelled_action = life_read
         .and(ai_read)
         .and(lists_read)
         .and(gather_read)
@@ -419,7 +416,8 @@ fn row(
             town_bell,
             building,
             combat,
-            motion: genie_core::objects::layers::MotionLayer::of(animated, mover),
+            motion: genie_core::objects::layers::Motion::of(animated, mover),
+            actions,
             ..ObjectParts::default()
         },
     )

@@ -22,16 +22,21 @@ use crate::world::tests::{forage_world, in_update};
 fn walking_forager() -> World {
     let mut t = forage_world();
     let u = &mut t.players[1].objects[ListIndex::new(0)];
-    u.actions.list.set_move_to(Some(MoveToAction {
-        sprite: None,
-        state: MoveTo::Moving,
-        point: Position::new(40.0, 80.0, 0.0),
-        target: None,
-        range: Distance::ZERO,
-        quiet: false,
-        on_target_moved: crate::movement::move_to::TargetMoved::Follows,
-        wait: MoveWait::default(),
-    }));
+    t.parts
+        .actions
+        .of_mut(u.id)
+        .unwrap()
+        .list
+        .set_move_to(Some(MoveToAction {
+            sprite: None,
+            state: MoveTo::Moving,
+            point: Position::new(40.0, 80.0, 0.0),
+            target: None,
+            range: Distance::ZERO,
+            quiet: false,
+            on_target_moved: crate::movement::move_to::TargetMoved::Follows,
+            wait: MoveWait::default(),
+        }));
     let ai = t.parts.unit_ai.get_mut(u.id).unwrap();
     (ai.current_order, ai.current_action, ai.current_target) = (
         Some(OrderKind::Move),
@@ -48,14 +53,19 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieErro
     for b in &mut t.players[0].objects {
         b.workers = crate::objects::WorkerCount::of_data(1);
     }
-    let released = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
-        u.capture_stop(c, class)?;
-        let gone = OthersRef::of(&c.w.players, &c.w.index, c.player)
-            .unwrap()
-            .foreign_iter()
-            .filter(|(_, b)| b.workers == crate::objects::WorkerCount::of_data(0));
-        Ok(gone.map(|(_, b)| b.id.get()).collect())
-    })?;
+    let released = in_update(
+        &mut t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |u, actions, c| {
+            u.capture_stop(actions, c, class)?;
+            let gone = OthersRef::of(&c.w.players, &c.w.index, c.player)
+                .unwrap()
+                .foreign_iter()
+                .filter(|(_, b)| b.workers == crate::objects::WorkerCount::of_data(0));
+            Ok(gone.map(|(_, b)| b.id.get()).collect())
+        },
+    )?;
     Ok((
         t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
             .unwrap(),
@@ -68,8 +78,7 @@ fn stopped(mut t: World, class: ClassId) -> Result<(Object, Vec<i32>), GenieErro
 #[test]
 fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     let (o, released) = stopped(walking_forager(), class::VILLAGER).unwrap();
-    let u = &o.unit;
-    assert_eq!(u.actions.list.move_to().copied(), None);
+    assert_eq!(o.parts.actions.list.move_to().copied(), None);
     assert_eq!(released, []);
     let m = o.parts.mover().unwrap();
     assert_eq!(m.animated.speed, Speed::new(0.0));
@@ -85,7 +94,7 @@ fn a_capture_stop_tears_the_actions_down_and_stops_the_unit_ai() {
     );
     // livestock's unit AI, and one on action 0x2c2, keep their order and target
     let (o, _) = stopped(walking_forager(), class::LIVESTOCK).unwrap();
-    assert_eq!(o.unit.actions.list.move_to().copied(), None);
+    assert_eq!(o.parts.actions.list.move_to().copied(), None);
     let kept = |ai: &crate::unit_ai::UnitAi| (ai.current_order, ai.current_target);
     assert_eq!(
         kept(o.parts.unit_ai.as_ref().unwrap()),
@@ -116,13 +125,13 @@ fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
         ..Artifact::new(false, None)
     };
     let mut t = forage_world();
-    t.players[1].objects[ListIndex::new(0)]
-        .actions
+    t.parts
+        .actions_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .set_artifact(Some(artifact()));
     let (o, released) = stopped(t, class::LIVESTOCK).unwrap();
-    let u = o.unit;
-    let a = u.actions.list.artifact().copied().unwrap();
+    let a = o.parts.actions.list.artifact().copied().unwrap();
     assert_eq!(
         (a.move_to, a.goal, a.target, a.state),
         (
@@ -136,7 +145,11 @@ fn a_capture_stop_keeps_the_artifact_and_lets_its_target_go() {
     assert_eq!(o.parts.mover().unwrap().animated.speed, Speed::new(0.0));
     let mut t = forage_world();
     let u = &mut t.players[1].objects[ListIndex::new(0)];
-    u.actions.list.set_artifact(Some(artifact()));
+    t.parts
+        .actions_mut(u.id)
+        .unwrap()
+        .list
+        .set_artifact(Some(artifact()));
     t.parts.put_mover(u.id, None);
     assert_eq!(
         stopped(t, class::LIVESTOCK).unwrap_err().reason(),

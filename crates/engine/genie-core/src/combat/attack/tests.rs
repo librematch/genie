@@ -27,7 +27,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::layers::Animated;
-use crate::objects::layers::{MotionLayer, MotionMut, Static};
+use crate::objects::layers::{Motion, MotionMut, Static};
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
@@ -178,7 +178,7 @@ fn a_stop_ends_the_attack_and_the_unit_stands() {
     let mut a = own_attack(77, AttackState::Move, Distance::new(1.0));
     a.move_to = Some(walking(MoveTo::Moving));
     a.arms.idle_sprite = Some(stand);
-    let mut motion = MotionLayer::Moving(crate::gathering::hunt::tests::walker());
+    let mut motion = Motion::Moving(crate::gathering::hunt::tests::walker());
     motion.lent().set_anim_speed(Speed::new(0.5));
     let (mut sprite, mut rng) = (None, Well512::default());
     a.halt(motion.lent(), &mut sprite, &mut rng).unwrap();
@@ -685,18 +685,24 @@ impl Rig {
             .map(|u| u.workers.get())
     }
 
-    /// `f` on the attacker's step of `dt` ms with the fight and the reads.
+    /// `f` on the attacker's step of `dt` ms with its action layer, the fight and the reads.
     pub(crate) fn run<R>(
         &mut self,
         dt: u32,
-        f: impl FnOnce(&mut Step<'_>, &mut Unit, &mut Fight, &AttackReads) -> Result<R, GenieError>,
+        f: impl FnOnce(
+            &mut Step<'_>,
+            &mut Unit,
+            &mut crate::objects::layers::Action,
+            &mut Fight,
+            &AttackReads,
+        ) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let (fight, r) = (&mut self.f, &self.r);
         crate::world::tests::in_update(
             &mut self.t,
             (PlayerId::new(1), ListIndex::new(0)),
             dt,
-            |u, c| f(c, u, fight, r),
+            |u, actions, c| f(c, u, actions, fight, r),
         )
     }
 
@@ -727,7 +733,7 @@ impl Rig {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat, motions),
+                (&parts.building, &parts.combat, &parts.actions, motions),
             ),
             map: spatial,
             sprite_rng: sprite,
@@ -749,6 +755,12 @@ impl Rig {
     /// The attacker to change.
     pub(crate) fn unit_mut(&mut self) -> &mut Unit {
         &mut self.t.players[1].objects[ListIndex::new(0)]
+    }
+
+    /// The attacker's action layer, to change.
+    pub(crate) fn actions_mut(&mut self) -> &mut crate::objects::layers::Action {
+        let id = self.unit().id;
+        self.t.parts.actions_mut(id).unwrap()
     }
 
     /// The attacker's combat layer, to change.
@@ -1207,7 +1219,7 @@ fn an_attack_on_a_target_out_of_sight_fails() {
         let ai = rig.ai_mut().unwrap();
         ai.current_target = Some(object_id(77));
         ai.home = Some(crate::unit_ai::Home::default());
-        let code = rig.run(100, |c, u, f, r| a.out_of_sight(c, u, f, r));
+        let code = rig.run(100, |c, u, _, f, r| a.out_of_sight(c, u, f, r));
         let ai = rig.ai().unwrap();
         let (forgot, home) = (ai.current_target.is_none(), ai.home.unwrap().go_home);
         let let_go = rig.workers(77, PlayerId::new(1)) == Some(0);
@@ -1325,8 +1337,8 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, seen_at);
         (a.state, a.seen, a.move_to) = (state, seen_at, Some(walking(MoveTo::Moving)));
         let code = rig
-            .run(20, |c, u, f, r| {
-                a.update(c, u, me(1, AttackState::Ready), f, r)
+            .run(20, |c, u, actions, f, r| {
+                a.update(c, u, actions, me(1, AttackState::Ready), f, r)
             })
             .unwrap();
         (code, a)
@@ -1386,8 +1398,8 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         let mut a = soldier_attack(7, range, 0.0, at);
         (a.state, a.seen, a.move_to) = (state, at, Some(walking(MoveTo::Arrived)));
         let code = rig
-            .run(20, |c, u, f, r| {
-                a.update(c, u, me(1, AttackState::Ready), f, r)
+            .run(20, |c, u, actions, f, r| {
+                a.update(c, u, actions, me(1, AttackState::Ready), f, r)
             })
             .unwrap();
         let let_go = rig.workers(7, PlayerId::new(2)) == Some(0);
@@ -1555,8 +1567,8 @@ fn an_attack_in_a_state_without_a_case_returns_0() {
     );
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
     (a.state, a.seen) = (AttackState::New, at);
-    let code = rig.run(20, |c, u, f, r| {
-        a.update(c, u, me(1, AttackState::Ready), f, r)
+    let code = rig.run(20, |c, u, actions, f, r| {
+        a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
     assert_eq!(code, Ok(UpdateCode::UNDER_WAY));
     assert_eq!((a.state, a.timer), (AttackState::New, Seconds::new(0.02)));
@@ -1589,8 +1601,8 @@ fn an_attack_on_a_target_its_player_counts_as_its_own_ends() {
             (a.state, a.seen, a.same_owner, a.sub_action) =
                 (AttackState::New, at, same_owner, sub_action);
             let code = rig
-                .run(20, |c, u, f, r| {
-                    a.update(c, u, me(1, AttackState::Ready), f, r)
+                .run(20, |c, u, actions, f, r| {
+                    a.update(c, u, actions, me(1, AttackState::Ready), f, r)
                 })
                 .unwrap();
             (code, a.state, rig.posted())
@@ -1653,8 +1665,8 @@ fn a_sub_action_s_attack_after_its_kill_posts_0x1fb_and_returns_5() {
     .holding(7, PlayerId::new(0));
     let mut a = soldier_attack(7, Distance::ZERO, 0.0, at);
     (a.state, a.seen, a.sub_action) = (AttackState::Killed, at, true);
-    let code = rig.run(20, |c, u, f, r| {
-        a.update(c, u, me(1, AttackState::Ready), f, r)
+    let code = rig.run(20, |c, u, actions, f, r| {
+        a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
     assert_eq!(code, Ok(UpdateCode::CODE_5));
     assert_eq!((a.state, a.target), (AttackState::Done, None));
@@ -1690,8 +1702,8 @@ fn a_dead_tree_keeps_a_soldier_s_attack_until_it_is_ready() {
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.seen = at;
         let code = rig
-            .run(20, |c, u, f, r| {
-                a.update(c, u, me(1, AttackState::Ready), f, r)
+            .run(20, |c, u, actions, f, r| {
+                a.update(c, u, actions, me(1, AttackState::Ready), f, r)
             })
             .unwrap();
         (code, a.state, rig.workers(7, PlayerId::new(0)) == Some(0))
@@ -1743,8 +1755,8 @@ fn a_swing_that_fails_its_interrupt_check_stays_failed() {
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     (a.state, a.seen, a.arms.interrupt_frame) =
         (AttackState::Swing, at, crate::objects::Frame::of_data(5));
-    let code = rig.run(20, |c, u, f, r| {
-        a.update(c, u, me(1, AttackState::Ready), f, r)
+    let code = rig.run(20, |c, u, actions, f, r| {
+        a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
     assert_eq!(code, Ok(UpdateCode::UNDER_WAY));
     assert_eq!(a.state, AttackState::Failed);
@@ -1805,7 +1817,7 @@ fn a_disarmed_building_s_targetless_attack_ends_with_its_notify() {
         on_target_moved: TargetMoved::Follows,
         same_owner: false,
     };
-    let mut motion = MotionLayer::Animated(Animated::new(Speed::new(0.5)));
+    let mut motion = Motion::Animated(Animated::new(Speed::new(0.5)));
     assert_eq!(
         a.clone()
             .update_targetless(Seconds::new(0.028), true, motion.lent()),
@@ -2432,7 +2444,12 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
     let centre = &mut t.players[1].objects[ListIndex::new(2)];
     let mut attack = own_attack(-1, AttackState::Done, Distance::ZERO);
     attack.arms.idle_sprite = Some(stand);
-    centre.actions.list.set_attack(Some(attack));
+    t.parts
+        .actions
+        .of_mut(centre.id)
+        .unwrap()
+        .list
+        .set_attack(Some(attack));
     // its unit AI on the attack's action, which takes the Attack's invalidation
     t.parts.set_unit_ai(
         centre.id,
@@ -2441,13 +2458,18 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
             ..UnitAi::default()
         }),
     );
-    in_update(&mut t, (PlayerId::new(1), ListIndex::new(2)), 50, |u, c| {
-        let code = u.attack_part(c, me(object_id(700)), None)?;
-        u.end_head_update(c, code)
-    })
+    in_update(
+        &mut t,
+        (PlayerId::new(1), ListIndex::new(2)),
+        50,
+        |u, actions, c| {
+            let code = u.attack_part(actions, c, me(object_id(700)), None)?;
+            u.end_head_update(actions, c, code)
+        },
+    )
     .unwrap();
     let centre = &t.players[1].objects[ListIndex::new(2)];
-    assert_eq!(centre.actions.list.attack().copied(), None);
+    assert_eq!(t.parts.actions_of(centre.id).list.attack().copied(), None);
     assert_eq!(
         (
             centre.sprite.map(|s| s.graphic.id),
@@ -2462,14 +2484,21 @@ fn a_disarmed_building_s_targetless_attack_ends_standing_and_posts_0x1fb() {
             .any(|n| n.kind == NotifyKind::ACTION_INVALIDATED && n.p == [600, -1, 0])
     );
     let mut t = forage_world();
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .set_attack(Some(own_attack(77, AttackState::Done, Distance::ZERO)));
-    let r = in_update(&mut t, (PlayerId::new(1), ListIndex::new(0)), 50, |u, c| {
-        let code = u.attack_part(c, me(object_id(9175)), None)?;
-        u.end_head_update(c, code)
-    });
+    let r = in_update(
+        &mut t,
+        (PlayerId::new(1), ListIndex::new(0)),
+        50,
+        |u, actions, c| {
+            let code = u.attack_part(actions, c, me(object_id(9175)), None)?;
+            u.end_head_update(actions, c, code)
+        },
+    );
     assert_eq!(
         r.unwrap_err().reason(),
         "an attack's target the slice does not hold live"
@@ -2510,8 +2539,9 @@ fn swinging_attack(state: AttackState, ranged: bool, fire: i16) -> Attack {
 fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
     use crate::world::tests::{archer_world, missiles};
     let mut t = archer_world(100, 0, 0.0);
-    let mut a = *t.players[1].objects[ListIndex::new(0)]
-        .actions
+    let mut a = *t
+        .parts
+        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
         .list
         .attack()
         .unwrap();
@@ -2545,9 +2575,12 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
                 &mut Well512::default(),
             )
         };
-        crate::world::tests::in_update(t, (PlayerId::new(1), ListIndex::new(0)), 100, |u, c| {
-            a.swing_to_hit(c, u, &mut f, &r, sprite)
-        })
+        crate::world::tests::in_update(
+            t,
+            (PlayerId::new(1), ListIndex::new(0)),
+            100,
+            |u, actions, c| a.swing_to_hit(c, u, actions, &mut f, &r, sprite),
+        )
     };
     swing_at(&mut t, &mut a, 4).unwrap();
     assert_eq!(
@@ -2570,8 +2603,8 @@ fn a_ranged_swing_fires_at_its_firing_frame_and_a_melee_one_counts_down() {
     });
     let mut melee = swinging_attack(AttackState::Swing, false, 0);
     melee.swing = Seconds::new(1.0);
-    rig.run(100, |c, u, f, r| {
-        melee.swing_to_hit(c, u, f, r, at_frame(4, 3))
+    rig.run(100, |c, u, actions, f, r| {
+        melee.swing_to_hit(c, u, actions, f, r, at_frame(4, 3))
     })
     .unwrap();
     assert_eq!(
@@ -2592,10 +2625,12 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
         });
         (rig.f.own.class, rig.f.own.master_id) = (class, master);
         let mut a = swinging_attack(AttackState::Swing, ranged, fire);
-        rig.run(100, |c, u, f, r| a.swing_to_hit(c, u, f, r, at_frame(5, 4)))
-            .unwrap_err()
-            .reason()
-            .to_owned()
+        rig.run(100, |c, u, actions, f, r| {
+            a.swing_to_hit(c, u, actions, f, r, at_frame(5, 4))
+        })
+        .unwrap_err()
+        .reason()
+        .to_owned()
     };
     assert_eq!(
         reason(class::CLASS_51, master_id(4), true, 3),
@@ -2614,8 +2649,9 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
         "a self-destructing attacker's hit (masters 527, 528, 1104, 2133..2135)"
     );
     let mut t = crate::world::tests::archer_world(100, 0, 0.0);
-    let mut a = *t.players[1].objects[ListIndex::new(0)]
-        .actions
+    let mut a = *t
+        .parts
+        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
         .list
         .attack()
         .unwrap();
@@ -2644,7 +2680,7 @@ fn a_swing_s_unmodelled_parts_fail_and_a_killing_hit_ends_it() {
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
         100,
-        |u, c| a.land_hit(c, u, &mut f, &r, sprite),
+        |u, actions, c| a.land_hit(c, u, actions, &mut f, &r, sprite),
     )
     .unwrap();
     assert_eq!((a.pending, a.state), (false, AttackState::Killed));
@@ -2663,7 +2699,7 @@ fn a_swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         let mut a = swinging_attack(AttackState::Swing, true, 3);
         (a.pending, a.target, a.swing) = (false, target, swing);
         a.arms.interrupt_frame = interrupt;
-        rig.run(100, |c, u, f, r| a.swing_after_hit(c, u, f, r, sprite))
+        rig.run(100, |c, u, _, f, r| a.swing_after_hit(c, u, f, r, sprite))
             .unwrap();
         (a.state, rig.mover().animated.speed)
     };
@@ -2750,7 +2786,7 @@ fn an_attack_s_move_to_starts_running_or_arrives_in_range() {
         });
         a.arms.idle_sprite = Some(STANDING);
         let code = rig
-            .run(100, |c, u, _, r| {
+            .run(100, |c, u, _, _, r| {
                 a.update_list(c, u, me(9177, AttackState::Move), r, GiveUp::default())
             })
             .unwrap();
@@ -2928,7 +2964,7 @@ fn an_attack_s_walk_walks_waits_arrives_or_fails() {
         };
         a.move_to = move_to.map(|state| walk_to_house(state, wait));
         let code = rig
-            .run(100, |c, u, f, r| {
+            .run(100, |c, u, _, f, r| {
                 a.walk(
                     c,
                     u,
@@ -3000,7 +3036,7 @@ fn an_attack_without_a_target_walks_to_where_it_saw_it_and_ends_there() {
         a.sub_action = sub_action;
         a.move_to = Some(walk_to_house(state, MoveWait::default()));
         let code = rig
-            .run(100, |c, u, _, r| {
+            .run(100, |c, u, _, _, r| {
                 a.update_gone(c, u, me(9177, AttackState::Move), r, class::CLASS_6)
             })
             .unwrap();
@@ -3083,14 +3119,14 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
     };
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, false));
     rig.r.ai_order = AiOrder::Idle;
-    let code = rig.run(20, |c, u, f, r| a.target_died(c, u, f, r));
+    let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
     assert_eq!(
         (code, rig.workers(7, PlayerId::new(0)), a.state),
         (Ok(UpdateCode::CODE_5), Some(0), AttackState::Done)
     );
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, true));
     rig.f.own.class = class::VILLAGER;
-    let code = rig.run(20, |c, u, f, r| a.target_died(c, u, f, r));
+    let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
     assert_eq!(
         (code, ObjectId::field(a.target), a.point, a.state),
         (
@@ -3101,14 +3137,14 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
         )
     );
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, true));
-    let r = rig.run(20, |c, u, f, r| a.target_died(c, u, f, r));
+    let r = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
     assert_eq!(
         r.unwrap_err().reason(),
         "an Attack of a unit other than a villager whose target died"
     );
     let (mut rig, mut a) = on_target(dead(2), true, (AttackState::Ready, true));
     rig.f.own.class = class::VILLAGER;
-    let r = rig.run(20, |c, u, f, r| a.target_died(c, u, f, r));
+    let r = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r));
     assert_eq!(
         r.unwrap_err().reason(),
         "a villager's Attack whose player-owned target died (its unit AI forgets it)"
@@ -3133,7 +3169,7 @@ fn an_attack_on_a_moved_target_follows_waits_or_fails() {
         rig.f.own.player = own_player;
         let t = *rig.t.spatial.get(object_id(7)).unwrap();
         let code = rig
-            .run(20, |c, u, f, r| a.target_moved(c, u, f, r, &t))
+            .run(20, |c, u, _, f, r| a.target_moved(c, u, f, r, &t))
             .unwrap();
         (code, a)
     };
@@ -3180,7 +3216,7 @@ fn an_attack_ends_early_on_an_ally_a_hidden_target_or_disarmed() {
         let (mut rig, mut a) = on_target(live, true, (AttackState::Move, false));
         set(&mut rig);
         let code = rig
-            .run(20, |c, u, f, r| a.ends_early(c, u, f, r, true))
+            .run(20, |c, u, _, f, r| a.ends_early(c, u, f, r, true))
             .unwrap();
         ((code, rig.posted()), a)
     };
@@ -3232,7 +3268,7 @@ fn a_ready_attack_swings_ends_on_a_dead_tree_or_follows() {
         (AttackState::Ready, false),
     );
     a.arms.sprite = Some(STANDING);
-    let code = rig.run(20, |c, u, f, r| a.ready_step(c, u, f, r, true));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
         (code, a.state),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Swing)
@@ -3247,7 +3283,7 @@ fn a_ready_attack_swings_ends_on_a_dead_tree_or_follows() {
         true,
         (AttackState::Ready, false),
     );
-    let code = rig.run(20, |c, u, f, r| a.ready_step(c, u, f, r, false));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, false));
     assert_eq!((code, a.state), (Ok(UpdateCode::CODE_5), AttackState::Done));
     let (mut rig, mut a) = on_target(
         (
@@ -3260,7 +3296,7 @@ fn a_ready_attack_swings_ends_on_a_dead_tree_or_follows() {
         (AttackState::Ready, false),
     );
     a.point = Position::from([NONE; 3]);
-    let code = rig.run(20, |c, u, f, r| a.ready_step(c, u, f, r, true));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
         (code, a.state),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Move)
@@ -3279,7 +3315,7 @@ fn a_killing_attack_ends_once_its_swing_looped() {
         Position::new(11.0, 10.0, 0.0),
     );
     let (mut rig, mut a) = on_target(dead, true, (AttackState::Killed, false));
-    let code = rig.run(20, |c, u, _, _| a.killed_step(c, u));
+    let code = rig.run(20, |c, u, _, _, _| a.killed_step(c, u));
     assert_eq!(
         (
             code,
@@ -3298,7 +3334,7 @@ fn a_killing_attack_ends_once_its_swing_looped() {
     );
     let (mut rig, mut a) = on_target(dead, true, (AttackState::Killed, false));
     rig.unit_mut().sprite = Some(ActiveSprite::start(STANDING, &mut Well512::default()));
-    let code = rig.run(20, |c, u, _, _| a.killed_step(c, u));
+    let code = rig.run(20, |c, u, _, _, _| a.killed_step(c, u));
     assert_eq!(
         (code, a.state, ObjectId::field(a.target)),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Killed, 7)
@@ -3337,7 +3373,7 @@ fn an_attack_on_a_dead_target_posts_by_its_unit_ai() {
         rig.ai_mut().unwrap().current_target = Some(object_id(7));
         set(&mut rig);
         let code = rig
-            .run(20, |c, u, f, r| a.lost(c, u, f, r))
+            .run(20, |c, u, _, f, r| a.lost(c, u, f, r))
             .map_err(|e| e.reason().to_owned());
         let forgot = rig.ai().unwrap().current_target.is_none();
         (

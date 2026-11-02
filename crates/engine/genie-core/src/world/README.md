@@ -32,6 +32,7 @@ moves it on. The behaviours that a tick runs live in their systems. Many of them
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`action_parts.rs`](action_parts.rs) | The action part's reads and writes (FD-045-D59): an object's action layer by id in the world's table (`Parts::actions`), an empty one where the table holds none, and the updating object's layer out of the table with its row (`Parts::take_actions`). |
 | [`after_step.rs`](after_step.rs) | An object's step and what follows it (`World::step_object`): what its `Step` gathered, applied to the world in the order the game's update makes them. |
 | [`ai_values.rs`](ai_values.rs) | The values of a player's AI settings (`crate::world::AiSettings`). |
 | [`checkpoint.rs`](checkpoint.rs) | The per-player 11-word state block that recorded games checkpoint every N syncs. |

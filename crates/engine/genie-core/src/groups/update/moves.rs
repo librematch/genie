@@ -422,7 +422,7 @@ impl World {
         let computer = self.players.player(p)?.computer;
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(p, idx)?;
-        let me = unit.me();
+        let me = unit.me(self.parts.actions_of(unit.id));
         let (mover, by_id) = self
             .parts
             .lend_mover(unit.id, (&self.players, &self.index, &self.masters));

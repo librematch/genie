@@ -33,12 +33,13 @@ impl Unit {
     /// statistics are not held.
     pub(crate) fn capture(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<(bool, Vec<ObjectId>), GenieError> {
         let class = self.placed_class(c)?;
-        self.capture_stop(c, class)?;
-        let changed = self.change_owner(c, new)?;
+        self.capture_stop(actions, c, class)?;
+        let changed = self.change_owner(actions, c, new)?;
         // the scan reads the owner after the change: the old one when `new` lacks the master
         let mut taken = Vec::new();
         // The livestock class (`-0xe72` raw).
@@ -74,11 +75,12 @@ impl Unit {
     /// [`Artifact::stop`]: crate::ownership::artifact::Artifact::stop
     pub(crate) fn capture_stop(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         class: ClassId,
     ) -> Result<(), GenieError> {
         let by = self.releaser(c)?;
-        if let Some(artifact) = self.actions.list.artifact_mut() {
+        if let Some(artifact) = actions.list.artifact_mut() {
             let (gone, released) = artifact.stop();
             if gone.stops {
                 c.w.parts
@@ -105,6 +107,7 @@ impl Unit {
             // artifact holds (a `MoveTo` of its own), and the list goes
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.tear_down_actions(
+                actions,
                 c.w.parts.motion.layer_mut(self.id),
                 &mut releases,
                 &mut leaves,
@@ -112,7 +115,7 @@ impl Unit {
             )?;
             crate::world::lets::torn_down(c, self, (leaves, releases))?;
         }
-        let trading = self.top_action_kind() == Some(TRADE_ACTION)
+        let trading = actions.top_action_kind() == Some(TRADE_ACTION)
             && crate::math::fmath::below_or_unordered(0.0, self.life.amount.get())
             && self.life.attribute_type.is_some();
         if class != class::LIVESTOCK
@@ -125,7 +128,7 @@ impl Unit {
         {
             let place = (self.place.position().ground(), Some(class));
             // slot 0xb0 with 0, its stopAction a call on the unit at once
-            self.run_calls(c, |ai, side, rng| {
+            self.run_calls(actions, c, |ai, side, rng| {
                 ai.stop_with(false, Some(place), side, rng)?;
                 ai.forget_targets();
                 Ok(())
@@ -146,10 +149,11 @@ impl Unit {
     /// [`Outcome::Captured`]: crate::objects::unit::Outcome::Captured
     pub(crate) fn ai_change_owner(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         new: PlayerId,
         c: &mut Step<'_>,
     ) -> Result<(), GenieError> {
-        let changed = self.change_owner(c, new)?;
+        let changed = self.change_owner(actions, c, new)?;
         if changed || c.building_handover {
             c.taken_over = Some((new, changed));
         }
@@ -163,6 +167,7 @@ impl Unit {
     /// (`FUN_14120f800` with `FUN_141192d10`).
     pub(crate) fn take_by_sight(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<(), GenieError> {
@@ -170,7 +175,7 @@ impl Unit {
         if master.class == class::SIEGE && !self.garrison.is_empty() {
             return Err(HANDS_LEFT);
         }
-        let _ = self.change_owner(c, new)?;
+        let _ = self.change_owner(actions, c, new)?;
         c.w.parts.combat_mut(self.id)?.capture_flag = CaptureKind::NONE;
         if let Some(s) = c.w.spatial.sight.as_mut().and_then(|v| v.seer_mut(self.id)) {
             s.capture = CaptureKind::NONE;
@@ -184,6 +189,7 @@ impl Unit {
     /// whether or not `new` has its master.
     pub(crate) fn change_owner(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         new: PlayerId,
     ) -> Result<bool, GenieError> {
@@ -202,7 +208,7 @@ impl Unit {
         let dead = crate::ownership::change::dead_master_of(self, c.player.index(), tables, had);
         let id = self.id;
         let changed = change_hands(
-            (self, c.w.parts.unit_ai.get_mut(id)),
+            (self, actions, c.w.parts.unit_ai.get_mut(id)),
             (c.player.index(), new),
             tables,
             &mut c.w.spatial,
@@ -300,11 +306,14 @@ fn take_livestock(
     let mut unit =
         c.w.take_out_own(c.player, id)?
             .ok_or_else(|| object_gone(id))?;
+    // its action layer goes out of the table with it, as the updating object's
+    let mut actions = c.w.parts.take_actions(id);
     let done = (|| {
-        unit.capture_stop(c, class::LIVESTOCK)?;
-        unit.change_owner(c, new)
+        unit.capture_stop(&mut actions, c, class::LIVESTOCK)?;
+        unit.change_owner(&mut actions, c, new)
     })();
     let position = unit.position();
+    c.w.parts.put_actions(id, actions);
     let _ = c.w.put_back_own(c.player, unit)?;
     Ok(done?.then_some(position))
 }

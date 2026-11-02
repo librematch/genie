@@ -175,12 +175,16 @@ pub(crate) struct Watch {
 }
 
 impl Watch {
-    /// The watch of `u` and its unit AI `ai`, taken only while a subscriber listens to the
-    /// state events.
-    pub(crate) fn of(u: &Unit, ai: Option<&crate::unit_ai::UnitAi>) -> Option<Self> {
+    /// The watch of `u`, its action layer `actions` and its unit AI `ai`, taken only while a
+    /// subscriber listens to the state events.
+    pub(crate) fn of(
+        u: &Unit,
+        actions: &crate::objects::layers::Action,
+        ai: Option<&crate::unit_ai::UnitAi>,
+    ) -> Option<Self> {
         tracing::enabled!(target: STATE, tracing::Level::DEBUG).then(|| Self {
             object_state: u.life.state,
-            action: u.top_action().map(|a| (a.kind.get(), a.state.get())),
+            action: actions.top_action().map(|a| (a.kind.get(), a.state.get())),
             order: ai.map(|ai| {
                 [
                     crate::unit_ai::OrderKind::field(ai.current_order),
@@ -191,15 +195,19 @@ impl Watch {
         })
     }
 
-    /// Tell the subscriber what changed from `self` to `u` (its unit AI `ai`) in the update
-    /// `tick` of `player`.
+    /// Tell the subscriber what changed from `self` to `u` (its action layer `actions`, its
+    /// unit AI `ai`) in the update `tick` of `player`.
     pub(crate) fn report(
         self,
-        (u, ai): (&Unit, Option<&crate::unit_ai::UnitAi>),
+        (u, actions, ai): (
+            &Unit,
+            &crate::objects::layers::Action,
+            Option<&crate::unit_ai::UnitAi>,
+        ),
         tick: crate::world::Tick,
         player: PlayerId,
     ) {
-        let Some(now) = Self::of(u, ai) else {
+        let Some(now) = Self::of(u, actions, ai) else {
             return;
         };
         let object = u.id.get();
@@ -395,7 +403,14 @@ mod tests {
 
     #[test]
     fn without_a_subscriber_no_watch_is_taken() {
-        assert_eq!(Watch::of(&Unit::default(), None), None);
+        assert_eq!(
+            Watch::of(
+                &Unit::default(),
+                &crate::objects::layers::Action::default(),
+                None
+            ),
+            None
+        );
     }
 
     #[test]
@@ -430,12 +445,15 @@ mod tests {
         let at = why.location();
         let mut t = one(vec![Unit {
             id: object_id(5),
-            actions: crate::objects::layers::ActionLayer {
+            ..Unit::default()
+        }]);
+        t.set_actions(
+            object_id(5),
+            crate::objects::layers::Action {
                 unmodelled_action: Some(why),
                 ..Default::default()
             },
-            ..Unit::default()
-        }]);
+        );
         let lines = heard(|| t.tick(Millis::new(10)));
         let warned: Vec<_> = lines.iter().filter(|l| l.starts_with("WARN")).collect();
         assert_eq!(

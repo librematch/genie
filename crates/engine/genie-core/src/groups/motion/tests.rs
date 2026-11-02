@@ -32,14 +32,10 @@ use crate::world::WorldTime;
 fn a_top_target_below_minus_one_is_none() {
     use crate::objects::unit::Unit;
     use crate::world::Player;
-    let hunter = |target: i32| Unit {
-        id: object_id(5),
-        actions: crate::objects::layers::ActionLayer {
-            list: ActionList::default()
-                .with_hunt(Some(crate::gathering::hunt::tests::hunting(target))),
-            ..Default::default()
-        },
-        ..Unit::default()
+    // the hunter 5's action layer, which the world's table holds
+    let hunter = |target: i32| crate::objects::layers::Action {
+        list: ActionList::default().with_hunt(Some(crate::gathering::hunt::tests::hunting(target))),
+        ..Default::default()
     };
     let held = |id: i32| Unit {
         id: object_id(id),
@@ -49,17 +45,21 @@ fn a_top_target_below_minus_one_is_none() {
         objects: vec![held(7), held(-3)].into(),
         ..Player::default()
     };
-    let t = World::new(
+    let mut t = World::new(
         WorldTime::ZERO,
         crate::world::FrameSeed::of_data(0),
         PlayerId::new(0),
         vec![Millis::ZERO, Millis::ZERO],
         vec![Player::default(), player],
     );
-    assert_eq!(t.top_target_object(&hunter(7)), Some(object_id(7)));
-    assert_eq!(t.top_target_object(&hunter(-3)), None);
-    assert_eq!(t.top_target_object(&hunter(9)), None);
-    assert_eq!(t.top_target_object(&held(1)), None);
+    let of = |t: &mut World, target| {
+        t.parts.put_actions(object_id(5), hunter(target));
+        t.top_target_object(object_id(5))
+    };
+    assert_eq!(of(&mut t, 7), Some(object_id(7)));
+    assert_eq!(of(&mut t, -3), None);
+    assert_eq!(of(&mut t, 9), None);
+    assert_eq!(t.top_target_object(object_id(1)), None, "no action layer");
 }
 
 /// `FUN_14104c150` turns only when 1e-7 is below the yaw's size (an ordered compare): a NaN

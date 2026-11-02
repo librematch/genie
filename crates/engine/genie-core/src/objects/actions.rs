@@ -6,9 +6,9 @@
 //! (`FUN_140a78470`), and a removal (`FUN_140a98e20`) tears the head down and starts the next one
 //! (slot 0x28). Each kind has its accessors here (`attack()`, `attack_mut()`, `take_attack()`,
 //! `set_attack()`), so a part of the object borrows the list apart from its place and its motion
-//! part ([`MotionLayer`]).
+//! part ([`Motion`]).
 //!
-//! [`MotionLayer`]: crate::objects::layers::MotionLayer
+//! [`Motion`]: crate::objects::layers::Motion
 
 use crate::combat::attack::Attack;
 use crate::combat::missile::MissileAction;

@@ -103,6 +103,7 @@ impl UnitView<'_, '_> {
         &self,
         owner: PlayerId,
         u: &Unit,
+        actions: &crate::objects::layers::Action,
         m: &crate::objects::masters::Master,
         attacker: ObjectId,
     ) -> Result<bool, GenieError> {
@@ -118,7 +119,8 @@ impl UnitView<'_, '_> {
         };
         let patrolling = match u.group.id.and_then(|id| self.c.w.groups.get(id)) {
             None => {
-                let busy = u.top_action_kind().is_some() || u.actions.unmodelled_action.is_some();
+                let busy =
+                    actions.top_action_kind().is_some() || actions.unmodelled_action.is_some();
                 if ai.current_action.is_some()
                     || busy
                     || ai.current_order.is_some()
@@ -132,7 +134,7 @@ impl UnitView<'_, '_> {
             Some(g) if g.patrols() => true,
             Some(_) => return Ok(false),
         };
-        if let Some((tq, t)) = u.top_target().and_then(find) {
+        if let Some((tq, t)) = actions.top_target().and_then(find) {
             let tm = t.master(self.c.w.master_tables(), tq)?;
             let gap = footprint_gap_squared(u.position(), m.radius, t.position(), tm.radius);
             let in_range = gap <= m.weapon_range.squared() && m.min_range.squared() <= gap;
@@ -163,6 +165,7 @@ impl UnitView<'_, '_> {
             .and_then(|v| v.seer(u.id))
             .map_or(CaptureKind::NONE, |s| s.capture);
         let me = u.attacker_of(
+            actions,
             ai.ai_type,
             Some(m),
             (owner, computer),
@@ -208,6 +211,7 @@ impl UnitView<'_, '_> {
         };
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.unit.tear_down_actions(
+            self.actions,
             self.c.w.parts.motion.layer_mut(self.unit.id),
             &mut releases,
             &mut leaves,
@@ -215,7 +219,9 @@ impl UnitView<'_, '_> {
         )?;
         self.torn_down((leaves, releases))?;
         self.c
-            .lend_at(self.unit, |w, p, i| w.change_master(p, i, next))
+            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
+                w.change_master(p, i, next)
+            })
     }
 }
 

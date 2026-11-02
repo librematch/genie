@@ -263,7 +263,8 @@ pub struct ObjectsRef<'a> {
     masters: crate::objects::masters::MasterTables<'a>,
     buildings: &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
     combats: &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
-    motions: crate::world::motions::Lent<'a, crate::objects::layers::MotionLayer>,
+    actions: &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
+    motions: crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
 }
 
 impl<'a> ObjectsRef<'a> {
@@ -281,23 +282,30 @@ impl<'a> ObjectsRef<'a> {
             players,
             index,
             crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-            (&parts.building, &parts.combat, parts.motion.unlent()),
+            (
+                &parts.building,
+                &parts.combat,
+                &parts.actions,
+                parts.motion.unlent(),
+            ),
         )
     }
 
     /// [`ObjectsRef::new`] of the part tables it reads, for a caller that holds another part
     /// table to change: the world's `masters` (the players' and the objects' own), the building
-    /// layers `buildings`, the combat layers `combats` and the motion layers `motions` (one of
-    /// them lent out to a walk, [`crate::world::parts::PartTable::lend`]).
+    /// layers `buildings`, the combat layers `combats`, the action layers `actions` and the
+    /// motion layers `motions` (one of them lent out to a walk,
+    /// [`crate::world::parts::PartTable::lend`]).
     #[must_use]
     pub const fn of_tables(
         players: &'a [Player],
         index: &'a ObjectIndex,
         masters: crate::objects::masters::MasterTables<'a>,
-        (buildings, combats, motions): (
+        (buildings, combats, actions, motions): (
             &'a crate::world::parts::PartTable<crate::objects::layers::Building>,
             &'a crate::world::parts::PartTable<crate::objects::layers::Combat>,
-            crate::world::motions::Lent<'a, crate::objects::layers::MotionLayer>,
+            &'a crate::world::parts::PartTable<crate::objects::layers::Action>,
+            crate::world::motions::Lent<'a, crate::objects::layers::Motion>,
         ),
     ) -> Self {
         Self {
@@ -306,6 +314,7 @@ impl<'a> ObjectsRef<'a> {
             masters,
             buildings,
             combats,
+            actions,
             motions,
         }
     }
@@ -317,7 +326,7 @@ impl<'a> ObjectsRef<'a> {
         let u = self.get(id)?;
         self.motions
             .get(u.id)
-            .and_then(crate::objects::layers::MotionLayer::mover)
+            .and_then(crate::objects::layers::Motion::mover)
     }
 
     /// Object `id`'s combat layer, an object out for its update's too: a new object's where
@@ -372,9 +381,10 @@ impl<'a> ObjectsRef<'a> {
     pub fn gait(&self, id: impl ObjectKey) -> Option<crate::map::spatial::Gait> {
         let u = self.get(id)?;
         u.gait(
+            self.actions.of(u.id),
             self.motions
                 .get(u.id)
-                .and_then(crate::objects::layers::MotionLayer::mover),
+                .and_then(crate::objects::layers::Motion::mover),
         )
     }
 
@@ -383,6 +393,13 @@ impl<'a> ObjectsRef<'a> {
     #[must_use]
     pub fn building(&self, id: impl ObjectKey) -> Option<&'a crate::objects::layers::Building> {
         Some(self.buildings.of(self.get(id)?.id))
+    }
+
+    /// The action layer of object `id` ([`crate::world::parts::Parts::actions_of`]); none for
+    /// an object the world does not hold or one out for its update.
+    #[must_use]
+    pub fn actions(&self, id: impl ObjectKey) -> Option<&'a crate::objects::layers::Action> {
+        Some(self.actions.of(self.get(id)?.id))
     }
 
     /// The main building of the annex `id` (its `+0xbb8`); none for an object that is no annex,

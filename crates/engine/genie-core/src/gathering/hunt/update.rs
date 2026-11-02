@@ -34,6 +34,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
@@ -44,7 +45,7 @@ impl HuntAction {
             ));
         }
         match self.state {
-            HuntState::Attack => self.update_attack(c, unit, me, f, r),
+            HuntState::Attack => self.update_attack(c, unit, actions, me, f, r),
             // case 3: a hunt that gave up on its MoveTo waits (its timer below 0), then set_state 11
             HuntState::Walk if self.timer < Seconds::ZERO => {
                 let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
@@ -55,7 +56,7 @@ impl HuntAction {
                 self.wait_then_walk(c.dt.seconds(), mover, &walks)?;
                 Ok(HuntNext::Stay)
             }
-            HuntState::Walk => self.update_walk(c, unit, me, f, r),
+            HuntState::Walk => self.update_walk(c, unit, actions, me, f, r),
             HuntState::Lead => self.update_lead(c, unit, f, r),
             HuntState::Face => self.update_face(c, unit, f, r),
             // case 6 without a target (or a task): set_state(8) to carry the load off, set_state(3)
@@ -69,7 +70,7 @@ impl HuntAction {
             }
             HuntState::Gather => {
                 let full = self.gather(c.dt.seconds(), unit, &mut f.victim, r)?;
-                write_target_back(c, unit, f)?;
+                write_target_back(c, unit, actions, f)?;
                 Ok(if full { HuntNext::Drop } else { HuntNext::Stay })
             }
             _ => Err(GenieError::unsupported(
@@ -90,6 +91,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
@@ -97,7 +99,7 @@ impl HuntAction {
         let attack = self.attack.as_mut().ok_or(GenieError::unsupported(
             "a Hunt in state 12 without its Attack",
         ))?;
-        match attack.update(c, unit, me, f, &r.attack)?.get() {
+        match attack.update(c, unit, actions, me, f, &r.attack)?.get() {
             0 | 6.. => Ok(HuntNext::Stay),
             1 | 2 | 5 if self.target.is_none() => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
@@ -114,7 +116,7 @@ impl HuntAction {
                 ))
             }
             1 | 2 | 5 => {
-                self.decay_check(c, unit, r.stops_decay, f)?;
+                self.decay_check(c, unit, actions, r.stops_decay, f)?;
                 let walks = r.walks(&c.w.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let player = f.own.player;
                 self.set_walk(
@@ -151,6 +153,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         f: &mut Fight,
         r: &HuntReads,
@@ -161,7 +164,7 @@ impl HuntAction {
         };
         match self.update_list(c, unit, me, gives_up)?.get() {
             0 => Ok(HuntNext::Stay),
-            1 | 2 => self.walk_arrived(c, unit, f, r),
+            1 | 2 => self.walk_arrived(c, unit, actions, f, r),
             3 => self
                 .walk_failed(c.w.parts.motion_mut(unit.id), r)
                 .map(|()| HuntNext::Stay),
@@ -189,6 +192,7 @@ impl HuntAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         f: &mut Fight,
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
@@ -199,8 +203,8 @@ impl HuntAction {
             self.begin_face(c, unit, r);
             return Ok(HuntNext::Stay);
         }
-        self.decay_check(c, unit, r.stops_decay, f)?;
-        self.set_face(c, unit, f, r)
+        self.decay_check(c, unit, actions, r.stops_decay, f)?;
+        self.set_face(c, unit, actions, f, r)
     }
 
     /// Case 5, the face (`FUN_141162db0`; a unit without a turn time turns at once, by the
@@ -317,10 +321,11 @@ impl HuntAction {
 pub(super) fn write_target_back(
     c: &mut Step<'_>,
     hunter: &mut Unit,
+    actions: &mut crate::objects::layers::Action,
     f: &mut Fight,
 ) -> Result<(), GenieError> {
     if let Some(k) = crate::combat::victims::write_back(c, &mut f.victim)? {
-        crate::combat::victims::file_kill(c, hunter, k)?;
+        crate::combat::victims::file_kill(c, (hunter, actions), k)?;
     }
     Ok(())
 }

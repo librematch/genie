@@ -41,12 +41,9 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         ..genie_core::production::Production::default()
     };
     let kind = ARTIFACT_TYPE;
-    let top = Unit {
-        actions: genie_core::objects::layers::ActionLayer {
-            list: ActionList::default().with_artifact(Some(artifact)),
-            ..Default::default()
-        },
-        ..Unit::default()
+    let top = genie_core::objects::layers::Action {
+        list: ActionList::default().with_artifact(Some(artifact)),
+        ..Default::default()
     };
     assert_eq!(
         checkpoint_action(&top, Some(&making)),
@@ -63,13 +60,19 @@ fn a_building_s_production_state_comes_before_its_top_action_s() {
         })
     );
     assert_eq!(
-        checkpoint_action(&Unit::default(), Some(&making)),
+        checkpoint_action(
+            &genie_core::objects::layers::Action::default(),
+            Some(&making)
+        ),
         Some(ActionTerm {
             kind: None,
             state: ActionState::new(6)
         })
     );
-    assert_eq!(checkpoint_action(&Unit::default(), None), None);
+    assert_eq!(
+        checkpoint_action(&genie_core::objects::layers::Action::default(), None),
+        None
+    );
 }
 
 /// Each differing field of a matched object is one difference with the game's master; an

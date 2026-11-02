@@ -7,6 +7,7 @@ use crate::movement::move_to::Walk;
 use crate::movement::{Me, Planning};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -109,7 +110,7 @@ impl World {
                 players,
                 index,
                 crate::objects::masters::MasterTables::new(masters, &parts.own_master),
-                (&parts.building, &parts.combat, motions),
+                (&parts.building, &parts.combat, &parts.actions, motions),
             ),
         };
         let beside = Beside {
@@ -121,11 +122,12 @@ impl World {
 }
 
 impl Step<'_> {
-    /// Runs `f` on the world with the updating object `me` lent back to its slot (FD-045-Q03:
-    /// the game's world holds the object while its update calls a routine that scans the
-    /// objects, a technology's effects or a search among them), then takes it out again from
-    /// where `f` left it; `me` holds what `f` changed on it. While the unit AI's side runs
-    /// ([`Step::side_notifies`]), a stand-in AI holds the AI's place on the lent unit.
+    /// Runs `f` on the world with the updating object `me` lent back to its slot and its
+    /// action layer `actions` to the table (FD-045-Q03: the game's world holds the object while
+    /// its update calls a routine that scans the objects, a technology's effects or a search
+    /// among them), then takes both out again from where `f` left them; `me` and `actions` hold
+    /// what `f` changed on them. While the unit AI's side runs ([`Step::side_notifies`]), a
+    /// stand-in AI holds the AI's place on the lent unit.
     ///
     /// # Errors
     ///
@@ -133,7 +135,7 @@ impl Step<'_> {
     /// a routine that reached the stand-in AI.
     pub(crate) fn lend<R>(
         &mut self,
-        me: &mut Unit,
+        (me, actions): (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let p = self.player;
@@ -144,11 +146,13 @@ impl Step<'_> {
             self.w.return_unit_ai(me.id, UnitAi::default());
         }
         let lent = std::mem::replace(me, Unit::taken_out());
+        self.w.parts.put_actions(self.me, std::mem::take(actions));
         let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
         let i = self.w.live_index(p, self.me).ok_or_else(|| {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
         })?;
         *me = self.w.take_out(p, i)?;
+        *actions = self.w.parts.take_actions(self.me);
         let stand_in = if side {
             self.w.lend_unit_ai(me.id)
         } else {
@@ -172,7 +176,7 @@ impl Step<'_> {
     /// `f`'s and the lend's.
     pub(crate) fn lend_at<R>(
         &mut self,
-        me: &mut Unit,
+        me: (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let (p, id) = (self.player, self.me);
@@ -280,7 +284,7 @@ impl Step<'_> {
                     &self.w.players,
                     &self.w.index,
                     crate::objects::masters::MasterTables::new(&self.w.masters, &parts.own_master),
-                    (&parts.building, &parts.combat, motions),
+                    (&parts.building, &parts.combat, &parts.actions, motions),
                 ),
             },
             sprite,

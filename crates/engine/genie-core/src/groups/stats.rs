@@ -401,7 +401,9 @@ impl World {
             return Ok(range);
         };
         let target = target.or_else(|| {
-            u.top_target()
+            self.parts
+                .actions_of(u.id)
+                .top_target()
                 .filter(|&t| !t.is_recyclable())
                 .and_then(|t| self.world_object(t))
         });
@@ -443,10 +445,11 @@ impl World {
         let (p, u) = self.object(view.id).ok_or_else(|| member_gone(view.id))?;
         // The types of action objects (`RGE_Action_Object`), whose action list slot 0x538 reads.
         if u.master(self.master_tables(), p)?.kind >= ACTION {
-            if let Some(e) = u.actions.unmodelled_action.clone() {
+            if let Some(e) = self.parts.actions_of(u.id).unmodelled_action.clone() {
                 return Err(e);
             }
-            if u.top_action_kind() == Some(crate::combat::attack::ATTACK) {
+            if self.parts.actions_of(u.id).top_action_kind() == Some(crate::combat::attack::ATTACK)
+            {
                 return Ok(false);
             }
         }

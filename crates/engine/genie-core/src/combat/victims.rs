@@ -51,6 +51,7 @@ impl World {
                 self.parts.unit_ai.contains(u.id),
                 self.parts.building_of(u.id),
                 self.parts.combat_of(u.id),
+                self.parts.actions.of(u.id),
             ),
             (p, master, &self.players.player(p)?.attributes),
             (attacker, &world),
@@ -234,6 +235,7 @@ pub(crate) fn victim(c: &Step<'_>, id: impl ObjectKey) -> Result<Option<Victim>,
             c.w.parts.unit_ai.contains(u.id),
             c.w.parts.building_of(u.id),
             c.w.parts.combat_of(u.id),
+            c.w.parts.actions.of(u.id),
         ),
         (p, master, attributes),
         (c.player, &sides),
@@ -326,7 +328,11 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
 /// # Errors
 ///
 /// What the kill does not model, or an attribute a player lacks.
-pub(crate) fn file_kill(c: &mut Step<'_>, me: &mut Unit, k: KillLeft) -> Result<(), GenieError> {
+pub(crate) fn file_kill(
+    c: &mut Step<'_>,
+    (me, actions): (&mut Unit, &mut crate::objects::layers::Action),
+    k: KillLeft,
+) -> Result<(), GenieError> {
     if k.id != c.me {
         return c.w.kill_left(&k);
     }
@@ -334,7 +340,7 @@ pub(crate) fn file_kill(c: &mut Step<'_>, me: &mut Unit, k: KillLeft) -> Result<
         let master = me.master(c.w.master_tables(), c.player)?.clone();
         c.w.count_killed(c.player, &master, kill)?;
         if kill.to_gaia {
-            me.ai_change_owner(PlayerId::GAIA, c)?;
+            me.ai_change_owner(actions, PlayerId::GAIA, c)?;
         }
     }
     c.w.count_razed(&k.razed)
@@ -350,17 +356,18 @@ pub(crate) fn file_kill(c: &mut Step<'_>, me: &mut Unit, k: KillLeft) -> Result<
 pub(crate) fn write_struck(
     c: &mut Step<'_>,
     me: &mut Unit,
+    actions: &mut crate::objects::layers::Action,
     mut blasted: Vec<Victim>,
     v: &mut Victim,
 ) -> Result<(), GenieError> {
     for b in &mut blasted {
         if let Some(k) = write_back(c, b)? {
-            file_kill(c, me, k)?;
+            file_kill(c, (me, actions), k)?;
         }
     }
     c.blasted = blasted;
     if let Some(k) = write_back(c, v)? {
-        file_kill(c, me, k)?;
+        file_kill(c, (me, actions), k)?;
     }
     Ok(())
 }
@@ -374,10 +381,11 @@ pub(crate) fn write_struck(
 pub(crate) fn write_strike_back(
     c: &mut Step<'_>,
     me: &mut Unit,
+    actions: &mut crate::objects::layers::Action,
     v: &mut Victim,
 ) -> Result<(), GenieError> {
     let blasted = std::mem::take(&mut c.blasted);
-    write_struck(c, me, blasted, v)
+    write_struck(c, me, actions, blasted, v)
 }
 
 impl World {

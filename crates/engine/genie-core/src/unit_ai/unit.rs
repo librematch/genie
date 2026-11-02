@@ -40,6 +40,7 @@ impl Unit {
     /// 0x230). Then the step the update ends with.
     pub(crate) fn ai_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         (captured, leaves): (Option<Captured>, Outcome),
     ) -> Result<Outcome, GenieError> {
@@ -66,7 +67,7 @@ impl Unit {
                 .get(q.index())
                 .is_some_and(|m| m.get(self.life.master_id).is_some())
         {
-            self.take_by_sight(c, q)?;
+            self.take_by_sight(actions, c, q)?;
             captured = Some(Captured {
                 new: q,
                 main: true,
@@ -74,9 +75,9 @@ impl Unit {
                 building: std::mem::take(&mut c.building_handover),
             });
         }
-        let mut after = self.ai_run(c, captured.as_ref(), None)?;
+        let mut after = self.ai_run(actions, c, captured.as_ref(), None)?;
         while let Some(tail) = after {
-            after = self.ai_run(c, captured.as_ref(), Some(tail))?;
+            after = self.ai_run(actions, c, captured.as_ref(), Some(tail))?;
         }
         if let Some((new, main)) = c.taken_over.take() {
             captured = Some(Captured {
@@ -104,6 +105,7 @@ impl Unit {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn surroundings(
         &self,
+        actions: &crate::objects::layers::Action,
         c: &Step<'_>,
         view: &OwnerView,
         (master, class): (Option<&Master>, Option<ClassId>),
@@ -161,15 +163,16 @@ impl Unit {
             under_attack: self.under_attack,
             id: self.id,
             anim_speed: c.w.parts.anim_speed_of(self.id),
-            action_state: if self.actions.unmodelled_action.is_some() {
+            action_state: if actions.unmodelled_action.is_some() {
                 None
             } else {
                 Some(
-                    self.top_action()
+                    actions
+                        .top_action()
                         .map_or(ActionState::NO_ACTION, |a| a.state),
                 )
             },
-            attack_listed: self.actions.list.attack().is_some(),
+            attack_listed: actions.list.attack().is_some(),
             units: self.named_units(
                 c,
                 changed_view(
@@ -188,7 +191,7 @@ impl Unit {
                     member_moving: c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
                 }
             }),
-            top_target: self
+            top_target: actions
                 .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
             min_range: master.map_or(Distance::ZERO, |m| m.min_range),
             attack_moving: c.w.parts.mover_of(self.id).is_some_and(|m| m.attack_moving),
@@ -236,6 +239,7 @@ impl Unit {
     /// routine the side called while the AI held the stream.
     pub(crate) fn with_side<R>(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         view: &OwnerView,
         attacker: crate::unit_ai::Attacker,
@@ -250,6 +254,7 @@ impl Unit {
         let mut side = UnitView {
             c: &mut *c,
             unit: self,
+            actions,
             attacker,
             player,
             computer,
@@ -284,6 +289,7 @@ impl Unit {
     /// and what `f` and its calls do not.
     pub(crate) fn run_ai(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         f: impl FnOnce(
             &mut UnitAi,
@@ -298,14 +304,21 @@ impl Unit {
                 "a unit AI's run of a unit without one",
             ));
         };
-        let busy = self.top_action_kind().is_some() || self.actions.unmodelled_action.is_some();
+        let busy = actions.top_action_kind().is_some() || actions.unmodelled_action.is_some();
         let master = Some(self.master(c.w.master_tables(), c.player)?);
         let class = master.map(|ms| ms.class);
         let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
         let view = OwnerView::of(c, None)?;
-        let interruptible = self.interruptible()?;
-        let at = self.surroundings(c, &view, (master, class), (player, busy, interruptible))?;
+        let interruptible = actions.interruptible()?;
+        let at = self.surroundings(
+            actions,
+            c,
+            &view,
+            (master, class),
+            (player, busy, interruptible),
+        )?;
         let attacker = self.attacker_of(
+            actions,
             ai_type,
             master,
             (player, computer),
@@ -318,9 +331,14 @@ impl Unit {
                     .map_or(Speed::ZERO, |m| m.stats.speed),
             ),
         );
-        self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
-            f(ai, &at, side, computer, rng)
-        })
+        self.with_side(
+            actions,
+            c,
+            &view,
+            attacker,
+            (player, computer),
+            |ai, side, rng| f(ai, &at, side, computer, rng),
+        )
     }
 
     /// The unit's AI run by a world routine that gives it only the unit's place (a stance, a
@@ -333,6 +351,7 @@ impl Unit {
     /// A unit without a unit AI, and what `f` and its calls do not model.
     pub(crate) fn run_calls<R>(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         f: impl FnOnce(
             &mut UnitAi,
@@ -349,6 +368,7 @@ impl Unit {
         let (player, computer) = (c.player, c.w.players.player(c.player)?.computer);
         let view = OwnerView::of(c, None)?;
         let attacker = self.attacker_of(
+            actions,
             ai_type,
             master,
             (player, computer),
@@ -361,9 +381,14 @@ impl Unit {
                     .map_or(Speed::ZERO, |m| m.stats.speed),
             ),
         );
-        self.with_side(c, &view, attacker, (player, computer), |ai, side, rng| {
-            f(ai, side, rng)
-        })
+        self.with_side(
+            actions,
+            c,
+            &view,
+            attacker,
+            (player, computer),
+            |ai, side, rng| f(ai, side, rng),
+        )
     }
 
     /// The capture kind its seer has in the players' sight (0 without one).
@@ -386,11 +411,12 @@ impl Unit {
     /// The unit AI's, its surroundings' and its calls'.
     fn ai_run(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
     ) -> Result<Option<AfterOrder>, GenieError> {
-        let busy = self.top_action_kind().is_some() || self.actions.unmodelled_action.is_some();
+        let busy = actions.top_action_kind().is_some() || actions.unmodelled_action.is_some();
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
             c.w.parts.own_master.get(self.id),
@@ -437,12 +463,18 @@ impl Unit {
             return Ok(None);
         };
         // slot 0x2d0 matters only to a queue with orders
-        let interruptible = match self.interruptible() {
+        let interruptible = match actions.interruptible() {
             Ok(i) => i,
             Err(e) if orders => return Err(e),
             Err(_) => false,
         };
-        let at = self.surroundings(c, &view, (master, class), (player, busy, interruptible))?;
+        let at = self.surroundings(
+            actions,
+            c,
+            &view,
+            (master, class),
+            (player, busy, interruptible),
+        )?;
         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
         let world_time = c.w.world_time;
         let ai_type =
@@ -451,6 +483,7 @@ impl Unit {
                 .get(self.id)
                 .map_or(UnitAiType::of_value(0), |ai| ai.ai_type);
         let attacker = self.attacker_of(
+            actions,
             ai_type,
             master,
             (player, computer),
@@ -464,6 +497,7 @@ impl Unit {
             ),
         );
         self.with_side(
+            actions,
             c,
             &view,
             attacker,

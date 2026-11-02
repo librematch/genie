@@ -563,12 +563,12 @@ impl World {
             Place::Live(p, i) => self.players.live(p, i)?,
             Place::Sleeping(p, i) => self.players.asleep(p, i)?,
         };
-        if u.actions.unmodelled_action.is_some() {
+        if self.parts.actions_of(u.id).unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "stopAllUnits of a member with an action the slice does not model",
             ));
         }
-        Ok(all || u.top_action_kind().is_some())
+        Ok(all || self.parts.actions_of(u.id).top_action_kind().is_some())
     }
 
     /// [`World::stop_all_units`]' stop of the member `id` at index `k` of group `group`.

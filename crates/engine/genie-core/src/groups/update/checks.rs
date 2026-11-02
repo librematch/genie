@@ -24,7 +24,6 @@ use crate::objects::masters::ids::MONASTERY;
 use crate::objects::masters::master_type::ACTION;
 use crate::objects::masters::master_type::COMBAT;
 use crate::objects::masters::master_type::MOVING;
-use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
 use crate::unit_ai::ActionKind;
@@ -152,7 +151,7 @@ impl World {
         {
             return Ok(false);
         }
-        u.interruptible()
+        self.parts.actions_of(u.id).interruptible()
     }
 
     /// `FUN_141007a50` of group `group`: at rest without a command (-1), its motion not moving
@@ -191,10 +190,13 @@ impl World {
         if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok(None);
         }
-        if let Some(e) = u.actions.unmodelled_action.clone() {
+        if let Some(e) = self.parts.actions_of(u.id).unmodelled_action.clone() {
             return Err(e);
         }
-        Ok(u.top_target()
+        Ok(self
+            .parts
+            .actions_of(u.id)
+            .top_target()
             .filter(|&t| !t.is_recyclable())
             .and_then(|t| self.world_object(t)))
     }
@@ -410,7 +412,7 @@ impl World {
         let WorldObject::Unit(p, u, _) = object else {
             return Ok(true);
         };
-        u.free_for_group(
+        self.parts.actions_of(u.id).free_for_group(
             u.master(self.master_tables(), p)?,
             self.parts.unit_ai.get(u.id),
         )
@@ -487,7 +489,7 @@ impl World {
             return Err(TRADE_CART_SPRITES);
         }
         if ACTION <= master.kind
-            && let Some(e) = u.actions.unmodelled_action.clone()
+            && let Some(e) = self.parts.actions_of(u.id).unmodelled_action.clone()
         {
             return Err(e);
         }
@@ -557,9 +559,10 @@ impl World {
     }
 }
 
-impl Unit {
-    /// [`World::member_idle`] of the unit itself (`FUN_141017f00`), of master `master` and unit
-    /// AI `ai`, as its own update asks it (slot 0x5e0, [`crate::movement::GroupSpeed`]).
+impl crate::objects::layers::Action {
+    /// [`World::member_idle`] of the unit itself (`FUN_141017f00`) by its action layer, of
+    /// master `master` and unit AI `ai`, as its own update asks it (slot 0x5e0,
+    /// [`crate::movement::GroupSpeed`]).
     ///
     /// # Errors
     ///
@@ -569,14 +572,16 @@ impl Unit {
         master: &Master,
         ai: Option<&UnitAi>,
     ) -> Result<bool, GenieError> {
-        let u = self;
+        let actions = self;
         let state = if master.kind < ACTION {
             ActionState::NO_ACTION
         } else {
-            if let Some(e) = u.actions.unmodelled_action.clone() {
+            if let Some(e) = actions.unmodelled_action.clone() {
                 return Err(e);
             }
-            u.top_action().map_or(ActionState::NO_ACTION, |a| a.state)
+            actions
+                .top_action()
+                .map_or(ActionState::NO_ACTION, |a| a.state)
         }
         .get();
         if 1 < state {
@@ -584,7 +589,7 @@ impl Unit {
                 if master.class == class::TRADE_CART || master.class == class::TRADE_BOAT {
                     return Ok(true);
                 }
-                if u.top_action_kind() == Some(crate::combat::attack::ATTACK) {
+                if actions.top_action_kind() == Some(crate::combat::attack::ATTACK) {
                     return Ok(false);
                 }
             } else if !matches!(state, 3 | 13 | 14) {

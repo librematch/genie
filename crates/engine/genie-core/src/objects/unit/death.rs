@@ -67,7 +67,12 @@ impl Unit {
     /// takes from its owner's attributes; then the base one's (`FUN_14119d710`, whose storage and
     /// sight are the caller's). An animated or moving object (types 20 to 69) shows its
     /// master's dying sprite. Not held: the particles and the sounds.
-    pub(crate) fn died(&mut self, c: &mut Step<'_>, before: ObjectState) -> Result<(), GenieError> {
+    pub(crate) fn died(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        before: ObjectState,
+    ) -> Result<(), GenieError> {
         // its master as the death starts: the world's calls below change other objects
         let master = &self.master(c.w.master_tables(), c.player)?.clone();
         // the last building of a master with a technology withdraws it, after the combat part
@@ -88,7 +93,7 @@ impl Unit {
             if before == ObjectState::Alive {
                 tech = self.built_building_died(c, master)?;
             } else if before == ObjectState::Foundation {
-                self.foundation_died(c, master)?;
+                self.foundation_died(actions, c, master)?;
             }
         } else if master.kind != COMBAT {
             // a static object's dying sprite is the lifecycle's ([`Lifecycle::die`]); an
@@ -122,7 +127,7 @@ impl Unit {
             // FUN_141166ab0 finds no other of the master standing (the building lent to the
             // world for the scan), then FUN_1413d4ec0
             let p = c.player;
-            c.lend(self, |w| w.withdraw_tech(p, m, t))?;
+            c.lend((&mut *self, &mut *actions), |w| w.withdraw_tech(p, m, t))?;
         }
         // the static update's sprite after the death (0x14118ad50): a building's by its build
         // points (its destruction sprite unbuilt), any other combat object's slot 0x7a0's
@@ -168,6 +173,7 @@ impl Unit {
     /// the foundation lent to the world).
     pub(crate) fn foundation_died(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         master: &Master,
     ) -> Result<(), GenieError> {
@@ -200,7 +206,7 @@ impl Unit {
         // the world for what they place and search
         if part.pasture || part.cart {
             let (p, id) = (c.player, self.id);
-            c.lend(self, |w| {
+            c.lend((&mut *self, &mut *actions), |w| {
                 if part.pasture {
                     w.setup_pasture(p, crate::gathering::PastureId::new(id))?;
                 }
@@ -226,7 +232,7 @@ impl Unit {
         if started {
             c.w.parts.combat_mut(self.id)?.firepower = master.volley_fire;
             let (p, id) = (c.player, self.id);
-            c.lend(self, |w| w.watch_started(p, id))?;
+            c.lend((&mut *self, &mut *actions), |w| w.watch_started(p, id))?;
         }
         Ok(())
     }

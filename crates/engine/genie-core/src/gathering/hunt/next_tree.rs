@@ -27,6 +27,7 @@ impl Unit {
     /// found one.
     pub(crate) fn hunt_tree_search(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         within: Option<Distance>,
         near: Option<Distance>,
@@ -37,11 +38,7 @@ impl Unit {
             let d = crate::math::fmath::sqrt(dx * dx + dz * dz + dy * dy);
             d.partial_cmp(&limit.get()) != Some(std::cmp::Ordering::Less)
         };
-        let hunt = self
-            .actions
-            .list
-            .hunt()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         if let Some(within) = within
             && beyond(hunt.point, self.position(), within)
         {
@@ -49,6 +46,7 @@ impl Unit {
         }
         let site = hunt.carry_to;
         let Some(found) = self.resource_search_from(
+            actions,
             c,
             crate::objects::masters::GatherGroup::WOOD,
             crate::objects::WorkerCount::of_data(2),
@@ -89,7 +87,7 @@ impl Unit {
             player: tp,
             amount: t.life.amount,
             allied: crate::unit_ai::task_finder::allied(own, c.player, tp, true),
-            top_action: t.top_action_kind(),
+            top_action: actions.top_action_kind(),
             drop_site: false,
         };
         let master = object_master(
@@ -125,8 +123,7 @@ impl Unit {
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let hunt = self
-            .actions
+        let hunt = actions
             .list
             .hunt_mut()
             .ok_or(crate::gathering::hunt::NO_HUNT)?;

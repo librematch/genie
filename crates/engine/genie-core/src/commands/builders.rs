@@ -198,9 +198,9 @@ impl World {
         let unit = self
             .live_object(q, id)
             .ok_or(GenieError::unsupported("a builder the slice does not have"))?;
-        if unit.actions.list.artifact().is_some()
+        if self.parts.actions_of(unit.id).list.artifact().is_some()
             || self.parts.production.contains(id)
-            || unit.actions.list.fly().is_some()
+            || self.parts.actions_of(unit.id).list.fly().is_some()
         {
             return Err(GenieError::unsupported(
                 "a builder with an action (its replacement)",
@@ -350,9 +350,8 @@ impl World {
         // the install (slot 0x808): the action list clears (its actions' teardowns), then
         // holds the Build
         self.clear_actions(player, idx)?;
-        self.players
-            .live_mut(player, idx)?
-            .actions
+        self.parts
+            .actions_mut(self.players.live(player, idx)?.id)?
             .list
             .set_build(Some(build));
         Ok(())
@@ -374,9 +373,8 @@ impl World {
             self.change_master(player, idx, master)?;
         }
         self.clear_actions(player, idx)?;
-        self.players
-            .live_mut(player, idx)?
-            .actions
+        self.parts
+            .actions_mut(self.players.live(player, idx)?.id)?
             .list
             .set_wait_solidify(Some(crate::construction::wait_solidify::WaitSolidify::new(
                 wait.task,
@@ -403,7 +401,12 @@ impl World {
         if self.object(foundation).is_none() {
             return Ok(false);
         }
-        if self.players.live(player, idx)?.top_action_kind() == Some(action_type::BUILD) {
+        if self
+            .parts
+            .actions_of(self.players.live(player, idx)?.id)
+            .top_action_kind()
+            == Some(action_type::BUILD)
+        {
             let _ = self.build_take(player, idx, foundation.id())?;
             return Ok(true);
         }
@@ -485,9 +488,9 @@ impl World {
         }
         self.take(foundation.id(), self.releaser(player, idx)?)?;
         self.clear_actions(player, idx)?;
-        self.players
-            .live_mut(player, idx)?
+        self.parts
             .actions
+            .of_mut(self.players.live(player, idx)?.id)?
             .list
             .set_build(Some(build));
         Ok(true)

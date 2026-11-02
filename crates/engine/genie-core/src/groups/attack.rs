@@ -211,7 +211,7 @@ impl World {
     fn members_on_target(&self, g: &UnitGroup, main: ObjectId) -> bool {
         g.members.iter().all(|m| {
             self.object(m.id).is_none_or(|(_, u)| {
-                let top = self.top_target_object(u);
+                let top = self.top_target_object(u.id);
                 top.is_none_or(|t| t == main)
             })
         })

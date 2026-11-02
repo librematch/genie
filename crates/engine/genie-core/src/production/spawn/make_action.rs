@@ -92,16 +92,20 @@ impl World {
             return Ok(());
         }
         let busy = !self.players.player(p)?.computer
-            && unit.top_action_kind().is_some_and(|k| {
-                matches!(
-                    k,
-                    action_type::MAKE_OBJECT
-                        | action_type::MAKE_TECH
-                        | action_type::ACTION_123
-                        | action_type::PACK
-                        | action_type::UNPACK
-                )
-            });
+            && self
+                .parts
+                .actions_of(unit.id)
+                .top_action_kind()
+                .is_some_and(|k| {
+                    matches!(
+                        k,
+                        action_type::MAKE_OBJECT
+                            | action_type::MAKE_TECH
+                            | action_type::ACTION_123
+                            | action_type::PACK
+                            | action_type::UNPACK
+                    )
+                });
         if let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id) {
             production.queue.waiting = busy;
         }

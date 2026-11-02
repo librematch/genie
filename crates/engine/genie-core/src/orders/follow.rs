@@ -366,7 +366,7 @@ impl World {
             return Ok(true);
         }
         let unit = &self.players.live(player, idx)?;
-        if unit.actions.unmodelled_action.is_some() {
+        if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "a move to an object of a unit with an action",
             ));
@@ -434,7 +434,10 @@ impl World {
                 self.streams.get(Stream::Sprite),
             )?;
         }
-        unit.actions.list.set_move_to(Some(move_to));
+        self.parts
+            .actions_mut(unit.id)?
+            .list
+            .set_move_to(Some(move_to));
         Ok(false)
     }
 
@@ -458,12 +461,12 @@ impl World {
         let Some(target) = target else {
             return self.point_taken(player, idx, point);
         };
-        if unit.actions.unmodelled_action.is_some() {
+        if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "slot 0x40 of an action the slice does not hold",
             ));
         }
-        match unit.top_action_kind() {
+        match self.parts.actions_of(unit.id).top_action_kind() {
             None
             | Some(
                 crate::movement::move_to::MOVE_TO
@@ -507,6 +510,7 @@ impl World {
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
+            self.parts.actions.of_mut(id)?,
             self.parts.motion.layer_mut(id),
             point,
             player,

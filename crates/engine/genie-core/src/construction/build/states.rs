@@ -170,6 +170,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<HeadCode, GenieError> {
         if c.w.players.player(c.player)?.computer {
@@ -207,13 +208,13 @@ impl BuildAction {
                 ))?;
         if works_it {
             ai.orders.retain(|o| o.order != OrderKind::Build);
-            self.works_it(c, builder)?;
+            self.works_it(actions, c, builder)?;
             return Ok(HeadCode::Keeps);
         }
         // FUN_140c5dcd0 (the building just completed is in state 2 now)
         drop_done_orders(ai, built, &reads.build_targets);
         if ai.orders.is_empty() {
-            self.search(c, builder, reads)?;
+            self.search(c, builder, actions, reads)?;
             return Ok(HeadCode::Keeps);
         }
         ai.end_order_and_action()?;
@@ -226,7 +227,12 @@ impl BuildAction {
     /// update then answers 0.
     ///
     /// [`World::order_work`]: crate::world::World::order_work
-    fn works_it(&mut self, c: &mut Step<'_>, builder: &mut Unit) -> Result<(), GenieError> {
+    fn works_it(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        builder: &mut Unit,
+    ) -> Result<(), GenieError> {
         let point =
             c.w.spatial
                 .get(self.target)
@@ -241,7 +247,7 @@ impl BuildAction {
             filter: None,
             notified: true,
         };
-        self.lend(c, builder, |w, p, i| w.order_work(p, i, &work))
+        self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work))
     }
 
     /// The Build's case 0xdf after the work: the builder's search for more work around the
@@ -259,6 +265,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         // the caller read the foundation, so the player holds it
@@ -267,8 +274,8 @@ impl BuildAction {
                 "a builder's search for more work without its building",
             ));
         };
-        if let Some(work) = builder.more_work(c, target, built)? {
-            return self.lend(c, builder, |w, p, i| w.order_work(p, i, &work));
+        if let Some(work) = builder.more_work(actions, c, target, built)? {
+            return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
         }
         self.no_more_work()?;
         crate::world::lets::release(c, builder, target, reads.by)?;

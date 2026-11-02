@@ -300,14 +300,6 @@ impl World {
                 master: death.2,
                 ..Lifecycle::default()
             },
-            actions: crate::objects::layers::ActionLayer {
-                list: ActionList::default(),
-                unmodelled_action: None,
-                default_task,
-                default_fly: false,
-                default_make,
-                default_artifact: false,
-            },
             place: crate::objects::layers::Static::at(position),
             attackable: true,
             untargetable: false,
@@ -357,11 +349,19 @@ impl World {
             attacking_units: Vec::new(),
         };
         let parts = ObjectParts {
+            actions: crate::objects::layers::Action {
+                list: ActionList::default(),
+                unmodelled_action: None,
+                default_task,
+                default_fly: false,
+                default_make,
+                default_artifact: false,
+            },
             unit_ai: ai,
             building: layer,
             combat,
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
-            motion: crate::objects::layers::MotionLayer::of(
+            motion: crate::objects::layers::Motion::of(
                 Some(crate::objects::layers::Animated::default()),
                 mover,
             ),

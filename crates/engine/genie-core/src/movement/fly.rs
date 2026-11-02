@@ -340,14 +340,19 @@ impl Unit {
     /// The default task's Fly ([`crate::movement::fly::Fly::start`]): a player's bird (its task's
     /// `+0x15`, not held) is not modelled; a master of fly mode 1 lifts the bird to the fly
     /// height (slot 0x58, the position setter: its tile stays, so do its counts).
-    pub(crate) fn start_fly(&mut self, c: &mut Step<'_>, task: Task) -> Result<(), GenieError> {
+    pub(crate) fn start_fly(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        task: Task,
+    ) -> Result<(), GenieError> {
         if c.player != PlayerId::GAIA {
             return Err(GenieError::unsupported(
                 "a player's bird's default Fly (its task's +0x15)",
             ));
         }
         let fly_mode = self.master(c.w.master_tables(), c.player)?.fly_mode;
-        self.actions.list.set_fly(Some(Fly::start(
+        actions.list.set_fly(Some(Fly::start(
             task,
             self.position(),
             c.w.streams.get(Stream::Action),
@@ -435,7 +440,7 @@ mod tests {
     /// A map of 120 × 120 tiles whose Gaia holds the hawk at its place with `fly`, a unit AI
     /// and movement state of top speed `speed`; the Action stream seeded with `seed`.
     fn sky_world(fly: Fly, speed: f32, seed: u32) -> World {
-        let mut bird = Unit {
+        let bird = Unit {
             id: object_id(9925),
             place: crate::objects::layers::Static::at(AT),
             life: Lifecycle {
@@ -445,7 +450,8 @@ mod tests {
             },
             ..Unit::default()
         };
-        bird.actions.list.set_fly(Some(fly));
+        let mut layer = crate::objects::layers::Action::default();
+        layer.list.set_fly(Some(fly));
         let gaia = Player {
             objects: vec![bird].into(),
             ..Player::default()
@@ -458,9 +464,10 @@ mod tests {
             vec![gaia],
         )
         .with_ais([(object_id(9925), UnitAi::default())])
+        .with_actions([(object_id(9925), layer)])
         .with_motions([(
             object_id(9925),
-            crate::objects::layers::MotionLayer::Moving(wings(speed)),
+            crate::objects::layers::Motion::Moving(wings(speed)),
         )]);
         t.spatial = crate::map::spatial::Spatial::new(GridSize::new(120, 120));
         t.streams.get(Stream::Action).set_seed(seed);
@@ -502,11 +509,15 @@ mod tests {
             group: None,
             action_state: ActionState::NO_ACTION,
         };
-        crate::world::tests::in_update(t, (PlayerId::new(0), ListIndex::new(0)), 21, |u, c| {
-            u.fly_part(c, me)
-        })?;
-        Ok(*t.players[0].objects[ListIndex::new(0)]
-            .actions
+        crate::world::tests::in_update(
+            t,
+            (PlayerId::new(0), ListIndex::new(0)),
+            21,
+            |u, actions, c| u.fly_part(actions, c, me),
+        )?;
+        Ok(*t
+            .parts
+            .actions_of(t.players[0].objects[ListIndex::new(0)].id)
             .list
             .fly()
             .unwrap())
@@ -738,8 +749,10 @@ mod tests {
             (fly.state, t.streams.get(Stream::Action).draws),
             (FlyState::Resting, 0)
         );
-        t.players[0].objects[ListIndex::new(0)]
+        t.parts
             .actions
+            .of_mut(t.players[0].objects[ListIndex::new(0)].id)
+            .unwrap()
             .list
             .fly_mut()
             .unwrap()
@@ -775,8 +788,8 @@ mod tests {
         let start = |default: Option<crate::objects::masters::TaskIndex>| {
             let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
             let bird = &mut t.players[0].objects[ListIndex::new(0)];
-            bird.actions.list.set_fly(None);
-            bird.actions.default_fly = true;
+            t.parts.actions.of_mut(bird.id).unwrap().list.set_fly(None);
+            t.parts.actions.of_mut(bird.id).unwrap().default_fly = true;
             let master = t.masters[0].get_mut(master_id(96)).unwrap();
             master.tasks = vec![task];
             master.default_task = default;
@@ -786,8 +799,9 @@ mod tests {
                 21,
                 Unit::start_default_task,
             );
-            let fly = t.players[0].objects[ListIndex::new(0)]
-                .actions
+            let fly = t
+                .parts
+                .actions_of(t.players[0].objects[ListIndex::new(0)].id)
                 .list
                 .fly()
                 .copied();

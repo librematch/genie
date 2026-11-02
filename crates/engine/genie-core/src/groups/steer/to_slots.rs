@@ -128,7 +128,7 @@ impl World {
         let Some((p, u)) = self.object(id) else {
             return Ok(());
         };
-        let (keeps_moving, _) = self.action_list(p, u)?;
+        let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
         if keeps_moving
             || !self
                 .parts
@@ -157,14 +157,15 @@ impl World {
         &self,
         p: PlayerId,
         u: &crate::objects::unit::Unit,
+        actions: &crate::objects::layers::Action,
     ) -> Result<(bool, ActionState), GenieError> {
         if u.master(self.master_tables(), p)?.kind < ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
-        if let Some(e) = u.actions.unmodelled_action.clone() {
+        if let Some(e) = actions.unmodelled_action.clone() {
             return Err(e);
         }
-        let top = u.top_action();
+        let top = actions.top_action();
         let state = top.map_or(ActionState::NO_ACTION, |a| a.state);
         let move_to = top.is_some_and(|a| a.kind == MOVE_TO);
         Ok((move_to || KEEPS_MOVING.contains(&state.get()), state))
@@ -359,7 +360,7 @@ impl World {
         id: ObjectId,
     ) -> Result<(), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let (keeps_moving, _) = self.action_list(p, u)?;
+        let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
         if !keeps_moving
             && self
                 .parts

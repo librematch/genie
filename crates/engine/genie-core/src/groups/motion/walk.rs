@@ -301,7 +301,7 @@ impl World {
                 .map(|m| {
                     self.object(m.id).map(|(_, u)| {
                         (
-                            self.top_target_object(u),
+                            self.top_target_object(u.id),
                             u.moved_vector(self.parts.mover_of(u.id)),
                         )
                     })

@@ -45,15 +45,18 @@ impl crate::world::World {
         i: ListIndex,
         to: Position,
     ) -> Result<(), GenieError> {
-        let existing = self.players.live(p, i)?.top_action_kind() == Some(TRANSPORT);
+        let existing = self
+            .parts
+            .actions_of(self.players.live(p, i)?.id)
+            .top_action_kind()
+            == Some(TRANSPORT);
         if !existing {
             self.clear_actions(p, i)?;
         }
         // a new Transport has no task (`TransportAction::new`)
         let task = self
-            .players
-            .live(p, i)?
-            .actions
+            .parts
+            .actions_of(self.players.live(p, i)?.id)
             .list
             .transport()
             .filter(|_| existing)
@@ -85,13 +88,24 @@ impl crate::world::World {
             ship.position,
         )?;
         let unit = self.players.live_mut(p, i)?;
-        let changes = if let Some(t) = unit.actions.list.transport_mut().filter(|_| existing) {
+        let changes = if let Some(t) = self
+            .parts
+            .actions
+            .of_mut(unit.id)?
+            .list
+            .transport_mut()
+            .filter(|_| existing)
+        {
             vec![t.work(ship.position, true, &ship, &mut shore)?]
         } else {
             let mut t = TransportAction::new(ship.position);
             let started = t.start(true, &ship, &mut shore)?;
             let worked = t.work(to, true, &ship, &mut shore)?;
-            unit.actions.list.set_transport(Some(t));
+            self.parts
+                .actions
+                .of_mut(unit.id)?
+                .list
+                .set_transport(Some(t));
             vec![started, worked]
         };
         for c in changes {
@@ -115,6 +129,7 @@ impl crate::world::World {
         let rng = self.streams.get(crate::math::rng::Stream::Sprite);
         let id = self.players.live(p, i)?.id;
         self.players.live_mut(p, i)?.transport_sail(
+            self.parts.actions.of_mut(id)?,
             self.parts.motion.layer_mut(id),
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
@@ -180,8 +195,9 @@ impl crate::world::World {
     /// [`Updated::Unload`]: crate::garrison::transport::Updated::Unload
     pub(crate) fn transport_unload(&mut self, p: PlayerId, i: ListIndex) -> Result<(), GenieError> {
         let unit = self.players.live(p, i)?;
-        let t = unit
-            .actions
+        let t = self
+            .parts
+            .actions_of(unit.id)
             .list
             .transport()
             .copied()
@@ -232,13 +248,7 @@ impl crate::world::World {
                 restriction,
                 ship.position,
             )?;
-            let t = self
-                .players
-                .live_mut(p, i)?
-                .actions
-                .list
-                .transport_mut()
-                .ok_or(NO_TRANSPORT)?;
+            let t = transport_mut(&self.players, &mut self.parts, p, i)?;
             let (x, y) = (point.x(), point.y());
             t.point = t.point.with_x(x).with_y(y);
             if sails {
@@ -257,13 +267,7 @@ impl crate::world::World {
             restriction,
             ship.position,
         )?;
-        let t = self
-            .players
-            .live_mut(p, i)?
-            .actions
-            .list
-            .transport_mut()
-            .ok_or(NO_TRANSPORT)?;
+        let t = transport_mut(&self.players, &mut self.parts, p, i)?;
         changes.push(t.unloaded(&ship, &mut shore)?);
         for c in changes {
             self.transport_changed(p, i, c)?;
@@ -476,4 +480,24 @@ impl crate::world::World {
         }
         Ok(())
     }
+}
+
+/// The Transport of player `p`'s object at `i` in `players`, to change in its action layer in
+/// `parts`, beside borrows of the world's map tables.
+///
+/// # Errors
+///
+/// A slot the world does not hold, and an object without its Transport.
+fn transport_mut<'a>(
+    players: &[crate::world::Player],
+    parts: &'a mut crate::world::parts::Parts,
+    p: PlayerId,
+    i: ListIndex,
+) -> Result<&'a mut TransportAction, GenieError> {
+    let id = players.live(p, i)?.id;
+    parts
+        .actions_mut(id)?
+        .list
+        .transport_mut()
+        .ok_or(NO_TRANSPORT)
 }

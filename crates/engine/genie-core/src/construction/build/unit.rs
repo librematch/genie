@@ -37,13 +37,18 @@ impl Unit {
     /// The Build's update ([`BuildAction::update`]) with what it reads as it starts
     /// ([`Unit::build_reads`]), on the Build copied out of the action list and put back after
     /// it; its code (the end's 1). Nothing without a Build.
-    pub(crate) fn build_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let Some(mut build) = self.actions.list.build().copied() else {
+    pub(crate) fn build_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<HeadCode, GenieError> {
+        let Some(mut build) = actions.list.build().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.build_reads(c, build)?;
-        let built = build.update(c, self, me, &reads);
-        if let Some(b) = self.actions.list.build_mut() {
+        let built = build.update(c, self, actions, me, &reads);
+        if let Some(b) = actions.list.build_mut() {
             *b = build;
         }
         // its end's 1 deletes it; the destructor (FUN_140aadbf0) finds it out of the builders
@@ -231,13 +236,14 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        if let Some(b) = builder.actions.list.build_mut() {
+        if let Some(b) = actions.list.build_mut() {
             *b = *self;
         }
-        let answer = c.lend_at(builder, f);
-        if let Some(b) = builder.actions.list.build() {
+        let answer = c.lend_at((&mut *builder, &mut *actions), f);
+        if let Some(b) = actions.list.build() {
             *self = *b;
         }
         answer
@@ -256,12 +262,13 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         rate: Seconds,
     ) -> Result<bool, GenieError> {
         let target = self
             .target
             .ok_or(crate::construction::build::world_side::NOT_HELD)?;
-        self.lend(c, builder, |w, _, _| w.work_building(target, rate))
+        self.lend(c, builder, actions, |w, _, _| w.work_building(target, rate))
     }
 }
 

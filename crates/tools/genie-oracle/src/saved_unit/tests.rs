@@ -3,7 +3,7 @@ use crate::fixtures::{
     with_masters,
 };
 use crate::masters::{DefaultAction, MasterTable};
-use crate::saved_unit::{annexes, object, unit};
+use crate::saved_unit::{annexes, object};
 use crate::test_ids::object_id;
 use genie_core::combat::missile::ShooterId;
 use genie_core::objects::ObjectId;
@@ -20,7 +20,7 @@ const PLAYERS: usize = 3;
 /// An object without a static part is no unit the slice can run.
 #[test]
 fn an_object_without_its_static_part_is_unmodelled() {
-    let u = unit(
+    let u = object(
         &genie_save::Object::default(),
         &PlayerObjects::default(),
         &[],
@@ -28,8 +28,8 @@ fn an_object_without_its_static_part_is_unmodelled() {
         None,
         PLAYERS,
     );
-    assert_eq!(u.id, ObjectId::UNSAVED);
-    assert!(u.actions.unmodelled_action.is_some());
+    assert_eq!(u.unit.id, ObjectId::UNSAVED);
+    assert!(u.parts.actions.unmodelled_action.is_some());
 }
 
 /// A saved building's gather point and production lists are its object's parts, not its
@@ -68,7 +68,7 @@ fn a_saved_building_s_parts_are_its_object_s() {
     );
     let o = whole(0x100);
     assert!(o.parts.gather_point.is_none());
-    assert!(o.unit.actions.unmodelled_action.is_some());
+    assert!(o.parts.actions.unmodelled_action.is_some());
 }
 
 /// A save from the start: livestock's default task is the Artifact, which exists from the
@@ -87,7 +87,7 @@ fn livestock_starts_with_its_artifact() {
         DefaultAction::Type(genie_core::ownership::artifact::ARTIFACT_TYPE),
     );
     let sheep = combat_object(5, 83);
-    let u = unit(
+    let u = object(
         &sheep,
         &PlayerObjects::default(),
         &[],
@@ -95,17 +95,17 @@ fn livestock_starts_with_its_artifact() {
         Some(&table),
         PLAYERS,
     );
-    assert_eq!(u.id, object_id(5));
-    assert!(u.actions.list.artifact().is_some() && u.actions.default_artifact);
-    assert!(u.actions.default_task.is_none());
+    assert_eq!(u.unit.id, object_id(5));
+    assert!(u.parts.actions.list.artifact().is_some() && u.parts.actions.default_artifact);
+    assert!(u.parts.actions.default_task.is_none());
     // a combat object's mover needs its master, which this save does not hold
-    assert!(u.actions.unmodelled_action.is_some());
+    assert!(u.parts.actions.unmodelled_action.is_some());
 }
 
 /// Without a table the default task is unknown: reported, as the object's.
 #[test]
 fn without_a_table_the_default_task_is_reported() {
-    let u = unit(
+    let u = object(
         &combat_object(5, 83),
         &PlayerObjects::default(),
         &[],
@@ -113,8 +113,8 @@ fn without_a_table_the_default_task_is_reported() {
         None,
         PLAYERS,
     );
-    assert!(u.actions.default_task.is_some());
-    assert!(u.actions.list.artifact().is_none());
+    assert!(u.parts.actions.default_task.is_some());
+    assert!(u.parts.actions.list.artifact().is_none());
 }
 
 /// A saved action the slice does not model stops the object.
@@ -132,7 +132,7 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         .rge_combat_object
         .rge_action_object
         .actions = action_list(vec![(genie_core::movement::explore::EXPLORE, explore)]);
-    let u = unit(
+    let u = object(
         &scout,
         &PlayerObjects::default(),
         &[],
@@ -140,8 +140,8 @@ fn a_saved_action_the_slice_does_not_model_is_reported() {
         None,
         PLAYERS,
     );
-    assert!(u.actions.unmodelled_action.is_some());
-    assert!(!u.actions.default_fly);
+    assert!(u.parts.actions.unmodelled_action.is_some());
+    assert!(!u.parts.actions.default_fly);
 }
 
 /// A missile without its action (it met its target) flies on with its own fields.
@@ -239,7 +239,7 @@ fn a_build_s_work_rate_takes_the_builder_s_powerup() {
         None,
         PLAYERS,
     );
-    let b = o.unit.actions.list.build().copied().unwrap();
+    let b = o.parts.actions.list.build().copied().unwrap();
     assert_eq!(b.task.work_rate.get().to_bits(), 2.5_f32.to_bits());
     assert_eq!(
         o.parts.combat.work_rate_powerup.get().to_bits(),
@@ -276,7 +276,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
     let o = whole(&object);
     assert_eq!(
-        o.unit.actions.unmodelled_action.map(|e| e.kind()),
+        o.parts.actions.unmodelled_action.map(|e| e.kind()),
         Some(genie_core::ErrorKind::InvalidInput)
     );
     assert_eq!(

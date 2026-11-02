@@ -54,7 +54,7 @@ pub(crate) fn search_origin(point: Point, has_site: bool, unit: Position) -> Pos
 /// footprint (the site's tile in the unit's zone of its restriction, or a dock: masters 45 and
 /// 2172, `0x140c49d17`); the answer and the out argument's steps.
 pub(crate) fn closest_resource_of(
-    (unit, mover): (&Unit, Option<&Mover>),
+    (unit, actions, mover): (&Unit, &crate::objects::layers::Action, Option<&Mover>),
     c: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
     (kind, cap, site): (
@@ -160,7 +160,7 @@ pub(crate) fn closest_resource_of(
         my_pasture: unit.my_pasture,
         min_state,
     };
-    let me_walk = unit.me();
+    let me_walk = unit.me(actions);
     let me_at = unit.position();
     let master_id = unit.life.master_id;
     let plan = &mut c.plan;
@@ -191,12 +191,12 @@ pub(crate) fn closest_resource_of(
 }
 
 /// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`): the object's top action is the Artifact
-/// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1).
-pub(crate) fn herded(others: OthersRef<'_>, id: ObjectId) -> bool {
-    others.get(id).is_some_and(|u| {
-        u.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE)
-            && u.actions
-                .list
+/// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1); `by_id` reads its
+/// action layer.
+pub(crate) fn herded(by_id: crate::world::index::ObjectsRef<'_>, id: ObjectId) -> bool {
+    by_id.actions(id).is_some_and(|a| {
+        a.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE)
+            && a.list
                 .artifact()
                 .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
     })
@@ -243,7 +243,11 @@ impl UnitView<'_, '_> {
             },
         };
         let (id, _) = closest_resource_of(
-            (self.unit, self.c.w.parts.mover_of(self.unit.id)),
+            (
+                self.unit,
+                &*self.actions,
+                self.c.w.parts.mover_of(self.unit.id),
+            ),
             &mut w,
             owner_view(
                 &self.c.w.players,
@@ -285,11 +289,12 @@ impl Unit {
     /// stand on; None for none.
     pub(crate) fn resource_search(
         &self,
+        actions: &crate::objects::layers::Action,
         c: &mut Step<'_>,
         kind: GatherGroup,
         cap: crate::objects::WorkerCount,
     ) -> Result<Option<ObjectId>, GenieError> {
-        self.resource_search_from(c, kind, cap, None)
+        self.resource_search_from(actions, c, kind, cap, None)
     }
 
     /// [`Unit::resource_search`] from the drop site `site` (if any;
@@ -298,6 +303,7 @@ impl Unit {
     /// unit's zone of its restriction, or a dock: masters 45 and 2172, `0x140c49d17`).
     pub(crate) fn resource_search_from(
         &self,
+        actions: &crate::objects::layers::Action,
         c: &mut Step<'_>,
         kind: GatherGroup,
         cap: crate::objects::WorkerCount,
@@ -342,7 +348,7 @@ impl Unit {
             crate::unit_ai::NO_POINT,
         );
         closest_resource_of(
-            (self, c.w.parts.mover_of(self.id)),
+            (self, actions, c.w.parts.mover_of(self.id)),
             &mut w,
             others,
             (kind, cap, site),

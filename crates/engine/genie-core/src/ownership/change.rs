@@ -43,7 +43,11 @@ impl World {
         let dead = dead_master_of(&unit, q.index(), tables, had);
         let id = unit.id;
         let changed = change_hands(
-            (&mut unit, self.parts.unit_ai.get_mut(id)),
+            (
+                &mut unit,
+                self.parts.actions.of_mut(id)?,
+                self.parts.unit_ai.get_mut(id),
+            ),
             (q.index(), PlayerId::GAIA),
             tables,
             &mut self.spatial,
@@ -304,7 +308,11 @@ impl World {
         let tables = MasterTables::new(&self.masters, &self.parts.own_master);
         let dead = dead_master_of(&unit, old.index(), tables, had);
         let changed = change_hands(
-            (&mut unit, self.parts.unit_ai.get_mut(id)),
+            (
+                &mut unit,
+                self.parts.actions.of_mut(id)?,
+                self.parts.unit_ai.get_mut(id),
+            ),
             (old.index(), new),
             tables,
             &mut self.spatial,
@@ -496,7 +504,11 @@ pub(crate) fn dead_master_of(
 /// the message of game mode 12 for master 1377; nor are the slot 0xa8 calls on the copies (the
 /// masters' graphics).
 pub(crate) fn change_hands(
-    (u, ai): (&mut Unit, Option<&mut crate::unit_ai::UnitAi>),
+    (u, actions, ai): (
+        &mut Unit,
+        &mut crate::objects::layers::Action,
+        Option<&mut crate::unit_ai::UnitAi>,
+    ),
     (old, new): (usize, PlayerId),
     masters: MasterTables<'_>,
     spatial: &mut Spatial,
@@ -524,7 +536,7 @@ pub(crate) fn change_hands(
     let los = own.line_of_sight;
     let sees = u.life.state == ObjectState::Alive && u.life.inside.is_none();
     spatial.change_owner(u.id, new, los, sees)?;
-    if let Some(a) = u.actions.list.artifact_mut() {
+    if let Some(a) = actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }
     let mut inbox = crate::unit_ai::Inbox {

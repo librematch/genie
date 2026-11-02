@@ -15,9 +15,10 @@ use crate::combat::missile::Missile;
 use crate::commands::GatherPoint;
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
+use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::Combat;
-use crate::objects::layers::MotionLayer;
+use crate::objects::layers::Motion;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
@@ -239,7 +240,12 @@ pub struct Parts {
     /// An object's layers between its place and its action layer (types 20 and up): the
     /// animated layer, and a moving object's mover with its movement state (FD-045-D58). A
     /// static object has none.
-    pub motion: PartTable<MotionLayer>,
+    pub motion: PartTable<Motion>,
+    /// An object's action layer (`RGE_Action_Object`, types 40 and up): its action list and its
+    /// master's default task (FD-045-D59). An object the table does not hold reads an empty one
+    /// ([`Parts::actions_of`], a tree's); a write puts one in ([`Parts::actions_mut`]). The
+    /// updating object's layer is out of the table with its row ([`Parts::take_actions`]).
+    pub actions: PartTable<Action>,
 }
 
 /// The building layer of an object the table does not hold.
@@ -286,6 +292,7 @@ impl Parts {
             building,
             combat,
             motion,
+            actions,
         } = parts;
         if let Some(m) = dead_master {
             let _ = self.dead_master.insert(id, m);
@@ -317,6 +324,9 @@ impl Parts {
         if let Some(m) = motion {
             let _ = self.motion.insert(id, m);
         }
+        if actions != Action::default() {
+            let _ = self.actions.insert(id, actions);
+        }
     }
 
     /// Object `id`'s parts taken out of the tables (it leaves the world).
@@ -332,6 +342,7 @@ impl Parts {
             building: self.building.remove(id).unwrap_or_default(),
             combat: self.combat.remove(id).unwrap_or_default(),
             motion: self.motion.remove(id),
+            actions: self.actions.remove(id).unwrap_or_default(),
         }
     }
 
@@ -349,6 +360,7 @@ impl Parts {
             building: self.building_of(id).clone(),
             combat: self.combat_of(id).clone(),
             motion: self.motion.get(id).cloned(),
+            actions: self.actions_of(id).clone(),
         }
     }
 
@@ -462,6 +474,7 @@ impl Parts {
             .chain(self.building.iter().map(|(id, _)| id))
             .chain(self.combat.iter().map(|(id, _)| id))
             .chain(self.motion.iter().map(|(id, _)| id))
+            .chain(self.actions.iter().map(|(id, _)| id))
     }
 }
 
@@ -487,7 +500,9 @@ pub enum Part {
     /// The combat layer ([`Parts::combat`]), boxed; a new object's leaves the table.
     Combat(Box<Combat>),
     /// The animated and moving layers ([`Parts::motion`]), boxed, none clearing them.
-    Motion(Option<Box<MotionLayer>>),
+    Motion(Option<Box<Motion>>),
+    /// The action layer ([`Parts::actions`]), boxed; an empty one leaves the table.
+    Actions(Box<Action>),
 }
 
 impl World {
@@ -554,6 +569,7 @@ impl World {
             Part::Motion(None) => {
                 let _ = self.parts.motion.remove(id);
             }
+            Part::Actions(a) => self.parts.put_actions(id, *a),
         }
         Ok(())
     }

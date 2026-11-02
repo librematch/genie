@@ -18,7 +18,7 @@ use crate::movement::{Me, Motion, Planning, footprint_gap, footprint_gap_squared
 use crate::movement::{MoveStats, PathAsk};
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
-use crate::objects::layers::{MotionLayer, Static};
+use crate::objects::layers::{self, Static};
 use crate::objects::masters::ActionType;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::unit_ai::UnitStance;
@@ -174,7 +174,7 @@ pub struct Walk<'a> {
     pub place: &'a mut Static,
     /// The unit's animated and moving layers, lent out of the world's table for the walk (none
     /// for a static object).
-    pub motion: Option<&'a mut MotionLayer>,
+    pub motion: Option<&'a mut layers::Motion>,
     /// The unit.
     pub me: Me,
     /// The world's dt in seconds.
@@ -197,12 +197,14 @@ impl Walk<'_> {
     /// The walking unit's mover, none for an object that does not move.
     #[must_use]
     pub fn mover(&self) -> Option<&Mover> {
-        self.motion.as_deref().and_then(MotionLayer::mover)
+        self.motion.as_deref().and_then(layers::Motion::mover)
     }
 
     /// The walking unit's mover to change, none for an object that does not move.
     pub fn mover_mut(&mut self) -> Option<&mut Mover> {
-        self.motion.as_deref_mut().and_then(MotionLayer::mover_mut)
+        self.motion
+            .as_deref_mut()
+            .and_then(layers::Motion::mover_mut)
     }
 
     /// The walking unit's place to change and its mover (none for an object that does not
@@ -210,7 +212,9 @@ impl Walk<'_> {
     pub fn place_and_mover(&mut self) -> (&mut Static, Option<&mut Mover>) {
         (
             &mut *self.place,
-            self.motion.as_deref_mut().and_then(MotionLayer::mover_mut),
+            self.motion
+                .as_deref_mut()
+                .and_then(layers::Motion::mover_mut),
         )
     }
 
@@ -443,7 +447,7 @@ pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
         by_id,
     } = walk;
     let mover = motion
-        .and_then(MotionLayer::mover_mut)
+        .and_then(layers::Motion::mover_mut)
         .ok_or(crate::world::WALKER_UNMOVING)?;
     if mover.paths.is_empty() {
         return Err(GenieError::unsupported("the path request (FUN_14114e410)"));
@@ -997,7 +1001,7 @@ mod tests {
             let mut world = crate::movement::tests::tiled_world(classes.to_vec());
             let mover = crate::movement::tests::builder_9177();
             let mut place = Static::at(Position::new(28.0, 89.0, 0.0));
-            let mut motion = MotionLayer::Moving(mover);
+            let mut motion = layers::Motion::Moving(mover);
             let mut walk = Walk {
                 by_id: ObjectsRef::empty(),
                 place: &mut place,

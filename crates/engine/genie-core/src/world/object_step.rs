@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::construction::building_update::blasts_at_death;
 use crate::objects::ListIndex;
+use crate::objects::layers::Action;
 use crate::objects::unit::{Outcome, Unit};
 use crate::players::PlayerId;
 use crate::world::Millis;
@@ -12,23 +13,27 @@ use crate::world::step::Step;
 
 impl World {
     /// One object's step with its `Step` (`f`: the unit's update, or one part of its unit AI
-    /// for a command): object `i` of player `p` leaves its list (its stand-in holds the slot),
-    /// and `f` gets it and the `Step`, which holds the world (FD-045-D28; the objects it
-    /// makes join the list at their making). It goes back to the slot its stand-in holds then
-    /// ([`World::put_back_own`]). Returns `f`'s result (an error of the put-back, then of the
-    /// sight's registry first).
+    /// for a command): object `i` of player `p` leaves its list (its stand-in holds the slot)
+    /// and its action layer the table ([`Parts::take_actions`]), and `f` gets both and the
+    /// `Step`, which holds the world (FD-045-D28; the objects it makes join the list at their
+    /// making). It goes back to the slot its stand-in holds then ([`World::put_back_own`]), its
+    /// layer to the table. Returns `f`'s result (an error of the put-back, then of the sight's
+    /// registry first).
+    ///
+    /// [`Parts::take_actions`]: crate::world::parts::Parts::take_actions
     #[allow(clippy::too_many_lines)]
     pub(super) fn run_object(
         &mut self,
         (p, i): (PlayerId, ListIndex),
         (dt, turn): (Millis, Option<Millis>),
-        f: impl FnOnce(&mut Unit, &mut Step<'_>) -> Result<Outcome, GenieError>,
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<Outcome, GenieError>,
     ) -> Result<Outcome, GenieError> {
         let mut unit = self.take_out(p, i)?;
-        let watch = crate::trace::Watch::of(&unit, self.parts.unit_ai.get(unit.id));
+        let mut actions = self.parts.take_actions(unit.id);
+        let watch = crate::trace::Watch::of(&unit, &actions, self.parts.unit_ai.get(unit.id));
         // the objects a hit's blast may reach about its target (one a hit can read), or about
         // the unit for its blast at death (TRIBE_Combat_Object::update)
-        let target = match unit.attack_target() {
+        let target = match actions.attack_target() {
             Some(t) if self.victim(t, p)?.is_some() => Some(t),
             _ => None,
         };
@@ -51,9 +56,13 @@ impl World {
             building_handover: false,
             side_notifies: None,
         };
-        let mut result = f(&mut unit, &mut c);
+        let mut result = f(&mut unit, &mut actions, &mut c);
         if let Some(w) = watch {
-            w.report((&unit, c.w.parts.unit_ai.get(unit.id)), c.w.ticks, p);
+            w.report(
+                (&unit, &actions, c.w.parts.unit_ai.get(unit.id)),
+                c.w.ticks,
+                p,
+            );
         }
         if let Some(e) = self.take_sight_unsupported()
             && result.is_ok()
@@ -61,6 +70,7 @@ impl World {
             result = Err(e);
         }
         // back to its stand-in's slot, which a removal in the step may have moved
+        self.parts.put_actions(unit.id, actions);
         if let Err(e) = self.put_back_own(p, unit) {
             result = Err(e);
         }
@@ -78,11 +88,11 @@ impl World {
         &mut self,
         p: PlayerId,
         i: ListIndex,
-        f: impl FnOnce(&mut Unit, &mut Step<'_>) -> Result<R, GenieError>,
+        f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let mut answer = None;
-        let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, c| {
-            answer = Some(f(unit, c)?);
+        let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
+            answer = Some(f(unit, actions, c)?);
             Ok(Outcome::Stay)
         })?;
         answer.ok_or(GenieError::unreachable(
@@ -109,8 +119,8 @@ impl World {
         ) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let mut answer = None;
-        let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, c| {
-            answer = Some(unit.run_calls(c, f)?);
+        let _ = self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
+            answer = Some(unit.run_calls(actions, c, f)?);
             Ok(Outcome::Stay)
         })?;
         answer.ok_or(GenieError::unreachable(
@@ -137,9 +147,10 @@ impl World {
             &mut crate::math::rng::Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {
-        let stepped = self.step_object((p, i), (Millis::ZERO, None, false), |unit, c| {
-            unit.run_ai(c, f).map(|()| Outcome::Stay)
-        })?;
+        let stepped =
+            self.step_object((p, i), (Millis::ZERO, None, false), |unit, actions, c| {
+                unit.run_ai(actions, c, f).map(|()| Outcome::Stay)
+            })?;
         match stepped.outcome {
             Outcome::Stay => Ok(()),
             _ => Err(GenieError::unsupported(

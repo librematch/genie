@@ -541,14 +541,19 @@ impl World {
         if self.parts.town_bell_of(unit.id).flag {
             return Ok(());
         }
-        if unit.actions.unmodelled_action.is_some() {
+        if self.parts.actions_of(unit.id).unmodelled_action.is_some() {
             return Err(GenieError::unsupported(
                 "a town-bell record of an action not held",
             ));
         }
         // an id below 0 names none (`JL`)
         let held = |id: ObjectId| (!id.is_recyclable()).then(|| self.object(id)).flatten();
-        let mut found = unit.top_target().and_then(held).map(|(_, t)| t);
+        let mut found = self
+            .parts
+            .actions_of(unit.id)
+            .top_target()
+            .and_then(held)
+            .map(|(_, t)| t);
         if let Some(t) = found
             && let Some(pasture) = t.pasture
         {
@@ -566,8 +571,8 @@ impl World {
             || (None, unit.position().ground()),
             |t| (Some(t.id), t.position().ground()),
         );
-        let actions = &unit.actions;
-        let target_class = match unit.top_action_kind() {
+        let actions = &self.parts.actions_of(unit.id);
+        let target_class = match actions.top_action_kind() {
             Some(HUNT) => actions.list.hunt().and_then(|h| h.target_class),
             Some(GATHER) => actions.list.gather().and_then(|g| g.target_class),
             _ => None,
@@ -579,7 +584,10 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a town-bell record of a unit without a unit AI",
             ))?;
-        let target2 = unit.top_second_target().and_then(held).map(|(_, t)| t.id);
+        let target2 = actions
+            .top_second_target()
+            .and_then(held)
+            .map(|(_, t)| t.id);
         let now = BackToWork {
             target,
             target_class,
@@ -807,10 +815,8 @@ mod tests {
         use crate::world::World;
 
         fn enter(t: &World, id: i32) -> Option<ObjectId> {
-            t.object(object_id(id))
-                .unwrap()
-                .1
-                .actions
+            t.parts
+                .actions_of(object_id(id))
                 .list
                 .enter()
                 .and_then(|e| e.target)
@@ -930,7 +936,12 @@ mod tests {
             let goal = |t: &World, id: i32| {
                 let u = t.object(object_id(id)).unwrap().1;
                 (
-                    u.actions.list.move_to().copied().and_then(|m| m.goal()),
+                    t.parts
+                        .actions_of(object_id(id))
+                        .list
+                        .move_to()
+                        .copied()
+                        .and_then(|m| m.goal()),
                     t.parts.town_bell_of(u.id).flag,
                 )
             };
@@ -993,7 +1004,12 @@ mod tests {
             let u = t.object(object_id(1001)).unwrap().1;
             assert_eq!(
                 (
-                    u.actions.list.move_to().copied().and_then(|m| m.goal()),
+                    t.parts
+                        .actions_of(object_id(1001))
+                        .list
+                        .move_to()
+                        .copied()
+                        .and_then(|m| m.goal()),
                     t.parts.town_bell_of(u.id).flag
                 ),
                 (Some(Position::new(3.5, 3.5, 0.0)), false)

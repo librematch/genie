@@ -34,33 +34,38 @@ impl Unit {
     /// the caller's after the update.
     pub(crate) fn attack_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
     ) -> Result<HeadCode, GenieError> {
-        match self.actions.list.attack().map(|a| a.target) {
+        match actions.list.attack().map(|a| a.target) {
             None => Ok(HeadCode::Keeps),
-            Some(None) => self.attack_lost_part(c, me),
-            Some(_) => self.attack_strike_part(c, me, own),
+            Some(None) => self.attack_lost_part(actions, c, me),
+            Some(_) => self.attack_strike_part(actions, c, me, own),
         }
     }
 
     /// The unit's own Attack after its target went
     /// ([`crate::combat::attack::Attack::lost`]): its update without a target, the notify its
     /// disarm posts to the unit AI; codes 1 and 3 delete it.
-    fn attack_lost_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
+    fn attack_lost_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<HeadCode, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let armed = armed(master, c.w.parts.combat_of(self.id).firepower);
         let master_class = master.class;
-        let walking = self
-            .actions
+        let walking = actions
             .list
             .attack()
             .is_some_and(|a| matches!(a.state, AttackState::GotoSeen | AttackState::GotoPoint));
         if walking && armed {
-            return self.attack_walks_unseen(c, me, master_class);
+            return self.attack_walks_unseen(actions, c, me, master_class);
         }
-        let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
+        let attack = actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let (code, disarmed) =
             attack.update_targetless(c.dt.seconds(), armed, c.w.parts.motion_mut(self.id))?;
         if disarmed {
@@ -80,11 +85,12 @@ impl Unit {
     /// update ([`crate::combat::attack::Attack::update_gone`]); codes 1 and 3 delete it.
     fn attack_walks_unseen(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         master_class: ClassId,
     ) -> Result<HeadCode, GenieError> {
-        let mut attack = *self.actions.list.attack().ok_or(NO_ATTACK)?;
+        let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = self.master(c.w.master_tables(), c.player)?;
         let computer =
             c.w.players
@@ -104,7 +110,7 @@ impl Unit {
             (computer, c.w.world_time),
         );
         let code = attack.update_gone(c, self, me, &r, master_class);
-        if let Some(a) = self.actions.list.attack_mut() {
+        if let Some(a) = actions.list.attack_mut() {
             *a = attack;
         }
         Ok(HeadCode::of(code?))
@@ -116,11 +122,12 @@ impl Unit {
     /// unit ([`Unit::hit_back`]). Codes 1 and 3 delete it (`RGE_Action_Object::update`).
     fn attack_strike_part(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
     ) -> Result<HeadCode, GenieError> {
-        let mut attack = *self.actions.list.attack().ok_or(NO_ATTACK)?;
+        let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = object_master(
             c.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
@@ -149,14 +156,15 @@ impl Unit {
         let own = own.ok_or(crate::world::ATTACKER_MASTER)?;
         let mut f = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
-        let code = attack.update(c, self, me, &mut f, &r);
-        if let Some(a) = self.actions.list.attack_mut() {
+        let code = attack.update(c, self, actions, me, &mut f, &r);
+        if let Some(a) = actions.list.attack_mut() {
             *a = attack;
         }
         let code = code?;
         // the retaliation's kill of the unit itself, which follows its step
         if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
-            file_kill(c, self, KillLeft::own(self.id, k))?;
+            let own = KillLeft::own(self.id, k);
+            file_kill(c, (self, actions), own)?;
         }
         Ok(HeadCode::of(code))
     }
@@ -184,8 +192,12 @@ pub(crate) fn run_down_attack_timers(combat: &mut Combat, dt: Seconds, now: Worl
 impl Unit {
     /// The hunter or the attacker as a combat object, which its hits read and change: none for a
     /// unit without a Hunt or an Attack, or without its master.
-    pub(crate) fn own_victim(&self, c: &Step<'_>) -> Result<Option<Victim>, GenieError> {
-        if self.actions.list.hunt().is_none() && self.actions.list.attack().is_none() {
+    pub(crate) fn own_victim(
+        &self,
+        actions: &crate::objects::layers::Action,
+        c: &Step<'_>,
+    ) -> Result<Option<Victim>, GenieError> {
+        if actions.list.hunt().is_none() && actions.list.attack().is_none() {
             return Ok(None);
         }
         let master = self.master(c.w.master_tables(), c.player)?;
@@ -196,6 +208,7 @@ impl Unit {
                 c.w.parts.unit_ai.contains(self.id),
                 c.w.parts.building_of(self.id),
                 c.w.parts.combat_of(self.id),
+                actions,
             ),
             master,
             &c.w.players.player(c.player)?.attributes,

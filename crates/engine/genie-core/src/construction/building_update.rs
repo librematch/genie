@@ -92,7 +92,11 @@ impl Unit {
     /// open one (a height below the epsilon) with nothing in it starts its close timer at 0.5 s,
     /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
     /// of at most 0).
-    pub(crate) fn gate_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn gate_update(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         let transforms = master
             .building
@@ -132,7 +136,7 @@ impl Unit {
                 ))?;
         if shut && 0 < allied && !locked {
             gate.close_timer = Seconds::ZERO;
-            return self.toggle_own_gate(c, GATE_SHUT_HEIGHT <= height);
+            return self.toggle_own_gate(actions, c, GATE_SHUT_HEIGHT <= height);
         }
         if height < GATE_EPSILON && total == 0 {
             if gate.close_timer <= Seconds::ZERO {
@@ -141,7 +145,7 @@ impl Unit {
                 gate.close_timer -= c.dt.seconds();
                 if gate.close_timer <= Seconds::ZERO {
                     gate.close_timer = Seconds::ZERO;
-                    return self.toggle_own_gate(c, height <= 0.0);
+                    return self.toggle_own_gate(actions, c, height <= 0.0);
                 }
             }
         }
@@ -154,12 +158,17 @@ impl Unit {
     /// # Errors
     ///
     /// The toggle's, or the gate gone from its owner's live list.
-    fn toggle_own_gate(&mut self, c: &mut Step<'_>, toggles: bool) -> Result<(), GenieError> {
+    fn toggle_own_gate(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        toggles: bool,
+    ) -> Result<(), GenieError> {
         if !toggles {
             return Ok(());
         }
         let (p, id) = (c.player, self.id);
-        c.lend(self, |w| {
+        c.lend((&mut *self, &mut *actions), |w| {
             let i = w.live_index(p, id).ok_or_else(|| {
                 GenieError::unreachable("a lent gate left its list").with("object", id)
             })?;
@@ -241,7 +250,11 @@ impl Unit {
     /// # Errors
     ///
     /// What the completion does not model.
-    pub(crate) fn complete_on_update(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn complete_on_update(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         self.farm_stage(c)?;
         let due = self.life.state == ObjectState::Foundation
             && c.w
@@ -257,7 +270,9 @@ impl Unit {
             return Ok(());
         }
         let (p, id) = (c.player, self.id);
-        c.lend(self, |w| w.set_state(p, id, ObjectState::Alive))
+        c.lend((&mut *self, &mut *actions), |w| {
+            w.set_state(p, id, ObjectState::Alive)
+        })
     }
 
     /// `TRIBE_Building_Object::update`'s whole seconds of a building in state 2 (`0x1411c9000`,
@@ -443,7 +458,11 @@ impl Unit {
     /// # Errors
     ///
     /// What the blast does not model.
-    pub(crate) fn death_blast(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn death_blast(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
         if !blasts_at_death(master, &self.life) {
             return Ok(());
@@ -455,6 +474,7 @@ impl Unit {
                 c.w.parts.unit_ai.contains(self.id),
                 c.w.parts.building_of(self.id),
                 c.w.parts.combat_of(self.id),
+                actions,
             ),
             master,
             &c.w.players.player(c.player)?.attributes,
@@ -474,7 +494,7 @@ impl Unit {
         let mut blasted = std::mem::take(&mut c.blasted);
         for v in &mut blasted {
             if let Some(k) = write_back(c, v)? {
-                crate::combat::victims::file_kill(c, self, k)?;
+                crate::combat::victims::file_kill(c, (self, actions), k)?;
             }
         }
         c.blasted = blasted;

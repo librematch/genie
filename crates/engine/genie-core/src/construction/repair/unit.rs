@@ -40,13 +40,18 @@ impl Unit {
     /// The Repair's update ([`crate::construction::repair::RepairAction::update`]) with what it
     /// reads as it starts ([`Unit::repair_reads`]), on the Repair copied out of the action list
     /// and put back after it; its code (the end's 1). Nothing without a Repair.
-    pub(crate) fn repair_part(&mut self, c: &mut Step<'_>, me: Me) -> Result<HeadCode, GenieError> {
-        let Some(mut repair) = self.actions.list.repair().copied() else {
+    pub(crate) fn repair_part(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        me: Me,
+    ) -> Result<HeadCode, GenieError> {
+        let Some(mut repair) = actions.list.repair().copied() else {
             return Ok(HeadCode::Keeps);
         };
         let reads = self.repair_reads(c, repair.target)?;
         let repaired = repair.update(c, self, me, &reads);
-        if let Some(r) = self.actions.list.repair_mut() {
+        if let Some(r) = actions.list.repair_mut() {
             *r = repair;
         }
         // its end's 1 deletes it; the destructor (FUN_140ad8fd0) finds it out of the repairers
@@ -97,6 +102,7 @@ impl Unit {
     /// (its mover's, 0 for an object that does not move).
     pub(crate) fn attacker_of(
         &self,
+        actions: &crate::objects::layers::Action,
         ai_type: UnitAiType,
         master: Option<&Master>,
         (player, computer): (PlayerId, bool),
@@ -109,7 +115,7 @@ impl Unit {
             computer,
             state: self.life.state,
             held: self.life.attribute_type,
-            top_action: self.top_action_kind(),
+            top_action: actions.top_action_kind(),
             master: self.life.master_id,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
             class: master.map(|m| m.class),
@@ -131,29 +137,6 @@ impl Unit {
             firepower,
             capture,
         }
-    }
-
-    /// Slot 400 (`FUN_14106d090`) as the unit AI reads it: its top action's target as the world
-    /// holds it (its owner's other objects as they stand, the other players' lists), with its
-    /// type, place and its master's radii; None without one.
-    pub(crate) fn top_target_seen(
-        &self,
-        c: &Step<'_>,
-        others: OthersRef<'_>,
-    ) -> Result<Option<crate::unit_ai::TopTarget>, GenieError> {
-        let Some(id) = self.top_target() else {
-            return Ok(None);
-        };
-        let Some((owner, u)) = others.find(id) else {
-            return Ok(None);
-        };
-        let m = u.master(c.w.master_tables(), owner)?;
-        Ok(Some(crate::unit_ai::TopTarget {
-            id,
-            kind: m.kind,
-            position: u.position(),
-            radius: m.radius,
-        }))
     }
 
     /// `restorePatrolInformation`'s unit part ([`crate::unit_ai::Effect::RestorePatrol`]): its own
@@ -409,4 +392,29 @@ fn repair_write_back(
         }
     }
     Ok(())
+}
+
+impl crate::objects::layers::Action {
+    /// Slot 400 (`FUN_14106d090`) as the unit AI reads it: its top action's target as the world
+    /// holds it (its owner's other objects as they stand, the other players' lists), with its
+    /// type, place and its master's radii; None without one.
+    pub(crate) fn top_target_seen(
+        &self,
+        c: &Step<'_>,
+        others: OthersRef<'_>,
+    ) -> Result<Option<crate::unit_ai::TopTarget>, GenieError> {
+        let Some(id) = self.top_target() else {
+            return Ok(None);
+        };
+        let Some((owner, u)) = others.find(id) else {
+            return Ok(None);
+        };
+        let m = u.master(c.w.master_tables(), owner)?;
+        Ok(Some(crate::unit_ai::TopTarget {
+            id,
+            kind: m.kind,
+            position: u.position(),
+            radius: m.radius,
+        }))
+    }
 }

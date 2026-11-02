@@ -294,6 +294,7 @@ impl World {
                 self.parts.unit_ai.contains(u.id),
                 self.parts.building_of(u.id),
                 self.parts.combat_of(u.id),
+                self.parts.actions.of(u.id),
             ),
             m,
             &self.players.player(q)?.attributes,

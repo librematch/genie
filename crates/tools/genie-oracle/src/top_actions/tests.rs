@@ -20,6 +20,7 @@ use genie_core::objects::Frame;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
 use genie_core::objects::WorkRate;
+use genie_core::objects::layers;
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::SoundEvents;
 use genie_core::objects::masters::TargetOwner;
@@ -31,7 +32,6 @@ use genie_core::objects::masters::WorkValue;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{Task, class};
 use genie_core::objects::sprite::Graphic;
-use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::{ARTIFACT_TYPE, ArtifactState};
 use genie_core::players::attribute;
 use genie_core::world::Seconds;
@@ -131,23 +131,22 @@ fn acting(kind: ActionType, action: Action) -> genie_save::Object {
     object
 }
 
-/// `object`'s top action imported into `unit`: each task slot's task of range 2, the fly task
-/// 8, the build task 7 (range 1, work rate 2, moving sprite 9), no sprites' table.
+/// `object`'s top action imported into an action layer: each task slot's task of range 2, the
+/// fly task 8, the build task 7 (range 1, work rate 2, moving sprite 9), no sprites' table.
 fn import(
     object: &genie_save::Object,
     objects: &PlayerObjects,
-    unit: Unit,
-) -> Result<Unit, GenieError> {
-    import_drawn(object, objects, unit, None)
+) -> Result<layers::Action, GenieError> {
+    import_drawn(object, objects, None)
 }
 
 /// [`import`] with the sprites' table `graphics`.
 fn import_drawn(
     object: &genie_save::Object,
     objects: &PlayerObjects,
-    mut unit: Unit,
     graphics: Option<&genie_core::objects::Graphics>,
-) -> Result<Unit, GenieError> {
+) -> Result<layers::Action, GenieError> {
+    let mut actions = layers::Action::default();
     let s = object.static_part().expect("a test object's static part");
     saved_actions(
         object,
@@ -166,18 +165,14 @@ fn import_drawn(
         |_| Ok(task(8, 3.0)),
         |_, slot| Ok(task(slot, 2.0)),
         graphics,
-        &mut unit,
+        &mut actions,
     )?;
-    Ok(unit)
+    Ok(actions)
 }
 
 /// Unit 5's top action `action` of type `kind` imported, its player without masters.
-fn imported(kind: ActionType, action: Action) -> Result<Unit, GenieError> {
-    import(
-        &acting(kind, action),
-        &PlayerObjects::default(),
-        Unit::default(),
-    )
+fn imported(kind: ActionType, action: Action) -> Result<layers::Action, GenieError> {
+    import(&acting(kind, action), &PlayerObjects::default())
 }
 
 fn bits3(v: Position) -> [u32; 3] {
@@ -221,7 +216,7 @@ fn a_second_saved_action_is_refused() {
         (MOVE_TO, move_to(2, 0.5)),
         (genie_core::movement::explore::EXPLORE, explore(base(0))),
     ]);
-    let err = import(&object, &PlayerObjects::default(), Unit::default()).unwrap_err();
+    let err = import(&object, &PlayerObjects::default()).unwrap_err();
     assert_eq!(
         err,
         GenieError::unsupported("a saved action the slice does not import")
@@ -239,7 +234,6 @@ fn a_second_saved_action_is_refused() {
 fn a_move_to_takes_its_state_point_range_and_wait() {
     let m = imported(MOVE_TO, move_to(4, 0.5))
         .unwrap()
-        .actions
         .list
         .move_to()
         .copied()
@@ -273,7 +267,6 @@ fn a_move_to_takes_its_state_point_range_and_wait() {
     ] {
         let m = imported(MOVE_TO, move_to(state, 0.5))
             .unwrap()
-            .actions
             .list
             .move_to()
             .copied()
@@ -328,13 +321,8 @@ fn a_move_to_takes_its_sprite_from_the_sprites_table() {
             .rge_action
             .short_val_2 = sprite;
         let object = acting(MOVE_TO, action.clone());
-        import_drawn(
-            &object,
-            &PlayerObjects::default(),
-            Unit::default(),
-            graphics,
-        )
-        .map(|u| u.actions.list.move_to().copied().unwrap().sprite)
+        import_drawn(&object, &PlayerObjects::default(), graphics)
+            .map(|a| a.list.move_to().copied().unwrap().sprite)
     };
     assert_eq!(shown(5, Some(&graphics)), Ok(Some(walking)));
     assert_eq!(shown(-1, None), Ok(None));
@@ -367,7 +355,6 @@ fn artifact(b: RgeAction) -> Action {
 fn an_artifact_waits_or_walks_to_its_target() {
     let a = imported(ARTIFACT_TYPE, artifact(base(ArtifactState::Wait.get())))
         .unwrap()
-        .actions
         .list
         .artifact()
         .copied()
@@ -385,7 +372,6 @@ fn an_artifact_waits_or_walks_to_its_target() {
         artifact(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))),
     )
     .unwrap()
-    .actions
     .list
     .artifact()
     .copied()
@@ -412,7 +398,6 @@ fn an_artifact_waits_or_walks_to_its_target() {
         artifact(with_sub(b.clone(), MOVE_TO, to_object)),
     )
     .unwrap()
-    .actions
     .list
     .artifact()
     .copied()
@@ -426,7 +411,6 @@ fn an_artifact_waits_or_walks_to_its_target() {
     near.target_id = 9;
     let a = imported(ARTIFACT_TYPE, artifact(near.clone()))
         .unwrap()
-        .actions
         .list
         .artifact()
         .copied()
@@ -435,7 +419,6 @@ fn an_artifact_waits_or_walks_to_its_target() {
     near.target_x = -1.0;
     let a = imported(ARTIFACT_TYPE, artifact(near))
         .unwrap()
-        .actions
         .list
         .artifact()
         .copied()
@@ -451,7 +434,6 @@ fn an_artifact_waits_or_walks_to_its_target() {
         )),
     )
     .unwrap()
-    .actions
     .list
     .artifact()
     .copied()
@@ -524,7 +506,7 @@ fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
 
 #[test]
 fn a_missile_flies_with_its_actions_course() {
-    assert!(import(&missile(), &PlayerObjects::default(), Unit::default()).is_ok());
+    assert!(import(&missile(), &PlayerObjects::default()).is_ok());
     let m = saved_missile(&missile()).unwrap();
     assert_eq!(
         (m.fired_from, m.max_range.get().to_bits()),
@@ -535,9 +517,8 @@ fn a_missile_flies_with_its_actions_course() {
     let landing = genie_core::combat::missile::LANDING;
     let m = saved_missile(&missile_of(landing, 1)).unwrap();
     assert!(m.charge && !m.flying);
-    let action = import(&missile(), &PlayerObjects::default(), Unit::default())
+    let action = import(&missile(), &PlayerObjects::default())
         .unwrap()
-        .actions
         .list
         .missile()
         .cloned()
@@ -577,7 +558,6 @@ fn a_farms_make_takes_its_timers_and_task() {
     b.short_val = 3;
     let m = imported(MAKE, make(b))
         .unwrap()
-        .actions
         .list
         .make()
         .copied()
@@ -603,7 +583,6 @@ fn a_birds_fly_takes_its_home_and_move_to() {
     let bird = |b: RgeAction| by_type(|t| t.rge_action_bird = Some(Box::new(b)));
     let f = imported(FLY, bird(base(3)))
         .unwrap()
-        .actions
         .list
         .fly()
         .copied()
@@ -618,7 +597,6 @@ fn a_birds_fly_takes_its_home_and_move_to() {
     );
     let f = imported(FLY, bird(with_sub(base(3), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
-        .actions
         .list
         .fly()
         .copied()
@@ -661,12 +639,10 @@ fn a_build_takes_its_task_move_to_and_site() {
     let mut b = base(4);
     b.target_id = 30;
     b.target2_id = 31;
-    let unit = Unit::default();
     let objects = PlayerObjects::default();
     let walking = with_sub(b.clone(), MOVE_TO, move_to(4, 0.75));
-    let a = import(&acting(BUILD, build(walking)), &objects, unit.clone())
+    let a = import(&acting(BUILD, build(walking)), &objects)
         .unwrap()
-        .actions
         .list
         .build()
         .copied()
@@ -711,24 +687,17 @@ fn a_build_takes_its_task_move_to_and_site() {
         flags: SpriteFlags::ANIMATED,
     };
     let graphics = genie_core::objects::Graphics::from([(carried.id, carried)]);
-    let a = import_drawn(
-        &acting(BUILD, build(dropping)),
-        &objects,
-        unit,
-        Some(&graphics),
-    )
-    .unwrap()
-    .actions
-    .list
-    .build()
-    .copied()
-    .unwrap();
+    let a = import_drawn(&acting(BUILD, build(dropping)), &objects, Some(&graphics))
+        .unwrap()
+        .list
+        .build()
+        .copied()
+        .unwrap();
     let walk = a.move_to.unwrap();
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(walk.sprite, Some(carried));
     let a = imported(BUILD, build(b.clone()))
         .unwrap()
-        .actions
         .list
         .build()
         .copied()
@@ -772,7 +741,6 @@ fn a_repair_takes_its_task_and_counts_its_builder() {
         repair(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))),
     )
     .unwrap()
-    .actions
     .list
     .repair()
     .copied()
@@ -790,7 +758,6 @@ fn a_repair_takes_its_task_and_counts_its_builder() {
     assert_eq!(walk.range.get().to_bits(), 0.5_f32.to_bits());
     let r = imported(REPAIR, repair(b.clone()))
         .unwrap()
-        .actions
         .list
         .repair()
         .copied()
@@ -836,7 +803,6 @@ fn a_hunt_takes_its_task_lead_and_move_to() {
     use genie_core::gathering::hunt::{HUNT, HuntState};
     let h = imported(HUNT, hunt(base(HuntState::Idle.get())))
         .unwrap()
-        .actions
         .list
         .hunt()
         .copied()
@@ -863,7 +829,6 @@ fn a_hunt_takes_its_task_lead_and_move_to() {
         )),
     )
     .unwrap()
-    .actions
     .list
     .hunt()
     .copied()
@@ -942,7 +907,6 @@ fn a_gather_takes_its_stops_and_move_to() {
     use genie_core::gathering::gather::{GATHER, GatherState};
     let g = imported(GATHER, gather(base(GatherState::Work.get())))
         .unwrap()
-        .actions
         .list
         .gather()
         .copied()
@@ -966,7 +930,6 @@ fn a_gather_takes_its_stops_and_move_to() {
         )),
     )
     .unwrap()
-    .actions
     .list
     .gather()
     .copied()
@@ -1021,7 +984,6 @@ fn an_enter_takes_its_task_and_retry() {
     b.short_val = 1;
     let e = imported(ENTER, enter(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
-        .actions
         .list
         .enter()
         .copied()
@@ -1070,7 +1032,6 @@ fn a_transport_takes_its_base_alone() {
         transport(with_sub(base(2), MOVE_TO, move_to(4, 0.5))),
     )
     .unwrap()
-    .actions
     .list
     .transport()
     .copied()
@@ -1105,7 +1066,6 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     use genie_core::movement::explore::{EXPLORE, ExploreState};
     let e = imported(EXPLORE, explore(base(ExploreState::Wait.get())))
         .unwrap()
-        .actions
         .list
         .explore()
         .copied()
@@ -1120,7 +1080,6 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
         )),
     )
     .unwrap()
-    .actions
     .list
     .explore()
     .copied()
@@ -1177,7 +1136,6 @@ fn a_wait_solidify_waits_for_its_foundation() {
     b.short_val = 1;
     let w = imported(WAIT_SOLIDIFY, wait(b))
         .unwrap()
-        .actions
         .list
         .wait_solidify()
         .copied()
@@ -1260,11 +1218,9 @@ fn a_hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
                 )),
             ),
             objects,
-            Unit::default(),
             Some(&sprites),
         )
         .unwrap()
-        .actions
         .list
         .hunt()
         .copied()

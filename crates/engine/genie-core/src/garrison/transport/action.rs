@@ -212,6 +212,7 @@ impl TransportAction {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         me: Me,
         r: &TransportReads,
     ) -> Result<UpdateCode, GenieError> {
@@ -239,7 +240,7 @@ impl TransportAction {
         match self.state_update(walked, (&ship, &mut shore), posts, look, computer)? {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
-                self.unload(c, unit)?;
+                self.unload(c, unit, actions)?;
                 Ok(UpdateCode::UNDER_WAY)
             }
         }
@@ -252,12 +253,17 @@ impl TransportAction {
     /// # Errors
     ///
     /// The unload's and the lend's, or a unit whose Transport the unload took.
-    fn unload(&mut self, c: &mut Step<'_>, unit: &mut Unit) -> Result<(), GenieError> {
-        if let Some(own) = unit.actions.list.transport_mut() {
+    fn unload(
+        &mut self,
+        c: &mut Step<'_>,
+        unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
+    ) -> Result<(), GenieError> {
+        if let Some(own) = actions.list.transport_mut() {
             *own = *self;
         }
-        c.lend_at(unit, World::transport_unload)?;
-        *self = *unit.actions.list.transport().ok_or(NO_TRANSPORT)?;
+        c.lend_at((&mut *unit, &mut *actions), World::transport_unload)?;
+        *self = *actions.list.transport().ok_or(NO_TRANSPORT)?;
         Ok(())
     }
 

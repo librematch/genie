@@ -161,7 +161,11 @@ impl World {
             let mut found = Vec::new();
             for kind in kinds {
                 let (f, _) = closest_resource_of(
-                    (&cart, self.parts.mover_of(cart.id)),
+                    (
+                        &cart,
+                        self.parts.actions_of(cart.id),
+                        self.parts.mover_of(cart.id),
+                    ),
                     &mut w,
                     others,
                     (

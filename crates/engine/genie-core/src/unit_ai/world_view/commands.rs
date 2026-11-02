@@ -60,10 +60,12 @@ impl UnitView<'_, '_> {
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), t_unit.position());
-        if unit.top_action_kind() == Some(crate::construction::repair::REPAIR) {
+        if self.actions.top_action_kind() == Some(crate::construction::repair::REPAIR) {
             let order = RepairOrder::Retake(target);
             self.c
-                .lend_at(self.unit, |w, p, i| w.repair_order(p, i, order))?;
+                .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
+                    w.repair_order(p, i, order)
+                })?;
             return Ok(true);
         }
         let masters = self
@@ -147,7 +149,9 @@ impl UnitView<'_, '_> {
         };
         let repairs = found.is_some();
         self.c
-            .lend_at(self.unit, |w, p, i| w.repair_order(p, i, order))?;
+            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
+                w.repair_order(p, i, order)
+            })?;
         Ok(repairs)
     }
 
@@ -186,7 +190,7 @@ impl UnitView<'_, '_> {
             return Ok(false);
         };
         let under_artifact =
-            unit.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE);
+            self.actions.top_action_kind() == Some(crate::ownership::artifact::ARTIFACT_TYPE);
         let masters = self
             .c
             .w
@@ -264,7 +268,9 @@ impl UnitView<'_, '_> {
         };
         if let Some(n) = self
             .c
-            .lend_at(self.unit, |w, p, i| w.enter_order(p, i, order))?
+            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
+                w.enter_order(p, i, order)
+            })?
         {
             self.c.notify_own(self.unit, n)?;
         }
@@ -303,7 +309,7 @@ impl UnitView<'_, '_> {
             .restriction(mover.stats.restriction)
             .ok_or(crate::pathing::zones::UNKNOWN_RESTRICTION)?;
         let zones = self.c.w.zones.of(map, &terrain.kinds, values)?;
-        let me = unit.me();
+        let me = unit.me(self.actions);
         let area = ScoutArea {
             spatial: &mut self.c.w.spatial,
             by_id: crate::world::index::ObjectsRef::new(

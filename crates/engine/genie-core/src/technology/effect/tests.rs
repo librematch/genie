@@ -87,11 +87,11 @@ fn a_charge_keeps_its_share_of_a_changed_maximum() {
 /// building's Make) or it is a missile; an empty queue or none at all is no action.
 #[test]
 fn an_object_has_actions_while_it_holds_one() {
-    let u = Unit::default();
-    assert!(!has_actions(&u, None, false));
-    assert!(has_actions(&u, None, true));
+    let a = crate::objects::layers::Action::default();
+    assert!(!has_actions(&a, None, false));
+    assert!(has_actions(&a, None, true));
     let mut production = crate::production::Production::default();
-    assert!(!has_actions(&u, Some(&production), false));
+    assert!(!has_actions(&a, Some(&production), false));
     production.action = Some(crate::production::Making::Research(
         crate::production::MakeTech {
             state: crate::production::MakeTechState::Researching,
@@ -101,7 +101,7 @@ fn an_object_has_actions_while_it_holds_one() {
             progress: Seconds::ZERO,
         },
     ));
-    assert!(has_actions(&u, Some(&production), false));
+    assert!(has_actions(&a, Some(&production), false));
 }
 
 /// An Attack's slot 0x50 (`FUN_140a7f800`): its sprites take the master's unless they are
@@ -944,8 +944,7 @@ fn a_master_s_new_speed_reaches_its_units_top_speed_by_their_sprites() {
         u.place = crate::objects::layers::Static::at(Position::new(5.5, 5.5, 0.0));
         u
     };
-    let walker =
-        || crate::objects::layers::MotionLayer::Moving(crate::gathering::hunt::tests::walker());
+    let walker = || crate::objects::layers::Motion::Moving(crate::gathering::hunt::tests::walker());
     let mut shows = moving(1);
     shows.sprite = Some(crate::objects::sprite::ActiveSprite::start(
         fast,
@@ -1131,7 +1130,7 @@ fn a_speed_change_reaches_the_units_movement() {
         vec![Millis::ZERO],
         vec![player],
     )
-    .with_motions([(id, crate::objects::layers::MotionLayer::Moving(mover))]);
+    .with_motions([(id, crate::objects::layers::Motion::Moving(mover))]);
     let mut villager = combat(master_id(4), class::VILLAGER, 25);
     villager.max_speed = Speed::new(0.8);
     villager.moving = Some(stats);
@@ -1201,7 +1200,8 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
 fn a_farm_food_change_grows_the_farms_food() {
     let mut farm = unit_of(5, ids::FARM, HitPoints::new(480.0));
     farm.life.amount = Amount::new(75.0);
-    farm.actions
+    let mut layer = crate::objects::layers::Action::default();
+    layer
         .list
         .set_make(Some(crate::gathering::make::MakeAction {
             state: MakeState::Done,
@@ -1221,7 +1221,8 @@ fn a_farm_food_change_grows_the_farms_food() {
         vec![Millis::ZERO],
         vec![player],
     )
-    .with_buildings([(object_id(5), built_layer())]);
+    .with_buildings([(object_id(5), built_layer())])
+    .with_actions([(object_id(5), layer)]);
     let mut master = combat(ids::FARM, class::FARM, 480);
     master.kind = master_type::BUILDING;
     t.masters = vec![Masters::new([master])];
@@ -1234,8 +1235,8 @@ fn a_farm_food_change_grows_the_farms_food() {
     assert_eq!(t.players[0].attributes[36], Amount::new(250.0));
     // (175 / 175)^1 × 75 + 175 − 75
     assert_eq!(
-        t.players[0].objects[ListIndex::new(0)]
-            .actions
+        t.parts
+            .actions_of(t.players[0].objects[ListIndex::new(0)].id)
             .list
             .make()
             .copied()
@@ -2087,8 +2088,9 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         u.idle_variant = variant;
         u
     };
-    let mut exploring = shown(3, 0);
-    exploring.actions.list.set_explore(Some(
+    let exploring = shown(3, 0);
+    let mut layer = crate::objects::layers::Action::default();
+    layer.list.set_explore(Some(
         crate::movement::explore::ExploreAction::new(
             Position::new(5.0, 5.0, 0.0),
             &crate::movement::explore::bare_walk(),
@@ -2106,7 +2108,8 @@ fn a_standing_sprite_change_shows_on_the_master_s_idle_units() {
         PlayerId::new(0),
         vec![Millis::ZERO],
         vec![player],
-    );
+    )
+    .with_actions([(object_id(3), layer)]);
     t.masters = vec![Masters::new([Master {
         standing_sprite: Some(SpriteId::named(300)),
         ..combat(master_id(4), class::CLASS_6, 60)

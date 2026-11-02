@@ -6,7 +6,6 @@
 
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
-use genie_core::objects::unit::Unit;
 use genie_core::world::parts::ObjectView;
 use genie_diff::Scope;
 
@@ -94,7 +93,7 @@ pub fn object_field_differences_in<'a>(
                 master,
                 field: ONLY_IN_THE_GAME.to_owned(),
                 slice: String::new(),
-                game: summary(g.unit),
+                game: summary(g),
             });
             continue;
         };
@@ -118,7 +117,7 @@ pub fn object_field_differences_in<'a>(
             id: s.unit.id,
             master: s.unit.life.master_id,
             field: ONLY_IN_THE_SLICE.to_owned(),
-            slice: summary(s.unit),
+            slice: summary(s),
             game: String::new(),
         });
     }
@@ -126,13 +125,14 @@ pub fn object_field_differences_in<'a>(
 }
 
 /// What names an object one side lacks: its master, state, hit points, place and top action.
-fn summary(u: &Unit) -> String {
+fn summary(o: &ObjectView<'_>) -> String {
+    let u = o.unit;
     format!(
         "master {} state {} hp {:?} at {:?} action {:?}",
         u.life.master_id,
         u.life.state,
         u.life.hp.get(),
         u.position(),
-        crate::top_action(u).map(|a| (a.kind, a.state))
+        crate::top_action(&o.parts.actions).map(|a| (a.kind, a.state))
     )
 }

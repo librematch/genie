@@ -30,6 +30,7 @@ impl Unit {
     /// no carried-resource test, `+0xa14` as it stands outside slot 0x128: 1; the caller's).
     pub(crate) fn more_work(
         &self,
+        actions: &crate::objects::layers::Action,
         c: &mut Step<'_>,
         building: ObjectId,
         built: MasterId,
@@ -136,7 +137,7 @@ impl Unit {
             ));
         }
         let (kind, cap) = gather_search::gather_group(found.attribute);
-        let target = self.resource_search(c, kind, cap)?;
+        let target = self.resource_search(actions, c, kind, cap)?;
         let spatial: &Spatial = &c.w.spatial;
         let target = target
             .filter(|&t| spatial.get(t).is_some())

@@ -37,7 +37,7 @@ impl UnitView<'_, '_> {
             return Ok(false);
         }
         // The Build action's type, which word 9 adds.
-        if self.unit.top_action_kind() == Some(action_type::BUILD) {
+        if self.actions.top_action_kind() == Some(action_type::BUILD) {
             return Ok(true);
         }
         self.build_found(foundation)
@@ -245,7 +245,7 @@ impl UnitView<'_, '_> {
             }
             None => None,
         };
-        let target = unit.top_target();
+        let target = self.actions.top_target();
         Ok(crate::unit_ai::OffFootprint {
             spot,
             z: unit.position().z(),

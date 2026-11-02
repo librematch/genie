@@ -159,7 +159,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             if HELP_REACH < gap {
                 continue;
             }
-            if !self.helper_free(owner, u, m, attacker)? {
+            if !self.helper_free(owner, u, self.actions, m, attacker)? {
                 continue;
             }
             return crate::unit_ai::helper_answers();
@@ -258,7 +258,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             groups: &self.c.w.groups,
         };
         let unit = &*self.unit;
-        let walker = unit.me();
+        let walker = unit.me(self.actions);
         let mover = self
             .c
             .w
@@ -346,7 +346,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             groups: &self.c.w.groups,
         };
         let unit = &*self.unit;
-        let walker = unit.me();
+        let walker = unit.me(self.actions);
         let (mover, master_id, at) = (
             self.c.w.parts.mover_of(unit.id),
             unit.life.master_id,
@@ -371,7 +371,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 master_id,
             )
         };
-        let moving = |id: ObjectId| herded(others, id);
+        let moving = |id: ObjectId| herded(by_id, id);
         // a class-10 searcher passes master 440 and the masters with object flag 0x10
         let shuns = |p: &Placed| {
             let m = player_master(every, p.player, p.master).ok_or(GenieError::unsupported(
@@ -438,8 +438,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             .unit
             .master(self.c.w.master_tables(), self.c.player)
             .map(|m| m.class);
-        let done = class
-            .and_then(|class| posted.and_then(|()| self.unit.run_effect(e, Some(class), self.c)));
+        let done = class.and_then(|class| {
+            posted.and_then(|()| self.unit.run_effect(self.actions, e, Some(class), self.c))
+        });
         std::mem::swap(self.c.w.streams.get(Stream::Ai), rng);
         self.c.side_notifies = Some(Vec::new());
         *ai = self.c.w.lend_unit_ai(self.unit.id).ok_or_else(|| {
@@ -450,11 +451,11 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     }
 
     fn busy_now(&mut self) -> Result<bool, GenieError> {
-        Ok(self.unit.top_action_kind().is_some() || self.unit.actions.unmodelled_action.is_some())
+        Ok(self.actions.top_action_kind().is_some() || self.actions.unmodelled_action.is_some())
     }
 
     fn interruptible_now(&mut self) -> Result<bool, GenieError> {
-        self.unit.interruptible()
+        self.actions.interruptible()
     }
 
     fn seek_unexplored(
@@ -545,7 +546,9 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 over_wall: false,
             } => {
                 self.c
-                    .lend_at(self.unit, |w, p, i| w.transport_order(p, i, to))?;
+                    .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
+                        w.transport_order(p, i, to)
+                    })?;
                 Ok(true)
             }
             _ => Err(crate::unit_ai::UNMODELLED_COMMAND),
@@ -584,7 +587,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
     ///
     /// [`Unit::top_target`]: crate::objects::unit::Unit::top_target
     fn top_target_now(&mut self) -> Result<Option<ObjectId>, GenieError> {
-        let target = self.unit.top_target();
+        let target = self.actions.top_target();
         Ok(target.filter(|&t| self.c.w.spatial.get(t).is_some()))
     }
 

@@ -163,7 +163,7 @@ impl World {
         let g = |id: Option<SpriteId>| id.and_then(|id| self.graphics.get(id)).copied();
         if master.kind < master_type::ACTION
             || !has_actions(
-                u,
+                self.parts.actions_of(u.id),
                 self.parts.production.get(u.id),
                 self.parts.missile.contains(u.id),
             )
@@ -206,12 +206,13 @@ impl World {
             second: g(master.attack_sprite2),
             combat: master_type::COMBAT <= master.kind,
         };
-        let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
+        // the object the read above found: its action layer
+        let actions = self.parts.actions_mut(id)?;
         // a unit's own Attack's task (the work command's attack task) has no sprites
-        if let Some(attack) = u.actions.list.attack_mut() {
+        if let Some(attack) = actions.list.attack_mut() {
             follow_master(&mut attack.arms, None, &sprites);
         }
-        if let Some(hunt) = u.actions.list.hunt_mut() {
+        if let Some(hunt) = actions.list.hunt_mut() {
             let task = hunt.task.sprites;
             if let Some(attack) = hunt.attack.as_mut() {
                 follow_master(&mut attack.arms, Some(task), &sprites);

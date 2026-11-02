@@ -2,14 +2,14 @@
 //! Make ([`crate::top_actions::saved_actions`]).
 
 use crate::top_actions::{Saved, TaskAt, first_action, saved_move_to};
-use crate::{saved_attack, saved_reload, saved_sprite};
+use crate::{saved_attack, saved_reload};
 use genie_core::GenieError;
 use genie_core::gathering::DropSiteId;
 use genie_core::map::Point;
 use genie_core::movement::move_to::MOVE_TO;
 use genie_core::objects::ObjectId;
+use genie_core::objects::layers;
 use genie_core::objects::masters::{ClassId, Task};
-use genie_core::objects::unit::Unit;
 use genie_core::players::Amount;
 use genie_core::world::Seconds;
 use genie_save::generated::world::Action;
@@ -18,7 +18,7 @@ use genie_save::generated::world::Action;
 pub(super) fn import_make(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
-    unit: &mut Unit,
+    actions: &mut layers::Action,
 ) -> Result<(), GenieError> {
     let base = saved.base;
     let make = saved
@@ -30,7 +30,7 @@ pub(super) fn import_make(
     if base.sub_actions.entries().next().is_some() {
         return Err(GenieError::unsupported("a saved Make with a sub-action"));
     }
-    unit.actions
+    actions
         .list
         .set_make(Some(genie_core::gathering::make::MakeAction {
             state: genie_core::gathering::make::MakeState::of_byte(base.state)?,
@@ -59,7 +59,7 @@ const fn hunt_task(t: &Task) -> genie_core::gathering::hunt::HuntTask {
 pub(super) fn import_hunt(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
-    unit: &mut Unit,
+    actions: &mut layers::Action,
 ) -> Result<(), GenieError> {
     use genie_core::gathering::hunt::{HuntAction, HuntState};
     let base = saved.base;
@@ -113,7 +113,6 @@ pub(super) fn import_hunt(
         None => {}
         Some((genie_core::combat::attack::ATTACK, sub)) => {
             hunt.attack = Some(hunt_attack(saved, sub)?);
-            unit.sprite = saved.graphics.and_then(|g| saved_sprite(saved.s, g));
         }
         Some((MOVE_TO, sub)) => {
             // every MoveTo of the Hunt is quiet (`FUN_140a7a170` with 1)
@@ -125,7 +124,7 @@ pub(super) fn import_hunt(
             ));
         }
     }
-    unit.actions.list.set_hunt(Some(hunt));
+    actions.list.set_hunt(Some(hunt));
     Ok(())
 }
 
@@ -154,7 +153,7 @@ fn hunt_attack(
 pub(super) fn import_gather(
     saved: &Saved<'_>,
     task_at: TaskAt<'_>,
-    unit: &mut Unit,
+    actions: &mut layers::Action,
 ) -> Result<(), GenieError> {
     use genie_core::gathering::gather::{GatherAction, GatherState};
     let base = saved.base;
@@ -213,6 +212,6 @@ pub(super) fn import_gather(
         ))?
         .map(|sub| saved_move_to(sub, saved.graphics, true))
         .transpose()?;
-    unit.actions.list.set_gather(Some(gather));
+    actions.list.set_gather(Some(gather));
     Ok(())
 }

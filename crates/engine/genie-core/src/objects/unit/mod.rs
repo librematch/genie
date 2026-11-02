@@ -48,11 +48,6 @@ pub struct Unit {
     /// the object's layers had, `body`.
     #[diff(path = "body")]
     pub place: Static,
-    /// Its action layer (`RGE_Action_Object`, [`ActionLayer`]): its action list and its master's
-    /// default task.
-    ///
-    /// [`ActionLayer`]: crate::objects::layers::ActionLayer
-    pub actions: crate::objects::layers::ActionLayer,
     /// `+0x68a`, `unit_attackable_flag`.
     pub attackable: bool,
     /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes the

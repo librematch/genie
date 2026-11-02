@@ -86,8 +86,11 @@ impl World {
             return Ok(false);
         }
         let unit = self.players.live(player, idx)?;
-        let top = unit.top_action_kind();
-        if !forced && top == Some(ENTER) && unit.top_target() == Some(target) {
+        let top = self.parts.actions_of(unit.id).top_action_kind();
+        if !forced
+            && top == Some(ENTER)
+            && self.parts.actions_of(unit.id).top_target() == Some(target)
+        {
             return Ok(true);
         }
         let Some(task) = self.find_work_task(player, idx, target, Some(GARRISON), true)? else {
@@ -225,52 +228,12 @@ impl World {
     ) -> Result<Option<crate::unit_ai::Notify>, GenieError> {
         let id = self.players.live(player, idx)?.id;
         if sub {
-            let by = self.releaser(player, idx)?;
-            let unit = self.players.live_mut(player, idx)?;
-            let art = unit
-                .actions
-                .list
-                .artifact_mut()
-                .ok_or(GenieError::unreachable(
-                    "an Artifact on top without its action",
-                ))?;
-            let gone = art.hold_enter(action);
-            // the old Enter's teardown lets its target go before its MoveTo's stops the unit
-            if let Some(t) = gone.released {
-                self.release(t, by)?;
-            }
-            let unit = self.players.live_mut(player, idx)?;
-            if gone.stops
-                && let Some(m) = self.parts.mover_mut(unit.id)
-            {
-                m.stop()?;
-            }
+            self.enter_under_artifact(player, idx, id, action)?;
         } else {
             self.clear_actions(player, idx)?;
         }
-        let unit = self.players.live(player, idx)?;
-        if unit.life.inside.is_some() {
-            // set_state(13): the unit takes its master's standing sprite (slot 0x68 with
-            // `+0x470`) and, its `+0x60` 0 in a new Enter, posts notify 0x1f9 with the enter's
-            // action value to its unit AI; the update returns 3 then
-            action.state = EnterState::Failed;
-            let masters = crate::objects::masters::OwnerMasters::new(
-                &self.parts.own_master,
-                self.masters.of(player),
-            );
-            let unit = self.players.live_mut(player, idx)?;
-            unit.place_enter(action, sub);
-            unit.shows_standing_sprite(
-                self.parts.motion.layer_mut(unit.id),
-                masters,
-                &self.graphics,
-                self.streams.get(crate::math::rng::Stream::Sprite),
-            )?;
-            return Ok(Some(crate::unit_ai::Notify::own(
-                id,
-                crate::unit_ai::NotifyKind::ACTION_FAILED,
-                [ActionKind::Enter.value(), 0, 0],
-            )));
+        if self.players.live(player, idx)?.life.inside.is_some() {
+            return self.enter_from_inside(player, idx, action, sub).map(Some);
         }
         let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
         if !self.has_room(tp, t, Some(id))? {
@@ -283,27 +246,93 @@ impl World {
         match walking {
             // the enter's set_state(1) reads the Enter as the unit's; a sub-action goes back
             Walking::Enter => {
-                self.players
-                    .live_mut(player, idx)?
+                self.parts
                     .actions
+                    .of_mut(self.players.live(player, idx)?.id)?
                     .list
                     .set_enter(Some(action));
                 let entered = self.enter_now(player, idx, target);
                 if sub {
-                    let unit = self.players.live_mut(player, idx)?;
-                    let e = unit.actions.list.take_enter();
-                    if let (Some(e), Some(art)) = (e, unit.actions.list.artifact_mut()) {
+                    let actions = self.parts.actions.of_mut(id)?;
+                    let e = actions.list.take_enter();
+                    if let (Some(e), Some(art)) = (e, actions.list.artifact_mut()) {
                         art.enter = Some(e);
                     }
                 }
                 entered.map(|()| None)
             }
             Walking::Walk(to) => {
-                self.players.live_mut(player, idx)?.place_enter(action, sub);
+                self.parts.actions.of_mut(id)?.place_enter(action, sub);
                 to.map_or(Ok(()), |to| self.move_transport(Some(target), to))
                     .map(|()| None)
             }
         }
+    }
+
+    /// [`World::install_enter_as`] under the Artifact on top of unit `idx` of `player` (its id
+    /// `id`): the Artifact's sub-action goes for the Enter `action`
+    /// ([`crate::ownership::artifact::Artifact::hold_enter`]): an old Enter lets its target go
+    /// (slot 0x180, [`World::release`]), then a walking `MoveTo`'s teardown stops the unit.
+    fn enter_under_artifact(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        id: ObjectId,
+        action: EnterAction,
+    ) -> Result<(), GenieError> {
+        let by = self.releaser(player, idx)?;
+        let art =
+            self.parts
+                .actions
+                .of_mut(id)?
+                .list
+                .artifact_mut()
+                .ok_or(GenieError::unreachable(
+                    "an Artifact on top without its action",
+                ))?;
+        let gone = art.hold_enter(action);
+        // the old Enter's teardown lets its target go before its MoveTo's stops the unit
+        if let Some(t) = gone.released {
+            self.release(t, by)?;
+        }
+        let unit = self.players.live(player, idx)?;
+        if gone.stops
+            && let Some(m) = self.parts.mover_mut(unit.id)
+        {
+            m.stop()?;
+        }
+        Ok(())
+    }
+
+    /// [`World::install_enter_as`] for unit `idx` of `player` inside an object: the Enter
+    /// `action` fails at once (`set_state(13)`): the unit takes its master's standing sprite
+    /// (slot 0x68 with `+0x470`) and, its `+0x60` 0 in a new Enter, posts notify 0x1f9 with the
+    /// enter's action value to its unit AI, which this returns; the update returns 3 then.
+    fn enter_from_inside(
+        &mut self,
+        player: PlayerId,
+        idx: ListIndex,
+        mut action: EnterAction,
+        sub: bool,
+    ) -> Result<crate::unit_ai::Notify, GenieError> {
+        action.state = EnterState::Failed;
+        let masters = crate::objects::masters::OwnerMasters::new(
+            &self.parts.own_master,
+            self.masters.of(player),
+        );
+        let unit = self.players.live_mut(player, idx)?;
+        self.parts.actions.of_mut(unit.id)?.place_enter(action, sub);
+        unit.shows_standing_sprite(
+            self.parts.motion.layer_mut(unit.id),
+            masters,
+            &self.graphics,
+            self.streams.get(crate::math::rng::Stream::Sprite),
+        )?;
+        Ok(crate::unit_ai::Notify::own(
+            unit.id,
+            crate::unit_ai::NotifyKind::ACTION_FAILED,
+            [ActionKind::Enter.value(), 0, 0],
+        ))
     }
 
     /// What the Enter's start reads of unit `idx` of `player` and its target ([`enter_view`],
@@ -383,6 +412,7 @@ impl World {
             room: t.room,
             unit,
             mover: self.parts.mover_of(unit.id),
+            target_actions: self.parts.actions_of(target.id),
             target_mover: self.parts.mover_of(target.id),
         };
         action.walk_again(t, start, meeting, &reads, by_id)
@@ -422,6 +452,7 @@ impl World {
             room,
             unit,
             mover: self.parts.mover_of(unit.id),
+            target_actions: self.parts.actions_of(target.id),
             target_mover: self.parts.mover_of(target.id),
         }
         .point(by_id)
@@ -455,7 +486,11 @@ impl World {
             groups: &self.groups,
         };
         if !ship_reaches(
-            (ship, self.parts.mover_of(ship.id)),
+            (
+                ship,
+                self.parts.actions_of(ship.id),
+                self.parts.mover_of(ship.id),
+            ),
             &mut self.spatial,
             &mut plan,
             to,
@@ -503,13 +538,13 @@ impl World {
         let Some(crate::world::index::Place::Live(..)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
-        self.run_on_step(player, idx, |unit, c| {
-            if !unit.enter_building(c, target, inside)? {
+        self.run_on_step(player, idx, |unit, actions, c| {
+            if !unit.enter_building(actions, c, target, inside)? {
                 return Err(GenieError::unsupported(
                     "an Enter in reach that did not get in",
                 ));
             }
-            unit.entered(c)
+            unit.entered(actions, c)
         })
     }
 
@@ -536,7 +571,9 @@ impl World {
             .live(tp, ti)?
             .master(self.master_tables(), tp)?
             .clone();
-        self.run_on_step(player, idx, |unit, c| unit.go_inside(c, target, &me, &bm))
+        self.run_on_step(player, idx, |unit, actions, c| {
+            unit.go_inside(actions, c, target, &me, &bm)
+        })
     }
 }
 

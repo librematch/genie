@@ -492,15 +492,19 @@ fn a_member_is_free_by_its_action_and_its_unit_ai() {
         (AttackState::Failed, true),
         (AttackState::Move, false),
     ] {
-        t.players[1].objects[ListIndex::new(0)]
+        t.parts
             .actions
+            .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+            .unwrap()
             .list
             .set_attack(Some(attack(state)));
         assert_eq!(t.member_idle(object_id(10)).unwrap(), free, "{state}");
     }
     // a trade cart's state 2 is free, whatever its action
-    t.players[1].objects[ListIndex::new(0)]
+    t.parts
         .actions
+        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .unwrap()
         .list
         .set_attack(Some(attack(AttackState::Killed)));
     for m in &mut t.masters {
@@ -1477,7 +1481,12 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
         crate::objects::masters::OwnerMasters::new(&t.parts.own_master, Some(&t.masters[1]));
     let of = |groups: &UnitGroups, id| {
         let u = t.object(object_id(id)).unwrap().1;
-        u.group_speed(groups, masters, t.parts.unit_ai.get(u.id))
+        u.group_speed(
+            t.parts.actions_of(u.id),
+            groups,
+            masters,
+            t.parts.unit_ai.get(u.id),
+        )
     };
     assert_eq!(of(&groups, 10), Ok(None));
     assert_eq!(of(&groups, 11), Ok(Some(GroupSpeed::Free)));
@@ -1491,15 +1500,40 @@ fn the_speed_slot_reads_the_group_that_steers_a_free_member() {
     let busy = t.object(object_id(11)).unwrap().1.clone();
     let mut busy_ai = t.parts.unit_ai.get(busy.id).unwrap().clone();
     busy_ai.current_action = Some(ActionKind::Attack);
-    assert_eq!(busy.group_speed(&groups, masters, Some(&busy_ai)), Ok(None));
+    assert_eq!(
+        busy.group_speed(
+            t.parts.actions_of(busy.id),
+            &groups,
+            masters,
+            Some(&busy_ai)
+        ),
+        Ok(None)
+    );
     let mut gone = busy;
     gone.group.id = Some(group_id(7));
-    assert_eq!(gone.group_speed(&groups, masters, Some(&busy_ai)), Ok(None));
+    assert_eq!(
+        gone.group_speed(
+            t.parts.actions_of(gone.id),
+            &groups,
+            masters,
+            Some(&busy_ai)
+        ),
+        Ok(None)
+    );
     gone.group.id = None;
-    assert_eq!(gone.group_speed(&groups, masters, Some(&busy_ai)), Ok(None));
+    assert_eq!(
+        gone.group_speed(
+            t.parts.actions_of(gone.id),
+            &groups,
+            masters,
+            Some(&busy_ai)
+        ),
+        Ok(None)
+    );
     let lost = t.object(object_id(11)).unwrap().1;
     assert_eq!(
         lost.group_speed(
+            t.parts.actions_of(lost.id),
             &groups,
             crate::objects::masters::OwnerMasters::new(&t.parts.own_master, None),
             t.parts.unit_ai.get(lost.id)

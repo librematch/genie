@@ -39,15 +39,19 @@ impl Unit {
     /// one a Gather with its point would walk there to search again (`set_state(11)`, not
     /// modelled, or 0xf3 for a farmer); without a point a computer player's Gather is done, a
     /// human's idles (`set_state(2)`).
-    pub(crate) fn gather_after_drop(&mut self, c: &mut Step<'_>) -> Result<HeadCode, GenieError> {
+    pub(crate) fn gather_after_drop(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
         if self.after_drop_orders(c)? {
             return Ok(HeadCode::Deletes);
         }
-        let Some(found) = self.after_drop_search(c)? else {
-            return self.after_drop_nothing(c, by);
+        let Some(found) = self.after_drop_search(actions, c)? else {
+            return self.after_drop_nothing(actions, c, by);
         };
-        self.after_drop_retarget(c, found, by)
+        self.after_drop_retarget(actions, c, found, by)
             .map(|()| HeadCode::Keeps)
     }
 
@@ -85,9 +89,12 @@ impl Unit {
     /// workers, state 2, no point) for the gather group (slot 0x1b0, the civilian's) of its target
     /// class (the AI's `+0x58`, else the Gather's `mTargetType`); none for none, a class of no
     /// group, or a unit without a unit AI.
-    fn after_drop_search(&self, c: &mut Step<'_>) -> Result<Option<ObjectId>, GenieError> {
-        let gather = self
-            .actions
+    fn after_drop_search(
+        &self,
+        actions: &crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<Option<ObjectId>, GenieError> {
+        let gather = actions
             .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
@@ -103,7 +110,7 @@ impl Unit {
         let Some(kind) = class.and_then(crate::unit_ai::civilian_kind) else {
             return Ok(None);
         };
-        self.resource_search(c, kind, crate::objects::WorkerCount::NO_CAP)
+        self.resource_search(actions, c, kind, crate::objects::WorkerCount::NO_CAP)
     }
 
     /// Nothing found after the drop: a Gather with its point walks there to search again
@@ -113,12 +120,13 @@ impl Unit {
     /// [`Unit::idle_sprite`]'s) and lets its drop site go.
     fn after_drop_nothing(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         by: Releaser,
     ) -> Result<HeadCode, GenieError> {
         let farm_waits = crate::gathering::gather::waits_for_a_farm(
             self.life.master_id,
-            self.actions.list.gather().and_then(|g| g.target_class),
+            actions.list.gather().and_then(|g| g.target_class),
         );
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
@@ -129,8 +137,7 @@ impl Unit {
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let gather = self
-            .actions
+        let gather = actions
             .list
             .gather_mut()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
@@ -153,9 +160,8 @@ impl Unit {
             return Ok(HeadCode::Deletes);
         }
         let carry_to = gather.carry_to;
-        let shows = self.idle_sprite(c)?;
-        let gather = self
-            .actions
+        let shows = self.idle_sprite(actions, c)?;
+        let gather = actions
             .list
             .gather_mut()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
@@ -183,10 +189,10 @@ impl Unit {
     /// the task's resource, else its master's standing sprite (none the data file lacks).
     fn idle_sprite(
         &self,
+        actions: &crate::objects::layers::Action,
         c: &Step<'_>,
     ) -> Result<Option<crate::objects::sprite::Graphic>, GenieError> {
-        let gather = self
-            .actions
+        let gather = actions
             .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
@@ -216,6 +222,7 @@ impl Unit {
     /// changed is let go and the new one taken (one of its own player's directly, never listed).
     fn after_drop_retarget(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         found: ObjectId,
         by: Releaser,
@@ -240,12 +247,11 @@ impl Unit {
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: crate::gathering::gather::productivity_of(
-                self.actions.list.gather().and_then(|g| g.task.productivity),
+                actions.list.gather().and_then(|g| g.task.productivity),
                 &c.w.players.player(c.player)?.attributes,
             ),
         };
-        let (Some(gather), Some(mover)) =
-            (self.actions.list.gather_mut(), c.w.parts.mover_mut(self.id))
+        let (Some(gather), Some(mover)) = (actions.list.gather_mut(), c.w.parts.mover_mut(self.id))
         else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
@@ -334,7 +340,11 @@ impl Unit {
     /// ([`Unit::drop_site`]) becomes its second target (`FUN_140a7a190`: slot 0x178) and a quiet
     /// `MoveTo` walks there ([`crate::gathering::gather::GatherAction::set_drop`]). Without one the unit AI's
     /// part (notify 0x203) is not modelled.
-    pub(crate) fn gather_drop_off(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn gather_drop_off(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let (mover, by_id) =
             c.w.parts
                 .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.masters));
@@ -349,7 +359,9 @@ impl Unit {
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        if let Some(site) = self.gather_drop_off_in(mover, w, others, &c.w.graphics, by_id)? {
+        if let Some(site) =
+            self.gather_drop_off_in(actions, mover, w, others, &c.w.graphics, by_id)?
+        {
             let by = self.releaser(c)?;
             crate::world::lets::take(c, self, site, by)?;
         }
@@ -360,7 +372,8 @@ impl Unit {
     /// with the sprites' table `graphics`: the drop site it took when it is a new second target (the caller's to take,
     /// slot 0x178).
     pub(crate) fn gather_drop_off_in(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
@@ -372,14 +385,13 @@ impl Unit {
                 "a gather's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let gather = self
-            .actions
+        let gather = actions
             .list
             .gather()
             .ok_or(crate::gathering::gather::unit::NO_GATHER)?;
         let (carry_to, state) = (gather.carry_to, gather.state);
         let (site, gap) = self.drop_site(
-            mover.as_deref(),
+            (actions, mover.as_deref()),
             &mut c,
             others,
             carry_to,
@@ -396,7 +408,7 @@ impl Unit {
             graphics,
         );
         let walks = Walks::of(sprites, (self, mover.as_deref()));
-        let (Some(gather), Some(mover)) = (self.actions.list.gather_mut(), mover) else {
+        let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
@@ -410,7 +422,8 @@ impl Unit {
     /// with the sprites' table `graphics`: the drop site it took when it is a new second target
     /// (`FUN_140a7a190`, the caller's to take, slot 0x178).
     pub(crate) fn drop_off_in(
-        &mut self,
+        &self,
+        actions: &mut crate::objects::layers::Action,
         mover: Option<&mut Mover>,
         mut c: DropWorld<'_>,
         others: OthersRef<'_>,
@@ -422,14 +435,10 @@ impl Unit {
                 "a hunt's drop-off carrying nothing (set_state 3)",
             ));
         }
-        let hunt = self
-            .actions
-            .list
-            .hunt()
-            .ok_or(crate::gathering::hunt::NO_HUNT)?;
+        let hunt = actions.list.hunt().ok_or(crate::gathering::hunt::NO_HUNT)?;
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) = self.drop_site(
-            mover.as_deref(),
+            (actions, mover.as_deref()),
             &mut c,
             others,
             carry_to,
@@ -451,7 +460,7 @@ impl Unit {
             graphics,
         );
         let walks = Walks::of(sprites, (self, mover.as_deref()));
-        let (Some(hunt), Some(mover)) = (self.actions.list.hunt_mut(), mover) else {
+        let (Some(hunt), Some(mover)) = (actions.list.hunt_mut(), mover) else {
             return Err(GenieError::unsupported(
                 "a hunter without its hunt or movement state",
             ));
@@ -468,7 +477,7 @@ impl Unit {
     /// With the footprint gap to it (`FUN_14118f680`).
     pub(crate) fn drop_site(
         &self,
-        mover: Option<&Mover>,
+        (actions, mover): (&crate::objects::layers::Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         carry_to: Option<DropSiteId>,
@@ -483,18 +492,19 @@ impl Unit {
                 "a drop-off of a player without masters",
             ))?;
             let sites = &master.drop_sites;
-            site = match self.drop_site_from(Some(mover), c, others, state, true, by_id)? {
-                Some(s) => Some(s),
-                None => drop_site_search(
-                    others.own_iter(),
-                    crate::objects::masters::OwnerMasters::new(c.masters.own, Some(masters)),
-                    sites,
-                    self.position(),
-                    None,
-                    (true, Some(action_type::UNPACK)),
-                    by_id,
-                )?,
-            };
+            site =
+                match self.drop_site_from((actions, Some(mover)), c, others, state, true, by_id)? {
+                    Some(s) => Some(s),
+                    None => drop_site_search(
+                        others.own_iter(),
+                        crate::objects::masters::OwnerMasters::new(c.masters.own, Some(masters)),
+                        sites,
+                        self.position(),
+                        None,
+                        (true, Some(action_type::UNPACK)),
+                        by_id,
+                    )?,
+                };
         }
         let Some(site) = site else {
             return Ok((None, Distance::ZERO));
@@ -516,7 +526,7 @@ impl Unit {
     /// when `outside` (its argument 10) and those at work on `0x7d` or `0x7c` (its argument 8).
     pub(crate) fn drop_site_from(
         &self,
-        mover: Option<&Mover>,
+        (actions, mover): (&crate::objects::layers::Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
@@ -525,7 +535,7 @@ impl Unit {
     ) -> Result<Option<DropSiteId>, GenieError> {
         let by_path = !c.computer;
         self.drop_site_with(
-            mover,
+            (actions, mover),
             c,
             others,
             state,
@@ -538,7 +548,7 @@ impl Unit {
     /// and the action type `at_work` it passes over (−1 none).
     pub(crate) fn drop_site_with(
         &self,
-        mover: Option<&Mover>,
+        (actions, mover): (&crate::objects::layers::Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
@@ -559,7 +569,7 @@ impl Unit {
         let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
         let me = Me {
             action_state: state,
-            ..self.me()
+            ..self.me(actions)
         };
         let mut plan = Planning {
             pathing: &mut *c.pathing,
@@ -570,6 +580,7 @@ impl Unit {
         };
         let seeker = Seeker {
             unit: self,
+            actions,
             me,
             mover,
             plan: &mut plan,

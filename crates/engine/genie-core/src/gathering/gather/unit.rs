@@ -49,31 +49,30 @@ impl Unit {
     /// ([`Unit::gather_drop_off`]).
     pub(crate) fn gather_update(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
     ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
-        self.gather_check_targets(c, by)?;
-        let gather = *self.actions.list.gather().ok_or(NO_GATHER)?;
+        self.gather_check_targets(actions, c, by)?;
+        let gather = *actions.list.gather().ok_or(NO_GATHER)?;
         let reads = self.gather_reads(c, &gather)?;
         if gather.state == crate::gathering::gather::GatherState::Drop {
-            return self.gather_drop_update(c, me, gather, &reads, by);
+            return self.gather_drop_update(actions, c, me, gather, &reads, by);
         }
-        self.gather_work_update(c, me, gather, &reads, by)
-    }
-
-    /// The Gather's copy `gather` back in the action list, as its update left it.
-    fn put_gather(&mut self, gather: crate::gathering::gather::GatherAction) {
-        if let Some(g) = self.actions.list.gather_mut() {
-            *g = gather;
-        }
+        self.gather_work_update(actions, c, me, gather, &reads, by)
     }
 
     /// The Gather's update's check of its targets: a target the world does not hold goes, one
     /// past state 6 is let go and goes (one the slice holds but cannot read is not modelled); a
     /// second target ([`second_target_checked`]) alike.
-    fn gather_check_targets(&mut self, c: &mut Step<'_>, by: Releaser) -> Result<(), GenieError> {
-        let target = self.actions.list.gather().ok_or(NO_GATHER)?.target;
+    fn gather_check_targets(
+        &mut self,
+        actions: &mut crate::objects::layers::Action,
+        c: &mut Step<'_>,
+        by: Releaser,
+    ) -> Result<(), GenieError> {
+        let target = actions.list.gather().ok_or(NO_GATHER)?.target;
         if target.is_some() {
             let state = readable(c, target)?.map(|(_, u, _)| u.life.state);
             let gone = match state {
@@ -89,10 +88,10 @@ impl Unit {
                 if state.is_some() {
                     crate::world::lets::release(c, self, target, by)?;
                 }
-                self.actions.list.gather_mut().ok_or(NO_GATHER)?.target = None;
+                actions.list.gather_mut().ok_or(NO_GATHER)?.target = None;
             }
         }
-        let site = self.actions.list.gather().ok_or(NO_GATHER)?.carry_to;
+        let site = actions.list.gather().ok_or(NO_GATHER)?.carry_to;
         let held = c.w.spatial.get(site).is_some();
         let (kept, let_go) = second_target_checked(
             site,
@@ -102,7 +101,7 @@ impl Unit {
                 OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             ),
         );
-        self.actions.list.gather_mut().ok_or(NO_GATHER)?.carry_to = kept;
+        actions.list.gather_mut().ok_or(NO_GATHER)?.carry_to = kept;
         if let Some(t) = let_go {
             crate::world::lets::release(c, self, t, by)?;
         }
@@ -193,6 +192,7 @@ impl Unit {
     /// the drop-off again ([`Unit::gather_drop_off`]); an idle gather lets its targets go.
     fn gather_drop_update(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         mut gather: crate::gathering::gather::GatherAction,
@@ -208,12 +208,14 @@ impl Unit {
         let site = self.gather_site(c, gather.carry_to, (position, radius))?;
         let before = [gather.target, gather.carry_to.map(DropSiteId::id)];
         let dropped = gather.update_drop(c, self, me, reads, site);
-        self.put_gather(gather);
+        actions.put_gather(gather);
         match dropped? {
             Dropped::Going => Ok(HeadCode::Keeps),
-            Dropped::Load(kind, amount) => self.gather_load_dropped(c, by, (kind, amount), radius),
+            Dropped::Load(kind, amount) => {
+                self.gather_load_dropped(actions, c, by, (kind, amount), radius)
+            }
             // set_state(8) again: the drop site kept or searched
-            Dropped::Again => self.gather_drop_off(c).map(|()| HeadCode::Keeps),
+            Dropped::Again => self.gather_drop_off(actions, c).map(|()| HeadCode::Keeps),
             // set_state(2): the target, then the drop site go (slot 0x68, FUN_140a7a190)
             Dropped::Idle => {
                 for id in before.into_iter().flatten() {
@@ -265,15 +267,16 @@ impl Unit {
     /// footprint, `radius` its radii).
     fn gather_load_dropped(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         by: Releaser,
         (kind, amount): (AttributeId, Amount),
         radius: Footprint,
     ) -> Result<HeadCode, GenieError> {
         c.give_load(kind, amount)?;
-        let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
+        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         if gather.target.is_none() {
-            return self.gather_after_drop(c);
+            return self.gather_after_drop(actions, c);
         }
         crate::world::lets::release(c, self, gather.carry_to, by)?;
         // the unit's load is gone (slot 0xf8 after the drop): its walking sprite is the moving one
@@ -286,7 +289,7 @@ impl Unit {
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
         )?;
-        let gather = self.actions.list.gather_mut().ok_or(NO_GATHER)?;
+        let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
         gather.carry_to = None;
         let t =
             c.w.spatial
@@ -316,6 +319,7 @@ impl Unit {
     /// ([`Unit::gather_next`]).
     fn gather_work_update(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         me: Me,
         mut gather: crate::gathering::gather::GatherAction,
@@ -325,15 +329,15 @@ impl Unit {
         let mut victim = victim(c, gather.target)?;
         let old = (gather.target, gather.carry_to);
         let next = gather.update(c, self, me, victim.as_mut(), reads);
-        self.put_gather(gather);
+        actions.put_gather(gather);
         let next = next?;
         // what the work changed on its target, where it ran
         if let Some(v) = victim.as_mut()
             && let Some(k) = write_back(c, v)?
         {
-            crate::combat::victims::file_kill(c, self, k)?;
+            crate::combat::victims::file_kill(c, (self, actions), k)?;
         }
-        self.gather_next(c, next, old, by)
+        self.gather_next(actions, c, next, old, by)
     }
 
     /// What follows the Gather's update (`next`; `old`: its targets before): an end is its code
@@ -346,6 +350,7 @@ impl Unit {
     /// Gather; the update then answers 0, as after them.
     pub(crate) fn gather_next(
         &mut self,
+        actions: &mut crate::objects::layers::Action,
         c: &mut Step<'_>,
         next: crate::gathering::gather::Next,
         (old_target, old_second): (Option<ObjectId>, Option<DropSiteId>),
@@ -355,7 +360,7 @@ impl Unit {
         if next == Next::Done {
             return Ok(HeadCode::Deletes);
         }
-        if let Some(g) = self.actions.list.gather() {
+        if let Some(g) = actions.list.gather() {
             for (old, new) in [
                 (old_target, g.target),
                 (
@@ -369,19 +374,21 @@ impl Unit {
             }
         }
         match next {
-            Next::Drop => self.gather_drop_off(c)?,
-            Next::Search => self.gather_search(c)?,
+            Next::Drop => self.gather_drop_off(actions, c)?,
+            Next::Search => self.gather_search(actions, c)?,
             Next::Build => {
                 // a build command on no foundation does nothing
-                if let Some(target) = self.actions.list.gather().and_then(|g| g.target) {
-                    c.lend_at(self, |w, p, i| {
+                if let Some(target) = actions.list.gather().and_then(|g| g.target) {
+                    c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                         w.build_command(p, i, crate::construction::FoundationId::new(target))
                             .map(drop)
                     })?;
                 }
             }
             Next::Reseed { arrived } => {
-                c.lend_at(self, |w, p, i| w.reseed_after_walk(p, i, arrived))?;
+                c.lend_at((&mut *self, &mut *actions), |w, p, i| {
+                    w.reseed_after_walk(p, i, arrived)
+                })?;
             }
             Next::Stay | Next::Done => {}
         }
@@ -393,7 +400,11 @@ impl Unit {
     /// the Gather's target type (`+0x68`) and a drop site: the second target's, else for a master
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
     /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
-    pub(crate) fn gather_search(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
+    pub(crate) fn gather_search(
+        &self,
+        actions: &crate::objects::layers::Action,
+        c: &mut Step<'_>,
+    ) -> Result<(), GenieError> {
         let by_id = crate::world::index::ObjectsRef::new(
             &c.w.players,
             &c.w.index,
@@ -401,7 +412,7 @@ impl Unit {
             &c.w.parts,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let gather = self.actions.list.gather().ok_or(NO_GATHER)?;
+        let gather = actions.list.gather().ok_or(NO_GATHER)?;
         let (carry_to, class, state) = (gather.carry_to, gather.target_class, gather.state);
         let master = self.master(c.w.master_tables(), c.player)?;
         let site = if let Some(carry) = carry_to {
@@ -422,7 +433,7 @@ impl Unit {
             };
             // the notify's record holds the drop site's id, 0 for none
             self.drop_site_from(
-                c.w.parts.mover_of(self.id),
+                (actions, c.w.parts.mover_of(self.id)),
                 &mut w,
                 others,
                 ActionState::new(state.get()),
@@ -477,4 +488,13 @@ pub(crate) fn give_load(
         adds.push((attribute::GATHERED.offset(kind.index())?, amount));
     }
     Ok(())
+}
+
+impl crate::objects::layers::Action {
+    /// The Gather's copy `gather` back in the action list, as its update left it.
+    fn put_gather(&mut self, gather: crate::gathering::gather::GatherAction) {
+        if let Some(g) = self.list.gather_mut() {
+            *g = gather;
+        }
+    }
 }

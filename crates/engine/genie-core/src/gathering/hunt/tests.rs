@@ -216,12 +216,16 @@ fn a_stopped_decay_goes_back_to_the_world_at_once() {
     let mut hunt = hunting(10028);
     hunt.task.kind4 = Some(DECAY_TASK);
     let mut rig = Rig::on_the_path(decaying.clone());
-    rig.run(100, |c, u, f, _| hunt.decay_check(c, u, true, f))
-        .unwrap();
+    rig.run(100, |c, u, actions, f, _| {
+        hunt.decay_check(c, u, actions, true, f)
+    })
+    .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(-0.25));
     let mut rig = Rig::on_the_path(decaying);
-    rig.run(100, |c, u, f, _| hunt.decay_check(c, u, false, f))
-        .unwrap();
+    rig.run(100, |c, u, actions, f, _| {
+        hunt.decay_check(c, u, actions, false, f)
+    })
+    .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(0.25));
 }
 
@@ -742,7 +746,7 @@ fn a_hunt_whose_target_went_walks_to_its_point() {
     };
     let lost = |h: &HuntAction, r: &HuntReads, rig: &mut Rig| {
         let mut h = *h;
-        let got = rig.run(100, |c, u, _, _| h.lost_on_the_way(c, u, r));
+        let got = rig.run(100, |c, u, _, _, _| h.lost_on_the_way(c, u, r));
         (got, h)
     };
     assert!(lost(&hunt, &r, &mut rig).0.is_err());
@@ -801,7 +805,9 @@ fn a_hunt_faces_its_own_pasture_s_dead_livestock() {
             },
             ..hunt_reads()
         };
-        let got = rig.run(50, |c, u, f, _| hunt.set_face(c, u, f, &r));
+        let got = rig.run(50, |c, u, actions, f, _| {
+            hunt.set_face(c, u, actions, f, &r)
+        });
         (got, hunt, rig.sprite())
     };
     let (r, hunt, shown) = face(ibex.clone());
@@ -855,11 +861,9 @@ fn a_walk_to_the_point_ends_in_a_search_or_done() {
         let at = Position::new(171.888_89, 59.053_39, 0.0);
         rig.unit_mut().place = crate::objects::layers::Static::at(at);
         let id = rig.unit().id;
-        rig.t.set_motion(
-            id,
-            Some(crate::objects::layers::MotionLayer::Moving(walker())),
-        );
-        let got = rig.run(500, |c, u, _, _| {
+        rig.t
+            .set_motion(id, Some(crate::objects::layers::Motion::Moving(walker())));
+        let got = rig.run(500, |c, u, _, _, _| {
             h.update_point_walk(c, u, me(h.state), who)
         });
         (got, rig.mover().velocity.unwrap().velocity.y())
@@ -952,7 +956,7 @@ fn a_hunter_walks_to_its_drop_site_and_to_its_point() {
             rig.unit_mut().life.attribute_type,
             rig.unit_mut().life.amount,
         ) = (Some(attribute::WOOD), Amount::new(3.0));
-        rig.run(100, |c, u, _, _| {
+        rig.run(100, |c, u, _, _, _| {
             h.update_drop(c, u, me(HuntState::Drop), None, who)
         })
     };
@@ -1006,7 +1010,7 @@ fn a_hunter_walks_to_its_drop_site_and_to_its_point() {
     assert!(drop(&mut h, &mut rig).is_err());
     // the walk to a point
     let point_walk = |h: &mut HuntAction, rig: &mut Rig, who| {
-        rig.run(100, |c, u, _, _| {
+        rig.run(100, |c, u, _, _, _| {
             h.update_point_walk(c, u, me(h.state), who)
         })
     };
@@ -1072,7 +1076,7 @@ fn a_hunter_s_walks_pass_on_the_units_in_their_way() {
                 }),
                 ..hunting(-1)
             };
-            rig.run(100, |c, u, _, _| {
+            rig.run(100, |c, u, _, _, _| {
                 if state == HuntState::Drop {
                     h.update_drop(c, u, me(state), None, who).map(|_| ())
                 } else {
@@ -1186,7 +1190,7 @@ fn a_herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
             herd,
             ..hunt_reads()
         };
-        rig.run(100, |c, u, f, _| h.update_lead(c, u, f, &r))
+        rig.run(100, |c, u, _, f, _| h.update_lead(c, u, f, &r))
     };
     let leading = |timer| HuntAction {
         state: HuntState::Lead,
@@ -1287,7 +1291,9 @@ fn a_hunt_s_update_runs_the_step_of_its_state() {
         let mut r = hunt_reads();
         r.attack.computer = computer;
         let me = me(h.state);
-        rig.run(100, |c, u, f, _| h.update(c, u, me, f, &r))
+        rig.run(100, |c, u, actions, f, _| {
+            h.update(c, u, actions, me, f, &r)
+        })
     };
     let mut rig = Rig::on_the_path(Victim::default()).holding(10028, PlayerId::new(0));
     let reason = |r: Result<HuntNext, crate::GenieError>| r.unwrap_err().reason();
@@ -1402,8 +1408,8 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
         let mut rig = Rig::on_the_path(victim).holding(10028, PlayerId::new(1));
         let mut r = hunt_reads();
         (r.attack.queue_empty, r.predator_hunts_end) = (queue_empty, ends);
-        let got = rig.run(100, |c, u, f, _| {
-            h.update(c, u, me(HuntState::Attack), f, &r)
+        let got = rig.run(100, |c, u, actions, f, _| {
+            h.update(c, u, actions, me(HuntState::Attack), f, &r)
         });
         (got, rig.workers(10028, PlayerId::new(1)) == Some(0))
     };
@@ -1464,8 +1470,8 @@ fn a_hunt_s_attack_ends_into_a_walk_a_search_or_its_point() {
     assert_eq!((h.state, h.target), (HuntState::WalkSearch, None));
     let mut rig = Rig::on_the_path(sheep());
     let r = hunt_reads();
-    let r = rig.run(100, |c, u, f, _| {
-        fresh(10028).update(c, u, me(HuntState::Attack), f, &r)
+    let r = rig.run(100, |c, u, actions, f, _| {
+        fresh(10028).update(c, u, actions, me(HuntState::Attack), f, &r)
     });
     assert_eq!(
         r.unwrap_err().reason(),
@@ -1504,7 +1510,7 @@ fn a_hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
             herd,
             ..hunt_reads()
         };
-        rig.run(100, |c, u, f, _| h.set_face(c, u, f, &r))
+        rig.run(100, |c, u, actions, f, _| h.set_face(c, u, actions, f, &r))
     };
     let walking = |target, moved| HuntAction {
         state: HuntState::Walk,
@@ -1600,10 +1606,8 @@ fn a_drop_off_gives_the_load_to_the_player() {
     let at = Position::new(26.820_372, 94.718_056, 0.0);
     rig.unit_mut().place = crate::objects::layers::Static::at(at);
     let id = rig.unit().id;
-    rig.t.set_motion(
-        id,
-        Some(crate::objects::layers::MotionLayer::Moving(walker())),
-    );
+    rig.t
+        .set_motion(id, Some(crate::objects::layers::Motion::Moving(walker())));
     rig.t.players[1].attributes = vec![Amount::ZERO; 230];
     let site = DropOff {
         takes: true,
@@ -1619,7 +1623,7 @@ fn a_drop_off_gives_the_load_to_the_player() {
             rig.unit_mut().life.attribute_type,
             rig.unit_mut().life.amount,
         ) = (held.kind, held.amount);
-        rig.run(28, |c, u, _, _| {
+        rig.run(28, |c, u, _, _, _| {
             hunt.update_drop(c, u, me(HuntState::Drop), Some(site), who)
         })
     };
@@ -1733,7 +1737,9 @@ fn a_hunt_s_walk_starts_toward_its_target() {
             ..hunting(10028)
         };
         let r = hunt_reads();
-        let got = rig.run(100, |c, u, f, _| h.update(c, u, me(HuntState::Walk), f, &r));
+        let got = rig.run(100, |c, u, actions, f, _| {
+            h.update(c, u, actions, me(HuntState::Walk), f, &r)
+        });
         let paths = rig.mover().paths.len();
         let walk = h.move_to.map(|m| (m.state, m.wait.state));
         (got, walk, paths, rig.sprite())
@@ -1766,7 +1772,9 @@ fn a_walk_that_ended_without_its_target_only_turns_to_the_face() {
         ..hunting(-1)
     };
     let r = hunt_reads();
-    let got = rig.run(100, |c, u, f, _| h.update(c, u, me(HuntState::Walk), f, &r));
+    let got = rig.run(100, |c, u, actions, f, _| {
+        h.update(c, u, actions, me(HuntState::Walk), f, &r)
+    });
     assert_eq!(got, Ok(HuntNext::Stay));
     assert_eq!(
         (h.state, h.timer, h.move_to),
@@ -1799,7 +1807,7 @@ fn a_move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
         move_to: Some(to_house(MoveTo::Moving, CHOP.range)),
         ..hunting(-1)
     };
-    let got = rig.run(100, |c, u, _, _| {
+    let got = rig.run(100, |c, u, _, _, _| {
         h.update_drop(c, u, me(HuntState::Drop), None, who)
     });
     assert_eq!(got, Ok(Dropped::Going));
@@ -1810,7 +1818,7 @@ fn a_move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
         move_to: Some(to_house(MoveTo::Moving, CHOP.range)),
         ..hunting(-1)
     };
-    let got = rig.run(100, |c, u, _, _| {
+    let got = rig.run(100, |c, u, _, _, _| {
         h.update_point_walk(c, u, me(HuntState::WalkSearch), who)
     });
     assert_eq!(
@@ -1837,12 +1845,12 @@ fn a_hunt_of_a_tree_searches_on_a_failed_walk_or_a_target_let_go() {
             target_class: class_of(15),
             ..crate::unit_ai::UnitAi::default()
         }));
-        rig.unit_mut().actions.list.set_hunt(Some(HuntAction {
+        rig.actions_mut().list.set_hunt(Some(HuntAction {
             state: HuntState::Walk,
             move_to: Some(to_house(move_to, Distance::ZERO)),
             ..hunting(-1)
         }));
-        rig.run(100, |c, u, _, _| Ok(u.tree_lost(c)))
+        rig.run(100, |c, u, actions, _, _| Ok(u.tree_lost(actions, c)))
     };
     assert_eq!(
         tree_lost(ObjectState::Removed, MoveTo::Moving, true),

@@ -229,18 +229,18 @@ mod tests {
     use crate::movement::move_to::MoveToAction;
     use crate::objects::UpdateCode;
     use crate::objects::WorkRate;
-    use crate::objects::layers::MotionLayer;
+    use crate::objects::layers::Motion;
     use crate::objects::masters::TaskId;
     use crate::test_ids::object_id;
 
     /// A moving object's motion layer, moving (its velocity and animation speed set).
-    fn moving() -> MotionLayer {
+    fn moving() -> Motion {
         let mut m = crate::gathering::hunt::tests::walker();
         m.velocity = Some(crate::movement::Velocity {
             velocity: BVector::new(0.0, 0.0, 0.7),
             acceleration: BVector::new(0.0, 0.0, 1.0),
         });
-        let mut motion = MotionLayer::Moving(m);
+        let mut motion = Motion::Moving(m);
         motion.lent().set_anim_speed(Speed::new(0.8));
         motion
     }
@@ -275,7 +275,7 @@ mod tests {
     }
 
     /// Whether `motion` still moves.
-    fn moves(motion: &MotionLayer) -> bool {
+    fn moves(motion: &Motion) -> bool {
         motion
             .mover()
             .is_some_and(|m| m.velocity.is_some_and(|v| v.velocity.y() != 0.0))

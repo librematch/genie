@@ -136,6 +136,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         f: &mut Fight,
         r: &AttackReads,
     ) -> Result<UpdateCode, GenieError> {
@@ -143,7 +144,7 @@ impl Attack {
             return Err(GenieError::unsupported("a swing without the unit's sprite"));
         };
         if self.pending {
-            self.swing_to_hit(c, unit, f, r, sprite)?;
+            self.swing_to_hit(c, unit, actions, f, r, sprite)?;
         } else {
             self.swing_after_hit(c, unit, f, r, sprite)?;
         }
@@ -158,6 +159,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         f: &mut Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
@@ -186,7 +188,7 @@ impl Attack {
         if fire != Frame::ZERO && !sprite.reached(fire) {
             return Ok(());
         }
-        self.land_hit(c, unit, f, r, sprite)
+        self.land_hit(c, unit, actions, f, r, sprite)
     }
 
     /// The swing's hit at its firing frame: the attack timer becomes the reload less the time to
@@ -200,6 +202,7 @@ impl Attack {
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         f: &mut Fight,
         r: &AttackReads,
         sprite: ActiveSprite,
@@ -244,7 +247,7 @@ impl Attack {
                     [600, target.get(), 0],
                 )?;
             }
-            write_strike_back(c, unit, &mut f.victim)?;
+            write_strike_back(c, unit, actions, &mut f.victim)?;
         }
         self.pending = false;
         if f.victim.hp <= HitPoints::ZERO {

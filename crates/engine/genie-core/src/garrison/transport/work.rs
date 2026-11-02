@@ -40,9 +40,8 @@ impl crate::world::World {
         self.clear_actions(p, i)?;
         let mut t = TransportAction::on_task(Some(task.id), point);
         let changed = self.with_shore(p, i, t.task, |ship, shore| t.start(true, ship, shore))?;
-        self.players
-            .live_mut(p, i)?
-            .actions
+        self.parts
+            .actions_mut(self.players.live(p, i)?.id)?
             .list
             .set_transport(Some(t));
         self.transport_changed(p, i, changed)
@@ -67,14 +66,22 @@ impl crate::world::World {
         clears: bool,
     ) -> Result<bool, GenieError> {
         let unit = self.players.live(p, i)?;
-        let on_task = unit.top_action_kind() == Some(TRANSPORT)
-            && unit.actions.list.transport().copied().and_then(|t| t.task) == Some(task.id);
+        let on_task = self.parts.actions_of(unit.id).top_action_kind() == Some(TRANSPORT)
+            && self
+                .parts
+                .actions_of(unit.id)
+                .list
+                .transport()
+                .copied()
+                .and_then(|t| t.task)
+                == Some(task.id);
         if !on_task || self.trade_at_own_market((p, i), target)? {
             return Ok(false);
         }
         let by_self = target == Some(unit.id);
-        let mut t = unit
-            .actions
+        let mut t = self
+            .parts
+            .actions_of(unit.id)
             .list
             .transport()
             .copied()
@@ -84,9 +91,8 @@ impl crate::world::World {
         let changed = self.with_shore(p, i, t.task, |ship, shore| {
             t.work(point, by_self, ship, shore)
         })?;
-        self.players
-            .live_mut(p, i)?
-            .actions
+        self.parts
+            .actions_mut(self.players.live(p, i)?.id)?
             .list
             .set_transport(Some(t));
         self.transport_changed(p, i, changed)?;

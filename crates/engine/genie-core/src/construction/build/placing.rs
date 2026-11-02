@@ -51,6 +51,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         let desolid =
@@ -86,12 +87,14 @@ impl BuildAction {
         for cl in cleared {
             c.w.clear_object(cl, true)?;
         }
-        let parts = self.part_tests(c, builder, (site.id(), &cleared_ids), reads)?;
+        let parts = self.part_tests(c, builder, actions, (site.id(), &cleared_ids), reads)?;
         // the foundation's placement test (its master's slot 0x50, FUN_14123aee0): one that may
         // not stay, or follows a part that may not, sends no unit off
         let own = with_annexes(c, site.id());
         // the builder lent to its slot, where the tests' scans meet it (FD-045-D32)
-        let code = self.lend(c, builder, |w, _, _| w.foundation_code(&placed, true, &own))?;
+        let code = self.lend(c, builder, actions, |w, _, _| {
+            w.foundation_code(&placed, true, &own)
+        })?;
         let stays = parts.stay && code.is_allowed();
         let others: Vec<ObjectId> = occupants
             .iter()
@@ -153,6 +156,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         (site, cleared): (ObjectId, &[ObjectId]),
         reads: &BuildReads,
     ) -> Result<PartTests, GenieError> {
@@ -176,7 +180,7 @@ impl BuildAction {
                     .building_of(unit.id)
                     .construction
                     .is_some_and(|k| k.desolid);
-            let code = self.lend(c, builder, |w, _, _| {
+            let code = self.lend(c, builder, actions, |w, _, _| {
                 w.foundation_code(&placed, desolid, &own)
             })?;
             if !code.is_allowed() {
@@ -327,6 +331,7 @@ impl BuildAction {
         &mut self,
         c: &mut Step<'_>,
         builder: &mut Unit,
+        actions: &mut crate::objects::layers::Action,
         reads: &BuildReads,
     ) -> Result<(), GenieError> {
         let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
@@ -342,7 +347,7 @@ impl BuildAction {
         if 1.0 < n {
             rate *= ((n - 1.0) * EXTRA_BUILDER + 1.0) / n;
         }
-        if self.work_on(c, builder, Seconds::new(rate))? {
+        if self.work_on(c, builder, actions, Seconds::new(rate))? {
             return Ok(());
         }
         // a finished foundation with hit points ends the work (its `+0x278`, decoded); one
