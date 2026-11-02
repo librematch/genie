@@ -29,6 +29,7 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::step::Step;
 
 /// A gatherer without movement state, which the Gather's walks and turns need.
@@ -56,8 +57,13 @@ impl GatherAction {
     /// task's resource): true when the unit's load asks for `set_state(8)`; false for a load of
     /// another resource (the unit AI takes notify 0x21c, the caller's).
     #[must_use]
-    pub fn drop_off_asked(&self, held_kind: Option<AttributeId>, attributes: usize) -> bool {
-        asked_drop_off(self.task.resource, held_kind, attributes)
+    pub fn drop_off_asked(
+        &self,
+        held_kind: Option<AttributeId>,
+        attributes: usize,
+        slots: Slots,
+    ) -> bool {
+        asked_drop_off(self.task.resource, held_kind, attributes, slots)
     }
 
     /// The teardown (`FUN_140a73fc0`) and `set_state`'s first step (`FUN_140a98620`): the

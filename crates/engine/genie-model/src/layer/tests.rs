@@ -1,6 +1,7 @@
 use crate::layer::BuildLayer;
 use crate::layer::Roles;
 use crate::layer::by_id;
+use crate::layer::generated::AttributeRoles;
 use crate::layer::generated::ClassRoles;
 use crate::layer::generated::MasterRoles;
 use crate::model::Model;
@@ -109,6 +110,23 @@ fn optional_masters_hold_their_master_roles() {
     };
     assert_eq!(roles.of_some_master(Some(MasterId::named(1))), dock);
     assert!(roles.of_some_master(None).is_empty());
+}
+
+/// An optional attribute holds its attribute's roles; no attribute holds none.
+#[test]
+fn optional_attributes_hold_their_attribute_roles() {
+    let food = AttributeRoles::from_bits_retain(1);
+    let roles = Roles {
+        attributes: Arc::new(vec![food]),
+        ..Roles::default()
+    };
+    assert_eq!(roles.of_some_attribute(Some(AttributeId::named(0))), food);
+    assert!(
+        roles
+            .of_some_attribute(Some(AttributeId::named(1)))
+            .is_empty()
+    );
+    assert!(roles.of_some_attribute(None).is_empty());
 }
 
 /// A slot's id serializes as its value and parses through the id's check.

@@ -61,6 +61,7 @@ use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::slots;
 use crate::testing::static_roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::BOAR_AI;
@@ -960,6 +961,7 @@ fn strike_on_an_annex_hits_its_main_building() {
         hit,
         &mut Well512::default(),
         &roles(),
+        slots(),
     )
     .unwrap();
     assert_eq!(struck.result, StrikeResult::of_data(1));
@@ -1015,6 +1017,7 @@ fn building_relic_raises_its_missile_hit() {
             hit,
             &mut Well512::default(),
             &roles(),
+            slots(),
         )
         .unwrap();
         target.hp
@@ -1078,6 +1081,7 @@ fn trample_hit_leaves_out_its_building_target_blast_so_far() {
         HitChance::of_data(100),
         &mut Well512::default(),
         &roles(),
+        slots(),
     )
     .unwrap();
     assert_eq!(executed, Some(object_id(21)));

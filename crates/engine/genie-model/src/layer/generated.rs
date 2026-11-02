@@ -4,6 +4,7 @@
 
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::players::AttributeId;
 use bitflags::bitflags;
 use serde::Deserialize;
 use serde::Serialize;
@@ -451,6 +452,42 @@ bitflags! {
     /// exe tests the id for.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct AttributeRoles: u128 {
+        /// The resource storage that keeps its player (`0x14163b86b`): attribute 11 …
+        const ALIVE_STORAGE = 1 << 0;
+        /// The attribute that turns the allied vision on (`FUN_141616820`'s and `FUN_14162d610`'s 0x32): the player's `allied_LOS_Enable` (`+0x2cc`) takes 1, the world's masks are rebuilt (its slot 0x78, `World::rebuild_vision`) and the player's map files every tile its masks reach as new (`World::refill_tiles`, `FUN_141285cb0`).
+        const ALLIED_VISION = 1 << 1;
+        /// A task whose `attribute_type4` is this (`0x124`) stops its target's decay under player attribute 292 (`FUN_140ac44b0`).
+        const DECAY_TASK = 1 << 2;
+        /// The attribute whose set above 0 calls the scripts' `EffectFunction<n>` (0x21, `FUN_14162d610`).
+        const EFFECT_FUNCTION = 1 << 3;
+        /// A load of a farm's food: a farmer's, and what a Make of a farm holds.
+        const FARM_FOOD = 1 << 4;
+        /// The food the farms hold (Farm Food Amount, `player+0x100` at `+0x120`: 36), which `set_state(6)` of a farm's Make reads and an effect's change grows (`FUN_141615270`).
+        const FARM_FOOD_AMOUNT = 1 << 5;
+        /// Food: the first of the four resources (food, wood, stone, gold: 0 to 3).
+        const FOOD = 1 << 6;
+        /// Gold: a sale gives it and a purchase costs it, the treason costs it.
+        const GOLD = 1 << 7;
+        /// The population headroom (`+0x308` 4): a building's held amount gives it, and a cost check skips it (`FUN_141618db0` with its fifth argument 1).
+        const HEADROOM = 1 << 8;
+        /// The loads whose drop-off works with the hunt's task filter (`FUN_14161e370`'s list: meat 15, wood 1, food 0).
+        const HUNTED_LOAD = 1 << 9;
+        /// A storage the population attribute (110) moves by its magnitude (`FUN_1412163c0`): the current population (11) and attribute 19 take the old amount's negation, then the new value's magnitude.
+        const MAGNITUDE_STORAGE = 1 << 10;
+        /// The ore (0x38): a commodity the market's price reads know (none of its commands trades it), and a load a drop-off takes as itself beside the four resources and the trade goods (`FUN_140fdd4f0`).
+        const ORE = 1 << 11;
+        /// A relic, as a monk carries it (`+0x308` 0x39): the monk tasks for carried relics; a unit carrying one never attacks.
+        const RELIC = 1 << 12;
+        /// The relics the player holds (7): a research paid in them (`FUN_1413d0e70`).
+        const RELICS_HELD = 1 << 13;
+        /// The attribute that shares every player's sight (0xb7): the masks are rebuilt.
+        const SHARED_VISION = 1 << 14;
+        /// The attribute of the town centres' flare reveal across the players (0xc4, Spies' "Treason"): a player with it above 0 changes nothing; else each other player with it at most 0 takes the amount too.
+        const SPREAD_ATTRIBUTE = 1 << 15;
+        /// Stone.
+        const STONE = 1 << 16;
+        /// Wood.
+        const WOOD = 1 << 17;
     }
 }
 
@@ -552,7 +589,152 @@ pub struct TechSlots {}
 /// The attribute ids the engine names, one field each.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct AttributeSlots {}
+pub struct AttributeSlots {
+    /// Food: the first of the four resources (food, wood, stone, gold: 0 to 3).
+    pub food: AttributeId,
+    /// Gold: a sale gives it and a purchase costs it, the treason costs it.
+    pub gold: AttributeId,
+    /// The population headroom (`+0x308` 4): a building's held amount gives it, and a cost check skips it (`FUN_141618db0` with its fifth argument 1).
+    pub headroom: AttributeId,
+    /// The current age (`+0x30`, `player+0x100`), as the `i16` game mode 16's QUEUE, a new soldier's unit AI (`FUN_140c12300`) and a command compare; the mode's bound is `DAT_14330eb8c`.
+    pub current_age: AttributeId,
+    /// The population.
+    pub population: AttributeId,
+    /// The units owned.
+    pub units_owned: AttributeId,
+    /// The kills.
+    pub kills: AttributeId,
+    /// The technologies researched (0x15).
+    pub techs_researched: AttributeId,
+    /// The explored share of the map, in percent.
+    pub explored: AttributeId,
+    /// The attribute giving the exponent the farms' food grows by (31, `FUN_141615270`).
+    pub farm_exponent: AttributeId,
+    /// The population cap (32).
+    pub population_cap: AttributeId,
+    /// The food the farms hold (Farm Food Amount, `player+0x100` at `+0x120`: 36), which `set_state(6)` of a farm's Make reads and an effect's change grows (`FUN_141615270`).
+    pub farm_food_amount: AttributeId,
+    /// The civilian population.
+    pub civilian_population: AttributeId,
+    /// The attribute 0x2f3's cost adjustments scale by (`+0x130`).
+    pub attribute_38: AttributeId,
+    /// The military population.
+    pub military_population: AttributeId,
+    /// The wonders the player holds (42).
+    pub wonders: AttributeId,
+    /// The razings.
+    pub razings: AttributeId,
+    /// The kill ratio: kills less losses.
+    pub kill_ratio: AttributeId,
+    /// The survival to the finish, which a defeat clears.
+    pub survival: AttributeId,
+    /// The town centre is not available (0 lets a builder place one, `FUN_141625a20`).
+    pub no_town_centre: AttributeId,
+    /// The gold counter, which gold with a statistic grows (`FUN_141616820`).
+    pub gold_counter: AttributeId,
+    /// The monasteries the player holds (52): their completion adds 1, their death takes it.
+    pub monasteries: AttributeId,
+    /// The giver's tribute given (53).
+    pub tribute_given: AttributeId,
+    /// The share of a trade's worth the market keeps (78).
+    pub market_fee: AttributeId,
+    /// The units queued (80).
+    pub queued: AttributeId,
+    /// The units in production (81).
+    pub in_production: AttributeId,
+    /// The research cost modifier, as the `i16` the cost code compares.
+    pub research_cost_modifier: AttributeId,
+    /// The attribute that scales research times above 0 (`+0x2b0`: 86).
+    pub research_time_modifier: AttributeId,
+    /// The fish traps' food (Fish Trap Food Amount, `player+0x100` at `+0x2c0`: 88), which `set_state(6)` of any other Make reads.
+    pub fish_trap_food: AttributeId,
+    /// The paid cost of the player's units and buildings together (98): a unit's or a building's completion adds it, as to `UNITS_VALUE` or `BUILDINGS_VALUE`, its death takes it back.
+    pub total_value: AttributeId,
+    /// The resources spent on research (0x63).
+    pub research_spent: AttributeId,
+    /// The castles the player holds (134).
+    pub castles: AttributeId,
+    /// The kills' value of the other players.
+    pub kills_value_other: AttributeId,
+    /// The razings' value of the other players.
+    pub razings_value_other: AttributeId,
+    /// The kills of the other players.
+    pub kills_other: AttributeId,
+    /// The razings of the other players.
+    pub razings_other: AttributeId,
+    /// The units' value.
+    pub units_value: AttributeId,
+    /// The buildings' value.
+    pub buildings_value: AttributeId,
+    /// The first of the gathered totals of food, wood and stone (166 to 168).
+    pub gathered: AttributeId,
+    /// The gathered total of gold.
+    pub gold_gathered: AttributeId,
+    /// The kills' value.
+    pub kills_value: AttributeId,
+    /// The receiver's tribute received (171).
+    pub tribute_received: AttributeId,
+    /// The razings' value.
+    pub razings_value: AttributeId,
+    /// The castles the player built (173: their completion adds 1, their death takes nothing).
+    pub castles_built: AttributeId,
+    /// The wonders the player built (174).
+    pub wonders_built: AttributeId,
+    /// The giver's tribute paid, with the fee (175).
+    pub tribute_paid: AttributeId,
+    /// Where a castle's or a wonder's paid cost goes rather than to 98 and 165 (184, `FUN_1411dbb70`).
+    pub castle_wonder_cost: AttributeId,
+    /// The construction rate modifier (195), which a builder's work reads (at the player's attributes `+0x618`).
+    pub construction_rate: AttributeId,
+    /// The attribute of the town centres' flare reveal across the players (0xc4, Spies' "Treason"): a player with it above 0 changes nothing; else each other player with it at most 0 takes the amount too.
+    pub spread_attribute: AttributeId,
+    /// The attribute that halves the treason's gold (197): above 0 the treason costs 200, not 400 (read at `0x1416204d5`).
+    pub treason_discount: AttributeId,
+    /// The town centres a player may have (`FUN_141625a20`).
+    pub town_centre_limit: AttributeId,
+    /// A villager's death by a player of type 2.
+    pub villager_killed_by_type_2: AttributeId,
+    /// A villager's death by a hunted animal (a prey or predator attacker).
+    pub villager_killed_by_animal: AttributeId,
+    /// A villager's death by a player of type 3.
+    pub villager_killed_by_type_3: AttributeId,
+    /// A villager's death by a player of type 1.
+    pub villager_killed_by_type_1: AttributeId,
+    /// The first of the trickles a minute of food, wood, stone and gold (230 to 233).
+    pub trickles: AttributeId,
+    /// The paid cost of the units a player makes while the telemetry's match runs (`FUN_140982ff0()`'s `+0x921`): a new unit's combat setup adds it beside 98 and 164.
+    pub made_units_cost: AttributeId,
+    /// The buildings' paid costs (247), which the combat setup adds for a building with a train location (`FUN_14121df60`).
+    pub building_cost: AttributeId,
+    /// The villagers a player makes: a new villager's (class 4) combat setup adds one.
+    pub made_villagers: AttributeId,
+    /// The food a minute of the livestock in the player's mills.
+    pub mill_food: AttributeId,
+    /// The attribute naming the world's effect a player gets after each research (`+0x868`: 269).
+    pub world_effect: AttributeId,
+    /// The owner's attribute of a pasture's food, which its livestock share.
+    pub pasture_food: AttributeId,
+    /// The owner's attribute of the livestock a pasture holds.
+    pub pasture_livestock: AttributeId,
+    /// The owner's attribute of the workers a pasture's livestock take.
+    pub pasture_workers: AttributeId,
+    /// The kills of each player's units (300 plus the victim's player).
+    pub kills_of: AttributeId,
+    /// The kills by each player (325 plus the killer's player), on the victim's owner.
+    pub killed_by: AttributeId,
+    /// The razings of each player's buildings (350 plus the owner's player).
+    pub razings_of: AttributeId,
+    /// The razings by each player (375 plus the razer's player), on the owner.
+    pub razed_by: AttributeId,
+    /// The value of the kills of each player's units (400 plus the victim's player).
+    pub kills_value_of: AttributeId,
+    /// The value of the razings of each player's buildings (425 plus the owner's player).
+    pub razings_value_of: AttributeId,
+    /// The giver's tribute to each player (450 plus the receiver's number).
+    pub tribute_to: AttributeId,
+    /// The receiver's tribute from each player (475 plus the giver's number).
+    pub tribute_from: AttributeId,
+}
 
 /// The tuning values, one group per port module (FD-046-D32).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

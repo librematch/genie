@@ -11,15 +11,16 @@ the two equal. The module exists in test builds only.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`attribute.rs`](attribute.rs) | The player attributes genie-core's tests name: build 158041's numbers, as the tests' players hold them, by the names the engine's constants had (FD-046-D48: the engine reads them from the build layer's slots and roles). |
 | [`build_158041.rs`](build_158041.rs) | Build 158041's layer as genie's tests build it (FD-046-D08): the values of `builds/158041.ncl`, each float by its bits, without Nickel. |
 | [`class.rs`](class.rs) | The classes genie-core's tests name: build 158041's `.dat` values, as the tests' masters carry them. |
 | [`ids.rs`](ids.rs) | The masters genie-core's tests name: build 158041's `.dat` ids, as the tests' objects carry them, by the names the engine's constants had. |
-| [`mod.rs`](mod.rs) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes and masters the tests name. |
+| [`mod.rs`](mod.rs) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes, masters and player attributes the tests name. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`objects`](../objects/), [`world`](../world/).
+- Uses: [`objects`](../objects/), [`players`](../players/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

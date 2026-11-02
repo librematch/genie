@@ -4,6 +4,7 @@ use crate::OTHER_SUB_ACTION;
 use crate::fixtures::{action_list, combat_master, combat_mut, combat_object, with_masters};
 use crate::saved_unit::saved_missile;
 use crate::test_ids::action_type;
+use crate::test_ids::attribute;
 use crate::test_ids::class_id;
 use crate::test_ids::object_id;
 use crate::top_actions::saved_actions;
@@ -42,7 +43,6 @@ use genie_core::objects::masters::WorkValue;
 use genie_core::objects::sprite::Graphic;
 use genie_core::objects::{Graphics, SpeedMultiplier};
 use genie_core::ownership::artifact::{ARTIFACT_TYPE, ArtifactState};
-use genie_core::players::attribute;
 use genie_core::world::Seconds;
 use genie_save::generated::world::{
     Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByType, RgeActionEnter,

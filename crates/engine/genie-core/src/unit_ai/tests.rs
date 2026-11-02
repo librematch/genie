@@ -396,7 +396,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
         Task {
             action_kind: ActionKind::CONVERT,
             object_group: Some(class_id(3)),
-            attribute_type4: Some(AttributeId::numbered(28)),
+            attribute_type4: Some(AttributeId::named(28)),
             ..Task::default()
         },
     ];

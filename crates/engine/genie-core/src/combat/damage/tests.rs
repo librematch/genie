@@ -80,14 +80,15 @@ use crate::objects::masters::DamageAmount;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::WorkValue;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_of;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::slots;
 use std::f32::consts::FRAC_PI_2;
 
 fn sheep() -> Victim {
@@ -261,7 +262,10 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(4, 3), ClassAmount::new(3, 2)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(
@@ -275,7 +279,10 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(4, 3), ClassAmount::new(3, 2)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     // a villager's hit leaves what it holds
@@ -293,7 +300,10 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(3, 4)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!((t.hp, t.amount), (HitPoints::ZERO, Amount::ZERO));
@@ -305,7 +315,10 @@ fn moving_object_takes_hit_as_static_one() {
         &[ClassAmount::new(3, 4)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert!(t.hp.get().is_nan() && t.amount == Amount::new(50.0) && t.goto_sleep);
@@ -326,7 +339,10 @@ fn hunter_strikes_its_sheep_for_twelve() {
         &weapons,
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(2.0));
@@ -339,7 +355,10 @@ fn hunter_strikes_its_sheep_for_twelve() {
         &weapons,
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::ZERO);
@@ -670,7 +689,10 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(14.0 - 8.0));
@@ -790,7 +812,7 @@ fn facing_offset_counts_facets_from_the_angle() {
     assert!((facing_offset(at, few, Position::new(10.0, 11.0, 0.0)) - 2.0).abs() < 1e-5);
     // a NaN difference goes on to atan2f (COMISS/JC, JNC: unordered is not "within 1e-7")
     assert!(facing_offset(at, facing, Position::new(f32::NAN, 10.0, 0.0)).is_nan());
-    // behind wraps into −π..π, and no sprite or the same point gives 0
+    // behind wraps into âÏ..Ï, and no sprite or the same point gives 0
     let back = facing_offset(at, facing, Position::new(9.0, 9.999, 0.0));
     assert!(7.9 < back.abs() && back.abs() <= 8.0);
     assert_eq!(
@@ -824,7 +846,10 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         &[ClassAmount::new(4, 10)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(sheep.hp, HitPoints::new(14.0 - 10.0 * SPECIAL));
@@ -839,7 +864,10 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         &[ClassAmount::new(4, 10)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(busy.hp, HitPoints::new(4.0));
@@ -853,7 +881,10 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
             &[ClassAmount::new(4, 10)],
             1.0,
             HitPoints::ZERO,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         )
         .is_err()
     );
@@ -880,7 +911,10 @@ fn retaliation_strikes_the_melee_attacker_first() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(
@@ -896,7 +930,10 @@ fn retaliation_strikes_the_melee_attacker_first() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     // the hunter dies; the sheep loses the least, one hit point
@@ -919,7 +956,10 @@ fn reflected_damage_comes_back_at_least_one() {
         &[ClassAmount::new(4, 6)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(
@@ -933,7 +973,10 @@ fn reflected_damage_comes_back_at_least_one() {
         &[ClassAmount::new(4, 1)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(
@@ -975,7 +1018,10 @@ fn blast_nan_paths_are_the_game_s() {
             None,
             &mut [&mut t],
             1.0,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         ),
         Ok(true)
     );
@@ -1007,7 +1053,10 @@ fn blast_nan_paths_are_the_game_s() {
             None,
             &mut [&mut t],
             1.0,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         ),
         Ok(true)
     );
@@ -1024,7 +1073,10 @@ fn blast_nan_paths_are_the_game_s() {
             None,
             &mut [&mut t],
             1.0,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         ),
         Ok(true)
     );
@@ -1032,12 +1084,34 @@ fn blast_nan_paths_are_the_game_s() {
     // no radius, no blast; a NaN radius blasts
     elephant.source.area_effect = Distance::ZERO;
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [], 1.0, &roles()),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut [],
+            1.0,
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
+        ),
         Ok(false)
     );
     elephant.source.area_effect = Distance::new(f32::NAN);
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut [], 1.0, &roles()),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut [],
+            1.0,
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
+        ),
         Ok(true)
     );
     // CVTTSS2SI gives 0x80000000 past the i32 range: 0 in the low short
@@ -1085,7 +1159,10 @@ fn blast_reaches_the_objects_about_its_attacker() {
             None,
             &mut all,
             1.0,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         ),
         Ok(true)
     );
@@ -1103,7 +1180,18 @@ fn blast_reaches_the_objects_about_its_attacker() {
     let mut near = enemy(2, 10.8);
     let mut all = [&mut near];
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut all, 1.0, &roles()),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut all,
+            1.0,
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
+        ),
         Ok(true)
     );
     let dx = (10.8f32 - 10.5f32).abs();
@@ -1153,7 +1241,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(547.0));
@@ -1174,7 +1265,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(549.0));
@@ -1187,7 +1281,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 1)],
         0.5,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(548.5));
@@ -1203,7 +1300,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(550.0 - LEAST_CLASS_HIT));
@@ -1217,7 +1317,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::new(2.0),
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(550.0));
@@ -1228,7 +1331,10 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::new(f32::NAN),
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(h.hp, HitPoints::new(550.0));
@@ -1250,7 +1356,10 @@ fn building_without_hit_points_takes_no_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!((h.hp, h.damaged.is_empty()), (HitPoints::ZERO, true));
@@ -1266,7 +1375,10 @@ fn building_without_hit_points_takes_no_hit() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert!(!h.damaged.is_empty() && h.building.as_ref().unwrap().struck);
@@ -1309,7 +1421,10 @@ fn hit_on_an_annex_goes_to_its_main_building() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(
@@ -1333,7 +1448,10 @@ fn hit_on_an_annex_goes_to_its_main_building() {
             &[ClassAmount::new(4, 3)],
             1.0,
             HitPoints::ZERO,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         ),
         Err(NOT_HELD)
     );
@@ -1359,7 +1477,10 @@ fn player_building_below_one_hit_point_is_razed() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(castle.hp, HitPoints::ZERO);
@@ -1380,21 +1501,9 @@ fn player_building_below_one_hit_point_is_razed() {
                     Amount::new(25.0)
                 ),
                 (PlayerId::new(2), attribute::RAZINGS_OTHER, Amount::new(1.0)),
-                (
-                    PlayerId::new(1),
-                    AttributeId::numbered(352),
-                    Amount::new(1.0)
-                ),
-                (
-                    PlayerId::new(2),
-                    AttributeId::numbered(376),
-                    Amount::new(1.0)
-                ),
-                (
-                    PlayerId::new(1),
-                    AttributeId::numbered(427),
-                    Amount::new(25.0)
-                ),
+                (PlayerId::new(1), AttributeId::named(352), Amount::new(1.0)),
+                (PlayerId::new(2), AttributeId::named(376), Amount::new(1.0)),
+                (PlayerId::new(1), AttributeId::named(427), Amount::new(25.0)),
                 (
                     PlayerId::new(1),
                     attribute::RAZINGS_VALUE,
@@ -1421,7 +1530,10 @@ fn player_building_below_one_hit_point_is_razed() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     let razed = &wonder.building.as_ref().unwrap().razed;
@@ -1441,7 +1553,10 @@ fn player_building_below_one_hit_point_is_razed() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!(gaia.building.as_ref().unwrap().razed, Vec::new());
@@ -1475,7 +1590,10 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert_eq!((t.hp, t.killed), (HitPoints::new(0.5), None));
@@ -1490,9 +1608,9 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
             (PlayerId::new(1), attribute::KILLS_VALUE, 400.0),
             (PlayerId::new(2), attribute::KILLS_OTHER, 1.0),
             (PlayerId::new(2), attribute::KILLS_VALUE_OTHER, 400.0),
-            (PlayerId::new(1), AttributeId::numbered(302), 1.0),
-            (PlayerId::new(2), AttributeId::numbered(326), 1.0),
-            (PlayerId::new(1), AttributeId::numbered(402), 400.0),
+            (PlayerId::new(1), AttributeId::named(302), 1.0),
+            (PlayerId::new(2), AttributeId::named(326), 1.0),
+            (PlayerId::new(1), AttributeId::named(402), 400.0),
             (PlayerId::new(1), attribute::RAZINGS_VALUE, 400.0),
             (PlayerId::new(2), attribute::RAZINGS_VALUE_OTHER, 400.0),
         ]
@@ -1505,7 +1623,10 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     assert!(t.killed.is_some());
@@ -1540,7 +1661,10 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
             &[ClassAmount::new(4, 3)],
             1.0,
             HitPoints::ZERO,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         )
         .is_err()
     );
@@ -1555,7 +1679,10 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     let mut h = Victim {
@@ -1569,7 +1696,10 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
     let mut villager = hunter();
@@ -1586,7 +1716,10 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
             &[ClassAmount::new(4, 3)],
             1.0,
             HitPoints::ZERO,
-            &roles()
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
         )
         .is_err()
     );
@@ -1602,7 +1735,10 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         &[ClassAmount::new(4, 3)],
         1.0,
         HitPoints::ZERO,
-        &roles(),
+        HitLayer {
+            roles: &roles(),
+            slots: slots(),
+        },
     )
     .unwrap();
 }
@@ -1650,7 +1786,18 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
     };
     let mut all = [&mut main, &mut annex];
     assert_eq!(
-        blast(&mut mangonel, center, None, None, &mut all, 1.0, &roles()),
+        blast(
+            &mut mangonel,
+            center,
+            None,
+            None,
+            &mut all,
+            1.0,
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
+        ),
         Ok(true)
     );
     assert_eq!(all.map(|t| t.id), [object_id(21), object_id(20)]);
@@ -1695,7 +1842,18 @@ fn blast_walks_tile_objects_in_its_list_order() {
     let center = elephant.position;
     let mut all = [&mut a, &mut b, &mut c];
     assert_eq!(
-        blast(&mut elephant, center, None, None, &mut all, 1.0, &roles()),
+        blast(
+            &mut elephant,
+            center,
+            None,
+            None,
+            &mut all,
+            1.0,
+            HitLayer {
+                roles: &roles(),
+                slots: slots()
+            },
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -2064,6 +2222,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         (&weapons, 0.5),
         (None, HitPoints::ZERO),
         &roles(),
+        slots(),
     )
     .unwrap();
     assert_eq!(enemy.hp, HitPoints::new(9.0));
@@ -2084,6 +2243,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         (&weapons, 1.0),
         (Some(0), HitPoints::ZERO),
         &roles(),
+        slots(),
     )
     .unwrap();
     let lost = 550.0 - all[0].hp.get();
@@ -2099,6 +2259,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         (&weapons, 1.0),
         (Some(0), HitPoints::ZERO),
         &roles(),
+        slots(),
     )
     .unwrap();
     assert_eq!(all[1].hp, HitPoints::new(550.0));
@@ -2143,7 +2304,14 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
     let b = blast(elephant.source);
     let mut hit = |b: &Blast, t: Victim| {
         let mut t = t;
-        let r = blast_one(&mut elephant, &mut [&mut t], 0, (b, &weapons), &roles());
+        let r = blast_one(
+            &mut elephant,
+            &mut [&mut t],
+            0,
+            (b, &weapons),
+            &roles(),
+            slots(),
+        );
         r.map(|()| t.hp)
     };
     assert_eq!(hit(&b, enemy.clone()), Ok(HitPoints::new(9.0)));

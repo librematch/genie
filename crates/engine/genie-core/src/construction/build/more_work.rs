@@ -148,7 +148,7 @@ impl Unit {
                 "a builder's search for more work finding a farm",
             ));
         }
-        let (kind, cap) = gather_search::gather_group(found.attribute);
+        let (kind, cap) = gather_search::gather_group(found.attribute, roles);
         let target = self.resource_search(actions, c, kind, cap)?;
         let spatial: &Spatial = &c.w.spatial;
         let target = target

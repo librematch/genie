@@ -23,9 +23,9 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
@@ -223,7 +223,7 @@ impl HuntAction {
         }
     }
 
-    /// State 7 (case 6): the work, `(work rate) × work_val1 × dt`, at most what the target holds,
+    /// State 7 (case 6): the work, `(work rate) Ã work_val1 Ã dt`, at most what the target holds,
     /// times the productivity, while the load stays within the capacity: the target loses the
     /// work, its last bit below 0.1 going with a thousandth of its master's first storage amount;
     /// the unit gains, a remainder below 0.1 of the capacity rounding the load up. A full load or
@@ -270,8 +270,12 @@ impl HuntAction {
         if roles
             .of_class(victim.class)
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
-            && unit.life.attribute_type == Some(attribute::GOLD)
-            && self.task.resource == Some(attribute::GOLD)
+            && roles
+                .of_some_attribute(unit.life.attribute_type)
+                .contains(AttributeRoles::GOLD)
+            && roles
+                .of_some_attribute(self.task.resource)
+                .contains(AttributeRoles::GOLD)
         {
             return Err(GenieError::unsupported(
                 "a gold load of class 9 or 10 (its player's attribute 3)",

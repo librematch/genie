@@ -8,8 +8,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
-use crate::players::attribute::QUEUED;
 use crate::players::game_status::ONE_UNIT_AGE;
 use crate::players::tracker::Key;
 use crate::production::Batch;
@@ -70,7 +68,7 @@ impl World {
     /// `count` units of a unit entry `e` of player `p` cancelled (`FUN_1411cff00`,
     /// `FUN_1411d61e0`): each its refund ([`refund`]) and its tracker place (the counter one
     /// less, [`crate::players::tracker::Tracker::unplace`]); then attribute 80 lowers by the population
-    /// times the count (slot 0xf8 with −population × count).
+    /// times the count (slot 0xf8 with âpopulation Ã count).
     pub(super) fn cancel_units(
         &mut self,
         p: PlayerId,
@@ -93,8 +91,11 @@ impl World {
         }
         let pop = master
             .as_ref()
-            .map_or(Amount::ZERO, |m| population(&m.storage));
-        owner.add_attribute(QUEUED, -pop * f32::from(count.get()))
+            .map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+        owner.add_attribute(
+            self.model.slots.attribute.queued,
+            -pop * f32::from(count.get()),
+        )
     }
 
     /// `count` researches of a research entry `e` at the building at `idx` of player `p`
@@ -243,8 +244,8 @@ impl World {
         owner.tracker.unplace(entry.master, class);
         let pop = master
             .as_ref()
-            .map_or(Amount::ZERO, |m| population(&m.storage));
-        owner.add_attribute(QUEUED, -pop)
+            .map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+        owner.add_attribute(self.model.slots.attribute.queued, -pop)
     }
 
     /// `FUN_1411d66b0`'s cancel of up to five of a kind, from the unit entry `e` of the
@@ -334,7 +335,7 @@ impl World {
     }
 
     /// `FUN_1411d61e0`, the cancel of `count` of master `master` (or of technology `tech`, not
-    /// −1) in the queue of the building at `idx` of player `p`, from entry `from` (held to the
+    /// â1) in the queue of the building at `idx` of player `p`, from entry `from` (held to the
     /// last). A research: the entry at `from` gives back what its researches paid
     /// ([`World::refund_researches`], its count at most the entry's). A unit: the first entry
     /// at `from` or before it of that master (none: nothing) gives back its units, at most its
@@ -444,7 +445,7 @@ impl World {
         }
         let attribute =
             // The player's attribute that mode reads (6, `+0x30`).
-            Attributes::get(self.players.player(p)?, attribute::CURRENT_AGE)?;
+            Attributes::get(self.players.player(p)?, self.model.slots.attribute.current_age)?;
         if below_or_unordered(ONE_UNIT_AGE, attribute.get()) {
             return Ok(());
         }

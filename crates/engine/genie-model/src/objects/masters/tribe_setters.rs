@@ -4,6 +4,7 @@
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
 use crate::combat::{Firepower, MissileCount};
+use crate::layer::AttributeRoles;
 use crate::map::Distance;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
@@ -33,7 +34,6 @@ use crate::objects::masters::select_entry;
 use crate::objects::masters::set_sprite;
 use crate::objects::masters::{GarrisonKinds, HeroFlags};
 use crate::players::Amount;
-use crate::players::attribute as players_attribute;
 use crate::production::HotkeyId;
 use crate::production::LocationButton;
 use crate::world::WholeSeconds;
@@ -115,12 +115,11 @@ impl Master {
                     c.amount = CostAmount::of_data(low16(negated));
                 }
                 for s in &mut self.storage {
-                    match s.0 {
-                        Some(players_attribute::HEADROOM) => s.1 = Amount::new(v),
-                        Some(players_attribute::POPULATION | players_attribute::UNITS_OWNED) => {
-                            s.1 = Amount::new(negated);
-                        }
-                        _ => {}
+                    let held = world.roles.of_some_attribute(s.0);
+                    if held.contains(AttributeRoles::HEADROOM) {
+                        s.1 = Amount::new(v);
+                    } else if held.contains(AttributeRoles::MAGNITUDE_STORAGE) {
+                        s.1 = Amount::new(negated);
                     }
                 }
             }

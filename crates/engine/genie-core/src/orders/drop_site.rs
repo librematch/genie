@@ -19,7 +19,7 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::Dispatch;
 use crate::orders::object_gone;
-use crate::orders::{HUNTED_LOADS, NO_POINT, Work, nearest_table_site};
+use crate::orders::{NO_POINT, Work, nearest_table_site};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -32,6 +32,7 @@ use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::others::OthersRef;
@@ -70,7 +71,12 @@ impl World {
         if kind < MasterKind::COMBAT {
             return Ok(());
         }
-        let filter = if held.is_some_and(|h| HUNTED_LOADS.contains(&h)) {
+        let filter = if held.is_some_and(|h| {
+            self.model
+                .roles
+                .of_attribute(h)
+                .contains(AttributeRoles::HUNTED_LOAD)
+        }) {
             HUNT
         } else {
             GATHER

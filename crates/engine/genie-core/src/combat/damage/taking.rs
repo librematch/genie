@@ -11,6 +11,7 @@ use crate::world::slots::CheckedIndex;
 
 /// One kill or razing, as the counts add it to an attribute.
 const ONE_COUNT: Amount = Amount::new(ONE);
+use crate::combat::damage::HitLayer;
 use crate::construction::MainBuildingId;
 use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
@@ -24,11 +25,12 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::{self, AttributeId};
+use crate::players::attribute::AttributeId;
 use crate::players::history::EventKind;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use std::mem::replace;
 
 /// One hit as a building takes it ([`take_building`]): the attacker's weapons, the factor they
@@ -62,10 +64,11 @@ pub fn take(
     weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
-    roles: &Roles,
+    layer: HitLayer<'_>,
 ) -> Result<(), GenieError> {
+    let HitLayer { roles, slots } = layer;
     match t.kind {
-        MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken, roles),
+        MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken, layer),
         MasterKind::RGE_COMBAT | MasterKind::MISSILE => {
             damage(t, src, weapons, factor, blast_taken, roles)
         }
@@ -75,7 +78,7 @@ pub fn take(
                 factor,
                 blast_taken,
             };
-            take_building(t, src, others, strike, true, roles).map(|_| ())
+            take_building(t, src, others, strike, true, roles, slots).map(|_| ())
         }
         _ => {
             take_static(t, &src.source, weapons, factor, roles);
@@ -94,15 +97,20 @@ pub fn take(
 fn razing_counts(
     (ap, q): (PlayerId, PlayerId),
     cost: Amount,
+    slots: Slots,
 ) -> Result<[(PlayerId, AttributeId, Amount); 7], GenieError> {
     Ok([
-        (ap, attribute::RAZINGS, ONE_COUNT),
-        (ap, attribute::KILLS_VALUE, cost),
-        (q, attribute::KILLS_VALUE_OTHER, cost),
-        (q, attribute::RAZINGS_OTHER, ONE_COUNT),
-        (ap, attribute::RAZINGS_OF.offset(q.index())?, ONE_COUNT),
-        (q, attribute::RAZED_BY.offset(ap.index())?, ONE_COUNT),
-        (ap, attribute::RAZINGS_VALUE_OF.offset(q.index())?, cost),
+        (ap, slots.attribute.razings, ONE_COUNT),
+        (ap, slots.attribute.kills_value, cost),
+        (q, slots.attribute.kills_value_other, cost),
+        (q, slots.attribute.razings_other, ONE_COUNT),
+        (ap, slots.attribute.razings_of.offset(q.index())?, ONE_COUNT),
+        (q, slots.attribute.razed_by.offset(ap.index())?, ONE_COUNT),
+        (
+            ap,
+            slots.attribute.razings_value_of.offset(q.index())?,
+            cost,
+        ),
     ])
 }
 
@@ -116,15 +124,16 @@ fn razing_counts(
 fn kill_counts(
     (ap, q): (PlayerId, PlayerId),
     cost: Amount,
+    slots: Slots,
 ) -> Result<[(PlayerId, AttributeId, Amount); 7], GenieError> {
     Ok([
-        (ap, attribute::KILLS, ONE_COUNT),
-        (ap, attribute::KILLS_VALUE, cost),
-        (q, attribute::KILLS_OTHER, ONE_COUNT),
-        (q, attribute::KILLS_VALUE_OTHER, cost),
-        (ap, attribute::KILLS_OF.offset(q.index())?, ONE_COUNT),
-        (q, attribute::KILLED_BY.offset(ap.index())?, ONE_COUNT),
-        (ap, attribute::KILLS_VALUE_OF.offset(q.index())?, cost),
+        (ap, slots.attribute.kills, ONE_COUNT),
+        (ap, slots.attribute.kills_value, cost),
+        (q, slots.attribute.kills_other, ONE_COUNT),
+        (q, slots.attribute.kills_value_other, cost),
+        (ap, slots.attribute.kills_of.offset(q.index())?, ONE_COUNT),
+        (q, slots.attribute.killed_by.offset(ap.index())?, ONE_COUNT),
+        (ap, slots.attribute.kills_value_of.offset(q.index())?, cost),
     ])
 }
 
@@ -159,6 +168,7 @@ pub(super) fn take_building(
     strike: Strike<'_>,
     forward: bool,
     roles: &Roles,
+    slots: Slots,
 ) -> Result<bool, GenieError> {
     let Strike {
         weapons,
@@ -168,7 +178,7 @@ pub(super) fn take_building(
     let before = t.hp;
     let main = t.building.as_ref().and_then(|b| b.main);
     if forward && let Some(main) = main {
-        return forward_to_main(t, src, others, strike, main, roles);
+        return forward_to_main(t, src, others, strike, main, roles, slots);
     }
     if HitPoints::ZERO >= t.hp {
         return Ok(false);
@@ -207,14 +217,14 @@ pub(super) fn take_building(
         if b.main.is_none() && !roles.of_class(t.class).contains(ClassRoles::WALL) {
             let cost = b.cost;
             if !b.trebuchet {
-                adds.extend(razing_counts((ap, q), cost)?);
+                adds.extend(razing_counts((ap, q), cost, slots)?);
             } else if !counted {
-                adds.extend(kill_counts((ap, q), cost)?);
+                adds.extend(kill_counts((ap, q), cost, slots)?);
             }
             kill_bonus(&src.source)?;
             adds.extend([
-                (ap, attribute::RAZINGS_VALUE, cost),
-                (q, attribute::RAZINGS_VALUE_OTHER, cost),
+                (ap, slots.attribute.razings_value, cost),
+                (q, slots.attribute.razings_value_other, cost),
             ]);
         }
         b.razed.push(Razed {
@@ -247,13 +257,14 @@ fn forward_to_main(
     strike: Strike<'_>,
     main: MainBuildingId,
     roles: &Roles,
+    slots: Slots,
 ) -> Result<bool, GenieError> {
     let k = others
         .iter()
         .position(|v| v.id == main.id())
         .ok_or(NOT_HELD)?;
     let mut m = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
-    let struck = take_building(&mut m, src, others, strike, false, roles);
+    let struck = take_building(&mut m, src, others, strike, false, roles, slots);
     let annexed = m
         .building
         .as_ref()
@@ -357,8 +368,9 @@ pub(super) fn take_unit(
     weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
-    roles: &Roles,
+    layer: HitLayer<'_>,
 ) -> Result<(), GenieError> {
+    let HitLayer { roles, slots } = layer;
     let before = effective(t);
     if t.hp < HitPoints::new(1.0) {
         return Ok(());
@@ -378,7 +390,7 @@ pub(super) fn take_unit(
             }
         }
     }
-    if retaliates(t, src, others, &a, roles)? {
+    if retaliates(t, src, others, &a, roles, slots)? {
         factor = 0.0;
     }
     damage(t, src, weapons, factor, blast_taken, roles)?;
@@ -412,6 +424,7 @@ pub(super) fn retaliates(
     others: &mut [&mut Victim],
     a: &Armored,
     roles: &Roles,
+    slots: Slots,
 ) -> Result<bool, GenieError> {
     let reach = src.source.weapon_range;
     let melee = reach <= Distance::new(RETALIATION_RANGE) && RETALIATION_RANGE != reach.get();
@@ -434,7 +447,15 @@ pub(super) fn retaliates(
         f *= RETALIATION_SCALE;
     }
     let w = t.weapons.clone();
-    take(src, t, others, &w, f, HitPoints::ZERO, roles)?;
+    take(
+        src,
+        t,
+        others,
+        &w,
+        f,
+        HitPoints::ZERO,
+        HitLayer { roles, slots },
+    )?;
     Ok(src.hp <= HitPoints::new(1.0))
 }
 

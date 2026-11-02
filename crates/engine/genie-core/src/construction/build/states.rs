@@ -14,7 +14,6 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{AiAction, OrderKind};
@@ -113,7 +112,7 @@ impl BuildAction {
 
     /// The load a builder drops (`FUN_140aadc50`): its player's slot 0xf8 with 1 and 1 on
     /// `kind` and `amount` ([`Step::give_load`]), then it carries nothing (`FUN_14119d310` with
-    /// −1 and 0).
+    /// â1 and 0).
     ///
     /// # Errors
     ///
@@ -131,7 +130,7 @@ impl BuildAction {
     }
 
     /// `set_state(224)` (`0x140aae200` case 0xe0): the work ended. A builder carrying something
-    /// (`+0x310` above 0, its kind not −1) on a drop site of its civ (`FUN_140fde180`,
+    /// (`+0x310` above 0, its kind not â1) on a drop site of its civ (`FUN_140fde180`,
     /// [`BuildReads::drop_site`]) drops it ([`BuildAction::drop_load`], the food kinds as food).
     ///
     /// # Errors
@@ -151,7 +150,7 @@ impl BuildAction {
         };
         // the foods a unit carries (15 to 17) as food
         let kind = if kind.is_food_load() {
-            attribute::FOOD
+            c.w.model.slots.attribute.food
         } else {
             kind
         };
@@ -164,7 +163,7 @@ impl BuildAction {
     /// 1897, slot 0x780 against its owner's attribute 290) is not modelled; the builder's unit
     /// AI drops its build orders on foundations gone or built (`FUN_140c5dcd0`); with orders
     /// left in its queue (`FUN_140c564a0`) it has no order and no action (`FUN_140c64b60`,
-    /// `FUN_140c64b50` with −1) and the Build ends (`set_state(1)`, then the update returns 1).
+    /// `FUN_140c64b50` with â1) and the Build ends (`set_state(1)`, then the update returns 1).
     /// A builder without queued orders looks for more work around the building
     /// (`FUN_1415cc4e0`, [`BuildAction::search`]). A computer player's builder is not modelled.
     ///
@@ -350,7 +349,7 @@ impl BuildAction {
     /// `MoveTo`'s teardown), then with a unit AI its build orders on foundations gone or no
     /// longer in state 0 leave its queue (`FUN_140c5dcd0`, the foundation's state as it is now);
     /// with orders left (`FUN_140c564a0`) it has no order and no action (`FUN_140c64b60`,
-    /// `FUN_140c64b50` with −1) and the Build ends (`set_state(1)`: the update after removes
+    /// `FUN_140c64b50` with â1) and the Build ends (`set_state(1)`: the update after removes
     /// it); with none it posts notify 0x202 to its unit AI and takes its standing sprite (slot
     /// 0x68).
     ///
@@ -458,7 +457,7 @@ impl BuildAction {
     /// [`crate::world::World::leave_builders`]: true when it counted), the sub-actions go (a
     /// `MoveTo`'s teardown stops the unit), the unit takes its standing sprite (slot 0x68 with the
     /// master's `+0x470`, the caller's), the foundation and the second target go (slot 0x68 and
-    /// `FUN_140a7a190` with none: the caller releases both) and the point is −1. The answer is
+    /// `FUN_140a7a190` with none: the caller releases both) and the point is â1. The answer is
     /// true, so the stop keeps the list; returns whether it counted, the foundation and the
     /// second target (its drop site).
     ///

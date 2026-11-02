@@ -13,9 +13,6 @@ use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
-use crate::players::attribute::RELICS_HELD;
-use crate::players::attribute::RESEARCH_SPENT;
-use crate::players::attribute::TECHS_RESEARCHED;
 use crate::players::history::EventKind;
 use crate::production::LocationButton;
 use crate::technology::ChangeMode;
@@ -30,6 +27,7 @@ use crate::technology::{Location, TechDef, TechKind, TechState, factors};
 use crate::world::GameMode;
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::sync::Arc;
@@ -64,7 +62,12 @@ impl World {
         if !(ResearchState::Unavailable..=ResearchState::Researching).contains(&state.state) {
             return Ok(false);
         }
-        if def.costs[0].attribute == Some(RELICS_HELD) {
+        if self
+            .model
+            .roles
+            .of_some_attribute(def.costs[0].attribute)
+            .contains(AttributeRoles::RELICS_HELD)
+        {
             return Err(GenieError::unsupported(
                 "a research paid in relics (FUN_1413d0e70)",
             ));
@@ -78,12 +81,18 @@ impl World {
         let location = building.map_or_else(|| state.locations.first(), |b| state.location(b));
         if location.is_some_and(|l| l.building.is_some() && l.button != LocationButton::NONE) {
             let get = |k: AttributeId| owner.get(k);
-            let factors = factors(tech, &get)?;
+            let factors = factors(tech, &get, self.model.slots)?;
             let listed = state.listed_costs(&def, factors)?;
             let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
             let owner = self.players.player_mut(p)?;
-            owner.add_attribute(TECHS_RESEARCHED, Amount::new(1.0))?;
-            owner.add_attribute(RESEARCH_SPENT, Amount::new(spent))?;
+            owner.add_attribute(
+                self.model.slots.attribute.techs_researched,
+                Amount::new(1.0),
+            )?;
+            owner.add_attribute(
+                self.model.slots.attribute.research_spent,
+                Amount::new(spent),
+            )?;
         }
         let age = match t {
             101 => Some(EventKind::FEUDAL_AGE),
@@ -195,7 +204,7 @@ impl World {
 
     /// `FUN_1413cce70` for player `p`'s technology `t`: each technology that requires it, by id
     /// (`+0x38`'s lists), not of the shared kind: one in state 0 or 1 and not held by
-    /// `+0x60` turns to −1 when it is another civ's (or its civ's under the full tech tree,
+    /// `+0x60` turns to â1 when it is another civ's (or its civ's under the full tech tree,
     /// [`crate::world::settings::Settings::full_tech_tree`], while not of mode 1) or not for this game
     /// mode; else with fewer of
     /// its requirements researched than it needs it turns to 0 (from above 0), with them all to
@@ -284,7 +293,7 @@ impl World {
     /// the civ's own under the full tech tree, unless of mode 1), or for other game modes
     /// (`FUN_1413cf2f0`).
     fn dependent_disabled(&self, def: &TechDef, civ: CivId) -> Result<bool, GenieError> {
-        // another civ's: −1; the civ's own too under the full tech tree (the option +0x63)
+        // another civ's: â1; the civ's own too under the full tech tree (the option +0x63)
         // unless of mode 1
         let other_civ = match def.civ {
             None => false,
@@ -336,8 +345,8 @@ impl World {
     }
 
     /// The cost modifier (`'e'`, `FUN_1413d10f0`) of player `p`'s technology `tech`: each of its
-    /// `.dat` cost entries that is paid and takes `resource` (any for −1) changes its adjustment
-    /// (`+0x6`): mode 2 adds `(amount − 1) × the .dat's amount`, rounded half away from 1; mode
+    /// `.dat` cost entries that is paid and takes `resource` (any for â1) changes its adjustment
+    /// (`+0x6`): mode 2 adds `(amount â 1) Ã the .dat's amount`, rounded half away from 1; mode
     /// 0 sets it so the cost is `amount`; any other adds `amount`. A named resource changes only
     /// its first entry. A technology out of the tree is let be.
     pub(super) fn tech_cost(
@@ -387,7 +396,7 @@ impl World {
     /// without a building as its object lets be (with one, `FUN_1411c49a0` files it in the
     /// building's list `+0xd00`, which the slice does not hold); any other goes through
     /// `FUN_1413cdb00`: a technology of type 0x21 turns to 1 (it may be researched), any other
-    /// but a researched one (state 3) to −1; a negative id does so to every technology.
+    /// but a researched one (state 3) to â1; a negative id does so to every technology.
     pub(super) fn disable_tech(
         &mut self,
         p: PlayerId,

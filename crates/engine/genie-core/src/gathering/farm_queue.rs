@@ -24,7 +24,6 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::production::CostCount;
 use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_type;
@@ -36,7 +35,7 @@ use crate::world::slots::PlayerSlots;
 /// A queue takes a purchase only below this count (`0x28`).
 pub const QUEUE_LIMIT: QueueCount = QueueCount::of_data(40);
 
-/// A reseeding gatherer's farm spot of none (`DAT_14330ec20`, −1.0, read at `0x140a8aa9e`).
+/// A reseeding gatherer's farm spot of none (`DAT_14330ec20`, â1.0, read at `0x140a8aa9e`).
 const NO_FARM: f32 = FARM_QUEUE_NO_FARM;
 /// The one farm or fish trap a reseed pays (`DAT_14330eb8c`, 1.0, read at `0x140a8ac75` and
 /// `0x140a8b025`).
@@ -128,8 +127,23 @@ impl World {
         let player = self.players.player_mut(p)?;
         let mut n = count;
         loop {
-            if cost_test(masters, master, n.factor(), false, &*player)? {
-                if !pay(masters, master, n.factor(), &mut *player)? {
+            if cost_test(
+                masters,
+                master,
+                n.factor(),
+                false,
+                &*player,
+                &self.model.roles,
+                self.model.slots,
+            )? {
+                if !pay(
+                    masters,
+                    master,
+                    n.factor(),
+                    &mut *player,
+                    &self.model.roles,
+                    self.model.slots,
+                )? {
                     return Ok(false);
                 }
                 match queue {
@@ -215,7 +229,7 @@ impl World {
             let limit = self
                 .players
                 .player(p)?
-                .attribute(attribute::TOWN_CENTRE_LIMIT)
+                .attribute(self.model.slots.attribute.town_centre_limit)
                 .unwrap_or(Amount::ZERO);
             if (self.town_centre_count(p) as f32) < limit.get() {
                 return Ok(true);
@@ -251,7 +265,7 @@ impl World {
     }
 
     /// `FUN_140a8aa60`: player `p`'s gatherer at `idx` reseeds its farm at its farm spot
-    /// (`mFarmX`, `mFarmY`; none at −1). A villager (class 4) with the automatic farm queue
+    /// (`mFarmX`, `mFarmY`; none at â1). A villager (class 4) with the automatic farm queue
     /// (`+0x1424`) or farms queued (`+0x141c`) makes the farm [`World::reseed_master`] names; any
     /// other gatherer, with the automatic fish trap queue (`+0x1425`) or fish traps queued
     /// (`+0x1420`), makes a fish trap when it is a fishing ship (class 21); else none. (For the
@@ -386,8 +400,23 @@ impl World {
                 // unreachable: the gatherer's master was found in this table above
                 return Ok(None);
             };
-            if cost_test(masters, master, ONE_FARM, false, self.players.player(p)?)? {
-                if !pay(masters, master, ONE_FARM, self.players.player_mut(p)?)? {
+            if cost_test(
+                masters,
+                master,
+                ONE_FARM,
+                false,
+                self.players.player(p)?,
+                &self.model.roles,
+                self.model.slots,
+            )? {
+                if !pay(
+                    masters,
+                    master,
+                    ONE_FARM,
+                    self.players.player_mut(p)?,
+                    &self.model.roles,
+                    self.model.slots,
+                )? {
                     return Ok(None);
                 }
             } else {
@@ -461,13 +490,13 @@ mod tests {
     use crate::objects::masters::Master;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
-    use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::opt_master;
     #[cfg(test)]
     use crate::test_ids::{amounts, attributes};
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::ids::FARM;
@@ -595,7 +624,7 @@ mod tests {
     }
 
     /// A building master `id` of class `class` and base id `base`, available or not, heading
-    /// `head` (−1 for none).
+    /// `head` (â1 for none).
     fn building(
         id: MasterId,
         class: ClassId,

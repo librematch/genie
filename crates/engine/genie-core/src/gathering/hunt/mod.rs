@@ -84,9 +84,6 @@ const GAP: f32 = HUNT_GAP;
 const REMAINDER: Amount = Amount::new(HUNT_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).
 const LAST_BIT: f32 = HUNT_LAST_BIT;
-/// A task whose `attribute_type4` is this (`0x124`) stops its target's decay under player
-/// attribute 292 (`FUN_140ac44b0`).
-const DECAY_TASK: AttributeId = AttributeId::numbered(0x124);
 
 /// The range of the walk to the hunter's own player's livestock (`DAT_142eb4838`).
 const OWN_LIVESTOCK_RANGE: f32 = HUNT_OWN_LIVESTOCK_RANGE;

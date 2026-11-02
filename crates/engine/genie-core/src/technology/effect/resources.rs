@@ -11,23 +11,8 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::technology::ResourceChange;
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
-
-/// The attribute that turns the allied vision on (`FUN_141616820`'s and `FUN_14162d610`'s 0x32):
-/// the player's `allied_LOS_Enable` (`+0x2cc`) takes 1, the world's masks are rebuilt (its slot
-/// 0x78, [`World::rebuild_vision`]) and the player's map files every tile its masks reach as new
-/// ([`World::refill_tiles`], `FUN_141285cb0`).
-pub(super) const ALLIED_VISION: AttributeId = AttributeId::numbered(0x32);
-/// The attribute that shares every player's sight (0xb7): the masks are rebuilt.
-pub(super) const SHARED_VISION: AttributeId = AttributeId::numbered(0xb7);
-/// The attribute of the town centres' flare reveal across the players (0xc4, Spies' "Treason"):
-/// a player with it above 0 changes nothing; else each other player with it at most 0 takes the
-/// amount too.
-pub(super) const SPREAD_ATTRIBUTE: AttributeId = AttributeId::numbered(0xc4);
-/// The attribute whose set above 0 calls the scripts' `EffectFunction<n>` (0x21, `FUN_14162d610`).
-pub(super) const EFFECT_FUNCTION: AttributeId = AttributeId::numbered(0x21);
-/// The attribute giving the exponent the farms' food grows by (31, `FUN_141615270`).
-pub(super) const FARM_EXPONENT: AttributeId = AttributeId::numbered(31);
 
 impl World {
     /// Slot 0x1b0 (`FUN_141620c70`) of player `p` on resource `attribute` with `amount`: every
@@ -122,28 +107,37 @@ impl World {
         attribute: AttributeId,
         v: Amount,
     ) -> Result<(), GenieError> {
-        match attribute {
-            ALLIED_VISION => self.allied_vision_on(p)?,
-            SPREAD_ATTRIBUTE => {
-                if Amount::ZERO < self.attribute_of(p, SPREAD_ATTRIBUTE) {
+        {
+            let held = self.model.roles.of_attribute(attribute);
+            if held.contains(AttributeRoles::ALLIED_VISION) {
+                self.allied_vision_on(p)?;
+            } else if held.contains(AttributeRoles::SPREAD_ATTRIBUTE) {
+                if Amount::ZERO < self.attribute_of(p, self.model.slots.attribute.spread_attribute)
+                {
                     return Ok(());
                 }
                 // the message to the players is the interface's
                 for q in PlayerId::each(self.players.len()).skip(1) {
-                    if q != p && self.attribute_of(q, SPREAD_ATTRIBUTE) <= Amount::ZERO {
-                        self.store_attribute(q, SPREAD_ATTRIBUTE, v)?;
+                    if q != p
+                        && self.attribute_of(q, self.model.slots.attribute.spread_attribute)
+                            <= Amount::ZERO
+                    {
+                        self.store_attribute(q, self.model.slots.attribute.spread_attribute, v)?;
                     }
                 }
-            }
-            EFFECT_FUNCTION if Amount::ZERO < v => {
+            } else if held.contains(AttributeRoles::EFFECT_FUNCTION) && (Amount::ZERO < v) {
                 return Err(GenieError::unsupported(
                     "an effect's script function (attribute 0x21, EffectFunction in Effects.xs)",
                 ));
             }
-            _ => {}
         }
         self.store_attribute(p, attribute, v)?;
-        if attribute == SHARED_VISION {
+        if self
+            .model
+            .roles
+            .of_attribute(attribute)
+            .contains(AttributeRoles::SHARED_VISION)
+        {
             // the world's slot 0x78; the message is the interface's
             self.rebuild_vision()?;
         }
@@ -160,21 +154,28 @@ impl World {
         attribute: AttributeId,
         v: Amount,
     ) -> Result<(), GenieError> {
-        match attribute {
-            ALLIED_VISION => self.allied_vision_on(p)?,
-            SHARED_VISION => self.rebuild_vision()?,
-            SPREAD_ATTRIBUTE => {
-                if Amount::ZERO < self.attribute_of(p, SPREAD_ATTRIBUTE) {
+        {
+            let held = self.model.roles.of_attribute(attribute);
+            if held.contains(AttributeRoles::ALLIED_VISION) {
+                self.allied_vision_on(p)?;
+            } else if held.contains(AttributeRoles::SHARED_VISION) {
+                self.rebuild_vision()?;
+            } else if held.contains(AttributeRoles::SPREAD_ATTRIBUTE) {
+                if Amount::ZERO < self.attribute_of(p, self.model.slots.attribute.spread_attribute)
+                {
                     return Ok(());
                 }
                 for q in PlayerId::each(self.players.len()).skip(1) {
-                    let theirs = self.attribute_of(q, SPREAD_ATTRIBUTE);
+                    let theirs = self.attribute_of(q, self.model.slots.attribute.spread_attribute);
                     if q != p && theirs <= Amount::ZERO {
-                        self.store_attribute(q, SPREAD_ATTRIBUTE, v + theirs)?;
+                        self.store_attribute(
+                            q,
+                            self.model.slots.attribute.spread_attribute,
+                            v + theirs,
+                        )?;
                     }
                 }
-            }
-            _ => {
+            } else {
                 return self.players.player_mut(p)?.add_attribute(attribute, v);
             }
         }
@@ -207,7 +208,9 @@ impl World {
         before: f32,
         amount: f32,
     ) -> Result<(), GenieError> {
-        let exponent = self.attribute_of(p, FARM_EXPONENT).get();
+        let exponent = self
+            .attribute_of(p, self.model.slots.attribute.farm_exponent)
+            .get();
         if below_or_unordered(exponent, 0.0) {
             return Ok(());
         }

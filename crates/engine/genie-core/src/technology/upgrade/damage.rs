@@ -180,8 +180,8 @@ mod tests {
     use crate::objects::masters::{DamageGraphic, DamageSpriteMode, HpPercent, Master};
     use crate::objects::unit::Unit;
     use crate::players::Amount;
-    use crate::players::attribute;
     use crate::test_ids::{master_id, object_id};
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::roles;
 

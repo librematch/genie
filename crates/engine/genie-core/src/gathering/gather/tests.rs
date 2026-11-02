@@ -28,15 +28,17 @@ use crate::objects::masters::WorkValue;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
-use crate::players::attribute::{self, AttributeId};
+use crate::players::attribute::AttributeId;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::slots;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
 use crate::world::step::Step;
@@ -132,7 +134,7 @@ impl Rig {
         let unit = rig.unit_mut();
         unit.life.master_id = ids::VILLAGER_MALE;
         (unit.life.attribute_type, unit.life.amount) =
-            (Some(AttributeId::numbered(17)), Amount::new(3.0));
+            (Some(AttributeId::named(17)), Amount::new(3.0));
         rig
     }
 
@@ -203,7 +205,7 @@ fn task() -> HuntTask {
     HuntTask {
         id: task_id(2),
         range: Distance::new(0.25),
-        resource: Some(AttributeId::numbered(17)),
+        resource: Some(AttributeId::named(17)),
         sprites: TaskSprites::NONE,
         work_value: WorkValue::new(1.0),
         productivity: None,
@@ -324,7 +326,7 @@ fn under_the_farm_setting_farm_gather_goes_in_four_timed_stops() {
 
 /// Slot 0x38 (`FUN_140a8e1b0`, `set_state(2)`): the `MoveTo` goes and stops the unit, the
 /// timer clears, the unit stands, the target and the drop site go (returned for the
-/// caller's release) and the point is −1.
+/// caller's release) and the point is â1.
 #[test]
 fn stop_idles_the_gather_and_lets_its_targets_go() {
     let mut mover = walker();
@@ -487,7 +489,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
     };
     // a move to a point (or an object that is no drop site): state 15 to the point
     let mut g = gatherer();
-    let loaded = walks(carrying(Some(AttributeId::numbered(17)), 5.0));
+    let loaded = walks(carrying(Some(AttributeId::named(17)), 5.0));
     g.take_move(
         None,
         Position::new(30.0, 40.0, 0.0),
@@ -570,7 +572,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         Position::from([1.0; 3]),
         PlayerId::new(7),
         &mut mover,
-        &walks(carrying(Some(AttributeId::numbered(17)), 0.0)),
+        &walks(carrying(Some(AttributeId::named(17)), 0.0)),
     )
     .unwrap();
     assert_eq!(
@@ -773,7 +775,7 @@ fn gatherer_drop_off_waits_walks_and_drops_its_load_at_the_site() {
     assert_eq!(
         drop(&mut g, &mut rig, site(true, DistanceSquared::ZERO)),
         Ok(Dropped::Load(
-            resource_kind(Some(AttributeId::numbered(17)), 4),
+            resource_kind(Some(AttributeId::named(17)), 4, slots()),
             Amount::new(3.0)
         ))
     );
@@ -1103,7 +1105,7 @@ fn gatherer_facing_its_target_works_it() {
             Seconds::ZERO
         )
     );
-    assert_eq!(rig.load(), carrying(Some(AttributeId::numbered(17)), 0.0));
+    assert_eq!(rig.load(), carrying(Some(AttributeId::named(17)), 0.0));
     assert_eq!(
         rig.unit().sprite.map(|s| s.graphic.id),
         Some(SpriteId::named(7))
@@ -1368,7 +1370,7 @@ fn forager_walks_to_its_bush() {
         &roles(),
     )
     .unwrap();
-    assert_eq!(held, carrying(Some(AttributeId::numbered(17)), 3.0));
+    assert_eq!(held, carrying(Some(AttributeId::named(17)), 3.0));
 }
 
 /// Slot 0x48 on the work command's target: the 4v4's forager 31156 walking to bush 28222 (state
@@ -1397,7 +1399,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
                 target: &bush(),
                 player: PlayerId::new(7),
                 player_type: PlayerType::HUMAN,
-                walks: walks(carrying(Some(AttributeId::numbered(17)), 0.0)),
+                walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
                 farm_stops: true,
                 rate: rate()
             },
@@ -1446,7 +1448,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
                     target: &bush(),
                     player: PlayerId::new(7),
                     player_type,
-                    walks: walks(carrying(Some(AttributeId::numbered(17)), 0.0)),
+                    walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
                     farm_stops: true,
                     rate: rate()
                 },
@@ -1476,7 +1478,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
                 target: &mill,
                 player: PlayerId::new(7),
                 player_type: PlayerType::HUMAN,
-                walks: walks(carrying(Some(AttributeId::numbered(17)), 3.0)),
+                walks: walks(carrying(Some(AttributeId::named(17)), 3.0)),
                 farm_stops: true,
                 rate: rate()
             },
@@ -1497,7 +1499,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
     );
 }
 
-/// The forager's gathering: `(work rate) × work_val1 × dt` a tick into its load, the bush
+/// The forager's gathering: `(work rate) Ã work_val1 Ã dt` a tick into its load, the bush
 /// losing as much; the last bit below 0.1 goes with a thousandth of the master's storage; a
 /// load that would pass the capacity asks for the drop-off.
 #[test]
@@ -1507,7 +1509,7 @@ fn forager_gathers_until_its_load_is_full() {
         ..GatherAction::new(task(), &bush(), true, rate(), &roles()).unwrap()
     };
     let mut rig = Rig::on_the_path();
-    rig.set_load(Some(AttributeId::numbered(17)), 0.0);
+    rig.set_load(Some(AttributeId::named(17)), 0.0);
     let r = GatherReads {
         farm_stops: true,
         ..reads()
@@ -1532,7 +1534,7 @@ fn forager_gathers_until_its_load_is_full() {
         rig.load().amount,
         Amount::new(0.155 + (0.155 + (125.0 * LAST_BIT + last)))
     );
-    rig.set_load(Some(AttributeId::numbered(17)), 9.9);
+    rig.set_load(Some(AttributeId::named(17)), 9.9);
     assert_eq!(gather(&mut rig, &mut target(100.0)), Ok(Next::Drop));
     assert_eq!(rig.load().amount, Amount::new(9.9));
 }

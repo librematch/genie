@@ -114,6 +114,12 @@ impl Roles {
             .copied()
             .unwrap_or_default()
     }
+
+    /// The roles of an optional attribute (a load, a storage): its attribute's, none for none.
+    #[must_use]
+    pub fn of_some_attribute(&self, attribute: Option<AttributeId>) -> AttributeRoles {
+        attribute.map_or_else(AttributeRoles::empty, |a| self.of_attribute(a))
+    }
 }
 
 /// The build layer (FD-046-D08, D32): what the exe hardcodes about ids, and its tuning values.

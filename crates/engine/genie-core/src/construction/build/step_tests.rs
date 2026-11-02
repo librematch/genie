@@ -21,10 +21,10 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::players::Amount;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::test_ids::carrying;
+use crate::testing::attribute;
 use crate::unit_ai::NotifyKind;
 use crate::vision::VisionBits;
 use crate::world::Millis;
@@ -146,7 +146,7 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
 /// `class`, walking sprite [`WALKING`], standing sprite [`STANDING`]; a walker of the hunt's
 /// tests, last moved at `at`, showing [`WALKING`]; a civilian unit AI without orders) at `at`,
 /// building `build`, and its desolid house foundation 10028 (master 70, state 0, 1 hit point,
-/// taken by the builder) at (10.5, 10.5), on 20 × 20 tiles of terrain 0 without planners. The
+/// taken by the builder) at (10.5, 10.5), on 20 Ã 20 tiles of terrain 0 without planners. The
 /// masters hold the house as 562 (a lumber camp, a drop site), 1889 (a pasture), 1584 (a gate,
 /// class 39), 68 (a mill) and 50 (a farm, class 49).
 fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
@@ -257,7 +257,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     t
 }
 
-/// The world's planners for its 20 × 20 tiles and their shape mesh.
+/// The world's planners for its 20 Ã 20 tiles and their shape mesh.
 fn plan(t: &mut World) {
     t.pathing = Pathing::new(
         GridSize::new(20, 20),
@@ -1148,7 +1148,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
     });
     layer.stack_made = Some(object_id(10031));
     let v = own(&mut t, BUILDER);
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(7.0));
+    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(7.0));
     let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
     (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(AiAction::Build));
     assert_eq!(code(&mut t, 20), HeadCode::Deletes);
@@ -1629,7 +1629,7 @@ fn builder_drop_off_without_its_drop_site_searches_again() {
 /// State 8 without a foundation: after the load its unit AI drops its orders 0x2c5, 0x2c9
 /// and 0x2db on targets gone (`FUN_140c5de60`); with orders left it has no order and the
 /// Build is done (`set_state(1)`, the update returns 1), with none it waits (`set_state(3)`:
-/// notify 0x202, the standing sprite). A builder without a unit AI and a point of −1 halts
+/// notify 0x202, the standing sprite). A builder without a unit AI and a point of â1 halts
 /// (a human's, `set_state(2)`: the drop site goes); with a point it walks there
 /// (`set_state(11)`).
 #[test]

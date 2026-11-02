@@ -28,7 +28,6 @@ use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::technology::effect::{MasterSprites, follow_master};
 use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
 use crate::unit_ai::UnitAi;
@@ -80,7 +79,7 @@ fn keeps_unit_ai(roles: &Roles, new: ClassId, old: ClassId) -> bool {
 
 impl World {
     /// Slot 0x98 of player `p`'s object at `place`, whose master `old` upgrades to `new`; with
-    /// `keep` (the upgrade's modes −1 and 3, whose master then copies `new`) its master stays.
+    /// `keep` (the upgrade's modes â1 and 3, whose master then copies `new`) its master stays.
     /// In the game's order, outermost class first:
     ///
     /// - a building (`FUN_1411c4660`) showing `old`'s construction sprite shows `new`'s (slot
@@ -96,7 +95,7 @@ impl World {
     /// - a moving object (`FUN_14114cb80`) showing `old`'s walking or running sprite shows
     ///   `new`'s;
     /// - the static object (`FUN_141186580`): without `keep` a combat object leaves its class
-    ///   counters ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load goes to its
+    ///   counters ([`crate::objects::lifecycle::death_parts::count_class`] with â1) and a villager's load goes to its
     ///   player (slot 0xf8 with 1 and 1, the foods as food; the statistics are not
     ///   simulation); on the map in state 2 its sight goes and comes with `new`'s line of sight
     ///   (slots 0x1d8 and 0x1d0); its hit points take their share of `new`'s (`old`'s through
@@ -225,7 +224,7 @@ impl World {
 
     /// The static object's part of an upgrade from `old` without its master kept
     /// (`FUN_141186580`): a combat object leaves its class counters
-    /// ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load
+    /// ([`crate::objects::lifecycle::death_parts::count_class`] with â1) and a villager's load
     /// goes to its player (slot 0xf8 with 1 and 1, the foods as food).
     fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> Result<(), GenieError> {
         let kind = old.kind;
@@ -246,7 +245,7 @@ impl World {
         {
             // the foods a unit carries (15 to 17) as food
             let kind = if kind.is_food_load() {
-                attribute::FOOD
+                self.model.slots.attribute.food
             } else {
                 kind
             };
@@ -258,6 +257,8 @@ impl World {
                 &mut adds,
                 kind,
                 amount,
+                &self.model.roles,
+                self.model.slots,
             )?;
             for (k, v) in adds {
                 self.players.player_mut(p)?.add_attribute(k, v)?;
@@ -604,7 +605,6 @@ mod tests {
     use crate::objects::{FacetCount, Frame, Graphics};
     use crate::ownership::CaptureKind;
     use crate::players::PlayerType;
-    use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
     use crate::technology::UpgradeMode;
@@ -615,6 +615,7 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
     use crate::test_ids::task_id;
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
@@ -869,7 +870,7 @@ mod tests {
         assert!(!class_changes(None, Some(&m(class::BUILDING)), &roles()));
     }
 
-    /// The Feudal Age's upgrade of the house (70 to 464, mode −1, `FUN_141657d10`): a house in
+    /// The Feudal Age's upgrade of the house (70 to 464, mode â1, `FUN_141657d10`): a house in
     /// state 2 keeps its master and its share of the hit points (275 of 550: 450 of 900), and
     /// shows the new standing sprite; a dead one (state 4) and the rubble of its old death spawn
     /// (1403, whose copy differs from 464's 1435) take masters of their own, the dead one also
@@ -991,8 +992,7 @@ mod tests {
             ObjectState::Alive,
             HitPoints::new(25.0),
         );
-        (v.life.attribute_type, v.life.amount) =
-            (Some(AttributeId::numbered(17)), Amount::new(10.0));
+        (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(10.0));
         let player = Player {
             objects: vec![v].into(),
             attributes: vec![Amount::ZERO; 300],
@@ -1056,7 +1056,7 @@ mod tests {
             object_group,
             work_range,
             work_val1: WorkValue::new((work_range * 2.0).get()),
-            attribute_type: Some(AttributeId::numbered(17)),
+            attribute_type: Some(AttributeId::named(17)),
             ..Task::default()
         };
         let mut t = forage_world();
@@ -1094,7 +1094,7 @@ mod tests {
             range: Distance::new(0.25),
             work_value: WorkValue::new(0.5),
             work_rate: WorkRate::new(1.0),
-            resource: Some(AttributeId::numbered(17)),
+            resource: Some(AttributeId::named(17)),
             id: task_id(3),
             moving: None,
         };
@@ -1149,7 +1149,7 @@ mod tests {
                 range: Distance::new(1.5),
                 work_value: WorkValue::new(3.0),
                 work_rate: WorkRate::new(1.0),
-                resource: Some(AttributeId::numbered(17)),
+                resource: Some(AttributeId::named(17)),
                 id: task_id(7),
                 moving: Some(SpriteId::named(12)),
             }
@@ -1505,11 +1505,7 @@ mod tests {
             )
         };
         assert_eq!(
-            load(
-                &villager,
-                Some(AttributeId::numbered(17)),
-                Amount::new(10.0)
-            ),
+            load(&villager, Some(AttributeId::named(17)), Amount::new(10.0)),
             (Held::default(), [10.0, 0.0], Amount::ZERO)
         );
         assert_eq!(

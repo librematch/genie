@@ -2,6 +2,7 @@
 //! 0x848).
 
 use crate::combat::Charge;
+use crate::combat::damage::HitLayer;
 use crate::combat::damage::{
     Attacker, CONE, Kill, MINUS_CONE, Victim, WIDE_CONE, armor_damage, bonus_damage, charge_hit,
     elevation_factor, facing_offset, kill_bonus, lose, shield, take,
@@ -24,6 +25,7 @@ use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 use std::mem::replace;
@@ -160,8 +162,9 @@ pub fn blast(
     main: Option<ObjectId>,
     targets: &mut [&mut Victim],
     factor: f32,
-    roles: &Roles,
+    layer: HitLayer<'_>,
 ) -> Result<bool, GenieError> {
+    let HitLayer { roles, slots } = layer;
     let a = attacker.source;
     let r = a.area_effect;
     if !fmath::below_or_unordered(0.0, r.get()) {
@@ -198,7 +201,7 @@ pub fn blast(
     attacker.source.charge_hit = false;
     let weapons = attacker.weapons.clone();
     for i in 0..targets.len() {
-        blast_one(attacker, targets, i, (&blast, &weapons), roles)?;
+        blast_one(attacker, targets, i, (&blast, &weapons), roles, slots)?;
     }
     Ok(true)
 }
@@ -239,6 +242,7 @@ pub(super) fn blast_one(
     i: usize,
     (b, weapons): (&Blast, &[ClassAmount]),
     roles: &Roles,
+    slots: Slots,
 ) -> Result<(), GenieError> {
     let a = &b.a;
     let t = &**targets.checked(i)?;
@@ -300,6 +304,7 @@ pub(super) fn blast_one(
         (weapons, f * b.factor),
         (ledger, blast_taken),
         roles,
+        slots,
     )
 }
 
@@ -480,6 +485,7 @@ pub(super) fn blast_hit(
     (weapons, factor): (&[ClassAmount], f32),
     (ledger, blast_taken): (Option<usize>, HitPoints),
     roles: &Roles,
+    slots: Slots,
 ) -> Result<(), GenieError> {
     let before = targets.checked(i)?.hp;
     let mut t = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
@@ -490,7 +496,7 @@ pub(super) fn blast_hit(
         weapons,
         factor,
         blast_taken,
-        roles,
+        HitLayer { roles, slots },
     );
     if hit.is_ok() {
         if !attacker.source.charge_hit {

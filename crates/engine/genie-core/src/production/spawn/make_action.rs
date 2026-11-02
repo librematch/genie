@@ -12,8 +12,6 @@ use crate::orders::NO_QUEUE;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
-use crate::players::attribute::IN_PRODUCTION;
-use crate::players::attribute::QUEUED;
 use crate::production::{
     MakeObj, MakeObjState, MakeTech, MakeTechState, Making, housed, population,
 };
@@ -126,6 +124,13 @@ impl World {
             self.note_shared_research(p, i)?;
         }
         self.end_production_action(p, i)?;
+        self.release_first_entry(p, i)
+    }
+
+    /// After its action ends the first queue entry of the building at `i` of player `p` lets one
+    /// go ([`World::produce`]): a unit's population leaves the queued attribute (80, the slot
+    /// `queued`), then the entry ([`crate::production::Queue::release_first`]).
+    fn release_first_entry(&mut self, p: PlayerId, i: ListIndex) -> Result<(), GenieError> {
         let Some(first) = self
             .parts
             .production
@@ -138,8 +143,10 @@ impl World {
             let pop = first
                 .master
                 .and_then(|m| player_master(&self.model.masters, p, m))
-                .map_or(Amount::ZERO, |m| population(&m.storage));
-            self.players.player_mut(p)?.add_attribute(QUEUED, -pop)?;
+                .map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+            self.players
+                .player_mut(p)?
+                .add_attribute(self.model.slots.attribute.queued, -pop)?;
         }
         if let Some(production) = self.parts.production.get_mut(self.players.live(p, i)?.id) {
             production.queue.release_first()?;
@@ -162,8 +169,8 @@ impl World {
                 let pop = first
                     .master
                     .and_then(|m| player_master(&self.model.masters, p, m))
-                    .map_or(Amount::ZERO, |m| population(&m.storage));
-                if housed(&self.players.player(p)?.attributes, pop)? {
+                    .map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
+                if housed(&self.players.player(p)?.attributes, pop, self.model.slots)? {
                     if self.players.player(p)?.kind.is_computer() {
                         self.cancel_queue(p, i)?;
                         return Ok(false);
@@ -230,10 +237,10 @@ impl World {
                     .master
                     .and_then(|m| player_master(&self.model.masters, p, m))
                 {
-                    let pop = population(&m.storage);
+                    let pop = population(&m.storage, &self.model.roles);
                     self.players
                         .player_mut(p)?
-                        .add_attribute(IN_PRODUCTION, pop)?;
+                        .add_attribute(self.model.slots.attribute.in_production, pop)?;
                     make.state = MakeObjState::Making;
                 }
             }
@@ -256,7 +263,7 @@ impl World {
         let (t, def) = self.research_tech(p, r.tech)?;
         let owner = self.players.player(p)?;
         let get = |k: AttributeId| owner.get(k);
-        let factors = factors(r.tech, &get)?;
+        let factors = factors(r.tech, &get, self.model.slots)?;
         let paid = self
             .parts
             .production
@@ -345,7 +352,7 @@ impl World {
         if below_or_unordered(progress.get(), time) {
             return Ok(UpdateCode::UNDER_WAY);
         }
-        let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
+        let pop = made.map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
         self.spawn(
             p,
             i,
@@ -406,10 +413,10 @@ impl World {
             let made = make
                 .master
                 .and_then(|m| player_master(&self.model.masters, p, m));
-            let pop = made.map_or(Amount::ZERO, |m| population(&m.storage));
+            let pop = made.map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
             let refund = (!make.paid).then(|| made.cloned()).flatten();
             let owner = self.players.player_mut(p)?;
-            owner.add_attribute(IN_PRODUCTION, -pop)?;
+            owner.add_attribute(self.model.slots.attribute.in_production, -pop)?;
             if let Some(m) = refund {
                 refund_master(&m, QueueCount::ONE, owner)?;
             }

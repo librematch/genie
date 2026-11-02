@@ -47,6 +47,7 @@ impl Unit {
             master,
             player_type,
             &c.w.model.roles,
+            c.w.model.slots,
         )?;
         c.w.players
             .player_mut(c.player)?
@@ -127,7 +128,12 @@ impl Unit {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
             // 165), each at least 0 (slots 0xf8, then 0xf0 with 0)
             let owner = c.w.players.player_mut(c.player)?;
-            for (kind, cost) in refund_of(master, c.w.parts.building_of(self.id).annex_of, roles) {
+            for (kind, cost) in refund_of(
+                master,
+                c.w.parts.building_of(self.id).annex_of,
+                roles,
+                c.w.model.slots,
+            ) {
                 owner.take_at_least_zero(kind, cost)?;
             }
         }

@@ -48,7 +48,6 @@ use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::{ByPlayer, relation_row};
@@ -66,6 +65,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::{amounts, opt_master};
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
@@ -236,9 +236,9 @@ fn population_set_moves_each_storage_entry_to_the_new_value() {
         id: ids::HOUSE,
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(-5.0), 0),
-            (Some(POPULATION), Amount::new(3.0), 0),
+            (Some(attribute::POPULATION), Amount::new(3.0), 0),
             (Some(attribute::RELICS_HELD), Amount::new(1.0), 0),
-            (Some(RESOURCE_19), Amount::new(2.0), 0),
+            (Some(attribute::UNITS_OWNED), Amount::new(2.0), 0),
         ],
         ..Master::default()
     };
@@ -248,9 +248,9 @@ fn population_set_moves_each_storage_entry_to_the_new_value() {
     assert_eq!(
         [
             at(attribute::HEADROOM),
-            at(POPULATION),
+            at(attribute::POPULATION),
             at(attribute::RELICS_HELD),
-            at(RESOURCE_19)
+            at(attribute::UNITS_OWNED)
         ],
         amounts([-3.0, 5.0, 0.0, 0.0])
     );
@@ -445,7 +445,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
         .iter()
         .map(|u| u.life.hp.get())
         .collect();
-    // (25 + 15) × 10 / 25 = 16
+    // (25 + 15) Ã 10 / 25 = 16
     assert_eq!(hp, [40.0, 16.0]);
     let m = t.model.masters[0].get(ids::VILLAGER_MALE).unwrap();
     assert_eq!(
@@ -579,7 +579,7 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
         combat(master_id(5), class::CLASS_6, 60),
         combat(ids::ID_7, class::CLASS_6, 60),
     ]))];
-    // set master 4's hit points to 90: its unit keeps its share, 30 × 90 / 60 = 45
+    // set master 4's hit points to 90: its unit keeps its share, 30 Ã 90 / 60 = 45
     // the load files the objects in the players' trackers
     t.load_trackers().unwrap();
     t.do_effect(PlayerId::new(0), &[attribute(0, 4, 6, 0, 90.0)], None)
@@ -603,7 +603,7 @@ fn an_effect_on_one_master_changes_its_objects_and_it_alone() {
         .map(|m| m.hit_points.get())
         .collect();
     assert_eq!(hps, [90, 60, 60]);
-    // past the table the class changes: (60 + 10) × 30 / 60 = 35
+    // past the table the class changes: (60 + 10) Ã 30 / 60 = 35
     t.do_effect(PlayerId::new(0), &[attribute(4, 100, 6, 0, 10.0)], None)
         .unwrap();
     let hps: Vec<i16> = t.model.masters[0]
@@ -727,7 +727,7 @@ fn class_effect_reaches_buildings_their_annexes_and_foundations() {
         ),
         building(31, MasterHitPoints::of_data(100), 30, [None; 4]),
     ]))];
-    // multiply the class's hit points by 1.5: every object's hit points × 1.5 + 0.5
+    // multiply the class's hit points by 1.5: every object's hit points Ã 1.5 + 0.5
     // the load files the objects in the players' trackers
     t.load_trackers().unwrap();
     t.do_effect(PlayerId::new(0), &[attribute(5, -1, 3, 0, 1.5)], None)
@@ -1255,7 +1255,7 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
     t.players[0].attributes[69] = Amount::new(2.0);
     t.do_effect(PlayerId::new(0), &[attribute(1, 78, 0, -1, 0.15)], None)
         .unwrap();
-    // Horse Collar: 75 × attribute 69 added to 36
+    // Horse Collar: 75 Ã attribute 69 added to 36
     t.do_effect(PlayerId::new(0), &[attribute(1, 36, 1, 69, 75.0)], None)
         .unwrap();
     t.do_effect(PlayerId::new(0), &[attribute(6, 78, -1, -1, 2.0)], None)
@@ -1271,7 +1271,7 @@ fn the_resource_commands_set_add_and_multiply_an_attribute() {
 }
 
 /// A change of the farms' food (resource 0x24) grows the food each farm still makes:
-/// `(f / before)^exponent × amount + f − held` with `f = held + still to make`
+/// `(f / before)^exponent Ã amount + f â held` with `f = held + still to make`
 /// (`FUN_141615270`), the exponent attribute 31.
 #[test]
 fn farm_food_change_grows_the_farms_food() {
@@ -1308,7 +1308,7 @@ fn farm_food_change_grows_the_farms_food() {
     t.do_effect(PlayerId::new(0), &[attribute(1, 36, 1, -1, 75.0)], None)
         .unwrap();
     assert_eq!(t.players[0].attributes[36], Amount::new(250.0));
-    // (175 / 175)^1 × 75 + 175 − 75
+    // (175 / 175)^1 Ã 75 + 175 â 75
     assert_eq!(
         t.parts
             .actions_of(t.players[0].objects[ListIndex::new(0)].id)
@@ -1412,7 +1412,7 @@ fn barracks_tech() -> World {
 }
 
 /// `FUN_1413d1210`: mode 0 sets the time (the adjustment is the value less the `.dat`'s
-/// time), mode 1 adds the truncated value, mode 2 adds `(v − 1) × time` rounded half away
+/// time), mode 1 adds the truncated value, mode 2 adds `(v â 1) Ã time` rounded half away
 /// from 1; once the work done reaches the new time a technology in state 1 completes.
 #[test]
 fn the_research_time_modifier_changes_the_adjustment_and_may_complete() {
@@ -1425,13 +1425,13 @@ fn the_research_time_modifier_changes_the_adjustment_and_may_complete() {
     );
     t.do_effect(PlayerId::new(0), &[attribute(b'g', 0, -1, 2, 0.8)], None)
         .unwrap();
-    // (0.8 − 1) × 30 − 0.5 = −6.5, truncated −6, plus 4
+    // (0.8 â 1) Ã 30 â 0.5 = â6.5, truncated â6, plus 4
     assert_eq!(
         t.players[0].techs[0].locations[0].adjustment,
         Seconds::new(-2.0)
     );
     assert_eq!(t.players[0].techs[0].state, ResearchState::Available);
-    // set to 20: the adjustment −10, and 20 seconds are done
+    // set to 20: the adjustment â10, and 20 seconds are done
     t.do_effect(PlayerId::new(0), &[attribute(b'g', 0, -1, 0, 20.0)], None)
         .unwrap();
     assert_eq!(
@@ -1443,7 +1443,7 @@ fn the_research_time_modifier_changes_the_adjustment_and_may_complete() {
 
 /// Kind 8 (`FUN_1415c3f20`'s technology change): a cost mode changes a cost (0x4002: add to
 /// stone), 4 a location's building to a master the player has, 5 its button, 10 the research
-/// cap, 12 the state, −1 the research time (with the dependents' update).
+/// cap, 12 the state, â1 the research time (with the dependents' update).
 #[test]
 fn technology_change_reaches_its_costs_locations_and_state() {
     use crate::technology::Cost;
@@ -1509,7 +1509,7 @@ fn technology_change_reaches_its_costs_locations_and_state() {
 }
 
 /// Kind 8's other modes: a technology past the player's tree changes nothing; a location
-/// within the list changes it alone (−2, a research time's add: at its building); one past
+/// within the list changes it alone (â2, a research time's add: at its building); one past
 /// the list of a technology without locations changes nothing; 9 the stacking, 12 with 1
 /// makes it unavailable; 18 the effect override (a researched technology's new effect would
 /// run from the world's effect table, not modelled).
@@ -1555,7 +1555,7 @@ fn technology_change_location_stacking_and_effect_override() {
     assert_eq!(t.players[0].techs[0].locations.len(), 0);
 }
 
-/// Kind 3 (`FUN_14160e410`, mode −1): the old master takes the new one's values but keeps its
+/// Kind 3 (`FUN_14160e410`, mode â1): the old master takes the new one's values but keeps its
 /// id, class, availability and disabling (`Master::copy_from`); its objects first take the
 /// new one through their slot 0x98 ([`World::upgrade_object`]).
 #[test]
@@ -1619,7 +1619,7 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
 
 /// Kind 7 (`FUN_1416136f0`) makes objects at the built buildings of a master, which this file
 /// leaves to the spawning; with none built it does nothing. Kind 5 on a cost by a negative
-/// amount empties (−2) a cost slot in its place or fills (−1) the first empty one
+/// amount empties (â2) a cost slot in its place or fills (â1) the first empty one
 /// (`FUN_1415c1f70`): the slots after an emptied one keep their places.
 #[test]
 fn spawns_and_cost_entries() {
@@ -1888,7 +1888,7 @@ fn dependent_technology_done_already_completes_with_its_requirement() {
     assert_eq!(states, [3, 3, 3, 0]);
 }
 
-/// `FUN_1413cce70`'s civilisation test: a dependent of another civilisation turns −1; one of
+/// `FUN_1413cce70`'s civilisation test: a dependent of another civilisation turns â1; one of
 /// its own of mode 0 does too under the full tech tree (`+0x63`), not one of mode 1; one for
 /// every civilisation (civ 0) is available either way.
 #[test]
@@ -1937,7 +1937,7 @@ fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
 }
 
 /// The technology commands of an effect: the disable command (`'f'`, MarvinBlue/426048737's
-/// civ effect disabling technology 238 in update 1) sets a technology to −1 but a researched
+/// civ effect disabling technology 238 in update 1) sets a technology to â1 but a researched
 /// one, one of type 0x21 to 1, and leaves one of the shared kind (a building's own); the cost
 /// modifier (`'e'`) adds to, sets or scales a paid cost entry's adjustment.
 #[test]
@@ -2025,7 +2025,7 @@ fn the_technology_commands_disable_and_adjust_costs() {
 }
 
 /// `FUN_1413cdb00` reads the id as a short (`MOVZX EDX, BX` in `FUN_14163a500`): 65538 is
-/// technology 2, 65535 is −1, every technology.
+/// technology 2, 65535 is â1, every technology.
 #[test]
 fn the_disable_command_reads_its_id_low_16_bits() {
     use crate::technology::{TechDef, TechState};
@@ -2061,7 +2061,7 @@ fn the_disable_command_reads_its_id_low_16_bits() {
 }
 
 /// `FUN_1413d10f0` converts with `CVTTSS2SI` and adds the low word: an amount of 2^31 or
-/// more adds 0 (0x80000000's low word), where a saturating cast would add −1.
+/// more adds 0 (0x80000000's low word), where a saturating cast would add â1.
 #[test]
 fn cost_change_past_the_i32_range_adds_nothing() {
     use crate::technology::{Cost, TechDef, TechState};
@@ -2094,7 +2094,7 @@ fn cost_change_past_the_i32_range_adds_nothing() {
         t.players[0].techs[0].cost_adj.map(CostAmount::get),
         [0, 0, 0]
     );
-    // mode 2 at 1.5: (1.5 − 1) × 150 + 0.5 = 75.5, truncated to 75
+    // mode 2 at 1.5: (1.5 â 1) Ã 150 + 0.5 = 75.5, truncated to 75
     let scale = EffectCommand::of_data(b'e', 0, 0, 2, 1.5).unwrap();
     t.do_effect(PlayerId::new(0), &[scale], None).unwrap();
     assert_eq!(

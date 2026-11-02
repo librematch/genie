@@ -56,7 +56,6 @@ use crate::math::image::world_player::{
     PERCENT as WORLD_PLAYER_PERCENT, SECOND as WORLD_PLAYER_SECOND,
 };
 use crate::players::CivId;
-use crate::players::attribute::POPULATION;
 use crate::technology::TechId;
 use crate::world::Mode680;
 #[cfg(test)]
@@ -86,7 +85,7 @@ const UNKEPT_LOW: ClassMask = ClassMask::new(0x4800_0800, 31);
 /// 39, 42, 49, 58, 60).
 const UNKEPT_HIGH: ClassMask = ClassMask::new(0x1402_04a0_0038_4006, 61);
 /// The ages' technologies (Feudal, Castle, Imperial: `0x3284`, `0x3304`, `0x3384` in the
-/// player's technologies), whose state −1 puts their units out of the player's tree.
+/// player's technologies), whose state â1 puts their units out of the player's tree.
 const AGES: [TechId; 3] = [TechId::FIRST_AGE, TechId::CASTLE_AGE, TechId::LAST_AGE];
 /// `FUN_140c7e6f0`: the civilisation the full tech tree reads, by the game's tagged value at
 /// `+0x680` ([`crate::world::World::mode_680`]): 18 for 1, 59 for 2, else 0.
@@ -97,18 +96,17 @@ const fn full_tree_civ(mode_680: Mode680) -> CivId {
         _ => 0,
     })
 }
-/// The resource storage that keeps its player (`0x14163b86b`): attribute 11 …
-const POPULATION_STORAGE: AttributeId = POPULATION;
-/// … with the store mode 0x20 (`0x14163b89d`).
+
+/// â¦ with the store mode 0x20 (`0x14163b89d`).
 const ALIVE_STORE_MODE: u8 = 0x20;
 
 /// The timers that keep a player in the game without a living object (the defeat check's first
-/// test): each counts at 0 or more; −1 is none.
+/// test): each counts at 0 or more; â1 is none.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VictoryTimes {
     /// The game's wonder countdown of the player (the game object's `+0x4ec[id]`,
     /// `FUN_140c88300`): the least time left of its wonders' actions (`TRIBE_Action_Wonder`,
-    /// `FUN_140c91500`), −1 without one (`FUN_140c90040`).
+    /// `FUN_140c91500`), â1 without one (`FUN_140c90040`).
     pub wonder: Seconds,
     /// `ruin_held_time` (`+0xdb0`, saved).
     pub ruins: Seconds,
@@ -116,7 +114,7 @@ pub struct VictoryTimes {
     pub artifacts: Seconds,
 }
 
-/// A victory timer that does not run (−1).
+/// A victory timer that does not run (â1).
 const NO_TIMER: Seconds = Seconds::new(-1.0);
 
 /// No timer runs.

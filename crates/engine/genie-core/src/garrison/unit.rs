@@ -41,7 +41,6 @@ use crate::pathing::Pathing;
 use crate::pathing::zones::Zones;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
@@ -56,6 +55,7 @@ use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::LosSight;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
@@ -345,7 +345,7 @@ impl Unit {
     /// The enter (`FUN_140a867b0`) into `target`, one of the unit's player's buildings: a
     /// building that takes what the unit carries (`FUN_140fdd190`, as a drop site) takes its load
     /// first (the resource for kinds 15 to 17 is food, 0 to 3 and 56 their own, others none:
-    /// [`give_load`]; the unit carries nothing after, `FUN_14119d310` with −1). A building at no
+    /// [`give_load`]; the unit carries nothing after, `FUN_14119d310` with â1). A building at no
     /// more than a fifth of its master's hit points (in floats) and a master with a transform
     /// task (0x88) on the building's are not modelled. Then slot 0x1a0 (`FUN_141212e10` ->
     /// `FUN_141084b30` -> `FUN_1411921d0`): with room in the building, the unit's sight goes from
@@ -407,10 +407,11 @@ impl Unit {
             // the building takes food for the foods a unit carries (15 to 17), the four resources
             // and the ore themselves, nothing else
             let resource = self.life.attribute_type.and_then(|kind| {
-                if kind != attribute::FOOD && kind.is_food_load() {
-                    Some(attribute::FOOD)
+                if !roles.of_attribute(kind).contains(AttributeRoles::FOOD) && kind.is_food_load() {
+                    Some(c.w.model.slots.attribute.food)
                 } else {
-                    (kind.is_resource() || kind == attribute::ORE).then_some(kind)
+                    (kind.is_resource() || roles.of_attribute(kind).contains(AttributeRoles::ORE))
+                        .then_some(kind)
                 }
             });
             if let Some(resource) = resource {
@@ -422,6 +423,8 @@ impl Unit {
                     &mut adds,
                     resource,
                     self.life.amount,
+                    roles,
+                    c.w.model.slots,
                 )?;
                 c.w.players.player_mut(c.player)?.add_attributes(adds)?;
                 self.life.attribute_type = None;

@@ -11,7 +11,6 @@ use crate::math::image::treason::{
 };
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::{self, AttributeId};
 use crate::players::tracker::ListKey;
 use crate::unit_ai::task_finder::allied;
 use crate::world::World;
@@ -22,7 +21,6 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 /// 200 (`DAT_142eb0f54`, read at `0x1416204d5`) with attribute 197 above 0.
 const TREASON_COST: f32 = TREASON_TREASON_COST;
 const TREASON_DISCOUNT_COST: f32 = TREASON_TREASON_DISCOUNT_COST;
-const DISCOUNT: AttributeId = AttributeId::numbered(197);
 
 impl World {
     /// `FUN_14160ffb0`: player `p` has a castle (0x52; 0xd1 with the loaded world's content mode
@@ -59,7 +57,7 @@ impl World {
         let discount = self
             .players
             .player(p)?
-            .attribute(DISCOUNT)
+            .attribute(self.model.slots.attribute.treason_discount)
             .unwrap_or(Amount::ZERO);
         let cost = if Amount::ZERO < discount {
             TREASON_DISCOUNT_COST
@@ -70,7 +68,7 @@ impl World {
             .players
             .player(p)?
             .attributes
-            .checked(attribute::GOLD.index())?;
+            .checked(self.model.slots.attribute.gold.index())?;
         if cost > gold.get() || !self.settings.regicide() {
             return Ok(());
         }
@@ -78,7 +76,7 @@ impl World {
             .players
             .player_mut(p)?
             .attributes
-            .checked_mut(attribute::GOLD.index())? = gold - Amount::new(cost);
+            .checked_mut(self.model.slots.attribute.gold.index())? = gold - Amount::new(cost);
         let n = self.players.len();
         for i in PlayerId::each(n).skip(1) {
             if allied(&self.players.player(p)?.relations, p, i, false) {
@@ -131,6 +129,7 @@ mod tests {
     #[cfg(test)]
     use crate::players::relation_row;
     use crate::test_ids::object_id;
+    use crate::testing::attribute;
     use crate::testing::ids;
     use crate::testing::ids::CASTLE;
     use crate::testing::ids::KING;
@@ -177,7 +176,7 @@ mod tests {
             t.players[1].attributes[attribute::GOLD.index()],
             Amount::new(399.0)
         );
-        t.players[1].attributes[DISCOUNT.index()] = Amount::new(1.0);
+        t.players[1].attributes[attribute::TREASON_DISCOUNT.index()] = Amount::new(1.0);
         t.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
             t.players[1].attributes[attribute::GOLD.index()],

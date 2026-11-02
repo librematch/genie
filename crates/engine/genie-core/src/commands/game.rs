@@ -15,7 +15,6 @@ use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::Stance;
-use crate::players::attribute;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
@@ -49,7 +48,7 @@ impl GameCommand {
         w.game(self)
     }
 
-    /// `+8` as a world player of `count` players (`FUN_14152fe40`: none outside 0 to count − 1).
+    /// `+8` as a world player of `count` players (`FUN_14152fe40`: none outside 0 to count â 1).
     #[must_use]
     pub fn target(&self, count: usize) -> Option<PlayerId> {
         u8::try_from(self.player)
@@ -190,7 +189,7 @@ impl World {
                 .players
                 .player_mut(p)?
                 .pending_debit
-                .checked_mut(attribute::GOLD.index())? -= TREASON_COST;
+                .checked_mut(self.model.slots.attribute.gold.index())? -= TREASON_COST;
             self.treason(p)?;
         }
         Ok(())
@@ -304,12 +303,12 @@ mod tests {
     use crate::gathering::QueueCount;
     use crate::players::Amount;
     use crate::players::Posture;
-    use crate::players::attribute;
     #[cfg(test)]
     use crate::players::{ByPlayer, PlayerType};
     use crate::test_ids::costs;
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids::CASTLE;
     use crate::testing::ids::FARM;

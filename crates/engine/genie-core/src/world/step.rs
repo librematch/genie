@@ -244,6 +244,8 @@ impl Step<'_> {
             &mut adds,
             kind,
             amount,
+            &self.w.model.roles,
+            self.w.model.slots,
         )?;
         self.w.players.player_mut(self.player)?.add_attributes(adds)
     }

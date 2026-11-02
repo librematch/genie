@@ -26,12 +26,12 @@ use crate::objects::masters::TaskTerrain;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_id;
 use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::vision::TileCount;
@@ -51,7 +51,7 @@ fn task(action_type: ActionKind) -> Task {
 fn feitoria_food() -> Task {
     Task {
         object_group: None,
-        attribute_type2: Some(AttributeId::numbered(205)),
+        attribute_type2: Some(AttributeId::named(205)),
         attribute_type3: Some(attribute::FOOD),
         work_val1: WorkValue::new(1.6),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
@@ -63,7 +63,7 @@ fn feitoria_food() -> Task {
 fn keshik_gold() -> Task {
     Task {
         object_group: Some(class_id(0)),
-        attribute_type2: Some(AttributeId::numbered(213)),
+        attribute_type2: Some(AttributeId::named(213)),
         attribute_type3: Some(attribute::GOLD),
         work_val1: WorkValue::new(0.01),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
@@ -287,7 +287,7 @@ fn the_store_gives_what_reached_1_and_starts_again() {
     stores[2] = a(f32::NAN);
     assert_eq!(store(a(0.5), attribute::STONE, &mut stores), None);
     // a store the player does not have: no store and no give, however large
-    assert_eq!(store(a(5.0), AttributeId::numbered(9), &mut stores), None);
+    assert_eq!(store(a(5.0), AttributeId::named(9), &mut stores), None);
 }
 
 #[test]
@@ -527,7 +527,7 @@ fn the_terrain_mask_is_bitset_of_8() {
 }
 
 /// The longboat's task 3 (250 in the current build): terrains of flag 32, sprites 19601,
-/// −1, 19599, 19599, the dying and undead sprites 19598 and 19600.
+/// â1, 19599, 19599, the dying and undead sprites 19598 and 19600.
 fn longboat_look() -> Task {
     Task {
         terrain: TaskTerrain::of_data(-32),
@@ -667,6 +667,7 @@ use crate::objects::{FacetCount, Frame};
 use crate::players::relation_row;
 use crate::test_ids::{amounts, attributes};
 use crate::testing::roles;
+use crate::testing::slots;
 use crate::vision::visibility::{BuildingSight, Seer, Visibility, VisibleMap};
 use crate::world::FrameSeed;
 use crate::world::Player;
@@ -1232,15 +1233,12 @@ fn player_attribute_reads_its_place_and_none_past_the_count() {
     };
     p.attributes[5] = Amount::new(9.0);
     assert_eq!(p.attribute(attribute::STONE), Some(Amount::new(3.0)));
-    assert_eq!(
-        p.attribute(AttributeId::numbered(5)),
-        Some(Amount::new(9.0))
-    );
+    assert_eq!(p.attribute(AttributeId::named(5)), Some(Amount::new(9.0)));
     assert_eq!(p.attribute(attribute::CURRENT_AGE), None);
     assert_eq!(p.resources(), amounts([1.0, 2.0, 3.0, 4.0]));
-    assert_eq!(p.construction_rate(), Amount::ZERO);
+    assert_eq!(p.construction_rate(slots()), Amount::ZERO);
     p.attributes.resize(196, Amount::ZERO);
     p.attributes[attribute::CONSTRUCTION_RATE.index()] = Amount::new(1.5);
-    assert_eq!(p.construction_rate(), Amount::new(1.5));
+    assert_eq!(p.construction_rate(slots()), Amount::new(1.5));
     assert_eq!(Player::default().resources(), amounts([0.0; 4]));
 }

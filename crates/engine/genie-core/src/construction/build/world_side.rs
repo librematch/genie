@@ -47,8 +47,9 @@ impl World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
+        let (roles, slots) = (self.model.roles.clone(), self.model.slots);
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
-        for (kind, amount) in death_parts_storage_leaves(held, master) {
+        for (kind, amount) in death_parts_storage_leaves(held, master, &roles, slots) {
             self.players
                 .player_mut(owner)?
                 .add_attribute(kind, amount)?;

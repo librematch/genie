@@ -11,8 +11,6 @@ use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
-use crate::players::attribute::RESEARCH_SPENT;
-use crate::players::attribute::TECHS_RESEARCHED;
 use crate::production::LocationButton;
 use crate::technology::ChangeMode;
 use crate::technology::EffectId;
@@ -32,15 +30,15 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 pub(super) const fn tech_cost_mode(mode: ModifyMode) -> Option<(Option<AttributeId>, ChangeMode)> {
     let mode = mode.get();
     match mode {
-        0..=3 => Some((Some(AttributeId::numbered(mode)), ChangeMode::SET)),
-        0x4000..=0x4003 => Some((Some(AttributeId::numbered(mode - 0x4000)), ChangeMode::ADD)),
-        0xd..=0x10 => Some((Some(AttributeId::numbered(mode - 0xd)), ChangeMode::SCALE)),
+        0..=3 => Some((Some(AttributeId::named(mode)), ChangeMode::SET)),
+        0x4000..=0x4003 => Some((Some(AttributeId::named(mode - 0x4000)), ChangeMode::ADD)),
+        0xd..=0x10 => Some((Some(AttributeId::named(mode - 0xd)), ChangeMode::SCALE)),
         0x11 => Some((None, ChangeMode::SCALE)),
         _ => None,
     }
 }
 
-/// The modes that change a research time (`DAT_142f8f340`'s map: −1 sets, −2 adds, −3
+/// The modes that change a research time (`DAT_142f8f340`'s map: â1 sets, â2 adds, â3
 /// multiplies).
 pub(super) const fn tech_time_mode(mode: ModifyMode) -> Option<ChangeMode> {
     match mode.get() {
@@ -56,7 +54,7 @@ pub(super) const fn tech_time_mode(mode: ModifyMode) -> Option<ChangeMode> {
 pub(super) const STATE_UNAVAILABLE: f32 = EFFECT_STATE_UNAVAILABLE;
 pub(super) const STATE_AVAILABLE: f32 = EFFECT_STATE_AVAILABLE;
 pub(super) const STATE_RESEARCHED: f32 = EFFECT_STATE_RESEARCHED;
-/// −1.0 (`DAT_14330ec20`): a research time without a `.dat` location, and a set's "none".
+/// â1.0 (`DAT_14330ec20`): a research time without a `.dat` location, and a set's "none".
 pub(super) const NO_TIME: f32 = EFFECT_NO_TIME;
 
 /// A technology location a modify command names: its index and its building.
@@ -240,22 +238,28 @@ impl World {
         self.do_effect(p, &def.effect, None)?;
         let owner = self.players.player(p)?;
         let get = |k: AttributeId| Attributes::get(owner, k);
-        let factors = factors(tech, &get)?;
+        let factors = factors(tech, &get, self.model.slots)?;
         let listed = owner.techs.checked(t)?.listed_costs(&def, factors)?;
         let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
         let owner = self.players.player_mut(p)?;
-        owner.add_attribute(TECHS_RESEARCHED, Amount::new(1.0))?;
-        owner.add_attribute(RESEARCH_SPENT, Amount::new(spent))?;
+        owner.add_attribute(
+            self.model.slots.attribute.techs_researched,
+            Amount::new(1.0),
+        )?;
+        owner.add_attribute(
+            self.model.slots.attribute.research_spent,
+            Amount::new(spent),
+        )?;
         Ok(true)
     }
 
     /// The research time modifier (`'g'`, `FUN_1413d1210`) of player `p`'s technology `tech` by
-    /// `v` in `mode`: each location (`location` −1; else its location of that building,
-    /// `FUN_1413c8930`) changes its adjustment (`+0xc`) against the `.dat`'s time there (−1
-    /// without one): mode 2 adds `(v − 1) × time` rounded half away from 1 (in 16 bits), mode 0
-    /// sets it so the time is `v` (none for −1, which leaves 0), any other adds `v` (in 16 bits).
+    /// `v` in `mode`: each location (`location` â1; else its location of that building,
+    /// `FUN_1413c8930`) changes its adjustment (`+0xc`) against the `.dat`'s time there (â1
+    /// without one): mode 2 adds `(v â 1) Ã time` rounded half away from 1 (in 16 bits), mode 0
+    /// sets it so the time is `v` (none for â1, which leaves 0), any other adds `v` (in 16 bits).
     /// A technology in state 1 whose work done reaches its new time completes
-    /// ([`World::complete_research`]), but for a set to −1. The game walks a copy of the
+    /// ([`World::complete_research`]), but for a set to â1. The game walks a copy of the
     /// locations.
     pub(super) fn research_time(
         &mut self,

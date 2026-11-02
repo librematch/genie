@@ -3,6 +3,7 @@
 
 use crate::combat::Charge;
 use crate::combat::attack::DRAW_SCALE;
+use crate::combat::damage::HitLayer;
 use crate::combat::damage::Victim;
 use crate::combat::missile::StrikeResult;
 use crate::construction::build::NOT_HELD;
@@ -20,6 +21,7 @@ use crate::objects::masters::MasterKind;
 use crate::world::Seconds;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::{GenieError, combat::damage};
 
 /// Where a hit comes from: the place it lands (`FUN_141084230`'s x, y, z: the attacker's for a
@@ -108,6 +110,7 @@ pub(crate) fn strike(
     hit: Hit,
     object_rng: &mut Well512,
     roles: &Roles,
+    slots: Slots,
 ) -> Result<Struck, GenieError> {
     if victim.kind == MasterKind::COMBAT && damage::shield(victim, hit.missile) {
         let master_hp = i32::from(own.master_hp.get());
@@ -131,7 +134,15 @@ pub(crate) fn strike(
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
-        let _ = damage::blast(own, hit.at, None, Some(main), &mut targets, 1.0, roles)?;
+        let _ = damage::blast(
+            own,
+            hit.at,
+            None,
+            Some(main),
+            &mut targets,
+            1.0,
+            HitLayer { roles, slots },
+        )?;
         if a.charge_kind == ChargeKind::AREA {
             own.source.charge = Charge::ZERO;
         }
@@ -166,7 +177,7 @@ pub(crate) fn strike(
         &weapons,
         factor,
         HitPoints::ZERO,
-        roles,
+        HitLayer { roles, slots },
     )?;
     Ok(struck)
 }

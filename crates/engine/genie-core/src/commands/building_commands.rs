@@ -321,7 +321,7 @@ impl World {
             "a technology the data file has not got",
         ))?;
         let get = |i: AttributeId| Attributes::get(owner, i);
-        let factors = factors(tech_id, &get)?;
+        let factors = factors(tech_id, &get, self.model.slots)?;
         let listed = owner.techs.checked(tech)?.listed_costs(def, factors)?;
         debit_listed(self.players.player_mut(player)?, listed);
         let owner = self.players.player(player)?;

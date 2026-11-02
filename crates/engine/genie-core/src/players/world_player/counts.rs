@@ -10,7 +10,6 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{
     AGES, TreeMaster, TreeQuery, TreeTech, full_tree_civ, get, town_centres,
@@ -42,7 +41,7 @@ impl World {
     #[must_use]
     pub fn town_centre_at(&self, p: PlayerId, n: usize) -> Option<ObjectId> {
         let tracker = &self.players.get(p.index())?.tracker;
-        // a queued unit's place (−1) names no object the world holds
+        // a queued unit's place (â1) names no object the world holds
         town_centres(self.model.slots.master)
             .iter()
             .flat_map(|&k| tracker.list(ListKey::master(k)).iter().copied().flatten())
@@ -112,9 +111,10 @@ impl World {
             };
             let a = &player.attributes;
             let centre = masters.get(self.model.slots.master.town_centre_621);
-            if get(a, attribute::NO_TOWN_CENTRE) == Amount::ZERO
+            if get(a, self.model.slots.attribute.no_town_centre) == Amount::ZERO
                 && centre.is_some_and(|c| !c.disabled && !c.available)
-                && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT).get()
+                && (self.town_centre_count(p) as f32)
+                    < get(a, self.model.slots.attribute.town_centre_limit).get()
             {
                 count = count.wrapping_add(1);
             }
@@ -204,9 +204,10 @@ impl World {
         {
             let a = &player.attributes;
             let centre = masters.get(self.model.slots.master.town_centre_621);
-            if get(a, attribute::NO_TOWN_CENTRE) == Amount::ZERO
+            if get(a, self.model.slots.attribute.no_town_centre) == Amount::ZERO
                 && centre.is_some_and(|c| !c.disabled && c.available)
-                && (self.town_centre_count(p) as f32) < get(a, attribute::TOWN_CENTRE_LIMIT).get()
+                && (self.town_centre_count(p) as f32)
+                    < get(a, self.model.slots.attribute.town_centre_limit).get()
             {
                 count = count.wrapping_add(1);
             }

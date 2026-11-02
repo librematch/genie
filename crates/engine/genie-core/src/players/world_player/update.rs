@@ -8,14 +8,14 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::players::game_status::GameStatus;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{
-    ALIVE_STORE_MODE, PERCENT, POPULATION_STORAGE, SECOND, UNKEPT_HIGH, UNKEPT_LOW, get, set,
+    ALIVE_STORE_MODE, PERCENT, SECOND, UNKEPT_HIGH, UNKEPT_LOW, get, set,
 };
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
@@ -71,7 +71,7 @@ impl World {
         let player = self.players.player_mut(p)?;
         player
             .history
-            .update(&player.attributes, world_time, period)?;
+            .update(&player.attributes, world_time, period, self.model.slots)?;
         let explored = if self.settings.explored_all() {
             Some(PERCENT)
         } else {
@@ -79,14 +79,30 @@ impl World {
         };
         let player = self.players.player_mut(p)?;
         if let Some(e) = explored {
-            set(&mut player.attributes, attribute::EXPLORED, Amount::new(e));
+            set(
+                &mut player.attributes,
+                self.model.slots.attribute.explored,
+                Amount::new(e),
+            );
         }
         let a = &player.attributes;
-        let ratio = get(a, attribute::KILLS)
-            - (get(a, attribute::UNITS_OWNED) - get(a, attribute::POPULATION));
-        set(&mut player.attributes, attribute::KILL_RATIO, ratio);
-        if !at_most_or_unordered(0.0, get(&player.attributes, attribute::KILL_RATIO).get()) {
-            set(&mut player.attributes, attribute::KILL_RATIO, Amount::ZERO);
+        let ratio = get(a, self.model.slots.attribute.kills)
+            - (get(a, self.model.slots.attribute.units_owned)
+                - get(a, self.model.slots.attribute.population));
+        set(
+            &mut player.attributes,
+            self.model.slots.attribute.kill_ratio,
+            ratio,
+        );
+        if !at_most_or_unordered(
+            0.0,
+            get(&player.attributes, self.model.slots.attribute.kill_ratio).get(),
+        ) {
+            set(
+                &mut player.attributes,
+                self.model.slots.attribute.kill_ratio,
+                Amount::ZERO,
+            );
         }
         if !matches!(player.kind, PlayerType::HUMAN | PlayerType::COMPUTER) {
             return Ok(());
@@ -159,7 +175,7 @@ impl World {
             self.set_status(p, GameStatus::LOST)?;
             set(
                 &mut self.players.player_mut(p)?.attributes,
-                attribute::SURVIVAL,
+                self.model.slots.attribute.survival,
                 Amount::ZERO,
             );
         }
@@ -189,7 +205,11 @@ impl World {
         let state = unit.life.state;
         if (ObjectState::Unfinished..=ObjectState::DyingSprite).contains(&state)
             && master.storage.iter().any(|&(kind, _, mode)| {
-                kind == Some(POPULATION_STORAGE) && mode == ALIVE_STORE_MODE
+                self.model
+                    .roles
+                    .of_some_attribute(kind)
+                    .contains(AttributeRoles::ALIVE_STORAGE)
+                    && mode == ALIVE_STORE_MODE
             })
         {
             return Ok(true);

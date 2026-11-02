@@ -15,7 +15,6 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::unit_ai::Notify;
 use crate::unit_ai::task_finder::world::{SideWorld, TaskWorld};
 use crate::world::World;
@@ -500,14 +499,15 @@ impl World {
                 .of_class(kill.attacker_class)
                 .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
             {
-                self.players
-                    .player_mut(q)?
-                    .add_attribute(attribute::VILLAGER_KILLED_BY_ANIMAL, Amount::new(1.0))?;
+                self.players.player_mut(q)?.add_attribute(
+                    self.model.slots.attribute.villager_killed_by_animal,
+                    Amount::new(1.0),
+                )?;
             }
             let by_kind = match self.players.player(ap)?.kind {
-                PlayerType::HUMAN => Some(attribute::VILLAGER_KILLED_BY_TYPE_1),
-                PlayerType::GAIA => Some(attribute::VILLAGER_KILLED_BY_TYPE_2),
-                PlayerType::COMPUTER => Some(attribute::VILLAGER_KILLED_BY_TYPE_3),
+                PlayerType::HUMAN => Some(self.model.slots.attribute.villager_killed_by_type_1),
+                PlayerType::GAIA => Some(self.model.slots.attribute.villager_killed_by_type_2),
+                PlayerType::COMPUTER => Some(self.model.slots.attribute.villager_killed_by_type_3),
                 _ => None,
             };
             if let Some(kind) = by_kind {
@@ -551,27 +551,34 @@ impl World {
         {
             self.players
                 .player_mut(ap)?
-                .add_attribute(attribute::KILLS, Amount::new(1.0))?;
+                .add_attribute(self.model.slots.attribute.kills, Amount::new(1.0))?;
             self.players
                 .player_mut(q)?
-                .add_attribute(attribute::KILLS_OTHER, Amount::new(1.0))?;
+                .add_attribute(self.model.slots.attribute.kills_other, Amount::new(1.0))?;
         }
-        self.players
-            .player_mut(ap)?
-            .add_attribute(attribute::KILLS_OF.offset(q.index())?, Amount::new(1.0))?;
-        self.players
-            .player_mut(q)?
-            .add_attribute(attribute::KILLED_BY.offset(ap.index())?, Amount::new(1.0))?;
+        self.players.player_mut(ap)?.add_attribute(
+            self.model.slots.attribute.kills_of.offset(q.index())?,
+            Amount::new(1.0),
+        )?;
+        self.players.player_mut(q)?.add_attribute(
+            self.model.slots.attribute.killed_by.offset(ap.index())?,
+            Amount::new(1.0),
+        )?;
         let cost = paid_cost(master);
         self.players
             .player_mut(ap)?
-            .add_attribute(attribute::KILLS_VALUE, cost)?;
+            .add_attribute(self.model.slots.attribute.kills_value, cost)?;
         self.players
             .player_mut(q)?
-            .add_attribute(attribute::KILLS_VALUE_OTHER, cost)?;
-        self.players
-            .player_mut(ap)?
-            .add_attribute(attribute::KILLS_VALUE_OF.offset(q.index())?, cost)?;
+            .add_attribute(self.model.slots.attribute.kills_value_other, cost)?;
+        self.players.player_mut(ap)?.add_attribute(
+            self.model
+                .slots
+                .attribute
+                .kills_value_of
+                .offset(q.index())?,
+            cost,
+        )?;
         Ok(())
     }
 }

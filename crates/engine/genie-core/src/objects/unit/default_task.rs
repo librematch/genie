@@ -49,6 +49,8 @@ impl Unit {
                     task,
                     &c.w.players.player(c.player)?.attributes,
                     &mut self.life,
+                    &c.w.model.roles,
+                    c.w.model.slots,
                 )));
                 Ok(true)
             }

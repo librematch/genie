@@ -7,10 +7,10 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
-use crate::players::attribute::FARM_FOOD_AMOUNT;
 use crate::technology::DisabledTech;
 use crate::technology::{EffectCommand, Party};
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -42,7 +42,7 @@ impl World {
     /// effect's id names them in the game's table; its 0x318 makes the spawns count in the local
     /// player's statistics, which are not simulation) for player `p` with the effect's object `object` (none for a research's): first its
     /// technology commands in order, the cost modifier (`'e'`, [`World::tech_cost`]), the disable
-    /// command (`'f'`, an id other than −1, [`World::disable_tech`]) and the research time
+    /// command (`'f'`, an id other than â1, [`World::disable_tech`]) and the research time
     /// modifier (`'g'`, [`World::research_time`]); then the base's ([`World::base_effect`]).
     pub(crate) fn do_effect(
         &mut self,
@@ -182,8 +182,18 @@ impl World {
                 let Some(attribute) = attribute else {
                     return Ok(());
                 };
-                if party == Party::Own && attribute == FARM_FOOD_AMOUNT {
-                    *farms = Some((self.attribute_of(p, FARM_FOOD_AMOUNT).get(), amount.get()));
+                if party == Party::Own
+                    && self
+                        .model
+                        .roles
+                        .of_attribute(attribute)
+                        .contains(AttributeRoles::FARM_FOOD_AMOUNT)
+                {
+                    *farms = Some((
+                        self.attribute_of(p, self.model.slots.attribute.farm_food_amount)
+                            .get(),
+                        amount.get(),
+                    ));
                 }
                 for q in self.party(p, party) {
                     self.modify_resource(q, attribute, amount, change)?;

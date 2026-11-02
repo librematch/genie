@@ -30,11 +30,13 @@ use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 
 use crate::combat::AttackTargetId;
+use crate::combat::damage::HitLayer;
 use crate::objects::layers::Action;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::step::Step;
 use crate::{GenieError, combat::damage};
 
@@ -257,7 +259,14 @@ impl Attack {
             }
             let executed = {
                 let object = c.w.streams.get(Stream::Object);
-                Self::hit(f, &mut c.blasted, r.hit_chance, object, roles)?
+                Self::hit(
+                    f,
+                    &mut c.blasted,
+                    r.hit_chance,
+                    object,
+                    roles,
+                    c.w.model.slots,
+                )?
             };
             if let Some(target) = executed {
                 unit.post_own(
@@ -367,15 +376,16 @@ impl Attack {
         chance: HitChance,
         object_rng: &mut Well512,
         roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<ObjectId>, GenieError> {
         let a = f.own.source;
         if Distance::ZERO < a.area_effect
             && a.weapon_range < Distance::new(damage::BLAST_RANGE)
             && (a.charge_kind != ChargeKind::AREA || damage::charge_hit(&a, &f.victim, roles))
         {
-            return Self::trample(f, blasted, chance, object_rng, roles);
+            return Self::trample(f, blasted, chance, object_rng, roles, slots);
         }
-        Self::strike(f, blasted, chance, object_rng, roles)
+        Self::strike(f, blasted, chance, object_rng, roles, slots)
     }
 
     /// `FUN_141084230` with the unit's own place as the hit's origin ([`strike`]).
@@ -385,6 +395,7 @@ impl Attack {
         chance: HitChance,
         object_rng: &mut Well512,
         roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<ObjectId>, GenieError> {
         let hit = Hit {
             at: f.own.position,
@@ -392,7 +403,15 @@ impl Attack {
             missile: false,
             chance,
         };
-        let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng, roles)?;
+        let struck = strike(
+            &mut f.own,
+            &mut f.victim,
+            blasted,
+            hit,
+            object_rng,
+            roles,
+            slots,
+        )?;
         Ok(struck.executed)
     }
 
@@ -410,6 +429,7 @@ impl Attack {
         chance: HitChance,
         object_rng: &mut Well512,
         roles: &Roles,
+        slots: Slots,
     ) -> Result<Option<ObjectId>, GenieError> {
         let (center, target) = (f.own.position, f.victim.id);
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
@@ -421,7 +441,7 @@ impl Attack {
             None,
             &mut targets,
             1.0,
-            roles,
+            HitLayer { roles, slots },
         )?;
         let taken = blast_so_far(&f.victim, blasted)?;
         let draw = object_rng.raw64();
@@ -439,7 +459,7 @@ impl Attack {
                     &weapons,
                     factor,
                     taken,
-                    roles,
+                    HitLayer { roles, slots },
                 )?;
             }
         }

@@ -11,11 +11,12 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::ResourceStat;
-use crate::players::attribute::{self, AttributeId, RESOURCES};
+use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{EARLY_SCOUTING_MS, LIVESTOCK_SCALE, MINUTE, SECOND, get, set};
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 impl World {
@@ -23,10 +24,10 @@ impl World {
     /// `JBE` skips a NaN) adds its sixtieth to food, wood, stone and gold in turn, through the
     /// attribute add with its statistic and its sharing ([`World::add_resource`] with 1 and 1).
     pub fn trickles(&mut self, p: PlayerId) -> Result<(), GenieError> {
-        for kind in RESOURCES {
+        for kind in AttributeId::resources() {
             let rate = get(
                 &self.players.player(p)?.attributes,
-                attribute::TRICKLES.offset(kind.index())?,
+                self.model.slots.attribute.trickles.offset(kind.index())?,
             );
             if at_most_or_unordered(rate.get(), 0.0) {
                 continue;
@@ -62,10 +63,15 @@ impl World {
             }
         }
         let grows = log(sum / LIVESTOCK_SCALE + SECOND);
-        let rate = get(&self.players.player(p)?.attributes, attribute::MILL_FOOD).get() / MINUTE;
+        let rate = get(
+            &self.players.player(p)?.attributes,
+            self.model.slots.attribute.mill_food,
+        )
+        .get()
+            / MINUTE;
         self.add_resource(
             p,
-            attribute::FOOD,
+            self.model.slots.attribute.food,
             Amount::new(rate * (time * grows)),
             ResourceStat::GATHERED,
             true,
@@ -88,15 +94,20 @@ impl World {
         stat: ResourceStat,
         share: bool,
     ) -> Result<(), GenieError> {
-        if kind == attribute::GOLD {
+        if self
+            .model
+            .roles
+            .of_attribute(kind)
+            .contains(AttributeRoles::GOLD)
+        {
             if stat.counts_gold() {
                 let a = &mut self.players.player_mut(p)?.attributes;
-                let counter = get(a, attribute::GOLD_COUNTER);
-                set(a, attribute::GOLD_COUNTER, amount + counter);
+                let counter = get(a, self.model.slots.attribute.gold_counter);
+                set(a, self.model.slots.attribute.gold_counter, amount + counter);
                 if stat.gathered() {
                     self.add_attribute_base(
                         p,
-                        attribute::GOLD_GATHERED,
+                        self.model.slots.attribute.gold_gathered,
                         amount,
                         ResourceStat::GATHERED,
                         share,
@@ -106,7 +117,7 @@ impl World {
         } else if stat.gathered() {
             self.add_attribute_base(
                 p,
-                attribute::GATHERED.offset(kind.index())?,
+                self.model.slots.attribute.gathered.offset(kind.index())?,
                 amount,
                 ResourceStat::GATHERED,
                 share,

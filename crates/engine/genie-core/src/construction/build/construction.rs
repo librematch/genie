@@ -19,14 +19,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::pathing::Pathing;
 use crate::players::Amount;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
-use crate::players::attribute::CASTLE_WONDER_COST;
-use crate::players::attribute::CASTLES;
-use crate::players::attribute::CASTLES_BUILT;
-use crate::players::attribute::MONASTERIES;
-use crate::players::attribute::WONDERS;
-use crate::players::attribute::WONDERS_BUILT;
 use crate::players::history::EventKind;
 use crate::world::Millis;
 use crate::world::Mode680;
@@ -34,6 +27,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 
 /// The completion's storage ([`crate::world::World::complete_building`]): its master's entries of modes 4, 8 and 64 go to its
 /// owner (slot 0xf8, into `attributes`), those of mode 16 to its own `store` (`FUN_1411abad0`: an
@@ -143,6 +137,7 @@ pub(super) fn completion_counts(
     main: bool,
     attributes: &mut Vec<(AttributeId, Amount)>,
     roles: &Roles,
+    slots: Slots,
 ) -> Option<EventKind> {
     // the castle's and the wonder's history event (0x1411dd094), the counts (slot 0xf8 with
     // 1.0, 0x14330eb8c)
@@ -159,16 +154,16 @@ pub(super) fn completion_counts(
     {
         let held = roles.of_master(master.id);
         if held.contains(MasterRoles::MONASTERY) {
-            attributes.push((MONASTERIES, Amount::new(1.0)));
+            attributes.push((slots.attribute.monasteries, Amount::new(1.0)));
         } else if held.contains(MasterRoles::WONDER) {
             attributes.extend([
-                (WONDERS, Amount::new(1.0)),
-                (WONDERS_BUILT, Amount::new(1.0)),
+                (slots.attribute.wonders, Amount::new(1.0)),
+                (slots.attribute.wonders_built, Amount::new(1.0)),
             ]);
         } else if held.contains(MasterRoles::CASTLE) {
             attributes.extend([
-                (CASTLES, Amount::new(1.0)),
-                (CASTLES_BUILT, Amount::new(1.0)),
+                (slots.attribute.castles, Amount::new(1.0)),
+                (slots.attribute.castles_built, Amount::new(1.0)),
             ]);
         }
     }
@@ -184,10 +179,10 @@ pub(super) fn completion_counts(
         .of_master(master.id)
         .intersects(MasterRoles::CASTLE | MasterRoles::WONDER)
     {
-        attributes.push((CASTLE_WONDER_COST, Amount::new(paid as f32)));
+        attributes.push((slots.attribute.castle_wonder_cost, Amount::new(paid as f32)));
     } else if !main && building.stack_unit.is_none() {
-        attributes.push((attribute::TOTAL_VALUE, Amount::new(paid as f32)));
-        attributes.push((attribute::BUILDINGS_VALUE, Amount::new(paid as f32)));
+        attributes.push((slots.attribute.total_value, Amount::new(paid as f32)));
+        attributes.push((slots.attribute.buildings_value, Amount::new(paid as f32)));
     }
     history
 }

@@ -16,7 +16,6 @@ use crate::players::EscrowShare;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::ResourceStat;
-use crate::players::attribute;
 use crate::players::game_status::GameStatus;
 use crate::players::history::HistoryUpdates;
 use crate::players::relation_row;
@@ -26,6 +25,8 @@ use crate::technology::TechState;
 use crate::test_ids::amounts;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
+use crate::testing::attribute;
+use crate::testing::attribute::POPULATION;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::BUILDER;
@@ -420,7 +421,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     assert_eq!(t.players[1].attributes[45], Amount::new(1.0));
 }
 
-/// Each victory timer at 0 or more keeps the player; −1 and NaN do not.
+/// Each victory timer at 0 or more keeps the player; â1 and NaN do not.
 #[test]
 fn running_victory_timer_keeps_the_player() {
     assert!(!VictoryTimes::default().running());

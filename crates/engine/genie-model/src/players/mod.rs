@@ -9,4 +9,5 @@ pub mod history;
 pub mod world_player;
 pub use self::amount::Amount;
 pub use self::amount_rate::AmountRate;
+pub use self::attribute::AttributeId;
 pub use self::civ_id::CivId;

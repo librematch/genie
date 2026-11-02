@@ -6,9 +6,7 @@ use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::update::write_target_back;
-use crate::gathering::hunt::{
-    DECAY_TASK, Herd, HuntAction, HuntNext, HuntReads, LEAD_REACH, LEAD_WAIT,
-};
+use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, LEAD_REACH, LEAD_WAIT};
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Mover;
@@ -20,6 +18,7 @@ use crate::players::AmountRate;
 use crate::world::HUNTER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
 use crate::world::step::Step;
 
@@ -151,7 +150,7 @@ impl HuntAction {
         f: &mut Fight,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        if self.stops_decay_of(stops_decay, &mut f.victim) {
+        if self.stops_decay_of(stops_decay, &mut f.victim, roles) {
             write_target_back(c, hunter, actions, f, roles)?;
         }
         Ok(())
@@ -159,9 +158,17 @@ impl HuntAction {
 
     /// [`HuntAction::decay_check`]'s test and its sign change on the target's copy: true when it
     /// stopped the decay.
-    pub(super) fn stops_decay_of(&self, stops_decay: bool, victim: &mut Victim) -> bool {
-        let stops =
-            self.task.kind4 == Some(DECAY_TASK) && stops_decay && AmountRate::ZERO < victim.decay;
+    pub(super) fn stops_decay_of(
+        &self,
+        stops_decay: bool,
+        victim: &mut Victim,
+        roles: &Roles,
+    ) -> bool {
+        let stops = roles
+            .of_some_attribute(self.task.kind4)
+            .contains(AttributeRoles::DECAY_TASK)
+            && stops_decay
+            && AmountRate::ZERO < victim.decay;
         if stops {
             victim.decay = -victim.decay;
         }

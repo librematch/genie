@@ -29,7 +29,6 @@ use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::players::QueryRelation;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
@@ -42,6 +41,7 @@ use crate::unit_ai::{
     siege_can_attack,
 };
 use crate::world::WorldTime;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
@@ -49,7 +49,7 @@ use crate::world::layer::Roles;
 /// A unit AI's search (`FUN_140c63e20`) as the idle checks run it: it queries its player's
 /// objects in sight of `classes` within `radius` of `at` for a searcher of radii `size`
 /// (`GetVisibleUnits`, mode 0, every relation), and `pick` chooses among them. The caller answers
-/// with the object's id, −1 for none.
+/// with the object's id, â1 for none.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Search<'a> {
     /// Where it searches from.
@@ -125,20 +125,20 @@ pub struct Memory<'a> {
 pub enum Pick {
     /// `ClosestObject` (`FUN_140c488b0`) with its reachability check: the closest object of
     /// master class `group`, of relation `relation` (0 itself or friends, 1 neutrals, 2 enemies,
-    /// 3 itself), in state `state`, of master `master` and below `workers` workers (each −1 for
+    /// 3 itself), in state `state`, of master `master` and below `workers` workers (each â1 for
     /// any), reachable ones only.
     Closest {
-        /// The master class (−1 any).
+        /// The master class (â1 any).
         group: Option<ClassId>,
-        /// The relation (−1 any).
+        /// The relation (â1 any).
         relation: Option<QueryRelation>,
-        /// The object state (−1 any).
+        /// The object state (â1 any).
         state: Option<ObjectState>,
-        /// The master (−1 any).
+        /// The master (â1 any).
         master: Option<MasterId>,
-        /// The workers cap (−1 none).
+        /// The workers cap (â1 none).
         workers: WorkerCount,
-        /// The relation passed over (argument 9; −1 none).
+        /// The relation passed over (argument 9; â1 none).
         spared: Option<QueryRelation>,
         /// Argument 8: only objects the unit reaches count (slot 0x3d0); every caller but the
         /// artifact's passes 1.
@@ -178,7 +178,7 @@ pub struct Attacker {
     pub player_type: PlayerType,
     /// The unit's state.
     pub state: ObjectState,
-    /// The kind it holds (`attribute_type_held`, `+0x308`), none for −1.
+    /// The kind it holds (`attribute_type_held`, `+0x308`), none for â1.
     pub held: Option<AttributeId>,
     /// Its top action's type, if any.
     pub top_action: Option<ActionKind>,
@@ -190,7 +190,7 @@ pub struct Attacker {
     pub class: Option<ClassId>,
     /// Its master's `attack_priority`.
     pub attack_priority: AttackPriority,
-    /// Its master's missile, −1 for none.
+    /// Its master's missile, â1 for none.
     pub missile: Option<MasterId>,
     /// Its master's weapon range (slot 0x230, `+0x828`).
     pub range: Distance,
@@ -281,7 +281,7 @@ pub struct Seeker {
 }
 
 impl Seeker {
-    /// `canMoveToAttack` with no target (slot 0x1d0 with −1, `FUN_140c48420`; the slice holds no
+    /// `canMoveToAttack` with no target (slot 0x1d0 with â1, `FUN_140c48420`; the slice holds no
     /// unit groups): with an order, or without one in a stance below 2.
     #[must_use]
     pub const fn can_move(&self) -> bool {
@@ -474,7 +474,9 @@ pub fn soldier_can_attack(
     if never_attacks(me, roles) {
         return Ok(false);
     }
-    if me.held == Some(attribute::RELIC)
+    if roles
+        .of_some_attribute(me.held)
+        .contains(AttributeRoles::RELIC)
         || roles
             .of_class(t.class)
             .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC | ClassRoles::MISC_BUILDING)

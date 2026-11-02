@@ -1,6 +1,7 @@
 //! What the attribute setters share: the caps, the truncations, the sprite and class amounts,
 //! the damage sprites' and train locations' entries.
 
+use crate::layer::Roles;
 use crate::math::conversions::{cvttss2si, cvttss2si_64};
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::image::masters::{
@@ -15,7 +16,7 @@ use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TrainLocation;
 use crate::objects::masters::{ClassAmount, DamageClass, DamageGraphicEntry, TrainLocationEntry};
-use crate::players::attribute::{self as players_attribute, AttributeId};
+use crate::players::attribute::AttributeId;
 use std::fmt::{Debug, Error, Formatter};
 
 /// 32767.0 (`DAT_142eb69cc`): a capped add or multiply holds hit points and carry capacity
@@ -52,6 +53,8 @@ pub struct AttributeWorld<'a> {
     /// The player's `+0x648`, which an add or a multiply passes: hit points and carry capacity
     /// stop at 32767, the speed at its cap.
     pub capped: bool,
+    /// The build layer's roles: the storages the population attribute sets (FD-046-D48).
+    pub roles: &'a Roles,
 }
 
 /// The sprite table shows as its absence of a name.
@@ -143,11 +146,12 @@ pub(super) fn handicapped(handicap: Option<f32>, class: DamageClass) -> Option<f
 /// paid one, then food, wood, gold (3) and stone (2).
 #[must_use]
 pub const fn cost_resource(attribute: MasterAttribute) -> Option<AttributeId> {
+    let [food, wood, stone, gold] = AttributeId::resources();
     match attribute {
-        MasterAttribute::FOOD_COSTS => Some(players_attribute::FOOD),
-        MasterAttribute::WOOD_COSTS => Some(players_attribute::WOOD),
-        MasterAttribute::GOLD_COSTS => Some(players_attribute::GOLD),
-        MasterAttribute::STONE_COSTS => Some(players_attribute::STONE),
+        MasterAttribute::FOOD_COSTS => Some(food),
+        MasterAttribute::WOOD_COSTS => Some(wood),
+        MasterAttribute::GOLD_COSTS => Some(gold),
+        MasterAttribute::STONE_COSTS => Some(stone),
         _ => None,
     }
 }

@@ -282,8 +282,16 @@ pub(crate) fn repair_target(
         attributes: &mut paid,
     };
     let answer = match kind {
-        MasterKind::BUILDING => repair_building(&mut set, 0, amount, true, &mut payer, roles),
-        MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer, roles),
+        MasterKind::BUILDING => repair_building(
+            &mut set,
+            0,
+            amount,
+            true,
+            &mut payer,
+            roles,
+            c.w.model.slots,
+        ),
+        MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer, roles, c.w.model.slots),
         // the task finder repairs buildings and combat units of its classes alone
         _ => Err(GenieError::unreachable(
             "a repaired object of a type below 70 (slot 0x110)",

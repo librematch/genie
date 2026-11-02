@@ -22,7 +22,6 @@ use crate::orders::Dispatch;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::PASTURE_WORKERS;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
@@ -41,7 +40,7 @@ use crate::world::slots::PlayerSlots;
 pub(super) enum PastureAfter {
     /// The order ends there: no livestock was given.
     Ends,
-    /// The unit tends this pasture, or none (`FUN_141189ca0` with −1: it leaves the one it
+    /// The unit tends this pasture, or none (`FUN_141189ca0` with â1: it leaves the one it
     /// tends).
     Tends(Option<PastureId>),
 }
@@ -311,7 +310,7 @@ impl World {
     /// owner's [`crate::gathering::pasture::PASTURE_WORKERS`] (COMISS, JBE) works the livestock
     /// [`World::pasture_pick`] gives at its place with the order's flags (slot 0x7e8 again) and
     /// then tends the pasture; none given ends the order there; a full pasture has its unit AI
-    /// take a search (slot 0x38: 0x202 with the hunt action, class 49 and −1). Any other unit
+    /// take a search (slot 0x38: 0x202 with the hunt action, class 49 and â1). Any other unit
     /// leaves the pasture it tends ([`World::tend_pasture`], `FUN_141189ca0`).
     pub(crate) fn order_work(
         &mut self,
@@ -366,7 +365,7 @@ impl World {
                 ..*order
             };
             self.work_command(player, idx, &order)?;
-            // FUN_141189ca0 with −1: the unit leaves the pasture it tends
+            // FUN_141189ca0 with â1: the unit leaves the pasture it tends
             return self.tend_pasture(player, idx, None);
         }
         self.work_on_held(player, idx, order)
@@ -477,7 +476,10 @@ impl World {
             return Ok(PastureAfter::Tends(None));
         }
         let on = PastureId::new(on);
-        let room = Attributes::get(self.players.player(player)?, PASTURE_WORKERS)?;
+        let room = Attributes::get(
+            self.players.player(player)?,
+            self.model.slots.attribute.pasture_workers,
+        )?;
         let workers = self.livestock_workers(on).as_f32();
         // COMISS room with the workers, JBE: a NaN is full
         if room > Amount::new(workers) {
@@ -496,7 +498,7 @@ impl World {
             self.order_work(player, idx, &on_it)?;
             return Ok(PastureAfter::Tends(Some(on)));
         }
-        // its unit AI's slot 0x38 takes a search (0x202 with the hunt action, class 49 and −1,
+        // its unit AI's slot 0x38 takes a search (0x202 with the hunt action, class 49 and â1,
         // from and to the unit)
         let unit = self.players.live_mut(player, idx)?;
         let (id, state) = (unit.id, unit.life.state);

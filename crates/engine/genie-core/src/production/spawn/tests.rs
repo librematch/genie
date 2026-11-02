@@ -36,10 +36,10 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::players::Amount;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
@@ -1596,7 +1596,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     );
 }
 
-/// A 3×3 map of terrains `kinds` (row by row) whose terrain `t` has the flags `flags[t]`, for
+/// A 3Ã3 map of terrains `kinds` (row by row) whose terrain `t` has the flags `flags[t]`, for
 /// the placement terrains' test ([`placement_terrains`]).
 struct Terrains {
     kinds: [u8; 9],

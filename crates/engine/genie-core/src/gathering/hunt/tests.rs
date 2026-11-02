@@ -29,10 +29,10 @@ use crate::objects::masters::MasterKind;
 use crate::objects::sprite::Graphic;
 use crate::players::AmountRate;
 use crate::players::PlayerType;
-use crate::players::attribute;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::object_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::unit_ai::UnitStance;
@@ -49,11 +49,12 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::test_ids::task_id;
 use crate::testing::roles;
+use crate::testing::slots;
 use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::World;
 
 /// The reads of a human player's hunt ([`HuntReads`]): a work rate and a productivity of 1, a
-/// capacity of 10, its unit AI's target class −1, no sprites, the Attack's of
+/// capacity of 10, its unit AI's target class â1, no sprites, the Attack's of
 /// [`crate::combat::attack::tests::reads`].
 pub(crate) fn hunt_reads() -> HuntReads {
     HuntReads {
@@ -160,18 +161,21 @@ fn load_of_another_resource_asks_no_drop_off() {
     assert!(asked_drop_off(
         Some(attribute::FOOD),
         Some(attribute::MEAT),
-        300
+        300,
+        slots()
     ));
-    assert!(asked_drop_off(None, Some(attribute::WOOD), 300));
+    assert!(asked_drop_off(None, Some(attribute::WOOD), 300, slots()));
     assert!(!asked_drop_off(
         Some(attribute::FOOD),
         Some(attribute::WOOD),
-        300
+        300,
+        slots()
     ));
     assert!(!asked_drop_off(
         Some(attribute::STONE),
         Some(attribute::GOLD),
-        300
+        300,
+        slots()
     ));
 }
 
@@ -200,17 +204,17 @@ fn decay_task_stops_its_target_decay_once() {
         ..Victim::default()
     };
     let mut v = decaying();
-    assert!(!hunt.stops_decay_of(true, &mut v));
+    assert!(!hunt.stops_decay_of(true, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(0.25));
-    hunt.task.kind4 = Some(DECAY_TASK);
-    assert!(!hunt.stops_decay_of(false, &mut v));
+    hunt.task.kind4 = Some(attribute::DECAY_TASK);
+    assert!(!hunt.stops_decay_of(false, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(0.25));
-    assert!(hunt.stops_decay_of(true, &mut v));
+    assert!(hunt.stops_decay_of(true, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(-0.25));
-    assert!(!hunt.stops_decay_of(true, &mut v));
+    assert!(!hunt.stops_decay_of(true, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(-0.25));
     let mut none = Victim::default();
-    assert!(!hunt.stops_decay_of(true, &mut none));
+    assert!(!hunt.stops_decay_of(true, &mut none, &roles()));
     assert_eq!(none.decay.get().to_bits(), 0);
 }
 
@@ -224,7 +228,7 @@ fn stopped_decay_goes_back_to_the_world_at_once() {
         ..Victim::default()
     };
     let mut hunt = hunting(10028);
-    hunt.task.kind4 = Some(DECAY_TASK);
+    hunt.task.kind4 = Some(attribute::DECAY_TASK);
     let mut rig = Rig::on_the_path(decaying.clone());
     rig.run(100, |c, u, actions, f, _| {
         hunt.decay_check(c, u, actions, true, f, &roles())
@@ -464,7 +468,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
 }
 
 /// Slot 0x68 (`FUN_140ac7980`) clears the lead with the target: a hunt that led one sheep and
-/// is sent to another forgets it sent any (`moved_sheep` 0, the start −1). 429604460's
+/// is sent to another forgets it sent any (`moved_sheep` 0, the start â1). 429604460's
 /// shepherd 30721 at update 184: its next sheep, more than 3 tiles from the town centre, is
 /// sent there.
 #[test]
@@ -1222,7 +1226,7 @@ fn hunt_walks_to_its_target_place_within_its_range() {
 /// hunt searches; an animal standing where it was sent is slaughtered (`set_state(12)`, its
 /// Attack); else the timer runs, and at its end an animal on the start is slaughtered too,
 /// one within 1.5 tiles becomes the start again with the hunter facing it and the timer at
-/// −1 s, and one farther is walked to (`set_state(4)`). A hunt leading unprepared is not
+/// â1 s, and one farther is walked to (`set_state(4)`). A hunt leading unprepared is not
 /// modelled.
 #[test]
 fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {

@@ -377,7 +377,7 @@ impl Unit {
             spatial,
             streams,
             parts,
-            model: Model { masters, .. },
+            model: Model { masters, slots, .. },
             ..
         } = &mut *c.w;
         let Player {
@@ -424,7 +424,7 @@ impl Unit {
             chance: master.hit_chance,
         };
         let object = streams.get(Stream::Object);
-        let struck = strike(&mut own, victim, &mut c.blasted, hit, object, roles)?;
+        let struck = strike(&mut own, victim, &mut c.blasted, hit, object, roles, *slots)?;
         if let Some(target) = struck.executed {
             shooter.post_own(
                 &mut parts.unit_ai,
@@ -501,7 +501,15 @@ impl Unit {
             chance: master.hit_chance,
         };
         let object = c.w.streams.get(Stream::Object);
-        let struck = strike(&mut own, victim, &mut c.blasted, hit, object, roles)?;
+        let struck = strike(
+            &mut own,
+            victim,
+            &mut c.blasted,
+            hit,
+            object,
+            roles,
+            c.w.model.slots,
+        )?;
         if self
             .hit_back(own, c.w.parts.ai_and_combat_mut(self.id)?)?
             .is_some()

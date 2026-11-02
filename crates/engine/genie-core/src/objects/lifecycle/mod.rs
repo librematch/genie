@@ -40,10 +40,10 @@ pub enum Class {
 }
 
 /// What an object holds (`+0x308` and `+0x310`), as a reader of the object takes it: the
-/// attribute (none for −1) and the amount.
+/// attribute (none for â1) and the amount.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Held {
-    /// The attribute, none for −1.
+    /// The attribute, none for â1.
     pub kind: Option<AttributeId>,
     /// The amount.
     pub amount: Amount,
@@ -88,7 +88,7 @@ pub struct Lifecycle {
     pub state: ObjectState,
     /// The masked hit points (`+0x278`).
     pub hp: HitPoints,
-    /// `+0x308`: the attribute of what the object holds, none for −1.
+    /// `+0x308`: the attribute of what the object holds, none for â1.
     pub attribute_type: Option<AttributeId>,
     /// `+0x310`: how much it holds.
     pub amount: Amount,
@@ -204,7 +204,7 @@ impl Lifecycle {
 
     /// The static update's death (state 3, `set_state` `FUN_14119d710`), then the animated update's
     /// step to state 5. A static object takes its dying sprite (slot 0x68) and, starting on a
-    /// random facet, draws it (`rand15 × facets / 0x7fff`, at most the last; the facet, `+0xe`, is
+    /// random facet, draws it (`rand15 Ã facets / 0x7fff`, at most the last; the facet, `+0xe`, is
     /// not held). The storage the caller checks, and the players' fog ghosts of a master whose
     /// fog visibility is 2 (`FUN_14118e990`, for players that explored the tile but do not see
     /// it) are the caller's too ([`crate::vision::ghost`]); the statistics and the sounds are not held.
@@ -261,12 +261,12 @@ impl Lifecycle {
 mod tests {
     use super::*;
     use crate::garrison::ContainerId;
-    use crate::players::attribute;
     use crate::players::attribute::AttributeId;
     #[cfg(test)]
     use crate::test_ids::amounts;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::attribute;
     use crate::world::Millis;
 
     /// The states after each update until the object leaves, and the update (1-based) it leaves in.
@@ -304,7 +304,7 @@ mod tests {
         // FLARE3 (MarvinBlue/426048731 object 10025): 1.0 of attribute 12, decay 1.0 per second;
         // the game's states after updates 1 to 13, then it is gone in update 14
         let flare = Lifecycle {
-            attribute_type: Some(AttributeId::numbered(12)),
+            attribute_type: Some(AttributeId::named(12)),
             amount: Amount::new(1.0),
             master: Some(MasterData {
                 decay: AmountRate::new(1.0),
@@ -335,7 +335,7 @@ mod tests {
     fn the_decayed_amount_never_drops_below_zero() {
         let mut life = Lifecycle {
             state: ObjectState::Dying,
-            attribute_type: Some(AttributeId::numbered(12)),
+            attribute_type: Some(AttributeId::named(12)),
             amount: Amount::new(0.05),
             master: Some(MasterData {
                 decay: AmountRate::new(1.0),
@@ -498,7 +498,7 @@ mod tests {
     }
 
     /// The static init's storage (a new missile's too): flags 1, 2 and 32 with an attribute
-    /// go to the owner (resources and attributes alike), one without an attribute (−1) does
+    /// go to the owner (resources and attributes alike), one without an attribute (â1) does
     /// not; the last of flag 0 is what the object holds.
     #[test]
     fn new_object_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {
@@ -509,11 +509,11 @@ mod tests {
         let storage = [
             (Some(attribute::WOOD), 2.0, 1),
             (Some(attribute::POPULATION), 5.0, 2),
-            (Some(AttributeId::numbered(9)), 2.0, 0),
+            (Some(AttributeId::named(9)), 2.0, 0),
             (None, 1.0, 32),
-            (Some(AttributeId::numbered(12)), 3.0, 32),
+            (Some(AttributeId::named(12)), 3.0, 32),
             (Some(attribute::RELICS_HELD), 1.5, 0),
-            (Some(AttributeId::numbered(13)), 4.0, 4),
+            (Some(AttributeId::named(13)), 4.0, 4),
         ]
         .map(|(kind, amount, flag)| (kind, Amount::new(amount), flag));
         assert_eq!(

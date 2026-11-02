@@ -252,7 +252,14 @@ impl World {
             &self.model.roles,
         )?;
         let mut counts = Vec::new();
-        let history = completion_counts(master, building, main, &mut counts, &self.model.roles);
+        let history = completion_counts(
+            master,
+            building,
+            main,
+            &mut counts,
+            &self.model.roles,
+            self.model.slots,
+        );
         if let Some(kind) = history {
             let now = self.world_time;
             self.players

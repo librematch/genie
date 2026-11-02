@@ -29,10 +29,10 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::task_finder::DropSite;
 use crate::vision::SightTiles;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
@@ -62,7 +62,7 @@ pub struct Candidate {
     pub pasture: Option<PastureId>,
     /// `+0x689` is 0 ([`crate::objects::unit::Unit::untargetable`]).
     pub untargetable: bool,
-    /// `+0x308`, `attribute_type_held`, none for −1.
+    /// `+0x308`, `attribute_type_held`, none for â1.
     pub attribute: Option<AttributeId>,
     /// `+0x310`, `attribute_amount_held`.
     pub amount: Amount,
@@ -117,7 +117,7 @@ pub fn more_work(
     let Some(entry) = entry.filter(|e| e.auto_work) else {
         return Ok(None);
     };
-    // the box: (short)(int) of the building's place, ± the reach plus the builder's radius
+    // the box: (short)(int) of the building's place, Â± the reach plus the builder's radius
     let r = builder
         .range
         .wrapping_add((builder.radius + Distance::new(0.5)).get() as i32 as i16);
@@ -176,7 +176,7 @@ pub fn more_work(
                 let Some(resource) = entry.resource_of(o.class, o.state, o.workers) else {
                     continue;
                 };
-                let Some(g) = group_of(resource) else {
+                let Some(g) = group_of(resource, roles) else {
                     continue;
                 };
                 let dx = o.position.x() - builder.position.x();
@@ -196,13 +196,18 @@ pub fn more_work(
 }
 
 /// [`more_work`]'s group of a resource: gold 0, stone 1, food 2, wood 3; None for another.
-const fn group_of(resource: AttributeId) -> Option<usize> {
-    match resource {
-        attribute::GOLD => Some(0),
-        attribute::STONE => Some(1),
-        food if food.is_food_load() => Some(2),
-        attribute::WOOD => Some(3),
-        _ => None,
+fn group_of(resource: AttributeId, roles: &Roles) -> Option<usize> {
+    let held = roles.of_attribute(resource);
+    if held.contains(AttributeRoles::GOLD) {
+        Some(0)
+    } else if held.contains(AttributeRoles::STONE) {
+        Some(1)
+    } else if resource.is_food_load() {
+        Some(2)
+    } else if held.contains(AttributeRoles::WOOD) {
+        Some(3)
+    } else {
+        None
     }
 }
 
@@ -373,10 +378,10 @@ impl<W> Debug for ResourceWorld<'_, W> {
     }
 }
 
-/// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` −1: the unit's
-/// place), no drop site (`param_3` −1) and `param_6` 2: the closest object of gather group `kind`
+/// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` â1: the unit's
+/// place), no drop site (`param_3` â1) and `param_6` 2: the closest object of gather group `kind`
 /// that the unit reaches (`reach`, slot 0x3d0 with the range 0: `FUN_14152b6e0` holds in the
-/// games the slice runs), −1 for none. A unit below state 2 is not modelled.
+/// games the slice runs), â1 for none. A unit below state 2 is not modelled.
 ///
 /// A breadth-first walk over the tiles from the unit's tile, its queue after the tile in hand kept
 /// sorted by the distance of the tiles' centres from the unit ([`msvc::sort`]): a tile the player
@@ -385,7 +390,7 @@ impl<W> Debug for ResourceWorld<'_, W> {
 /// its four neighbours not seen yet that lie on the map. On each such tile the first object in a
 /// pasture or targetable whose master gathers by itself (`enable_auto_gather` 1) as `kind`, with
 /// some amount held, and that is not the unit AI's current target, is tested: with fewer workers
-/// than `max_workers` (−1 for any) a reach makes it the answer; else a reach makes it the
+/// than `max_workers` (â1 for any) a reach makes it the answer; else a reach makes it the
 /// fallback when it is fewer steps away than the last. After 30 tests, or the queue's end, the
 /// fallback is the answer. A tile whose last object fails the first test counts it as found
 /// (the game's loop leaves it in hand).
@@ -403,7 +408,7 @@ pub fn closest_resource<W>(
     closest_resource_at(seeker, None, kind, max_workers, reads).map(|(id, _)| id)
 }
 
-/// [`closest_resource`] from a drop site (`param_3`, None for −1 or a site not found), with what
+/// [`closest_resource`] from a drop site (`param_3`, None for â1 or a site not found), with what
 /// its out argument (`param_5`) takes: the distance of the answer's tile from the pass's origin
 /// (the search's 1.4-per-diagonal measure, truncated), None for no answer (the argument keeps its
 /// value).
@@ -524,13 +529,20 @@ pub fn closest_resource_at<W>(
 /// the Build's search for more work lets an object of it have (`0x140ab0c57`): food (0, 15 to 17)
 /// forage (1) and 6, wood (0) and 2, stone (3) and 3, gold (4) and 3, the rest fish (2) and 2.
 #[must_use]
-pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, WorkerCount) {
-    let kind = match attribute.and_then(AttributeId::load_resource) {
-        Some(attribute::FOOD) => GatherGroup::FORAGE,
-        Some(attribute::WOOD) => GatherGroup::WOOD,
-        Some(attribute::STONE) => GatherGroup::STONE,
-        Some(attribute::GOLD) => GatherGroup::GOLD,
-        _ => GatherGroup::FISH,
+pub fn gather_group(attribute: Option<AttributeId>, roles: &Roles) -> (GatherGroup, WorkerCount) {
+    let kind = {
+        let held = roles.of_some_attribute(attribute.and_then(AttributeId::load_resource));
+        if held.contains(AttributeRoles::FOOD) {
+            GatherGroup::FORAGE
+        } else if held.contains(AttributeRoles::WOOD) {
+            GatherGroup::WOOD
+        } else if held.contains(AttributeRoles::STONE) {
+            GatherGroup::STONE
+        } else if held.contains(AttributeRoles::GOLD) {
+            GatherGroup::GOLD
+        } else {
+            GatherGroup::FISH
+        }
     };
     let workers = WorkerCount::of_data(match kind {
         GatherGroup::FORAGE => 6,
@@ -544,9 +556,9 @@ pub fn gather_group(attribute: Option<AttributeId>) -> (GatherGroup, WorkerCount
 mod tests {
     use super::*;
     use crate::gathering::PastureId;
-    use crate::players::attribute;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::roles;
     use crate::unit_ai::task_finder::DropTarget;
@@ -1036,23 +1048,23 @@ mod tests {
     #[test]
     fn held_resource_names_its_gather_group_and_the_workers_the_build_lets_it_have() {
         assert_eq!(
-            gather_group(Some(attribute::WOOD)),
+            gather_group(Some(attribute::WOOD), &roles()),
             (GatherGroup::WOOD, WorkerCount::of_data(2))
         );
         assert_eq!(
-            gather_group(Some(attribute::FARM_FOOD)),
+            gather_group(Some(attribute::FARM_FOOD), &roles()),
             (GatherGroup::FORAGE, WorkerCount::of_data(6))
         );
         assert_eq!(
-            gather_group(Some(attribute::STONE)),
+            gather_group(Some(attribute::STONE), &roles()),
             (GatherGroup::STONE, WorkerCount::of_data(3))
         );
         assert_eq!(
-            gather_group(Some(attribute::GOLD)),
+            gather_group(Some(attribute::GOLD), &roles()),
             (GatherGroup::GOLD, WorkerCount::of_data(3))
         );
         assert_eq!(
-            gather_group(None),
+            gather_group(None, &roles()),
             (GatherGroup::FISH, WorkerCount::of_data(2))
         );
     }

@@ -288,7 +288,7 @@ impl BuildAction {
             return Ok(HeadCode::Keeps);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(builder.life.attribute_type, attributes);
+        let kind = resource_kind(builder.life.attribute_type, attributes, slots);
         let amount = builder.life.amount;
         Self::drop_load(c, builder, kind, amount)?;
         self.after_deposit(c, builder, reads, roles)

@@ -345,7 +345,11 @@ impl BuildAction {
     ) -> Result<(), GenieError> {
         let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
         let mut rate = self.task.work_rate * self.task.work_value * c.dt.seconds();
-        let mut factor = c.w.players.player(c.player)?.construction_rate().get();
+        let mut factor =
+            c.w.players
+                .player(c.player)?
+                .construction_rate(c.w.model.slots)
+                .get();
         if c.w
             .model
             .roles

@@ -25,5 +25,5 @@ destroyed, battles and the defeat. The AI's age time reads the age events back.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`math`](../../math/), [`world`](../../world/).
+- Uses: [`math`](../../math/), [`testing`](../../testing/), [`world`](../../world/).
 <!-- /uses -->

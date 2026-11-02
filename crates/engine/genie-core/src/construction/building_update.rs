@@ -2,6 +2,7 @@
 //! death blast.
 
 use crate::GenieError;
+use crate::combat::damage::HitLayer;
 use crate::combat::damage::Victim;
 use crate::combat::damage::blast;
 use crate::combat::victims::file_kill;
@@ -518,7 +519,10 @@ impl Unit {
             None,
             &mut targets,
             DEATH_BLAST_FACTOR,
-            roles,
+            HitLayer {
+                roles,
+                slots: c.w.model.slots,
+            },
         )?;
         let mut blasted = take(&mut c.blasted);
         for v in &mut blasted {

@@ -17,8 +17,8 @@ use crate::objects::ObjectState;
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
-use crate::players::attribute;
 use crate::world::Seconds;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
@@ -101,7 +101,7 @@ impl GatherAction {
         Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
     }
 
-    /// State 7 (case 6) with one stop: the work, `(work rate) × work_val1 × dt`, at most what the
+    /// State 7 (case 6) with one stop: the work, `(work rate) Ã work_val1 Ã dt`, at most what the
     /// target holds, times the productivity. A load that would pass the capacity ends the
     /// gathering ([`Next::Drop`]); else the target loses the work, its last bit (above 0, below
     /// 0.1) going with a thousandth of its master's first storage amount, the unit gains, and a
@@ -151,10 +151,10 @@ impl GatherAction {
         if Amount::ZERO < r.food_sold
             && roles.of_class(target.class).contains(ClassRoles::FARM)
             // The food kind a farm holds (`+0x308` 16): the food sold at once.
-            && unit.life.attribute_type == Some(attribute::FARM_FOOD)
+            && roles.of_some_attribute(unit.life.attribute_type).contains(AttributeRoles::FARM_FOOD)
         {
             let sold = mem_take(&mut unit.life.amount);
-            c.give_load(attribute::FOOD, sold)?;
+            c.give_load(c.w.model.slots.attribute.food, sold)?;
             return Ok(Next::Stay);
         }
         let empty = target.amount <= Amount::ZERO
@@ -173,7 +173,7 @@ impl GatherAction {
     /// stops the unit) the load goes
     /// to the player at a drop site that takes it (`site`) within `DROP_REACH` (squared): the
     /// resource of what the unit carries ([`crate::gathering::hunt::resource_kind`]), which the caller adds;
-    /// the unit carries nothing after (`FUN_14119d310` with −1). Returns the resource and the
+    /// the unit carries nothing after (`FUN_14119d310` with â1). Returns the resource and the
     /// amount; the caller lets the drop site go and walks back to the target (`set_state(4)`).
     /// A `MoveTo` that failed or let its target go (codes 3 to 5) waits at random
     /// ([`GatherAction::random_wait`]). A site that does not take the load idles (`set_state` 2),
@@ -222,7 +222,7 @@ impl GatherAction {
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_type, attributes);
+        let kind = resource_kind(unit.life.attribute_type, attributes, c.w.model.slots);
         let amount = unit.life.amount;
         unit.life.attribute_type = None;
         unit.life.amount = Amount::ZERO;

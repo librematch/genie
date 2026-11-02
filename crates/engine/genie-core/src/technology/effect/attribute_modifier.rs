@@ -450,6 +450,7 @@ impl World {
                 sprites: &self.model.graphics,
                 handicap: None,
                 capped: CAPPED,
+                roles: &self.model.roles,
             };
             let terrain = self.spatial.terrain.as_ref();
             let Some(m) = self.model.masters.of_mut(p).and_then(|m| m.get_mut(id)) else {

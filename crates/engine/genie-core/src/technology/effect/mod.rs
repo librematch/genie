@@ -20,9 +20,9 @@ mod upgrade;
 
 pub(crate) use self::attribute_modifier::{MasterSprites, follow_master};
 pub use self::change::Change;
-use self::object_slots::{CAPPED, ONE, ROUND, has_actions, within_table};
 #[cfg(test)]
-use self::object_slots::{POPULATION, RESOURCE_19, charge_after};
+use self::object_slots::charge_after;
+use self::object_slots::{CAPPED, ONE, ROUND, has_actions, within_table};
 use crate::GenieError;
 #[cfg(test)]
 use crate::math::rng::Stream;

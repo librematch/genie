@@ -21,3 +21,16 @@ pub(crate) fn costs(entries: &[(AttributeId, i16, bool)]) -> [CostSlot; COST_SLO
     }
     slots
 }
+
+/// The player attributes the tests name, by build 158041's numbers (the engine reads them from
+/// the build layer, FD-046-D48).
+pub(crate) mod attribute {
+    use crate::players::attribute::AttributeId;
+
+    /// Food.
+    pub(crate) const FOOD: AttributeId = AttributeId::named(0);
+    /// Wood.
+    pub(crate) const WOOD: AttributeId = AttributeId::named(1);
+    /// The population headroom.
+    pub(crate) const HEADROOM: AttributeId = AttributeId::named(4);
+}

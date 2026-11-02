@@ -8,7 +8,6 @@ use crate::objects::UpdateCode;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::{RESEARCH_TIME_MODIFIER, WORLD_EFFECT};
 use crate::production::{Entry, Production, refund_tech};
 use crate::production::{MakeTech, MakeTechState, Making};
 use crate::technology::ResearchState;
@@ -108,7 +107,7 @@ impl World {
         let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, false);
         let shared = def.kind == TechKind::SHARED;
-        let time_modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
+        let time_modifier = owner.get(self.model.slots.attribute.research_time_modifier)?;
         let location = state
             .location(master)
             .copied()
@@ -143,7 +142,7 @@ impl World {
     /// The research's end in its update (`0x140ad2a20`) once its progress reaches its time:
     /// `FUN_1413d1740` (with `repeat`, the player's `+0x648` or [`TechState::repeatable`]): a
     /// technology in state 2 (or with `repeat`) whose work done reaches the `.dat`'s time at the
-    /// building (−1 without), times the research time modifier (attribute 86, above 0, not an
+    /// building (â1 without), times the research time modifier (attribute 86, above 0, not an
     /// age), plus the location's adjustment, is done ([`World::complete_research`]); else, or
     /// without `repeat`, it is left. Then the action takes state 1 (the event 100 and the
     /// computer players' slot 0x3a8 are not held) and the building's unit AI is told 0x1fa with
@@ -171,7 +170,7 @@ impl World {
                 .iter()
                 .find(|l| l.0 == Some(master))
                 .map_or(-1.0, |l| Seconds::of_master(l.1).get());
-            let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
+            let modifier = owner.get(self.model.slots.attribute.research_time_modifier)?;
             if !is_age(tech) && Amount::ZERO < modifier {
                 time *= modifier.get();
             }
@@ -202,7 +201,13 @@ impl World {
         // attribute 269, cut by CVTTSS2SI and its low short above 0, names an effect of the
         // world's table the player gets with the building as its object (its slot 0x10,
         // `TRIBE_Effects::do_effect`, which skips an id the table does not hold)
-        let reward = cvttss2si((self.players.player(p)?.get(WORLD_EFFECT)?).get()) as i16;
+        let reward = cvttss2si(
+            (self
+                .players
+                .player(p)?
+                .get(self.model.slots.attribute.world_effect)?)
+            .get(),
+        ) as i16;
         if 0 < reward
             && let Some(effect) = usize::try_from(reward)
                 .ok()
@@ -229,7 +234,7 @@ impl World {
             let def = self.model.techs.checked(t)?;
             let owner = self.players.player_mut(p)?;
             let mut state = take(owner.techs.checked_mut(t)?);
-            let done = refund_tech(&mut state, def, r.tech, owner);
+            let done = refund_tech(&mut state, def, r.tech, owner, self.model.slots);
             *owner.techs.checked_mut(t)? = state;
             let _ = done?;
         }
@@ -295,7 +300,7 @@ impl World {
         let adjustment = state
             .location(master)
             .map_or(Seconds::ZERO, |l| l.adjustment);
-        let modifier = owner.get(RESEARCH_TIME_MODIFIER)?;
+        let modifier = owner.get(self.model.slots.attribute.research_time_modifier)?;
         if !is_age(r.tech) && Amount::ZERO < modifier {
             time *= modifier.get();
         }

@@ -127,12 +127,12 @@ const LAYER_BUILD: u32 = 158_041;
 /// The build layer, evaluated once from its Nickel source (FD-046-D08, D09's step 2).
 static LAYER: LazyLock<Result<BuildLayer, GenieError>> = LazyLock::new(|| build_layer(LAYER_BUILD));
 
-/// The build layer genie-oracle's import reads ([`LAYER`]).
+/// The build layer genie-oracle's import reads: build 158041's, from `builds/158041.ncl`.
 ///
 /// # Errors
 ///
 /// Its Nickel source does not evaluate or breaks its contracts.
-pub(crate) fn layer() -> Result<&'static BuildLayer, GenieError> {
+pub fn layer() -> Result<&'static BuildLayer, GenieError> {
     LAYER.as_ref().map_err(Clone::clone)
 }
 

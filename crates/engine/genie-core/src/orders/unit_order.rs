@@ -353,6 +353,7 @@ impl World {
                 resource,
                 unit.life.attribute_type,
                 self.players.player(p)?.attributes.len(),
+                self.model.slots,
             ),
             unaimed: way_back && target.is_none() && point.x() == NO_POINT && point.y() == NO_POINT,
         }))

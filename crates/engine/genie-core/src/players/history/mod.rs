@@ -29,8 +29,8 @@ use crate::GenieError;
 use crate::math::conversions::cvttss2si;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::world::WorldTime;
+use crate::world::layer::Slots;
 use crate::world::slots::CheckedIndex;
 
 /// A history event's kind (`event`, `+0x0`): an age reached, a castle or wonder built or
@@ -319,6 +319,7 @@ impl History {
         attributes: &[Amount],
         world_time: WorldTime,
         period: HistoryUpdates,
+        slots: Slots,
     ) -> Result<(), GenieError> {
         self.update_count = self.update_count.next();
         if self.update_count < period {
@@ -328,8 +329,8 @@ impl History {
         // the save holds every attribute of the .dat's count, these among them
         let a = |i: usize| attributes.get(i).copied().unwrap_or(Amount::ZERO);
         let tally = |i: usize| Tally::of_amount(a(i));
-        let civilian = a(attribute::CIVILIAN_POPULATION.index());
-        let military = a(attribute::MILITARY_POPULATION.index());
+        let civilian = a(slots.attribute.civilian_population.index());
+        let military = a(slots.attribute.military_population.index());
         if military + civilian < Amount::ZERO {
             self.add_entry(EntryKind::POPULATION, Population::ZERO, Population::ZERO);
         } else {
@@ -339,19 +340,19 @@ impl History {
                 Population::of_count(military.get()),
             );
         }
-        let kills = tally(attribute::KILLS.index()).wrapping_sub(self.old_total_kills);
+        let kills = tally(slots.attribute.kills.index()).wrapping_sub(self.old_total_kills);
         let kills_value =
-            tally(attribute::KILLS_VALUE.index()).wrapping_sub(self.old_build_value_kills);
-        let razings = tally(attribute::RAZINGS.index()).wrapping_sub(self.old_total_razings);
+            tally(slots.attribute.kills_value.index()).wrapping_sub(self.old_build_value_kills);
+        let razings = tally(slots.attribute.razings.index()).wrapping_sub(self.old_total_razings);
         let razings_value =
-            tally(attribute::RAZINGS_VALUE.index()).wrapping_sub(self.old_build_value_razings);
+            tally(slots.attribute.razings_value.index()).wrapping_sub(self.old_build_value_razings);
         let kills_other =
-            tally(attribute::KILLS_OTHER.index()).wrapping_sub(self.old_total_kills_other);
-        let kills_value_other = tally(attribute::KILLS_VALUE_OTHER.index())
+            tally(slots.attribute.kills_other.index()).wrapping_sub(self.old_total_kills_other);
+        let kills_value_other = tally(slots.attribute.kills_value_other.index())
             .wrapping_sub(self.old_build_value_kills_other);
         let razings_other =
-            tally(attribute::RAZINGS_OTHER.index()).wrapping_sub(self.old_total_razings_other);
-        let razings_value_other = tally(attribute::RAZINGS_VALUE_OTHER.index())
+            tally(slots.attribute.razings_other.index()).wrapping_sub(self.old_total_razings_other);
+        let razings_value_other = tally(slots.attribute.razings_value_other.index())
             .wrapping_sub(self.old_build_value_razings_other);
         let value = self
             .old_current_build_value_buildings
@@ -402,16 +403,16 @@ impl History {
             // total_share + running in the game; the share is never a NaN, so the order is moot
             self.running_ave_bv_percent = self.running_ave_bv_percent.plus(total_share);
         }
-        self.old_total_razings = tally(attribute::RAZINGS.index());
-        self.old_build_value_razings = tally(attribute::RAZINGS_VALUE.index());
-        self.old_total_razings_other = tally(attribute::RAZINGS_OTHER.index());
-        self.old_build_value_razings_other = tally(attribute::RAZINGS_VALUE_OTHER.index());
-        self.old_total_kills = tally(attribute::KILLS.index());
-        self.old_build_value_kills = tally(attribute::KILLS_VALUE.index());
-        self.old_total_kills_other = tally(attribute::KILLS_OTHER.index());
-        self.old_build_value_kills_other = tally(attribute::KILLS_VALUE_OTHER.index());
-        self.old_current_build_value_units = tally(attribute::UNITS_VALUE.index());
-        self.old_current_build_value_buildings = tally(attribute::BUILDINGS_VALUE.index());
+        self.old_total_razings = tally(slots.attribute.razings.index());
+        self.old_build_value_razings = tally(slots.attribute.razings_value.index());
+        self.old_total_razings_other = tally(slots.attribute.razings_other.index());
+        self.old_build_value_razings_other = tally(slots.attribute.razings_value_other.index());
+        self.old_total_kills = tally(slots.attribute.kills.index());
+        self.old_build_value_kills = tally(slots.attribute.kills_value.index());
+        self.old_total_kills_other = tally(slots.attribute.kills_other.index());
+        self.old_build_value_kills_other = tally(slots.attribute.kills_value_other.index());
+        self.old_current_build_value_units = tally(slots.attribute.units_value.index());
+        self.old_current_build_value_buildings = tally(slots.attribute.buildings_value.index());
         if self.battle_flag == 0 {
             for (i, kill) in self.old_player_kill_bv.iter_mut().enumerate() {
                 *kill = Tally::of_amount_64(a(KILL_VALUE_OF + i));
@@ -481,6 +482,8 @@ impl History {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::attribute;
+    use crate::testing::slots;
 
     fn entry(civilian: i16, military: i16) -> HistoryEntry {
         HistoryEntry {
@@ -499,6 +502,7 @@ mod tests {
             a,
             WorldTime::from_millis(millis),
             HistoryUpdates::of_data(30),
+            slots(),
         )
         .unwrap();
     }

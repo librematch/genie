@@ -508,7 +508,7 @@ mod tests {
             parse(1, 3, 0x0100, -1, 20.0),
             EffectCommand::Resource {
                 party: Party::Own,
-                attribute: Some(AttributeId::numbered(3)),
+                attribute: Some(AttributeId::named(3)),
                 change: ResourceChange::Set,
                 scale: None,
                 amount: 20.0,

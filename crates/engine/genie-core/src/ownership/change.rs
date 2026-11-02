@@ -14,7 +14,6 @@ use crate::objects::masters::{Master, MasterTables, player_master};
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
 use crate::vision::SightCentre;
@@ -30,9 +29,11 @@ use crate::ownership::capture::HANDS_LEFT;
 use crate::unit_ai::{Inbox, UnitAi};
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::parts::Part;
 use crate::world::player::Player;
 
@@ -118,7 +119,7 @@ impl World {
     ///   place (the master's slot 0x40, [`World::remains`]) and its master's technology is
     ///   researched ([`World::research_built`]); then its owner gains the storage of flags 4 and 8
     ///   and a held attribute 4;
-    /// - the units inside leave it toward no point, from the last ([`World::let_out`] with −1, −1,
+    /// - the units inside leave it toward no point, from the last ([`World::let_out`] with â1, â1,
     ///   `DAT_14330ec20`); one that finds no spot leaves and is destroyed (slots 0x1a8, 0xd0);
     /// - below state 3 its record and mesh shape come again (`FUN_141056460`);
     /// - its gather point goes (`+0xc30`..`+0xc44`).
@@ -155,7 +156,14 @@ impl World {
             self.unrecord(id);
         }
         if state == ObjectState::Alive {
-            lose_built_storage(self.players.player_mut(old)?, &master, held, amount)?;
+            lose_built_storage(
+                self.players.player_mut(old)?,
+                &master,
+                held,
+                amount,
+                &self.model.roles,
+                self.model.slots,
+            )?;
         }
         if state == ObjectState::Foundation {
             self.foundation_sight_off(id, placed)?;
@@ -173,7 +181,14 @@ impl World {
         }
         if state == ObjectState::Alive {
             self.built_with_new_owner(owner, id, &master, rice)?;
-            gain_built_storage(self.players.player_mut(owner)?, &master, held, amount)?;
+            gain_built_storage(
+                self.players.player_mut(owner)?,
+                &master,
+                held,
+                amount,
+                &self.model.roles,
+                self.model.slots,
+            )?;
         }
         self.garrison_leaves(owner, id)?;
         if state < ObjectState::Dying {
@@ -405,7 +420,7 @@ impl World {
     }
 
     /// [`World::building_changes_hands`]'s units inside building `id` leave it toward no point,
-    /// from the last ([`World::let_out`] with −1, −1, `DAT_14330ec20`); one that finds no spot
+    /// from the last ([`World::let_out`] with â1, â1, `DAT_14330ec20`); one that finds no spot
     /// leaves and is destroyed (slots 0x1a8, 0xd0).
     ///
     /// # Errors
@@ -446,7 +461,7 @@ impl World {
     /// `old` to `new`, by its master of its own (`own`, none for an object without one), in the
     /// order of `FUN_14120f800`: the storage
     /// the old owner loses (`FUN_1411a56c0` with 1: flags 2, 16 and 32, the amount's sign
-    /// flipped), its class counters ([`count_class`], −1 for the old owner, then 1 for the new)
+    /// flipped), its class counters ([`count_class`], â1 for the old owner, then 1 for the new)
     /// and the storage the new owner gains (`FUN_141193860`: flags 1, 2 and 32). The lists'
     /// moves come between the first two, which nothing here reads.
     pub(crate) fn hand_over_attributes(
@@ -538,7 +553,7 @@ pub(crate) fn dead_master_of(
 /// (`FUN_140c5dc10`) and it tells its unit AI it changed hands (slot 0x328, 0x20b with the new
 /// owner). The caller's: the storage (`FUN_1411a56c0` with 1 for the old owner,
 /// `FUN_141193860` for the new), the lists (the players' slots 0x2d8 and 0x2d0) and the class
-/// counters ([`count_class`], −1 then 1), from the master of its own, and the units a siege
+/// counters ([`count_class`], â1 then 1), from the master of its own, and the units a siege
 /// weapon (class 13) carries. Not simulation: the names (`FUN_141189810`, `+0x6a8`, `+0x758`,
 /// `+0x770`), the old owner's selection (`FUN_141677380` for `+0x30c` bit 0), the log line and
 /// the message of game mode 12 for master 1377; nor are the slot 0xa8 calls on the copies (the
@@ -600,6 +615,8 @@ pub(crate) fn lose_built_storage(
     master: &Master,
     held: Option<AttributeId>,
     amount: Amount,
+    roles: &Roles,
+    slots: Slots,
 ) -> Result<(), GenieError> {
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
@@ -609,8 +626,11 @@ pub(crate) fn lose_built_storage(
         }
     }
     // The population headroom attribute, which a building's held amount gives (`+0x308` 4).
-    if held == Some(attribute::HEADROOM) {
-        p.add_attribute(attribute::HEADROOM, -amount)?;
+    if roles
+        .of_some_attribute(held)
+        .contains(AttributeRoles::HEADROOM)
+    {
+        p.add_attribute(slots.attribute.headroom, -amount)?;
     }
     Ok(())
 }
@@ -626,6 +646,8 @@ pub(crate) fn gain_built_storage(
     master: &Master,
     held: Option<AttributeId>,
     amount: Amount,
+    roles: &Roles,
+    slots: Slots,
 ) -> Result<(), GenieError> {
     for &(kind, amount, flag) in &master.storage {
         if let Some(kind) = kind
@@ -634,8 +656,11 @@ pub(crate) fn gain_built_storage(
             p.add_attribute(kind, amount)?;
         }
     }
-    if held == Some(attribute::HEADROOM) {
-        p.add_attribute(attribute::HEADROOM, amount)?;
+    if roles
+        .of_some_attribute(held)
+        .contains(AttributeRoles::HEADROOM)
+    {
+        p.add_attribute(slots.attribute.headroom, amount)?;
     }
     Ok(())
 }

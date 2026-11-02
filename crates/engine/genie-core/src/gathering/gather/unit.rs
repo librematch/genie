@@ -33,7 +33,6 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::{Unit, second_target_checked};
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::{ByPlayer, NO_RELATIONS, Relations};
 use crate::unit_ai::AiAction;
@@ -44,7 +43,9 @@ use crate::unit_ai::task_finder::world::state_of;
 use crate::unit_ai::task_finder::{allied, drops_at};
 use crate::unit_ai::world_view::DropWorld;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -424,7 +425,7 @@ impl Unit {
     /// 2): the unit's notify 0x202 to its unit AI (slot 0x328) with the gather action (`0x261`),
     /// the Gather's target type (`+0x68`) and a drop site: the second target's, else for a master
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
-    /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
+    /// [`Unit::drop_site_from`]), 0 when it finds none; â1 for a master without.
     pub(crate) fn gather_search(
         &self,
         actions: &Action,
@@ -490,6 +491,8 @@ pub(crate) fn give_load(
     adds: &mut Vec<(AttributeId, Amount)>,
     kind: AttributeId,
     amount: Amount,
+    roles: &Roles,
+    slots: Slots,
 ) -> Result<(), GenieError> {
     let own = relations.get(player).unwrap_or(&NO_RELATIONS);
     let allied = PlayerId::each(own.len())
@@ -501,12 +504,12 @@ pub(crate) fn give_load(
         ));
     }
     adds.push((kind, amount));
-    if kind == attribute::GOLD {
-        adds.push((attribute::GOLD_COUNTER, amount));
-        adds.push((attribute::GOLD_GATHERED, amount));
+    if roles.of_attribute(kind).contains(AttributeRoles::GOLD) {
+        adds.push((slots.attribute.gold_counter, amount));
+        adds.push((slots.attribute.gold_gathered, amount));
     } else if kind.is_resource() {
         // food, wood and stone gathered: 166 and on
-        adds.push((attribute::GATHERED.offset(kind.index())?, amount));
+        adds.push((slots.attribute.gathered.offset(kind.index())?, amount));
     }
     Ok(())
 }

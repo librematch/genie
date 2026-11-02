@@ -322,7 +322,7 @@ impl World {
     }
 
     /// `FUN_1414615d0` on the world's treaty monitor (`+0x820`) for a town centre's owner: its
-    /// zones (`+0x18 + (owner − 1) × 0x24`: two rectangles and a flag) go to 0, and the game
+    /// zones (`+0x18 + (owner â 1) Ã 0x24`: two rectangles and a flag) go to 0, and the game
     /// screen's list of them (`FUN_1414d2060`, `Game/ui/GameScreenPC.cpp`) loses its entries. Only
     /// a treaty fills the zones (`FUN_141461c00`), so without one they are 0 already.
     ///
@@ -465,7 +465,7 @@ impl World {
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
         if new == ObjectState::Dying && state == ObjectState::Alive {
-            for (kind, amount) in refund_of(master, main, &self.model.roles) {
+            for (kind, amount) in refund_of(master, main, &self.model.roles, self.model.slots) {
                 let player = self.players.player_mut(owner)?;
                 player.take_at_least_zero(kind, amount)?;
             }
@@ -551,9 +551,9 @@ impl World {
     ) -> Result<(), GenieError> {
         let player_type = self.players.player(owner)?.kind;
         let annex_of = self.parts.building_of(id).annex_of;
-        let roles = self.model.roles.clone();
+        let (roles, slots) = (self.model.roles.clone(), self.model.slots);
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
-        let death = built_death(held, annex_of, master, player_type, &roles)?;
+        let death = built_death(held, annex_of, master, player_type, &roles, slots)?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?
@@ -616,11 +616,11 @@ mod tests {
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
-    use crate::players::attribute;
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::player_id;
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::ids::TOWN_CENTRE_621;
@@ -844,15 +844,17 @@ mod clearing_tests {
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
-    use crate::players::attribute::{self, AttributeId};
+    use crate::players::attribute::AttributeId;
     use crate::test_ids::costs;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     #[cfg(test)]
     use crate::test_ids::{adds, amounts};
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
+    use crate::testing::slots;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -1115,7 +1117,7 @@ mod clearing_tests {
                 .unwrap()
                 .storage = vec![
                 (Some(attribute::HEADROOM), Amount::new(2.0), 2),
-                (Some(AttributeId::numbered(5)), Amount::new(3.0), 16),
+                (Some(AttributeId::named(5)), Amount::new(3.0), 16),
                 (Some(attribute::RELICS_HELD), Amount::new(1.0), 32),
                 (None, Amount::new(9.0), 2),
             ];
@@ -1183,7 +1185,7 @@ mod clearing_tests {
             ..Master::default()
         };
         assert_eq!(
-            refund_of(&unit, None, &roles()),
+            refund_of(&unit, None, &roles(), slots()),
             adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::UNITS_VALUE, 70.0)
@@ -1195,14 +1197,19 @@ mod clearing_tests {
             ..unit
         };
         assert_eq!(
-            refund_of(&house, None, &roles()),
+            refund_of(&house, None, &roles(), slots()),
             adds([
                 (attribute::TOTAL_VALUE, 70.0),
                 (attribute::BUILDINGS_VALUE, 70.0)
             ])
         );
         assert_eq!(
-            refund_of(&house, Some(MainBuildingId::new(object_id(9))), &roles()),
+            refund_of(
+                &house,
+                Some(MainBuildingId::new(object_id(9))),
+                &roles(),
+                slots()
+            ),
             []
         );
         let castle = Master {
@@ -1210,7 +1217,7 @@ mod clearing_tests {
             ..house
         };
         assert_eq!(
-            refund_of(&castle, None, &roles()),
+            refund_of(&castle, None, &roles(), slots()),
             adds([(attribute::TOTAL_VALUE, 70.0)])
         );
     }

@@ -21,8 +21,6 @@ use crate::objects::masters::Masters;
 use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
-use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::production::Production;
 use crate::technology::effect::{Change, OBJECT_GONE};
@@ -33,10 +31,9 @@ use crate::vision::visibility::LosSight;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
 use crate::world::slots::PlayerSlots;
 
-pub(crate) const POPULATION: AttributeId = attribute::POPULATION;
-pub(super) const RESOURCE_19: AttributeId = attribute::UNITS_OWNED;
 /// A storage flag of `'@'` (64): the object's storage stays with it (`FUN_141195a50`).
 pub(super) const KEPT_STORAGE: u8 = 64;
 /// A hit point total a capped multiply holds an object's below (`FUN_1411962e0`: `0x46fffe00`).
@@ -47,7 +44,7 @@ pub(super) const ROUND: f32 = EFFECT_ROUND;
 impl World {
     /// The ids player `p`'s tracker files under class `class` (`FUN_14104f8f0`, key class + 900)
     /// and those pending under it (`FUN_14104f9e0`, key class + 90900), each in the tracker's
-    /// order. A queued unit's place holds −1, which no object has: every reader's lookup passes
+    /// order. A queued unit's place holds â1, which no object has: every reader's lookup passes
     /// it over, so it is left out ([`tracked_ids`]).
     pub(super) fn tracked_class(
         &self,
@@ -110,7 +107,7 @@ impl World {
     }
 }
 
-/// The objects of a tracker's list, its queued units' places (−1) left out.
+/// The objects of a tracker's list, its queued units' places (â1) left out.
 fn tracked_ids(list: &[Option<ObjectId>]) -> Vec<ObjectId> {
     list.iter().copied().flatten().collect()
 }
@@ -142,8 +139,8 @@ impl World {
     }
 
     /// `FUN_141195a50`, `FUN_141196060`, `FUN_1411962e0`: the static object's slots. The hit
-    /// points take the master's share (a set: `v × hp / master's`, an add: `(master's + v) × hp /
-    /// master's`, truncated to a short; a multiply: `v × hp + 0.5`, truncated, held at 32767 when
+    /// points take the master's share (a set: `v Ã hp / master's`, an add: `(master's + v) Ã hp /
+    /// master's`, truncated to a short; a multiply: `v Ã hp + 0.5`, truncated, held at 32767 when
     /// that is not below it under the player's `+0x648` ([`CAPPED`])); the line of sight lets the old circle go and takes
     /// the new one (an object on the map in state 2: slot 0x1d8, then 0x1d0 with the new value,
     /// truncated); a set of a resource storage (21, 26, 27) moves its player's attribute from the
@@ -293,18 +290,18 @@ impl World {
     ) -> Result<(), GenieError> {
         let owner = self.players.player_mut(p)?;
         for &(kind, amount, _) in master.storage.iter().take(3) {
-            match kind {
-                // The resources the population attribute (110) moves an object's storage of (`FUN_1412163c0`):
-                // headroom (4), and current population (11) and 19, which hold its magnitude.
-                Some(attribute::HEADROOM) => {
-                    owner.add_attribute(attribute::HEADROOM, amount.abs())?;
-                    owner.add_attribute(attribute::HEADROOM, Amount::new(v))?;
-                }
-                Some(kind @ (POPULATION | RESOURCE_19)) => {
-                    owner.add_attribute(kind, -amount)?;
-                    owner.add_attribute(kind, Amount::new(v.abs()))?;
-                }
-                _ => {}
+            // The resources the population attribute (110) moves an object's storage of
+            // (`FUN_1412163c0`): headroom (4), and current population (11) and 19, which hold
+            // its magnitude.
+            let held = self.model.roles.of_some_attribute(kind);
+            if held.contains(AttributeRoles::HEADROOM) {
+                owner.add_attribute(self.model.slots.attribute.headroom, amount.abs())?;
+                owner.add_attribute(self.model.slots.attribute.headroom, Amount::new(v))?;
+            } else if held.contains(AttributeRoles::MAGNITUDE_STORAGE)
+                && let Some(kind) = kind
+            {
+                owner.add_attribute(kind, -amount)?;
+                owner.add_attribute(kind, Amount::new(v.abs()))?;
             }
         }
         Ok(())
@@ -312,8 +309,8 @@ impl World {
 
     /// `FUN_1411d4e70`, `FUN_1411d4f30`, `FUN_1411d4fe0`: a building's slots. Its build points
     /// (`+0xc50`) keep their share of its master's build time (its first train location's,
-    /// `t`): a set `v / t × points`, an add `(t + v) / t × points`, a multiply
-    /// `points / t × (t × v + 0.5, truncated to a short)`, or `1 × that` for a time of at most 0;
+    /// `t`): a set `v / t Ã points`, an add `(t + v) / t Ã points`, a multiply
+    /// `points / t Ã (t Ã v + 0.5, truncated to a short)`, or `1 Ã that` for a time of at most 0;
     /// its icon override (17, `+0xe`) is the interface's; the rest is the combat unit's.
     pub(super) fn change_building(
         &mut self,
@@ -347,8 +344,8 @@ pub(super) const ONE: f32 = EFFECT_ONE;
 pub(super) const CAPPED: bool = false;
 
 /// A combat unit's charge after its master's maximum charge (`max`, the old) changes
-/// (`FUN_1412163c0`'s `;`): a set takes `v / max × charge` (`v` without a maximum), an add
-/// `(v + max) / max × charge` (`v + charge` without one), a multiply `v × charge`.
+/// (`FUN_1412163c0`'s `;`): a set takes `v / max Ã charge` (`v` without a maximum), an add
+/// `(v + max) / max Ã charge` (`v + charge` without one), a multiply `v Ã charge`.
 pub(super) fn charge_after(charge: Charge, max: Charge, change: Change, v: f32) -> Charge {
     let (charge, max) = (charge.get(), max.get());
     Charge::new(match change {

@@ -90,6 +90,19 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::history::EventKind;
 use crate::world::Mode680;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
+
+/// What a hit reads of the build layer (FD-046-D45): the roles of the classes and masters it
+/// tests and the slots of the attributes it counts into, one argument of [`take`] and
+/// [`blast`].
+#[derive(Clone, Copy, Debug)]
+pub struct HitLayer<'a> {
+    /// The build layer's roles.
+    pub roles: &'a Roles,
+    /// The build layer's slots.
+    pub slots: Slots,
+}
 
 /// Elevation: a higher attacker hits at 1.25 (`DAT_142eb56a8`), a lower one at 0.75
 /// (`DAT_142e7f388`), each plus its player's and the target's player's attributes (211/272,

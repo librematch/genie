@@ -194,6 +194,8 @@ impl World {
             &mut adds,
             out,
             give,
+            &self.model.roles,
+            self.model.slots,
         )?;
         for (kind, amount) in adds {
             self.players

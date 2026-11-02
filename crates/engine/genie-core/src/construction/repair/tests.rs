@@ -25,16 +25,17 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, Graphics};
 use crate::orders::Work;
 use crate::players::Amount;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::technology::Attributes;
 use crate::test_ids::costs;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::slots;
 use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::tests::{in_update, repairing};
 use crate::world::{Player, World, WorldTime};
@@ -219,7 +220,8 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             HitPoints::new(10.0),
             true,
             &mut payer,
-            &roles()
+            &roles(),
+            slots()
         ),
         Ok(RepairOutcome::Healed)
     );
@@ -237,7 +239,8 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             HitPoints::new(50.0),
             true,
             &mut payer,
-            &roles()
+            &roles(),
+            slots()
         ),
         Ok(RepairOutcome::Full)
     );
@@ -255,7 +258,8 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             HitPoints::new(10.0),
             true,
             &mut payer,
-            &roles()
+            &roles(),
+            slots()
         ),
         Ok(RepairOutcome::Unpaid)
     );
@@ -268,7 +272,8 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             HitPoints::new(10.0),
             true,
             &mut payer,
-            &roles()
+            &roles(),
+            slots()
         ),
         Ok(RepairOutcome::Unpaid)
     );
@@ -306,7 +311,8 @@ fn an_annex_repair_goes_to_its_main_building_and_its_annexes() {
             HitPoints::new(20.0),
             true,
             &mut payer,
-            &roles()
+            &roles(),
+            slots()
         ),
         Ok(RepairOutcome::Full)
     );
@@ -339,7 +345,14 @@ fn siege_unit_repair_pays_its_unit_share() {
         attributes: &mut held,
     };
     assert_eq!(
-        repair_unit(&mut set, 0, HitPoints::new(10.0), &mut payer, &roles()),
+        repair_unit(
+            &mut set,
+            0,
+            HitPoints::new(10.0),
+            &mut payer,
+            &roles(),
+            slots()
+        ),
         Ok(RepairOutcome::Healed)
     );
     let share = 0.5f32 * 10.0 / 175.0;

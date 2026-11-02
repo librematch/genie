@@ -10,7 +10,6 @@ use crate::objects::object_list::ObjectList;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Posture;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::game_status::{Fealty, GameStatus, VictoryState};
 use crate::players::history::History;
@@ -24,6 +23,7 @@ use crate::trace::{player_stops, player_unsupported};
 use crate::vision::ghost::{Ghost, Watched};
 use crate::world::Seconds;
 use crate::world::World;
+use crate::world::layer::Slots;
 use crate::world::slots::PlayerSlots;
 use crate::world::{LureDestination, Percent, TargetingMode, Tick, VillagerGarrison};
 
@@ -262,8 +262,8 @@ impl Player {
     /// Attribute 195, the construction rate modifier ([`attribute::CONSTRUCTION_RATE`]), 0 past
     /// the count.
     #[must_use]
-    pub fn construction_rate(&self) -> Amount {
-        self.attribute(attribute::CONSTRUCTION_RATE)
+    pub fn construction_rate(&self, slots: Slots) -> Amount {
+        self.attribute(slots.attribute.construction_rate)
             .unwrap_or(Amount::ZERO)
     }
 

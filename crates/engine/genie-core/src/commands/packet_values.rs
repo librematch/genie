@@ -1,16 +1,15 @@
 //! Values the command packets carry: a command's queue id, a trade's lots, a BUILD's sprite
 //! override and a tribute's or trade's resource word.
 
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 
-/// A command's queue id (the formatter's `qId`, an int): −1 runs the command now; any other
+/// A command's queue id (the formatter's `qId`, an int): â1 runs the command now; any other
 /// value the commands that read it leave alone or queue.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct QueueId(i32);
 
 impl QueueId {
-    /// None (−1): the command runs now.
+    /// None (â1): the command runs now.
     pub const NONE: Self = Self(-1);
 
     /// The id of the packet's int `value`.
@@ -25,7 +24,7 @@ impl QueueId {
         self.0
     }
 
-    /// Whether it names a queue: not −1.
+    /// Whether it names a queue: not â1.
     #[must_use]
     pub const fn is_queued(self) -> bool {
         self.0 != Self::NONE.0
@@ -51,13 +50,13 @@ impl TradeLots {
     }
 }
 
-/// The sprite a BUILD packet asks its foundation to show (`+0x18`, an int): −1 for none; the
+/// The sprite a BUILD packet asks its foundation to show (`+0x18`, an int): â1 for none; the
 /// handler keeps 0x2c9 to 0x2ce for a house of civ 12 ([`crate::commands::BuildCommand`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SpriteOverride(i32);
 
 impl SpriteOverride {
-    /// None (−1).
+    /// None (â1).
     pub const NONE: Self = Self(-1);
     /// The first override the handler keeps (0x2c9).
     const FIRST_KEPT: i32 = 0x2c9;
@@ -76,7 +75,7 @@ impl SpriteOverride {
         self.0
     }
 
-    /// Whether it is one the handler keeps: not −1 and 0x2c9 to 0x2ce (`FUN_141189e70`'s
+    /// Whether it is one the handler keeps: not â1 and 0x2c9 to 0x2ce (`FUN_141189e70`'s
     /// unsigned compare).
     #[must_use]
     pub const fn kept(self) -> bool {
@@ -106,7 +105,7 @@ impl ResourceWord {
     /// The resource a tribute gives: food, wood, stone or gold for 0 to 3, none for any other.
     #[must_use]
     pub fn tributed(self) -> Option<AttributeId> {
-        attribute::RESOURCES.get(usize::from(self.0)).copied()
+        AttributeId::resources().get(usize::from(self.0)).copied()
     }
 
     /// The commodity a trade takes: food, wood or stone for a low byte of 0 to 2
@@ -114,16 +113,16 @@ impl ResourceWord {
     #[must_use]
     pub fn traded(self) -> Option<AttributeId> {
         let commodity = self.0.to_le_bytes()[0];
-        (commodity <= 2).then(|| AttributeId::numbered(i16::from(commodity)))
+        (commodity <= 2).then(|| AttributeId::named(i16::from(commodity)))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::commands::{QueueId, ResourceWord, SpriteOverride, TradeLots};
-    use crate::players::attribute;
+    use crate::testing::attribute;
 
-    /// −1 runs at once; the handler keeps the six overrides from 0x2c9.
+    /// â1 runs at once; the handler keeps the six overrides from 0x2c9.
     #[test]
     fn the_packet_values_keep_their_tests() {
         assert!(!QueueId::NONE.is_queued() && QueueId::of_data(71).is_queued());

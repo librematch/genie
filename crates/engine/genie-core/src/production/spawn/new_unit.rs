@@ -23,9 +23,6 @@ use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute;
-use crate::players::attribute::AttributeId;
-use crate::players::attribute::IN_PRODUCTION;
 use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::QueueEnd;
@@ -118,7 +115,7 @@ impl World {
         let new = self.combat_object(p, master, &made, point.with_height(position.z()))?;
         let class = self.tracker_key(p, master).class;
         let owner = self.players.player_mut(p)?;
-        owner.add_attribute(IN_PRODUCTION, -pop)?;
+        owner.add_attribute(self.model.slots.attribute.in_production, -pop)?;
         // its queue place goes (FUN_14104fb00 with -1, FUN_14104f330)
         owner.tracker.count_queued(QueuedUnits::ONE.negated());
         owner.tracker.unplace(Some(master), class);
@@ -232,7 +229,7 @@ impl World {
         if !keeps
             && MasterKind::COMBAT <= target_master.kind
             && target_master.garrison.holds()
-            // a queued order's target −1 is a point: it takes nothing in
+            // a queued order's target â1 is a point: it takes nothing in
             && o.target
                 .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?
         {
@@ -263,7 +260,7 @@ impl World {
             posture: owner.posture,
             // The player's attribute a new soldier's unit AI reads: the current age (`player+0x100` at
             // `+0x30`, `FUN_140c12300`).
-            age: Attributes::get(owner, attribute::CURRENT_AGE)?,
+            age: Attributes::get(owner, self.model.slots.attribute.current_age)?,
             ..NewObject::of(position, master, made)
         })
     }
@@ -427,16 +424,25 @@ impl World {
             .filter(|&(_, _, paid)| paid)
             .map(|(_, amount, _)| i32::from(amount.get()))
             .sum();
-        owner.add_attribute(attribute::TOTAL_VALUE, Amount::new(cost as f32))?;
-        owner.add_attribute(attribute::UNITS_VALUE, Amount::new(cost as f32))?;
-        owner.add_attribute(AttributeId::numbered(246), Amount::new(cost as f32))?;
+        owner.add_attribute(
+            self.model.slots.attribute.total_value,
+            Amount::new(cost as f32),
+        )?;
+        owner.add_attribute(
+            self.model.slots.attribute.units_value,
+            Amount::new(cost as f32),
+        )?;
+        owner.add_attribute(
+            self.model.slots.attribute.made_units_cost,
+            Amount::new(cost as f32),
+        )?;
         if self
             .model
             .roles
             .of_class(made.class)
             .contains(ClassRoles::VILLAGER)
         {
-            owner.add_attribute(AttributeId::numbered(248), Amount::new(1.0))?;
+            owner.add_attribute(self.model.slots.attribute.made_villagers, Amount::new(1.0))?;
         }
         // the combat setup's class counters (FUN_141226060)
         count_class(&mut owner.attributes, made, 1.0, &self.model.roles);

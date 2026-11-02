@@ -40,7 +40,6 @@ use crate::objects::sprite::Graphic;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
-use crate::players::attribute as player_attribute;
 use crate::production::HotkeyId;
 use crate::production::LocationButton;
 use crate::test_ids::carrying;
@@ -48,10 +47,12 @@ use crate::test_ids::costs;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::{class_of, opt_master};
+use crate::testing::attribute as player_attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::static_roles;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::unit_ai_type;
@@ -183,6 +184,7 @@ fn world(capped: bool) -> AttributeWorld<'static> {
         sprites: &SPRITES,
         handicap: None,
         capped,
+        roles: static_roles(),
     }
 }
 

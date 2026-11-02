@@ -68,7 +68,6 @@ use crate::ownership::artifact::Artifact;
 use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::ByPlayer;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
 use crate::players::relations;
@@ -82,6 +81,7 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::object_ids;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
@@ -1270,7 +1270,7 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
 }
 
 /// `FUN_140e6f620`: UNLOAD's check of its first 60 ids (500 for a computer), which alone go on.
-/// Its own unit stays and one the world lacks becomes −1. Another player's stays when the two
+/// Its own unit stays and one the world lacks becomes â1. Another player's stays when the two
 /// count each other as allies (`FUN_1416642c0`) and the command names the issuer (flag 1) or
 /// an object of the issuer's (flags 3 to 6); with the setting `+0x1074` any stays. A human's
 /// command left without a unit is refused.
@@ -2048,10 +2048,10 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
     assert_eq!(
         run(
             ids::VILLAGER_MALE,
-            carrying(Some(AttributeId::numbered(17)), 10.0),
+            carrying(Some(AttributeId::named(17)), 10.0),
             task(HUNT, Some(attribute::FOOD))
         ),
-        (Some(AttributeId::numbered(17)), Amount::new(10.0), 0)
+        (Some(AttributeId::named(17)), Amount::new(10.0), 0)
     );
     // the same resource: kept
     assert_eq!(
@@ -2487,8 +2487,8 @@ fn switch_masters() -> (Master, Master) {
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(attribute::POPULATION), Amount::new(1.0), 16),
-            (Some(AttributeId::numbered(12)), Amount::new(2.0), 32),
-            (Some(AttributeId::numbered(13)), Amount::new(3.0), 1),
+            (Some(AttributeId::named(12)), Amount::new(2.0), 32),
+            (Some(AttributeId::named(13)), Amount::new(3.0), 1),
             (None, Amount::new(1.0), 2),
         ],
         ..Master::default()
@@ -2502,7 +2502,7 @@ fn switch_masters() -> (Master, Master) {
         standing_sprite: Some(SpriteId::named(11)),
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
-            (Some(AttributeId::numbered(14)), Amount::new(1.0), 16),
+            (Some(AttributeId::named(14)), Amount::new(1.0), 16),
         ],
         volley_fire: Firepower::new(3.0),
         obstruction_kind: ObstructionKind::TYPE_3,
@@ -2554,7 +2554,7 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
         adds([
             (attribute::HEADROOM, -1.0),
             (attribute::POPULATION, -1.0),
-            (AttributeId::numbered(12), -2.0)
+            (AttributeId::named(12), -2.0)
         ])
     );
     assert_eq!(switched.coming, adds([(attribute::HEADROOM, 1.0)]));
@@ -3195,7 +3195,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(99)),
-            // a new target the world does not hold (the game's −1 finds none either)
+            // a new target the world does not hold (the game's â1 finds none either)
             object_id(98),
             Voice::Loud
         ),
@@ -4896,7 +4896,7 @@ fn foraging() -> World {
         .unwrap();
     t.players[1].attributes = vec![Amount::ZERO; 10];
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::numbered(17)), Amount::new(6.0));
+    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     t
 }
 
@@ -5079,7 +5079,7 @@ fn drop_off_order_takes_hunt_to_its_site() {
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.actions.of_mut(v.id).unwrap().list.set_gather(None);
     let mut hunt = hunting(600);
-    hunt.task.resource = Some(AttributeId::numbered(17));
+    hunt.task.resource = Some(AttributeId::named(17));
     // the sprites' table of the world holds none
     hunt.task.sprites = TaskSprites::NONE;
     t.parts

@@ -44,7 +44,6 @@ use crate::objects::{DamagedTimer, Frame, Regeneration, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::attribute::BUILDING_COST;
 use crate::trace::player_unsupported;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiType;
@@ -89,7 +88,7 @@ impl World {
 
     /// [`World::make_building`]'s combat setup (`FUN_14121df60`): its class counters
     /// (`FUN_141226060`), its powerup offset (`+0xa54`, the Object stream's "setup" draw) and,
-    /// for a building with a train location (an entry of `+0x898` other than −1), its paid cost
+    /// for a building with a train location (an entry of `+0x898` other than â1), its paid cost
     /// in attribute 247 (slot 0xf8).
     pub(super) fn building_combat_setup(
         &mut self,
@@ -112,16 +111,17 @@ impl World {
                 .filter(|&(_, _, paid)| paid)
                 .map(|(_, amount, _)| i32::from(amount.get()))
                 .sum();
-            self.players
-                .player_mut(player)?
-                .add_attribute(BUILDING_COST, Amount::new(paid as f32))?;
+            self.players.player_mut(player)?.add_attribute(
+                self.model.slots.attribute.building_cost,
+                Amount::new(paid as f32),
+            )?;
         }
         Ok(())
     }
 
     /// [`World::make_building`]'s static init (`FUN_1411a45a0`): the storage entries of flags 1, 2
     /// and 32 go to the owner (`FUN_141193860`); returns the last entry of flag 0, which the
-    /// building holds (`FUN_141193710`; none: −1 and 0).
+    /// building holds (`FUN_141193710`; none: â1 and 0).
     pub(super) fn building_storage(
         &mut self,
         player: PlayerId,
@@ -143,7 +143,7 @@ impl World {
     /// and a building with a train location its paid cost (attribute 247); the static init's
     /// storage; its place and sight (its place links its tiles to its anchor, `FUN_1411e6780`).
     /// The constructor: masters 50 and 1889 on snow keep their snow (`+0xc61` 2); a master
-    /// neither of classes 51, 54 nor 357, 1188, nor an annex (`+0x9b8` −1) takes its build time
+    /// neither of classes 51, 54 nor 357, 1188, nor an annex (`+0x9b8` â1) takes its build time
     /// as a foundation (a build time above 0: hit points 1, a farm's terrain,
     /// [`World::construction_terrain`]; build points 0), the others are built already (build
     /// points their train time, their master's hit points); one with build points 0 and a

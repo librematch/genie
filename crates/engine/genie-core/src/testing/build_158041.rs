@@ -53,6 +53,7 @@ use genie_model::layer::generated::WallTuning;
 use genie_model::layer::generated::WorldPlayerTuning;
 use genie_model::objects::masters::ClassId;
 use genie_model::objects::masters::MasterId;
+use genie_model::players::AttributeId;
 
 /// Build 158041's layer.
 #[must_use]
@@ -61,44 +62,10 @@ pub fn build_158041() -> BuildLayer {
         build: 158_041,
         roles: roles(),
         slots: Slots {
-            class: ClassSlots {
-                building: ClassId::named(3),
-                villager: ClassId::named(4),
-                farm: ClassId::named(49),
-                livestock: ClassId::named(58),
-            },
-            master: MasterSlots {
-                farm: MasterId::named(50),
-                mill: MasterId::named(68),
-                castle: MasterId::named(82),
-                villager_male: MasterId::named(83),
-                market: MasterId::named(84),
-                town_centre: MasterId::named(109),
-                flare: MasterId::named(112),
-                builder: MasterId::named(118),
-                villager_repairer_male: MasterId::named(156),
-                fish_trap: MasterId::named(199),
-                castle_mode_1: MasterId::named(209),
-                villager_repairer_female: MasterId::named(222),
-                doppelganger: MasterId::named(243),
-                flare_2: MasterId::named(274),
-                villager_female: MasterId::named(293),
-                king: MasterId::named(434),
-                town_centre_444: MasterId::named(444),
-                boarding_galley: MasterId::named(535),
-                town_centre_621: MasterId::named(621),
-                flare_4: MasterId::named(697),
-                rice_farm: MasterId::named(1187),
-                market_1647: MasterId::named(1647),
-                mule_cart: MasterId::named(1808),
-                pasture_1889: MasterId::named(1889),
-                pasture_mangrove: MasterId::named(1893),
-                pasture: MasterId::named(1897),
-                pasture_argali: MasterId::named(1899),
-                pasture_ibex: MasterId::named(1900),
-            },
-            tech: TechSlots {},
-            attribute: AttributeSlots {},
+            class: class_slots(),
+            master: master_slots(),
+            tech: tech_slots(),
+            attribute: attribute_slots(),
         },
         tuning: Tuning {
             artifact: artifact(),
@@ -895,11 +862,160 @@ const MASTER_ROLES: [(usize, MasterRoles); 90] = [
 const TECH_ROLES: [(usize, TechRoles); 0] = [];
 
 /// The attribute roles by id.
-const ATTRIBUTE_ROLES: [(usize, AttributeRoles); 0] = [];
+const ATTRIBUTE_ROLES: [(usize, AttributeRoles); 18] = [
+    (0, AttributeRoles::FOOD.union(AttributeRoles::HUNTED_LOAD)),
+    (1, AttributeRoles::HUNTED_LOAD.union(AttributeRoles::WOOD)),
+    (2, AttributeRoles::STONE),
+    (3, AttributeRoles::GOLD),
+    (4, AttributeRoles::HEADROOM),
+    (7, AttributeRoles::RELICS_HELD),
+    (
+        11,
+        AttributeRoles::ALIVE_STORAGE.union(AttributeRoles::MAGNITUDE_STORAGE),
+    ),
+    (15, AttributeRoles::HUNTED_LOAD),
+    (16, AttributeRoles::FARM_FOOD),
+    (19, AttributeRoles::MAGNITUDE_STORAGE),
+    (33, AttributeRoles::EFFECT_FUNCTION),
+    (36, AttributeRoles::FARM_FOOD_AMOUNT),
+    (50, AttributeRoles::ALLIED_VISION),
+    (56, AttributeRoles::ORE),
+    (57, AttributeRoles::RELIC),
+    (183, AttributeRoles::SHARED_VISION),
+    (196, AttributeRoles::SPREAD_ATTRIBUTE),
+    (292, AttributeRoles::DECAY_TASK),
+];
 
 /// The roles by id.
 fn roles() -> Roles {
     Roles::from_ids(&CLASS_ROLES, &MASTER_ROLES, &TECH_ROLES, &ATTRIBUTE_ROLES)
+}
+
+/// The class slots.
+const fn class_slots() -> ClassSlots {
+    ClassSlots {
+        building: ClassId::named(3),
+        villager: ClassId::named(4),
+        farm: ClassId::named(49),
+        livestock: ClassId::named(58),
+    }
+}
+
+/// The master slots.
+const fn master_slots() -> MasterSlots {
+    MasterSlots {
+        farm: MasterId::named(50),
+        mill: MasterId::named(68),
+        castle: MasterId::named(82),
+        villager_male: MasterId::named(83),
+        market: MasterId::named(84),
+        town_centre: MasterId::named(109),
+        flare: MasterId::named(112),
+        builder: MasterId::named(118),
+        villager_repairer_male: MasterId::named(156),
+        fish_trap: MasterId::named(199),
+        castle_mode_1: MasterId::named(209),
+        villager_repairer_female: MasterId::named(222),
+        doppelganger: MasterId::named(243),
+        flare_2: MasterId::named(274),
+        villager_female: MasterId::named(293),
+        king: MasterId::named(434),
+        town_centre_444: MasterId::named(444),
+        boarding_galley: MasterId::named(535),
+        town_centre_621: MasterId::named(621),
+        flare_4: MasterId::named(697),
+        rice_farm: MasterId::named(1187),
+        market_1647: MasterId::named(1647),
+        mule_cart: MasterId::named(1808),
+        pasture_1889: MasterId::named(1889),
+        pasture_mangrove: MasterId::named(1893),
+        pasture: MasterId::named(1897),
+        pasture_argali: MasterId::named(1899),
+        pasture_ibex: MasterId::named(1900),
+    }
+}
+
+/// The tech slots.
+const fn tech_slots() -> TechSlots {
+    TechSlots {}
+}
+
+/// The attribute slots.
+const fn attribute_slots() -> AttributeSlots {
+    AttributeSlots {
+        food: AttributeId::named(0),
+        gold: AttributeId::named(3),
+        headroom: AttributeId::named(4),
+        current_age: AttributeId::named(6),
+        population: AttributeId::named(11),
+        units_owned: AttributeId::named(19),
+        kills: AttributeId::named(20),
+        techs_researched: AttributeId::named(21),
+        explored: AttributeId::named(22),
+        farm_exponent: AttributeId::named(31),
+        population_cap: AttributeId::named(32),
+        farm_food_amount: AttributeId::named(36),
+        civilian_population: AttributeId::named(37),
+        attribute_38: AttributeId::named(38),
+        military_population: AttributeId::named(40),
+        wonders: AttributeId::named(42),
+        razings: AttributeId::named(43),
+        kill_ratio: AttributeId::named(44),
+        survival: AttributeId::named(45),
+        no_town_centre: AttributeId::named(48),
+        gold_counter: AttributeId::named(49),
+        monasteries: AttributeId::named(52),
+        tribute_given: AttributeId::named(53),
+        market_fee: AttributeId::named(78),
+        queued: AttributeId::named(80),
+        in_production: AttributeId::named(81),
+        research_cost_modifier: AttributeId::named(85),
+        research_time_modifier: AttributeId::named(86),
+        fish_trap_food: AttributeId::named(88),
+        total_value: AttributeId::named(98),
+        research_spent: AttributeId::named(99),
+        castles: AttributeId::named(134),
+        kills_value_other: AttributeId::named(152),
+        razings_value_other: AttributeId::named(153),
+        kills_other: AttributeId::named(154),
+        razings_other: AttributeId::named(155),
+        units_value: AttributeId::named(164),
+        buildings_value: AttributeId::named(165),
+        gathered: AttributeId::named(166),
+        gold_gathered: AttributeId::named(169),
+        kills_value: AttributeId::named(170),
+        tribute_received: AttributeId::named(171),
+        razings_value: AttributeId::named(172),
+        castles_built: AttributeId::named(173),
+        wonders_built: AttributeId::named(174),
+        tribute_paid: AttributeId::named(175),
+        castle_wonder_cost: AttributeId::named(184),
+        construction_rate: AttributeId::named(195),
+        spread_attribute: AttributeId::named(196),
+        treason_discount: AttributeId::named(197),
+        town_centre_limit: AttributeId::named(218),
+        villager_killed_by_type_2: AttributeId::named(226),
+        villager_killed_by_animal: AttributeId::named(227),
+        villager_killed_by_type_3: AttributeId::named(228),
+        villager_killed_by_type_1: AttributeId::named(229),
+        trickles: AttributeId::named(230),
+        made_units_cost: AttributeId::named(246),
+        building_cost: AttributeId::named(247),
+        made_villagers: AttributeId::named(248),
+        mill_food: AttributeId::named(254),
+        world_effect: AttributeId::named(269),
+        pasture_food: AttributeId::named(288),
+        pasture_livestock: AttributeId::named(289),
+        pasture_workers: AttributeId::named(290),
+        kills_of: AttributeId::named(300),
+        killed_by: AttributeId::named(325),
+        razings_of: AttributeId::named(350),
+        razed_by: AttributeId::named(375),
+        kills_value_of: AttributeId::named(400),
+        razings_value_of: AttributeId::named(425),
+        tribute_to: AttributeId::named(450),
+        tribute_from: AttributeId::named(475),
+    }
 }
 
 /// The `artifact` port's tuning values.

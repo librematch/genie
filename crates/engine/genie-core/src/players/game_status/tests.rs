@@ -43,7 +43,6 @@ use crate::ownership::artifact::{ARTIFACT_TYPE, Artifact, ArtifactState};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::relation_row;
@@ -67,6 +66,7 @@ use crate::test_ids::player_id;
 use crate::test_ids::task_id;
 use crate::test_ids::tech_id;
 use crate::test_ids::{adds, amounts};
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
@@ -252,7 +252,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     let task = HuntTask {
         id: task_id(0),
         range: Distance::new(0.25),
-        resource: Some(AttributeId::numbered(17)),
+        resource: Some(AttributeId::named(17)),
         sprites: TaskSprites::NONE,
         work_value: WorkValue::new(1.0),
         productivity: None,

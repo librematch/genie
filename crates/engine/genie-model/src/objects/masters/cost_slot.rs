@@ -54,7 +54,7 @@ pub fn entries(slots: &[CostSlot]) -> impl Iterator<Item = (AttributeId, CostAmo
 mod tests {
     use crate::objects::masters::CostAmount;
     use crate::objects::masters::cost_slot::{CostSlot, entries};
-    use crate::players::attribute;
+    use crate::test_ids::attribute;
     use crate::test_ids::costs;
 
     /// An empty slot keeps its place: the entries pass over it, the slot after it stays third.

@@ -9,7 +9,6 @@ use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::TributeFee;
-use crate::players::attribute;
 use crate::players::tracker::ListKey;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -106,12 +105,22 @@ impl World {
             self.players.player_mut(to)?.add_attribute(kind, given)?;
             self.players.player_mut(from)?.add_attribute(kind, -paid)?;
             let giver = self.players.player_mut(from)?;
-            giver.add_attribute(attribute::TRIBUTE_GIVEN, given)?;
-            giver.add_attribute(attribute::TRIBUTE_PAID, paid)?;
-            giver.add_attribute(attribute::TRIBUTE_TO.offset(to.index())?, given)?;
+            giver.add_attribute(self.model.slots.attribute.tribute_given, given)?;
+            giver.add_attribute(self.model.slots.attribute.tribute_paid, paid)?;
+            giver.add_attribute(
+                self.model.slots.attribute.tribute_to.offset(to.index())?,
+                given,
+            )?;
             let receiver = self.players.player_mut(to)?;
-            receiver.add_attribute(attribute::TRIBUTE_RECEIVED, given)?;
-            receiver.add_attribute(attribute::TRIBUTE_FROM.offset(from.index())?, given)?;
+            receiver.add_attribute(self.model.slots.attribute.tribute_received, given)?;
+            receiver.add_attribute(
+                self.model
+                    .slots
+                    .attribute
+                    .tribute_from
+                    .offset(from.index())?,
+                given,
+            )?;
             if receiver.kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's AI told of a tribute (0x20a, slot 0x3c8)",

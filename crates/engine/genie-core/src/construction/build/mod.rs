@@ -110,7 +110,7 @@ pub struct BuildAction {
     /// off the footprint (223).
     pub state: BuildState,
     /// `+0x38`..`+0x40`, the action's own point: the foundation's place from the constructor
-    /// (`FUN_140aad4e0`) and each `set_state(4)` with a target, −1 each from `set_state(2)`;
+    /// (`FUN_140aad4e0`) and each `set_state(4)` with a target, â1 each from `set_state(2)`;
     /// `set_state(11)` walks there.
     pub point: Position,
     /// The task it builds with.
@@ -140,7 +140,7 @@ pub struct BuildTask {
     /// (slot 0x78) asks a builder carrying another one to its unit AI instead.
     pub resource: Option<AttributeId>,
     /// The task's id in its master's list (`+0xa`), which a master's upgrade finds the new
-    /// master's task by (−1 for none).
+    /// master's task by (â1 for none).
     pub id: TaskId,
     /// The task's moving sprite (`+0x40`), which it gives its `MoveTo`s; None for none.
     pub moving: Option<SpriteId>,
@@ -183,7 +183,7 @@ pub struct Construction {
         gap = "the death's and the teardowns' clearing (FUN_1411dbb70 at 0x1411dda85, FUN_1411d5600, FUN_1411ad250) is not ported"
     )]
     pub snow: Snow,
-    /// `+0x788`, `sprite_override_id`, is not −1.
+    /// `+0x788`, `sprite_override_id`, is not â1.
     pub sprite_override: bool,
 }
 
@@ -482,12 +482,13 @@ mod stack_tests {
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{BuildingMaster, Masters};
     use crate::objects::unit::Unit;
-    use crate::players::attribute::{self, AttributeId};
+    use crate::players::attribute::AttributeId;
     #[cfg(test)]
     use crate::players::history::{EntryKind, Event, EventKind, Population, TimeSlice};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::opt_master;
+    use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids;
     use crate::unit_ai::UnitAiType;
@@ -543,7 +544,7 @@ mod stack_tests {
     /// foundation 621 (stack unit 109, disappears when built), the town centre 109 (annexes 618,
     /// 619, 620 and 890; its storage of population, 5 of mode 4, and of attribute 506, 1 of mode
     /// 16; a volley missile: the tower's unit AI), 618 (tall), 619 (its own annexes 1649 and
-    /// 2160), 620, 1649 and 890 (class 27, hit points −1, tall).
+    /// 2160), 620, 1649 and 890 (class 27, hit points â1, tall).
     fn masters() -> Masters {
         let mut foundation = building(
             621,
@@ -570,7 +571,7 @@ mod stack_tests {
         );
         tc.storage = vec![
             (Some(attribute::HEADROOM), Amount::new(5.0), 4),
-            (Some(AttributeId::numbered(506)), Amount::new(1.0), 16),
+            (Some(AttributeId::named(506)), Amount::new(1.0), 16),
             (None, Amount::ZERO, 0),
         ];
         tc.volley_missile = Some(master_id(54));
@@ -827,7 +828,7 @@ mod stack_tests {
             ),
             (
                 HitPoints::new(2400.0 - lacked),
-                vec![(AttributeId::numbered(506), Amount::new(1.0))]
+                vec![(AttributeId::named(506), Amount::new(1.0))]
             )
         );
         let attributes = &t.players[1].attributes;

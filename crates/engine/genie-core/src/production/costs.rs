@@ -10,7 +10,6 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
 use crate::objects::masters::{Master, Masters};
 use crate::players::Amount;
-use crate::players::attribute;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
 use crate::production::QueuedUnits;
@@ -18,6 +17,9 @@ use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::{Attributes, TechDef, TechState, is_age};
 use crate::world::Seconds;
+use crate::world::layer::AttributeRoles;
+use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 
 /// `FUN_141630530`: a queued unit's refund. For a master of type 70 and up each of its cost
 /// entries with an attribute and a paid flag gives back what the queue entry's `costs` paid
@@ -101,6 +103,7 @@ pub fn refund_tech(
     def: &TechDef,
     tech: TechId,
     attributes: &mut dyn Attributes,
+    slots: Slots,
 ) -> Result<bool, GenieError> {
     use crate::math::conversions::cvttss2si;
     if !matches!(
@@ -114,7 +117,9 @@ pub fn refund_tech(
     } else {
         // The research cost modifier (attribute 85, `+0x2a8`), which scales a refunded technology's
         // costs above 0.
-        attributes.get(attribute::RESEARCH_COST_MODIFIER)?.get()
+        attributes
+            .get(slots.attribute.research_cost_modifier)?
+            .get()
     };
     for (c, adj) in def.costs.iter().zip(&state.cost_adj) {
         let Some(attribute) = c.attribute.filter(|_| c.paid.is_paid()) else {
@@ -179,6 +184,8 @@ pub fn cost_test(
     count: CostCount,
     population: bool,
     attributes: &dyn Attributes,
+    roles: &Roles,
+    slots: Slots,
 ) -> Result<bool, GenieError> {
     let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
         return Ok(false);
@@ -192,23 +199,26 @@ pub fn cost_test(
             continue;
         }
         let need = amount.as_f32() * count.get();
-        if attribute == attribute::HEADROOM {
+        if roles
+            .of_attribute(attribute)
+            .contains(AttributeRoles::HEADROOM)
+        {
             if !population {
                 continue;
             }
-            let pop = attributes.get(attribute::POPULATION)?;
-            let cap = attributes.get(attribute::POPULATION_CAP)?;
+            let pop = attributes.get(slots.attribute.population)?;
+            let cap = attributes.get(slots.attribute.population_cap)?;
             if cap <= pop {
                 return Ok(false);
             }
-            let room = attributes.get(attribute::HEADROOM)? + pop;
+            let room = attributes.get(slots.attribute.headroom)? + pop;
             // CMOVBE: the cap unless it is above the headroom's sum (a NaN takes the cap)
             let limit = if at_most_or_unordered(cap.get(), room.get()) {
                 cap
             } else {
                 room
             };
-            if limit < attributes.get(attribute::QUEUED)? + pop + Amount::new(need) {
+            if limit < attributes.get(slots.attribute.queued)? + pop + Amount::new(need) {
                 return Ok(false);
             }
         } else if attributes.get(attribute)? < Amount::new(need) {
@@ -227,8 +237,10 @@ pub fn pay(
     master: MasterId,
     count: CostCount,
     attributes: &mut dyn Attributes,
+    roles: &Roles,
+    slots: Slots,
 ) -> Result<bool, GenieError> {
-    if !cost_test(masters, master, count, false, &*attributes)? {
+    if !cost_test(masters, master, count, false, &*attributes, roles, slots)? {
         return Ok(false);
     }
     // the cost test found the master
@@ -255,10 +267,12 @@ pub fn master_costs(
     masters: &Masters,
     master: MasterId,
     attributes: &dyn Attributes,
+    roles: &Roles,
+    slots: Slots,
 ) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
     use crate::math::conversions::cvttss2si;
     let mut out = [(None, 0i16); 3];
-    let can = cost_test(masters, master, ONE, true, attributes)?;
+    let can = cost_test(masters, master, ONE, true, attributes, roles, slots)?;
     let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
         return Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))));
     };
@@ -277,13 +291,15 @@ pub fn master_costs(
         }
     }
     if 0 < extra {
-        let gold = |a: Option<AttributeId>| matches!(a, None | Some(attribute::GOLD));
+        let gold = |a: Option<AttributeId>| {
+            a.is_none() || roles.of_some_attribute(a).contains(AttributeRoles::GOLD)
+        };
         if gold(out[0].0) {
-            out[0] = (Some(attribute::GOLD), out[0].1.wrapping_add(extra));
+            out[0] = (Some(slots.attribute.gold), out[0].1.wrapping_add(extra));
         } else if gold(out[1].0) {
-            out[1] = (Some(attribute::GOLD), out[1].1.wrapping_add(extra));
+            out[1] = (Some(slots.attribute.gold), out[1].1.wrapping_add(extra));
         } else if gold(out[2].0) {
-            out[2] = (Some(attribute::GOLD), extra);
+            out[2] = (Some(slots.attribute.gold), extra);
         }
     }
     for slot in &mut out {

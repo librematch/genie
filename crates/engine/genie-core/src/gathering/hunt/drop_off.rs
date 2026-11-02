@@ -27,6 +27,7 @@ use crate::players::attribute::AttributeId;
 use crate::unit_ai::world_view::DropWorld;
 use crate::world::Seconds;
 use crate::world::layer::Roles;
+use crate::world::layer::Slots;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -147,7 +148,7 @@ impl HuntAction {
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_type, attributes);
+        let kind = resource_kind(unit.life.attribute_type, attributes, c.w.model.slots);
         let amount = unit.life.amount;
         unit.life.attribute_type = None;
         unit.life.amount = Amount::ZERO;
@@ -158,8 +159,13 @@ impl HuntAction {
     /// some of `held_kind` (`+0x310` above 0, which the caller checked): [`asked_drop_off`] on the
     /// task's resource.
     #[must_use]
-    pub fn drop_off_asked(&self, held_kind: Option<AttributeId>, attributes: usize) -> bool {
-        asked_drop_off(self.task.resource, held_kind, attributes)
+    pub fn drop_off_asked(
+        &self,
+        held_kind: Option<AttributeId>,
+        attributes: usize,
+        slots: Slots,
+    ) -> bool {
+        asked_drop_off(self.task.resource, held_kind, attributes, slots)
     }
 
     /// Slot 0x68 with none (`FUN_140ac7980`, [`HuntAction::set_target`]): the target goes; the

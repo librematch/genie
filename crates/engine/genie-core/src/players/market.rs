@@ -18,9 +18,11 @@ use crate::math::image::market::{
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::ResourceStat;
-use crate::players::attribute::{self, AttributeId};
+use crate::players::attribute::AttributeId;
 use crate::players::{NetTrades, Price, PriceSwing};
 use crate::world::World;
+use crate::world::layer::AttributeRoles;
+use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
 /// A commodity's price after its net trades came back to 0 (`DAT_142f03164`, `DAT_14330eb8c`,
@@ -73,25 +75,43 @@ pub struct Market {
 
 impl Market {
     /// The commodity of attribute `commodity` with its starting price, none for another.
-    const fn commodity(&mut self, commodity: AttributeId) -> Option<(&mut Commodity, Price)> {
-        match commodity {
-            attribute::FOOD => Some((&mut self.food, FOOD_START)),
-            attribute::WOOD => Some((&mut self.wood, WOOD_START)),
-            attribute::STONE => Some((&mut self.stone, STONE_START)),
-            attribute::ORE => Some((&mut self.ore, ORE_START)),
-            _ => None,
+    fn commodity(
+        &mut self,
+        commodity: AttributeId,
+        roles: &Roles,
+    ) -> Option<(&mut Commodity, Price)> {
+        {
+            let held = roles.of_attribute(commodity);
+            if held.contains(AttributeRoles::FOOD) {
+                Some((&mut self.food, FOOD_START))
+            } else if held.contains(AttributeRoles::WOOD) {
+                Some((&mut self.wood, WOOD_START))
+            } else if held.contains(AttributeRoles::STONE) {
+                Some((&mut self.stone, STONE_START))
+            } else if held.contains(AttributeRoles::ORE) {
+                Some((&mut self.ore, ORE_START))
+            } else {
+                None
+            }
         }
     }
 
-    /// `FUN_1415cd3c0`: the price of attribute `commodity`'s commodity, −1 for another.
+    /// `FUN_1415cd3c0`: the price of attribute `commodity`'s commodity, â1 for another.
     #[must_use]
-    pub const fn price(&self, commodity: AttributeId) -> Price {
-        match commodity {
-            attribute::FOOD => self.food.price,
-            attribute::WOOD => self.wood.price,
-            attribute::STONE => self.stone.price,
-            attribute::ORE => self.ore.price,
-            _ => UNKNOWN_PRICE,
+    pub fn price(&self, commodity: AttributeId, roles: &Roles) -> Price {
+        {
+            let held = roles.of_attribute(commodity);
+            if held.contains(AttributeRoles::FOOD) {
+                self.food.price
+            } else if held.contains(AttributeRoles::WOOD) {
+                self.wood.price
+            } else if held.contains(AttributeRoles::STONE) {
+                self.stone.price
+            } else if held.contains(AttributeRoles::ORE) {
+                self.ore.price
+            } else {
+                UNKNOWN_PRICE
+            }
         }
     }
 
@@ -101,9 +121,9 @@ impl Market {
     /// positive: `COMISS`, `JBE`, a NaN stays; truncated by `CVTTSS2SI`) in hundredths raises the
     /// price to at most the maximum, or lowers it to at least the minimum (`COMISS`, `JBE`: a NaN
     /// price stays). The game's event 0x80 on a changed price is the interface's.
-    pub fn trade(&mut self, commodity: AttributeId, buy: bool) {
+    pub fn trade(&mut self, commodity: AttributeId, buy: bool, roles: &Roles) {
         let (min, max) = (self.min_price, self.max_price);
-        let Some((c, start)) = self.commodity(commodity) else {
+        let Some((c, start)) = self.commodity(commodity, roles) else {
             return;
         };
         c.trades = c.trades.traded(buy);
@@ -141,7 +161,11 @@ impl World {
     fn fee(&self, p: PlayerId) -> f32 {
         self.players
             .get(p.index())
-            .and_then(|pl| pl.attributes.get(attribute::MARKET_FEE.index()).copied())
+            .and_then(|pl| {
+                pl.attributes
+                    .get(self.model.slots.attribute.market_fee.index())
+                    .copied()
+            })
             .map_or(0.0, Amount::get)
     }
 
@@ -169,18 +193,18 @@ impl World {
             if below_or_unordered(held.get(), volume.as_f32()) {
                 return Ok(());
             }
-            let price = self.market.price(commodity).get();
+            let price = self.market.price(commodity, &self.model.roles).get();
             if at_most_or_unordered(price, 0.0) {
                 return Ok(());
             }
-            self.market.trade(commodity, false);
+            self.market.trade(commodity, false, &self.model.roles);
             let worth = volume.as_f32() * price;
             let fee = self.fee(p) * worth;
             let gold = cvttss2si(worth - fee + ROUND) as f32;
             // The gold a sale gives and a purchase costs.
             self.add_resource(
                 p,
-                attribute::GOLD,
+                self.model.slots.attribute.gold,
                 Amount::new(gold),
                 ResourceStat::GATHERED,
                 true,
@@ -212,9 +236,9 @@ impl World {
             let gold = self
                 .players
                 .player(p)?
-                .attribute(attribute::GOLD)
+                .attribute(self.model.slots.attribute.gold)
                 .unwrap_or(Amount::ZERO);
-            let price = self.market.price(commodity).get();
+            let price = self.market.price(commodity, &self.model.roles).get();
             if at_most_or_unordered(price, 0.0) {
                 return Ok(());
             }
@@ -227,12 +251,12 @@ impl World {
             let paid = cvttss2si(cost) as f32;
             self.add_resource(
                 p,
-                attribute::GOLD,
+                self.model.slots.attribute.gold,
                 Amount::new(-paid),
                 ResourceStat::NONE,
                 true,
             )?;
-            self.market.trade(commodity, true);
+            self.market.trade(commodity, true, &self.model.roles);
             self.add_resource(p, commodity, Amount::new(lot), ResourceStat::NONE, true)?;
         }
         Ok(())
@@ -247,6 +271,8 @@ mod tests {
     use crate::test_ids::player_id;
     #[cfg(test)]
     use crate::test_ids::{amounts, attributes};
+    use crate::testing::attribute;
+    use crate::testing::roles;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -275,7 +301,7 @@ mod tests {
     #[test]
     fn trade_moves_the_price_step_and_back_at_no_net_trades_it_resets() {
         let mut m = market();
-        m.trade(attribute::WOOD, true);
+        m.trade(attribute::WOOD, true, &roles());
         assert_eq!(
             m.wood,
             Commodity {
@@ -284,17 +310,17 @@ mod tests {
                 swing: PriceSwing::new(2.0),
             }
         );
-        m.trade(attribute::WOOD, true);
+        m.trade(attribute::WOOD, true, &roles());
         assert_eq!(
             (m.wood.price.get(), m.wood.trades.get(), m.wood.swing.get()),
             (0.02 + (1.0 + 0.02), 2, 4.0)
         );
-        m.trade(attribute::WOOD, false);
+        m.trade(attribute::WOOD, false, &roles());
         assert_eq!(
             (m.wood.price.get(), m.wood.trades.get(), m.wood.swing.get()),
             (0.02 + (1.0 + 0.02) - 0.02, 1, 6.0)
         );
-        m.trade(attribute::WOOD, false);
+        m.trade(attribute::WOOD, false, &roles());
         assert_eq!(
             m.wood,
             Commodity {
@@ -305,23 +331,26 @@ mod tests {
         );
         // the stone's start, the bounds, another attribute
         m.stone.price = Price::new(9.98);
-        m.trade(attribute::STONE, true);
-        m.trade(attribute::STONE, true);
+        m.trade(attribute::STONE, true, &roles());
+        m.trade(attribute::STONE, true, &roles());
         assert_eq!(m.stone.price.get(), 9.99);
-        m.trade(attribute::STONE, false);
-        m.trade(attribute::STONE, false);
+        m.trade(attribute::STONE, false, &roles());
+        m.trade(attribute::STONE, false, &roles());
         assert_eq!(m.stone.price.get(), 1.3);
         m.food.price = Price::new(0.21);
-        m.trade(attribute::FOOD, false);
-        m.trade(attribute::FOOD, false);
+        m.trade(attribute::FOOD, false, &roles());
+        m.trade(attribute::FOOD, false, &roles());
         assert_eq!(m.food.price.get(), 0.2);
         let before = m;
-        m.trade(attribute::HEADROOM, true);
-        assert_eq!((m, m.price(attribute::HEADROOM).get()), (before, -1.0));
+        m.trade(attribute::HEADROOM, true, &roles());
+        assert_eq!(
+            (m, m.price(attribute::HEADROOM, &roles()).get()),
+            (before, -1.0)
+        );
         // a swing so large that 2 more does not change it: no step
         m.ore.swing = PriceSwing::new(1.0e8);
         m.ore.trades = NetTrades::new(5);
-        m.trade(attribute::ORE, true);
+        m.trade(attribute::ORE, true, &roles());
         assert_eq!((m.ore.price.get(), m.ore.swing.get()), (1.0, 1.0e8));
     }
 

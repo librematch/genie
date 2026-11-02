@@ -2096,8 +2096,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
 fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
     let with_food = |t: &mut World| {
         let v = t.players[1].objects.last_mut().unwrap();
-        (v.life.attribute_type, v.life.amount) =
-            (Some(AttributeId::numbered(17)), Amount::new(6.0));
+        (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     };
     let drop_site = |t: &mut World| {
         t.model.drop_sites = Arc::new(vec![DropSite {
@@ -2107,7 +2106,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
                 class: class::CLASS_7,
                 workers: WorkerCount::of_data(-1),
                 state: None,
-                attribute: Some(AttributeId::numbered(17)),
+                attribute: Some(AttributeId::named(17)),
             }],
             ..DropSite::default()
         }]);

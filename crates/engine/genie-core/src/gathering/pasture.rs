@@ -23,7 +23,6 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
-use crate::players::attribute::{PASTURE_FOOD, PASTURE_LIVESTOCK, PASTURE_WORKERS};
 use crate::technology::Attributes;
 use crate::world::World;
 use crate::world::layer::MasterSlots;
@@ -46,8 +45,8 @@ const STEP: f32 = PASTURE_STEP;
 const END: f32 = PASTURE_END;
 
 /// The points along the edges of a pasture at `at` whose ground radius on x is `radius_x`, in
-/// the routine's order: the radius less [`INSET`] gives the corners (x−r, y−r), (x+r, y−r),
-/// (x+r, y+r) and (x−r, y+r); each edge from its first corner to its second, `(b − a) · t + a`
+/// the routine's order: the radius less [`INSET`] gives the corners (xâr, yâr), (x+r, yâr),
+/// (x+r, y+r) and (xâr, y+r); each edge from its first corner to its second, `(b â a) Â· t + a`
 /// in f32 (SUBSS, MULSS, ADDSS) with `t` from 0 by [`STEP`] while at most [`END`]: the bottom
 /// edge from the first corner to the second, the right one from the third to the second, the
 /// top one from the third to the fourth and the left one from the first to the fourth.
@@ -112,8 +111,9 @@ impl World {
         let radius_x = self.master(p, master)?.radius.x();
         let mut points = edge_points(at, Distance::new(radius_x));
         let owner = self.players.player(p)?;
-        let count = cvttss2si(Attributes::get(owner, PASTURE_LIVESTOCK)?.get());
-        let food = Attributes::get(owner, PASTURE_FOOD)? / count as f32;
+        let count =
+            cvttss2si(Attributes::get(owner, self.model.slots.attribute.pasture_livestock)?.get());
+        let food = Attributes::get(owner, self.model.slots.attribute.pasture_food)? / count as f32;
         let map = self.spatial.map;
         let mut made = 0;
         while made < count && !points.is_empty() {
@@ -184,7 +184,7 @@ impl World {
     }
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
-    /// −1 for none (a unit of another player, too): its livestock the world holds with their
+    /// â1 for none (a unit of another player, too): its livestock the world holds with their
     /// workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted by the
     /// gap (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the first whose
     /// workers are below the owner's [`PASTURE_WORKERS`].
@@ -216,7 +216,10 @@ impl World {
             tended.push((id, l.workers, gap));
         }
         sort(&mut tended, &|a, b| a.2 < b.2)?;
-        let room = Attributes::get(self.players.player(q)?, PASTURE_WORKERS)?;
+        let room = Attributes::get(
+            self.players.player(q)?,
+            self.model.slots.attribute.pasture_workers,
+        )?;
         let mut pick = None;
         for (id, workers, _) in tended {
             if workers == WorkerCount::ZERO {
@@ -229,7 +232,7 @@ impl World {
         Ok(pick)
     }
 
-    /// `FUN_141189ca0`: player `p`'s unit at `idx` tends `pasture`, none (−1) to tend none. The
+    /// `FUN_141189ca0`: player `p`'s unit at `idx` tends `pasture`, none (â1) to tend none. The
     /// building it names (the one the unit tends, `+0x794`, for none; none for an object that is
     /// no building) takes the unit last among its workers unless it lists it already, or for none
     /// drops it

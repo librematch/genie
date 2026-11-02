@@ -7,7 +7,8 @@ use crate::objects::SpriteId;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::Task;
 use crate::objects::sprite::Graphic;
-use crate::players::attribute::{self, AttributeId};
+use crate::players::attribute::AttributeId;
+use crate::world::layer::Slots;
 
 /// `FUN_140ac5210`, the sprite a hunter stands with: the task's carrying sprite while it holds a
 /// whole unit or more of the task's resource and the sprite exists, else its master's standing
@@ -41,18 +42,23 @@ pub(crate) fn asked_drop_off(
     resource: Option<AttributeId>,
     held_kind: Option<AttributeId>,
     attributes: usize,
+    slots: Slots,
 ) -> bool {
     resource.is_none()
-        || resource_kind(held_kind, attributes) == resource_kind(resource, attributes)
+        || resource_kind(held_kind, attributes, slots) == resource_kind(resource, attributes, slots)
 }
 
 /// The player's resource of what a unit carries (`FUN_140fdd4f0`): the load's resource
 /// ([`AttributeId::load_resource`], none for none), then food for none or for a resource beyond
 /// the player's `attributes` (`FUN_140efe5b0`).
-pub(crate) fn resource_kind(kind: Option<AttributeId>, attributes: usize) -> AttributeId {
+pub(crate) fn resource_kind(
+    kind: Option<AttributeId>,
+    attributes: usize,
+    slots: Slots,
+) -> AttributeId {
     kind.and_then(AttributeId::load_resource)
         .filter(|k| k.index() < attributes)
-        .unwrap_or(attribute::FOOD)
+        .unwrap_or(slots.attribute.food)
 }
 
 /// The hunt's sprites as graphics: the task's moving, working and carrying sprites, and the
