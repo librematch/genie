@@ -37,6 +37,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::Voice;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
@@ -493,7 +494,7 @@ fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
             point: Position::new(9.5, 19.5, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::default(),
         }));
@@ -2761,7 +2762,7 @@ fn villager_meets_moving_ship_where_it_goes() {
             point: Position::new(9.5, 19.5, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::default(),
         }));

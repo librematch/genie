@@ -158,7 +158,7 @@ impl Attack {
             {
                 // a mover of stance 0 that is not a villager waits where it saw the target:
                 // 0x1fb with 600 and 0x202 for a unit's own Attack, then `set_state(5)`
-                if !self.sub_action {
+                if self.voice.is_loud() {
                     unit.post_own(
                         &mut c.w.parts.unit_ai,
                         NotifyKind::ACTION_INVALIDATED,
@@ -217,7 +217,7 @@ impl Attack {
                 "a predator's failed Attack whose unit AI is not a boar's or a lion's (slot 0x1f0)",
             ));
         }
-        if self.sub_action {
+        if self.voice.is_quiet() {
             return Ok(UpdateCode::FAILED);
         }
         let_go(c, unit, target)?;

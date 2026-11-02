@@ -19,6 +19,7 @@ use genie_core::objects::FacetCount;
 use genie_core::objects::Frame;
 use genie_core::objects::SpriteFlags;
 use genie_core::objects::SpriteId;
+use genie_core::objects::Voice;
 use genie_core::objects::WorkRate;
 use genie_core::objects::layers;
 use genie_core::objects::masters::ActionType;
@@ -377,7 +378,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .copied()
     .unwrap();
     let walk = a.move_to().copied().unwrap();
-    assert_eq!((walk.state, walk.quiet), (MoveTo::Moving, true));
+    assert_eq!((walk.state, walk.voice), (MoveTo::Moving, Voice::Quiet));
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(4.0, 2.0, 0.0))));
     assert!(
         matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
@@ -440,7 +441,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .unwrap();
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
     // a move to the point: its MoveTo is not quiet, its AI hears the end
-    assert_eq!(a.move_to().copied().map(|m| m.quiet), Some(false));
+    assert_eq!(a.move_to().copied().map(|m| m.voice), Some(Voice::Loud));
     assert_eq!(
         imported(
             ARTIFACT_TYPE,
@@ -602,7 +603,7 @@ fn birds_fly_takes_its_home_and_move_to() {
         .copied()
         .unwrap();
     let flight = f.state.move_to().copied().unwrap();
-    assert_eq!((flight.state, flight.quiet), (MoveTo::Moving, false));
+    assert_eq!((flight.state, flight.voice), (MoveTo::Moving, Voice::Loud));
     assert_eq!(
         (flight.target, bits3(flight.point)),
         (None, bits3(Position::new(1.0, 2.0, 0.0)))
@@ -656,13 +657,13 @@ fn build_takes_its_task_move_to_and_site() {
         .unwrap();
     let walk = a.state.move_to().copied().unwrap();
     assert_eq!(
-        (a.target, a.site, walk.target, walk.state, walk.quiet),
+        (a.target, a.site, walk.target, walk.state, walk.voice),
         (
             Some(genie_core::construction::FoundationId::new(object_id(30))),
             Some(DropSiteId::new(object_id(31))),
             None,
             MoveTo::Moving,
-            true
+            Voice::Quiet
         )
     );
     assert!(a.added);
@@ -754,10 +755,10 @@ fn repair_takes_its_task_and_counts_its_builder() {
     .unwrap();
     let walk = r.state.move_to().copied().unwrap();
     assert_eq!(
-        (r.task.id, walk.state, walk.quiet, r.range.get().to_bits()),
-        (TaskId::of_task(2), MoveTo::Moving, true, 0)
+        (r.task.id, walk.state, walk.voice, r.range.get().to_bits()),
+        (TaskId::of_task(2), MoveTo::Moving, Voice::Quiet, 0)
     );
-    assert!(r.counted && r.quiet);
+    assert!(r.counted && r.voice == Voice::Quiet);
     // a MoveTo without a target walks to its point, within its own range
     assert!(
         matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
@@ -847,13 +848,13 @@ fn hunt_takes_its_task_lead_and_move_to() {
     assert_eq!(
         (
             walk.state,
-            walk.quiet,
+            walk.voice,
             walk.range.get().to_bits(),
             walk.wait.state
         ),
         (
             MoveTo::Moving,
-            true,
+            Voice::Quiet,
             0.75_f32.to_bits(),
             MoveWaitState::AskedAgain
         )
@@ -956,7 +957,7 @@ fn gather_takes_its_stops_and_move_to() {
     assert!(!g.worked);
     // every MoveTo of the Gather is quiet; one without a target walks to its point
     let walk = g.state.move_to().copied().unwrap();
-    assert_eq!((walk.state, walk.quiet), (MoveTo::Moving, true));
+    assert_eq!((walk.state, walk.voice), (MoveTo::Moving, Voice::Quiet));
     assert!(
         matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
     );
@@ -1020,8 +1021,8 @@ fn an_enter_takes_its_task_and_retry() {
         .unwrap();
     let m = e.state.move_to().copied().unwrap();
     assert_eq!(
-        (e.state.bare(), m.state, m.quiet, e.task_class),
-        (walking, MoveTo::Moving, true, Some(class_id(3)))
+        (e.state.bare(), m.state, m.voice, e.task_class),
+        (walking, MoveTo::Moving, Voice::Quiet, Some(class_id(3)))
     );
     assert!(e.retry);
     assert_eq!(
@@ -1079,12 +1080,12 @@ fn transport_takes_its_base_alone() {
     .unwrap();
     let m = t.state.move_to().copied().unwrap();
     assert_eq!(
-        (t.state.bare(), t.mode, m.state, m.quiet),
+        (t.state.bare(), t.mode, m.state, m.voice),
         (
             sailing,
             genie_core::garrison::transport::TransportMode::NEW,
             MoveTo::Moving,
-            true
+            Voice::Quiet
         )
     );
     assert!(!t.retarget);
@@ -1141,8 +1142,8 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     // a quiet MoveTo (its maker's `+0x60`, which the save does not hold) with the saved wait
     let m = e.state.move_to().copied().unwrap();
     assert_eq!(
-        (m.state, m.quiet, m.wait.state),
-        (MoveTo::Moving, true, MoveWaitState::AskedAgain)
+        (m.state, m.voice, m.wait.state),
+        (MoveTo::Moving, Voice::Quiet, MoveWaitState::AskedAgain)
     );
     assert_eq!(
         imported(

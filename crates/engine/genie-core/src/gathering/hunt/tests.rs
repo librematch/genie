@@ -22,6 +22,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::class;
@@ -714,14 +715,20 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
                 ObjectId::field(m.target),
                 m.range,
                 m.on_target_moved,
-                m.quiet,
+                m.voice,
             )
         });
         assert_eq!(
             (hunt.state.bare(), walk, hunt.state.attack().copied()),
             (
                 HuntState::Walk { move_to: None },
-                Some((MoveTo::Start, 9365, range, TargetMoved::AsksAgain, true)),
+                Some((
+                    MoveTo::Start,
+                    9365,
+                    range,
+                    TargetMoved::AsksAgain,
+                    Voice::Quiet
+                )),
                 None
             )
         );
@@ -1455,7 +1462,7 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
     };
     let attack = |h: &mut HuntAction, state, victim, queue_empty, ends| {
         let mut a = own_attack(10028, state, Distance::new(1.0));
-        (a.sub_action, a.seen) = (true, Position::new(30.0, 88.0, 0.0));
+        (a.voice, a.seen) = (Voice::Quiet, Position::new(30.0, 88.0, 0.0));
         a.arms.idle_sprite = Some(Graphic {
             id: SpriteId::named(1),
             frames: crate::objects::Frame::of_data(10),

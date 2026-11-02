@@ -13,6 +13,7 @@ use crate::movement::move_to::{
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::UpdateCode;
+use crate::objects::Voice;
 use crate::objects::sprite::Graphic;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{ActionKind, Inbox};
@@ -49,7 +50,7 @@ impl MoveToAction {
             target: None,
             range,
             sprite,
-            quiet: true,
+            voice: Voice::Quiet,
             on_target_moved: TargetMoved::Follows,
             wait: MoveWait::NEW,
         }
@@ -110,7 +111,7 @@ impl MoveToAction {
         if let Some(code) = self.check_held(target_state, inbox)? {
             // no owner makes a sub-action MoveTo to an object that is not quiet, which would
             // owe its target the release (FUN_140a7a230)
-            if !self.quiet {
+            if self.voice.is_loud() {
                 return Err(SUB_RELEASE.with("target", ObjectId::field(target)));
             }
             return Ok(code);
@@ -163,7 +164,7 @@ impl MoveToAction {
     /// A `MoveTo` that is not quiet tells its unit's AI how it ended (`0x140aa2a70` in state 1
     /// and 13: notify `kind`, 0x1fa or 0x1f9, with the move action value and 0, 0).
     fn post_end(&self, inbox: &mut Inbox<'_>, kind: NotifyKind) -> Result<(), GenieError> {
-        if self.quiet {
+        if self.voice.is_quiet() {
             return Ok(());
         }
         inbox.post(kind, [ActionKind::Move.value(), 0, 0])

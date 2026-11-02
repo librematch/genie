@@ -233,7 +233,7 @@ impl EnterAction {
             },
             range: self.range,
             sprite: None,
-            quiet: true,
+            voice: crate::objects::Voice::Quiet,
             on_target_moved: TargetMoved::Ignores,
             wait: crate::movement::move_to::MoveWait::NEW,
         });

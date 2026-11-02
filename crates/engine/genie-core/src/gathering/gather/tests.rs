@@ -16,6 +16,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
@@ -540,7 +541,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         target: Some(object_id(500)),
         range: task().range,
         sprite: None,
-        quiet: true,
+        voice: Voice::Quiet,
         on_target_moved: TargetMoved::AsksAgain,
         wait: MoveWait::NEW,
     };

@@ -87,7 +87,7 @@ impl Attack {
         match self.update_list(c, unit, me, r, gives_up)?.get() {
             1 | 2 => {
                 self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
-                if !self.sub_action {
+                if self.voice.is_loud() {
                     unit.post_own(
                         &mut c.w.parts.unit_ai,
                         NotifyKind::ACTION_INVALIDATED,
@@ -124,7 +124,7 @@ impl Attack {
             "an Attack's unit without a standing sprite",
         ))?;
         new_sprite(sprite, motion.move_stats_mut(), idle, rng);
-        Ok((!self.sub_action).then_some((
+        Ok(self.voice.is_loud().then_some((
             NotifyKind::ACTION_INVALIDATED,
             [
                 600,
@@ -218,7 +218,7 @@ impl Attack {
         // the target go (slot 0x68 with none: a sub-action lets nothing go; the unit's attack
         // count clears, the caller's) and its point, posts no notify as the hunt's
         // sub-action (`+0x60`), ends (set_state 1) and returns 5
-        if !self.sub_action {
+        if self.voice.is_loud() {
             return self.lost(c, unit, f, r);
         }
         if f.own.class != class::VILLAGER {
@@ -317,7 +317,7 @@ impl Attack {
         let rng = c.w.streams.get(Stream::Sprite);
         if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied.by_attacker {
             self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
@@ -335,7 +335,7 @@ impl Attack {
         // order queue is empty posts 0x1fb with 600 and the target
         if f.victim.inside {
             self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
-            if !self.sub_action && r.queue_empty {
+            if self.voice.is_loud() && r.queue_empty {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
@@ -352,7 +352,7 @@ impl Attack {
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
         if !r.armed {
             self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
@@ -411,7 +411,7 @@ impl Attack {
         // the target goes (slot 0x68 with none: a sub-action lets nothing go; the unit's
         // attack count clears, the caller's) and the attack ends (set_state 1); the Hunt's
         // Attack, a sub-action, then posts 0x1fb with 600 and 0x202 too and returns 5
-        if self.sub_action {
+        if self.voice.is_quiet() {
             self.target = None;
             self.finish(
                 unit,
@@ -520,7 +520,7 @@ impl Attack {
             return Ok(UpdateCode::UNDER_WAY);
         }
         let target = self.target.take();
-        if !self.sub_action {
+        if self.voice.is_loud() {
             let_go(c, unit, target)?;
         }
         self.finish_in(
@@ -529,7 +529,7 @@ impl Attack {
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
         )?;
-        if !self.sub_action {
+        if self.voice.is_loud() {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_FAILED,

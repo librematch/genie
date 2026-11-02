@@ -17,6 +17,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::Voice;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ids::TOWN_CENTRE;
@@ -28,7 +29,7 @@ use crate::world::Seconds;
 use genie_diff::Diff;
 
 /// A `MoveTo` (`RGE_Action_Move_To`): a unit's own top action (a wandering animal's, a moved or
-/// following unit's; its `+0x60` and `+0x61` are 0: it is not quiet), or the sub-action of an
+/// following unit's; its `+0x60` and `+0x61` are 0: it is loud), or the sub-action of an
 /// action that walks ([`MoveToAction::sub_to_point`]).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct MoveToAction {
@@ -47,11 +48,11 @@ pub struct MoveToAction {
     /// the one its maker gave, else its constructor's default ([`point_sprite`],
     /// [`object_sprite`]); None for none (null).
     pub sprite: Option<Graphic>,
-    /// `+0x60`: quiet. An action makes its sub-action `MoveTo` quiet (`FUN_140a7a170` with 1):
-    /// its `set_state` 1, 13 and 14 show no standing sprite (`0x140aa29e0`), and its update
-    /// posts no notify 0x1fa, 0x1f9 or 0x1fb (`0x140aa2a70`). A `MoveTo` of its own is not quiet.
-    /// The save does not hold it: the import takes its maker's.
-    pub quiet: bool,
+    /// `+0x60` ([`Voice`]). An action makes its sub-action `MoveTo` quiet (`FUN_140a7a170`
+    /// with 1): its `set_state` 1, 13 and 14 show no standing sprite (`0x140aa29e0`), and its
+    /// update posts no notify 0x1fa, 0x1f9 or 0x1fb (`0x140aa2a70`). A `MoveTo` of its own is
+    /// loud. The save does not hold it: the import takes its maker's.
+    pub voice: Voice,
     /// `+0x61`: what it does when its target object left its point ([`TargetMoved`]); 0
     /// ([`TargetMoved::Follows`]) from its constructors (`FUN_140a73e90`), which an Enter sets
     /// to 2 and a drop-off's, a hunt's and its Attack's maker to 1.
@@ -234,13 +235,13 @@ impl MoveToAction {
             target: Some(target),
             range,
             sprite,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: TargetMoved::Follows,
             wait: MoveWait::default(),
         })
     }
 
-    /// A new `MoveTo` of its own (quiet, `+0x60`, 0) to the object `target` within `range`
+    /// A new `MoveTo` of its own (loud, `+0x60` 0) to the object `target` within `range`
     /// (`FUN_140aa0df0`), then its start (slot 0x808 -> `0x140aa2100`). Livestock (`livestock`,
     /// the unit's class 58) moving to a town centre (master 109) holds no target and walks to
     /// the centre's place less [`TOWN_CENTRE_OFFSET`] on both axes; a target in a `state` of 7
@@ -300,7 +301,7 @@ impl MoveToAction {
             target: None,
             range,
             sprite,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: TargetMoved::Follows,
             wait: MoveWait::default(),
         }
@@ -433,7 +434,7 @@ impl MoveToAction {
             }
             Some(s) if ObjectState::Undead < s => {
                 self.target = None;
-                if self.quiet {
+                if self.voice.is_quiet() {
                     return Ok(Some(UpdateCode::CODE_5));
                 }
                 inbox.post(
@@ -541,7 +542,7 @@ mod tests {
             point: Position::new(30.0, 88.0, 0.0),
             target: ObjectId::of_field(target),
             range: Distance::new(0.1),
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: TargetMoved::Follows,
             wait: MoveWait {
                 state: MoveWaitState::Waiting,

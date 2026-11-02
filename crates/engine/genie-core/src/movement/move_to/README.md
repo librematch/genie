@@ -1,14 +1,14 @@
 # `movement/move_to`
 
 The `MoveTo` action: a unit walks to a target object or a point. One struct, `MoveToAction`,
-holds the game's fields: its state, target, point, sprite, quiet flag, range and wait. It runs
+holds the game's fields: its state, target, point, sprite, voice (loud or quiet), range and wait. It runs
 in two roles:
 
 - As a unit's own top action (`action.rs`): a moved or following unit's, a wandering animal's.
-  It is not quiet.
+  It is loud.
 - As a sub-action (`sub_action.rs`): another action holds it, mostly quiet. The Explore,
   the Transport, the Enter, the Artifact, the Repair and a bird's Fly hold the struct. The
-  Artifact's `MoveTo` to a point and the Fly's are not quiet. The other owners (an Attack, a
+  Artifact's `MoveTo` to a point and the Fly's are loud. The other owners (an Attack, a
   Build, a Gather, a Hunt) still hold its state and wait in fields of their own and run it
   with `start_walk_shown` and `walk_or_give_up` (`mod.rs`), until they move to the struct one
   by one.

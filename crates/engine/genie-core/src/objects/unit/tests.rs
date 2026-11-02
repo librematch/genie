@@ -13,6 +13,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::{Animated, Motion};
@@ -141,7 +142,7 @@ fn an_object_past_state_2_loses_its_actions() {
             point: Position::new(40.0, 80.0, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: MoveWait::default(),
         }));

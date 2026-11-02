@@ -11,6 +11,7 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::Voice;
 use crate::objects::masters::class;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::unit::Unit;
@@ -109,7 +110,7 @@ impl World {
                 point,
                 target: None,
                 range: Distance::ZERO,
-                quiet: false,
+                voice: Voice::Loud,
                 on_target_moved: crate::movement::move_to::TargetMoved::Follows,
                 wait: crate::movement::move_to::MoveWait::default(),
             },

@@ -97,6 +97,7 @@ impl std::fmt::Display for FlyState {
 #[cfg(test)]
 mod tests {
     use crate::movement::fly::FlyState;
+    use crate::objects::Voice;
 
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
     /// `MoveTo` of a state that does not fly.
@@ -112,7 +113,7 @@ mod tests {
         let mut flight = crate::movement::move_to::MoveToAction::sub_in(
             crate::movement::move_to::MoveTo::Moving,
         );
-        flight.quiet = false;
+        flight.voice = Voice::Loud;
         let mut flying = FlyState::of_byte(4, Some(flight)).unwrap();
         assert_eq!(flying.move_to(), Some(&flight));
         flying.move_to_mut().unwrap().range = crate::map::Distance::new(2.0);

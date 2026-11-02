@@ -4,6 +4,7 @@ use crate::sub_actions::{DefaultStart, default_task, gather_point, production, s
 use crate::test_ids::object_id;
 use genie_core::combat::attack::AttackState;
 use genie_core::movement::move_to::MoveTo;
+use genie_core::objects::Voice;
 use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ActionType;
 use genie_core::objects::masters::FlyMode;
@@ -344,8 +345,8 @@ fn saved_attack_reads_its_target_range_and_move_to() {
     // the MoveTo is quiet and holds its own state, point and range
     let m = a.state.move_to().copied().unwrap();
     assert_eq!(
-        (m.state, m.point.x(), m.point.y(), m.quiet),
-        (MoveTo::Moving, 3.0, 4.0, true)
+        (m.state, m.point.x(), m.point.y(), m.voice),
+        (MoveTo::Moving, 3.0, 4.0, Voice::Quiet)
     );
     assert_eq!(a.range.get().to_bits(), 5.0_f32.to_bits());
     let plain = saved_attack(&attack(2, vec![]), Some(&graphics)).unwrap();

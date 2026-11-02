@@ -13,6 +13,7 @@ use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
+use crate::objects::Voice;
 use crate::objects::masters::class;
 use crate::objects::masters::ids;
 use crate::objects::masters::master_type;
@@ -466,7 +467,7 @@ fn repair_move_tos_are_quiet() {
         target: Some(object_id(20)),
         range: Distance::new(1.5),
         sprite: Some(*g.get(SpriteId::named(21)).unwrap()),
-        quiet: true,
+        voice: Voice::Quiet,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         wait: MoveWait::NEW,
     };

@@ -18,6 +18,7 @@ use crate::movement::move_to::{MoveTo, MoveToAction, MoveToReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::actions::Action;
 use crate::objects::masters::ActionType;
 use crate::objects::release::Releaser;
@@ -290,7 +291,10 @@ impl Artifact {
         self.goal = Some(point);
         let gone = self.drop_sub_actions();
         self.sub = walk.map(|m| ArtifactSub::Walk {
-            move_to: MoveToAction { quiet: false, ..m },
+            move_to: MoveToAction {
+                voice: Voice::Loud,
+                ..m
+            },
         });
         self.state = ArtifactState::Check;
         Ok(gone)
@@ -403,14 +407,14 @@ impl Artifact {
                 None
             }
         };
-        let (quiet, released) = self.end_walk();
+        let (voice, released) = self.end_walk();
         if let Some(m) = c.w.parts.mover_mut(unit.id) {
             m.stop()?;
         }
         if let Some(t) = released {
             crate::world::lets::release(c, unit, t, r.by)?;
         }
-        if let Some(notify) = notify.filter(|_| !quiet) {
+        if let Some(notify) = notify.filter(|_| voice.is_loud()) {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 notify,
@@ -421,12 +425,12 @@ impl Artifact {
     }
 
     /// The `MoveTo` ended (codes 1 to 5): it goes with the point and the target (slot 0x68 with
-    /// none); true when it was quiet, and the target let go.
-    fn end_walk(&mut self) -> (bool, Option<ObjectId>) {
-        let quiet = self.take_move_to().is_some_and(|m| m.quiet);
+    /// none); its voice (loud without one), and the target let go.
+    fn end_walk(&mut self) -> (Voice, Option<ObjectId>) {
+        let voice = self.take_move_to().map_or(Voice::Loud, |m| m.voice);
         self.goal = None;
         let released = self.set_target(None, false).released;
-        (quiet, released)
+        (voice, released)
     }
 
     /// The update's second part after `dt_ms`: the state's step ([`Handover`]): the check's new
@@ -673,7 +677,7 @@ mod tests {
         );
         // a MoveTo to the point within 0 that is not quiet: the action's AI hears its end
         let to_point = MoveToAction {
-            quiet: false,
+            voice: Voice::Loud,
             ..MoveToAction::sub_to_point(Position::new(28.5, 93.5, 0.0), Distance::ZERO, None)
         };
         assert_eq!(a.move_to().copied(), Some(to_point));
@@ -1312,12 +1316,12 @@ mod tests {
         assert_eq!(
             a.move_to()
                 .copied()
-                .map(|m| (m.goal(), ObjectId::field(m.target), m.range, m.quiet)),
+                .map(|m| (m.goal(), ObjectId::field(m.target), m.range, m.voice)),
             Some((
                 Some(Position::new(9.8, 11.8, 0.0)),
                 -1,
                 Distance::new(1.0),
-                true
+                Voice::Quiet
             ))
         );
         assert_eq!(a.target, Some(object_id(9149)));
@@ -1463,7 +1467,7 @@ mod tests {
         a.target = Some(object_id(77));
         a.sub = Some(ArtifactSub::Walk {
             move_to: MoveToAction {
-                quiet: false,
+                voice: Voice::Loud,
                 ..MoveToAction::sub_in(MoveTo::Failed)
             },
         });

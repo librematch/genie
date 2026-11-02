@@ -13,6 +13,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
+use crate::objects::Voice;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ClassId;
@@ -832,7 +833,7 @@ fn keshik(t: &mut World) {
             fire_frame: crate::objects::Frame::of_data(0),
             interrupt_frame: crate::objects::Frame::of_data(-1),
         },
-        sub_action: false,
+        voice: Voice::Loud,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         same_owner: false,
     };

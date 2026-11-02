@@ -18,6 +18,7 @@ use crate::movement::move_to::{MoveToReads, TargetMoved};
 use crate::movement::{Mover, footprint_gap, footprint_gap_squared};
 use crate::objects::ObjectId;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
@@ -51,7 +52,7 @@ impl Attack {
             swing: Seconds::ZERO,
             rest: Seconds::ZERO,
             arms,
-            sub_action: false,
+            voice: Voice::Loud,
             on_target_moved: TargetMoved::Follows,
             same_owner: e.same_owner,
         }
@@ -79,7 +80,7 @@ impl Attack {
         reads: &MoveToReads<'_>,
     ) -> Result<(Self, bool), GenieError> {
         let mut a = Self {
-            sub_action: true,
+            voice: Voice::Quiet,
             on_target_moved: TargetMoved::AsksAgain,
             ..Self::own(target, e, arms)
         };
@@ -284,12 +285,12 @@ impl Attack {
                 failed_first = true;
             }
         } else if self.min_range > e.gap {
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 posted.push((crate::unit_ai::NotifyKind::TOO_CLOSE, [-1; 3]));
             }
             failed_first = !movable;
         } else if !crate::math::fmath::at_most_or_unordered(reach_gap.get(), self.reach().get()) {
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 posted.push((crate::unit_ai::NotifyKind::OUT_OF_REACH, [0; 3]));
             }
             if (e.stance == UnitStance::DEFENSIVE

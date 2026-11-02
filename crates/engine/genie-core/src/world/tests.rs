@@ -70,6 +70,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
@@ -11610,7 +11611,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
             state: FlyState::Flying {
                 move_to: Some(MoveToAction {
                     state: MoveTo::Moving,
-                    quiet: false,
+                    voice: Voice::Loud,
                     ..MoveToAction::sub_to_point(
                         Position::new(12.0, 12.0, 0.0),
                         Distance::ZERO,
@@ -12183,7 +12184,7 @@ fn move_to_an_object_lets_it_go_when_it_ends_or_its_unit_dies() {
                     target: Some(object_id(50)),
                     range: Distance::ZERO,
                     sprite: None,
-                    quiet: false,
+                    voice: Voice::Loud,
                     on_target_moved: crate::movement::move_to::TargetMoved::Follows,
                     wait: crate::movement::move_to::MoveWait::default(),
                 })),
@@ -12276,7 +12277,7 @@ fn move_to_of_its_own_lets_dying_target_go_and_forgets_lost_one() {
                     target: ObjectId::of_field(target),
                     range: Distance::ZERO,
                     sprite: None,
-                    quiet: false,
+                    voice: Voice::Loud,
                     on_target_moved: crate::movement::move_to::TargetMoved::Follows,
                     wait: crate::movement::move_to::MoveWait {
                         state: MoveWaitState::Waiting,
@@ -14532,7 +14533,7 @@ fn restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
             target: Some(object_id(77)),
             range: Distance::ZERO,
             sprite: None,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::default(),
         })),
@@ -15493,7 +15494,7 @@ fn own_attack(target: i32, target2: i32, state: AttackState) -> crate::combat::a
             fire_frame: crate::objects::Frame::of_data(-1),
             interrupt_frame: crate::objects::Frame::of_data(-1),
         },
-        sub_action: false,
+        voice: Voice::Loud,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         same_owner: false,
     }
@@ -19276,7 +19277,7 @@ fn unit_own_move_to_walks_tells_its_end_and_lets_its_target_go() {
         target: Some(object_id(600)),
         range: Distance::new(0.25),
         sprite: None,
-        quiet: false,
+        voice: Voice::Loud,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         wait: crate::movement::move_to::MoveWait::default(),
     };
@@ -19354,7 +19355,7 @@ fn flown(move_to: MoveTo, setup: impl FnOnce(&mut World)) -> Flown {
             state: FlyState::Flying {
                 move_to: Some(MoveToAction {
                     state: move_to,
-                    quiet: false,
+                    voice: Voice::Loud,
                     ..MoveToAction::sub_to_point(
                         Position::new(40.5, 89.5, 0.0),
                         Distance::ZERO,

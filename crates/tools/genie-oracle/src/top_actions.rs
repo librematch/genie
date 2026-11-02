@@ -14,6 +14,7 @@ use genie_core::movement::fly::{FLY, Fly};
 use genie_core::movement::move_to::{MOVE_TO, MoveTo, MoveToAction, TargetMoved};
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
+use genie_core::objects::Voice;
 use genie_core::objects::layers;
 use genie_core::objects::masters::action_type::BUILD;
 use genie_core::objects::masters::{ActionType, Task};
@@ -207,9 +208,13 @@ fn import_artifact(
     ))?;
     // a move to an object (set_state 5) holds the target and a quiet MoveTo (to the target,
     // or to a town centre's point); a move to a point (set_state 4) a MoveTo that is not quiet
-    let quiet = base.target_id != -1;
+    let voice = if base.target_id == -1 {
+        Voice::Loud
+    } else {
+        Voice::Quiet
+    };
     let move_to = sub
-        .map(|s| saved_move_to(s, saved.graphics, quiet))
+        .map(|s| saved_move_to(s, saved.graphics, voice))
         .transpose()?;
     actions
         .list
@@ -233,17 +238,17 @@ fn import_artifact(
 
 /// A `MoveTo` of its own (type 1): its state, goal, range, sprite and wait; not quiet.
 fn import_move_to(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(), GenieError> {
-    let move_to = saved_move_to(saved.action, saved.graphics, false)?;
+    let move_to = saved_move_to(saved.action, saved.graphics, Voice::Loud)?;
     actions.list.set_move_to(Some(move_to));
     Ok(())
 }
 
 /// A saved `MoveTo` (type 1), of its own or an action's sub-action: its state, goal, target,
-/// range, sprite and wait. The save does not hold `+0x60`: `quiet` is its maker's.
+/// range, sprite and wait. The save does not hold `+0x60`: `voice` is its maker's.
 pub(crate) fn saved_move_to(
     action: &Action,
     graphics: Option<&genie_core::objects::Graphics>,
-    quiet: bool,
+    voice: Voice,
 ) -> Result<MoveToAction, GenieError> {
     let base = action.base().ok_or(MOVE_TO_BASELESS)?;
     Ok(MoveToAction {
@@ -254,7 +259,7 @@ pub(crate) fn saved_move_to(
         range: Distance::new(sub_range(action)?),
         // its sprite (`+0x58`, the save's second `short_val`; −1 for none)
         sprite: saved_move_to_sprite(SpriteId::of_data(base.short_val_2), graphics)?,
-        quiet,
+        voice,
         // what it does when its target moves (`+0x61`)
         on_target_moved: TargetMoved::try_from(base.target_moved_state)?,
         // its wait (`+0x6c`, `+0x70`, `+0x74`)
@@ -345,7 +350,7 @@ fn import_fly(
         .move_to_sub(GenieError::unsupported(
             "a saved Fly action with another sub-action",
         ))?
-        .map(|s| saved_move_to(s, saved.graphics, false))
+        .map(|s| saved_move_to(s, saved.graphics, Voice::Loud))
         .transpose()?;
     actions.list.set_fly(Some(Fly {
         state: genie_core::movement::fly::FlyState::of_byte(base.state, move_to)?,
@@ -366,7 +371,7 @@ fn import_build(
     // its quiet MoveTo (FUN_140a7a170 with 1)
     let move_to = saved
         .move_to_sub(OTHER_SUB_ACTION)?
-        .map(|s| saved_move_to(s, saved.graphics, true))
+        .map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
         .transpose()?;
     let task = work(saved.s.master_obj)?;
     actions.list.set_build(Some(BuildAction {
@@ -400,7 +405,7 @@ fn import_repair(
     // every MoveTo of the Repair is quiet: to the target, or to a point without one
     let move_to = saved
         .move_to_sub(OTHER_SUB_ACTION)?
-        .map(|s| saved_move_to(s, saved.graphics, true))
+        .map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
         .transpose()?;
     let t = saved.task(task_at)?;
     actions
@@ -417,7 +422,7 @@ fn import_repair(
                 .and_then(combat_master)
                 .map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
             counted: part.added_to_num_builders != 0,
-            quiet: base.sub_action_value != 0,
+            voice: Voice::of_byte(base.sub_action_value),
         }));
     Ok(())
 }
@@ -444,7 +449,7 @@ fn import_enter(
     ))?;
     // its quiet MoveTo to the target (`FUN_140a87320` case 4: `FUN_140a7a170` with 1)
     let move_to = sub
-        .map(|s| saved_move_to(s, saved.graphics, true))
+        .map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
         .transpose()?;
     // the states the slice models: all but the walk to the meeting point (11)
     if !EnterState::of_byte(base.state, None)
@@ -483,7 +488,7 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(
             // its quiet MoveTo to the point (`0x140aa42a0`: `FUN_140a7a170` with 1)
             state: genie_core::garrison::transport::TransportState::of_byte(
                 base.state,
-                sub.map(|s| saved_move_to(s, saved.graphics, true))
+                sub.map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
                     .transpose()?,
             )?,
             mode: genie_core::garrison::transport::TransportMode::of_data(base.target2_id),
@@ -504,7 +509,7 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
     ))?;
     // its quiet MoveTo to the point (`0x140a87e30`: `FUN_140a7a170` with 1)
     let move_to = sub
-        .map(|s| saved_move_to(s, saved.graphics, true))
+        .map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
         .transpose()?;
     let state = ExploreState::of_byte(base.state, move_to)?;
     if !matches!(state, ExploreState::Wait | ExploreState::Walk { .. }) {

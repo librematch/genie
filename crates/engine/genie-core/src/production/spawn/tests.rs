@@ -19,6 +19,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
@@ -879,7 +880,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
             point: Position::new(40.0, 80.0, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: MoveWait::default(),
         })

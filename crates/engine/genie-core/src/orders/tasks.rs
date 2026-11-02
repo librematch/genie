@@ -7,6 +7,7 @@ use crate::gathering::hunt::HuntTask;
 use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::objects::ListIndex;
+use crate::objects::Voice;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::master_type::BUILDING;
 use crate::objects::{ObjectId, ObjectKey};
@@ -378,7 +379,7 @@ impl World {
                     idx,
                     repair.target.map(crate::construction::RepairTargetId::id),
                     target,
-                    false,
+                    repair.voice,
                 )?
                 .map(crate::construction::RepairTargetId::new);
             if ship {
@@ -578,7 +579,7 @@ impl World {
                 idx,
                 old.map(crate::construction::FoundationId::id),
                 new.id(),
-                false,
+                Voice::Loud,
             )?
             .map(crate::construction::FoundationId::new);
         if let Some(build) = self

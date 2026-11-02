@@ -204,7 +204,7 @@ impl Unit {
         let state = c.w.object_state(target);
         let mut inbox = c.w.parts.unit_ai.inbox(self.id, self.life.state);
         let code = move_to.check_held(state, &mut inbox)?;
-        let releases = code.is_some() && !move_to.quiet;
+        let releases = code.is_some() && move_to.voice.is_loud();
         if releases && let Some(target) = target {
             let by = self.releaser(c)?;
             crate::world::lets::release(c, self, target, by)?;

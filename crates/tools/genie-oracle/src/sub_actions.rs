@@ -13,6 +13,7 @@ use genie_core::objects::AnimateState;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::SpriteId;
+use genie_core::objects::Voice;
 use genie_core::objects::WorkRate;
 use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ACTION_FACTORY_TYPES;
@@ -122,7 +123,7 @@ pub(super) fn saved_attack(
     // every MoveTo of the Attack is quiet (`FUN_140a7a170` with 1)
     let move_to = match first_action(&b.sub_actions)? {
         None => None,
-        Some((MOVE_TO, s2)) => Some(saved_move_to(s2, Some(graphics), true)?),
+        Some((MOVE_TO, s2)) => Some(saved_move_to(s2, Some(graphics), Voice::Quiet)?),
         Some(_) => {
             return Err(GenieError::unsupported(
                 "a saved Attack with another sub-action",
@@ -155,7 +156,7 @@ pub(super) fn saved_attack(
             fire_frame: Frame::of_data(a.frame_delay),
             interrupt_frame: Frame::of_data(a.interrupt_animation_at_frame),
         },
-        sub_action: b.sub_action_value != 0,
+        voice: Voice::of_byte(b.sub_action_value),
         on_target_moved: TargetMoved::try_from(b.target_moved_state)?,
         same_owner: a.was_same_owner != 0,
     })

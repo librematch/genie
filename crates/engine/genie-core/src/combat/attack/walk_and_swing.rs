@@ -117,7 +117,7 @@ impl Attack {
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
         )?;
-        if !self.sub_action {
+        if self.voice.is_loud() {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_FAILED,

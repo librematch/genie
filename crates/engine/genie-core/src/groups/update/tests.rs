@@ -32,6 +32,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
@@ -482,7 +483,7 @@ fn member_is_free_by_its_action_and_its_unit_ai() {
             fire_frame: crate::objects::Frame::of_data(-1),
             interrupt_frame: crate::objects::Frame::of_data(-1),
         },
-        sub_action: false,
+        voice: Voice::Loud,
         on_target_moved: crate::movement::move_to::TargetMoved::Follows,
         same_owner: false,
     };

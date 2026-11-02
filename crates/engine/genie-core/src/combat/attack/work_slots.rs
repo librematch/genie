@@ -222,13 +222,13 @@ impl Attack {
         if new != self.target {
             worked.clears_count = true;
         }
-        if self.target.is_some() && self.target != new && !self.sub_action {
+        if self.target.is_some() && self.target != new && self.voice.is_loud() {
             worked.lets_go = self.target.map(crate::combat::AttackTargetId::id);
         }
         if self.target != new {
             self.target = match target {
                 Some(t) if t.state < ObjectState::Removed => {
-                    if !self.sub_action {
+                    if self.voice.is_loud() {
                         worked.takes = Some(t.id);
                     }
                     new

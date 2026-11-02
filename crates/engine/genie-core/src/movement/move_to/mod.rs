@@ -264,10 +264,11 @@ pub enum Goal {
 /// owner's answer decides what follows). In range is the footprints' squared gap (`FUN_14118f8c0`)
 /// to a target object, the gap from the unit's footprint to a point, at most `range` squared. A
 /// unit already in range ends the `MoveTo` (`set_state` 1, code 0, none of its sprite shown) when
-/// [`PathAsk::ends_in_range`] (a unit AI not on order 711 or 733); a `MoveTo` that is not `quiet`
-/// (its `+0x60` clear) then shows the unit's idle sprite (slot 0x68 with slot 0x798's: the master's
-/// standing sprite, [`crate::movement::Mover::shows_standing`]; the sprite itself and `+0x7b8`,
-/// cleared, are the caller's).
+/// [`PathAsk::ends_in_range`] (a unit AI not on order 711 or 733); a loud `MoveTo`
+/// ([`crate::objects::Voice::Loud`], its `+0x60` clear) then shows the unit's idle sprite (slot
+/// 0x68 with slot 0x798's: the master's standing sprite,
+/// [`crate::movement::Mover::shows_standing`]; the sprite itself and `+0x7b8`, cleared, are the
+/// caller's).
 ///
 /// Returns the `MoveTo`'s state after it, and the place it asked a path toward (None when it
 /// ended in range): its point (`+0x38`..`+0x40`), which for a target object state 3 takes from
@@ -560,6 +561,7 @@ mod tests {
     use crate::objects::ActionState;
     use crate::objects::ObjectState;
     use crate::objects::UpdateCode;
+    use crate::objects::Voice;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ObstructionType;
     use crate::objects::masters::class;
@@ -785,10 +787,10 @@ mod tests {
     /// value, the id let go, −1, and 0). A sub-action `MoveTo` runs it first and gives its 5.
     #[test]
     fn move_to_lets_dying_target_go_and_walks_on_from_one_the_world_lost() {
-        let checked = |quiet: bool, target: i32, state: Option<ObjectState>| {
+        let checked = |voice: Voice, target: i32, state: Option<ObjectState>| {
             let mut m = MoveToAction {
                 target: ObjectId::of_field(target),
-                quiet,
+                voice,
                 ..MoveToAction::sub_in(MoveTo::Moving)
             };
             // a moving unit's AI: an invalidation of its move joins its queue
@@ -804,16 +806,16 @@ mod tests {
             (code, ObjectId::field(m.target), posted)
         };
         assert_eq!(
-            checked(true, -1, Some(ObjectState::Gone)),
+            checked(Voice::Quiet, -1, Some(ObjectState::Gone)),
             (None, -1, vec![])
         );
-        assert_eq!(checked(false, 10028, None), (None, -1, vec![]));
+        assert_eq!(checked(Voice::Loud, 10028, None), (None, -1, vec![]));
         assert_eq!(
-            checked(false, 10028, Some(ObjectState::Undead)),
+            checked(Voice::Loud, 10028, Some(ObjectState::Undead)),
             (None, 10028, vec![])
         );
         assert_eq!(
-            checked(true, 10028, Some(ObjectState::Removed)),
+            checked(Voice::Quiet, 10028, Some(ObjectState::Removed)),
             (Some(UpdateCode::CODE_5), -1, vec![])
         );
         let invalidated = (
@@ -821,7 +823,7 @@ mod tests {
             [0x262, -1, 0],
         );
         assert_eq!(
-            checked(false, 10028, Some(ObjectState::Removed)),
+            checked(Voice::Loud, 10028, Some(ObjectState::Removed)),
             (Some(UpdateCode::CODE_4), -1, vec![invalidated])
         );
         // through the sub-action's update, before its state's case
@@ -847,7 +849,7 @@ mod tests {
         );
         let mut loud = MoveToAction {
             target: Some(object_id(10028)),
-            quiet: false,
+            voice: Voice::Loud,
             ..MoveToAction::sub_in(MoveTo::Moving)
         };
         let code = loud.sub_update(
@@ -866,9 +868,9 @@ mod tests {
     #[test]
     fn not_quiet_move_to_posts_its_end_and_quiet_one_does_not() {
         let mut rig = crate::movement::tests::WalkRig::on_the_path();
-        let mut update = |quiet: bool, state: MoveTo| {
+        let mut update = |voice: Voice, state: MoveTo| {
             let mut m = MoveToAction {
-                quiet,
+                voice,
                 ..MoveToAction::sub_in(state)
             };
             let mut ai = Some(crate::unit_ai::UnitAi {
@@ -891,17 +893,23 @@ mod tests {
             });
             (code, posted)
         };
-        assert_eq!(update(true, MoveTo::Arrived), (UpdateCode::DONE, vec![]));
-        assert_eq!(update(true, MoveTo::Failed), (UpdateCode::FAILED, vec![]));
         assert_eq!(
-            update(false, MoveTo::Arrived),
+            update(Voice::Quiet, MoveTo::Arrived),
+            (UpdateCode::DONE, vec![])
+        );
+        assert_eq!(
+            update(Voice::Quiet, MoveTo::Failed),
+            (UpdateCode::FAILED, vec![])
+        );
+        assert_eq!(
+            update(Voice::Loud, MoveTo::Arrived),
             (
                 UpdateCode::DONE,
                 vec![(crate::unit_ai::NotifyKind::ACTION_COMPLETED, [0x262, 0, 0])]
             )
         );
         assert_eq!(
-            update(false, MoveTo::Failed),
+            update(Voice::Loud, MoveTo::Failed),
             (
                 UpdateCode::FAILED,
                 vec![(crate::unit_ai::NotifyKind::ACTION_FAILED, [0x262, 0, 0])]
@@ -970,8 +978,8 @@ mod tests {
         );
         let added = m.added(ObjectState::Alive, Distance::new(0.5), Speed::new(1.0));
         assert_eq!(
-            added.map(|a| (a.point, a.range, a.quiet)),
-            Some((m.point, Distance::new(0.5), true))
+            added.map(|a| (a.point, a.range, a.voice)),
+            Some((m.point, Distance::new(0.5), Voice::Quiet))
         );
     }
 

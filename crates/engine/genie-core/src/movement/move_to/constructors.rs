@@ -15,6 +15,7 @@ use crate::movement::move_to::{
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
@@ -168,7 +169,7 @@ impl<'g> MoveToReads<'g> {
             target,
             range,
             sprite: self.sprites.to_object(given)?,
-            quiet: true,
+            voice: Voice::Quiet,
             on_target_moved,
             wait: MoveWait::NEW,
         };
@@ -216,7 +217,7 @@ impl<'g> MoveToReads<'g> {
             target: None,
             range,
             sprite: self.sprites.to_object(given)?,
-            quiet: true,
+            voice: Voice::Quiet,
             on_target_moved: TargetMoved::Follows,
             wait: MoveWait::NEW,
         };
@@ -317,8 +318,8 @@ mod tests {
             )
         );
         assert_eq!(
-            (m.sprite.map(|g| g.id), m.quiet, m.wait),
-            (Some(SpriteId::named(21)), true, MoveWait::NEW)
+            (m.sprite.map(|g| g.id), m.voice, m.wait),
+            (Some(SpriteId::named(21)), Voice::Quiet, MoveWait::NEW)
         );
         assert_eq!(
             to(&move_reads, house, Some(SpriteId::named(3)))

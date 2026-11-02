@@ -12,6 +12,7 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::Voice;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::PlayersMasters;
@@ -355,7 +356,7 @@ impl World {
             // the hunt's slot 0x68 (FUN_140ac7980): FUN_140a7a230 on the new target, which the
             // work command's task finder took below state 3
             let old = old.flatten().map(crate::gathering::HuntTargetId::id);
-            let _ = self.retarget_action(player, idx, old, target, false)?;
+            let _ = self.retarget_action(player, idx, old, target, Voice::Loud)?;
         }
         Ok(())
     }
@@ -363,22 +364,22 @@ impl World {
     /// An action's slot 0x68 base (`FUN_140a7a230`) for the unit at `idx`: its target `old`
     /// becomes `new`. The same target changes nothing. A different old target the
     /// world still holds is let go (slot 0x180, [`World::release`]) unless the action is a
-    /// sub-action (`quiet`, `+0x60`); a new target in state 7 or more is not taken, and the
-    /// action is left without one; else it is taken (slot 0x178 with the action's type,
-    /// [`World::take`]) unless `quiet`. Returns the action's target (`+0x30`) after it.
+    /// quiet sub-action (`voice`, `+0x60`); a new target in state 7 or more is not taken, and
+    /// the action is left without one; else it is taken (slot 0x178 with the action's type,
+    /// [`World::take`]) unless quiet. Returns the action's target (`+0x30`) after it.
     pub(crate) fn retarget_action(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         old: Option<ObjectId>,
         new: ObjectId,
-        quiet: bool,
+        voice: Voice,
     ) -> Result<Option<ObjectId>, GenieError> {
         if old == Some(new) {
             return Ok(old);
         }
         if let Some(old) = old
-            && !quiet
+            && voice.is_loud()
             && self.object(old).is_some()
         {
             let by = self.releaser(player, idx)?;
@@ -390,7 +391,7 @@ impl World {
         if ObjectState::Removed <= t.life.state {
             return Ok(None);
         }
-        if !quiet {
+        if voice.is_loud() {
             self.take(new, self.releaser(player, idx)?)?;
         }
         Ok(Some(new))

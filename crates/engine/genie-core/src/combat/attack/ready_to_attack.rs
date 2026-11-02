@@ -42,7 +42,7 @@ impl Attack {
     ) -> Result<(), GenieError> {
         self.enter(AttackState::Ready, g.motion.reborrow())?;
         if self.target.is_none() && self.point.x() == NONE {
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 g.post(unit, NotifyKind::ACTION_COMPLETED, [600, 0, 0])?;
             }
             return self.finish(unit, g.motion.reborrow(), g.sprite_rng);
@@ -137,7 +137,7 @@ impl Attack {
             );
         }
         if gap < self.min_range {
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 g.post(unit, NotifyKind::TOO_CLOSE, [-1; 3])?;
             }
             if speed != Speed::ZERO && r.can_move {
@@ -148,7 +148,7 @@ impl Attack {
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
         let gap = crate::movement::gate_gap(g.map, (at, ground), (target, &t), gap, |g| g, g.by_id);
         if self.reach() < gap {
-            if !self.sub_action {
+            if self.voice.is_loud() {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
             }
             if (r.stance == UnitStance::DEFENSIVE && self.off_leash(t.position, r.state_position))

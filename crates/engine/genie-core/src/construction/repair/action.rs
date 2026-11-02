@@ -20,6 +20,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::master_type::COMBAT;
@@ -114,7 +115,7 @@ impl RepairAction {
             task,
             range,
             counted: false,
-            quiet: false,
+            voice: Voice::Loud,
         };
         repair.state = RepairState::Move {
             move_to: repair.walk(move_reads, Some(to))?,
@@ -552,7 +553,7 @@ impl RepairAction {
         reads: &RepairReads,
     ) -> Result<(), GenieError> {
         self.drop_target(c, repairer, reads)?;
-        if !self.quiet {
+        if self.voice.is_loud() {
             notify(c, repairer, NotifyKind::ACTION_COMPLETED)?;
         }
         standing(c, repairer)

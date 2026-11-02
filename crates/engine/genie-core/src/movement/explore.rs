@@ -686,6 +686,7 @@ mod tests {
     use crate::objects::ObjectState;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    use crate::objects::Voice;
     use crate::objects::sprite::Graphic;
     use crate::world::Seconds;
 
@@ -791,7 +792,7 @@ mod tests {
             target: None,
             range: Distance::ZERO,
             sprite: Some(walking),
-            quiet: true,
+            voice: Voice::Quiet,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::NEW,
         };

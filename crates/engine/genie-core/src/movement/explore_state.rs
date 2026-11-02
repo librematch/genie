@@ -108,6 +108,7 @@ impl std::fmt::Display for ExploreState {
 #[cfg(test)]
 mod tests {
     use crate::movement::explore::ExploreState;
+    use crate::objects::Voice;
 
     /// Each state reads back from its byte; the bytes without a state are errors, and so is a
     /// `MoveTo` of a state that does not walk.
@@ -126,7 +127,7 @@ mod tests {
             target: None,
             range: crate::map::Distance::ZERO,
             sprite: None,
-            quiet: true,
+            voice: Voice::Quiet,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::NEW,
         };

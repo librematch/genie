@@ -22,6 +22,7 @@ use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, TargetMoved};
 use crate::objects::ObjectId;
+use crate::objects::Voice;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
@@ -163,9 +164,9 @@ pub struct Attack {
     pub rest: Seconds,
     /// The sprites and frames from its constructor.
     pub arms: Arms,
-    /// `+0x60`, `subActionValue`: the action is another's sub-action (the Hunt's) and posts no
-    /// notifies; a unit's own Attack posts them to its unit AI (slot 0x328).
-    pub sub_action: bool,
+    /// `+0x60`, `subActionValue` ([`Voice`]): quiet as another's sub-action (the Hunt's), which
+    /// posts no notifies; a unit's own Attack is loud and posts them to its unit AI (slot 0x328).
+    pub voice: Voice,
     /// `+0x61`, `mTargetMovedState`, which its `MoveTo` takes ([`TargetMoved`]): a unit's own
     /// Attack's follows, the Hunt's asks for a path at once (its `set_state` 12 sets it).
     pub on_target_moved: TargetMoved,

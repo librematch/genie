@@ -4,6 +4,7 @@ use crate::map::Position;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
 use crate::objects::ListIndex;
+use crate::objects::Voice;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::class;
 use crate::ownership::artifact::Artifact;
@@ -33,7 +34,7 @@ fn walking_forager() -> World {
             point: Position::new(40.0, 80.0, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: MoveWait::default(),
         }));

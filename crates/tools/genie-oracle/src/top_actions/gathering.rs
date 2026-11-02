@@ -7,6 +7,7 @@ use genie_core::GenieError;
 use genie_core::gathering::DropSiteId;
 use genie_core::map::Point;
 use genie_core::movement::move_to::MOVE_TO;
+use genie_core::objects::Voice;
 use genie_core::objects::layers;
 use genie_core::objects::masters::{ClassId, Task};
 use genie_core::players::Amount;
@@ -93,7 +94,10 @@ pub(super) fn import_hunt(
         None => (None, None),
         Some((genie_core::combat::attack::ATTACK, sub)) => (None, Some(hunt_attack(saved, sub)?)),
         // every MoveTo of the Hunt is quiet (`FUN_140a7a170` with 1)
-        Some((MOVE_TO, sub)) => (Some(saved_move_to(sub, saved.graphics, true)?), None),
+        Some((MOVE_TO, sub)) => (
+            Some(saved_move_to(sub, saved.graphics, Voice::Quiet)?),
+            None,
+        ),
         Some(_) => {
             return Err(GenieError::unsupported(
                 "a saved Hunt with another sub-action",
@@ -184,7 +188,7 @@ pub(super) fn import_gather(
         .move_to_sub(GenieError::unsupported(
             "a saved Gather with another sub-action",
         ))?
-        .map(|sub| saved_move_to(sub, saved.graphics, true))
+        .map(|sub| saved_move_to(sub, saved.graphics, Voice::Quiet))
         .transpose()?;
     let state = GatherState::of_byte(base.state, walk)?;
     let task = hunt_task(&saved.task(task_at)?);

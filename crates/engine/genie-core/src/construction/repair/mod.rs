@@ -18,6 +18,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::WorkRate;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::ClassId;
@@ -128,8 +129,8 @@ pub struct RepairAction {
     /// `+0x6c`: the action counts among its target's repairers (`+0x9e8` of the object
     /// `FUN_140ad9050` gives: the target, an annex's main building).
     pub counted: bool,
-    /// `+0x60`: its end posts no notify 0x1fa.
-    pub quiet: bool,
+    /// `+0x60` ([`Voice`]): a quiet Repair's end posts no notify 0x1fa.
+    pub voice: Voice,
 }
 
 /// What a Repair's update reads of its target (the object its id names).

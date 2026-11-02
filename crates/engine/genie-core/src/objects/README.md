@@ -62,6 +62,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`sprite_id.rs`](sprite_id.rs) | A sprite's id (`SpriteId`): the `.dat`'s graphic a master or a task shows. |
 | [`teardown.rs`](teardown.rs) | The action list's deletions (`FUN_140a98620`, `FUN_140a98e20`) and each action's destructor (its slot 0): what they leave the unit's world to apply. |
 | [`update_code.rs`](update_code.rs) | What an action's update answers its list. |
+| [`voice.rs`](voice.rs) | Whether an action speaks for its unit (`Voice`): the base action's `+0x60`. |
 | [`work_rate.rs`](work_rate.rs) | A worker's work rate (`WorkRate`), with the game's `f32` operations. |
 | [`worker_count.rs`](worker_count.rs) | The count of the actions that work on an object, and the caps on it. |
 | [`layers/`](layers/) | The object's class chain (FD-045-D06): the game's object classes, each layer holding the one below it, as the save reads them (`RgeMovingObject` holds `rge_animated_object`). |

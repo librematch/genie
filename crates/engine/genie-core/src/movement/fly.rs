@@ -16,6 +16,7 @@ use crate::movement::move_to::{MoveToAction, graphic_of};
 use crate::movement::{Me, Mover};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
+use crate::objects::Voice;
 use crate::objects::masters::ActionType;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::Task;
@@ -259,7 +260,7 @@ impl Fly {
         // FUN_140aa0d30 to the point within 0 with the flight's sprite, not quiet, then
         // set_state(4) keeps it
         let flight = MoveToAction {
-            quiet: false,
+            voice: Voice::Loud,
             ..MoveToAction::sub_to_point(
                 Position::new(point[0], point[1], z),
                 Distance::ZERO,
@@ -421,7 +422,7 @@ mod tests {
     fn flight(state: MoveTo, point: Position) -> MoveToAction {
         MoveToAction {
             state,
-            quiet: false,
+            voice: Voice::Loud,
             ..MoveToAction::sub_to_point(point, Distance::ZERO, None)
         }
     }

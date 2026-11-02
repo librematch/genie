@@ -27,6 +27,7 @@ use crate::objects::ObjectId;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
+use crate::objects::Voice;
 use crate::objects::actions::ActionList;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::BuildableOn;
@@ -2716,7 +2717,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
             point: Position::new(30.0, 30.0, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::default(),
         }));
@@ -3166,7 +3167,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             ListIndex::new(0),
             Some(object_id(40)),
             object_id(40),
-            false
+            Voice::Loud
         ),
         Ok(Some(object_id(40)))
     );
@@ -3177,7 +3178,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             ListIndex::new(0),
             Some(object_id(40)),
             object_id(41),
-            true
+            Voice::Quiet
         ),
         Ok(Some(object_id(41)))
     );
@@ -3188,7 +3189,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             ListIndex::new(0),
             Some(object_id(40)),
             object_id(41),
-            false
+            Voice::Loud
         ),
         Ok(Some(object_id(41)))
     );
@@ -3199,7 +3200,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             ListIndex::new(0),
             Some(object_id(41)),
             object_id(42),
-            false
+            Voice::Loud
         ),
         Ok(None)
     );
@@ -3211,7 +3212,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             Some(object_id(99)),
             // a new target the world does not hold (the game's −1 finds none either)
             object_id(98),
-            false
+            Voice::Loud
         ),
         Ok(None)
     );
@@ -5437,7 +5438,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             point: Position::new(40.0, 89.5, 0.0),
             target: None,
             range: Distance::ZERO,
-            quiet: false,
+            voice: Voice::Loud,
             on_target_moved: crate::movement::move_to::TargetMoved::Follows,
             wait: crate::movement::move_to::MoveWait::default(),
         }));
