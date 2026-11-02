@@ -588,7 +588,7 @@ impl Unit {
             player: owner,
             amount: t.life.amount,
             allied: crate::unit_ai::task_finder::allied(relations, c.player, owner, true),
-            top_action: actions.top_action_kind(),
+            top_action: c.w.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         };
         let (me_at, them) = (

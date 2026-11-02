@@ -54,6 +54,7 @@ impl UnitView<'_, '_> {
             ),
             restriction: None,
             unit: &*self.unit,
+            actions: &*self.actions,
             attributes: &self.c.w.players.player(self.player)?.attributes,
             relations: &self.c.w.players.player(self.player)?.relations,
             ai_settings: self.ai_settings,

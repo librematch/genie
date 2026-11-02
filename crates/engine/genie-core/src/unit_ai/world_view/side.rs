@@ -159,7 +159,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
             if HELP_REACH < gap {
                 continue;
             }
-            if !self.helper_free(owner, u, self.actions, m, attacker)? {
+            if !self.helper_free(owner, u, self.c.w.parts.actions_of(u.id), m, attacker)? {
                 continue;
             }
             return crate::unit_ai::helper_answers();
@@ -322,6 +322,7 @@ impl crate::unit_ai::UnitSide for UnitView<'_, '_> {
                 .master(self.c.w.master_tables(), self.player)?
                 .terrain_restriction,
             unit: &*self.unit,
+            actions: &*self.actions,
             attributes: &self.c.w.players.player(self.player)?.attributes,
             relations: &self.c.w.players.player(self.player)?.relations,
             ai_settings: self.ai_settings,

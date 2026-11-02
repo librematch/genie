@@ -68,6 +68,8 @@ pub(crate) struct WorldPicker<'a> {
     pub(crate) restriction: Option<crate::map::RestrictionId>,
     /// The unit itself.
     pub(crate) unit: &'a Unit,
+    /// Its action layer, out of the table with it.
+    pub(crate) actions: &'a crate::objects::layers::Action,
     /// Its owner's attributes, diplomacy and AI settings.
     pub(crate) attributes: &'a [Amount],
     /// Its owner's diplomacy (`player+0x260`).
@@ -89,6 +91,16 @@ type Held<'a> = (
 );
 
 impl WorldPicker<'_> {
+    /// The action layer of object `id`: the unit's own (out of the table with it, as its row is
+    /// out of its list) or the table's.
+    fn actions_of(&self, id: ObjectId) -> &crate::objects::layers::Action {
+        if id == self.me {
+            self.actions
+        } else {
+            self.parts.actions.of(id)
+        }
+    }
+
     /// The object `id` (another player's, the owner's others or the unit itself) with its owner,
     /// its owner's attributes and its master (its own, else its owner's).
     pub(super) fn held(&self, id: ObjectId) -> Result<Option<Held<'_>>, GenieError> {
@@ -170,7 +182,7 @@ impl WorldPicker<'_> {
                 self.parts.unit_ai.contains(t.id),
                 self.parts.building_of(t.id),
                 self.parts.combat_of(t.id),
-                self.parts.actions.of(t.id),
+                self.actions_of(t.id),
             ),
             tm,
             ta,
@@ -184,7 +196,7 @@ impl WorldPicker<'_> {
                 self.parts.unit_ai.contains(f.id),
                 self.parts.building_of(f.id),
                 self.parts.combat_of(f.id),
-                self.parts.actions.of(f.id),
+                self.actions_of(f.id),
             ),
             fm,
             fa,
@@ -245,7 +257,7 @@ impl WorldPicker<'_> {
                 self.parts.unit_ai.contains(o.id),
                 self.parts.building_of(o.id),
                 self.parts.combat_of(o.id),
-                self.parts.actions.of(o.id),
+                self.actions_of(o.id),
             ),
             om,
             attributes,
@@ -253,9 +265,9 @@ impl WorldPicker<'_> {
             terrain,
             self.mode_680,
         );
-        let attacked = (self.parts.actions_of(o.id).top_action_kind()
+        let attacked = (self.actions_of(o.id).top_action_kind()
             == Some(crate::combat::attack::ATTACK))
-        .then(|| self.parts.actions_of(o.id).top_target())
+        .then(|| self.actions_of(o.id).top_target())
         .flatten();
         let target = match attacked {
             Some(t) => self.held(t)?.map(|(tq, t, ta, tm)| {
@@ -265,7 +277,7 @@ impl WorldPicker<'_> {
                         self.parts.unit_ai.contains(t.id),
                         self.parts.building_of(t.id),
                         self.parts.combat_of(t.id),
-                        self.parts.actions.of(t.id),
+                        self.actions_of(t.id),
                     ),
                     tm,
                     ta,

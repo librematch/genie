@@ -87,7 +87,7 @@ impl Unit {
             player: tp,
             amount: t.life.amount,
             allied: crate::unit_ai::task_finder::allied(own, c.player, tp, true),
-            top_action: actions.top_action_kind(),
+            top_action: c.w.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         };
         let master = object_master(
