@@ -62,9 +62,8 @@ mod request;
 mod request_plans;
 pub use self::acceleration::Acceleration;
 pub use self::speed::Speed;
-pub use self::turn_rate::TurnRate;
+pub use genie_model::movement::TurnRate;
 use genie_model::movement::speed;
-use genie_model::movement::turn_rate;
 mod step;
 pub use self::step::GroupSpeed;
 use genie_model::movement::move_stats;
@@ -84,13 +83,11 @@ pub(crate) use self::long_walk::{
 };
 pub use self::move_stats::MoveStats;
 use self::path_end::ReachAsk;
-#[cfg(test)]
-use self::path_points::TWO_PI;
-pub use self::path_points::{
-    Planning, Turning, footprint_gap, footprint_gap_squared, turn_rate, turning,
-};
+pub use self::path_points::{Planning, footprint_gap, footprint_gap_squared};
 use self::request::LongAsk;
 use crate::groups::{GroupId, UnitGroups};
+#[cfg(test)]
+use crate::math::image::movement::TWO_PI;
 use crate::math::image::movement::{
     CLOSE as MOVEMENT_CLOSE, EDGE_GAP as MOVEMENT_EDGE_GAP,
     EDGE_POSITION_GAP as MOVEMENT_EDGE_POSITION_GAP, EPSILON as MOVEMENT_EPSILON,
@@ -113,6 +110,7 @@ use crate::pathing::tile_path::Path;
 use crate::pathing::{Pathing, PlanBudget};
 use crate::world::WALKER_UNMOVING;
 use crate::world::index::ObjectsRef;
+pub use genie_model::movement::{Turning, turn_rate, turning};
 
 /// The velocity data (`+0x868`): velocity and acceleration in the unit's own frame; component 2 is
 /// along the forward vector.

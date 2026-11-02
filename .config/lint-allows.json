@@ -5,6 +5,7 @@
  "clippy::cast_possible_truncation": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-core/tests/crt_math.rs": 1,
+  "crates/engine/genie-import/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
   "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
@@ -36,6 +37,7 @@
  },
  "clippy::cast_possible_wrap": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-import/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
   "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-scx/src/format/scx.rs": 3,
@@ -56,6 +58,7 @@
  },
  "clippy::cast_sign_loss": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-import/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
   "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
@@ -113,6 +116,7 @@
  },
  "clippy::missing_errors_doc": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-import/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::module_name_repetitions": {
@@ -163,6 +167,7 @@
  },
  "clippy::too_long_first_doc_paragraph": {
   "crates/engine/genie-core/src/lib.rs": 1,
+  "crates/engine/genie-import/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
   "crates/engine/genie-model/src/lib.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
@@ -176,6 +181,7 @@
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-core/src/unit_ai/unit.rs": 1,
   "crates/engine/genie-core/src/world/object_step.rs": 1,
+  "crates/engine/genie-import/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,
   "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-rec/tests/de_oracle.rs": 1,

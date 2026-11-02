@@ -1,6 +1,7 @@
+//! The tests of the save importer's masters ([`genie_import::save`]), beside genie-oracle's save
+//! fixtures.
+
 use crate::fixtures::{combat_master, master_moving_mut, master_static_mut};
-use crate::masters::{MasterTable, Turning};
-use crate::saved_masters::{master_facets, moving_stats};
 use genie_core::map::{RestrictionId, TerrainMask};
 use genie_core::movement::MoveAlgorithm;
 use genie_core::objects::FacetCount;
@@ -11,6 +12,8 @@ use genie_core::objects::facing::SpriteFacets;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::CivId;
+use genie_import::dat::{MasterTable, Turning};
+use genie_import::save::{master_facets, moving_stats};
 use genie_save::generated::world::Master;
 
 /// A walker: master 83 standing as sprite 10, walking as 11 and running as 12.

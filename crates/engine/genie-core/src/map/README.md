@@ -22,10 +22,8 @@ vision and the unit AI's searches read it.
 | [`grid_size.rs`](grid_size.rs) | The size of a grid of tiles as one type (`GridSize`): its width and height, apart from a tile on it. |
 | [`mod.rs`](mod.rs) | The map: the terrain of each tile and where the world's objects stand (their places, radii, footprints and the grid that finds them). |
 | [`rect.rs`](rect.rs) | A box on the map's ground as one type (`Rect`): two corners, x0 and y0 then x1 and y1, apart from a point (`Point`) and a walk between two points (`Segment`). |
-| [`restriction.rs`](restriction.rs) | A terrain restriction's values (`Restriction`): one a terrain, which terrains an object of the restriction may stand on and the terrain bonus's damage multipliers. |
 | [`snow.rs`](snow.rs) | The snow under a building (`Snow`): its `snow_flag`, `+0xc61`. |
 | [`terrain.rs`](terrain.rs) | The map's terrain per tile (`RGE_Map`'s tiles, 0x40 bytes each: `+0x9` the terrain, `+0xa` the terrain to restore, `+0xc` the layer) and what the `.dat` says of each terrain, as far as the slice reads them: a completed building's snow check and its foundation terrain (`FUN_1411dbb70`, `FUN_1411ddd90`). |
-| [`terrain_flags.rs`](terrain_flags.rs) | A terrain's flags (`TerrainFlags`, the `.dat`'s `is_water` byte). |
 | [`spatial/`](spatial/) | Where the world's objects are, as movement reads them: each live object's position, radii and class, and the obstruction record the game keeps for it in its obstruction manager (`DAT_143f0a088`, queried by `FUN_141051900`). |
 <!-- /files -->
 

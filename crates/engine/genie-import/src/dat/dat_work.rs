@@ -1,52 +1,52 @@
 //! A `.dat` master's work-command values (genie-core's [`work::Master`]): its tasks with their
 //! sound events, its costs in their slots and the rest the work command reads.
 
-use genie_core::GenieError;
-use genie_core::combat::Firepower;
-use genie_core::combat::MissileCount;
-use genie_core::map::Distance;
-use genie_core::map::RestrictionId;
-use genie_core::map::TerrainId;
-use genie_core::map::{Footprint, GroundOffset, Radii};
-use genie_core::objects::HitPoints;
-use genie_core::objects::MasterHitPoints;
-use genie_core::objects::SpriteId;
-use genie_core::objects::WorkRate;
-use genie_core::objects::masters as work;
-use genie_core::objects::masters::ActionType;
-use genie_core::objects::masters::AdjacentMode;
-use genie_core::objects::masters::CarryCapacity;
-use genie_core::objects::masters::CombatLevel;
-use genie_core::objects::masters::CostAmount;
-use genie_core::objects::masters::FogVisibility;
-use genie_core::objects::masters::GarrisonCapacity;
-use genie_core::objects::masters::GarrisonKinds;
-use genie_core::objects::masters::GatherGroup;
-use genie_core::objects::masters::GhostMode;
-use genie_core::objects::masters::HillMode;
-use genie_core::objects::masters::MasterId;
-use genie_core::objects::masters::ObjectFlags;
-use genie_core::objects::masters::ObstructionClass;
-use genie_core::objects::masters::ObstructionType;
-use genie_core::objects::masters::PlacementTerrains;
-use genie_core::objects::masters::RestrictionField;
-use genie_core::objects::masters::SoundEvents;
-use genie_core::objects::masters::TargetOwner;
-use genie_core::objects::masters::TaskFlags;
-use genie_core::objects::masters::TaskGroup;
-use genie_core::objects::masters::TaskIndex;
-use genie_core::objects::masters::TaskSprites;
-use genie_core::objects::masters::TaskTerrain;
-use genie_core::objects::masters::VolleySpread;
-use genie_core::objects::masters::{BuildableOn, ClassId, MasterKind, TaskId};
-use genie_core::objects::masters::{COST_SLOTS, CostSlot};
-use genie_core::players::attribute::AttributeId;
-use genie_core::production::HotkeyId;
-use genie_core::production::LocationButton;
-use genie_core::technology::TechId;
-use genie_core::world::Seconds;
-use genie_core::world::WholeSeconds;
 use genie_dat::de::{Sound, Task, Unit};
+use genie_model::GenieError;
+use genie_model::combat::Firepower;
+use genie_model::combat::MissileCount;
+use genie_model::map::Distance;
+use genie_model::map::RestrictionId;
+use genie_model::map::TerrainId;
+use genie_model::map::{Footprint, GroundOffset, Radii};
+use genie_model::objects::HitPoints;
+use genie_model::objects::MasterHitPoints;
+use genie_model::objects::SpriteId;
+use genie_model::objects::WorkRate;
+use genie_model::objects::masters as work;
+use genie_model::objects::masters::ActionType;
+use genie_model::objects::masters::AdjacentMode;
+use genie_model::objects::masters::CarryCapacity;
+use genie_model::objects::masters::CombatLevel;
+use genie_model::objects::masters::CostAmount;
+use genie_model::objects::masters::FogVisibility;
+use genie_model::objects::masters::GarrisonCapacity;
+use genie_model::objects::masters::GarrisonKinds;
+use genie_model::objects::masters::GatherGroup;
+use genie_model::objects::masters::GhostMode;
+use genie_model::objects::masters::HillMode;
+use genie_model::objects::masters::MasterId;
+use genie_model::objects::masters::ObjectFlags;
+use genie_model::objects::masters::ObstructionClass;
+use genie_model::objects::masters::ObstructionType;
+use genie_model::objects::masters::PlacementTerrains;
+use genie_model::objects::masters::RestrictionField;
+use genie_model::objects::masters::SoundEvents;
+use genie_model::objects::masters::TargetOwner;
+use genie_model::objects::masters::TaskFlags;
+use genie_model::objects::masters::TaskGroup;
+use genie_model::objects::masters::TaskIndex;
+use genie_model::objects::masters::TaskSprites;
+use genie_model::objects::masters::TaskTerrain;
+use genie_model::objects::masters::VolleySpread;
+use genie_model::objects::masters::{BuildableOn, ClassId, MasterKind, TaskId};
+use genie_model::objects::masters::{COST_SLOTS, CostSlot};
+use genie_model::players::attribute::AttributeId;
+use genie_model::production::HotkeyId;
+use genie_model::production::LocationButton;
+use genie_model::technology::TechId;
+use genie_model::world::Seconds;
+use genie_model::world::WholeSeconds;
 
 /// The default event id a task's load gives a sound without one (`FUN_141062470`'s
 /// `FUN_1413af9a0` calls, an immediate of the code).
@@ -68,7 +68,7 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
     }
 }
 
-/// A `.dat` task as the task finder reads it (`genie_core::objects::masters::Task`), with the world's
+/// A `.dat` task as the task finder reads it (`genie_model::objects::masters::Task`), with the world's
 /// sound table its sound events read ([`sound_event`]).
 ///
 /// # Errors
@@ -344,7 +344,7 @@ fn dat_cost(unit: &Unit) -> Result<[CostSlot; COST_SLOTS], GenieError> {
 /// # Errors
 ///
 /// A value below −1, which no attribute is.
-pub(crate) fn attributes<const N: usize>(
+pub fn attributes<const N: usize>(
     values: [i16; N],
 ) -> Result<[Option<AttributeId>; N], GenieError> {
     let mut out = [None; N];

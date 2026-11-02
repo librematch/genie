@@ -29,92 +29,12 @@ use genie_core::objects::layers::Animated;
 use genie_core::players::CivId;
 use genie_core::world::Seconds;
 use genie_core::world::WorldTime;
-use genie_save::generated::world::RgeMasterMovingObject;
-use genie_save::generated::world::{
-    Master, Path, PathData, PlayerObjects, RgeMasterAnimatedObject, RgeStaticObject,
-};
+use genie_import::save::parts::{animated_master, moving_master};
+use genie_save::generated::world::{Path, PathData, PlayerObjects, RgeStaticObject};
 
 pub(super) fn vec3(b: &[u8; 12]) -> BVector {
     let f = |i: usize| f32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
     BVector::new(f(0), f(4), f(8))
-}
-
-/// The animated part of a player's master, which holds its speed (`mMaxSpeed`, master `+0x740`).
-pub(super) fn animated_master(m: &Master) -> Option<&RgeMasterAnimatedObject> {
-    let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
-        m.tribe_master_building_object
-            .as_deref()
-            .map(|b| &b.tribe_master_combat_object)
-    });
-    if let Some(c) = combat {
-        let moving = &c
-            .rge_master_combat_object
-            .rge_master_action_object
-            .rge_master_moving_object;
-        return Some(&moving.rge_master_animated_object);
-    }
-    let r = m.rge_master.as_deref()?;
-    None.or(r.rge_master_animated_object.as_deref())
-        .or_else(|| {
-            r.rge_master_moving_object
-                .as_deref()
-                .map(|m| &m.rge_master_animated_object)
-        })
-        .or_else(|| {
-            r.rge_master_action_object
-                .as_deref()
-                .map(|a| &a.rge_master_moving_object.rge_master_animated_object)
-        })
-        .or_else(|| {
-            r.rge_master_combat_object.as_deref().map(|c| {
-                &c.rge_master_action_object
-                    .rge_master_moving_object
-                    .rge_master_animated_object
-            })
-        })
-        .or_else(|| {
-            r.rge_master_missile_object.as_deref().map(|m| {
-                &m.rge_master_combat_object
-                    .rge_master_action_object
-                    .rge_master_moving_object
-                    .rge_master_animated_object
-            })
-        })
-}
-
-/// The moving part of a saved master, when its class has one.
-pub(super) fn moving_master(m: &Master) -> Option<&RgeMasterMovingObject> {
-    let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
-        m.tribe_master_building_object
-            .as_deref()
-            .map(|b| &b.tribe_master_combat_object)
-    });
-    if let Some(c) = combat {
-        return Some(
-            &c.rge_master_combat_object
-                .rge_master_action_object
-                .rge_master_moving_object,
-        );
-    }
-    let r = m.rge_master.as_deref()?;
-    None.or(r.rge_master_moving_object.as_deref())
-        .or_else(|| {
-            r.rge_master_action_object
-                .as_deref()
-                .map(|a| &a.rge_master_moving_object)
-        })
-        .or_else(|| {
-            r.rge_master_combat_object
-                .as_deref()
-                .map(|c| &c.rge_master_action_object.rge_master_moving_object)
-        })
-        .or_else(|| {
-            r.rge_master_missile_object.as_deref().map(|m| {
-                &m.rge_master_combat_object
-                    .rge_master_action_object
-                    .rge_master_moving_object
-            })
-        })
 }
 
 /// One saved level of path data, with its path's waypoints from the world's path table.

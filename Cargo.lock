@@ -575,6 +575,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "genie-import"
+version = "0.1.0"
+dependencies = [
+ "genie-dat",
+ "genie-error",
+ "genie-json",
+ "genie-math",
+ "genie-model",
+ "genie-save",
+ "serde_json",
+]
+
+[[package]]
 name = "genie-json"
 version = "0.1.0"
 dependencies = [
@@ -624,6 +637,7 @@ dependencies = [
  "genie-core",
  "genie-dat",
  "genie-diff",
+ "genie-import",
  "genie-json",
  "genie-rec",
  "genie-save",

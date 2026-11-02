@@ -48,7 +48,7 @@
 
 pub mod census;
 pub mod groups;
-pub mod masters;
+pub use genie_import::dat as masters;
 pub mod survey;
 pub mod tick_trace;
 pub mod views;
@@ -65,7 +65,7 @@ mod decoder;
 mod differences;
 mod first_checkpoint;
 mod forced_replay;
-mod game_tables;
+use genie_import::tables as game_tables;
 mod header_runs;
 mod map_and_sight;
 mod movers;
@@ -73,7 +73,9 @@ mod object_parts;
 mod pathing_inputs;
 mod save_objects;
 mod save_runs;
-mod saved_masters;
+#[cfg(test)]
+mod save_tests;
+use genie_import::save as saved_masters;
 mod saved_unit;
 mod setup;
 mod step_runs;
@@ -86,7 +88,7 @@ mod top_actions;
 #[cfg(test)]
 mod fixtures;
 
-use self::command_args::{Frame, combat_master, frames, market, saved_move_wait};
+use self::command_args::{Frame, frames, market, saved_move_wait};
 use self::compared_objects::header_objects;
 pub use self::compared_objects::{object_rows, saved_objects};
 use self::decoder::Decoder;
@@ -113,7 +115,7 @@ pub use self::header_runs::{
 use self::header_runs::{header_slice, lane_block, run, top_action, watch_at_load};
 use self::map_and_sight::{SavedStep, spatial, tile_differences};
 pub use self::map_and_sight::{saved_visibility, terrain_differences, visibility_differences};
-use self::movers::{animated_master, mover, moving_master, path_level, vec3};
+use self::movers::{mover, path_level, vec3};
 use self::object_parts::{lifecycle, unit_ai};
 pub use self::pathing_inputs::{
     mesh_from_dump, mesh_owners_from_dump, planner_from_save, unit_terrain,
@@ -148,6 +150,7 @@ use genie_core::objects::unit::Unit;
 use genie_core::ownership::artifact::ARTIFACT_TYPE;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
+use genie_import::save::parts::combat_master;
 use std::error::Error as StdError;
 use std::fmt::{Display, Error as FmtError, Formatter};
 

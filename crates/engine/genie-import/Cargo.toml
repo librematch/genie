@@ -1,0 +1,22 @@
+[package]
+name = "genie-import"
+version = "0.1.0"
+description = "The game's files as the genie engine's model: the .dat's masters, technologies, effects and terrains, a save's masters, the JSON tables beside the .dat, and a cached load from a game install"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository.workspace = true
+
+[dependencies]
+# the game data the importers fill (FD-046)
+genie-model = { path = "../genie-model" }
+# the f32 operations as the game's code does them and the map's geometry (FD-046-D28)
+genie-math = { path = "../genie-math" }
+# the error every crate returns: its kind, reason, place and context
+genie-error = { path = "../../base/genie-error" }
+genie-dat = { version = "0.1.0", path = "../../formats/genie-dat" }
+genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
+genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

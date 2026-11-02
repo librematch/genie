@@ -1,83 +1,85 @@
 //! A player's saved masters as the engine reads them: the facets, the action part and
 //! tasks, the work command's masters, the movement and the placement.
 
-use crate::masters::MasterTable;
-use crate::masters::attributes;
-use crate::masters::dat_id;
-use crate::{animated_master, combat_master, moving_master};
-use genie_core::GenieError;
-use genie_core::combat::Charge;
-use genie_core::combat::Firepower;
-use genie_core::combat::MissileCount;
-use genie_core::combat::missile::MissSpread;
-use genie_core::combat::missile::SmartMode;
-use genie_core::combat::missile::VanishMode;
-use genie_core::combat::missile::{ArcRatio, HitMode, MissileStats};
-use genie_core::map::Distance;
-use genie_core::map::Footprint;
-use genie_core::map::Offset;
-use genie_core::map::Radii;
-use genie_core::map::RestrictionId;
-use genie_core::map::TerrainId;
-use genie_core::movement::Speed;
-use genie_core::movement::{MoveStats, turn_rate};
-use genie_core::objects::Frame;
-use genie_core::objects::HitPoints;
-use genie_core::objects::MasterHitPoints;
-use genie_core::objects::SpeedMultiplier;
-use genie_core::objects::SpriteFlags;
-use genie_core::objects::SpriteId;
-use genie_core::objects::WorkRate;
-use genie_core::objects::facing::SpriteFacets;
-use genie_core::objects::masters::CarryCapacity;
-use genie_core::objects::masters::ChargeTarget;
-use genie_core::objects::masters::ChargeType;
-use genie_core::objects::masters::ClassAmount;
-use genie_core::objects::masters::CombatAbility;
-use genie_core::objects::masters::CostAmount;
-use genie_core::objects::masters::DamageShare;
-use genie_core::objects::masters::FormationClass;
-use genie_core::objects::masters::GarrisonCapacity;
-use genie_core::objects::masters::GarrisonKinds;
-use genie_core::objects::masters::HeroFlags;
-use genie_core::objects::masters::HitChance;
-use genie_core::objects::masters::InvulnerabilityLevel;
-use genie_core::objects::masters::MasterField;
-use genie_core::objects::masters::ObjectFlags;
-use genie_core::objects::masters::SoundEvents;
-use genie_core::objects::masters::SpecialAttack;
-use genie_core::objects::masters::TargetOwner;
-use genie_core::objects::masters::TaskFlags;
-use genie_core::objects::masters::TaskSprites;
-use genie_core::objects::masters::TaskTerrain;
-use genie_core::objects::masters::VolleySpread;
-use genie_core::objects::masters::WorkValue;
-use genie_core::objects::masters::{
+pub mod parts;
+
+use crate::dat::MasterTable;
+use crate::dat::attributes;
+use crate::dat::dat_id;
+use crate::save::parts::{animated_master, combat_master, moving_master};
+use genie_model::GenieError;
+use genie_model::combat::Charge;
+use genie_model::combat::Firepower;
+use genie_model::combat::MissileCount;
+use genie_model::combat::missile::MissSpread;
+use genie_model::combat::missile::SmartMode;
+use genie_model::combat::missile::VanishMode;
+use genie_model::combat::missile::{ArcRatio, HitMode, MissileStats};
+use genie_model::map::Distance;
+use genie_model::map::Footprint;
+use genie_model::map::Offset;
+use genie_model::map::Radii;
+use genie_model::map::RestrictionId;
+use genie_model::map::TerrainId;
+use genie_model::movement::Speed;
+use genie_model::movement::{MoveStats, turn_rate};
+use genie_model::objects::Frame;
+use genie_model::objects::HitPoints;
+use genie_model::objects::MasterHitPoints;
+use genie_model::objects::SpeedMultiplier;
+use genie_model::objects::SpriteFlags;
+use genie_model::objects::SpriteId;
+use genie_model::objects::WorkRate;
+use genie_model::objects::facing::SpriteFacets;
+use genie_model::objects::masters::CarryCapacity;
+use genie_model::objects::masters::ChargeTarget;
+use genie_model::objects::masters::ChargeType;
+use genie_model::objects::masters::ClassAmount;
+use genie_model::objects::masters::CombatAbility;
+use genie_model::objects::masters::CostAmount;
+use genie_model::objects::masters::DamageShare;
+use genie_model::objects::masters::FormationClass;
+use genie_model::objects::masters::GarrisonCapacity;
+use genie_model::objects::masters::GarrisonKinds;
+use genie_model::objects::masters::HeroFlags;
+use genie_model::objects::masters::HitChance;
+use genie_model::objects::masters::InvulnerabilityLevel;
+use genie_model::objects::masters::MasterField;
+use genie_model::objects::masters::ObjectFlags;
+use genie_model::objects::masters::SoundEvents;
+use genie_model::objects::masters::SpecialAttack;
+use genie_model::objects::masters::TargetOwner;
+use genie_model::objects::masters::TaskFlags;
+use genie_model::objects::masters::TaskSprites;
+use genie_model::objects::masters::TaskTerrain;
+use genie_model::objects::masters::VolleySpread;
+use genie_model::objects::masters::WorkValue;
+use genie_model::objects::masters::{
     ActionType, ClassId, MasterId, ObstructionClass, ObstructionType,
 };
-use genie_core::objects::masters::{
+use genie_model::objects::masters::{
     AttackPriority, BuildableOn, DamageAmount, DamageGraphic, DamageSpriteMode, HpPercent, Masters,
     Task, TaskId, TrainLocation,
 };
-use genie_core::objects::masters::{BlastDefense, BlastLevel};
-use genie_core::objects::masters::{COST_SLOTS, CostSlot};
-use genie_core::players::Amount;
-use genie_core::players::CivId;
-use genie_core::players::attribute::AttributeId;
-use genie_core::production::HotkeyId;
-use genie_core::production::LocationButton;
-use genie_core::world::Seconds;
-use genie_core::world::WholeSeconds;
+use genie_model::objects::masters::{BlastDefense, BlastLevel};
+use genie_model::objects::masters::{COST_SLOTS, CostSlot};
+use genie_model::players::Amount;
+use genie_model::players::CivId;
+use genie_model::players::attribute::AttributeId;
+use genie_model::production::HotkeyId;
+use genie_model::production::LocationButton;
+use genie_model::world::Seconds;
+use genie_model::world::WholeSeconds;
 use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 use genie_save::generated::world::{
     RgeMasterActionObject, RgeMasterStaticObject, Task as WorldTask,
 };
 
-/// The facets every sprite a live object of a saved master shows ([`genie_core::objects::facing::SpriteFacets`]):
+/// The facets every sprite a live object of a saved master shows ([`genie_model::objects::facing::SpriteFacets`]):
 /// its standing, second standing, walking, running and attack sprites and its tasks' four, those
 /// the data file has, all of one count and bit 1 of the sequence flags; None when they differ or
 /// it has none. The dying sprite shows once the object is dead, where nothing turns it.
-pub(super) fn master_facets(
+pub fn master_facets(
     m: &Master,
     s: &RgeMasterStaticObject,
     table: &MasterTable,
@@ -109,7 +111,8 @@ pub(super) fn master_facets(
 
 /// A master's action part, whatever class it is: what holds its work rate, search radius and
 /// task list.
-pub(super) fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
+#[must_use]
+pub fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
     None.or_else(|| {
         m.tribe_master_combat_object
             .as_deref()
@@ -136,7 +139,7 @@ pub(super) fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
 /// The task at `index` in a master's task list (its saved list, else the `.dat`'s): the task a
 /// saved action's base `short_val` names (the base load `FUN_140a7a2f0` resolves it to `+0x48`
 /// at `0x140a7b5e8`).
-pub(super) fn task_at(
+pub fn task_at(
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
@@ -164,12 +167,12 @@ pub(super) fn task_at(
         ))
 }
 
-/// A saved task (`RGE_Task`) as genie-core's [`genie_core::objects::masters::Task`].
+/// A saved task (`RGE_Task`) as genie-core's [`genie_model::objects::masters::Task`].
 ///
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-pub(super) fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
+pub fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
     let [
         attribute_type,
         attribute_type2,
@@ -214,7 +217,7 @@ pub(super) fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
 /// A player's masters as the work command reads them: each master the save holds, with its saved
 /// class, radii, cost and (where saved) tasks, and the `.dat`'s task swap group and type, which
 /// the save does not carry (the game copies them from the `.dat` master).
-pub(super) fn work_masters(
+pub fn work_masters(
     objects: &PlayerObjects,
     civ: CivId,
     table: &MasterTable,
@@ -429,11 +432,12 @@ pub(super) fn work_masters(
     ))
 }
 
-/// What a unit of a saved master moves with ([`genie_core::movement::MoveStats`]): the master's
+/// What a unit of a saved master moves with ([`genie_model::movement::MoveStats`]): the master's
 /// top speed times its walking sprite's speed factor when above 0 (the run sprite if it has one,
 /// else the move sprite: the `MoveTo`'s, slots 2000 and 0x7c8), the `.dat`'s turning, the radii and
 /// the terrain restriction with its mask.
-pub(super) fn moving_stats(
+#[must_use]
+pub fn moving_stats(
     m: &Master,
     s: &RgeMasterStaticObject,
     civ: CivId,
@@ -474,7 +478,8 @@ pub(super) fn moving_stats(
 
 /// A combat master's cost slots from its `build_inventory` entries `(resource, amount, flag)`,
 /// three shorts each, in their places; the flag set means paid, resource −1 an empty slot.
-pub(super) fn build_cost(inventory: &[[u8; 6]]) -> [CostSlot; COST_SLOTS] {
+#[must_use]
+pub fn build_cost(inventory: &[[u8; 6]]) -> [CostSlot; COST_SLOTS] {
     let mut slots = [CostSlot::default(); COST_SLOTS];
     for (slot, (kind, amount, paid)) in slots.iter_mut().zip(build_entries(inventory)) {
         *slot = CostSlot {
@@ -488,7 +493,8 @@ pub(super) fn build_cost(inventory: &[[u8; 6]]) -> [CostSlot; COST_SLOTS] {
 
 /// A combat master's `build_inventory` entries `(resource, amount, paid)`, the empty ones
 /// (resource −1) kept in their places.
-pub(super) fn build_entries(inventory: &[[u8; 6]]) -> Vec<(i16, i16, bool)> {
+#[must_use]
+pub fn build_entries(inventory: &[[u8; 6]]) -> Vec<(i16, i16, bool)> {
     inventory
         .iter()
         .map(|e| {
@@ -501,13 +507,10 @@ pub(super) fn build_entries(inventory: &[[u8; 6]]) -> Vec<(i16, i16, bool)> {
 }
 
 /// How fast an object may move: its own or its player's master's speed, 0 for an object that
-/// does not move (whether it moves, [`genie_core::map::spatial::Placed::moves`], and whether a
+/// does not move (whether it moves, genie-core's `Placed::moves`, and whether a
 /// combat unit links its tiles); a master the save does not hold, the largest.
-pub(super) fn moving_speed(
-    o: &genie_save::Object,
-    s: &RgeStaticObject,
-    objects: &PlayerObjects,
-) -> f32 {
+#[must_use]
+pub fn moving_speed(o: &genie_save::Object, s: &RgeStaticObject, objects: &PlayerObjects) -> f32 {
     if o.moving_part().is_none() {
         return 0.0;
     }
@@ -523,16 +526,26 @@ pub(super) fn moving_speed(
 }
 
 /// What movement and sight read of an object's master (its own or its player's).
-pub(super) struct Placement {
-    pub(super) radius: Radii,
-    pub(super) class: ClassId,
-    pub(super) obstruction_type: ObstructionType,
-    pub(super) obstruction_class: ObstructionClass,
-    pub(super) buildable_on: BuildableOn,
-    pub(super) los: Distance,
+#[derive(Clone, Copy, Debug)]
+pub struct Placement {
+    /// The master's radii.
+    pub radius: Radii,
+    /// The master's class.
+    pub class: ClassId,
+    /// How the object obstructs others.
+    pub obstruction_type: ObstructionType,
+    /// The obstruction's class.
+    pub obstruction_class: ObstructionClass,
+    /// What may be built on the object.
+    pub buildable_on: BuildableOn,
+    /// The master's line of sight.
+    pub los: Distance,
 }
 
-pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placement> {
+/// What movement and sight read of the object `s`'s master: its own master's, else its
+/// player's; none for a master the save does not hold.
+#[must_use]
+pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placement> {
     if let Some(own) = s.own_master() {
         // an own master's second readTemp is its class (its first the id, its third the hit
         // points: as the shared masters' of the same id read)
@@ -555,6 +568,3 @@ pub(super) fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<
         los: Distance::new(m.los),
     })
 }
-
-#[cfg(test)]
-mod tests;

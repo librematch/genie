@@ -9,8 +9,7 @@ use genie_core::world::Millis;
 use genie_core::world::Seconds;
 use genie_rec::de;
 use genie_rec::de::Op;
-use genie_save::generated::world::Master;
-use genie_save::generated::world::{Action, RgeMasterCombatObject, World};
+use genie_save::generated::world::{Action, World};
 
 /// One frame of the body (FD-007's per-frame record order): the op-2 record that starts a tick, its
 /// dt and, every interval, a checkpoint, then the op-1 commands the tick runs after its `SeedAll`.
@@ -90,31 +89,6 @@ pub(super) fn market(w: &World) -> Market {
         ),
         ore: commodity(w.world_ore_price, w.ore_price_delta, w.old_ore_price_adj),
     }
-}
-
-pub(super) fn combat_master(m: &Master) -> Option<&RgeMasterCombatObject> {
-    None.or_else(|| {
-        m.tribe_master_combat_object
-            .as_deref()
-            .map(|c| &c.rge_master_combat_object)
-    })
-    .or_else(|| {
-        m.tribe_master_building_object
-            .as_deref()
-            .map(|b| &b.tribe_master_combat_object.rge_master_combat_object)
-    })
-    .or_else(|| {
-        m.rge_master
-            .as_deref()
-            .and_then(|r| r.rge_master_combat_object.as_deref())
-    })
-    .or_else(|| {
-        m.rge_master.as_deref().and_then(|r| {
-            r.rge_master_missile_object
-                .as_deref()
-                .map(|m| &m.rge_master_combat_object)
-        })
-    })
 }
 
 #[cfg(test)]

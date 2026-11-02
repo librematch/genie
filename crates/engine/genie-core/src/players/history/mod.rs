@@ -19,9 +19,11 @@
 //! first event of a kind `FUN_141560e20`, `get_history_event_by_time` `FUN_141560ea0`,
 //! `mark_new_battle` `FUN_141565470`, `update` `FUN_141569450`; the names are the 2016 HD PDB's.
 
+use genie_model::players::history::history_updates;
 mod values;
 
-pub use values::{EntryKind, HistoryEntry, HistoryUpdates, Population, Share, Tally, TimeSlice};
+pub use self::history_updates::{HISTORY_PERIOD, HistoryUpdates};
+pub use values::{EntryKind, HistoryEntry, Population, Share, Tally, TimeSlice};
 
 use crate::GenieError;
 use crate::math::conversions::cvttss2si;

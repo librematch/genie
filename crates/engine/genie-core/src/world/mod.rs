@@ -54,6 +54,7 @@ use crate::objects::masters::master_type;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+pub use crate::players::history::HISTORY_PERIOD;
 use crate::technology::TechId;
 use crate::unit_ai::task_finder::DropSite;
 pub(crate) use crate::world::player::NO_ATTRIBUTE;
@@ -180,9 +181,6 @@ pub(crate) const GATE_CLOSE_DELAY: Seconds = Seconds::new(0.5);
 /// counts (25).
 pub(crate) const GATE_QUERY_RECORDS: usize = 10;
 pub(crate) const GATE_COUNT_CAP: usize = 25;
-/// The world constructor's history period (`FUN_141599e50`'s immediate 0x19 at `world+0x8b8`),
-/// until the `.dat`'s `time_slice` replaces it.
-pub const HISTORY_PERIOD: HistoryUpdates = HistoryUpdates::of_data(25);
 
 /// The building top actions that keep RESEARCH from a building (`FUN_141227a00`: 0x7b to 0x7d).
 pub(crate) const BLOCKS_RESEARCH: [ActionType; 3] = [ACTION_123, PACK, UNPACK];

@@ -96,44 +96,6 @@ impl TimeSlice {
     }
 }
 
-/// A number of the history's updates, one a game second: the period (the `.dat`'s
-/// `time_slice`, `world+0x8b8`) and the runs since the last one (`update_history_count`,
-/// `+0x28`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct HistoryUpdates(i32);
-
-impl HistoryUpdates {
-    /// The number of the save's or the `.dat`'s int `value`.
-    #[must_use]
-    pub const fn of_data(value: i32) -> Self {
-        Self(value)
-    }
-
-    /// One update more, wrapping as the game's int add.
-    #[must_use]
-    pub const fn next(self) -> Self {
-        Self(self.0.wrapping_add(1))
-    }
-
-    /// This number less `period`, wrapping as the game's int sub.
-    #[must_use]
-    pub const fn wrapping_sub(self, period: Self) -> Self {
-        Self(self.0.wrapping_sub(period.0))
-    }
-
-    /// The int, as the save holds it.
-    #[must_use]
-    pub const fn get(self) -> i32 {
-        self.0
-    }
-}
-
-impl genie_diff::Diff for HistoryUpdates {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
-    }
-}
-
 /// An attribute's whole value as the history tallies it (`CVTTSS2SI`): kills, razings and the
 /// value of units and buildings, at a period's end, since it or summed over a battle.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -255,17 +217,13 @@ mod tests {
         assert_eq!(EntryKind::of_data(3).get(), 3);
     }
 
-    /// Time slices and update counts wrap as the game's ints.
+    /// Time slices wrap as the game's ints.
     #[test]
-    fn time_slices_and_update_counts_wrap() {
+    fn time_slices_wrap() {
         assert_eq!(TimeSlice::of_count(3), TimeSlice::of_data(3));
         let max = TimeSlice::of_data(i32::MAX);
         assert_eq!(max.wrapping_add(TimeSlice::of_data(1)).get(), i32::MIN);
         assert!(TimeSlice::of_data(2) < TimeSlice::of_data(60));
-        assert_eq!(HistoryUpdates::of_data(i32::MAX).next().get(), i32::MIN);
-        let period = HistoryUpdates::of_data(30);
-        assert_eq!(HistoryUpdates::of_data(31).wrapping_sub(period).get(), 1);
-        assert!(HistoryUpdates::of_data(29) < period);
     }
 
     /// A tally truncates the attribute (32 or 64 bits), wraps and keeps a count's low short.

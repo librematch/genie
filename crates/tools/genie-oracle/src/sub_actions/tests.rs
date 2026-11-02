@@ -208,6 +208,7 @@ fn the_default_task_starts_what_the_table_names() {
             FlyMode::of_data(0),
         )
         .with_default_action(CivId::GAIA, MasterId::of_data(83).unwrap(), action)
+        .unwrap()
     };
     let artifact = ARTIFACT_TYPE;
     assert!(matches!(

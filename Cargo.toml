@@ -27,6 +27,7 @@ members = [
   "crates/engine/genie-core",
   "crates/engine/genie-math",
   "crates/engine/genie-model",
+  "crates/engine/genie-import",
   "crates/tools/genie-oracle",
   "crates/tools/genie-swiss-knife",
 ]

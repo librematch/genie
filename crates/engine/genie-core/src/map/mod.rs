@@ -5,12 +5,12 @@ use genie_model::map::distance;
 mod grid_size;
 use genie_model::map::radii;
 mod rect;
-mod restriction;
+use genie_model::map::restriction;
 use genie_model::map::restriction_id;
 mod snow;
 pub mod spatial;
 pub mod terrain;
-mod terrain_flags;
+use genie_model::map::terrain_flags;
 use genie_model::map::terrain_id;
 use genie_model::map::terrain_mask;
 

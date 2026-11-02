@@ -1,14 +1,14 @@
 //! The game's own tables beside the `.dat`: the linked technologies, the unit lines and the
 //! drop sites.
 
-use genie_core::objects::ObjectState;
-use genie_core::objects::WorkerCount;
-use genie_core::objects::lines::{LineId, UnitLine};
-use genie_core::players::CivId;
-use genie_core::players::attribute::AttributeId;
-use genie_core::technology::Linked;
-use genie_core::technology::TechId;
-use genie_core::unit_ai::task_finder::{DropSite, DropTarget};
+use genie_model::objects::ObjectState;
+use genie_model::objects::WorkerCount;
+use genie_model::objects::lines::{LineId, UnitLine};
+use genie_model::players::CivId;
+use genie_model::players::attribute::AttributeId;
+use genie_model::technology::Linked;
+use genie_model::technology::TechId;
+use genie_model::unit_ai::task_finder::{DropSite, DropTarget};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{Display, Error as FmtError, Formatter};
@@ -56,7 +56,7 @@ impl Error for UnitLinesError {}
 /// The game's unit lines (`resources/_common/dat/unitlines.json`) as `FUN_140fde680` reads each
 /// entry of `UnitLines`: `LineID` (an int), `IDChain` (an array of ints), `Building` (a bool,
 /// false when absent) and `Identifier` (a string or an array of strings). A key an entry leaves
-/// out stays out ([`genie_core::objects::lines::UnitLines::build`] skips the entry); a file without
+/// out stays out ([`genie_model::objects::lines::UnitLines::build`] skips the entry); a file without
 /// `UnitLines` holds none.
 ///
 /// # Errors
@@ -165,7 +165,7 @@ fn object_state(i: usize, n: i64) -> Result<Option<ObjectState>, DropSitesError>
 /// A file that is not JSON, a target's `object_group` or an entry's `worker_object_group`
 /// that is neither a class nor (the worker group only) -1, or a target's `object_state` past 8.
 pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
-    use genie_core::objects::masters::{ClassId, MasterId};
+    use genie_model::objects::masters::{ClassId, MasterId};
     let v: serde_json::Value = serde_json::from_str(json).map_err(DropSitesError::Json)?;
     let num = |v: &serde_json::Value| v.as_i64().unwrap_or(-1);
     let list = |e: &serde_json::Value, key: &str| -> Vec<i64> {
@@ -236,8 +236,8 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::game_tables::{DropSitesError, drop_sites};
-    use genie_core::objects::ObjectState;
+    use crate::tables::{DropSitesError, drop_sites};
+    use genie_model::objects::ObjectState;
 
     /// A table of one entry whose target has `object_state` `state` (absent for `None`).
     fn table(state: Option<i64>) -> String {

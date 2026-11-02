@@ -90,7 +90,8 @@ fn livestock_starts_with_its_artifact() {
         CivId::GAIA,
         MasterId::of_data(83).unwrap(),
         DefaultAction::Type(ARTIFACT_TYPE),
-    );
+    )
+    .unwrap();
     let sheep = combat_object(5, 83);
     let u = object(
         &sheep,

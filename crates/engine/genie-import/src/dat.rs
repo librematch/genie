@@ -3,50 +3,54 @@
 //! and the default task's action. They are game data, which patches and DLCs change, so they come
 //! from the `.dat` of the recording's game, never from constants.
 
-use genie_core::GenieError;
-use genie_core::combat::missile::ProjectileType;
-use genie_core::map::TerrainFlags;
-use genie_core::movement::MoveAlgorithm;
-use genie_core::objects::FacetCount;
-use genie_core::objects::Frame;
-use genie_core::objects::SpeedMultiplier;
-use genie_core::objects::SpriteId;
-use genie_core::objects::lifecycle::MasterData;
-use genie_core::objects::masters as work;
-use genie_core::objects::masters::CostAmount;
-use genie_core::objects::masters::FlyMode;
-use genie_core::objects::masters::{ActionType, MasterId};
-use genie_core::players::AmountRate;
-use genie_core::players::CivId;
-use genie_core::players::attribute::AttributeId;
-use genie_core::technology::CostPaid;
-use genie_core::technology::EffectId;
-use genie_core::technology::TechId;
-use genie_core::world::Seconds;
-use genie_core::world::WholeSeconds;
 use genie_dat::de::DatFile;
+use genie_model::GenieError;
+use genie_model::combat::missile::ProjectileType;
+use genie_model::map::TerrainFlags;
+use genie_model::movement::MoveAlgorithm;
+use genie_model::objects::FacetCount;
+use genie_model::objects::Frame;
+use genie_model::objects::SpeedMultiplier;
+use genie_model::objects::SpriteId;
+use genie_model::objects::lifecycle::MasterData;
+use genie_model::objects::masters as work;
+use genie_model::objects::masters::CostAmount;
+use genie_model::objects::masters::FlyMode;
+use genie_model::objects::masters::{ActionType, MasterId};
+use genie_model::players::AmountRate;
+use genie_model::players::CivId;
+use genie_model::players::attribute::AttributeId;
+use genie_model::technology::CostPaid;
+use genie_model::technology::EffectId;
+use genie_model::technology::TechId;
+use genie_model::world::Seconds;
+use genie_model::world::WholeSeconds;
 use genie_save::generated::world::PlayerObjects;
 use std::collections::HashMap;
 
 mod dat_work;
 
-pub(crate) use self::dat_work::attributes;
+pub use self::dat_work::attributes;
 use self::dat_work::dat_work;
-use genie_core::map::terrain::{TerrainKind, terrain_class};
-use genie_core::map::{Restriction, TerrainMask};
-use genie_core::objects::lines::UnitLine;
-use genie_core::objects::sprite::Graphic;
-use genie_core::objects::{Graphics, SpriteFlags};
-use genie_core::players::history::HistoryUpdates;
-use genie_core::technology::{Cost, EffectCommand, Linked, TechDef, TechMode, TechType};
-use genie_core::unit_ai::task_finder::DropSite;
-use genie_core::world::HISTORY_PERIOD;
+use crate::tables::DropSitesError;
+use crate::tables::UnitLinesError;
+use crate::tables::drop_sites;
+use crate::tables::linked_techs;
+use crate::tables::unit_lines;
 use genie_dat::de::{Effect, Error, ResearchResourceCost, Sound, Tech, Unit};
+use genie_model::map::terrain::{TerrainKind, terrain_class};
+use genie_model::map::{Restriction, TerrainMask};
+use genie_model::objects::lines::UnitLine;
+use genie_model::objects::sprite::Graphic;
+use genie_model::objects::{Graphics, SpriteFlags};
+use genie_model::players::history::HISTORY_PERIOD;
+use genie_model::players::history::HistoryUpdates;
+use genie_model::technology::{Cost, EffectCommand, Linked, TechDef, TechMode, TechType};
+use genie_model::unit_ai::task_finder::DropSite;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fmt::{Display, Error as FmtError, Formatter};
 use std::fs::{File, read_to_string};
-#[cfg(test)]
 use std::iter::once;
 use std::path::Path;
 
@@ -81,7 +85,8 @@ pub fn default_action(
 
 /// The master a save's raw id `id` names in the data file ([`PlayerObjects::dat_master`]: the
 /// master an upgraded one copies); none for a negative id, which no row has.
-pub(crate) fn dat_id(objects: &PlayerObjects, id: i16) -> Option<MasterId> {
+#[must_use]
+pub fn dat_id(objects: &PlayerObjects, id: i16) -> Option<MasterId> {
     MasterId::of_data(objects.dat_master(id))
 }
 
@@ -161,7 +166,7 @@ struct Row {
 
 /// What the save does not hold of a moving master's movement (the `.dat` unit's moving part).
 /// Its turning is not here: every copy of a master derives it from its turn speed and walking
-/// sprite ([`genie_core::movement::turn_rate`]).
+/// sprite ([`turn_rate`](fn@genie_model::movement::turn_rate)).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Turning {
     /// Master `+0x768`, `old_move_algorithm`: bit 0 has a stop reset the unit's sprite.
@@ -283,13 +288,13 @@ pub struct MasterTable {
     pub graphics: Graphics,
     /// The terrain table.
     pub terrain: TerrainTable,
-    /// The drop-site table (`dropsites.json` beside the `.dat`, [`crate::drop_sites`]); empty
+    /// The drop-site table (`dropsites.json` beside the `.dat`, [`drop_sites`]); empty
     /// when not loaded.
     pub drop_sites: Vec<DropSite>,
-    /// The linked technologies (`linkedTechs.json` beside the `.dat`, [`crate::linked_techs`]);
+    /// The linked technologies (`linkedTechs.json` beside the `.dat`, [`linked_techs`]);
     /// empty when not loaded.
     pub linked_techs: BTreeMap<TechId, Linked>,
-    /// The unit lines (`unitlines.json` beside the `.dat`, [`crate::unit_lines`]) as the file
+    /// The unit lines (`unitlines.json` beside the `.dat`, [`unit_lines`]) as the file
     /// holds them; empty when not loaded (the game then builds tables of no line).
     pub unit_lines: Vec<UnitLine>,
     /// The technologies, by id.
@@ -297,7 +302,7 @@ pub struct MasterTable {
     /// The effects' commands, by id (the world's effect table).
     pub effects: Vec<Vec<EffectCommand>>,
     /// The history period (the `.dat`'s `time_slice`, which the world keeps at `+0x8b8`); the
-    /// world constructor's [`genie_core::world::HISTORY_PERIOD`] without a `.dat`.
+    /// world constructor's [`genie_model::players::history::HISTORY_PERIOD`] without a `.dat`.
     pub time_slice: HistoryUpdates,
 }
 
@@ -362,7 +367,7 @@ fn tech_tables(dat: &DatFile) -> Result<TechTables, GenieError> {
 type TechTables = (Vec<TechDef>, Vec<Vec<EffectCommand>>);
 
 /// An effect's commands as the engine's effect table holds them, each parsed by its kind
-/// ([`genie_core::technology::EffectCommand::of_data`]).
+/// ([`genie_model::technology::EffectCommand::of_data`]).
 fn effect_commands(e: &Effect) -> Result<Vec<EffectCommand>, GenieError> {
     e.commands
         .iter()
@@ -376,11 +381,11 @@ pub enum ReadError {
     /// The data file could not be opened or read.
     Dat(Error),
     /// The drop-site table beside it is out of shape.
-    DropSites(crate::DropSitesError),
+    DropSites(DropSitesError),
     /// The linked technologies beside it are out of shape.
     LinkedTechs(serde_json::Error),
     /// The unit lines beside it are out of shape.
-    UnitLines(crate::UnitLinesError),
+    UnitLines(UnitLinesError),
 }
 
 impl Display for ReadError {
@@ -423,13 +428,13 @@ impl MasterTable {
     fn read_tables_beside(&mut self, path: &Path) -> Result<(), ReadError> {
         let table = self;
         if let Ok(json) = read_to_string(path.with_file_name("dropsites.json")) {
-            table.drop_sites = crate::drop_sites(&json).map_err(ReadError::DropSites)?;
+            table.drop_sites = drop_sites(&json).map_err(ReadError::DropSites)?;
         }
         if let Ok(json) = read_to_string(path.with_file_name("linkedTechs.json")) {
-            table.linked_techs = crate::linked_techs(&json).map_err(ReadError::LinkedTechs)?;
+            table.linked_techs = linked_techs(&json).map_err(ReadError::LinkedTechs)?;
         }
         if let Ok(json) = read_to_string(path.with_file_name("unitlines.json")) {
-            table.unit_lines = crate::unit_lines(&json).map_err(ReadError::UnitLines)?;
+            table.unit_lines = unit_lines(&json).map_err(ReadError::UnitLines)?;
         }
         Ok(())
     }
@@ -564,12 +569,12 @@ impl MasterTable {
     }
 }
 
-/// The tests' tables: one master's row, the sprites' speed factors and graphics and the terrain
-/// restrictions' masks, without a data file.
-#[cfg(test)]
+/// Tables without a data file, which the tools' tests build: one master's row, the sprites' speed
+/// factors and graphics and the terrain restrictions' masks.
 impl MasterTable {
     /// A table of the master `master` of `civ`, turning as `turning` and flying as `fly_mode`.
-    pub(crate) fn of_master(
+    #[must_use]
+    pub fn of_master(
         civ: CivId,
         master: MasterId,
         turning: Option<Turning>,
@@ -590,7 +595,8 @@ impl MasterTable {
     }
 
     /// The sprite `sprite`'s speed factor and graphic of `facets` facets and `flags`.
-    pub(crate) fn with_sprite(
+    #[must_use]
+    pub fn with_sprite(
         mut self,
         sprite: SpriteId,
         speed: SpeedMultiplier,
@@ -611,26 +617,22 @@ impl MasterTable {
         self
     }
 
-    /// The default action of the table's master `master` of `civ`.
-    ///
-    /// # Panics
-    ///
-    /// For a master the table does not have.
-    pub(crate) fn with_default_action(
+    /// The default action of the table's master `master` of `civ`; none for a master the table
+    /// does not have.
+    #[must_use]
+    pub fn with_default_action(
         mut self,
         civ: CivId,
         master: MasterId,
         action: DefaultAction,
-    ) -> Self {
-        self.rows
-            .get_mut(&(civ, master))
-            .expect("a master of the table")
-            .default_action = action;
-        self
+    ) -> Option<Self> {
+        self.rows.get_mut(&(civ, master))?.default_action = action;
+        Some(self)
     }
 
     /// The terrain restrictions' masks.
-    pub(crate) fn with_masks(mut self, masks: Vec<u8>) -> Self {
+    #[must_use]
+    pub fn with_masks(mut self, masks: Vec<u8>) -> Self {
         self.terrain.masks = masks.into_iter().map(TerrainMask::of_bits).collect();
         self
     }
@@ -639,16 +641,15 @@ impl MasterTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::masters::dat_work::sound_event;
-    #[cfg(test)]
-    use genie_core::objects::lines::LineId;
-    #[cfg(test)]
-    use genie_core::objects::masters::action_type::HUNT_RANGE;
-    #[cfg(test)]
-    use genie_core::ownership::artifact::ARTIFACT_TYPE;
-    use genie_core::players::AmountRate;
+    use crate::dat::dat_work::sound_event;
     #[cfg(test)]
     use genie_dat::de::{DebugString, SoundItem};
+    #[cfg(test)]
+    use genie_model::objects::lines::LineId;
+    #[cfg(test)]
+    use genie_model::objects::masters::action_type::HUNT_RANGE;
+    #[cfg(test)]
+    use genie_model::players::AmountRate;
     #[cfg(test)]
     use std::env::temp_dir;
     #[cfg(test)]
@@ -660,9 +661,12 @@ mod tests {
     #[cfg(test)]
     use std::process::id;
 
+    /// The Artifact action's type (genie-core's `ownership::artifact::ARTIFACT_TYPE`).
+    const ARTIFACT_TYPE: ActionType = ActionType::named(107);
+
     /// A directory of its own under the system's temporary one, emptied first.
     fn scratch(name: &str) -> PathBuf {
-        let dir = temp_dir().join(format!("genie-oracle-{}-{name}", id()));
+        let dir = temp_dir().join(format!("genie-import-{}-{name}", id()));
         let _ = remove_dir_all(&dir);
         create_dir_all(&dir).unwrap();
         dir
@@ -718,7 +722,7 @@ mod tests {
     /// order; a value below −1 fails the parse.
     #[test]
     fn the_attribute_fields_parse_in_their_order() {
-        use genie_core::players::attribute::AttributeId;
+        use genie_model::players::attribute::AttributeId;
         assert_eq!(
             attributes([-1, 0, 5]).unwrap(),
             [
@@ -817,7 +821,7 @@ mod tests {
 
     #[test]
     fn unit_lines_read_each_entrys_keys_as_the_builder_does() {
-        use genie_core::objects::lines::UnitLine;
+        use genie_model::objects::lines::UnitLine;
         // two entries of the 158041 file, one without its chain, one with an array of names
         let json = r#"{"Hint": "LineIDs have to be between (-400, -199).", "UnitLines": [
             {"Name": "Wall Line", "Identifier": "stone-wall-line", "Building": true,
@@ -826,7 +830,7 @@ mod tests {
              "eagle-scout-line"], "LineID": -266, "IDChain": [751, 753, 752]},
             {"Name": "Broken", "LineID": -1}
         ]}"#;
-        let lines = crate::unit_lines(json).unwrap();
+        let lines = unit_lines(json).unwrap();
         assert_eq!(
             lines,
             [
@@ -851,13 +855,13 @@ mod tests {
                 },
             ]
         );
-        assert!(crate::unit_lines(r#"{"UnitLines": [{"LineID": "x"}]}"#).is_err());
-        assert_eq!(crate::unit_lines("{}").unwrap(), []);
+        assert!(unit_lines(r#"{"UnitLines": [{"LineID": "x"}]}"#).is_err());
+        assert_eq!(unit_lines("{}").unwrap(), []);
     }
 
     #[test]
     fn linked_techs_take_their_groups_kind() {
-        use genie_core::technology::Linked;
+        use genie_model::technology::Linked;
         // two groups of the 158041 file, and one of a kind the game does not know
         let json = r#"{"LinkedTechs": [
             {"NameId": 424008, "Comment": "Krypteia/Peloponnesian League",
@@ -866,7 +870,7 @@ mod tests {
              "StartingTech": 1215, "Instant": true},
             {"NameId": 1, "Comment": "", "Type": "Other", "Techs": [7]}
         ]}"#;
-        let linked = crate::linked_techs(json).unwrap();
+        let linked = linked_techs(json).unwrap();
         assert_eq!(
             linked
                 .into_iter()
