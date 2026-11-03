@@ -509,10 +509,10 @@ impl World {
                 )?;
             }
             let by_kind = match self.players.player(ap)?.kind {
-                PlayerKind::HUMAN => Some(self.model.slots.attribute.villager_killed_by_kind_1),
-                PlayerKind::GAIA => Some(self.model.slots.attribute.villager_killed_by_kind_2),
-                PlayerKind::COMPUTER => Some(self.model.slots.attribute.villager_killed_by_kind_3),
-                _ => None,
+                PlayerKind::Human => Some(self.model.slots.attribute.villager_killed_by_kind_1),
+                PlayerKind::Gaia => Some(self.model.slots.attribute.villager_killed_by_kind_2),
+                PlayerKind::Computer => Some(self.model.slots.attribute.villager_killed_by_kind_3),
+                PlayerKind::Phantom => None,
             };
             if let Some(kind) = by_kind {
                 self.players

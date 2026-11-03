@@ -734,7 +734,7 @@ fn rounder(at: BVector) -> detour::Rounder<'static> {
             restriction: RestrictionId::named(0),
             mask: TerrainMask::of_bits(2),
         },
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         at,
         here: at.position(),
         mask: TerrainMask::of_bits(2),

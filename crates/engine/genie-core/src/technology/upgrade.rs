@@ -1646,7 +1646,7 @@ mod tests {
                 vec![VisionBits::NONE; 400],
                 Vec::new(),
                 0,
-                vec![PlayerKind::HUMAN],
+                vec![PlayerKind::Human],
             );
             v.add_seer(
                 object_id(10),

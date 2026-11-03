@@ -280,7 +280,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
             },
         ]));
     }
-    t.players[1].kind = PlayerKind::HUMAN;
+    t.players[1].kind = PlayerKind::Human;
     t.players[1].ghosts = vec![Ghost {
         id: object_id(-2),
         original: None,

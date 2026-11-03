@@ -167,7 +167,7 @@ impl UnitView<'_, '_> {
             )?
             .players()
             .player(owner)
-            .map_or(PlayerKind::PHANTOM, |q| q.kind)
+            .map_or(PlayerKind::Phantom, |q| q.kind)
         };
         let capture = self
             .c

@@ -784,7 +784,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
         vec![VisionBits::NONE; 400],
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN; 3],
+        vec![PlayerKind::Human; 3],
     );
     v.add_seer(
         object_id(id),

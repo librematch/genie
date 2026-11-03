@@ -323,6 +323,10 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
             capacity: e.n + 1,
         })
         .collect();
+    let kinds = players
+        .iter()
+        .map(|p| PlayerKind::try_from(p.world_player().kind))
+        .collect::<Result<_, _>>()?;
     let mut sight = Visibility::new(
         GridSize::new(map.map_width, map.map_height),
         maps,
@@ -341,10 +345,7 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
             ),
         extents,
         umv.umv_data_list_size,
-        players
-            .iter()
-            .map(|p| PlayerKind::from(p.world_player().kind))
-            .collect(),
+        kinds,
     );
     sight.resources = players
         .iter()

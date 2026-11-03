@@ -184,7 +184,7 @@ impl World {
             player_kind: self
                 .players
                 .get(p.index())
-                .map_or(PlayerKind::PHANTOM, |q| q.kind),
+                .map_or(PlayerKind::Phantom, |q| q.kind),
             at: u.moved_vector(self.parts.mover_of(u.id)),
             here: u.position(),
             mask: mover.stats.restriction_mask,
@@ -422,7 +422,7 @@ impl World {
         let player_kind = self
             .players
             .get(p.index())
-            .map_or(PlayerKind::PHANTOM, |q| q.kind);
+            .map_or(PlayerKind::Phantom, |q| q.kind);
         let walker = LongWalker {
             id,
             position: u.position(),

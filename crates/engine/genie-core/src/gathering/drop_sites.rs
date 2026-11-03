@@ -436,7 +436,7 @@ mod tests {
         let mut plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             object: &mut object,
             groups: &groups,
         };

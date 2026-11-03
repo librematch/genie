@@ -127,8 +127,8 @@ mod tests {
             vec![Millis::ZERO; 3],
             vec![
                 player(PlayerKind::default()),
-                player(PlayerKind::HUMAN),
-                player(PlayerKind::COMPUTER),
+                player(PlayerKind::Human),
+                player(PlayerKind::Computer),
             ],
         )
     }

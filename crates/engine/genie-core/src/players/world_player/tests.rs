@@ -53,7 +53,7 @@ fn attributes() -> Vec<Amount> {
 /// the game (the defeat check passes it by).
 fn human() -> Player {
     Player {
-        kind: PlayerKind::HUMAN,
+        kind: PlayerKind::Human,
         attributes: attributes(),
         relations: relation_row([1, 0, 3, 3]),
         victory_times: VictoryTimes {
@@ -67,7 +67,7 @@ fn human() -> Player {
 /// Gaia and three humans, at world time 10 s, one second's update ahead.
 fn world() -> World {
     let gaia = Player {
-        kind: PlayerKind::GAIA,
+        kind: PlayerKind::Gaia,
         attributes: attributes(),
         ..Player::default()
     };
@@ -171,7 +171,7 @@ fn attribute_22_is_the_explored_share_in_percent() {
         vec![VisionBits::NONE; 100],
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN; 4],
+        vec![PlayerKind::Human; 4],
     ));
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(
@@ -277,7 +277,7 @@ fn mill_livestock_makes_food() {
 #[test]
 fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
     let mut t = world();
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     t.players[1].escrow_percentage = [0.5, 0.0, 0.0, 0.0].map(EscrowShare::of_data);
     t.add_resource(
         PlayerId::new(1),
@@ -800,7 +800,7 @@ fn the_scout_map_takes_the_new_tiles() {
         unified,
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN; 4],
+        vec![PlayerKind::Human; 4],
     );
     sight.new_tiles[1] = vec![Tile::new(0, 0), Tile::new(1, 0)];
     t.spatial.sight = Some(sight);

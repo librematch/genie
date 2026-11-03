@@ -153,10 +153,10 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
             };
             let live = rows(&mut p.live_objects());
             let sleeping = rows(&mut p.sleeping_objects());
-            Player {
+            Ok(Player {
                 objects: live.into(),
                 sleeping: sleeping.into(),
-                kind: PlayerKind::from(p.player.kind),
+                kind: PlayerKind::try_from(p.player.kind)?,
                 attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
                 // the second attribute array (+0x658), floats as their bits
                 generated: p
@@ -243,9 +243,9 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
                     ruins: Seconds::new(p.world_player().ruin_held_time),
                     artifacts: Seconds::new(p.world_player().artifact_held_time),
                 },
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, GenieError>>()?;
     let world = &header.world.base_world;
     let mut turns = World::new(
         WorldTime::from_millis(world.world_time),

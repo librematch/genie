@@ -1,45 +1,62 @@
 //! A player's type as one type: `player+0x10`, the save's class byte.
 
+use crate::GenieError;
 use std::fmt::{Display, Error, Formatter};
 
 /// A player's type (`player+0x10`, the save's `type`): which `WorldPlayer` class the game made
-/// for it. Every byte is a type (a save may hold types the slice does not name).
+/// for it. The player factory (`WorldPlayerFactory.cpp`, the creators `FUN_141679be0`
+/// registers) makes these four; a saved byte of another type is the game's
+/// `InvalidPlayerType`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct PlayerKind(u8);
+#[repr(u8)]
+pub enum PlayerKind {
+    /// Type 0: the scenario editor's phantom player.
+    #[default]
+    Phantom = 0,
+    /// Type 1: a human player.
+    Human = 1,
+    /// Type 2: Gaia (`WorldPlayerGaia`).
+    Gaia = 2,
+    /// Type 3: a computer player, whose income fills its escrow.
+    Computer = 3,
+}
 
 impl PlayerKind {
-    /// Type 0: the scenario editor's phantom player.
-    pub const PHANTOM: Self = Self(0);
-    /// Type 1: a human player.
-    pub const HUMAN: Self = Self(1);
-    /// Type 2: Gaia (`WorldPlayerGaia`).
-    pub const GAIA: Self = Self(2);
-    /// Type 3: a computer player, whose income fills its escrow.
-    pub const COMPUTER: Self = Self(3);
-
     /// Its value.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.0
+        self as u8
     }
 
     /// `FUN_141659cf0`: a computer player's (`player+0x10 == 3`).
     #[must_use]
     pub const fn is_computer(self) -> bool {
-        self.0 == Self::COMPUTER.0
+        matches!(self, Self::Computer)
     }
 }
 
-impl From<u8> for PlayerKind {
-    /// The type a saved player's byte holds: every value is one.
-    fn from(value: u8) -> Self {
-        Self(value)
+impl TryFrom<u8> for PlayerKind {
+    type Error = GenieError;
+
+    /// The type a saved player's byte holds.
+    ///
+    /// # Errors
+    ///
+    /// A byte of a type no creator handles (the game's `InvalidPlayerType`).
+    fn try_from(value: u8) -> Result<Self, GenieError> {
+        match value {
+            0 => Ok(Self::Phantom),
+            1 => Ok(Self::Human),
+            2 => Ok(Self::Gaia),
+            3 => Ok(Self::Computer),
+            _ => Err(GenieError::invalid_input("InvalidPlayerType").with("type", value)),
+        }
     }
 }
 
 impl Display for PlayerKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
+        self.get().fmt(f)
     }
 }
 
@@ -56,8 +73,32 @@ mod tests {
     /// A saved byte is its type; the default is the phantom's 0.
     #[test]
     fn saved_byte_is_its_kind() {
-        assert_eq!(PlayerKind::from(3), PlayerKind::COMPUTER);
-        assert_eq!(PlayerKind::GAIA.get(), 2);
-        assert_eq!(PlayerKind::default(), PlayerKind::PHANTOM);
+        assert_eq!(PlayerKind::try_from(3).unwrap(), PlayerKind::Computer);
+        assert_eq!(PlayerKind::try_from(0).unwrap(), PlayerKind::Phantom);
+        assert_eq!(PlayerKind::Gaia.get(), 2);
+        assert_eq!(PlayerKind::default(), PlayerKind::Phantom);
+        assert_eq!(PlayerKind::Human.to_string(), "1");
+    }
+
+    /// A byte no creator handles is the game's `InvalidPlayerType`.
+    #[test]
+    fn unhandled_byte_is_refused() {
+        for byte in [4, 0xff] {
+            let e = PlayerKind::try_from(byte).unwrap_err();
+            assert!(e.to_string().contains("InvalidPlayerType"), "{e}");
+        }
+    }
+
+    /// Only the computer's type is a computer player's.
+    #[test]
+    fn only_computer_is_computer() {
+        let kinds = [
+            PlayerKind::Phantom,
+            PlayerKind::Human,
+            PlayerKind::Gaia,
+            PlayerKind::Computer,
+        ];
+        let computers: Vec<_> = kinds.into_iter().filter(|k| k.is_computer()).collect();
+        assert_eq!(computers, [PlayerKind::Computer]);
     }
 }

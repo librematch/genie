@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn an_ai_setting_goes_to_computer_player_only() {
         let mut t = world();
-        t.players[2].kind = PlayerKind::COMPUTER;
+        t.players[2].kind = PlayerKind::Computer;
         t.settings.cheats_enabled = true;
         t.game(&game(1, GameSub::AI_SETTING, 1, 1, 30)).unwrap();
         assert_eq!(t.players[1].dodge_chance, Chance::NONE);

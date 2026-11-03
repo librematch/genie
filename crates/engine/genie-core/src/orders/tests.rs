@@ -1272,13 +1272,13 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
             .unwrap(),
         None
     );
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert_eq!(
         t.command_check(PlayerId::new(1), &object_ids([30, 99]))
             .unwrap(),
         Some(object_ids([-1, -1]))
     );
-    t.players[1].kind = PlayerKind::HUMAN;
+    t.players[1].kind = PlayerKind::Human;
     // past the first 60 nothing is checked
     let mut ids = vec![99; 60];
     ids.push(30);
@@ -1348,7 +1348,7 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         .unwrap(),
         None
     );
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert_eq!(
         t.unload_check(
             PlayerId::new(1),
@@ -1358,7 +1358,7 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         .unwrap(),
         Some(object_ids([-1, -1]))
     );
-    t.players[1].kind = PlayerKind::HUMAN;
+    t.players[1].kind = PlayerKind::Human;
     // past the first 60 nothing goes on
     let mut ids = vec![11; 60];
     ids.push(12);

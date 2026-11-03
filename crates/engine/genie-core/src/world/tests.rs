@@ -788,7 +788,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
         vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN; players],
+        vec![PlayerKind::Human; players],
     ));
 }
 
@@ -4956,7 +4956,7 @@ fn built_castle_death_takes_its_headroom_and_its_count() {
         .unwrap();
     assert_eq!(t.players[1].attributes[134], Amount::ZERO);
     let mut t = world(1.0);
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert!(
         t.set_state(PlayerId::new(1), object_id(900), ObjectState::Dying)
             .is_err()
@@ -6481,7 +6481,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 actions,
                 UnitAiKind::SOLDIER,
                 None,
-                (PlayerId::new(1), PlayerKind::HUMAN),
+                (PlayerId::new(1), PlayerKind::Human),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6496,7 +6496,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), PlayerKind::HUMAN),
+                (PlayerId::new(1), PlayerKind::Human),
                 |ai, side, _| {
                     side.release(by.id, by)?;
                     Ok((side.unit.workers.get(), ai.notifies.len()))
@@ -6540,7 +6540,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 actions,
                 UnitAiKind::SOLDIER,
                 None,
-                (PlayerId::new(1), PlayerKind::HUMAN),
+                (PlayerId::new(1), PlayerKind::Human),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6555,7 +6555,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), PlayerKind::HUMAN),
+                (PlayerId::new(1), PlayerKind::Human),
                 |ai, side, _| {
                     side.c.notify_own(side.unit, n)?;
                     Ok(ai.notifies.len())
@@ -6592,7 +6592,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     actions,
                     UnitAiKind::SOLDIER,
                     None,
-                    (PlayerId::new(1), PlayerKind::HUMAN),
+                    (PlayerId::new(1), PlayerKind::Human),
                     false,
                     (
                         CaptureKind::NONE,
@@ -6607,7 +6607,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     c,
                     &view,
                     attacker,
-                    (PlayerId::new(1), PlayerKind::HUMAN),
+                    (PlayerId::new(1), PlayerKind::Human),
                     |_, side, rng| {
                         if world_draws {
                             let _ = side.c.w.streams.get(Stream::Ai).rand15();
@@ -6866,7 +6866,7 @@ fn villager_side<R>(
                 actions,
                 UnitAiKind::BOAR,
                 None,
-                (PlayerId::new(1), PlayerKind::HUMAN),
+                (PlayerId::new(1), PlayerKind::Human),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6881,7 +6881,7 @@ fn villager_side<R>(
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), PlayerKind::HUMAN),
+                (PlayerId::new(1), PlayerKind::Human),
                 |_, side, _| f(side),
             )?;
             Ok((answer, c.w.parts.unit_ai.get(unit.id).cloned()))
@@ -7725,7 +7725,7 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
         |ai, at, side, _, rng| {
             let r = ai.process_order(
                 &order,
-                Some((at, PlayerKind::HUMAN)),
+                Some((at, PlayerKind::Human)),
                 None,
                 rng,
                 side,
@@ -8279,7 +8279,7 @@ fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() 
             vec![
                 Player {
                     attributes: attributes(250, [0.0, 100.0, 0.0, 0.0]),
-                    kind: PlayerKind::COMPUTER,
+                    kind: PlayerKind::Computer,
                     ..Player::default()
                 },
                 Player {
@@ -10339,7 +10339,7 @@ fn research_check_refuses_another_player_buildings() {
         Some(object_ids([-1, 10]))
     );
     // a computer's list left without one still runs
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(77)), 2, vec![9, 10]))
             .unwrap(),
@@ -10347,7 +10347,7 @@ fn research_check_refuses_another_player_buildings() {
     );
     // while players may order each other's
     t.settings.cheats_enabled = true;
-    t.players[1].kind = PlayerKind::HUMAN;
+    t.players[1].kind = PlayerKind::Human;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(9)), 1, vec![]))
             .unwrap(),
@@ -10574,7 +10574,7 @@ fn research_unmodelled_parts_fail() {
         "RESEARCH at another player's object"
     );
     assert_eq!(
-        fails(&|t| t.players[0].kind = PlayerKind::COMPUTER),
+        fails(&|t| t.players[0].kind = PlayerKind::Computer),
         "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)"
     );
     assert_eq!(
@@ -10633,7 +10633,7 @@ fn queue_takes_as_many_as_the_room_and_the_resources_allow() {
     assert_eq!(queued(&full), QueuedUnits::of_data(15));
     // a computer player fills to 2
     let mut computer = one_player(vec![centre(9)], [1000.0; 4]);
-    computer.players[0].kind = PlayerKind::COMPUTER;
+    computer.players[0].kind = PlayerKind::Computer;
     computer.tick_with(Millis::new(104), &[queue(9, 99, 5)]);
     assert_eq!(queued(&computer), QueuedUnits::of_data(2));
 }
@@ -10712,7 +10712,7 @@ fn queued_units_join_the_last_entry_and_full_buffer_grows() {
 #[test]
 fn computer_player_housed_building_cancels_its_queue() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.players[0].kind = PlayerKind::COMPUTER;
+    t.players[0].kind = PlayerKind::Computer;
     t.players[0].attributes[4] = Amount::new(0.5);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
@@ -10869,7 +10869,7 @@ pub(crate) fn hands_world(
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN; 3],
+        vec![PlayerKind::Human; 3],
     );
     let mut r = Registry::new(3, 65);
     r.entries
@@ -11638,9 +11638,9 @@ fn gaia_archer_player_sees_goes_to_that_player() {
                     objects: vec![live(500)].into(),
                     attributes: vec![Amount::ZERO; 300],
                     kind: if computer {
-                        PlayerKind::COMPUTER
+                        PlayerKind::Computer
                     } else {
-                        PlayerKind::HUMAN
+                        PlayerKind::Human
                     },
                     ..Player::default()
                 },
@@ -12680,7 +12680,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             pathing: &mut t.pathing,
             object: t.streams.get(Stream::Object),
             world_time: WorldTime::ZERO,
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             groups: &t.groups,
         };
         hunter.drop_off_in(
@@ -13769,11 +13769,11 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
             vec![Millis::ZERO; 3],
             vec![
                 player(
-                    PlayerKind::GAIA,
+                    PlayerKind::Gaia,
                     vec![unit(object_id(50), master_id(126))].into(),
                 ),
                 player(
-                    PlayerKind::HUMAN,
+                    PlayerKind::Human,
                     vec![
                         unit(object_id(40), VILLAGER_MALE),
                         unit(object_id(41), VILLAGER_MALE),
@@ -13814,7 +13814,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     };
     let counts = |t: &World| [226, 227, 228, 229].map(|i| t.players[1].attributes[i]);
     // Gaia's wolf: an animal, Gaia's type
-    let mut t = world(PlayerKind::HUMAN);
+    let mut t = world(PlayerKind::Human);
     t.killed(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -13824,9 +13824,9 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     assert_eq!(counts(&t), amounts([1.0, 1.0, 0.0, 0.0]));
     // the archers of a human, a computer and the editor's phantom
     for (kind, seen) in [
-        (PlayerKind::HUMAN, [0.0, 0.0, 0.0, 1.0]),
-        (PlayerKind::COMPUTER, [0.0, 0.0, 1.0, 0.0]),
-        (PlayerKind::PHANTOM, [0.0; 4]),
+        (PlayerKind::Human, [0.0, 0.0, 0.0, 1.0]),
+        (PlayerKind::Computer, [0.0, 0.0, 1.0, 0.0]),
+        (PlayerKind::Phantom, [0.0; 4]),
     ] {
         let mut t = world(kind);
         t.killed(
@@ -13837,7 +13837,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
         .unwrap();
         assert_eq!(counts(&t), amounts(seen));
     }
-    let mut t = world(PlayerKind::HUMAN);
+    let mut t = world(PlayerKind::Human);
     t.killed(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -13845,7 +13845,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     )
     .unwrap();
     assert_eq!(counts(&t), amounts([0.0, 1.0, 0.0, 1.0]));
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert!(
         t.killed(
             PlayerId::new(1),
@@ -16434,7 +16434,7 @@ fn on_side<R>(
                 attacker: Attacker {
                     ai_kind: UnitAiKind::SOLDIER,
                     player: PlayerId::new(1),
-                    player_kind: PlayerKind::HUMAN,
+                    player_kind: PlayerKind::Human,
                     state: ObjectState::Alive,
                     held: None,
                     top_action: None,
@@ -16457,7 +16457,7 @@ fn on_side<R>(
                     capture: CaptureKind::NONE,
                 },
                 player: PlayerId::new(1),
-                player_kind: PlayerKind::HUMAN,
+                player_kind: PlayerKind::Human,
                 new_owner: None,
                 civ: CivId::new(0),
                 ai_settings: AiSettings::default(),
@@ -17542,7 +17542,7 @@ fn without_farm_to_make_the_farmer_idles() {
     let mut t = reseed_world();
     t.players[1].auto_farm_queue = true;
     t.players[1].attributes[1] = Amount::new(59.0);
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
         .unwrap();
     let p = &t.players[1];
@@ -18760,7 +18760,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
             "a charged hit",
         ),
         (
-            |t| t.players[0].kind = PlayerKind::COMPUTER,
+            |t| t.players[0].kind = PlayerKind::Computer,
             "a hit on a computer player's object",
         ),
         (
@@ -19178,7 +19178,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
     );
     let t = dropped_without_bush(|t| {
         pointless(t);
-        t.players[1].kind = PlayerKind::COMPUTER;
+        t.players[1].kind = PlayerKind::Computer;
     });
     assert!(
         t.parts
@@ -19587,7 +19587,7 @@ fn drop_site_sought(
         pathing: &mut t.pathing,
         object: t.streams.get(Stream::Object),
         world_time: WorldTime::ZERO,
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         groups: &t.groups,
     };
     let objects = OthersRef::of(&t.players, &t.index, PlayerId::new(1)).unwrap();
@@ -22730,7 +22730,7 @@ fn an_order_units_are_capped_unless_its_comm_player_is_outside_the_world() {
         t.command_units(PlayerId::new(1), &UnitList::last_commanded()),
         Vec::<Option<ObjectId>>::new()
     );
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert_eq!(t.command_units(PlayerId::new(1), &listed), many[..500]);
     assert_eq!(t.most_units(outside), 0);
     t.set_last_commanded(PlayerId::new(0), object_ids([5]));
@@ -22950,7 +22950,7 @@ fn research_listed(t: &mut World, r: &ResearchCommand) -> Result<(), GenieError>
 fn explorer_world(open: &[[i32; 2]], slots: Vec<i32>) -> World {
     use crate::players::ai_module::{AiModule, InfoModule, TacticalModule};
     let mut t = forage_world();
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     let mut path_map = InfluenceMap::new(GridSize::new(120, 120), 0);
     for &[x, y] in open {
         path_map.set(Tile::new(x, y), 0xff);
@@ -23028,7 +23028,7 @@ fn computer_players_ai_detasks_an_explorer_with_nothing_left_to_explore() {
 #[test]
 fn only_computer_players_explorer_notify_reaches_the_ai() {
     let mut human = explorer_world(&[[31, 89]], vec![]);
-    human.players[1].kind = PlayerKind::HUMAN;
+    human.players[1].kind = PlayerKind::Human;
     let before = human.ai.clone();
     human
         .run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {

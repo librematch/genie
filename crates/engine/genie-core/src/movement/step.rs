@@ -497,7 +497,7 @@ impl Mover {
             }
             let (now, player_kind) = plan
                 .as_deref()
-                .map_or((WorldTime::ZERO, PlayerKind::PHANTOM), |p| {
+                .map_or((WorldTime::ZERO, PlayerKind::Phantom), |p| {
                     (p.now, p.player_kind)
                 });
             let groups = plan.as_deref().map(|p| p.groups);

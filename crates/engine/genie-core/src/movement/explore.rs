@@ -1063,7 +1063,7 @@ mod tests {
             line_of_sight: Distance::new(4.0),
             order: None,
             target_point: Point::new(NO_POINT, NO_POINT),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
         };
         let seeded = || {
             let mut r = Well512::default();
@@ -1090,7 +1090,7 @@ mod tests {
         );
         // a computer player's unit searches nothing
         let computer = Seeker {
-            player_kind: PlayerKind::COMPUTER,
+            player_kind: PlayerKind::Computer,
             ..seeker
         };
         let mut untouched = seeded();

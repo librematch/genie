@@ -104,7 +104,7 @@ fn harmless(master: Master) -> bool {
     let attacker = Attacker {
         ai_kind: UnitAiKind::CIVILIAN,
         player: PlayerId::new(1),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         state: ObjectState::Alive,
         held: None,
         top_action: None,
@@ -216,7 +216,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
     let attacker = Attacker {
         ai_kind: UnitAiKind::SOLDIER,
         player: PlayerId::new(1),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         state: ObjectState::Alive,
         held: None,
         top_action: None,
@@ -410,7 +410,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     let attacker = Attacker {
         ai_kind: UnitAiKind::SOLDIER,
         player: PlayerId::new(1),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         state: ObjectState::Alive,
         held: None,
         top_action: None,

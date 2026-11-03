@@ -283,7 +283,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(16360),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         object: &mut object,
         groups: &groups,
     };
@@ -463,7 +463,7 @@ fn drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         object: &mut object,
         groups: &groups,
     };
@@ -534,7 +534,7 @@ fn the_drop_off_walker_start_is_blocked_in_terrain_its_mask_lacks() {
         let mut plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             object: &mut object,
             groups: &groups,
         };
@@ -621,7 +621,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         object: &mut object,
         groups: &groups,
     };
@@ -737,7 +737,7 @@ fn kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
         &[RecordId::from(object_id(9175))],
         projected,
         Seconds::new(DT),
-        (WorldTime::from_millis(16361), PlayerKind::HUMAN),
+        (WorldTime::from_millis(16361), PlayerKind::Human),
     );
     let avoided = avoided.unwrap();
     assert!(avoided.at_target);
@@ -795,7 +795,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
             &me,
             &w,
             &[RecordId::from(object_id(9175))],
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
             ObjectsRef::empty()
         ),
         Ok(Next::Again)
@@ -809,7 +809,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
             &me,
             &w,
             &[RecordId::from(object_id(9175))],
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
             ObjectsRef::empty()
         ),
         Ok(Next::Done(Motion::Done))
@@ -845,7 +845,7 @@ fn map_edge_record_is_hit_without_an_object() {
             &[edge],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::Human),
         )
         .unwrap();
     assert_eq!(
@@ -859,7 +859,7 @@ fn map_edge_record_is_hit_without_an_object() {
             &[edge, RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::Human),
         )
         .unwrap();
     assert!(!avoided.at_target);
@@ -950,7 +950,7 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         object: &mut object,
         groups: &groups,
     };
@@ -1039,7 +1039,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::ZERO,
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         object: &mut object,
         groups: &groups,
     };
@@ -2115,7 +2115,7 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
         let plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             object: &mut object,
             groups: &groups,
         };
@@ -2279,7 +2279,7 @@ impl WalkRig {
             plan: Some(Planning {
                 pathing: &mut self.pathing,
                 now: WorldTime::ZERO,
-                player_kind: PlayerKind::HUMAN,
+                player_kind: PlayerKind::Human,
                 object: &mut self.object,
                 groups: &self.groups,
             }),
@@ -3189,7 +3189,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
             &[RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::Human),
         )
         .unwrap()
         .pauses
@@ -3260,7 +3260,7 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
             &[RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::Human),
         )
         .unwrap()
         .kept

@@ -112,7 +112,7 @@ impl Unit {
         let player_kind =
             c.w.players
                 .get(c.player.index())
-                .map_or(PlayerKind::PHANTOM, |q| q.kind);
+                .map_or(PlayerKind::Phantom, |q| q.kind);
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,
@@ -153,7 +153,7 @@ impl Unit {
         let player_kind =
             c.w.players
                 .get(c.player.index())
-                .map_or(PlayerKind::PHANTOM, |q| q.kind);
+                .map_or(PlayerKind::Phantom, |q| q.kind);
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,

@@ -458,7 +458,7 @@ impl UnitAi {
         let new = !self.attackers.contains(n.caller);
         alert_owner(player_kind)?;
         if n.p[1] >= 1 && at.guest_computer {
-            alert_owner(PlayerKind::COMPUTER)?;
+            alert_owner(PlayerKind::Computer)?;
         }
         if n.p[1] >= 1
             && new

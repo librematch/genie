@@ -856,7 +856,7 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
     };
     let human = soldier();
     let computer = Searcher {
-        player_kind: PlayerKind::COMPUTER,
+        player_kind: PlayerKind::Computer,
         ..soldier()
     };
     let house = Thing {

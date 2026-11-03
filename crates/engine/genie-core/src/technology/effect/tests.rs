@@ -919,7 +919,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             vec![VisionBits::NONE; n],
             Vec::new(),
             0,
-            vec![PlayerKind::HUMAN],
+            vec![PlayerKind::Human],
         );
         let seer = Seer {
             player: PlayerId::new(0),

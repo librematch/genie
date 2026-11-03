@@ -103,7 +103,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         [0, 2]
     );
     let p = &turns.players[1];
-    assert_eq!((p.civ, p.kind), (CivId::new(3), PlayerKind::HUMAN));
+    assert_eq!((p.civ, p.kind), (CivId::new(3), PlayerKind::Human));
     assert_eq!(
         p.resources().map(|r| r.get().to_bits()),
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)

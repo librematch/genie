@@ -33,7 +33,7 @@ impl World {
     pub fn update_world_player(&mut self, p: PlayerId) -> Result<(), GenieError> {
         let dt = self.dt_seconds;
         let player = self.players.player_mut(p)?;
-        if player.kind == PlayerKind::GAIA {
+        if player.kind == PlayerKind::Gaia {
             player.gaia_update_time += dt;
             return Ok(());
         }
@@ -108,7 +108,7 @@ impl World {
                 Amount::ZERO,
             );
         }
-        if !matches!(player.kind, PlayerKind::HUMAN | PlayerKind::COMPUTER) {
+        if !matches!(player.kind, PlayerKind::Human | PlayerKind::Computer) {
             return Ok(());
         }
         self.defeat_check(p)?;

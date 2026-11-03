@@ -101,7 +101,7 @@ impl World {
         let player_kind = self
             .players
             .get(p.index())
-            .map_or(PlayerKind::PHANTOM, |q| q.kind);
+            .map_or(PlayerKind::Phantom, |q| q.kind);
         let solid = mover.stats.radius.sized();
         let found = if solid {
             let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();

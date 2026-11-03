@@ -1997,7 +1997,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
         vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN; 4],
+        vec![PlayerKind::Human; 4],
     ));
     let tc = &mut t.players[1].objects[ListIndex::new(0)];
     tc.place_for_test(Position::new(10.0, 10.0, 0.0));
@@ -4198,7 +4198,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
     // a computer player's AI would hear it, which is not modelled
     let mut t = coast_world(Point::new(10.5, 10.5));
     t.build_mesh().unwrap();
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     UnloadCommand {
         player: player_id(1),
         units: unit_list(object_ids([200])),
@@ -4512,7 +4512,7 @@ fn market_tells_computer_ally_of_its_tile() {
         .unwrap();
         t.spatial.sight.unwrap().new_tiles[2].clone()
     };
-    let (human, computer) = (PlayerKind::HUMAN, PlayerKind::COMPUTER);
+    let (human, computer) = (PlayerKind::Human, PlayerKind::Computer);
     assert_eq!(market(computer, human), [Tile::new(10, 12)]);
     assert_eq!(market(human, human), Vec::<Tile>::new());
     assert_eq!(market(computer, computer), Vec::<Tile>::new());

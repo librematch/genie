@@ -376,7 +376,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 near: Amount::new(near),
             },
             masters: Some(&masters),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             ai: false,
         }
         .first_part(c, &roles())
@@ -428,7 +428,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 near: Amount::ZERO,
             },
             masters: None,
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             ai,
         }
         .first_part(&built, &roles())
@@ -681,7 +681,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
         walk,
         None,
         Some(&mut c.builders),
-        PlayerKind::HUMAN,
+        PlayerKind::Human,
     )
     .unwrap();
     assert_eq!(c.builders, BuilderCount::of_data(1));
@@ -704,7 +704,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
             walk,
             None,
             Some(&mut c.builders),
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
         )
         .unwrap();
     assert_eq!(working, before);

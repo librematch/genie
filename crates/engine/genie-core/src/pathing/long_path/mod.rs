@@ -649,7 +649,7 @@ mod tests {
             target: None,
             moves: true,
             mask: TerrainMask::of_bits(1),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             lowered: Vec::new(),
             within_range: false,
             near_player: false,

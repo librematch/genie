@@ -372,7 +372,7 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
             task: CHOP,
             target: &tree(),
             player: PlayerId::new(2),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             carry_rule: false,
             held: &mut held,
             walks: walks(Held::default()),
@@ -422,7 +422,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             task: CHOP,
             target: &tree(),
             player: PlayerId::new(2),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             carry_rule: false,
             held: &mut held,
             walks: walks(Held::default()),
@@ -504,7 +504,7 @@ fn hunt_new_target_clears_its_lead() {
             task: CHOP,
             target: &tree(),
             player: PlayerId::new(2),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             carry_rule: false,
             held: &mut held,
             walks: walks(Held::default()),
@@ -586,7 +586,7 @@ fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
                 task: CHOP,
                 target: &tree(),
                 player: PlayerId::new(2),
-                player_kind: PlayerKind::HUMAN,
+                player_kind: PlayerKind::Human,
                 carry_rule,
                 held: &mut held,
                 walks: walks(Held::default()),
@@ -720,7 +720,7 @@ fn hunt_on_live_ally_fails() {
             task: CHOP,
             target: &ally,
             player: PlayerId::new(2),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             carry_rule: false,
             held: &mut held,
             walks: walks(Held::default()),
@@ -767,7 +767,7 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
                 task: CHOP,
                 target: &q,
                 player: PlayerId::new(2),
-                player_kind: PlayerKind::HUMAN,
+                player_kind: PlayerKind::Human,
                 carry_rule: false,
                 held: &mut held,
                 walks: walks(Held::default()),
@@ -952,7 +952,7 @@ fn walk_to_the_point_ends_in_search_or_done() {
         h
     };
     let walker_at = PointWalker {
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         villager: true,
         stance: UnitStance::DEFENSIVE,
     };
@@ -992,7 +992,7 @@ fn walk_to_the_point_ends_in_search_or_done() {
         }
         // a computer player's failed walk ends the hunt (set_state 13)
         let computer = PointWalker {
-            player_kind: PlayerKind::COMPUTER,
+            player_kind: PlayerKind::Computer,
             ..walker_at
         };
         assert!(run(&mut hunt(state, MoveTo::Failed), computer).0.is_err());
@@ -1049,7 +1049,7 @@ fn walk_to_the_point_ends_in_search_or_done() {
 #[test]
 fn hunter_walks_to_its_drop_site_and_to_its_point() {
     let who = PointWalker {
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         villager: true,
         stance: UnitStance::AGGRESSIVE,
     };
@@ -1141,7 +1141,7 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
     assert_eq!(point_walk(&mut h, &mut rig, who), Ok(PointWalk::Walking));
     assert_eq!(state(&h), Some(MoveTo::Moving));
     let computer = PointWalker {
-        player_kind: PlayerKind::COMPUTER,
+        player_kind: PlayerKind::Computer,
         ..who
     };
     let mut h = walking(Some(to_point(MoveTo::Arrived, point, CHOP.range)));
@@ -1154,7 +1154,7 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
 #[test]
 fn hunter_walks_pass_on_the_units_in_their_way() {
     let who = PointWalker {
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         villager: true,
         stance: UnitStance::AGGRESSIVE,
     };
@@ -1422,13 +1422,13 @@ fn hunt_update_runs_the_step_of_its_state() {
     };
     let mut rig = Rig::on_the_path(Victim::default()).holding(10028, PlayerId::new(0));
     let reason = |r: Result<HuntNext, crate::GenieError>| r.unwrap_err().reason();
-    let r = update(&mut hunting(10028), &mut rig, PlayerKind::COMPUTER, 0.0);
+    let r = update(&mut hunting(10028), &mut rig, PlayerKind::Computer, 0.0);
     assert_eq!(reason(r), "a computer player's hunt (FUN_140fde4f0)");
     let mut h = HuntAction {
         state: HuntState::New,
         ..hunting(10028)
     };
-    let r = update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0);
+    let r = update(&mut h, &mut rig, PlayerKind::Human, 0.0);
     assert_eq!(
         reason(r),
         "a Hunt action in a state the slice does not model"
@@ -1452,7 +1452,7 @@ fn hunt_update_runs_the_step_of_its_state() {
         .for_each(|u| u.life.state = ObjectState::Removed);
     let mut h = walking(-1, Seconds::ZERO, MoveTo::Moving);
     assert_eq!(
-        update(&mut h, &mut lost, PlayerKind::HUMAN, 0.0),
+        update(&mut h, &mut lost, PlayerKind::Human, 0.0),
         Ok(HuntNext::Stay)
     );
     assert_eq!(
@@ -1473,7 +1473,7 @@ fn hunt_update_runs_the_step_of_its_state() {
     // a walk that gave up waits its time, then walks to the point
     let mut h = walking(10028, Seconds::new(-1.0), MoveTo::Failed);
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0),
+        update(&mut h, &mut rig, PlayerKind::Human, 0.0),
         Ok(HuntNext::Stay)
     );
     assert_eq!(
@@ -1482,7 +1482,7 @@ fn hunt_update_runs_the_step_of_its_state() {
     );
     let mut h = walking(10028, Seconds::new(-0.05), MoveTo::Failed);
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0),
+        update(&mut h, &mut rig, PlayerKind::Human, 0.0),
         Ok(HuntNext::Stay)
     );
     assert_eq!(
@@ -1492,7 +1492,7 @@ fn hunt_update_runs_the_step_of_its_state() {
     // a walk under way to the house at the MoveTo's point steps on; off it, it asks again
     let mut h = walking(10028, Seconds::ZERO, MoveTo::Moving);
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0),
+        update(&mut h, &mut rig, PlayerKind::Human, 0.0),
         Ok(HuntNext::Stay)
     );
     assert_eq!(
@@ -1505,7 +1505,7 @@ fn hunt_update_runs_the_step_of_its_state() {
         ..m
     });
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0),
+        update(&mut h, &mut rig, PlayerKind::Human, 0.0),
         Ok(HuntNext::Stay)
     );
     assert_eq!(
@@ -1519,7 +1519,7 @@ fn hunt_update_runs_the_step_of_its_state() {
             ..hunting(-1)
         };
         assert_eq!(
-            update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0),
+            update(&mut h, &mut rig, PlayerKind::Human, 0.0),
             Ok(HuntNext::Search)
         );
         assert_eq!(h.state.bare(), HuntState::Search, "state {state}");
@@ -1530,13 +1530,13 @@ fn hunt_update_runs_the_step_of_its_state() {
         ..hunting(-1)
     };
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::HUMAN, 0.0),
+        update(&mut h, &mut rig, PlayerKind::Human, 0.0),
         Ok(HuntNext::Search)
     );
     assert_eq!(h.state.bare(), HuntState::Search);
     let mut h = hunting(-1);
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::HUMAN, 5.0),
+        update(&mut h, &mut rig, PlayerKind::Human, 5.0),
         Ok(HuntNext::Drop)
     );
     assert_eq!(h.state.bare(), HuntState::Gather);
@@ -1810,7 +1810,7 @@ fn drop_off_gives_the_load_to_the_player() {
         gap_squared: DistanceSquared::new(0.5),
     };
     let who = PointWalker {
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         villager: true,
         stance: UnitStance::AGGRESSIVE,
     };
@@ -1996,7 +1996,7 @@ fn walk_that_ended_without_its_target_only_turns_to_the_face() {
 #[test]
 fn move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
     let who = PointWalker {
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         villager: true,
         stance: UnitStance::AGGRESSIVE,
     };

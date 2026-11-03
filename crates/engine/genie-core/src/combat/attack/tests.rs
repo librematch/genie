@@ -618,7 +618,7 @@ pub(crate) fn reads() -> AttackReads {
         hit_chance: HitChance::of_data(100),
         armed: true,
         swing_sprites: SwingSprites::default(),
-        player_kind: PlayerKind::HUMAN,
+        player_kind: PlayerKind::Human,
         world_time: WorldTime::ZERO,
         can_move: true,
         stance: UnitStance::AGGRESSIVE,
@@ -1479,7 +1479,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         AttackState::GotoSeen { move_to: None },
         true,
         Distance::new(2.0),
-        PlayerKind::HUMAN,
+        PlayerKind::Human,
     );
     assert_eq!(code, UpdateCode::UNDER_WAY);
     assert!(
@@ -1494,7 +1494,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         AttackState::GotoSeen { move_to: None },
         false,
         Distance::new(1.0),
-        PlayerKind::HUMAN,
+        PlayerKind::Human,
     );
     assert_eq!(
         (
@@ -1516,22 +1516,22 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         (
             AttackState::GotoSeen { move_to: None },
             0.9,
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
         ),
         (
             AttackState::GotoSeen { move_to: None },
             f32::NAN,
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
         ),
         (
             AttackState::GotoSeen { move_to: None },
             2.0,
-            PlayerKind::COMPUTER,
+            PlayerKind::Computer,
         ),
         (
             AttackState::GotoPoint { move_to: None },
             2.0,
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
         ),
     ] {
         let (code, a, posted, let_go) = run(state, false, Distance::new(range), player_kind);
@@ -3688,7 +3688,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
     let posted_1fb = vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])];
     assert_eq!(lost(AiOrder::Idle, |_| {}).1, posted_1fb);
     assert_eq!(
-        lost(order, |rig| rig.r.player_kind = PlayerKind::COMPUTER).1,
+        lost(order, |rig| rig.r.player_kind = PlayerKind::Computer).1,
         posted_1fb
     );
     let queued = lost(order, |rig| rig.r.queue_empty = false);

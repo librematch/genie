@@ -63,11 +63,11 @@ impl UnitView<'_, '_> {
         self.c.w.ai.put_back(player, module);
         match heard? {
             Heard::Nothing => Ok(()),
-            Heard::Task(t) => alert_owner(PlayerKind::COMPUTER).map_err(|e| {
+            Heard::Task(t) => alert_owner(PlayerKind::Computer).map_err(|e| {
                 e.with("tasks explorer", ObjectId::field(n.caller))
                     .with("to", format_args!("({}, {})", t.x(), t.y()))
             }),
-            Heard::Detask => alert_owner(PlayerKind::COMPUTER)
+            Heard::Detask => alert_owner(PlayerKind::Computer)
                 .map_err(|e| e.with("detasks explorer", ObjectId::field(n.caller))),
         }
     }
@@ -148,7 +148,7 @@ impl UnitView<'_, '_> {
         }
         let Some((at, centre_sight)) = centre else {
             // no town centre: the AI's own first civilian (`FUN_140b446f0`), not modelled
-            return alert_owner(PlayerKind::COMPUTER).map(|()| Heard::Nothing);
+            return alert_owner(PlayerKind::Computer).map(|()| Heard::Nothing);
         };
         let mut tile = info.top_point();
         if tile == Tile::new(-1, -1) {

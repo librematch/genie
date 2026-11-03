@@ -451,7 +451,7 @@ impl Unit {
                 k.new,
                 c.w.players
                     .get(k.new.index())
-                    .map_or(PlayerKind::PHANTOM, |q| q.kind),
+                    .map_or(PlayerKind::Phantom, |q| q.kind),
             ),
             _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
         };

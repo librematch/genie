@@ -623,7 +623,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         )]
     );
     let mut t = world();
-    t.players[1].kind = PlayerKind::COMPUTER;
+    t.players[1].kind = PlayerKind::Computer;
     assert!(
         t.spawn(
             PlayerId::new(1),

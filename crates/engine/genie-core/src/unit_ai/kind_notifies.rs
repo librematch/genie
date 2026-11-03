@@ -439,7 +439,7 @@ impl UnitAi {
             }
             NotifyKind::DAMAGED => {
                 if at.guest_computer {
-                    alert_owner(PlayerKind::COMPUTER)?;
+                    alert_owner(PlayerKind::Computer)?;
                 }
                 self.damaged(n, time, at, player_kind, ai_rng, side)
             }

@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn computer_player_receipt_is_not_modelled() {
         let mut t = world(true);
-        t.players[2].kind = PlayerKind::COMPUTER;
+        t.players[2].kind = PlayerKind::Computer;
         assert!(
             t.tribute(player_id(1), player_id(2), &[gift(1, 10.0, 0.3); 4])
                 .is_err()

@@ -172,7 +172,7 @@ fn run(
         s,
         c,
         (&mut unit, motion.lent(), &mut ais),
-        PlayerKind::HUMAN,
+        PlayerKind::Human,
     );
     (r, left((&unit, &motion, &ais)))
 }
@@ -186,7 +186,7 @@ fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
         s,
         c,
         (&mut unit, motion.lent(), &mut ais),
-        PlayerKind::COMPUTER,
+        PlayerKind::Computer,
     )
     .is_err_and(|e| {
         e.reason()
@@ -690,7 +690,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
             (&s, &mut c),
             (&mut unit, motion.lent(), &mut ais),
             look,
-            PlayerKind::HUMAN,
+            PlayerKind::Human,
             tuning()
         )
         .is_err()

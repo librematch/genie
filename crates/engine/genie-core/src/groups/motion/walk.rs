@@ -301,7 +301,7 @@ impl World {
             player_kind: g
                 .owner
                 .and_then(|o| self.players.get(o.index()))
-                .map_or(PlayerKind::PHANTOM, |p| p.kind),
+                .map_or(PlayerKind::Phantom, |p| p.kind),
             members: g
                 .members
                 .iter()

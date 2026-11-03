@@ -284,7 +284,7 @@ impl UnitAi {
             ) {
                 self.save_patrol(side);
             }
-            self.ask_for_help(attacker_id, at, PlayerKind::COMPUTER, side)?;
+            self.ask_for_help(attacker_id, at, PlayerKind::Computer, side)?;
             if self.attack_slot(attacker_id, true, at, side, ai_rng)? {
                 self.leave_patrol_timers(ai_rng);
                 self.current_order = None;

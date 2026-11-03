@@ -277,7 +277,7 @@ impl World {
             player_kind: self
                 .players
                 .get(p.index())
-                .map_or(PlayerKind::PHANTOM, |q| q.kind),
+                .map_or(PlayerKind::Phantom, |q| q.kind),
             group,
         })
     }

@@ -109,7 +109,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![PlayerKind::HUMAN, PlayerKind::COMPUTER, PlayerKind::HUMAN],
+        vec![PlayerKind::Human, PlayerKind::Computer, PlayerKind::Human],
     );
     assert_eq!(
         v.explore(

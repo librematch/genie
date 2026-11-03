@@ -344,7 +344,7 @@ impl NewObject {
                 .rev()
                 .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
-            player_kind: PlayerKind::HUMAN,
+            player_kind: PlayerKind::Human,
             posture: Posture::AGGRESSIVE,
             age: Amount::ZERO,
         }
