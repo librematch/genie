@@ -46,7 +46,7 @@ impl World {
     /// `FUN_1411c8fd0`) take part, at most 60: each where the unit trains ([`World::trains_at`],
     /// `FUN_141263610`) has its room (15, a computer player's 2, less its queued total
     /// `+0xbf4`; the sum of those above 0 holds the amount) and its load
-    /// ([`World::production_load`]); any other has room â1 and takes none. The amount is lowered while the player cannot pay that many:
+    /// ([`World::production_load`]); any other has room −1 and takes none. The amount is lowered while the player cannot pay that many:
     /// each cost entry of the costed master ([`crate::production::costed`]; an annex's paid
     /// ones) but the population's needs its amount times the count (`COMISS`, `JA`: a NaN
     /// passes); at one still short, or for a master below type 70, nothing is queued. In game
@@ -195,7 +195,7 @@ impl World {
     }
 
     /// [`World::queue`]'s rooms and loads of the `found` buildings for `unit`, each with `per`
-    /// places: a building the unit does not train at keeps room â1 and load 0; the sum of the
+    /// places: a building the unit does not train at keeps room −1 and load 0; the sum of the
     /// rooms (0 at least) comes third.
     fn rooms_and_loads(
         &self,
@@ -208,7 +208,7 @@ impl World {
         let mut total_room = 0i32;
         for &place in found {
             let (p, building) = self.at(place)?;
-            // a building the unit does not train at keeps room â1 and load 0
+            // a building the unit does not train at keeps room −1 and load 0
             if !self.trains_at(unit, building.life.master_id) {
                 rooms.push(-1);
                 loads.push(Seconds::ZERO);
@@ -322,8 +322,8 @@ impl World {
     }
 
     /// `FUN_1411cbc40`, QUEUE's and RESEARCH's building part, at the building at `i` of
-    /// `player`: `count` of master `unit`, or with `tech` other than â1 that technology (`unit`
-    /// â1), with the train button `button`. The generic villager (0x712) is the villager
+    /// `player`: `count` of master `unit`, or with `tech` other than −1 that technology (`unit`
+    /// −1), with the train button `button`. The generic villager (0x712) is the villager
     /// (0x53), whose sex the Action stream draws for each: the routine queues the rest first,
     /// one by one, then this one (the last drawn is queued first). A building whose total
     /// (`+0xbf4`) is above 14 refuses (its event 0x84 is the interface's); the count is held
@@ -526,8 +526,8 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_1411c3190`: the costs a queue entry of `master` (for a master other than â1:
-    /// [`crate::production::master_costs`]) or of technology `tech` records, from (â1, 0). A
+    /// `FUN_1411c3190`: the costs a queue entry of `master` (for a master other than −1:
+    /// [`crate::production::master_costs`]) or of technology `tech` records, from (−1, 0). A
     /// technology the tree has not got (`FUN_1413cc6c0`), or none, records none; one in state 2
     /// or 4 what [`crate::technology::TechState::entry_costs`] gives.
     pub(crate) fn entry_costs(

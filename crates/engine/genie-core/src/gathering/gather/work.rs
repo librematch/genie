@@ -105,7 +105,7 @@ impl GatherAction {
         Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
     }
 
-    /// State 7 (case 6) with one stop: the work, `(work rate) Ã work_val1 Ã dt`, at most what the
+    /// State 7 (case 6) with one stop: the work, `(work rate) × work_val1 × dt`, at most what the
     /// target holds, times the productivity. A load that would pass the capacity ends the
     /// gathering ([`Next::Drop`]); else the target loses the work, its last bit (above 0, below
     /// 0.1) going with a thousandth of its master's first storage amount, the unit gains, and a
@@ -177,7 +177,7 @@ impl GatherAction {
     /// stops the unit) the load goes
     /// to the player at a drop site that takes it (`site`) within `GatherTuning::drop_reach` (squared): the
     /// resource of what the unit carries ([`crate::gathering::hunt::resource_kind`]), which the caller adds;
-    /// the unit carries nothing after (`FUN_14119d310` with â1). Returns the resource and the
+    /// the unit carries nothing after (`FUN_14119d310` with −1). Returns the resource and the
     /// amount; the caller lets the drop site go and walks back to the target (`set_state(4)`).
     /// A `MoveTo` that failed or let its target go (codes 3 to 5) waits at random
     /// ([`GatherAction::random_wait`]). A site that does not take the load idles (`set_state` 2),

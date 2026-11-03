@@ -251,7 +251,7 @@ impl Unit {
     /// The enter (`FUN_140a867b0`) into `target`, one of the unit's player's buildings: a
     /// building that takes what the unit carries (`FUN_140fdd190`, as a drop site) takes its load
     /// first (the resource for kinds 15 to 17 is food, 0 to 3 and 56 their own, others none:
-    /// [`give_load`]; the unit carries nothing after, `FUN_14119d310` with â1). A building at no
+    /// [`give_load`]; the unit carries nothing after, `FUN_14119d310` with −1). A building at no
     /// more than a fifth of its master's hit points (in floats) and a master with a transform
     /// task (0x88) on the building's are not modelled. Then slot 0x1a0 (`FUN_141212e10` ->
     /// `FUN_141084b30` -> `FUN_1411921d0`): with room in the building, the unit's sight goes from

@@ -755,7 +755,7 @@ pub(crate) fn placeable(t: &mut World) {
     placeable_on(t, GridSize::new(120, 120));
 }
 
-/// [`placeable`]'s terrain and sight on a map of `w` Ã `h` tiles.
+/// [`placeable`]'s terrain and sight on a map of `w` × `h` tiles.
 pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
     let (w, h) = (map.width(), map.height());
     let n = (w * h) as usize;
@@ -1135,7 +1135,7 @@ fn completed_pasture_puts_its_livestock_on_its_edges() {
 
 /// One livestock a tile: a pasture at (20, 20) has twelve tiles under its sixteen points, so
 /// sixteen asked give twelve and the points run out; at the map's left edge the points off it
-/// (x below 0 after CVTTSS2SI: â1.5, not â0.6) go too, leaving six tiles.
+/// (x below 0 after CVTTSS2SI: −1.5, not −0.6) go too, leaving six tiles.
 #[test]
 fn pasture_puts_one_animal_tile_on_the_map() {
     let mut t = pasture_game(
@@ -1428,7 +1428,7 @@ fn villager_tends_the_nearest_livestock_with_room() {
 
 /// Slot 0x7e8 of a villager on a pasture: with room (the livestock's workers below attribute
 /// 290) it works the livestock `FUN_1411c7670` picks, at its place, and tends the pasture; a
-/// full one has its unit AI take a search (0x202 with the hunt action, class 49, â1) and it
+/// full one has its unit AI take a search (0x202 with the hunt action, class 49, −1) and it
 /// tends none.
 #[test]
 fn villager_ordered_on_pasture_works_its_livestock() {
@@ -2503,7 +2503,7 @@ fn task_target_reads_an_annex_as_its_main_building() {
 
 /// The unit's slot 0x388 after its unit AI's update (`FUN_141226fc0`): the switch to the
 /// master slot 0x820's search gave (slot 0x90), the actions cleared and the wait (type 0x9a,
-/// state 10) the only one, its target â1 (the foundation is at its `+0x68`).
+/// state 10) the only one, its target −1 (the foundation is at its `+0x68`).
 #[test]
 fn wait_for_foundation_switches_the_villager_and_holds_the_task() {
     let mut t = sent_off_world(vec![]);
@@ -3767,7 +3767,7 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
 /// The work command without a task (`FUN_14106ff70`'s move): the forager sent to its town
 /// centre empty-handed (no task on class 3) is told of the move (order 0x2c6, the centre with
 /// its class) and walks to the centre; sent to a point it walks there; in state 1 it is told of
-/// no order (â1) and stays; a master that does not move does nothing.
+/// no order (−1) and stays; a master that does not move does nothing.
 #[test]
 fn work_command_without_task_moves_the_unit_there() {
     let work = |target| Work {
@@ -5580,7 +5580,7 @@ fn failed_hunt_tells_its_unit_ai_and_lets_its_target_go() {
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
 }
 
-/// The search (state 3, case 2): the timer runs by dt; at its end it starts again at â10 s and
+/// The search (state 3, case 2): the timer runs by dt; at its end it starts again at −10 s and
 /// the unit AI hears notify 0x202 with the hunt action, the hunt's class (9) and its drop site,
 /// the town centre the search finds. Without its target a lead (state 10, case 9) searches at
 /// once; a done hunt (state 2) waits, but of a tree's class it is not modelled.
@@ -7997,7 +7997,7 @@ fn the_build_command_at_once_matches_the_one_after_the_update() {
 /// `FUN_141205ac0`, the way back after a drop-off: the order on a target `0x325` in front of the
 /// unit AI's queue, on the town-bell record's object the world holds (its master the target
 /// type, its owner the target's, its place the point), else on the record's target as recorded
-/// (owner â1, the record's point); issued by the unit's owner, priority 100, ready.
+/// (owner −1, the record's point); issued by the unit's owner, priority 100, ready.
 #[test]
 fn the_way_back_after_drop_off_queues_the_order_on_the_recorded_work() {
     use crate::orders::town_bell::BackToWork;
@@ -8651,7 +8651,7 @@ fn dying_object_gives_back_its_storage_of_kinds_2_and_16() {
 
 /// The dying sprite's end (`RGE_Animated_Object::update`, [`Unit::dying_sprite_ended`]): the
 /// animation stops and a unit (type below 80) leaves its remains (here 99) at its place within
-/// its update (the dead unit lent to the world); without remains (â1) or as a building none. A
+/// its update (the dead unit lent to the world); without remains (−1) or as a building none. A
 /// dead object's death spawn ([`Unit::death_spawn_comes`]) comes the same way. A master the
 /// player lacks fails.
 #[test]
@@ -10104,7 +10104,7 @@ fn queue_at_several_buildings_shares_its_units_out_by_load() {
 }
 
 /// `FUN_141614450` gives a building room and load only where the unit trains (`FUN_141263610`,
-/// [`World::trains_at`]): a building of another master keeps room â1 and takes none.
+/// [`World::trains_at`]): a building of another master keeps room −1 and takes none.
 /// 427647190's players queued villagers at their trophy (master 1649, which trains none) and
 /// the game queued nothing there.
 #[test]
@@ -10206,7 +10206,7 @@ fn queue_at_another_player_building_queues_and_pays_for_its_owner() {
 }
 
 /// `FUN_141614450` reads a listed object live or sleeping (`FUN_140e6b750`): a sleeping one the
-/// unit does not train at keeps room â1, and the town centre beside it takes the unit.
+/// unit does not train at keeps room −1, and the town centre beside it takes the unit.
 #[test]
 fn queue_passes_over_sleeping_object_the_unit_does_not_train_at() {
     let mut t = one_player(vec![centre(9)], [200.0; 4]);
@@ -10274,7 +10274,7 @@ fn research_at_several_buildings_takes_the_least_loaded() {
 /// `do_command`'s case 0x65 (`FUN_140e6f470`), RESEARCH's check before its handler: listing
 /// none is refused; the packet's building, when the world holds it, must be the player's own
 /// (any while players may order each other's), and one listed alone must be held; of more
-/// listed, another player's or one the world lacks becomes â1, and a human's left without one
+/// listed, another player's or one the world lacks becomes −1, and a human's left without one
 /// is refused.
 #[test]
 fn research_check_refuses_another_player_buildings() {
@@ -10846,7 +10846,7 @@ fn hands_masters() -> Vec<Arc<Masters>> {
     vec![Arc::new(table(0)), Arc::new(table(1)), Arc::new(table(2))]
 }
 
-/// A 40 Ã 40 world of three players' sight with the registry, holding object `id` of
+/// A 40 × 40 world of three players' sight with the registry, holding object `id` of
 /// player `p`, class `class` and master `master` at (10.5, 10.5) in player `p`'s registry
 /// list, its sight on.
 pub(crate) fn hands_world(
@@ -14896,7 +14896,7 @@ fn restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
 /// `TRIBE_Combat_Object::update` (`0x141208440`) before `RGE_Combat_Object::update`: a unit
 /// of class 35 (the petard; also 64 and the masters 527, 528, 1104, 2133 to 2135) below 1 hit
 /// point in state 2 blasts about its place (slot 0x848, `FUN_14107f690`, factor 1, itself left
-/// out, no main target), then dies. 426048706 (Aftermath): Gaia's petards 7948.. placed at â1
+/// out, no main target), then dies. 426048706 (Aftermath): Gaia's petards 7948.. placed at −1
 /// hit points blast the players' walls in update 1.
 #[test]
 fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
@@ -16061,7 +16061,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
 }
 
 /// The Hunt's slot 0x40 (`FUN_140ac52c0`) takes a point unless its task has a work range: its
-/// target goes, `+0x68` is â1 and `set_state(15)` walks to the point (431193960's villager in
+/// target goes, `+0x68` is −1 and `set_state(15)` walks to the point (431193960's villager in
 /// update 1465, its Hunt idle). A task with a range answers 0: the `MoveTo` replaces the list and
 /// the Hunt's teardown lets its target and its drop site go.
 #[test]
@@ -17802,7 +17802,7 @@ fn committing_build_or_wall_to_busy_builder_readies_its_queue() {
 }
 
 /// `ClosestResourceObject`'s point (`FUN_140c49760`): without a site the search starts from the
-/// point at the unit's height; (â1, â1) exactly, or a site, keeps the unit's place; one part â1
+/// point at the unit's height; (−1, −1) exactly, or a site, keeps the unit's place; one part −1
 /// or not a number is a point.
 #[test]
 fn resource_search_starts_from_its_point_unless_it_is_none_or_has_site() {
@@ -18109,7 +18109,7 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
 /// `RGE_Action_Object::update` with an empty list makes the default task and does no inside
 /// update in the same update: livestock inside another object gets its Artifact in one update
 /// and loses it in the next, by turns (431108946's sheep 11628 in the transport 11638 from update
-/// 61: 107 in state 6 after 63, 65, â¦, none after 62, 64, â¦).
+/// 61: 107 in state 6 after 63, 65, …, none after 62, 64, …).
 #[test]
 fn livestock_inside_gets_its_default_artifact_and_loses_it_by_turns() {
     let mut t = livestock_enter_world();
@@ -18143,7 +18143,7 @@ fn livestock_inside_gets_its_default_artifact_and_loses_it_by_turns() {
 }
 
 /// `TRIBE_Command::do_command`'s case 0x66 checks BUILD's builders before its handler
-/// ([`World::command_check`]): another player's becomes â1, and a human's BUILD left without one
+/// ([`World::command_check`]): another player's becomes −1, and a human's BUILD left without one
 /// is refused, placing and paying nothing (429712917's player 8 in update 96, its BUILD naming
 /// player 5's villagers 9618 and 9620). With one of its own the foundation goes down, and only
 /// that one builds.
@@ -18268,7 +18268,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
 
 /// A flat 40-tile map: player 1's archer 123 at (10, 10) in its Attack's READY on Gaia's deer 50
 /// at (13, 10); its swing fires at frame 5 of 0.1 s. The masters as [`archer_masters`]; the next
-/// reusable id â1.
+/// reusable id −1.
 pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> World {
     use crate::garrison::tests::{unit, walker};
     let mut players: Vec<Player> = (0..2).map(|_| Player::default()).collect();
@@ -18436,7 +18436,7 @@ fn assert_near(a: Position, b: Position) {
 
 /// Slot 0x858 (`FUN_14120c0a0`) and `FUN_141081020`: the archer's swing fires at its firing
 /// frame (frame 5 of 0.1 s: the sixth update) its master's missile (363) with the next reusable
-/// id (â1), a tile up (its weapon offset) and aimed at the deer a third of its height up; each
+/// id (−1), a tile up (its weapon offset) and aimed at the deer a third of its height up; each
 /// update the missile flies its speed's share (0.7 of a tile) along that line. It hits the deer
 /// in the update its sweep, grown by its radius, meets the deer's footprint: 1 hit point (the
 /// least damage, as neither has attacks) and its action done. The dead missile leaves the list
@@ -21453,7 +21453,7 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
 }
 
 /// More repairers repair faster, but not in proportion (`0x140adaa20` case 6): each of `n`
-/// repairs `((n â 1) Ã 0.5 + 1) / n` of one's work, so two repair 1.5 times as fast as one and
+/// repairs `((n − 1) × 0.5 + 1) / n` of one's work, so two repair 1.5 times as fast as one and
 /// three twice as fast. The cost (`FUN_1411d37d0`: the building repair cost times the amount over
 /// the master's hit points, of the master's costs) follows the hit points repaired: more
 /// repairers pay more wood each second, the same for each hit point (the house's 25 wood over
@@ -22665,8 +22665,8 @@ fn the_command_phase_runs_an_order_after_its_check() {
 }
 
 /// The last commanded units (`FUN_140e6b290`): a MOVE of its own list that its check lets
-/// run leaves that list as its player's last commanded units, â1s and all; a refused MOVE
-/// leaves them. A count of `0xffff` orders them, and its check writes its â1s back, refused
+/// run leaves that list as its player's last commanded units, −1s and all; a refused MOVE
+/// leaves them. A count of `0xffff` orders them, and its check writes its −1s back, refused
 /// or not.
 #[test]
 fn an_order_of_the_last_commanded_units_reads_what_the_last_run_order_left() {

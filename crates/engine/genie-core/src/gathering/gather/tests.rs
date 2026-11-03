@@ -329,7 +329,7 @@ fn under_the_farm_setting_farm_gather_goes_in_four_timed_stops() {
 
 /// Slot 0x38 (`FUN_140a8e1b0`, `set_state(2)`): the `MoveTo` goes and stops the unit, the
 /// timer clears, the unit stands, the target and the drop site go (returned for the
-/// caller's release) and the point is â1.
+/// caller's release) and the point is −1.
 #[test]
 fn stop_idles_the_gather_and_lets_its_targets_go() {
     let mut mover = walker();
@@ -1535,7 +1535,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
     );
 }
 
-/// The forager's gathering: `(work rate) Ã work_val1 Ã dt` a tick into its load, the bush
+/// The forager's gathering: `(work rate) × work_val1 × dt` a tick into its load, the bush
 /// losing as much; the last bit below 0.1 goes with a thousandth of the master's storage; a
 /// load that would pass the capacity asks for the drop-off.
 #[test]

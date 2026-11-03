@@ -47,7 +47,7 @@ impl GameCommand {
         w.game(self)
     }
 
-    /// `+8` as a world player of `count` players (`FUN_14152fe40`: none outside 0 to count â 1).
+    /// `+8` as a world player of `count` players (`FUN_14152fe40`: none outside 0 to count − 1).
     #[must_use]
     pub fn target(&self, count: usize) -> Option<PlayerId> {
         u8::try_from(self.player)

@@ -1629,7 +1629,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     );
 }
 
-/// A 3Ã3 map of terrains `kinds` (row by row) whose terrain `t` has the flags `flags[t]`, for
+/// A 3×3 map of terrains `kinds` (row by row) whose terrain `t` has the flags `flags[t]`, for
 /// the placement terrains' test ([`placement_terrains`]).
 struct Terrains {
     kinds: [u8; 9],

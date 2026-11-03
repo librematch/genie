@@ -140,7 +140,7 @@ impl BuildAction {
     }
 
     /// A human player's builder of a pasture (master 1889) already built: its unit AI has no
-    /// order and no action (`FUN_140c64b60`, `FUN_140c64b50` with â1), the unit tells it (notify
+    /// order and no action (`FUN_140c64b60`, `FUN_140c64b50` with −1), the unit tells it (notify
     /// 0x21d, the build action's value and the pasture the stack unit made, `FUN_1411c5f70`; 0
     /// when the slice does not hold it), the foundation goes (slot 0x68 with none: out of the
     /// builders, the foundation let go), the load goes to the player (`FUN_140aadc50`: a kind

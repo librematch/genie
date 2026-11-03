@@ -1295,7 +1295,7 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
 }
 
 /// `FUN_140e6f620`: UNLOAD's check of its first 60 ids (500 for a computer), which alone go on.
-/// Its own unit stays and one the world lacks becomes â1. Another player's stays when the two
+/// Its own unit stays and one the world lacks becomes −1. Another player's stays when the two
 /// count each other as allies (`FUN_1416642c0`) and the command names the issuer (flag 1) or
 /// an object of the issuer's (flags 3 to 6); with the setting `+0x1074` any stays. A human's
 /// command left without a unit is refused.
@@ -3254,7 +3254,7 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(99)),
-            // a new target the world does not hold (the game's â1 finds none either)
+            // a new target the world does not hold (the game's −1 finds none either)
             object_id(98),
             Voice::Loud
         ),

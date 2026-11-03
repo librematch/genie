@@ -87,7 +87,7 @@ impl Market {
         }
     }
 
-    /// `FUN_1415cd3c0`: the price of attribute `commodity`'s commodity, â1 for another.
+    /// `FUN_1415cd3c0`: the price of attribute `commodity`'s commodity, −1 for another.
     #[must_use]
     pub fn price(&self, commodity: AttributeId, roles: &Roles) -> Price {
         {

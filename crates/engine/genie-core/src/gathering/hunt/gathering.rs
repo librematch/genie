@@ -237,7 +237,7 @@ impl HuntAction {
         }
     }
 
-    /// State 7 (case 6): the work, `(work rate) Ã work_val1 Ã dt`, at most what the target holds,
+    /// State 7 (case 6): the work, `(work rate) × work_val1 × dt`, at most what the target holds,
     /// times the productivity, while the load stays within the capacity: the target loses the
     /// work, its last bit below 0.1 going with a thousandth of its master's first storage amount;
     /// the unit gains, a remainder below 0.1 of the capacity rounding the load up. A full load or

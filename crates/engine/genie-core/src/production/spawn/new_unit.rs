@@ -231,7 +231,7 @@ impl World {
         if !keeps
             && MasterKind::COMBAT <= target_master.kind
             && target_master.garrison.holds()
-            // a queued order's target â1 is a point: it takes nothing in
+            // a queued order's target −1 is a point: it takes nothing in
             && o.target
                 .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?
         {

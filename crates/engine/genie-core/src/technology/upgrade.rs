@@ -80,7 +80,7 @@ fn keeps_unit_ai(roles: &Roles, new: ClassId, old: ClassId) -> bool {
 
 impl World {
     /// Slot 0x98 of player `p`'s object at `place`, whose master `old` upgrades to `new`; with
-    /// `keep` (the upgrade's modes â1 and 3, whose master then copies `new`) its master stays.
+    /// `keep` (the upgrade's modes −1 and 3, whose master then copies `new`) its master stays.
     /// In the game's order, outermost class first:
     ///
     /// - a building (`FUN_1411c4660`) showing `old`'s construction sprite shows `new`'s (slot
@@ -96,7 +96,7 @@ impl World {
     /// - a moving object (`FUN_14114cb80`) showing `old`'s walking or running sprite shows
     ///   `new`'s;
     /// - the static object (`FUN_141186580`): without `keep` a combat object leaves its class
-    ///   counters ([`crate::objects::lifecycle::death_parts::count_class`] with â1) and a villager's load goes to its
+    ///   counters ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load goes to its
     ///   player (slot 0xf8 with 1 and 1, the foods as food; the statistics are not
     ///   simulation); on the map in state 2 its sight goes and comes with `new`'s line of sight
     ///   (slots 0x1d8 and 0x1d0); its hit points take their share of `new`'s (`old`'s through
@@ -230,7 +230,7 @@ impl World {
 
     /// The static object's part of an upgrade from `old` without its master kept
     /// (`FUN_141186580`): a combat object leaves its class counters
-    /// ([`crate::objects::lifecycle::death_parts::count_class`] with â1) and a villager's load
+    /// ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load
     /// goes to its player (slot 0xf8 with 1 and 1, the foods as food).
     fn hand_in_load(&mut self, p: PlayerId, place: Place, old: &Master) -> Result<(), GenieError> {
         let kind = old.kind;
@@ -904,7 +904,7 @@ mod tests {
         assert!(!class_changes(None, Some(&m(class::BUILDING)), &roles()));
     }
 
-    /// The Feudal Age's upgrade of the house (70 to 464, mode â1, `FUN_141657d10`): a house in
+    /// The Feudal Age's upgrade of the house (70 to 464, mode −1, `FUN_141657d10`): a house in
     /// state 2 keeps its master and its share of the hit points (275 of 550: 450 of 900), and
     /// shows the new standing sprite; a dead one (state 4) and the rubble of its old death spawn
     /// (1403, whose copy differs from 464's 1435) take masters of their own, the dead one also

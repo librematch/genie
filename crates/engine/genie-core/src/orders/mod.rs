@@ -155,7 +155,7 @@ fn packs(
 ) -> bool {
     match reach {
         // Masters and classes the order handler and slot 0x7e8 treat apart (decoded; the game stores a
-        // class as its value â 0xeac, a master id as its id + 0x609c).
+        // class as its value − 0xeac, a master id as its id + 0x609c).
         None => {
             targetless
                 && roles
@@ -207,7 +207,7 @@ struct Splittable {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Split {
     /// The owner of the list's first unit (`DAT_143f11960`), whose groups a new group of the
-    /// split joins; None for a list whose first unit is gone (the game's â1).
+    /// split joins; None for a list whose first unit is gone (the game's −1).
     pub(crate) owner: Option<PlayerId>,
     pub(crate) loose: Vec<ObjectId>,
     pub(crate) groups: Vec<Vec<ObjectId>>,
@@ -295,7 +295,7 @@ impl World {
         Some((p, u))
     }
 
-    /// The object state (`+0x640`) of the object `id`, live or sleeping, None for â1 or an id the
+    /// The object state (`+0x640`) of the object `id`, live or sleeping, None for −1 or an id the
     /// world no longer holds: what a `MoveTo`'s first check reads of its target
     /// ([`crate::movement::move_to::MoveToAction::check_held`]).
     pub(crate) fn object_state(&self, id: impl ObjectKey) -> Option<ObjectState> {
@@ -416,7 +416,7 @@ pub(crate) fn readiness(orders: &mut Vec<QueuedOrder>, drop_ready: bool) {
 /// rate (`+0xa30`), most hit points (`+0xa3c`), max range (`+0xa40`) and melee and pierce armor
 /// (`+0xa48`, `+0xa4c`) powerups go; the hit points powerup (`+0xa38`) stays. The routine also
 /// zeroes `+0xa34`, `+0xa50` and `+0x9f8`, empties the powerup map (`+0xa98`, count `+0xaa0`),
-/// sets `+0xa2c` to slot 0x1b8 Ã 0.05 and takes a sight powerup (`+0xad4`) off (slots 0x1d8,
+/// sets `+0xa2c` to slot 0x1b8 × 0.05 and takes a sight powerup (`+0xad4`) off (slots 0x1d8,
 /// 0x1d0): none of them is held.
 const fn clear_powerups(combat: &mut Combat) {
     combat.attack_powerup = AttackPowerup::ZERO;
@@ -428,7 +428,7 @@ const fn clear_powerups(combat: &mut Combat) {
 }
 
 /// `FUN_140c4da50`: the target of the first order in unit AI `ai`'s queue (`+0x20`, count
-/// `+0x18`) that has one (not negative) and that its own unit `id` issued; â1 for none.
+/// `+0x18`) that has one (not negative) and that its own unit `id` issued; −1 for none.
 /// The adjusted idle timeout and secondary timer `FUN_14161b970` gives the unit AI of the
 /// order's `i`th entry: 750 ms and the world's dt (`world+0x7c`) more for each six before it
 /// (`(i / 6) as f64 * dt as f64`, `CVTTSD2SI` to 64 bits, the low 32 plus 750; the product
@@ -541,7 +541,7 @@ fn set_differentiator_groups(g: &mut UnitGroup, list: &[GroupId]) {
 }
 
 /// `FUN_14118c790`: unit `id` joins the end of a unit's ignore list (`+0x670`, count `+0x678`);
-/// the list's capacity (`+0x67c`: 24 at first, then twice the count, the new slots â1) is the
+/// the list's capacity (`+0x67c`: 24 at first, then twice the count, the new slots −1) is the
 /// `Vec`'s, which no reader sees.
 fn ignore_unit(ignore: &mut Vec<ObjectId>, id: ObjectId) {
     ignore.push(id);
@@ -559,7 +559,7 @@ fn work_reach(gap: Distance, weapon_range: Distance, min_range: Distance) -> (bo
 /// A whole share (`DAT_14330ebcc`), which `FUN_1411859a0` takes hit points against.
 const DAMAGE_WHOLE: f32 = ORDER_DAMAGE_WHOLE;
 
-/// The damage share `FUN_1411859a0` picks damage sprites by: `100 â hp Ã 100 / hit points`,
+/// The damage share `FUN_1411859a0` picks damage sprites by: `100 − hp × 100 / hit points`,
 /// whole, of hit points at most the master's. An object whose share is its resource's (the
 /// classes `FUN_141193590` names; its master's `+0x681` would add any) is not modelled.
 fn damage_share(
@@ -611,7 +611,7 @@ pub(crate) fn nearest_table_site(
     let buildings = table_drop_buildings(table, held, Some(class), civ);
     let mut best = (None, order_tuning.table_drop_far);
     for m in buildings {
-        // a queued unit's place (â1) names no object
+        // a queued unit's place (−1) names no object
         for &id in tracker.list(ListKey::master(m)).iter().flatten() {
             let Some((state, position)) = look(id) else {
                 continue;

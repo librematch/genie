@@ -63,7 +63,7 @@ pub struct Candidate {
     pub pasture: Option<PastureId>,
     /// `+0x689` is 0 ([`crate::objects::unit::Unit::untargetable`]).
     pub untargetable: bool,
-    /// `+0x308`, `attribute_type_held`, none for â1.
+    /// `+0x308`, `attribute_type_held`, none for −1.
     pub attribute: Option<AttributeId>,
     /// `+0x310`, `attribute_amount_held`.
     pub amount: Amount,
@@ -118,7 +118,7 @@ pub fn more_work(
     let Some(entry) = entry.filter(|e| e.auto_work) else {
         return Ok(None);
     };
-    // the box: (short)(int) of the building's place, Â± the reach plus the builder's radius
+    // the box: (short)(int) of the building's place, ± the reach plus the builder's radius
     let r = builder
         .range
         .wrapping_add((builder.radius + Distance::new(0.5)).get() as i32 as i16);
@@ -379,10 +379,10 @@ impl<W> Debug for ResourceWorld<'_, W> {
     }
 }
 
-/// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` â1: the unit's
-/// place), no drop site (`param_3` â1) and `param_6` 2: the closest object of gather group `kind`
+/// `ClosestResourceObject` (`FUN_140c49760`) with no point (`param_7`, `param_8` −1: the unit's
+/// place), no drop site (`param_3` −1) and `param_6` 2: the closest object of gather group `kind`
 /// that the unit reaches (`reach`, slot 0x3d0 with the range 0: `FUN_14152b6e0` holds in the
-/// games the slice runs), â1 for none. A unit below state 2 is not modelled.
+/// games the slice runs), −1 for none. A unit below state 2 is not modelled.
 ///
 /// A breadth-first walk over the tiles from the unit's tile, its queue after the tile in hand kept
 /// sorted by the distance of the tiles' centres from the unit ([`msvc::sort`]): a tile the player
@@ -391,7 +391,7 @@ impl<W> Debug for ResourceWorld<'_, W> {
 /// its four neighbours not seen yet that lie on the map. On each such tile the first object in a
 /// pasture or targetable whose master gathers by itself (`enable_auto_gather` 1) as `kind`, with
 /// some amount held, and that is not the unit AI's current target, is tested: with fewer workers
-/// than `max_workers` (â1 for any) a reach makes it the answer; else a reach makes it the
+/// than `max_workers` (−1 for any) a reach makes it the answer; else a reach makes it the
 /// fallback when it is fewer steps away than the last. After 30 tests, or the queue's end, the
 /// fallback is the answer. A tile whose last object fails the first test counts it as found
 /// (the game's loop leaves it in hand).
@@ -411,7 +411,7 @@ pub fn closest_resource<W>(
         .map(|(id, _)| id)
 }
 
-/// [`closest_resource`] from a drop site (`param_3`, None for â1 or a site not found), with what
+/// [`closest_resource`] from a drop site (`param_3`, None for −1 or a site not found), with what
 /// its out argument (`param_5`) takes: the distance of the answer's tile from the pass's origin
 /// (the search's 1.4-per-diagonal measure, truncated), None for no answer (the argument keeps its
 /// value).

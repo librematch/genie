@@ -40,10 +40,10 @@ pub enum Class {
 }
 
 /// What an object holds (`+0x308` and `+0x310`), as a reader of the object takes it: the
-/// attribute (none for â1) and the amount.
+/// attribute (none for −1) and the amount.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Held {
-    /// The attribute, none for â1.
+    /// The attribute, none for −1.
     pub kind: Option<AttributeId>,
     /// The amount.
     pub amount: Amount,
@@ -88,7 +88,7 @@ pub struct Lifecycle {
     pub state: ObjectState,
     /// The masked hit points (`+0x278`).
     pub hp: HitPoints,
-    /// `+0x308`: the attribute of what the object holds, none for â1.
+    /// `+0x308`: the attribute of what the object holds, none for −1.
     pub attribute_type: Option<AttributeId>,
     /// `+0x310`: how much it holds.
     pub amount: Amount,
@@ -204,7 +204,7 @@ impl Lifecycle {
 
     /// The static update's death (state 3, `set_state` `FUN_14119d710`), then the animated update's
     /// step to state 5. A static object takes its dying sprite (slot 0x68) and, starting on a
-    /// random facet, draws it (`rand15 Ã facets / 0x7fff`, at most the last; the facet, `+0xe`, is
+    /// random facet, draws it (`rand15 × facets / 0x7fff`, at most the last; the facet, `+0xe`, is
     /// not held). The storage the caller checks, and the players' fog ghosts of a master whose
     /// fog visibility is 2 (`FUN_14118e990`, for players that explored the tile but do not see
     /// it) are the caller's too ([`crate::vision::ghost`]); the statistics and the sounds are not held.
@@ -498,7 +498,7 @@ mod tests {
     }
 
     /// The static init's storage (a new missile's too): flags 1, 2 and 32 with an attribute
-    /// go to the owner (resources and attributes alike), one without an attribute (â1) does
+    /// go to the owner (resources and attributes alike), one without an attribute (−1) does
     /// not; the last of flag 0 is what the object holds.
     #[test]
     fn new_object_storage_gives_its_owner_flags_1_2_and_32_and_holds_flag_0() {

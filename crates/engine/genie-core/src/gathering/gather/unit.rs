@@ -430,7 +430,7 @@ impl Unit {
     /// 2): the unit's notify 0x202 to its unit AI (slot 0x328) with the gather action (`0x261`),
     /// the Gather's target type (`+0x68`) and a drop site: the second target's, else for a master
     /// with drop sites (`+0x7a0`) the one `FUN_1411671e0` finds from the unit (inside others too:
-    /// [`Unit::drop_site_from`]), 0 when it finds none; â1 for a master without.
+    /// [`Unit::drop_site_from`]), 0 when it finds none; −1 for a master without.
     pub(crate) fn gather_search(
         &self,
         actions: &Action,

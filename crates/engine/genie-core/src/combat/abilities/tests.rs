@@ -527,7 +527,7 @@ fn the_terrain_mask_is_bitset_of_8() {
 }
 
 /// The longboat's task 3 (250 in the current build): terrains of flag 32, sprites 19601,
-/// â1, 19599, 19599, the dying and undead sprites 19598 and 19600.
+/// −1, 19599, 19599, the dying and undead sprites 19598 and 19600.
 fn longboat_look() -> Task {
     Task {
         terrain: TaskTerrain::of_data(-32),

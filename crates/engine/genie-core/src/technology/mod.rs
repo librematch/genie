@@ -68,7 +68,7 @@ const SCALED_BY_38: TechId = TechId::SCALED_BY_38;
 /// the seconds it takes there, its button and the seconds added (`+0xc`, `FUN_1413cec90`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Location {
-    /// The building's master, none for an entry the data leaves open (â1).
+    /// The building's master, none for an entry the data leaves open (−1).
     pub building: Option<MasterId>,
     /// The seconds it takes there (the save's `u16`, its bits kept).
     pub time: WholeSeconds,
@@ -93,7 +93,7 @@ pub struct TechState {
     pub allow_multiple: bool,
     /// `+0x40`: its researches queued and done are held to its cap.
     pub stack: bool,
-    /// `+0x42`, `+0x48`, `+0x4e`: the cost overrides' amounts, attributes and use (â2 the `.dat`'s
+    /// `+0x42`, `+0x48`, `+0x4e`: the cost overrides' amounts, attributes and use (−2 the `.dat`'s
     /// entry where it is paid, 0 none, else the override).
     pub overrides: [CostOverride; 3],
     /// `+0x56`: the cap of its researches queued and done (below 0: 0x100).
@@ -102,7 +102,7 @@ pub struct TechState {
     pub pending: ResearchCount,
     /// `+0x60` (`mEnabledTech`): the dependents' update leaves it alone.
     pub enabled: bool,
-    /// `+0x62`: the effect it gives instead of its own (â1 none).
+    /// `+0x62`: the effect it gives instead of its own (−1 none).
     pub effect_override: EffectId,
     /// `+0x64`: the master of the building it was last queued at.
     pub building_master: Option<MasterId>,
@@ -158,9 +158,9 @@ impl TechState {
 
     /// `FUN_1411c3190` for a research in state 2 or 4 (else none): the costs its queue entry
     /// records, attribute and amount: an override in use (or a `.dat` entry without an attribute,
-    /// under â2) gives its attribute and amount, else the `.dat`'s entry; the adjustment times
+    /// under −2) gives its attribute and amount, else the `.dat`'s entry; the adjustment times
     /// the scale adds to the amount (in 32 bits), which the modifier above 0 then scales (not
-    /// truncated). An entry without either is (â1, 0).
+    /// truncated). An entry without either is (−1, 0).
     pub fn entry_costs(
         &self,
         def: &TechDef,
@@ -249,7 +249,7 @@ impl TechState {
     }
 
     /// `FUN_1413d4a00`: the three costs, attribute and amount, as the pending debit and the
-    /// building's queue read them. An override in use (or a `.dat` entry not paid, under â2)
+    /// building's queue read them. An override in use (or a `.dat` entry not paid, under −2)
     /// gives its attribute and amount, else the `.dat`'s entry does; the adjustment times the
     /// scale adds to the amount, in 16 bits, which the modifier then scales (truncated). An
     /// override of 0 gives none; an amount below 1 leaves no attribute.
@@ -321,7 +321,7 @@ impl TechState {
 
     /// The research test (`FUN_1413cd600` without a building's holdings, `param_4` and
     /// `param_5` 0): a technology not in state 1 passes only with `repeat` (`param_6`), a state
-    /// other than â1 and 0 and multiple researches allowed, or of the shared kind; then each
+    /// other than −1 and 0 and multiple researches allowed, or of the shared kind; then each
     /// paid cost needs the player's attribute to hold at least its amount. The game's
     /// per-technology overrides (`FUN_140f39f40` on the game's `+0x18`) are not held: none
     /// (probed for Loom, 22).
@@ -358,7 +358,7 @@ impl TechState {
         Ok(true)
     }
 
-    /// The payment (`FUN_1413d4370` with `param_3` 1 and no location test, `param_5` â1): the
+    /// The payment (`FUN_1413d4370` with `param_3` 1 and no location test, `param_5` −1): the
     /// research test first (false: nothing paid); then each paid cost comes off its attribute,
     /// or, beyond what the attribute holds, the rest off gold and the attribute to 0. The
     /// technology takes state 4 and the building's master `building`. The game's statistics

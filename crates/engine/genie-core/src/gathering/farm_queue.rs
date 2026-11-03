@@ -36,7 +36,7 @@ use crate::world::slots::PlayerSlots;
 /// A queue takes a purchase only below this count (`0x28`).
 pub const QUEUE_LIMIT: QueueCount = QueueCount::of_data(40);
 
-/// A reseeding gatherer's farm spot of none (`DAT_14330ec20`, â1.0, read at `0x140a8aa9e`).
+/// A reseeding gatherer's farm spot of none (`DAT_14330ec20`, −1.0, read at `0x140a8aa9e`).
 const NO_FARM: f32 = FARM_QUEUE_NO_FARM;
 /// The one farm or fish trap a reseed pays (`DAT_14330eb8c`, 1.0, read at `0x140a8ac75` and
 /// `0x140a8b025`).
@@ -266,7 +266,7 @@ impl World {
     }
 
     /// `FUN_140a8aa60`: player `p`'s gatherer at `idx` reseeds its farm at its farm spot
-    /// (`mFarmX`, `mFarmY`; none at â1). A villager (class 4) with the automatic farm queue
+    /// (`mFarmX`, `mFarmY`; none at −1). A villager (class 4) with the automatic farm queue
     /// (`+0x1424`) or farms queued (`+0x141c`) makes the farm [`World::reseed_master`] names; any
     /// other gatherer, with the automatic fish trap queue (`+0x1425`) or fish traps queued
     /// (`+0x1420`), makes a fish trap when it is a fishing ship (class 21); else none. (For the
@@ -633,7 +633,7 @@ mod tests {
     }
 
     /// A building master `id` of class `class` and base id `base`, available or not, heading
-    /// `head` (â1 for none).
+    /// `head` (−1 for none).
     fn building(
         id: MasterId,
         class: ClassId,

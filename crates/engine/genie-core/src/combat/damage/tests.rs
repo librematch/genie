@@ -827,7 +827,7 @@ fn facing_offset_counts_facets_from_the_angle() {
     assert!((facing_offset(at, few, Position::new(10.0, 11.0, 0.0)) - 2.0).abs() < 1e-5);
     // a NaN difference goes on to atan2f (COMISS/JC, JNC: unordered is not "within 1e-7")
     assert!(facing_offset(at, facing, Position::new(f32::NAN, 10.0, 0.0)).is_nan());
-    // behind wraps into âÏ..Ï, and no sprite or the same point gives 0
+    // behind wraps into −π..π, and no sprite or the same point gives 0
     let back = facing_offset(at, facing, Position::new(9.0, 9.999, 0.0));
     assert!(7.9 < back.abs() && back.abs() <= 8.0);
     assert_eq!(

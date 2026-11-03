@@ -42,7 +42,7 @@ impl World {
     #[must_use]
     pub fn town_centre_at(&self, p: PlayerId, n: usize) -> Option<ObjectId> {
         let tracker = &self.players.get(p.index())?.tracker;
-        // a queued unit's place (â1) names no object the world holds
+        // a queued unit's place (−1) names no object the world holds
         town_centres(self.model.slots.master)
             .iter()
             .flat_map(|&k| tracker.list(ListKey::master(k)).iter().copied().flatten())

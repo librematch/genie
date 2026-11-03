@@ -68,7 +68,7 @@ impl World {
     /// `count` units of a unit entry `e` of player `p` cancelled (`FUN_1411cff00`,
     /// `FUN_1411d61e0`): each its refund ([`refund`]) and its tracker place (the counter one
     /// less, [`crate::players::tracker::Tracker::unplace`]); then attribute 80 lowers by the population
-    /// times the count (slot 0xf8 with âpopulation Ã count).
+    /// times the count (slot 0xf8 with −population × count).
     pub(super) fn cancel_units(
         &mut self,
         p: PlayerId,
@@ -335,7 +335,7 @@ impl World {
     }
 
     /// `FUN_1411d61e0`, the cancel of `count` of master `master` (or of technology `tech`, not
-    /// â1) in the queue of the building at `idx` of player `p`, from entry `from` (held to the
+    /// −1) in the queue of the building at `idx` of player `p`, from entry `from` (held to the
     /// last). A research: the entry at `from` gives back what its researches paid
     /// ([`World::refund_researches`], its count at most the entry's). A unit: the first entry
     /// at `from` or before it of that master (none: nothing) gives back its units, at most its

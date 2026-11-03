@@ -430,7 +430,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     assert_eq!(t.players[1].attributes[45], Amount::new(1.0));
 }
 
-/// Each victory timer at 0 or more keeps the player; â1 and NaN do not.
+/// Each victory timer at 0 or more keeps the player; −1 and NaN do not.
 #[test]
 fn running_victory_timer_keeps_the_player() {
     assert!(!VictoryTimes::default().running());

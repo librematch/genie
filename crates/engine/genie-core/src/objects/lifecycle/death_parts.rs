@@ -29,7 +29,7 @@ use crate::world::layer::generated::VisibilityTuning;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`farm_bonus`]);
-/// â1 for those the player has not got.
+/// −1 for those the player has not got.
 pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
     let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::new(-1.0));
     FarmBonus {
@@ -41,7 +41,7 @@ pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
 
 /// The owner's attributes 237, 238 and 239 (`player+0x768`..`+0x778`): a farm's bonus when built,
 /// its amount, the resource it goes to and a master near which it is given
-/// ([`Completion::first_part`](crate::construction::build::Completion::first_part)); each â1 when
+/// ([`Completion::first_part`](crate::construction::build::Completion::first_part)); each −1 when
 /// the player has not got it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FarmBonus {
@@ -194,7 +194,7 @@ pub(crate) struct BuiltDeath {
 
 /// [`BuiltDeath`] of the building `u` of `master` with its combat layer `combat` (its store)
 /// and its main building `annex_of` (an annex's): the monastery (104), the wonder (276) and the
-/// castle (82) count one less in attributes 52, 42 and 134 (slot 0xf8 with â1, then slot 0xf0
+/// castle (82) count one less in attributes 52, 42 and 134 (slot 0xf8 with −1, then slot 0xf0
 /// with 0 below 0); its master's technology (`+0x98c`) goes when no other building of the master
 /// stands ([`World::withdraw_tech`]). A foundation terrain stays. Not modelled: a computer
 /// player's (`FUN_1411e7ca0`), one with a pasture or its workers (`+0xcb8`), units inside, the
@@ -257,7 +257,7 @@ pub(crate) fn built_death(
 /// `FUN_1411e6580`): each entry of mode 4 with an attribute and an amount above 0 (the
 /// population headroom of a house, a town centre or a castle; slot 0xf8 with the amount
 /// negated), then the population it holds itself (`+0x308` 4: the amount leaves, and it holds
-/// nothing after, `FUN_14119d310` with â1 and 0); then each entry of mode 16 leaves its own store
+/// nothing after, `FUN_14119d310` with −1 and 0); then each entry of mode 16 leaves its own store
 /// ([`Combat::store`](crate::objects::layers::Combat::store)) when the store holds its attribute.
 pub(crate) fn storage_leaves(
     (u, combat): (&mut Unit, &mut Combat),

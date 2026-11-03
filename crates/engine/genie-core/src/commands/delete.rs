@@ -325,7 +325,7 @@ impl World {
     }
 
     /// `FUN_1414615d0` on the world's treaty monitor (`+0x820`) for a town centre's owner: its
-    /// zones (`+0x18 + (owner â 1) Ã 0x24`: two rectangles and a flag) go to 0, and the game
+    /// zones (`+0x18 + (owner − 1) × 0x24`: two rectangles and a flag) go to 0, and the game
     /// screen's list of them (`FUN_1414d2060`, `Game/ui/GameScreenPC.cpp`) loses its entries. Only
     /// a treaty fills the zones (`FUN_141461c00`), so without one they are 0 already.
     ///

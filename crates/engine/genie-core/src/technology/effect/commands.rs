@@ -60,7 +60,7 @@ impl World {
     /// effect of the table, [`World::do_table_effect`]; its 0x318 makes the spawns count in the
     /// local player's statistics, which are not simulation) for player `p` with the effect's object
     /// `object` (none for a research's): first its technology commands in order, the cost modifier
-    /// (`'e'`, [`World::tech_cost`]), the disable command (`'f'`, an id other than â1,
+    /// (`'e'`, [`World::tech_cost`]), the disable command (`'f'`, an id other than −1,
     /// [`World::disable_tech`]) and the research time modifier (`'g'`, [`World::research_time`]);
     /// then the base's ([`World::base_effect`]).
     pub(crate) fn do_effect(

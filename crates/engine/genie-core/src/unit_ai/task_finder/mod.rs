@@ -9,7 +9,7 @@
 //! and the like), then the general search: a task for the target's combat level, else for its
 //! master, else for its class, each the first in list order the task's own test passes, else a
 //! task for the terrain under the target's point. The masters' classes and ids it compares against
-//! are engine constants; the game stores them encoded (a class as its value â 0xeac, a master id as
+//! are engine constants; the game stores them encoded (a class as its value − 0xeac, a master id as
 //! its id + 0x609c), the port compares the decoded values and names the encoded ones.
 
 use crate::GenieError;
@@ -171,9 +171,9 @@ pub fn drops_at(table: &[DropSite], building: MasterId, actor: &Actor<'_>) -> bo
 }
 
 /// `FUN_140fdd950` with no buildings left out: the buildings of the drop-site table's entries
-/// for workers of class `class` (any for â1; an entry's own worker list is not read) that list
+/// for workers of class `class` (any for −1; an entry's own worker list is not read) that list
 /// resource types (`+0x40`), for `civ` where the entry names civs, that take `kind`: a basic
-/// resource (below 4, compared unsigned, so â1 is not one) among their resource types, any other
+/// resource (below 4, compared unsigned, so −1 is not one) among their resource types, any other
 /// among their targets' attribute types; in table order.
 #[must_use]
 pub fn table_drop_buildings(
@@ -195,7 +195,7 @@ pub fn table_drop_buildings(
         .collect()
 }
 
-/// A task's requirement (`FUN_1410622c0`): no enabling resource (â1), or the player's attribute of
+/// A task's requirement (`FUN_1410622c0`): no enabling resource (−1), or the player's attribute of
 /// that index above 0.
 #[must_use]
 pub fn enabled(attributes: &[Amount], resource: Option<AttributeId>) -> bool {
@@ -207,7 +207,7 @@ fn first(list: &Master, pred: impl Fn(&Task) -> bool) -> Option<&Task> {
     list.action_part().tasks.iter().find(|t| pred(t))
 }
 
-/// The filter: any task (â1), or one of this type.
+/// The filter: any task (−1), or one of this type.
 fn wanted(filter: Option<ActionKind>, t: &Task) -> bool {
     filter.is_none_or(|f| f == t.action_kind)
 }
@@ -348,7 +348,7 @@ fn garrison_task<'m>(
 }
 
 /// The task of `list` (a master's task list) for `actor` on `on` (`FUN_1412784d0` with the
-/// work command's arguments: the target's point, the filter (â1 any, else an action type) and mode
+/// work command's arguments: the target's point, the filter (−1 any, else an action type) and mode
 /// 0). The target is an annex's main building already (the finder's first step, `+0xbb8`); the
 /// general one the target the general search sees, which repeats that step (an annex of an annex:
 /// its main building's main building). The terrain: the terrain under the point when the map's
@@ -702,7 +702,7 @@ mod tests {
         let applies_to = |task: &Task, master, target: &TaskTarget<'_>| {
             applies(task, &me(master), target, &Teams)
         };
-        // the holder's test (â1 for no attribute)
+        // the holder's test (−1 for no attribute)
         let kind = AttributeId::of_data;
         let holder = |attribute_type, attribute_type3| Task {
             holding_attr: 1,
@@ -873,7 +873,7 @@ mod tests {
             ),
             [ids::TOWN_CENTRE, master_id(562), master_id(1754)]
         );
-        // a kind of 4 or more by the targets' attribute types; â1 is not a basic resource
+        // a kind of 4 or more by the targets' attribute types; −1 is not a basic resource
         assert_eq!(
             table_drop_buildings(
                 &table,
@@ -1314,8 +1314,8 @@ mod tests {
 
     /// The general search's last step (`FUN_1411a8ba0`): without a task for the target, or
     /// without a target, the first task for the terrain under the point (the transport's beach
-    /// task, 12 on terrain 2), whatever the filter the finder's tail passes (â1); none without a
-    /// terrain (a point off the map, or x or y â1).
+    /// task, 12 on terrain 2), whatever the filter the finder's tail passes (−1); none without a
+    /// terrain (a point off the map, or x or y −1).
     #[test]
     fn point_on_terrain_takes_the_task_for_that_terrain() {
         let beach = Task {

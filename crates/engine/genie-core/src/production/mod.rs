@@ -62,11 +62,11 @@ use crate::world::layer::Slots;
 /// slot the buffer's growth adds is zeroed (`calloc`), as [`Entry::default`] is.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct Entry {
-    /// `+0x0`, `mMasterUnitId`: the master it makes; â1 for a research.
+    /// `+0x0`, `mMasterUnitId`: the master it makes; −1 for a research.
     pub master: Option<MasterId>,
     /// `+0x2`, `mUnitCount`: how many.
     pub count: QueuedUnits,
-    /// `+0x4`, `mTechId`: the technology it researches; â1 for a unit.
+    /// `+0x4`, `mTechId`: the technology it researches; −1 for a unit.
     pub tech: Option<TechId>,
     /// `+0x8`, `mCosts`: what each of its units or researches paid, three (attribute, amount)
     /// pairs (`FUN_1411c3190`), which a cancel gives back.
@@ -75,7 +75,7 @@ pub struct Entry {
     /// the slots it reads from 0).
     #[diff(unsaved)]
     pub serial: EntrySerial,
-    /// `+0x28`, `mButtonLocationId`: the train button QUEUE named, â1 for none.
+    /// `+0x28`, `mButtonLocationId`: the train button QUEUE named, −1 for none.
     pub button: QueueButton,
     /// `+0x2c`, `mTrainTime`: the unit's train time at the building and button
     /// ([`train_time`]); a research entry does not write it.
@@ -233,7 +233,7 @@ impl Queue {
     /// `FUN_1411cbc40`'s growth of a full buffer (`+0xbf0` at most `+0xbf2`): ten zeroed slots
     /// more; each old slot keeps its master, count, technology, button, train time and serial,
     /// and takes its costs from `costs`, one per old slot (`FUN_1411c3190` filled them anew from
-    /// (â1, 0) with the slot's technology and master, as they stand now: [`Queue::full`]).
+    /// (−1, 0) with the slot's technology and master, as they stand now: [`Queue::full`]).
     pub fn grow(&mut self, costs: &[[(Option<AttributeId>, Amount); 3]]) {
         let old = self.slots.len();
         let mut slots = vec![Entry::default(); old + GROWTH as usize];
@@ -302,7 +302,7 @@ impl Queue {
 
 /// `FUN_1411cbc40`'s train time for a unit of a master with train locations `locations`
 /// queued at a building of master `building` with button `button` (and `FUN_140acf280`'s for a
-/// master without flag 0x80): with button â1 the first location's time; else the location of
+/// master without flag 0x80): with button −1 the first location's time; else the location of
 /// that building whose button is the button's low byte, else the first location's; 0 without
 /// locations.
 #[must_use]
@@ -335,7 +335,7 @@ pub struct MakeObj {
     pub master: Option<MasterId>,
     /// `+0x6c`, `work_done`: the seconds of work done.
     pub progress: Seconds,
-    /// `+0x70`, `unique_id` (â1 from the building's update).
+    /// `+0x70`, `unique_id` (−1 from the building's update).
     pub unique_id: i32,
     /// `+0x78`, `mButtonLocationId`.
     pub button: QueueButton,
@@ -344,7 +344,7 @@ pub struct MakeObj {
 }
 
 impl MakeObj {
-    /// The building's update's make action (`FUN_140acb140` with the first entry's master, â1,
+    /// The building's update's make action (`FUN_140acb140` with the first entry's master, −1,
     /// 0, its train time and button): paid, nothing done, state 0 until the list starts it.
     #[must_use]
     pub const fn for_entry(entry: &Entry) -> Self {
@@ -388,7 +388,7 @@ pub struct MakeTech {
     pub paid: bool,
     /// `+0x68`, `tech_id`.
     pub tech: TechId,
-    /// `+0x6c`, `unique_id`: the entry's master (â1).
+    /// `+0x6c`, `unique_id`: the entry's master (−1).
     pub master: i32,
     /// `+0x70`, `m_researchProgress`: the seconds of work done.
     pub progress: Seconds,
@@ -526,7 +526,7 @@ mod tests {
     }
 
     /// A zeroed slot (the buffer's growth, `calloc`) holds master 0 and technology 0, as the
-    /// game's save writes a slot past the entries: not the â1 of a research's master.
+    /// game's save writes a slot past the entries: not the −1 of a research's master.
     #[test]
     fn zeroed_slot_holds_master_0() {
         let e = Entry::default();
@@ -781,7 +781,7 @@ mod tests {
         );
     }
 
-    /// A villager stores â1 headroom, +1 population and +1 of attribute 19.
+    /// A villager stores −1 headroom, +1 population and +1 of attribute 19.
     #[test]
     fn villager_takes_one_population() {
         assert_eq!(
@@ -995,7 +995,7 @@ mod tests {
 
     /// The game's villager costs food, an empty slot and the population (the `.dat`'s
     /// `resource_costs`): a queue entry's costs keep the empty slot in its place
-    /// (MarvinBlue/426048731's 9149 at update 25: (0, 50), (â1, 0), (4, 1)).
+    /// (MarvinBlue/426048731's 9149 at update 25: (0, 50), (−1, 0), (4, 1)).
     #[test]
     fn queue_entry_keeps_the_empty_cost_slot_in_its_place() {
         let mut m = villager(&[]);

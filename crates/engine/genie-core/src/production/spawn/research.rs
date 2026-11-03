@@ -144,7 +144,7 @@ impl World {
     /// The research's end in its update (`0x140ad2a20`) once its progress reaches its time:
     /// `FUN_1413d1740` (with `repeat`, the player's `+0x648` or [`TechState::repeatable`]): a
     /// technology in state 2 (or with `repeat`) whose work done reaches the `.dat`'s time at the
-    /// building (â1 without), times the research time modifier (attribute 86, above 0, not an
+    /// building (−1 without), times the research time modifier (attribute 86, above 0, not an
     /// age), plus the location's adjustment, is done ([`World::complete_research`]); else, or
     /// without `repeat`, it is left. Then the action takes state 1 (the event 100 and the
     /// computer players' slot 0x3a8 are not held) and the building's unit AI is told 0x1fa with

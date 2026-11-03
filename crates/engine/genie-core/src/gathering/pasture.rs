@@ -36,8 +36,8 @@ pub const fn livestock(masters: MasterSlots) -> [MasterId; 2] {
 }
 
 /// The points along the edges of a pasture at `at` whose ground radius on x is `radius_x`, in
-/// the routine's order: the radius less `PastureTuning::inset` gives the corners (xâr, yâr), (x+r, yâr),
-/// (x+r, y+r) and (xâr, y+r); each edge from its first corner to its second, `(b â a) Â· t + a`
+/// the routine's order: the radius less `PastureTuning::inset` gives the corners (x−r, y−r), (x+r, y−r),
+/// (x+r, y+r) and (x−r, y+r); each edge from its first corner to its second, `(b − a) · t + a`
 /// in f32 (SUBSS, MULSS, ADDSS) with `t` from 0 by `PastureTuning::step` while at most `PastureTuning::end`: the bottom
 /// edge from the first corner to the second, the right one from the third to the second, the
 /// top one from the third to the fourth and the left one from the first to the fourth.
@@ -178,7 +178,7 @@ impl World {
     }
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
-    /// â1 for none (a unit of another player, too): its livestock the world holds with their
+    /// −1 for none (a unit of another player, too): its livestock the world holds with their
     /// workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted by the gap
     /// (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the first whose
     /// workers are below the owner's
@@ -227,7 +227,7 @@ impl World {
         Ok(pick)
     }
 
-    /// `FUN_141189ca0`: player `p`'s unit at `idx` tends `pasture`, none (â1) to tend none. The
+    /// `FUN_141189ca0`: player `p`'s unit at `idx` tends `pasture`, none (−1) to tend none. The
     /// building it names (the one the unit tends, `+0x794`, for none; none for an object that is
     /// no building) takes the unit last among its workers unless it lists it already, or for none
     /// drops it
