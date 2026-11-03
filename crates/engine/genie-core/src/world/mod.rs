@@ -175,10 +175,10 @@ pub(crate) const STATIC_TYPES_END: MasterKind = MasterKind::ACTION;
 pub(crate) const RESTORED_FOUNDATION: TerrainId = TerrainId::named(28);
 
 /// What a built building's death leaves its owner's update to do after it
-/// ([`Unit::building_died`]): the count attribute it lowers, and its master with the master's
+/// ([`Unit::built_building_died`]): the count attribute it lowers, and its master with the master's
 /// technology.
 ///
-/// [`Unit::building_died`]: crate::objects::unit::Unit::building_died
+/// [`Unit::built_building_died`]: crate::objects::unit::Unit::built_building_died
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct BuildingDeath {
     pub(crate) count: Option<AttributeId>,

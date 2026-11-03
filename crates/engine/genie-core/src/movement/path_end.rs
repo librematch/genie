@@ -246,8 +246,8 @@ impl Mover {
     }
 
     /// A non-quiet `MoveTo`'s path end follows its target to `point` (`0x140aa2a70` after the line
-    /// test): the walked level's current waypoint (`FUN_140f9b890` at its index) and the top
-    /// path's last point take it (the paths' layout, [`vector`]); bits 1 and 0 go off the walked
+    /// test): the walked level's current waypoint (`FUN_140f9b890` at its index) and the top path's
+    /// last point take it (the paths' layout, [`Position::vector`]); bits 1 and 0 go off the walked
     /// level (`FUN_140f9b4d0` twice).
     pub fn follow_path_end(&mut self, point: Position) {
         let point = point.vector();
@@ -496,24 +496,24 @@ impl Mover {
 
     /// The walk's avoidance of what its step hits (`0x141150f00`, after `FUN_14114cc60`). The first
     /// loop keeps a hit the unit must go round: none but a building, wall or gate
-    /// ([`KEPT_BY_MEMBERS`]) for a member of a unit group the world holds whose own move there
-    /// has reason 0 (`FUN_141017590`); none whose overlap with the unit's box the step
-    /// shrinks (`FUN_1411615a0`); else one in the walked path's ignore units (`FUN_140f98d20`)
-    /// that moved before the top path was made, or one that moved after the walked path was made
-    /// (or at the same time and outranks the unit: a higher player, or the same and a higher id).
-    /// A step whose one hit is the walked level's target counts its waypoint reached (the
-    /// caller's, [`Avoided::at_target`]), that hit kept or not. A kept hit (its place in the
-    /// include list and its temporary shape `FUN_141054fe0`, [`include_kept`]; the step's slide
-    /// `FUN_141159220` and the re-plan, [`Mover::go_round`]) is the caller's.
-    /// Then, on the walked level's first two waypoints (or the third of a path more
-    /// than 500 old), each hit the unit outranks pauses for `dt` when its own pause is shorter: a
-    /// human walker outranks another player's unit, or one of its own ordered at another time,
-    /// whose last human order (`+0x650`) is older; else, between two members of one unit group
-    /// (`+0x6d0`, not −1), the earlier member (`FUN_1410175f0`'s index in the group's list, −1
-    /// for none) outranks, and a group the world does not hold (`FUN_14152ff40`, `groups`)
-    /// pauses neither; else the lower id (slot 0x5f8) outranks. A Gaia unit is outranked by any
-    /// non-Gaia walker; the pause itself (slot 0x5f0) is the caller's. The paths' hash sets
-    /// (`+0x18`, `FUN_140f96120`) are empty in this game (the probe `path_sets.py`).
+    /// ([`ClassRoles::KEPT_BY_MEMBERS`]) for a member of a unit group the world holds whose own
+    /// move there has reason 0 (`FUN_141017590`); none whose overlap with the unit's box the step
+    /// shrinks (`FUN_1411615a0`); else one in the walked path's ignore units (`FUN_140f98d20`) that
+    /// moved before the top path was made, or one that moved after the walked path was made (or at
+    /// the same time and outranks the unit: a higher player, or the same and a higher id). A step
+    /// whose one hit is the walked level's target counts its waypoint reached (the caller's,
+    /// [`Avoided::at_target`]), that hit kept or not. A kept hit (its place in the include list and
+    /// its temporary shape `FUN_141054fe0`, [`include_kept`]; the step's slide `FUN_141159220` and
+    /// the re-plan, [`Mover::go_round`]) is the caller's. Then, on the walked level's first two
+    /// waypoints (or the third of a path more than 500 old), each hit the unit outranks pauses for
+    /// `dt` when its own pause is shorter: a human walker outranks another player's unit, or one of
+    /// its own ordered at another time, whose last human order (`+0x650`) is older; else, between
+    /// two members of one unit group (`+0x6d0`, not −1), the earlier member (`FUN_1410175f0`'s
+    /// index in the group's list, −1 for none) outranks, and a group the world does not hold
+    /// (`FUN_14152ff40`, `groups`) pauses neither; else the lower id (slot 0x5f8) outranks. A Gaia
+    /// unit is outranked by any non-Gaia walker; the pause itself (slot 0x5f0) is the caller's. The
+    /// paths' hash sets (`+0x18`, `FUN_140f96120`) are empty in this game (the probe
+    /// `path_sets.py`).
     ///
     /// [`include_kept`]: crate::movement::long_walk::include_kept
     pub(super) fn avoid(

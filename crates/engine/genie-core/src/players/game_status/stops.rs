@@ -242,15 +242,15 @@ impl World {
     }
 
     /// Slot 0x38 of the top actions with their own besides the Hunt's, each true: the Gather's
-    /// (`FUN_140a8e1b0`, [`crate::gathering::gather::GatherAction::halt`]: its target and second target go,
-    /// [`World::release`]), the Build's (`FUN_140ab0350`, [`crate::construction::build::BuildAction::halt`]:
-    /// a counted builder leaves its foundation's builders, [`World::leave_builders`], before the
-    /// rest; the foundation goes), the Attack's (`FUN_140a82ac0`,
-    /// [`crate::combat::attack::Attack::halt`]) and the Artifact's (`FUN_140aad1a0`,
-    /// [`crate::ownership::artifact::Artifact::stop`]). The Gather, the Build and the Artifact show the
-    /// master's standing sprite (the Gather the task's carrying one while it carries at least 1 of
-    /// the task's resource, `FUN_140a8b6b0`). [`crate::objects::unit::Unit::top_action`] holds no other
-    /// kind.
+    /// (`FUN_140a8e1b0`, [`crate::gathering::gather::GatherAction::halt`]: its target and second
+    /// target go, [`World::release`]), the Build's (`FUN_140ab0350`,
+    /// [`crate::construction::build::BuildAction::halt`]: a counted builder leaves its foundation's
+    /// builders, [`World::leave_builders`], before the rest; the foundation goes), the Attack's
+    /// (`FUN_140a82ac0`, [`crate::combat::attack::Attack::halt`]) and the Artifact's
+    /// (`FUN_140aad1a0`, [`crate::ownership::artifact::Artifact::stop`]). The Gather, the Build and
+    /// the Artifact show the master's standing sprite (the Gather the task's carrying one while it
+    /// carries at least 1 of the task's resource, `FUN_140a8b6b0`).
+    /// [`Action::list`](crate::objects::layers::Action::list) holds no other kind.
     pub(super) fn halt_other(
         &mut self,
         p: PlayerId,

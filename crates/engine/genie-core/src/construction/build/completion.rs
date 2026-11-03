@@ -177,10 +177,12 @@ impl World {
     }
 
     /// The block for state 2's stack unit (`+0x986`; master 1889 on mangrove or rice terrain,
-    /// `+0xcd0`, makes [`PASTURE_MANGROVE`]): the building `id` at `placed` drops its record and mesh
-    /// shape (`FUN_141055b40`), lets its tiles go (`FUN_140f65580`, a building that is no annex)
-    /// and sets `+0x686`; then its owner `p` makes the stack unit at its place, which loses the
-    /// hit points the building lacked (slot 0x1c0, [`crate::world::World::stack_unit`]).
+    /// `+0xcd0`, makes
+    /// [`MasterSlots::pasture_mangrove`](crate::world::layer::MasterSlots::pasture_mangrove)): the
+    /// building `id` at `placed` drops its record and mesh shape (`FUN_141055b40`), lets its tiles
+    /// go (`FUN_140f65580`, a building that is no annex) and sets `+0x686`; then its owner `p`
+    /// makes the stack unit at its place, which loses the hit points the building lacked (slot
+    /// 0x1c0, [`crate::world::World::stack_unit`]).
     ///
     /// # Errors
     ///
@@ -274,7 +276,8 @@ impl World {
     }
 }
 
-/// The master a completed building's stack unit takes (`+0x986`): [`PASTURE_MANGROVE`] for master
+/// The master a completed building's stack unit takes (`+0x986`):
+/// [`MasterSlots::pasture_mangrove`](crate::world::layer::MasterSlots::pasture_mangrove) for master
 /// 1889 on mangrove or rice terrain (`rice`, `+0xcd0`), else its own.
 fn stack_master(
     master: &Master,

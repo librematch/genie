@@ -80,7 +80,7 @@ pub enum Owner {
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct ExploreAction {
     /// `+0x18`, with state 11's `MoveTo` to the point (quiet, range 0, the master's walking
-    /// sprite, [`ExploreAction::move_shown`]).
+    /// sprite, [`ExploreMove::given`]).
     pub state: ExploreState,
     /// The point it walks to (`+0x38`..`+0x40`), x −1 for none.
     pub point: Position,
@@ -228,7 +228,7 @@ impl ExploreAction {
 impl ExploreAction {
     /// One update (`0x140a880c0`) of the Explore of `explorer` (`me`) through its step: state 11
     /// updates its quiet `MoveTo` to the point (the sprite its start shows is the master's
-    /// walking one, [`ExploreAction::move_shown`]) and goes on by the code
+    /// walking one, [`ExploreMove::given`]) and goes on by the code
     /// ([`ExploreAction::after_walk`]); a `MoveTo` the update dropped stops the unit (its
     /// teardown, slot 0x5d0), and what the new state asks of the unit follows at once
     /// ([`Unit::explore_owner`]). States 1 (done) and 13 (failed) are not modelled, and the

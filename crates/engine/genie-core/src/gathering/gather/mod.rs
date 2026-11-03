@@ -225,7 +225,8 @@ pub(crate) struct GatherReads {
     /// (`FUN_140aa0d30`, `FUN_140aa0df0`).
     pub(crate) defaults: MoveDefaults,
     /// The unit's master: a farmer's gather without a target waits for another farm
-    /// (`set_state(0xf3)`, [`FARM_WAITERS`]).
+    /// (`set_state(0xf3)`,
+    /// [`MasterRoles::FARM_WAITER`](crate::world::layer::MasterRoles::FARM_WAITER)).
     pub(crate) master: MasterId,
     /// The unit AI's stance (`+0x1a9`), 0 without a unit AI.
     pub(crate) stance: UnitStance,

@@ -289,7 +289,7 @@ pub fn blocks_per_tick(
     Ok(out)
 }
 
-/// The slice set up from a save's header ([`slice`]): every player's live objects, attributes,
+/// The slice set up from a save's header ([`slice()`]): every player's live objects, attributes,
 /// update times and history, the masters and the sight, without the run-time state a per-tick
 /// save's dumps add. For a check of a player-level update against the tick oracle's next save
 /// (the world player's, [`genie_core::players::world_player`]). Dev only.
@@ -304,7 +304,7 @@ pub fn slice_from_header(
     slice(header, masters)
 }
 
-/// The slice as the recording's header load leaves it: [`slice`] with the objects-in-sight
+/// The slice as the recording's header load leaves it: [`slice()`] with the objects-in-sight
 /// registry empty, every object's mask 0, as the game's load makes it, and the hunted animals'
 /// unit AI fields their load made.
 ///

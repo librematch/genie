@@ -39,7 +39,7 @@ pub(crate) struct Step<'a> {
     pub(crate) me: ObjectId,
     /// The tick's dt in milliseconds (`world+0x164`; in seconds, [`seconds`]).
     ///
-    /// [`seconds`]: crate::objects::lifecycle::seconds
+    /// [`seconds`]: crate::world::Millis::seconds
     pub(crate) dt: Millis,
     /// The owner's accumulated time when it has the turn: the full unit-AI update runs.
     pub(crate) turn: Option<Millis>,
@@ -80,7 +80,7 @@ pub(crate) struct Beside<'b> {
 }
 
 impl World {
-    /// A walk at `pace` ([`Step::walk`]) and the world's parts beside it, each its own
+    /// A walk at `pace` ([`Walk`]) and the world's parts beside it, each its own
     /// borrow.
     pub(crate) fn walk_beside<'b>(
         &'b mut self,

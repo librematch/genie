@@ -198,8 +198,8 @@ impl World {
     /// - any other class keeps it in state 2, and classes 51 and 54 (the packed and unpacked
     ///   siege) in state 0;
     /// - whatever the class, a wonder (master 276) not in state 0 keeps it in the scenario modes
-    ///   ([`crate::world::scenario_mode`]; the game asks the lobby's settings, `FUN_14152f9c0`,
-    ///   which hold the game's options).
+    ///   ([`crate::world::GameMode::scenario`]; the game asks the lobby's settings,
+    ///   `FUN_14152f9c0`, which hold the game's options).
     ///
     /// # Errors
     ///

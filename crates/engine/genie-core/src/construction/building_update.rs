@@ -96,16 +96,16 @@ impl Unit {
         c.w.parts.building_mut(self.id)?.annexes.let_go(removed)
     }
 
-    /// The gate's update (`FUN_1411e7730`, `TRIBE_Building_Object::update` for a master of class
-    /// 39 outside the walls' branch): a gate in state 2 whose master transforms
-    /// (`transform_unit`, `+0x9ba`) clears its first update (its endpoints, not held). Unless it
-    /// is shut (its master's height above [`GATE_EPSILON`]) and locked, it counts the units in it
-    /// ([`Unit::gate_count`]): a shut, unlocked gate with one of an ally (its player counting the
-    /// unit's an ally) in it opens (its player's slot 0x340, `FUN_14162f7e0`: a gate of a height
-    /// of at least 1, [`World::toggle_gate`], within the update) and its close timer is 0; an
-    /// open one (a height below the epsilon) with nothing in it starts its close timer at 0.5 s,
-    /// or runs it down by the world's dt, and at 0 shuts (slot 0x338, `FUN_1416193e0`: a height
-    /// of at most 0).
+    /// The gate's update (`FUN_1411e7730`, `TRIBE_Building_Object::update` for a master of class 39
+    /// outside the walls' branch): a gate in state 2 whose master transforms (`transform_unit`,
+    /// `+0x9ba`) clears its first update (its endpoints, not held). Unless it is shut (its master's
+    /// height above [`GATE_EPSILON`]) and locked, it counts the units in it ([`Unit::gate_count`]):
+    /// a shut, unlocked gate with one of an ally (its player counting the unit's an ally) in it
+    /// opens (its player's slot 0x340, `FUN_14162f7e0`: a gate of a height of at least 1,
+    /// [`World::toggle_gate`](crate::world::World::toggle_gate), within the update) and its close
+    /// timer is 0; an open one (a height below the epsilon) with nothing in it starts its close
+    /// timer at 0.5 s, or runs it down by the world's dt, and at 0 shuts (slot 0x338,
+    /// `FUN_1416193e0`: a height of at most 0).
     pub(crate) fn gate_update(
         &mut self,
         actions: &mut Action,
@@ -598,8 +598,10 @@ pub(crate) fn farm_stage_terrain(
 }
 
 /// `TRIBE_Combat_Object::update`'s test for the blast at death: a unit of one of
-/// [`DEATH_BLAST_MASTERS`] or [`DEATH_BLAST_CLASSES`] below `TurnTuning::death_blast_hp` hit points in state
-/// 2. The update runs for the combat objects and buildings (types 70 and 80).
+/// [`MasterRoles::DEATH_BLAST`](crate::world::layer::MasterRoles::DEATH_BLAST) or
+/// [`ClassRoles::DEATH_BLAST`](crate::world::layer::ClassRoles::DEATH_BLAST) below
+/// `TurnTuning::death_blast_hp` hit points in state 2. The update runs for the combat objects and
+/// buildings (types 70 and 80).
 pub(crate) fn blasts_at_death(
     master: &Master,
     life: &Lifecycle,

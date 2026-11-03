@@ -31,8 +31,8 @@ pub(super) const SPRITE_SCATTERED: DamageSpriteMode = DamageSpriteMode::SCATTERE
 pub(super) const SPRITE_SHOWN: DamageSpriteMode = DamageSpriteMode::SHOWN;
 
 /// `FUN_141193590`: an object of `master` in `state` whose damage share is its storage's
-/// (`+0x681` set, or a resource class: those of [`RESOURCE_CLASSES`] and
-/// [`RESOURCE_CLASSES_DEAD`] in a state above 2).
+/// (`+0x681` set, or a resource class: those of [`ClassRoles::DAMAGE_BY_STORAGE`] and
+/// [`ClassRoles::DAMAGE_BY_STORAGE_DEAD`] in a state above 2).
 fn storage_share(master: &Master, state: ObjectState, roles: &Roles) -> bool {
     master.auto_gather
         || ((roles

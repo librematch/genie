@@ -65,19 +65,19 @@ impl World {
     }
 
     /// The status setter (slot 1, `FUN_141639860`) of player `p`: `FUN_1416768e0` takes the new
-    /// status unless the player resigned (a defeat it always takes). A defeat without a
-    /// resignation (the world player's defeat check, [`World::defeat_check`]) then posts the
-    /// interface's event 6 (`FUN_140c898a0`), the local player's comm message
-    /// (`FUN_140d3c710`) and, with a comm handler in session (`DAT_143e8d7d0`'s `+0x388`), marks
-    /// the player's comm players defeated or dropped in the game object (`+0xb1c`, `+0xb13`)
-    /// and the local one's map flags (`FUN_140c915d0`, `FUN_140c915b0`): the lobby's and the
-    /// local view's, which a playback has none of. A status that turned won or
-    /// lost while the game goes on reveals the map to the player (`FUN_1412847b0`, with no lobby
-    /// settings object or its setting `FUN_141300cd0`, as the playback holds it,
-    /// [`Spatial::reveal_to`]); the battle royale's is not modelled. A lost player's objects stop
-    /// ([`World::stop_everything`]) once the game is a minute old; its fealty (`+0x12f8`) would
-    /// give its resources and units away while the game goes on, which is not modelled. A
-    /// newly lost player's history takes its defeat ([`World::defeat_event`]).
+    /// status unless the player resigned (a defeat it always takes). A defeat without a resignation
+    /// (the world player's defeat check, [`World::defeat_check`]) then posts the interface's event
+    /// 6 (`FUN_140c898a0`), the local player's comm message (`FUN_140d3c710`) and, with a comm
+    /// handler in session (`DAT_143e8d7d0`'s `+0x388`), marks the player's comm players defeated or
+    /// dropped in the game object (`+0xb1c`, `+0xb13`) and the local one's map flags
+    /// (`FUN_140c915d0`, `FUN_140c915b0`): the lobby's and the local view's, which a playback has
+    /// none of. A status that turned won or lost while the game goes on reveals the map to the
+    /// player (`FUN_1412847b0`, with no lobby settings object or its setting `FUN_141300cd0`, as
+    /// the playback holds it, [`Spatial::reveal_to`](crate::map::spatial::Spatial::reveal_to)); the
+    /// battle royale's is not modelled. A lost player's objects stop ([`World::stop_everything`])
+    /// once the game is a minute old; its fealty (`+0x12f8`) would give its resources and units
+    /// away while the game goes on, which is not modelled. A newly lost player's history takes its
+    /// defeat ([`World::defeat_event`]).
     pub(crate) fn set_status(&mut self, p: PlayerId, status: GameStatus) -> Result<(), GenieError> {
         let old = self.players.player(p)?.game_status;
         if status != old && (!self.players.player(p)?.resigned || status == GameStatus::LOST) {

@@ -5,7 +5,7 @@
 //! 6), else it sails toward the point (state 4, a quiet `MoveTo` sub-action to the last point of
 //! the planner's path that a unit can cross, [`Shore::shore_point`]) and unloads where that ends.
 //! The unload (`FUN_140aa3ba0`, the caller's) puts the units inside ashore where a drop location
-//! is free ([`find_drop_location`]); when none goes, the action sails to a random point about
+//! is free (`World::drop_location`); when none goes, the action sails to a random point about
 //! the old one ([`retry_point`]) and tries again.
 //!
 //! 158041: the constructor `FUN_140aa3ab0`, `first_in_stack` `0x140aa3e10` (slot 5), update
@@ -67,7 +67,7 @@ const WATER: TerrainId = TerrainId::named(1);
 /// A drop location's draw scale (`DAT_142eb69cc`) and the gap past the footprints
 /// (`DAT_142eb99cc`).
 const DRAW_SCALE: f32 = TRANSPORT_DRAW_SCALE;
-/// The draws `find_drop_location` makes (`FUN_141192d10`: 50).
+/// The draws `World::drop_location` makes (`FUN_141192d10`: 50).
 const DROP_TRIES: u16 = 50;
 
 /// A drop location's first draw of side 4 (a draw of `0x7fff`), which keeps the place the

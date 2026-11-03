@@ -99,9 +99,9 @@ impl World {
         handed
     }
 
-    /// A building's slot 0x70 (`FUN_1411cd860`) from player `old` to `new`, of the building `id`
-    /// in `old`'s live list (from its own update, after it: [`Outcome::Captured`]'s `building`). In
-    /// order:
+    /// A building's slot 0x70 (`FUN_1411cd860`) from player `old` to `new`, of the building `id` in
+    /// `old`'s live list (from its own update, after it:
+    /// [`Outcome::Captured`](crate::objects::unit::Outcome::Captured)'s `building`). In order:
     ///
     /// - its annexes (`+0xbc0`..), each a building: one its old owner watches leaves the watched
     ///   list (`FUN_141091310`, `+0xca4` 0), then the annex's own slot 0x70, depth first;

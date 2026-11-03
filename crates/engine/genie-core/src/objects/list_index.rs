@@ -34,8 +34,9 @@ impl ListIndex {
     }
 }
 
-/// The places of a list of a length counted once, first to last ([`crate::objects::ObjectList::places`]):
-/// the game's loops over a list whose objects may change under them by a count taken at the start.
+/// The places of a list of a length counted once, first to last
+/// ([`crate::objects::object_list::ObjectList::places`]): the game's loops over a list whose
+/// objects may change under them by a count taken at the start.
 #[derive(Clone, Debug)]
 pub struct Places(Range<usize>);
 

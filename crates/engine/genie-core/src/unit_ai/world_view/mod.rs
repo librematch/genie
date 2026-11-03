@@ -57,10 +57,10 @@ pub(crate) struct DropWorld<'a> {
 }
 
 /// What the unit's slot 0x388 (`FUN_141226fc0`) found while its unit AI ran
-/// ([`crate::unit_ai::UnitSide::wait_solidify`]): the foundation, the task its slot 0x820 found
-/// on it and the master the search switches the unit to (slot 0x90; None when its own master's
-/// list gave the task), which the side makes the unit's at once ([`World::wait_for_foundation`],
-/// [`UnitView::lend`]).
+/// ([`crate::unit_ai::UnitSide::wait_solidify`]): the foundation, the task its slot 0x820 found on
+/// it and the master the search switches the unit to (slot 0x90; None when its own master's list
+/// gave the task), which the side makes the unit's at once
+/// ([`World::wait_for_foundation`](crate::world::World::wait_for_foundation)).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Wait {
     pub(crate) target: FoundationId,

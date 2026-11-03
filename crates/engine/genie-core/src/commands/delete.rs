@@ -55,12 +55,14 @@ impl DeleteCommand {
 
 impl World {
     /// `CANCEL_BUILD` for `player` on object `id`: the object must exist and be the player's,
-    /// unless the setting `+0x1074` lets players order each other's ([`crate::world::settings::Settings::cheats_enabled`])
-    /// or its owner lost and the two are allies both ways (`FUN_14162ef10`). `FUN_1416257c0`
-    /// then wants its deletion enabled (`+0x687`), a master of type 70 or more, a class other
-    /// than [`UNDELETABLE`]'s and a capture flag (`+0x924`) other than 2; the object's slot 0x8b8
-    /// follows ([`World::delete_unit`], [`World::delete_building`]). The bypass of the
-    /// disable-verification cheat (`+0xb12`) is not held.
+    /// unless the setting `+0x1074` lets players order each other's
+    /// ([`crate::world::settings::Settings::cheats_enabled`]) or its owner lost and the two are
+    /// allies both ways (`FUN_14162ef10`). `FUN_1416257c0` then wants its deletion enabled
+    /// (`+0x687`), a master of type 70 or more, a class other than
+    /// [`ClassRoles::UNDELETABLE`](crate::world::layer::ClassRoles::UNDELETABLE)'s and a capture
+    /// flag (`+0x924`) other than 2; the object's slot 0x8b8 follows ([`World::delete_unit`],
+    /// [`World::delete_building`]). The bypass of the disable-verification cheat (`+0xb12`) is not
+    /// held.
     ///
     /// # Errors
     ///
@@ -169,11 +171,12 @@ impl World {
         Ok(())
     }
 
-    /// A unit's slot 0x8b8 (`FUN_14120f620`): a unit of a class other than [`UNDELETABLE`]'s is
-    /// marked deleted (`+0xa0c`) and its slot 0xd8 (`FUN_141211340`) spares class 42 and
-    /// livestock holding some, else `FUN_14118f580`: a sleeping unit wakes to the end of its
-    /// player's live list and its hit points go to 0. Not held: the deleted mark, the killer
-    /// (`+0x690`, its owner) and the special-object list (`+0x30c` bit 0).
+    /// A unit's slot 0x8b8 (`FUN_14120f620`): a unit of a class other than
+    /// [`ClassRoles::UNDELETABLE`](crate::world::layer::ClassRoles::UNDELETABLE)'s is marked
+    /// deleted (`+0xa0c`) and its slot 0xd8 (`FUN_141211340`) spares class 42 and livestock holding
+    /// some, else `FUN_14118f580`: a sleeping unit wakes to the end of its player's live list and
+    /// its hit points go to 0. Not held: the deleted mark, the killer (`+0x690`, its owner) and the
+    /// special-object list (`+0x30c` bit 0).
     fn delete_unit(&mut self, owner: PlayerId, id: ObjectId) -> Result<(), GenieError> {
         let (_, unit) = self.object(id).ok_or_else(|| object_gone(id))?;
         let class = unit.master(self.master_tables(), owner)?.class;

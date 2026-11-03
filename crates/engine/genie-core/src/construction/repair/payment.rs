@@ -160,12 +160,12 @@ pub fn repair_building(
     Ok(RepairOutcome::Unpaid)
 }
 
-/// A combat unit's slot 0x8c8 (`FUN_1412143b0`, also a building's last step) by `amount`: a
-/// class of [`COSTED`] first takes at most what its hit points lack of its most (slots 0xc0 and
-/// 200) and pays its owner's unit repair rate times the amount over its most of its master's
-/// costs (unpaid: [`RepairOutcome::Unpaid`]); then it heals (`FUN_141193b30`,
-/// [`crate::combat::damage::heal_hp`]): [`RepairOutcome::Full`] once full, else
-/// [`RepairOutcome::Healed`].
+/// A combat unit's slot 0x8c8 (`FUN_1412143b0`, also a building's last step) by `amount`: a class
+/// of [`ClassRoles::REPAIR_COSTED`](crate::world::layer::ClassRoles::REPAIR_COSTED) first takes at
+/// most what its hit points lack of its most (slots 0xc0 and 200) and pays its owner's unit repair
+/// rate times the amount over its most of its master's costs (unpaid: [`RepairOutcome::Unpaid`]);
+/// then it heals (`FUN_141193b30`, [`crate::combat::damage::heal_hp`]): [`RepairOutcome::Full`]
+/// once full, else [`RepairOutcome::Healed`].
 ///
 /// # Errors
 ///

@@ -87,14 +87,15 @@ impl HuntAction {
     }
 
     /// `set_state(6)` (case 6): the hunt faces its target. Live livestock of its own player is led
-    /// to its drop site first when it stands more than 3 tiles from it (`HuntTuning::herd_reach` squared,
-    /// `set_state` 10, not modelled); then live livestock is attacked (`set_state` 12, with an Attack
-    /// of the master's ranges: [`Herd`]). Dead livestock out of the task's range plus `HuntTuning::gap` is
-    /// walked to again (`set_state` 4, [`HuntAction::set_walk`]). Otherwise the unit takes the hunt's sprite
-    /// (`FUN_140ac51d0`: the carrying one for a load of the task's resource of 1 or more, else the
-    /// moving one; slot 0x68 takes the standing sprite for none) and its timer is 0. Another
-    /// player's target of class 49 (`FUN_141185360`: a farm changes hands, `FUN_1411858f0`, a
-    /// pasture's livestock ends the hunt) is not modelled.
+    /// to its drop site first when it stands more than 3 tiles from it (`HuntTuning::herd_reach`
+    /// squared, `set_state` 10, not modelled); then live livestock is attacked (`set_state` 12,
+    /// with an Attack of the master's ranges: [`Herd`](crate::gathering::hunt::Herd)). Dead
+    /// livestock out of the task's range plus `HuntTuning::gap` is walked to again (`set_state` 4,
+    /// [`HuntAction::set_walk`]). Otherwise the unit takes the hunt's sprite (`FUN_140ac51d0`: the
+    /// carrying one for a load of the task's resource of 1 or more, else the moving one; slot 0x68
+    /// takes the standing sprite for none) and its timer is 0. Another player's target of class 49
+    /// (`FUN_141185360`: a farm changes hands, `FUN_1411858f0`, a pasture's livestock ends the
+    /// hunt) is not modelled.
     pub(super) fn set_face(
         &mut self,
         c: &mut Step<'_>,

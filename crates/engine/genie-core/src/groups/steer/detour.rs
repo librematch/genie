@@ -34,10 +34,11 @@ use crate::{GenieError, math::fmath};
 impl World {
     /// The way round a record on the line to the slot (`0x141026867`..`0x1410277e5`), for member
     /// `index` (`id`) of group `group` in slot `slot`, `gap` the ground distance to it. A new path
-    /// record (`FUN_14152eea0`: flags 6, made at the world's time) takes the first way that
-    /// serves, each try emptying its points first; the short pather's radius is the member's on x
-    /// times [`ROUND_RADIUS`] and its ignore list `differentiators`; a position test is slot 0x270
-    /// ([`Spatial::point_clear_among`], the records grown by the same radius, the same list):
+    /// record (`FUN_14152eea0`: flags 6, made at the world's time) takes the first way that serves,
+    /// each try emptying its points first; the short pather's radius is the member's on x times
+    /// [`ROUND_RADIUS`] and its ignore list `differentiators`; a position test is slot 0x270
+    /// ([`Spatial::point_clear_among`](crate::map::spatial::Spatial::point_clear_among), the
+    /// records grown by the same radius, the same list):
     /// 1. The slot, when the member could stand there: for a unit with a footprint and a height
     ///    (`FUN_141194060`) whose footprint is within [`ROUND_REACH`] of it (`FUN_140a847c0`, the
     ///    squared gap; `COMISS`, `JBE`), the short pather from where it last moved to (slot 0x520);

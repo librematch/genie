@@ -134,11 +134,13 @@ impl World {
     }
 
     /// `FUN_140ac4c60` from the animal `sheep` (`listed` the animals sent so far, a static list of
-    /// 16): it joins the list; while it holds fewer than 16, the tiles within 3 of the animal's
-    /// (x outer, y inner, held to the map) that player `p` sees (`FUN_141663500` 0xf), each in its
+    /// 16): it joins the list; while it holds fewer than 16, the tiles within 3 of the animal's (x
+    /// outer, y inner, held to the map) that player `p` sees (`FUN_141663500` 0xf), each in its
     /// list's order, give the next: livestock (class 58) of the player in state 2 whose top action
-    /// has neither a target nor a point ([`Unit::top_action_idle`]) and not listed yet is sent to
-    /// the site (slot 0x138) and herds from it in turn; once 16 are listed it ends.
+    /// has neither a target nor a point
+    /// ([`Action::top_action_idle`](crate::objects::layers::Action::top_action_idle)) and not
+    /// listed yet is sent to the site (slot 0x138) and herds from it in turn; once 16 are listed it
+    /// ends.
     pub(super) fn herd_from(
         &mut self,
         p: PlayerId,
@@ -249,14 +251,15 @@ impl World {
     }
 
     /// `UNIT_ORDER`'s order `action` to the units `ids` (`FUN_14161e370`) of `player`'s command,
-    /// any player's: the drop-offs 6, 7 and 8 (one case): each unit the world holds in state 2 of
-    /// a type above 39 that carries something (`+0x310` above 0). For 7 and 8 a top Hunt (110),
+    /// any player's: the drop-offs 6, 7 and 8 (one case): each unit the world holds in state 2 of a
+    /// type above 39 that carries something (`+0x310` above 0). For 7 and 8 a top Hunt (110),
     /// Gather (5) or Build (101) gives it its drop-off (slot 0x78, [`HuntAction::drop_off_asked`],
-    /// then `set_state(8)`: [`Unit::drop_off_in`], [`Unit::gather_drop_off_in`],
+    /// then `set_state(8)`: [`Unit::drop_off_in`](crate::objects::unit::Unit::drop_off_in),
+    /// [`Unit::gather_drop_off_in`](crate::objects::unit::Unit::gather_drop_off_in),
     /// [`World::build_drop_off_now`]); for 8 one without a target or a point records its work for
     /// the town bell first (`FUN_141206a20`) and queues the way back after (`FUN_141205ac0`). For
-    /// 6, and a unit without one of these actions: [`World::drop_off_unasked`] (the way back for
-    /// 8 alone).
+    /// 6, and a unit without one of these actions: [`World::drop_off_unasked`] (the way back for 8
+    /// alone).
     ///
     /// [`HuntAction::drop_off_asked`]: crate::gathering::hunt::HuntAction::drop_off_asked
     pub(crate) fn unit_order(
@@ -396,8 +399,9 @@ impl World {
     }
 
     /// A Gather's or a Hunt's drop-off at its drop site (`set_state(8)`:
-    /// [`Unit::gather_drop_off_in`], [`Unit::drop_off_in`]): the site found is taken (slot
-    /// 0x178, [`World::take`]).
+    /// [`Unit::gather_drop_off_in`](crate::objects::unit::Unit::gather_drop_off_in),
+    /// [`Unit::drop_off_in`](crate::objects::unit::Unit::drop_off_in)): the site found is taken
+    /// (slot 0x178, [`World::take`]).
     pub(super) fn drop_off_at_site(
         &mut self,
         p: PlayerId,

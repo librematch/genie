@@ -281,11 +281,13 @@ impl Unit {
         Ok(())
     }
 
-    /// [`Unit::missile_hits`]'s objects the missile meets on its step from `old`: the step held
-    /// on the map ([`crate::combat::missile::QUERY_EDGE`] short of its far edges), the records its sweep
-    /// grown by the missile's radius crosses (the manager's walk query with the missile's player,
-    /// the missile itself ignored), of those each whose height the missile's meets
-    /// ([`crate::combat::missile::meets_height`]): its id, player, master type and blast defence.
+    /// [`Unit::missile_hits`]'s objects the missile meets on its step from `old`: the step held on
+    /// the map
+    /// ([`MissileTuning::query_edge`](crate::world::layer::generated::MissileTuning::query_edge)
+    /// short of its far edges), the records its sweep grown by the missile's radius crosses (the
+    /// manager's walk query with the missile's player, the missile itself ignored), of those each
+    /// whose height the missile's meets ([`crate::combat::missile::meets_height`]): its id, player,
+    /// master type and blast defence.
     ///
     /// # Errors
     ///

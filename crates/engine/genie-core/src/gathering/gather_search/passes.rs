@@ -16,10 +16,11 @@ use crate::vision::SightTiles;
 use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::slots::CheckedIndex;
 
-/// [`closest_resource_at`]'s passes: from a footprint site its footprint's tiles the unit can
-/// stand on ([`footprint_seeds`], sorted by `nearer`, within the site's line of sight plus 10 of
-/// its tile), then the unit's tile alone; from another site its tile alone; without one the
-/// unit's tile alone (a single tile's pass within the line of sight `los` plus 5).
+/// [`closest_resource`](crate::gathering::gather_search::closest_resource)'s passes: from a
+/// footprint site its footprint's tiles the unit can stand on ([`footprint_seeds`], sorted by
+/// `nearer`, within the site's line of sight plus 10 of its tile), then the unit's tile alone; from
+/// another site its tile alone; without one the unit's tile alone (a single tile's pass within the
+/// line of sight `los` plus 5).
 ///
 /// # Errors
 ///
@@ -58,9 +59,9 @@ pub(super) fn search_passes(
     Ok(passes)
 }
 
-/// [`closest_resource_at`]'s spread from a passable `cell`: its neighbours x−1, x+1, y−1, y+1
-/// ([`Tile::beside`]) not seen yet become seen (`at` gives a tile's index in `seen`), and those
-/// on the map join the `queue` a step farther.
+/// [`closest_resource`](crate::gathering::gather_search::closest_resource)'s spread from a passable
+/// `cell`: its neighbours x−1, x+1, y−1, y+1 ([`Tile::beside`]) not seen yet become seen (`at`
+/// gives a tile's index in `seen`), and those on the map join the `queue` a step farther.
 ///
 /// # Errors
 ///
@@ -87,9 +88,10 @@ pub(super) fn push_neighbours(
     Ok(())
 }
 
-/// [`closest_resource_at`]'s sort point and box side: without a site the unit's place and
-/// three times its line of sight plus 10; with one the point a quarter of the way from the
-/// site's place to the unit's, and for a footprint search the larger line of sight of the two.
+/// [`closest_resource`](crate::gathering::gather_search::closest_resource)'s sort point and box
+/// side: without a site the unit's place and three times its line of sight plus 10; with one the
+/// point a quarter of the way from the site's place to the unit's, and for a footprint search the
+/// larger line of sight of the two.
 pub(super) fn sort_point_and_side(
     at: Point,
     los: SightTiles,
@@ -125,9 +127,10 @@ pub(super) fn sort_point_and_side(
     )
 }
 
-/// [`closest_resource_at`]'s first pass from a site's footprint: every tile of the footprint
-/// the unit can stand on (x from the site's x less its radius, truncated, at least 1, less 1, to
-/// the site's x plus its radius, truncated, at most the map's last column; y alike), row by row.
+/// [`closest_resource`](crate::gathering::gather_search::closest_resource)'s first pass from a
+/// site's footprint: every tile of the footprint the unit can stand on (x from the site's x less
+/// its radius, truncated, at least 1, less 1, to the site's x plus its radius, truncated, at most
+/// the map's last column; y alike), row by row.
 pub(super) fn footprint_seeds(
     s: &SearchSite,
     map: GridSize,

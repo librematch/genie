@@ -257,7 +257,7 @@ impl Unit {
     /// `FUN_141084b30` -> `FUN_1411921d0`): with room in the building, the unit's sight goes from
     /// its tile (slot 0x1d8), it leaves its tile's list (`FUN_140f5f560`), the obstruction
     /// manager (`FUN_141055b40`) and the mesh (`+0x660`, `FUN_141053840`), a member of a unit
-    /// group leaves it (`FUN_14102c160`, the caller's: [`EnterWorld::left_group`]) and stands
+    /// group leaves it (`FUN_14102c160`, the caller's) and stands
     /// (slot 0x560), and it joins the
     /// building's (slot 0x1c0, `FUN_1411cb850` -> `FUN_14118c890`: `+0x2f0`, at the building's
     /// x and y); its records leave the registry's lists (`FUN_14128a1d0` from its mask to 0);

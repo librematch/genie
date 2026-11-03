@@ -134,15 +134,15 @@ impl World {
     }
 
     /// Slot 0x2d0 with 1 of `object`: false for an object below type 40 (a ghost's, a static,
-    /// animated or moving object's `FUN_141071d80`); an action object's (`FUN_14106d170`) is
-    /// false while its group (`+0x6d0`, by id) is held and not at rest ([`World::at_rest`],
-    /// `FUN_141007a50`) or its unit AI has queued orders (`+0x18`), else whether its top action
-    /// may be interrupted ([`crate::objects::unit::Unit::interruptible`]).
+    /// animated or moving object's `FUN_141071d80`); an action object's (`FUN_14106d170`) is false
+    /// while its group (`+0x6d0`, by id) is held and not at rest ([`World::at_rest`],
+    /// `FUN_141007a50`) or its unit AI has queued orders (`+0x18`), else whether its top action may
+    /// be interrupted ([`Action::interruptible`](crate::objects::layers::Action::interruptible)).
     ///
     /// # Errors
     ///
-    /// An object of a master the slice does not have, and what [`crate::objects::unit::Unit::interruptible`] does not
-    /// model.
+    /// An object of a master the slice does not have, and what
+    /// [`Action::interruptible`](crate::objects::layers::Action::interruptible) does not model.
     pub(super) fn may_interrupt(&self, object: WorldObject<'_>) -> Result<bool, GenieError> {
         let WorldObject::Unit(p, u, _) = object else {
             return Ok(false);
@@ -445,15 +445,15 @@ impl World {
         )
     }
 
-    /// Slot 0x660 of object `id`: it shows its standing sprite. Nothing for an object below type
-    /// 30 (`FUN_141072270`) or one the world does not hold. An action object's
-    /// (`FUN_14106e2e0`) asks its top action first (slot 0x430, then the action's slot 0x58 with
-    /// 3, which only a trade's, `FUN_140ae22b0`, answers: the slice holds no trades); a moving
-    /// object's (`FUN_14115cf80`) shows its standing sprite (slot 0x798: its master's, `+0x470`;
-    /// a trade cart's with goods, `FUN_14106a940`, is its trade task's, and the unit's own
-    /// `+0x8a9` override is not held) when it has one (slot 0x68, as [`crate::orders`]'s: the top
-    /// speed is the standing sprite's, [`crate::movement::Mover::shows_standing`], and the
-    /// sprite itself where the slice holds it).
+    /// Slot 0x660 of object `id`: it shows its standing sprite. Nothing for an object below type 30
+    /// (`FUN_141072270`) or one the world does not hold. An action object's (`FUN_14106e2e0`) asks
+    /// its top action first (slot 0x430, then the action's slot 0x58 with 3, which only a trade's,
+    /// `FUN_140ae22b0`, answers: the slice holds no trades); a moving object's (`FUN_14115cf80`)
+    /// shows its standing sprite (slot 0x798: its master's, `+0x470`; a trade cart's with goods,
+    /// `FUN_14106a940`, is its trade task's, and the unit's own `+0x8a9` override is not held) when
+    /// it has one (slot 0x68, as [`crate::orders`]'s: the top speed is the standing sprite's,
+    /// [`MoveToAction::shows_standing`](crate::movement::move_to::MoveToAction::shows_standing),
+    /// and the sprite itself where the slice holds it).
     ///
     /// # Errors
     ///
@@ -470,7 +470,7 @@ impl World {
     /// asked next (slot 0x430, then the action's slot 0x58 with 0: only a trade's answers, the
     /// slice holds none); then `FUN_14115d0e0` shows the walking sprite (slot 0x7c8: the
     /// master's, `+0x748`; the unit's own `+0x8a9` override is not held) when it has one (slot
-    /// 0x68: the top speed is the walking sprite's, [`crate::movement::MoveStats::walk_speed`]).
+    /// 0x68: the top speed is the walking sprite's, [`crate::objects::sprite::top_speed`]).
     /// The members it serves are units (type 70).
     ///
     /// # Errors
@@ -484,7 +484,7 @@ impl World {
     /// sprite; false when it has none. An action object's top action is asked first (slot 0x430,
     /// then the action's slot 0x58 with 1: only a trade's answers); then `FUN_14115d300` shows the
     /// master's running sprite (`+0x750`) when it has one (slot 0x68: the top speed is the running
-    /// sprite's, [`crate::movement::MoveStats::run_speed`]).
+    /// sprite's, [`crate::objects::sprite::top_speed`]).
     ///
     /// # Errors
     ///

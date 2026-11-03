@@ -216,7 +216,7 @@ impl MoveToAction {
     /// `0x140aa2100`) leaves it: a unit more than `MoveToTuning::arrived` from the target's footprint
     /// (`FUN_14118f680`) in state 3 with speed (slot 0x208), 13 without; a unit at the target
     /// already in state 1, which its next update ends. States 1 and 13 (`0x140aa29e0`, not quiet)
-    /// show the master's standing sprite ([`Mover::shows_standing`]; the sprite itself and
+    /// show the master's standing sprite ([`MoveToAction::shows_standing`]; the sprite itself and
     /// `+0x7b8`, cleared, are the caller's, [`MoveToAction::shows_standing`]). `me` is the unit's
     /// place.
     pub fn to_target(
@@ -291,12 +291,12 @@ impl MoveToAction {
     }
 
     /// A new `MoveTo` of its own (not quiet) to `point` within `range` (`FUN_140aa0d30`), with its
-    /// `sprite` ([`MoveToAction::sprite`]), as its start (slot 0x808 ->
-    /// `0x140aa2100`) leaves it. Without a target object the start's gap (`FUN_14118f680` with
-    /// none) is `f32::MAX`, never within 0.01: a unit with speed (slot 0x208, `UCOMISS`: a NaN
-    /// speed has some) is in state 3, one without in 13 (`0x140aa29e0`, not quiet: the master's
-    /// standing sprite, [`Mover::shows_standing`]; the sprite itself and `+0x7b8`, cleared, are the
-    /// caller's, [`MoveToAction::shows_standing`]). A unit without movement state has no speed.
+    /// `sprite` ([`MoveToAction::sprite`]), as its start (slot 0x808 -> `0x140aa2100`) leaves it.
+    /// Without a target object the start's gap (`FUN_14118f680` with none) is `f32::MAX`, never
+    /// within 0.01: a unit with speed (slot 0x208, `UCOMISS`: a NaN speed has some) is in state 3,
+    /// one without in 13 (`0x140aa29e0`, not quiet: the master's standing sprite,
+    /// [`MoveToAction::shows_standing`]; the sprite itself and `+0x7b8`, cleared, are the caller's,
+    /// [`MoveToAction::shows_standing`]). A unit without movement state has no speed.
     #[must_use]
     pub fn to_point(
         point: Position,
@@ -470,13 +470,13 @@ impl MoveToAction {
     }
 
     /// A moving `MoveTo`'s check of its target object (`0x140aa2a70` in state 4, before the
-    /// motion step; none for a `MoveTo` to a point) by its `+0x61` ([`target_moved`]): the path's
+    /// motion step; none for a `MoveTo` to a point) by its `+0x61` ([`target_left`]): the path's
     /// end follows the target ([`Mover::follow_path_end`]), or the `MoveTo` turns to state 3 (the
     /// slice's [`MoveTo::Start`]) when it asks again or its path's end could not follow.
     ///
     /// # Errors
     ///
-    /// [`target_moved`]'s.
+    /// [`target_left`]'s.
     pub(crate) fn check_target(&mut self, walk: &mut Walk<'_>) -> Result<Follow, GenieError> {
         let Some(target) = self.target else {
             return Ok(Follow::Stays);
@@ -496,7 +496,7 @@ impl MoveToAction {
 
     /// The update's start (state 3): after a wait `+0x6c` goes from 1 to 2 as it asks again; the
     /// goal is its point or its target; it asks for its path and moves (state 4), whose
-    /// `set_state` shows its sprite ([`MoveToAction::sprite`], [`start_walk_shown`]) before the
+    /// `set_state` shows its sprite ([`MoveToAction::sprite`]) before the
     /// motion step.
     fn update_start(
         &mut self,

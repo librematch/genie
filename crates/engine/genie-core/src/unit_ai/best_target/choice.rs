@@ -100,7 +100,7 @@ pub(super) fn may_attack(
 /// The owner and class rules of an object `t`: without `any_class` the buildings, walls,
 /// towers, gates and packed units are passed over; a computer player's unit passes over Gaia's
 /// objects that hold something or that others take by sight, and boats unless it is a boat, of
-/// class 52 or of [`BOAT_HUNTERS`].
+/// class 52 or of [`MasterRoles::BOAT_HUNTER`].
 pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles: &Roles) -> bool {
     if !ask.any_class && roles.of_class(t.class).contains(ClassRoles::NOT_ANY) {
         return false;
@@ -152,18 +152,18 @@ pub(super) fn within(me: &Searcher, ask: &Ask, gap: Distance, near: Distance) ->
 ///   outside the defend patrol of a unit that is no siege).
 ///
 /// With walls to attack and nothing but walls, the closest gate answers. Without statistics the
-/// retry walk adds its targets the same way (by the unit's range, not the sight, unless it
-/// may move); still none, the closest wall answers (a unit that attacks walls) or none. Then the
-/// scores ([`Statistics::score`]), the ranks (a fixed entry but category 6 by its weapon range:
-/// 3 above the epsilon, else 2, a farm 1; the others 4 for a unit of priority 1 or of 0 but
-/// [`PRIORITY_0_MASTERS`], else 0) and the sort. Fewer than 5 moving entries and a current
-/// target that moves (or nothing moves at all), outside an idle check, when it engages or
-/// nothing is armed: the current target, by its path (without path checks at once). Then the
-/// first three entries by the quick path (a moving one, or with nothing moving or a unit of
-/// another rank rule); more than 5 moving entries outside an idle check: the closest moving one
-/// by its path; in an attack work state a current target on top; without path checks the top;
-/// else the first three by their paths, each one that fails ignored for 1 s (moving) or 2 s.
-/// Last the closest wall (a unit that attacks walls) or none.
+/// retry walk adds its targets the same way (by the unit's range, not the sight, unless it may
+/// move); still none, the closest wall answers (a unit that attacks walls) or none. Then the scores
+/// ([`Statistics::score`]), the ranks (a fixed entry but category 6 by its weapon range: 3 above
+/// the epsilon, else 2, a farm 1; the others 4 for a unit of priority 1 or of 0 but
+/// [`MasterRoles::MOVING_RULE_EXEMPT`], else 0) and the sort. Fewer than 5 moving entries and a
+/// current target that moves (or nothing moves at all), outside an idle check, when it engages or
+/// nothing is armed: the current target, by its path (without path checks at once). Then the first
+/// three entries by the quick path (a moving one, or with nothing moving or a unit of another rank
+/// rule); more than 5 moving entries outside an idle check: the closest moving one by its path; in
+/// an attack work state a current target on top; without path checks the top; else the first three
+/// by their paths, each one that fails ignored for 1 s (moving) or 2 s. Last the closest wall (a
+/// unit that attacks walls) or none.
 ///
 /// # Errors
 ///
@@ -485,7 +485,7 @@ impl Walked {
 
 /// The scores ([`Statistics::score`]), the ranks and the sort: a fixed entry but category 6 by
 /// its weapon range (3 above the epsilon, else 2, a farm 1); the others 4 for a unit of
-/// priority 1 or of 0 but [`PRIORITY_0_MASTERS`], else 0. Whether the unit ranks so.
+/// priority 1 or of 0 but [`MasterRoles::MOVING_RULE_EXEMPT`], else 0. Whether the unit ranks so.
 fn rank_entries(
     me: &Searcher,
     st: &mut Statistics,

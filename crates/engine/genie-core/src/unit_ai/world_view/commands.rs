@@ -46,7 +46,7 @@ impl UnitView<'_, '_> {
     /// building, the new master's list first) finds a task: a new Repair on it
     /// (`FUN_140ad7fa0`) replaces the unit's actions (slot 0x808): 1; none: 0. The switches and
     /// the Repair are made at once on the unit lent back to its slot ([`RepairOrder`],
-    /// [`World::repair_order`]).
+    /// [`World::repair_order`](crate::world::World::repair_order)).
     pub(super) fn repair_command(
         &mut self,
         target: ObjectId,
@@ -176,12 +176,12 @@ impl UnitView<'_, '_> {
     }
 
     /// The unit's enter command (slot 0x3a0, `FUN_1410847e0`, forced) on `target`: an object the
-    /// world (`FUN_1415417a0`) does not hold is 0; its slot 0x820 with the garrison filter (3)
-    /// and the switch ([`task_search`] on the target and its main building) finds a task, whose
-    /// Enter (`FUN_140a855d0`) replaces the unit's actions (an Artifact on top would take it as
-    /// its sub-action): 1; none: 0. The switch and the Enter are made at once on the unit lent
-    /// back to its slot ([`EnterOrder`], [`World::enter_order`]); the notify its install gives
-    /// the unit's own AI waits for the side's return.
+    /// world (`FUN_1415417a0`) does not hold is 0; its slot 0x820 with the garrison filter (3) and
+    /// the switch ([`task_search`] on the target and its main building) finds a task, whose Enter
+    /// (`FUN_140a855d0`) replaces the unit's actions (an Artifact on top would take it as its
+    /// sub-action): 1; none: 0. The switch and the Enter are made at once on the unit lent back to
+    /// its slot ([`EnterOrder`], [`World::enter_order`](crate::world::World::enter_order)); the
+    /// notify its install gives the unit's own AI waits for the side's return.
     pub(super) fn enter_command(
         &mut self,
         target: ObjectId,

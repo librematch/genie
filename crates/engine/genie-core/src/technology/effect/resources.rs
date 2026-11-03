@@ -97,10 +97,10 @@ impl World {
     }
 
     /// Slot 0xf0 (`FUN_14162d610`) of player `p`: attribute `attribute` takes `v`
-    /// ([`World::store_attribute`]), with its side effects: 0x32 turns the allied vision on
-    /// first ([`World::allied_vision_on`]); 0xc4 changes nothing for a player above 0 and spreads
-    /// to the others at most 0 ([`SPREAD_ATTRIBUTE`]); 0xb7 rebuilds the masks after; 0x21 above 0
-    /// calls the scripts' `EffectFunction<v>` (the XS runtime is not modelled).
+    /// ([`World::store_attribute`]), with its side effects: 0x32 turns the allied vision on first
+    /// ([`World::allied_vision_on`]); 0xc4 changes nothing for a player above 0 and spreads to the
+    /// others at most 0 ([`AttributeRoles::SPREAD_ATTRIBUTE`]); 0xb7 rebuilds the masks after; 0x21
+    /// above 0 calls the scripts' `EffectFunction<v>` (the XS runtime is not modelled).
     pub(crate) fn set_player_attribute(
         &mut self,
         p: PlayerId,

@@ -49,10 +49,10 @@ impl World {
     /// - Any other unit takes the unload order at the point ([`World::unload_order`]): a transport
     ///   sails there and unloads (its Transport, [`crate::garrison::transport`]), any other walks there.
     /// - A building lets the units inside it out, from the last to come in, those `flag` and
-    ///   `unit_type` pick ([`unload_picks`]): each through [`World::let_out`], toward the point
-    ///   (or its unit AI's command queue location, which is not modelled); each one out has its
-    ///   order queue emptied (`FUN_140c5e010`); a unit (type 70) out is no longer under the town
-    ///   bell (`+0x9dc`).
+    ///   `unit_type` pick ([`World::unload_picks`](crate::world::World::unload_picks)): each
+    ///   through [`World::let_out`], toward the point (or its unit AI's command queue location,
+    ///   which is not modelled); each one out has its order queue emptied (`FUN_140c5e010`); a unit
+    ///   (type 70) out is no longer under the town bell (`+0x9dc`).
     ///
     /// The local player's interface flag (`FUN_141663f50`) is not held.
     pub(crate) fn unload(
@@ -160,10 +160,11 @@ impl World {
         Ok(())
     }
 
-    /// [`World::unload`] of player `player`'s building `idx`: the units inside it come out from
-    /// the last to come in, those `pick` names ([`unload_picks`]), each through
-    /// [`World::let_out`] toward `point` (with `sound`), its order queue emptied
-    /// (`FUN_140c5e010`) and, a unit (type 70), no longer under the town bell (`+0x9dc`).
+    /// [`World::unload`] of player `player`'s building `idx`: the units inside it come out from the
+    /// last to come in, those `pick` names
+    /// ([`World::unload_picks`](crate::world::World::unload_picks)), each through
+    /// [`World::let_out`] toward `point` (with `sound`), its order queue emptied (`FUN_140c5e010`)
+    /// and, a unit (type 70), no longer under the town bell (`+0x9dc`).
     ///
     /// # Errors
     ///

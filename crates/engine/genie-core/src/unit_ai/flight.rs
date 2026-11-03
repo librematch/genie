@@ -276,7 +276,7 @@ impl UnitAi {
 
     /// `AskForHelp` (`FUN_140c42ce0`) of a unit attacked by a new `attacker`: without an attacker
     /// the world holds (`FUN_1415417a0`) nothing; else its search from its place (slot 0x50,
-    /// `FUN_140c63e20` with mode 1: the classes it cares about, [`UnitAi::help_search`]; a search
+    /// `FUN_140c63e20` with mode 1: the classes it cares about; a search
     /// that ran sets the alert mode, [`UnitAi::attack_search_alert`]), whose lists of its own and
     /// its friends' objects ([`UnitSide::call_for_help`]) it walks for helpers.
     ///
@@ -284,7 +284,6 @@ impl UnitAi {
     ///
     /// A helper the slice does not model ([`helper_answers`]), and what the search does not.
     ///
-    /// [`UnitAi::help_search`]: crate::unit_ai::UnitAi::help_search
     /// [`helper_answers`]: crate::unit_ai::helper_answers
     pub(super) fn ask_for_help(
         &mut self,

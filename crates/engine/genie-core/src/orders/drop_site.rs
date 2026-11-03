@@ -170,9 +170,9 @@ impl World {
     /// player's civ), the objects of each master's done list in the player's tracker in turn
     /// (`FUN_14104f600`, the master itself the key) that the world holds in state 2, the nearest
     /// by the squared distance of the centres (the first of equals; none from
-    /// [`TABLE_DROP_FAR`] on).
+    /// [`OrderTuning::table_drop_far`] on).
     ///
-    /// [`TABLE_DROP_FAR`]: crate::orders::TABLE_DROP_FAR
+    /// [`OrderTuning::table_drop_far`]: crate::world::layer::generated::OrderTuning::table_drop_far
     pub(crate) fn table_drop_site(
         &self,
         p: PlayerId,

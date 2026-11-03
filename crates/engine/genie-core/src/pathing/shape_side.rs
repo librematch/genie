@@ -4,7 +4,7 @@ use crate::GenieError;
 use std::fmt::{Display, Error, Formatter};
 
 /// A side of a shape's box in the mesh and the short pather (side s runs from corner s to
-/// corner s + 1, [`crate::pathing::mesh::corner`]): its low y, high x, high y or low x edge,
+/// corner s + 1, [`crate::pathing::FixedRect::corner`]): its low y, high x, high y or low x edge,
 /// counter-clockwise. A contact names the side its outline goes on along; a node of the short
 /// pather the side it lies on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -81,7 +81,7 @@ impl ShapeSide {
         matches!(self, Self::HighX | Self::LowX)
     }
 
-    /// The corner it starts at ([`crate::pathing::mesh::corner`]'s number).
+    /// The corner it starts at ([`crate::pathing::FixedRect::corner`]'s number).
     #[must_use]
     pub const fn first_corner(self) -> u32 {
         self as u32

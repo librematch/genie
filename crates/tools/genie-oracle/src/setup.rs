@@ -1,4 +1,4 @@
-//! The slice set up from the header save ([`slice`]): the players' technologies, wonder
+//! The slice set up from the header save ([`slice()`]): the players' technologies, wonder
 //! times, ghosts, AI settings and history, and the garrisons' firepower.
 
 use genie_core::GenieError;

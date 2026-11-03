@@ -500,7 +500,7 @@ impl Visibility {
     }
 
     /// The unified map's word at the tile of point `at` (its x and y truncated), masked
-    /// ([`MASK`]).
+    /// ([`VisionBits::OBJECT_MASK`]).
     pub(super) fn word_at(&self, at: Point) -> Result<VisionBits, GenieError> {
         let tile = Tile::new(at.x() as i32, at.y() as i32);
         Ok(*self.unified.checked(self.index(tile))? & VisionBits::OBJECT_MASK)

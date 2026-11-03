@@ -302,13 +302,17 @@ impl World {
         Ok(NO_RANGE)
     }
 
-    /// `FUN_14100c6c0` of group `group` against `target`: the group's special units list
-    /// (`+0x488`) refills. A quarter of the members (one at most for fewer than five, else
-    /// four) take part: the first pass lists up to three of the members of class 46 and up to
-    /// three of the listed masters ([`LISTED_MASTERS`]); a target of one of the
-    /// [`BOTH_LISTS_CLASSES`] takes the masters' list then the class list, one of the
-    /// [`CLASS_LIST_MASTERS`] the class list only, and one of the [`CATEGORY_LIST_CLASSES`] the
-    /// units by formation category (0 to 5) in the group's statistics' order.
+    /// `FUN_14100c6c0` of group `group` against `target`: the group's special units list (`+0x488`)
+    /// refills. A quarter of the members (one at most for fewer than five, else four) take part:
+    /// the first pass lists up to three of the members of class 46 and up to three of the listed
+    /// masters ([`MasterRoles::REFILL_LISTED`](crate::world::layer::MasterRoles::REFILL_LISTED)); a
+    /// target of one of the
+    /// [`ClassRoles::BOTH_LISTS_TARGET`](crate::world::layer::ClassRoles::BOTH_LISTS_TARGET) takes
+    /// the masters' list then the class list, one of the
+    /// [`MasterRoles::CLASS_LIST_ONLY`](crate::world::layer::MasterRoles::CLASS_LIST_ONLY) the
+    /// class list only, and one of the
+    /// [`ClassRoles::CATEGORY_LIST_TARGET`](crate::world::layer::ClassRoles::CATEGORY_LIST_TARGET)
+    /// the units by formation category (0 to 5) in the group's statistics' order.
     pub(super) fn refill_special_units(
         &mut self,
         group: GroupId,

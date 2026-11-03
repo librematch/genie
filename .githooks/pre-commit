@@ -1,8 +1,8 @@
 #!/bin/sh
-# The commit gate: CI's rustfmt, clippy, file-length, allowance, casing, README and contracts jobs
-# (.github/workflows/ci.yml), run before each commit so a commit cannot fail them, then the CRAP
-# gate (scripts/crap.sh: the tests under coverage, no function newly above the threshold). Enable
-# it once per clone (worktrees share the setting):
+# The commit gate: CI's rustfmt, clippy, file-length, allowance, casing, README, contracts and
+# docs jobs (.github/workflows/ci.yml), run before each commit so a commit cannot fail them, then
+# the CRAP gate (scripts/crap.sh: the tests under coverage, no function newly above the
+# threshold). Enable it once per clone (worktrees share the setting):
 #
 #     git config core.hooksPath .githooks
 #
@@ -20,4 +20,6 @@ scripts/effects.py crates/engine/genie-core/src --check
 scripts/schedule.py crates/engine/genie-core/src --check
 # contracts/genie.ncl, the model's Nickel contracts written from genie-model's types (FD-046-D15)
 cargo run --locked -q -p genie-nickel --bin contracts -- --check
+# CI's docs job: every intra-doc link resolves, the private items' too
+RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps --document-private-items
 scripts/crap.sh

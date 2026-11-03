@@ -326,8 +326,10 @@ pub fn can_attack(
 }
 
 /// The predator's slot 0xa0 (`FUN_140c18ed0`) without its `any` flag: by the master's attack
-/// priority 1 and 2 anything, 3 the classes of [`PRIORITY_3_CLASSES`], any other the classes of
-/// [`PREDATOR_ATTACKS`].
+/// priority 1 and 2 anything, 3 the classes of
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET), any other
+/// the classes of
+/// [`ClassRoles::PREDATOR_TARGET`](crate::world::layer::ClassRoles::PREDATOR_TARGET).
 pub(super) fn predator_may_attack(
     attack_priority: AttackPriority,
     class: ClassId,
@@ -342,13 +344,14 @@ pub(super) fn predator_may_attack(
     }
 }
 
-/// The tower's attack check (`FUN_140c1a760`): never for Gaia's own tower nor the classes 1 and
-/// 42; Gaia's objects only of the classes 9 and 10, unless they are of the combat type with
-/// `+0x924` 0 outside the scenario modes; never a building (master type `'P'`) no builder has
-/// started (`desolid_flag`, `+0xc60`), masters 50 and 1187, nor from a tower in a state below 2. Class 10 with an attack
-/// priority below 3 only of combat level 4 (`FUN_140fde120`); else when the tower is armed
-/// (`FUN_14120ea30`: classes 51 and 54, or a missile, or else a firepower, `+0xa00`, above 1)
-/// and its attack priority is not 3 or the class one of [`PRIORITY_3_CLASSES`].
+/// The tower's attack check (`FUN_140c1a760`): never for Gaia's own tower nor the classes 1 and 42;
+/// Gaia's objects only of the classes 9 and 10, unless they are of the combat type with `+0x924` 0
+/// outside the scenario modes; never a building (master type `'P'`) no builder has started
+/// (`desolid_flag`, `+0xc60`), masters 50 and 1187, nor from a tower in a state below 2. Class 10
+/// with an attack priority below 3 only of combat level 4 (`FUN_140fde120`); else when the tower is
+/// armed (`FUN_14120ea30`: classes 51 and 54, or a missile, or else a firepower, `+0xa00`, above 1)
+/// and its attack priority is not 3 or the class one of
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 pub fn tower_can_attack(
     me: &Attacker,
     t: &Target,
@@ -434,7 +437,7 @@ impl Attacker {
 /// against the target plus 0.5 of its state position (by the squared footprint gap,
 /// `FUN_140a847c0`), but on order `0x2bd`; in Defend (1) within 5 more, the patrol orders' and a
 /// patrol path's tests not modelled. Then an attack priority of 3 takes only
-/// [`PRIORITY_3_CLASSES`].
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 pub fn soldier_can_attack(
     me: &Attacker,
     s: &Seeker,
@@ -550,10 +553,11 @@ pub(super) fn stance_reaches(
 }
 
 /// `FUN_14120e4e0` for an attacker of type 70: one of attack priority 3 attacks only
-/// [`PRIORITY_3_CLASSES`]; a ranged one (range above 1) with a blast (`+0x82c` above 0) whose
-/// `area_effect_level` has neither [`BlastLevel::SPARES_FRIENDS`] nor
-/// [`BlastLevel::SKIPS_FRIEND_CHECK`] (`FUN_1410bf160`, `FUN_1410bfcb0`) scans the tiles
-/// of the blast around the target for its own or allied objects (not modelled).
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET); a ranged
+/// one (range above 1) with a blast (`+0x82c` above 0) whose `area_effect_level` has neither
+/// [`BlastLevel::SPARES_FRIENDS`] nor [`BlastLevel::SKIPS_FRIEND_CHECK`] (`FUN_1410bf160`,
+/// `FUN_1410bfcb0`) scans the tiles of the blast around the target for its own or allied objects
+/// (not modelled).
 pub(crate) fn spares_friends(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool, GenieError> {
     if me.attack_priority == AttackPriority::PRIORITY_3
         && !roles

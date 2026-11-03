@@ -57,7 +57,7 @@ impl UnitView<'_, '_> {
     }
 
     /// Object `id` as slot 0x380 finds it (`FUN_1415417a0`): the unit, the player's live list,
-    /// another player's ([`crate::unit_ai::world_view::Foreign::find`]). The owner's sleeping
+    /// another player's. The owner's sleeping
     /// list holds only objects of a type below 30, never a building.
     fn find_in<'v>(&'v self, view: OthersRef<'v>, id: ObjectId) -> Option<(PlayerId, &'v Unit)> {
         if id == self.unit.id {

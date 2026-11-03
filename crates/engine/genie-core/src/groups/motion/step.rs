@@ -44,25 +44,25 @@ pub(crate) struct StepWorld<'w, 'p> {
 /// `lead`: `budget` (`param_2`) tests a computer player's path budget before a plan. Returns the
 /// routine's answer (1 when the walk goes on or arrived, 0 when it waits).
 ///
-/// A group without path data does nothing; a paused walked level waits out its pause. Then up
-/// to [`PASSES`] passes over the walked level, as a unit's motion step's: a reached waypoint
-/// moves the level on (or back to the waypoint it left when it is not in range, or to its parent
-/// waypoint on a looping path); an arrived level (states 4, 5) hands over to its parent by its
-/// link; a level in state 2 gets a new level with a path to its waypoint, planned from the
-/// group's place for the lead (the tile pathfinder for a top level, else for a waypoint within
-/// [`SHORT_REACH`] the short pather, a near waypoint the straight way when nothing stands on it,
-/// else the long pather), which becomes level 1 waiting for its stretches (a top level's plan)
-/// or level 0 walked at once; a walking level steers toward its waypoint: a units' query along
-/// the step finds what stands in the way (the target alone ends the step there; a unit moved
-/// after the path was made sends the level back to its parent), else the group turns toward the
-/// waypoint, the members' centre pulls it when every member acts on a target, and the forward
+/// A group without path data does nothing; a paused walked level waits out its pause. Then up to
+/// [`PASSES`] passes over the walked level, as a unit's motion step's: a reached waypoint moves the
+/// level on (or back to the waypoint it left when it is not in range, or to its parent waypoint on
+/// a looping path); an arrived level (states 4, 5) hands over to its parent by its link; a level in
+/// state 2 gets a new level with a path to its waypoint, planned from the group's place for the
+/// lead (the tile pathfinder for a top level, else for a waypoint within
+/// [`GroupTuning::short_reach`] the short pather, a near waypoint the straight way when nothing
+/// stands on it, else the long pather), which becomes level 1 waiting for its stretches (a top
+/// level's plan) or level 0 walked at once; a walking level steers toward its waypoint: a units'
+/// query along the step finds what stands in the way (the target alone ends the step there; a unit
+/// moved after the path was made sends the level back to its parent), else the group turns toward
+/// the waypoint, the members' centre pulls it when every member acts on a target, and the forward
 /// speed takes the top speed.
 ///
 /// # Errors
 ///
 /// What the planners or the queries do not model.
 ///
-/// [`SHORT_REACH`]: crate::groups::motion::SHORT_REACH
+/// [`GroupTuning::short_reach`]: crate::world::layer::generated::GroupTuning::short_reach
 pub(crate) fn path_step(
     motion: &mut Motion,
     group: &GroupView,

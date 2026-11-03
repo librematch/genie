@@ -303,12 +303,12 @@ impl Mover {
     }
 
     /// `FUN_141142750` with its last argument 1: whether the unit walks straight to `p`. The point
-    /// must lie within the map less the unit's radii (the game takes the height radius for the
-    /// low edge in y); then the walk's query (`FUN_14114cc60` with the tiles' records, flags
-    /// `0x190`, its radius times 0.5) must find nothing but the unit and its target with their
-    /// annexes ([`Spatial::query_ignore`]): no tile its
-    /// terrain mask lacks, no static record (kinds 2, 11, 13) ([`Spatial::segment_blocked`]).
-    /// The game also writes the straight path into a scratch path, which it drops.
+    /// must lie within the map less the unit's radii (the game takes the height radius for the low
+    /// edge in y); then the walk's query (`FUN_14114cc60` with the tiles' records, flags `0x190`,
+    /// its radius times 0.5) must find nothing but the unit and its target with their annexes
+    /// ([`ObjectsRef::query_ignore`](crate::world::index::ObjectsRef::query_ignore)): no tile its
+    /// terrain mask lacks, no static record (kinds 2, 11, 13) ([`Spatial::segment_blocked`]). The
+    /// game also writes the straight path into a scratch path, which it drops.
     pub(super) fn straight(
         &self,
         me: &Me,
@@ -452,7 +452,8 @@ impl Mover {
 
     /// The unit shows the sprite `shown` (None: none): its top speed (slot 0x208, the master's
     /// speed times the current sprite's factor, [`crate::objects::sprite::top_speed`]) is the
-    /// sprite's. The one derivation of [`MoveStats::speed`] besides [`crate::objects::sprite::new_sprite`].
+    /// sprite's. The one derivation of [`MoveStats::speed`](crate::movement::MoveStats::speed)
+    /// besides [`crate::objects::sprite::new_sprite`].
     pub(crate) fn shows(&mut self, shown: Option<&Graphic>) {
         self.stats.show(shown);
     }

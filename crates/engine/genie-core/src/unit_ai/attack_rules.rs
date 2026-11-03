@@ -69,10 +69,12 @@ pub struct Convertee {
 /// `t` (None: one the world does not hold), with `any` its faith not asked. Never for class 43, nor
 /// without full faith (100, `COMISS`: a NaN fails) unless `any`; never a Gaia object, nor with the
 /// owner's attribute 67 at most 0, nor livestock (58); master 53 converts only the boats (2, 20,
-/// 21, 22, 53); never the [`NEVER_CONVERTED`] masters, walls (27), gates (39) or flags (30); never
-/// a master whose hero flag grants [`HeroFlags::NO_CONVERSION`]. Then the priest's convert task
-/// (action type 104): its last for any class and master, or the first for the object's master or
-/// class; one that names an attribute (`+0x26`) the owner holds at most 0 (or not a number) fails.
+/// 21, 22, 53); never the
+/// [`MasterRoles::NEVER_CONVERTED`](crate::world::layer::MasterRoles::NEVER_CONVERTED) masters,
+/// walls (27), gates (39) or flags (30); never a master whose hero flag grants
+/// [`HeroFlags::NO_CONVERSION`]. Then the priest's convert task (action type 104): its last for any
+/// class and master, or the first for the object's master or class; one that names an attribute
+/// (`+0x26`) the owner holds at most 0 (or not a number) fails.
 #[must_use]
 pub fn can_convert(
     p: &Converter<'_>,
@@ -174,13 +176,13 @@ pub fn attacks_neutral(me: &Attacker, class: ClassId, roles: &Roles) -> bool {
 
 /// Slot 0xa8 of the unit AI of factory type `ai_type` (`FUN_141215560`'s modules), whether it
 /// attacks a neutral object of `class`, its unit's master of `attack_priority`: the civilian's
-/// (`FUN_140c1acf0`) and the building's (`FUN_140c1ace0`) never; the predator's
-/// (`FUN_140c1ad60`) and the lion's (`FUN_140c1ad00`) not classes 13, 22, 52, 54 and 55; the
-/// priest's ([`priest_attacks_neutral`]), the soldier's (`FUN_140c1ae60`) and the tower's
-/// (`FUN_140c1aeb0`, the same body: [`soldier_attacks_neutral`]) and the siege unit's
-/// ([`siege_attacks_neutral`]);
-/// the others' the base's (`FUN_140c48410`): always. The predator's and the lion's also take
-/// attack priority 3 to [`PRIORITY_3_CLASSES`].
+/// (`FUN_140c1acf0`) and the building's (`FUN_140c1ace0`) never; the predator's (`FUN_140c1ad60`)
+/// and the lion's (`FUN_140c1ad00`) not classes 13, 22, 52, 54 and 55; the priest's
+/// ([`priest_attacks_neutral`]), the soldier's (`FUN_140c1ae60`) and the tower's (`FUN_140c1aeb0`,
+/// the same body: [`soldier_attacks_neutral`]) and the siege unit's ([`siege_attacks_neutral`]);
+/// the others' the base's (`FUN_140c48410`): always. The predator's and the lion's also take attack
+/// priority 3 to
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 #[must_use]
 pub fn type_attacks_neutral(
     ai_type: UnitAiType,
@@ -215,7 +217,7 @@ pub(super) const PRIEST_NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2_0080_0838
 
 /// Slot 0xa8 of the priest's unit AI (`FUN_140c1adc0`): never a class below 50 of
 /// [`PRIEST_NEUTRAL_SPARED`] (`class` taken as unsigned), and with attack priority 3 only
-/// [`PRIORITY_3_CLASSES`].
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 #[must_use]
 pub fn priest_attacks_neutral(
     attack_priority: AttackPriority,
@@ -237,8 +239,9 @@ pub(super) const NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2002_0080_0838_001
 
 /// Slot 0xa8 of the soldier's unit AI (`FUN_140c1ae60`), whether it attacks a neutral object of
 /// `class` (taken as unsigned, so a class outside `0..0x3e` passes the mask): never one of
-/// [`NEUTRAL_SPARED`]'s classes, and with the unit's master's `attack_priority` 3
-/// (`FUN_141202220`) only [`PRIORITY_3_CLASSES`] (`FUN_140fddf10`).
+/// [`NEUTRAL_SPARED`]'s classes, and with the unit's master's `attack_priority` 3 (`FUN_141202220`)
+/// only [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET)
+/// (`FUN_140fddf10`).
 #[must_use]
 pub fn soldier_attacks_neutral(
     attack_priority: AttackPriority,
@@ -284,7 +287,7 @@ pub(super) const SIEGE_NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2002_0080_08
 
 /// Slot 0xa8 of the siege unit's AI (`FUN_140c1ae10`): never a class of
 /// [`SIEGE_NEUTRAL_SPARED`] (`class` taken as unsigned), and with attack priority 3 only
-/// [`PRIORITY_3_CLASSES`].
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 #[must_use]
 pub fn siege_attacks_neutral(
     attack_priority: AttackPriority,
@@ -348,17 +351,19 @@ pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point)
 /// The siege unit's attack check (slot 0xa0, `FUN_140c19190`) with `any` (its third argument):
 /// never the classes 1 and 42, nor in `NoAttack`. Its reach is the target's footprint gap to the
 /// unit's state position (`FUN_14118faf0`) less the unit's own diagonal (`sqrtf` of its radii
-/// squared by `powf`), against its range (slot 0x230), grown by `UnitAiTuning::gaia_target_reach` for a Gaia
-/// target: in `StandGround` (stance 2) but on order `0x2bd` within the range (`COMISS`, `JBE`:
-/// an unordered one passes); in Defend (1) within the range (ungrown) plus 5
+/// squared by `powf`), against its range (slot 0x230), grown by `UnitAiTuning::gaia_target_reach`
+/// for a Gaia target: in `StandGround` (stance 2) but on order `0x2bd` within the range (`COMISS`,
+/// `JBE`: an unordered one passes); in Defend (1) within the range (ungrown) plus 5
 /// (`DAT_14330ebb8`; `JA` rejects); the patrol orders' and a patrol path's ranges (slot 0x470,
 /// `FUN_140f95e10`) are not modelled. Then a Gaia unit only of the combat type with `+0x924` 0
 /// outside the scenario modes; never a building no builder has started (`+0xc60`); never from a
-/// unit below state 2; not `any`, never from a human player's packed unit (51); never while its
-/// top action packs or unpacks (124, 125). Not `any`, by attack priority 0 a ram attacks only
-/// [`RAM_TARGETS`] and a trebuchet (classes 51, 54) [`TREBUCHET_TARGETS`]; masters 1744 and 1746
-/// with a building as their current target ([`Seeker::target_kind`]) by their priority alone (1
-/// or 4 and up); attack priority 3 only [`PRIORITY_3_CLASSES`].
+/// unit below state 2; not `any`, never from a human player's packed unit (51); never while its top
+/// action packs or unpacks (124, 125). Not `any`, by attack priority 0 a ram attacks only
+/// [`ClassRoles::RAM_TARGET`](crate::world::layer::ClassRoles::RAM_TARGET) and a trebuchet (classes
+/// 51, 54) [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET);
+/// masters 1744 and 1746 with a building as their current target ([`Seeker::target_kind`]) by their
+/// priority alone (1 or 4 and up); attack priority 3 only
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 ///
 /// # Errors
 ///
@@ -442,9 +447,10 @@ pub(super) fn siege_in_reach(
 }
 
 /// [`siege_can_attack`]'s own choice (not `any`): by attack priority 0 a ram only
-/// [`RAM_TARGETS`] and a trebuchet [`TREBUCHET_TARGETS`]; masters 1744 and 1746 with a building
-/// as their current target by their priority alone; attack priority 3 only
-/// [`PRIORITY_3_CLASSES`].
+/// [`ClassRoles::RAM_TARGET`](crate::world::layer::ClassRoles::RAM_TARGET) and a trebuchet
+/// [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET); masters
+/// 1744 and 1746 with a building as their current target by their priority alone; attack priority 3
+/// only [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles) -> bool {
     let priority = me.attack_priority;
     if priority == AttackPriority::PRIORITY_0 {
@@ -477,9 +483,10 @@ pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles
             .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 
-/// The lion's slot 0xa0 (`FUN_140c18d50`) without its `any` flag: by the master's attack
-/// priority 1 and 2 anything, 3 the classes of [`PRIORITY_3_CLASSES`], any other the classes
-/// of [`LION_ATTACKS`].
+/// The lion's slot 0xa0 (`FUN_140c18d50`) without its `any` flag: by the master's attack priority 1
+/// and 2 anything, 3 the classes of
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET), any other
+/// the classes of [`ClassRoles::LION_TARGET`](crate::world::layer::ClassRoles::LION_TARGET).
 pub(super) fn lion_may_attack(
     attack_priority: AttackPriority,
     class: ClassId,
@@ -494,8 +501,9 @@ pub(super) fn lion_may_attack(
     }
 }
 
-/// The civilian's slot 0xa0 (`FUN_140c18b70`) without its `any` flag: never classes 1 and 42;
-/// with the unit's master's `attack_priority` 3 (`FUN_141202220`) only [`PRIORITY_3_CLASSES`]
+/// The civilian's slot 0xa0 (`FUN_140c18b70`) without its `any` flag: never classes 1 and 42; with
+/// the unit's master's `attack_priority` 3 (`FUN_141202220`) only
+/// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET)
 /// (`FUN_140fddf10`).
 pub(super) fn civilian_may_attack(
     attack_priority: AttackPriority,

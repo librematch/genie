@@ -252,7 +252,7 @@ pub struct Mover {
 }
 
 /// The moving unit, as the motion step needs it besides its [`Mover`], whose place it walks
-/// ([`Mover::position`]).
+/// ([`Walk::position`](crate::movement::move_to::Walk::position)).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Me {
     /// The unit.
@@ -388,7 +388,7 @@ impl PathData {
     }
 
     /// A new level without a path (`FUN_140f8f670` alone): target -1, the plans
-    /// [`CONTINUE`], everything else 0.
+    /// [`PlanTries::FULL`], everything else 0.
     #[must_use]
     pub const fn without_path() -> Self {
         Self {

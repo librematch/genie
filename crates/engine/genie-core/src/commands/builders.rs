@@ -279,9 +279,7 @@ impl World {
     /// The queue path of a builder at `idx` of player `q` (slot 0x30 into slot 0x28): its
     /// ignore list empties (`FUN_141197da0`) and its unit AI's queue takes the build order on
     /// `foundation` (of `master`, player `fp`'s) at `position`, issued by `q`, priority 100, the
-    /// point shown, ready, as the game's saves hold it ([`World::build_order`] runs it).
-    ///
-    /// [`World::build_order`]: crate::world::World::build_order
+    /// point shown, ready, as the game's saves hold it (its build order runs it).
     pub(crate) fn queue_build(
         &mut self,
         q: PlayerId,

@@ -1,8 +1,8 @@
 //! The damage an object deals per second ([`DamageRate`]).
 
 /// The damage an object deals per second: its weapons' amounts over its reload
-/// ([`crate::garrison::attack_rate`], [`crate::garrison::firepower`]); a building's rate is what a
-/// unit inside it adds a share of ([`crate::garrison::share`]).
+/// ([`crate::garrison::attack_rate`], [`crate::garrison::firepower()`]); a building's rate is what
+/// a unit inside it adds a share of ([`crate::garrison::share`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct DamageRate(f32);
 

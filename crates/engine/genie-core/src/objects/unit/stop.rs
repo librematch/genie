@@ -104,11 +104,12 @@ impl Unit {
     }
 
     /// The unit's slot 0x68 with its master's standing sprite (slot 0x798's, the master's
-    /// `+0x470`): its top speed becomes the standing sprite's ([`Mover::shows_standing`]) and,
-    /// where the slice holds its sprite, the sprite starts ([`crate::objects::sprite::new_sprite`] on the
-    /// Sprite stream). Its master is its own or its owner's (`masters`).
+    /// `+0x470`): its top speed becomes the standing sprite's ([`MoveToAction::shows_standing`])
+    /// and, where the slice holds its sprite, the sprite starts
+    /// ([`crate::objects::sprite::new_sprite`] on the Sprite stream). Its master is its own or its
+    /// owner's (`masters`).
     ///
-    /// [`Mover::shows_standing`]: crate::movement::Mover::shows_standing
+    /// [`MoveToAction::shows_standing`]: crate::movement::move_to::MoveToAction::shows_standing
     pub(crate) fn show_standing(
         &mut self,
         mut motion: MotionMut<'_>,

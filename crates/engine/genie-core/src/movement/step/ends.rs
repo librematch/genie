@@ -71,13 +71,13 @@ impl Mover {
         Ok(None)
     }
 
-    /// The motion step's end on a loop back at its first waypoint (`LAB_141155637`): the unit
-    /// turns from its forward vector on the ground (`FUN_141194060` with 3 holds, which zeroes
-    /// the height; `FUN_141027d00` divides by the length) toward `heading`, the direction the
-    /// step's walk last took (`[RBP+0x148]`, zero when no walk ran in this step: the angle to it
-    /// is then π/2, [`fmath::angle_between`]) ([`Mover::steer`]), controls its speed toward
-    /// `walked` (slot 0x630, [`Mover::control_speed`]) and, its level waiting for a path (state
-    /// 2), stops (slot 0x5d0).
+    /// The motion step's end on a loop back at its first waypoint (`LAB_141155637`): the unit turns
+    /// from its forward vector on the ground (`FUN_141194060` with 3 holds, which zeroes the
+    /// height; `FUN_141027d00` divides by the length) toward `heading`, the direction the step's
+    /// walk last took (`[RBP+0x148]`, zero when no walk ran in this step: the angle to it is then
+    /// π/2, [`fmath::angle_between`](crate::math::fmath::angle_between)) ([`Mover::steer`]),
+    /// controls its speed toward `walked` (slot 0x630, [`Mover::control_speed`]) and, its level
+    /// waiting for a path (state 2), stops (slot 0x5d0).
     pub(super) fn loop_end(
         &mut self,
         dt: Seconds,

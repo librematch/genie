@@ -211,9 +211,10 @@ impl UnitView<'_, '_> {
 
 impl UnitView<'_, '_> {
     /// Slot 0x90 with 0 from `own` to master `next` (a task's switch, a villager's swap): the
-    /// action list clears (the old actions' teardowns), then the master change at once, the
-    /// unit lent back to its slot ([`World::change_master`]: the master's unit part, what it
-    /// gives and takes of the owner's attributes and the tracker's promotion).
+    /// action list clears (the old actions' teardowns), then the master change at once, the unit
+    /// lent back to its slot ([`World::change_master`](crate::world::World::change_master): the
+    /// master's unit part, what it gives and takes of the owner's attributes and the tracker's
+    /// promotion).
     ///
     /// # Errors
     ///

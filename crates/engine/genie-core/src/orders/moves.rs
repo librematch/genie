@@ -307,21 +307,22 @@ impl World {
         Ok(())
     }
 
-    /// Slot 0x7e8 (`FUN_141227190`) of a unit on a target object: a unit in state 3 or later, or
-    /// of class 54 under its own Pack or Unpack (`0x7d`, `0x7c`), ignores it. Against a target
-    /// the unit is not allied with (`FUN_141663d90` with allies) [`work_reach`]
-    /// (`FUN_1410862c0`) decides: class 54 out of reach packs (`FUN_140ad4ff0`), class 51 in
-    /// reach unpacks (`FUN_140ae58a0`), each through slot 0x808; else a target below the least
-    /// range is the unit's notify [`NotifyKind::TOO_CLOSE`] to its own unit AI (slot 0x328) and nothing more.
-    /// Without a target the world holds (none, or one gone) the work command goes to the point,
-    /// and a computer's class 54 packs instead. Neither action is held. A villager drops its
-    /// town-bell flag (`FUN_1412067f0`); then the work command. A villager on a pasture (1893,
-    /// 1897) whose livestock's workers (slot 0x780, [`World::livestock_workers`]) are below its
-    /// owner's [`crate::gathering::pasture::PASTURE_WORKERS`] (COMISS, JBE) works the livestock
-    /// [`World::pasture_pick`] gives at its place with the order's flags (slot 0x7e8 again) and
-    /// then tends the pasture; none given ends the order there; a full pasture has its unit AI
-    /// take a search (slot 0x38: 0x202 with the hunt action, class 49 and â1). Any other unit
-    /// leaves the pasture it tends ([`World::tend_pasture`], `FUN_141189ca0`).
+    /// Slot 0x7e8 (`FUN_141227190`) of a unit on a target object: a unit in state 3 or later, or of
+    /// class 54 under its own Pack or Unpack (`0x7d`, `0x7c`), ignores it. Against a target the
+    /// unit is not allied with (`FUN_141663d90` with allies) [`work_reach`] (`FUN_1410862c0`)
+    /// decides: class 54 out of reach packs (`FUN_140ad4ff0`), class 51 in reach unpacks
+    /// (`FUN_140ae58a0`), each through slot 0x808; else a target below the least range is the
+    /// unit's notify [`NotifyKind::TOO_CLOSE`] to its own unit AI (slot 0x328) and nothing more.
+    /// Without a target the world holds (none, or one gone) the work command goes to the point, and
+    /// a computer's class 54 packs instead. Neither action is held. A villager drops its town-bell
+    /// flag (`FUN_1412067f0`); then the work command. A villager on a pasture (1893, 1897) whose
+    /// livestock's workers (slot 0x780, [`World::livestock_workers`]) are below its owner's
+    /// [`AttributeSlots::pasture_workers`](crate::world::layer::AttributeSlots::pasture_workers)
+    /// (COMISS, JBE) works the livestock [`World::pasture_pick`] gives at its place with the
+    /// order's flags (slot 0x7e8 again) and then tends the pasture; none given ends the order
+    /// there; a full pasture has its unit AI take a search (slot 0x38: 0x202 with the hunt action,
+    /// class 49 and â1). Any other unit leaves the pasture it tends ([`World::tend_pasture`],
+    /// `FUN_141189ca0`).
     pub(crate) fn order_work(
         &mut self,
         player: PlayerId,

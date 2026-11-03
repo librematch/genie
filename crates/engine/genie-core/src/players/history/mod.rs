@@ -306,14 +306,17 @@ impl History {
     /// time and the history period (`world+0x8b8`, the `.dat`'s `time_slice`). Every period:
     /// - an entry of the civilian and military population (attributes 37 and 40 as shorts; both
     ///   0 when their sum is below 0),
-    /// - the kills and razings since the last period against the player's value at the last
-    ///   period (attributes 164 and 165): the share of its own kills' and razings' value
-    ///   (attributes 170 and 172) at 0.12 or more ([`BATTLE_START`], as doubles) starts or goes
-    ///   on with a battle, which sums them and the share of all four (with 152 and 153); a
-    ///   battle that falls below it ends, recorded as an event when its summed share reached
-    ///   0.15 ([`BATTLE_RECORD`]) with the opponent whose razings' value (attribute 425 + i)
-    ///   over the player's value plus kills' value (400 + i) since the battle began is the
-    ///   largest (the first of equals, none above 0 gives player 0),
+    /// - the kills and razings since the last period against the player's value at the last period
+    ///   (attributes 164 and 165): the share of its own kills' and razings' value (attributes 170
+    ///   and 172) at 0.12 or more
+    ///   ([`HistoryTuning::battle_start`](crate::world::layer::generated::HistoryTuning::battle_start),
+    ///   as doubles) starts or goes on with a battle, which sums them and the share of all four
+    ///   (with 152 and 153); a battle that falls below it ends, recorded as an event when its
+    ///   summed share reached 0.15
+    ///   ([`HistoryTuning::battle_record`](crate::world::layer::generated::HistoryTuning::battle_record))
+    ///   with the opponent whose razings' value (attribute 425 + i) over the player's value plus
+    ///   kills' value (400 + i) since the battle began is the largest (the first of equals, none
+    ///   above 0 gives player 0),
     /// - and the attributes are kept for the next period, the per-player ones outside a battle.
     pub fn update(
         &mut self,

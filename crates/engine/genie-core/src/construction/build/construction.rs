@@ -62,7 +62,8 @@ pub(super) fn hand_storage(
 }
 
 /// The foundation terrain a completed `building` lays ([`lay_foundation`]): its own, or terrain
-/// 0x3f under master 1889's pasture on mangrove or rice (`stack_master` [`PASTURE_MANGROVE`]).
+/// 0x3f under master 1889's pasture on mangrove or rice (`stack_master`
+/// [`MasterSlots::pasture_mangrove`](crate::world::layer::MasterSlots::pasture_mangrove)).
 pub(super) fn foundation_laid(
     building: &BuildingMaster,
     stack_master: Option<MasterId>,

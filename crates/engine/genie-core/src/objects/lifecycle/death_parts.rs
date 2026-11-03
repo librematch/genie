@@ -28,7 +28,7 @@ use crate::world::layer::Slots;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
-/// The owner's attributes 237, 238 and 239: a built farm's bonus ([`Completion::farm_bonus`]);
+/// The owner's attributes 237, 238 and 239: a built farm's bonus ([`farm_bonus`]);
 /// â1 for those the player has not got.
 pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
     let at = |i: usize| attributes.get(i).copied().unwrap_or(Amount::new(-1.0));
@@ -39,9 +39,10 @@ pub(crate) fn farm_bonus(attributes: &[Amount]) -> FarmBonus {
     }
 }
 
-/// The owner's attributes 237, 238 and 239 (`player+0x768`..`+0x778`): a farm's bonus when
-/// built, its amount, the resource it goes to and a master near which it is given
-/// ([`Completion::first_part`]); each â1 when the player has not got it.
+/// The owner's attributes 237, 238 and 239 (`player+0x768`..`+0x778`): a farm's bonus when built,
+/// its amount, the resource it goes to and a master near which it is given
+/// ([`Completion::first_part`](crate::construction::build::Completion::first_part)); each â1 when
+/// the player has not got it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FarmBonus {
     /// Attribute 237: the amount.

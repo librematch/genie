@@ -118,9 +118,10 @@ impl Unit {
     /// in, in the update's order of its tests: the drop-off's wait ([`Unit::hunt_drop_wait`]) and
     /// walk ([`Unit::hunt_drop_walk`]), the failure ([`Unit::hunt_failed`]), the walks to a point
     /// ([`Unit::hunt_point_walk`]), the search ([`Unit::hunt_search_wait`]), the idle
-    /// ([`Unit::hunt_idle`]), the wait after a given-up `MoveTo` ([`Unit::hunt_wait_walk`]), a
-    /// lead without its target, a lost tree's search, else its strike ([`Unit::hunt_strike`]).
-    /// Nothing without a hunt. Its code: the failure's 3, the end after a drop-off's 1.
+    /// ([`Action::hunt_idle`](crate::objects::layers::Action::hunt_idle)), the wait after a
+    /// given-up `MoveTo` ([`Unit::hunt_wait_walk`]), a lead without its target, a lost tree's
+    /// search, else its strike ([`Unit::hunt_strike`]). Nothing without a hunt. Its code: the
+    /// failure's 3, the end after a drop-off's 1.
     pub(crate) fn hunt_part(
         &mut self,
         actions: &mut Action,

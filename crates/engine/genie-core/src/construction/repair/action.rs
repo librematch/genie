@@ -538,7 +538,7 @@ impl RepairAction {
     /// `MoveTo` to the target; 6 takes its place and shows the task's moving sprite; 7 shows its
     /// proceeding sprite (its sound, slot 0x4c0, is not held) and counts the action among the
     /// target's repairers; slot 0x68 shows the master's standing sprite for none. 10 waits a
-    /// second with the standing sprite (a ship target's move to the unit, [`SHIP_REPAIR`], is
+    /// second with the standing sprite (a ship target's move to the unit is
     /// not modelled); 11 walks to the point (a quiet `MoveTo`).
     pub(super) fn set_state(
         &mut self,

@@ -172,7 +172,7 @@ impl World {
         Ok(())
     }
 
-    /// `f` on the view of the Transport on `task` of player `p`'s object at `i` ([`World::ship`])
+    /// `f` on the view of the Transport on `task` of player `p`'s object at `i` ([`Ship`])
     /// and of the map ([`MapShore`] with the unit's terrain restriction).
     ///
     /// [`World`]: crate::world::World

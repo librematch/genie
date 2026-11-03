@@ -163,19 +163,18 @@ impl UnitAi {
             || (fierce && gathers && state < 16 && (0x9110u32 >> state) & 1 != 0))
     }
 
-    /// The transport ship's damage notify (`FUN_140c2a580`, cases 500 and a missile's warning
-    /// it did not dodge, "I took some damage from Unit #%d"): the unit's group only logs it
-    /// (`FUN_140c55c00`, `FUN_141027d60`). At no hit points left (`p[1]` below 1) it gives up
-    /// ("I'm dead, I give up."): the owner's alert (slot 0x2e8 with 0x209, [`alert_owner`]),
-    /// the notifies end (`FUN_140c5dc10`) and it returns 4. Else the owner's alert (0x201); a
-    /// new attacker (`FUN_140bf4cb0`) that is not its target makes a human player's ship call
-    /// for help ([`call_for_help`]); the attacker joins the set (`FUN_140b43f30`) and the unit
-    /// is under attack (`FUN_14119d2d0` with 1). With an order it ignores the damage ("I have an
-    /// order, I'm ignoring this damage notify.", 2); the siege tower's (`FUN_140c28400`) also
-    /// when a human player's tower is in a group (`+0x6d0`) that is not idle (`FUN_141017ad0`:
-    /// "I have a group that won't let me move and a human owner"). Else, with no action or its
-    /// top action in state 2, it runs from its attackers (slot 0x160 with 1,
-    /// [`UnitAi::run_away`]) and returns 3.
+    /// The transport ship's damage notify (`FUN_140c2a580`, cases 500 and a missile's warning it
+    /// did not dodge, "I took some damage from Unit #%d"): the unit's group only logs it
+    /// (`FUN_140c55c00`, `FUN_141027d60`). At no hit points left (`p[1]` below 1) it gives up ("I'm
+    /// dead, I give up."): the owner's alert (slot 0x2e8 with 0x209, [`alert_owner`]), the notifies
+    /// end (`FUN_140c5dc10`) and it returns 4. Else the owner's alert (0x201); a new attacker
+    /// (`FUN_140bf4cb0`) that is not its target makes a human player's ship call for help
+    /// ([`UnitSide::call_for_help`]); the attacker joins the set (`FUN_140b43f30`) and the unit is
+    /// under attack (`FUN_14119d2d0` with 1). With an order it ignores the damage ("I have an
+    /// order, I'm ignoring this damage notify.", 2); the siege tower's (`FUN_140c28400`) also when
+    /// a human player's tower is in a group (`+0x6d0`) that is not idle (`FUN_141017ad0`: "I have a
+    /// group that won't let me move and a human owner"). Else, with no action or its top action in
+    /// state 2, it runs from its attackers (slot 0x160 with 1, [`UnitAi::run_away`]) and returns 3.
     pub(super) fn transport_damaged(
         &mut self,
         n: Notify,
@@ -261,16 +260,16 @@ impl UnitAi {
         Ok(GO_ON)
     }
 
-    /// The trade ship's damage notify (`FUN_140c29bf0`, cases 500 and a missile's warning it
-    /// did not dodge): at no hit points left it gives up (the owner's alert 0x209, the notifies
-    /// end, 4). Else the owner's alert (0x201) only with no attackers yet or a computer owner; a
-    /// new attacker that is not its target makes a human player's ship call for help
-    /// ([`call_for_help`]); the attacker joins the set and the unit is under attack. With an
-    /// order it ignores the damage (2), but for a computer player's with `+0x621` set, which
-    /// cannot get here (its alert stops the handler first, [`alert_owner`]). Off the move
-    /// action (`0x262`) its order goes to the queue's end (slot 0x30, not immediate:
-    /// `FUN_140c55c90` takes none of −1) and its action stops (slot 0xb0 with 1); then it runs
-    /// from its attackers (slot 0x160 with 1) and returns 3.
+    /// The trade ship's damage notify (`FUN_140c29bf0`, cases 500 and a missile's warning it did
+    /// not dodge): at no hit points left it gives up (the owner's alert 0x209, the notifies end,
+    /// 4). Else the owner's alert (0x201) only with no attackers yet or a computer owner; a new
+    /// attacker that is not its target makes a human player's ship call for help
+    /// ([`UnitSide::call_for_help`]); the attacker joins the set and the unit is under attack. With
+    /// an order it ignores the damage (2), but for a computer player's with `+0x621` set, which
+    /// cannot get here (its alert stops the handler first, [`alert_owner`]). Off the move action
+    /// (`0x262`) its order goes to the queue's end (slot 0x30, not immediate: `FUN_140c55c90` takes
+    /// none of −1) and its action stops (slot 0xb0 with 1); then it runs from its attackers (slot
+    /// 0x160 with 1) and returns 3.
     pub(super) fn trade_damaged(
         &mut self,
         n: Notify,

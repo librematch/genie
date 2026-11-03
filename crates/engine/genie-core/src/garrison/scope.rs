@@ -7,7 +7,8 @@ pub enum GarrisonScope {
     /// 0: the target alone (an annex its main building, but a gate's).
     #[default]
     Target,
-    /// Any other byte: each object of the target's line near it ([`crate::garrison::NEARBY`]).
+    /// Any other byte: each object of the target's line near it
+    /// ([`GarrisonTuning::nearby`](crate::world::layer::generated::GarrisonTuning::nearby)).
     Nearby,
 }
 
@@ -37,7 +38,8 @@ impl GarrisonScope {
 /// bell's reach, or the garrison's far one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShelterReach {
-    /// The town bell's ([`crate::garrison::TOWN_BELL_REACH`]).
+    /// The town bell's
+    /// ([`GarrisonTuning::town_bell_reach`](crate::world::layer::generated::GarrisonTuning::town_bell_reach)).
     TownBell,
     /// A garrison order's and a seek shelter's ([`crate::garrison::FAR`]).
     Far,

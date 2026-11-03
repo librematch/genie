@@ -141,7 +141,7 @@ impl MoveTo {
 }
 
 /// `+0x61` (`mTargetMovedState`, the save's `target_moved_state`): what a moving `MoveTo` does
-/// when its target object left its point (`0x140aa2a70` in state 4, [`target_moved`]).
+/// when its target object left its point (`0x140aa2a70` in state 4, [`target_left`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
 pub enum TargetMoved {
     /// 0, the base constructor's (`FUN_140a73e90`): the path's end follows the target when the
@@ -273,7 +273,7 @@ pub enum Goal {
 /// [`PathAsk::ends_in_range`] (a unit AI not on order 711 or 733); a loud `MoveTo`
 /// ([`crate::objects::Voice::Loud`], its `+0x60` clear) then shows the unit's idle sprite (slot
 /// 0x68 with slot 0x798's: the master's standing sprite,
-/// [`crate::movement::Mover::shows_standing`]; the sprite itself and `+0x7b8`, cleared, are the
+/// [`MoveToAction::shows_standing`]; the sprite itself and `+0x7b8`, cleared, are the
 /// caller's).
 ///
 /// Returns the `MoveTo`'s state after it, and the place it asked a path toward (None when it
@@ -465,7 +465,7 @@ pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
     )
 }
 
-/// What [`target_moved`] found.
+/// What [`target_left`] found.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Follow {
     /// The target stayed on the `MoveTo`'s point, or the `MoveTo` ignores its moves

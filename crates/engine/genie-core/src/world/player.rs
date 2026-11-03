@@ -259,8 +259,9 @@ impl Player {
         [0, 1, 2, 3].map(|i| self.attributes.get(i).copied().unwrap_or(Amount::ZERO))
     }
 
-    /// Attribute 195, the construction rate modifier ([`attribute::CONSTRUCTION_RATE`]), 0 past
-    /// the count.
+    /// Attribute 195, the construction rate modifier
+    /// ([`AttributeSlots::construction_rate`](crate::world::layer::AttributeSlots::construction_rate)),
+    /// 0 past the count.
     #[must_use]
     pub fn construction_rate(&self, slots: Slots) -> Amount {
         self.attribute(slots.attribute.construction_rate)

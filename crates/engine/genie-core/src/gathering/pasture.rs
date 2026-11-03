@@ -74,21 +74,24 @@ fn draw_below(turns: &mut World, n: usize) -> usize {
 
 impl World {
     /// `FUN_1411c8410` on player `p`'s pasture `id`: the points along its edges ([`edge_points`]
-    /// with its master's ground radius on x), its owner's [`PASTURE_LIVESTOCK`] cut to an integer
-    /// (CVTTSS2SI) as the count and [`PASTURE_FOOD`] over it (DIVSS) as each one's food. Up to
-    /// the count, while points are left: a draw of the Object stream picks the master
-    /// ([`LIVESTOCK`], `SetupPasture` line 0x1fa4), a second the point (0x1fa6). A point off the
-    /// map (`FUN_140f5ec30`) or on a tile whose objects (its list, `+0x28`) hold a livestock
-    /// master of this pasture (`+0x790`) goes, and a draw picks another (0x1fb2); none left ends
-    /// it. On the point the owner's slot 0x1c0 makes the master at the pasture's height
-    /// ([`World::make_new_object`], no footprint): the point goes, the pasture lists it
-    /// ([`crate::objects::layers::Building::livestock`]), its state is 2 (slot 0xa0 with 2: it is already), no
-    /// unit targets it (`+0x689` 0, [`crate::objects::unit::Unit::untargetable`]), it is the pasture's
-    /// (`+0x790`) and holds its food (`+0x310`); its current sprite with a random first facet
-    /// draws a facet below its facets less one (0x1fd2, IDIV). Each attempt counts, a master
-    /// the owner has not got too. Not held: its selection flag (`+0x68b` 0, slot 0x6b0) and the
-    /// drawn facet (`+0xe`, `FUN_14119d490`: the moving set-sprite derives it from the angle
-    /// again, `FUN_141158620` -> `FUN_14114d6c0`, its dying sprite's included).
+    /// with its master's ground radius on x), its owner's
+    /// [`AttributeSlots::pasture_livestock`](crate::world::layer::AttributeSlots::pasture_livestock)
+    /// cut to an integer (CVTTSS2SI) as the count and
+    /// [`AttributeSlots::pasture_food`](crate::world::layer::AttributeSlots::pasture_food) over it
+    /// (DIVSS) as each one's food. Up to the count, while points are left: a draw of the Object
+    /// stream picks the master ([`livestock`], `SetupPasture` line 0x1fa4), a second the point
+    /// (0x1fa6). A point off the map (`FUN_140f5ec30`) or on a tile whose objects (its list,
+    /// `+0x28`) hold a livestock master of this pasture (`+0x790`) goes, and a draw picks another
+    /// (0x1fb2); none left ends it. On the point the owner's slot 0x1c0 makes the master at the
+    /// pasture's height ([`World::make_new_object`], no footprint): the point goes, the pasture
+    /// lists it ([`crate::objects::layers::Building::livestock`]), its state is 2 (slot 0xa0 with
+    /// 2: it is already), no unit targets it (`+0x689` 0,
+    /// [`crate::objects::unit::Unit::untargetable`]), it is the pasture's (`+0x790`) and holds its
+    /// food (`+0x310`); its current sprite with a random first facet draws a facet below its facets
+    /// less one (0x1fd2, IDIV). Each attempt counts, a master the owner has not got too. Not held:
+    /// its selection flag (`+0x68b` 0, slot 0x6b0) and the drawn facet (`+0xe`, `FUN_14119d490`:
+    /// the moving set-sprite derives it from the angle again, `FUN_141158620` -> `FUN_14114d6c0`,
+    /// its dying sprite's included).
     ///
     /// # Errors
     ///
@@ -176,9 +179,10 @@ impl World {
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
     /// â1 for none (a unit of another player, too): its livestock the world holds with their
-    /// workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted by the
-    /// gap (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the first whose
-    /// workers are below the owner's [`PASTURE_WORKERS`].
+    /// workers and their footprints' squared gap to the unit (`FUN_14118f8c0`), sorted by the gap
+    /// (`std::sort`, [`crate::math::msvc::sort`]); the first without workers, else the first whose
+    /// workers are below the owner's
+    /// [`AttributeSlots::pasture_workers`](crate::world::layer::AttributeSlots::pasture_workers).
     ///
     /// # Errors
     ///

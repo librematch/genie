@@ -25,7 +25,7 @@ impl World {
     /// (path and reason -1), and it takes the work command on the part at the part's place (slot
     /// 0x128: carry test 1, `+0xa14` the group's retargeting byte, the group's certain action as
     /// the filter). A unit on the special list ([`crate::groups::UnitGroup::special_units`])
-    /// with a speed above [`EPSILON`] draws its retarget timer from the time to the part at that
+    /// with a speed above the epsilon draws its retarget timer from the time to the part at that
     /// speed ([`crate::unit_ai::UnitAi::set_randomized_retarget_timer`]).
     ///
     /// # Errors

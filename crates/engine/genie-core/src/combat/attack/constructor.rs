@@ -203,12 +203,12 @@ impl Attack {
     /// readyToAttack with the start's `set_state(4)` ([`Attack::own_start`]), then the start's
     /// other ends at once (`0x140a7f8c0`): readyToAttack's `set_state(13)` before the
     /// `set_state(4)` that replaced it leaves the unit's animation at speed 1 (`+0x7b8`; the
-    /// standing sprite it shows is the start's already); a unit that cannot move fails out of
-    /// reach (`set_state(13)`, [`Attack::fail_at_start`]) or goes ready in it (`set_state(6)`,
-    /// [`Attack::enter_ready`] with `cmd`'s [`ReadyReads`]); a `MoveTo` that starts arrived shows
-    /// the standing sprite at its speed and clears `+0x7b8` (`0x140aa29e0`, not quiet). The
-    /// Attack and the notifies the start posted, in order, for the unit's AI (the swing's of
-    /// `set_state(6)` among them).
+    /// standing sprite it shows is the start's already); a unit that cannot move fails out of reach
+    /// (`set_state(13)`, [`Attack::fail_at_start`]) or goes ready in it (`set_state(6)`,
+    /// [`Attack::enter_ready`] with `cmd`'s [`ReadyReads`](crate::combat::attack::ReadyReads)); a
+    /// `MoveTo` that starts arrived shows the standing sprite at its speed and clears `+0x7b8`
+    /// (`0x140aa29e0`, not quiet). The Attack and the notifies the start posted, in order, for the
+    /// unit's AI (the swing's of `set_state(6)` among them).
     ///
     /// # Errors
     ///

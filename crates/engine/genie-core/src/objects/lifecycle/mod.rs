@@ -148,10 +148,10 @@ impl Lifecycle {
         self.state <= ObjectState::Alive
     }
 
-    /// One update of `dt_seconds` ([`seconds`]), with the tick's Object stream and whether the
-    /// object's current sprite still animates (the sprite list's slot 0x20, `FUN_1413b8790` ->
-    /// `FUN_1413b38a0`: its animate flag on and the graphic animated). True when the object leaves
-    /// its list.
+    /// One update of `dt_seconds` ([`Millis::seconds`](crate::world::Millis::seconds)), with the
+    /// tick's Object stream and whether the object's current sprite still animates (the sprite
+    /// list's slot 0x20, `FUN_1413b8790` -> `FUN_1413b38a0`: its animate flag on and the graphic
+    /// animated). True when the object leaves its list.
     pub fn update(
         &mut self,
         dt_seconds: Seconds,

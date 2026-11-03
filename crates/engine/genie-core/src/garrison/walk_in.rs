@@ -66,7 +66,7 @@ pub struct EnterAction {
     /// The building or transport (`+0x20`, its id `+0x30`).
     pub target: Option<ContainerId>,
     /// The action state (`+0x18`), with its walk's `MoveTo` sub-action to the target: quiet,
-    /// within [`EnterAction::walk_range`], with the sprite [`EnterAction::move_shown`] gives
+    /// within [`EnterAction::walk_range`], with the task's moving sprite ([`EnterAction::moving`])
     /// ([`EnterAction::walk_again`]).
     pub state: EnterState,
     /// `+0x38`..`+0x40`: where it meets the target ([`meeting`]: a building's place; for a
@@ -171,9 +171,9 @@ impl EnterAction {
     /// the transport: its state 3 goes to the transport's place; a point below 0 would make
     /// `FUN_140aa0df0` with the unit's slot 0x268, 0, alike), and code 1 asks the transport to
     /// move to the point. Both `MoveTo`s are quiet (`FUN_140a7a170` with 1) and leave a target
-    /// that moves (`+0x61` 2); each starts with a new wait, takes the sprite
-    /// [`EnterAction::move_shown`] gives from `sprites`, and starts as
-    /// [`EnterAction::walk_start`] says.
+    /// that moves (`+0x61` 2); each starts with a new wait, takes the task's moving
+    /// sprite ([`EnterAction::moving`]) from `sprites`, and starts as
+    /// [`WalkStart`] says.
     ///
     /// # Errors
     ///
@@ -456,7 +456,7 @@ impl EnterAction {
     /// point at once: it tests that it reaches within 1 of the point's tile (slot 0x3d8,
     /// `FUN_14114ffc0` with the point truncated), then moves there (slot 0x340,
     /// [`crate::world::World::move_transport`], the unit lent to the world). A transport that
-    /// cannot reach it makes `set_state(13)`, which is not modelled ([`UNREACHED`]). True when
+    /// cannot reach it makes `set_state(13)`, which is not modelled. True when
     /// the unit entered.
     ///
     /// # Errors

@@ -180,14 +180,14 @@ impl Unit {
         Ok(())
     }
 
-    /// A foundation's death (`FUN_1411dbb70` to state 3 from state 0), before the combat
-    /// object's: the completion's first part (`FUN_1411c6bd0`, [`crate::construction::build::completion_part`]:
-    /// a farm's bonus once its build points reached its build time, a pasture's livestock and a
-    /// mule cart's search for resources at once, the foundation lent to the world), then, as the
-    /// state is still 0 and 3 lies within 1 to 6, its
-    /// construction's start (`FUN_1411e5670`, [`Construction::begin`]: a desolid one gets its
-    /// record and sight, its missiles per volley its master's; its owner watches it at once,
-    /// the foundation lent to the world).
+    /// A foundation's death (`FUN_1411dbb70` to state 3 from state 0), before the combat object's:
+    /// the completion's first part (`FUN_1411c6bd0`,
+    /// [`World::completion_part`](crate::world::World::completion_part): a farm's bonus once its
+    /// build points reached its build time, a pasture's livestock and a mule cart's search for
+    /// resources at once, the foundation lent to the world), then, as the state is still 0 and 3
+    /// lies within 1 to 6, its construction's start (`FUN_1411e5670`, [`Construction::begin`]: a
+    /// desolid one gets its record and sight, its missiles per volley its master's; its owner
+    /// watches it at once, the foundation lent to the world).
     pub(crate) fn foundation_died(
         &mut self,
         actions: &mut Action,

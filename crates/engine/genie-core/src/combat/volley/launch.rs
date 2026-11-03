@@ -45,22 +45,22 @@ use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
 impl Unit {
-    /// A missile's making and start, which [`Unit::fire`] and [`Unit::volley_missile`] share.
-    /// The missile master comes from the player's master's slot 0x40 (`FUN_1410d5920`): from the
-    /// pool of type 60 when it holds one (keeping its id), else new with the next reusable id
-    /// ([`Recycling`]). The setups draw as a new object's do (its standing sprite,
-    /// [`ActiveSprite::start`] on the Sprite stream; its facet for a sprite with a random first
-    /// frame and several facets, then its angle for a turning one: Object stream) and put it on
-    /// the map (slot 0x58: held inside it; a pooled missile that last flew no farther than 0.1
-    /// takes the ground by its fly mode); it joins the end of its owner's list. Then its action
-    /// (`FUN_140a9a040`): the shot's point, the master's hit mode, the target taken (slot 0x178)
-    /// and, with the shooter, the shooter taken too and its place, master and owner with the
-    /// missile's radii as its origin (else none); the list's add starts it (`FUN_140a9c5b0`):
-    /// `set_state` 3 aims ([`crate::combat::missile::aim`], Action stream) and launches
-    /// ([`crate::combat::missile::MissileAction::launch`], its angle). The missile keeps the object's id
-    /// as what it was fired from, its reach and the object's attack count. Not held: the
-    /// missile's sprite and pitch facet, and a shooter's own master copy (its origin's master
-    /// −1).
+    /// A missile's making and start, which [`Unit::fire`] and [`Unit::volley_missile`] share. The
+    /// missile master comes from the player's master's slot 0x40 (`FUN_1410d5920`): from the pool
+    /// of type 60 when it holds one (keeping its id), else new with the next reusable id
+    /// ([`World::recycling`](crate::world::World::recycling)). The setups draw as a new object's do
+    /// (its standing sprite, [`ActiveSprite::start`] on the Sprite stream; its facet for a sprite
+    /// with a random first frame and several facets, then its angle for a turning one: Object
+    /// stream) and put it on the map (slot 0x58: held inside it; a pooled missile that last flew no
+    /// farther than 0.1 takes the ground by its fly mode); it joins the end of its owner's list.
+    /// Then its action (`FUN_140a9a040`): the shot's point, the master's hit mode, the target taken
+    /// (slot 0x178) and, with the shooter, the shooter taken too and its place, master and owner
+    /// with the missile's radii as its origin (else none); the list's add starts it
+    /// (`FUN_140a9c5b0`): `set_state` 3 aims ([`crate::combat::missile::aim`], Action stream) and
+    /// launches ([`crate::combat::missile::MissileAction::launch`], its angle). The missile keeps
+    /// the object's id as what it was fired from, its reach and the object's attack count. Not
+    /// held: the missile's sprite and pitch facet, and a shooter's own master copy (its origin's
+    /// master −1).
     pub(crate) fn launch(
         &mut self,
         c: &mut Step<'_>,

@@ -588,11 +588,12 @@ impl UnitSide for UnitView<'_, '_> {
     }
 
     /// The unit's slot 0x388 (`FUN_141226fc0`) on the foundation `target`: the world's object
-    /// (`FUN_1415417a0`; the owner's sleeping list, which the unit does not see here, holds
-    /// only objects of a type below 30, never a building), then its slot 0x820 with any action
-    /// type (`0xffff`) and the switch ([`task_search`] on the target and its main building);
-    /// with a task the new wait replaces the unit's actions, which the caller makes after the
-    /// update ([`Wait`], [`World::wait_for_foundation`]).
+    /// (`FUN_1415417a0`; the owner's sleeping list, which the unit does not see here, holds only
+    /// objects of a type below 30, never a building), then its slot 0x820 with any action type
+    /// (`0xffff`) and the switch ([`task_search`](crate::unit_ai::task_finder::world::task_search)
+    /// on the target and its main building); with a task the new wait replaces the unit's actions,
+    /// which the caller makes after the update ([`Wait`](crate::unit_ai::world_view::Wait),
+    /// [`World::wait_for_foundation`](crate::world::World::wait_for_foundation)).
     fn command(&mut self, command: UnitCommand) -> Result<bool, GenieError> {
         let roles = &self.c.w.model.roles.clone();
         let slots = self.c.w.model.slots;
@@ -644,11 +645,11 @@ impl UnitSide for UnitView<'_, '_> {
         Ok(())
     }
 
-    /// Slot 400 at the full update's tail: the top action's target ([`Unit::top_target`]), the
+    /// Slot 400 at the full update's tail: the top action's target ([`Action::top_target`]), the
     /// actions the AI gave in its run made already (a wait for a foundation and a Transport hold
     /// none), while the world holds it.
     ///
-    /// [`Unit::top_target`]: crate::objects::unit::Unit::top_target
+    /// [`Action::top_target`]: crate::objects::layers::Action::top_target
     fn top_target_now(&mut self) -> Result<Option<ObjectId>, GenieError> {
         let target = self.actions.top_target();
         Ok(target.filter(|&t| self.c.w.spatial.get(t).is_some()))

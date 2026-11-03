@@ -32,26 +32,25 @@ use crate::world::layer::ClassRoles;
 const RETARGET_SPAN_LEAST: Millis = Millis::new(1000);
 
 impl UnitAi {
-    /// Slot 73 (`0x140c567c0`, processMisc). Its order part first, by the order (an action's
-    /// value plus 100 without one): the follow order's ([`UnitAi::follow`]) and the defend
-    /// order's ([`UnitAi::defend_misc`]). Then the leash checks (not on the orders 0x2c7, 0x2dd and 0x323, nor in a
-    /// group that patrols, [`GroupState::patrol`]): stance 1's (Defend) stops a unit more than 5
-    /// tiles (`UnitAiTuning::defend_leash`, squared) from its state position, forgets its target and walks
-    /// back ([`UnitAi::walk_back`]), then goes on. Stance 2's (stand ground) stops a unit with an
-    /// action value (`+0x44`, not `0x2bf` or `0x2c0`) whose squared gap to its state position
-    /// exceeds its range plus `UnitAiTuning::stand_ground_slack` (`COMISS`/`JBE`: a gap that is not a number
-    /// stays), forgets its target and walks back, and slot 73 ends there (10); a unit without an
-    /// order but with an action of its own can stray. With patrol information (`+0x1c0`,
-    /// `FUN_140f95e10`) either leash is not modelled. Then the retarget check:
-    /// with retargeting on (`+0x1d6` 0), a timer used up is redrawn (`750 + r % 500`); a human
-    /// player's unit of a range above 3 on the attack order 700 stops there ("I have a range >
-    /// 3.0 with an attack order, so I don't retarget."), as does a unit with a target of Gaia's
-    /// ("I have a GAIA target, so I can't retarget.") or without a target (or one gone), and
-    /// one with a player's target off the attack order but for a building or wall target
-    /// (classes 3, 27,
-    /// 39, 49, 52) or a trebuchet's (51, 54), whose search for a better target (slot 0x538 with
-    /// 9, then slot 0x520) is not modelled; nor is the attack order's search. True when the
-    /// timer ran out.
+    /// Slot 73 (`0x140c567c0`, processMisc). Its order part first, by the order (an action's value
+    /// plus 100 without one): the follow order's ([`UnitAi::follow`]) and the defend order's
+    /// ([`UnitAi::defend_misc`]). Then the leash checks (not on the orders 0x2c7, 0x2dd and 0x323,
+    /// nor in a group that patrols, [`GroupState::patrol`](crate::unit_ai::GroupState::patrol)):
+    /// stance 1's (Defend) stops a unit more than 5 tiles (`UnitAiTuning::defend_leash`, squared)
+    /// from its state position, forgets its target and walks back ([`UnitAi::walk_back`]), then
+    /// goes on. Stance 2's (stand ground) stops a unit with an action value (`+0x44`, not `0x2bf`
+    /// or `0x2c0`) whose squared gap to its state position exceeds its range plus
+    /// `UnitAiTuning::stand_ground_slack` (`COMISS`/`JBE`: a gap that is not a number stays),
+    /// forgets its target and walks back, and slot 73 ends there (10); a unit without an order but
+    /// with an action of its own can stray. With patrol information (`+0x1c0`, `FUN_140f95e10`)
+    /// either leash is not modelled. Then the retarget check: with retargeting on (`+0x1d6` 0), a
+    /// timer used up is redrawn (`750 + r % 500`); a human player's unit of a range above 3 on the
+    /// attack order 700 stops there ("I have a range > 3.0 with an attack order, so I don't
+    /// retarget."), as does a unit with a target of Gaia's ("I have a GAIA target, so I can't
+    /// retarget.") or without a target (or one gone), and one with a player's target off the attack
+    /// order but for a building or wall target (classes 3, 27, 39, 49, 52) or a trebuchet's (51,
+    /// 54), whose search for a better target (slot 0x538 with 9, then slot 0x520) is not modelled;
+    /// nor is the attack order's search. True when the timer ran out.
     pub(super) fn retarget_check(
         &mut self,
         world_time: WorldTime,

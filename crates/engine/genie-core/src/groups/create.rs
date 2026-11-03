@@ -331,12 +331,12 @@ impl World {
     /// [`MAX_MEMBERS`] already; true when it is a member already. Else the members' arrays make
     /// room ([`UnitGroup::resize_members`]); a unit in another group the world holds leaves it
     /// ([`World::remove_unit`]); the unit's group link names the group (`+0x6d0`), its unit AI
-    /// drops the actions and orders of [`CLEARED_ACTIONS`] and [`CLEARED_ORDERS`] (`FUN_140c64b50`
-    /// and `FUN_140c64b60` with -1) and empties its order queue (`FUN_140c5e010`); it joins the
-    /// members with no move of its own (active 0, path and reason -1), its sub-formation's
-    /// statistic and the group's spacing (its two radii, the widest: `COMISS`/`JBE` at
-    /// 0x141008ced); the group takes [`GroupFlags::RELAYOUT`], and [`GroupFlags::STATISTICS`] too
-    /// when its motion lacks [`MotionFlags::NEW`]. A sleeping unit joins as a live one.
+    /// drops the actions of [`CLEARED_ACTIONS`] and the defend order ([`OrderKind::Defend`])
+    /// (`FUN_140c64b50` and `FUN_140c64b60` with -1) and empties its order queue (`FUN_140c5e010`);
+    /// it joins the members with no move of its own (active 0, path and reason -1), its
+    /// sub-formation's statistic and the group's spacing (its two radii, the widest: `COMISS`/`JBE`
+    /// at 0x141008ced); the group takes [`GroupFlags::RELAYOUT`], and [`GroupFlags::STATISTICS`]
+    /// too when its motion lacks [`MotionFlags::NEW`]. A sleeping unit joins as a live one.
     ///
     /// The routine's target (`param_3`), which it hands to `removeUnit` and to its second
     /// `FUN_141011300`, enters only the rams' rule, which never holds

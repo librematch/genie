@@ -408,9 +408,9 @@ impl World {
         ids.iter().map(|&id| self.place(id)).collect()
     }
 
-    /// Slot 0x68 with the master's standing sprite (`+0x470`): the unit's top speed is the
-    /// sprite's ([`crate::movement::Mover::shows_standing`]), and the sprite itself where the
-    /// slice holds it.
+    /// Slot 0x68 with the master's standing sprite (`+0x470`): the unit's top speed is the sprite's
+    /// ([`crate::movement::move_to::MoveToAction::shows_standing`]), and the sprite itself where
+    /// the slice holds it.
     pub(crate) fn standing_sprite(
         &mut self,
         p: PlayerId,

@@ -59,8 +59,9 @@ impl Diplomacy for TaskWorld<'_> {
     }
 }
 
-/// The players' relations and the drop sites as the task finder reads them while a unit's
-/// owner's list is out for its update ([`UnitView`]): the owner's relations, the others'.
+/// The players' relations and the drop sites as the task finder reads them while a unit's owner's
+/// list is out for its update ([`UnitView`](crate::unit_ai::world_view::UnitView)): the owner's
+/// relations, the others'.
 pub(crate) struct SideWorld<'a> {
     pub(crate) player: PlayerId,
     pub(crate) relations: &'a Relations,

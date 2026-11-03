@@ -96,9 +96,7 @@ impl World {
     /// but the last as its own (`FUN_14100f6b0`, the target forgotten) and a patrol's leg to the
     /// last ([`World::command_move_to`]: range 0, the target forgotten, direct). Then every
     /// listed group lists them all (`FUN_1410395a0`) and the command count goes on. Each loose
-    /// unit last ([`World::patrol_unit`]).
-    ///
-    /// [`World::patrol_unit`]: crate::world::World::patrol_unit
+    /// unit last.
     pub(crate) fn patrol_order(
         &mut self,
         ids: &[Option<ObjectId>],

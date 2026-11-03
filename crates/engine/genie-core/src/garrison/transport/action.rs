@@ -470,11 +470,12 @@ impl TransportAction {
     }
 
     /// The update of its `MoveTo` sub-action (`FUN_140a992b0`) on the step
-    /// ([`MoveToAction::sub_update`]): state 3 asks for its path by what the unit's AI asks of
-    /// the path (`0x140aa2a70`, [`UnitAi::path_ask`]) and shows its sprite; state 4 moves; after
-    /// either the units in the way go to the unit AI at once (notify 0x215). A motion step that
-    /// gives up fails it (`set_state(13)`: only a human player's villager waits). Its code: 1
-    /// once it ended at the point, 3 once it failed, 1 without one ("There is no list"), else 0.
+    /// ([`MoveToAction::sub_update`](crate::movement::move_to::MoveToAction::sub_update)): state 3
+    /// asks for its path by what the unit's AI asks of the path (`0x140aa2a70`,
+    /// [`UnitAi::path_ask`]) and shows its sprite; state 4 moves; after either the units in the way
+    /// go to the unit AI at once (notify 0x215). A motion step that gives up fails it
+    /// (`set_state(13)`: only a human player's villager waits). Its code: 1 once it ended at the
+    /// point, 3 once it failed, 1 without one ("There is no list"), else 0.
     ///
     /// # Errors
     ///

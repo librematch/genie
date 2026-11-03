@@ -102,11 +102,13 @@ impl Unit {
 
     /// What slot 0x5e0 (`FUN_14114f300`) reads of the unit's group ([`GroupSpeed`]) among the
     /// world's `groups`, the unit's master among `masters` and its unit AI `ai`, with its action
-    /// layer `actions` and why the load could not read it whole `unread`: none outside a group the world holds (`+0x6d0`, `FUN_14152ff40`: none for −1), nor when the
-    /// group's motion stands (`FUN_141046600`) and the unit is in its place
-    /// ([`UnitGroup::slot_in_place`]), nor for a unit not free for the group's moves
-    /// ([`Unit::free_for_group`]). Else its own move's reason (`FUN_141017590`): 2 moved aside,
-    /// −1 none, any other an own move at the group's top speed (`+0xbc`).
+    /// layer `actions` and why the load could not read it whole `unread`: none outside a group the
+    /// world holds (`+0x6d0`, `FUN_14152ff40`: none for −1), nor when the group's motion stands
+    /// (`FUN_141046600`) and the unit is in its place ([`UnitGroup::slot_in_place`]), nor for a
+    /// unit not free for the group's moves
+    /// ([`Action::free_for_group`](crate::objects::layers::Action::free_for_group)). Else its own
+    /// move's reason (`FUN_141017590`): 2 moved aside, −1 none, any other an own move at the
+    /// group's top speed (`+0xbc`).
     ///
     /// # Errors
     ///

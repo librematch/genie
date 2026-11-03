@@ -66,12 +66,14 @@ pub struct TribeScen {
     /// (What exactly?)
     ///
     /// According to [`AoE2ScenarioParser`][].
+    ///
     /// [`AoE2ScenarioParser`]: <https://github.com/KSneijders/AoE2ScenarioParser/blob/8e3abd422164961aa5c7857350475088790804f8/AoE2ScenarioParser/pieces/options.py>
     #[allow(dead_code)]
     pub(super) combat_mode: i32,
     /// (What exactly?)
     ///
     /// According to [`AoE2ScenarioParser`][].
+    ///
     /// [`AoE2ScenarioParser`]: <https://github.com/KSneijders/AoE2ScenarioParser/blob/8e3abd422164961aa5c7857350475088790804f8/AoE2ScenarioParser/pieces/options.py>
     #[allow(dead_code)]
     pub(super) naval_mode: i32,

@@ -126,12 +126,13 @@ impl World {
 
     /// `FUN_14123bb20`'s owner's units of a formation category (`+0x8bc`) on `foundation`'s
     /// footprint (master radii `radius`), in the tiles' order: the farthest free spot beside the
-    /// footprint from the first of them (`FUN_1411566b0` with 1, [`Spatial::spot_off`]); then, with
-    /// one, `FUN_1416123a0`: the order splitter on them ([`World::loose_units`]: a unit group it
-    /// forms, its group move `FUN_14100efd0`, is not modelled) and each unit it leaves loose takes
-    /// the action of moving off a footprint (`0x2bf`) and moves to the spot at its own height
-    /// (slot 0x138 without a target); last each of them whose unit AI's action is not `0x2bf` gets
-    /// notify `0x21b` ([`crate::unit_ai::NotifyKind::SENT_OFF_GROUP`]).
+    /// footprint from the first of them (`FUN_1411566b0` with 1,
+    /// [`Spatial::spot_off`](crate::map::spatial::Spatial::spot_off)); then, with one,
+    /// `FUN_1416123a0`: the order splitter on them ([`World::loose_units`]: a unit group it forms,
+    /// its group move `FUN_14100efd0`, is not modelled) and each unit it leaves loose takes the
+    /// action of moving off a footprint (`0x2bf`) and moves to the spot at its own height (slot
+    /// 0x138 without a target); last each of them whose unit AI's action is not `0x2bf` gets notify
+    /// `0x21b` ([`crate::unit_ai::NotifyKind::SENT_OFF_GROUP`]).
     pub(crate) fn evacuate_together(
         &mut self,
         foundation: FoundationId,
