@@ -65,9 +65,21 @@ pub struct Convertee {
     pub hero: HeroFlags,
 }
 
+/// Which targets a unit AI's attack check (slot 0xa0) and the priest's conversion test (slot
+/// 0x1b8) let through: their `any` argument.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TargetRules {
+    /// Any target the type may take at all (1): the lion's any, the priest's without its full
+    /// faith, the siege unit's without its own choice.
+    Any,
+    /// By the type's own rules (0).
+    Own,
+}
+
 /// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert object
-/// `t` (None: one the world does not hold), with `any` its faith not asked. Never for class 43, nor
-/// without full faith (100, `COMISS`: a NaN fails) unless `any`; never a Gaia object, nor with the
+/// `t` (None: one the world does not hold), with [`TargetRules::Any`] its faith not asked. Never
+/// for class 43, nor without full faith (100, `COMISS`: a NaN fails) unless with
+/// [`TargetRules::Any`]; never a Gaia object, nor with the
 /// owner's attribute 67 at most 0, nor livestock (58); master 53 converts only the boats (2, 20,
 /// 21, 22, 53); never the
 /// [`MasterRoles::NEVER_CONVERTED`](crate::world::layer::MasterRoles::NEVER_CONVERTED) masters,
@@ -79,7 +91,7 @@ pub struct Convertee {
 pub fn can_convert(
     p: &Converter<'_>,
     t: Option<&Convertee>,
-    any: bool,
+    rules: TargetRules,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> bool {
@@ -91,7 +103,7 @@ pub fn can_convert(
     }
     // full faith (`COMISS`: a NaN has none)
     let faithful = Amount::new(unit_ai_tuning.full_faith) <= p.faith;
-    if !any && !faithful {
+    if rules == TargetRules::Own && !faithful {
         return false;
     }
     let Some(t) = t else {
@@ -348,7 +360,7 @@ pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point)
     Distance::new(sqrt(gy * gy + gx * gx))
 }
 
-/// The siege unit's attack check (slot 0xa0, `FUN_140c19190`) with `any` (its third argument):
+/// The siege unit's attack check (slot 0xa0, `FUN_140c19190`) by `rules` (its third argument):
 /// never the classes 1 and 42, nor in `NoAttack`. Its reach is the target's footprint gap to the
 /// unit's state position (`FUN_14118faf0`) less the unit's own diagonal (`sqrtf` of its radii
 /// squared by `powf`), against its range (slot 0x230), grown by `UnitAiTuning::gaia_target_reach`
@@ -357,11 +369,12 @@ pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point)
 /// (`DAT_14330ebb8`; `JA` rejects); the patrol orders' and a patrol path's ranges (slot 0x470,
 /// `FUN_140f95e10`) are not modelled. Then a Gaia unit only of the combat type with `+0x924` 0
 /// outside the scenario modes; never a building no builder has started (`+0xc60`); never from a
-/// unit below state 2; not `any`, never from a human player's packed unit (51); never while its top
-/// action packs or unpacks (124, 125). Not `any`, by attack priority 0 a ram attacks only
-/// [`ClassRoles::RAM_TARGET`](crate::world::layer::ClassRoles::RAM_TARGET) and a trebuchet (classes
-/// 51, 54) [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET);
-/// masters 1744 and 1746 with a building as their current target ([`Seeker::target_master_kind`]) by their
+/// unit below state 2; by its own rules, never from a human player's packed unit (51); never while
+/// its top action packs or unpacks (124, 125). By its own rules, by attack priority 0 a ram attacks
+/// only [`ClassRoles::RAM_TARGET`](crate::world::layer::ClassRoles::RAM_TARGET) and a trebuchet
+/// (classes 51, 54)
+/// [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET); masters
+/// 1744 and 1746 with a building as their current target ([`Seeker::target_master_kind`]) by their
 /// priority alone (1 or 4 and up); attack priority 3 only
 /// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 ///
@@ -372,7 +385,7 @@ pub fn siege_can_attack(
     me: &Attacker,
     s: &Seeker,
     t: &Target,
-    any: bool,
+    rules: TargetRules,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> Result<bool, GenieError> {
@@ -392,7 +405,7 @@ pub fn siege_can_attack(
         return Ok(false);
     }
     if !me.player_kind.is_computer()
-        && !any
+        && rules == TargetRules::Own
         && roles
             .of_some_class(me.class)
             .contains(ClassRoles::SKIPS_SIEGE_CHECK)
@@ -402,7 +415,7 @@ pub fn siege_can_attack(
     if matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
         return Ok(false);
     }
-    Ok(any || siege_chooses(me, s, t, roles))
+    Ok(rules == TargetRules::Any || siege_chooses(me, s, t, roles))
 }
 
 /// [`siege_can_attack`]'s reach by the stance: the target's footprint gap to the unit's state
@@ -446,7 +459,7 @@ pub(super) fn siege_in_reach(
     }
 }
 
-/// [`siege_can_attack`]'s own choice (not `any`): by attack priority 0 a ram only
+/// [`siege_can_attack`]'s own choice ([`TargetRules::Own`]): by attack priority 0 a ram only
 /// [`ClassRoles::RAM_TARGET`](crate::world::layer::ClassRoles::RAM_TARGET) and a trebuchet
 /// [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET); masters
 /// 1744 and 1746 with a building as their current target by their priority alone; attack priority 3

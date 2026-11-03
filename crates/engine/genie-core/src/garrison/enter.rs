@@ -29,6 +29,7 @@ use crate::orders::object_gone;
 use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::EnterOrder;
 use crate::unit_ai::{AiMove, Notify, NotifyKind};
@@ -71,7 +72,7 @@ impl World {
     }
 
     /// Slot 0x3a0 (`FUN_1410847e0`, the enter command) of the unit at `idx` of `player` on
-    /// `target`, `forced` its third argument: a target the world does not hold is false;
+    /// `target`, `force` its third argument: a target the world does not hold is false;
     /// unforced, a unit entering the target already (its top action an Enter on it) is true.
     /// Slot 0x820 ([`World::find_work_task`]) looks for a task on the target with the garrison
     /// filter (3) and the switch (the unit takes the master that gave it, slot 0x90): none is
@@ -85,14 +86,14 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-        forced: bool,
+        force: OrderForce,
     ) -> Result<bool, GenieError> {
         if self.object(target).is_none() {
             return Ok(false);
         }
         let unit = self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
-        if !forced
+        if force == OrderForce::Unforced
             && top == Some(ENTER)
             && self.parts.actions_of(unit.id).top_target() == Some(target)
         {
@@ -530,7 +531,7 @@ impl World {
         let walk = AiMove {
             point: to,
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         };
         self.move_aside(p, i, walk)

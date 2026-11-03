@@ -11,10 +11,12 @@ use crate::objects::masters::ClassId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::{
     CIVILIAN, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI, Surroundings, UnitAi,
     UnitCommand, UnitSeen, UnitSide, order_move,
@@ -140,9 +142,13 @@ impl UnitAi {
                 }
                 m.is_some()
             }
-            OrderKind::ExploreAndDestroy => {
-                self.explore_and_destroy(o.point.tile(), true, side, ai, unit_ai_tuning)?
-            }
+            OrderKind::ExploreAndDestroy => self.explore_and_destroy(
+                o.point.tile(),
+                OrderForce::Forced,
+                side,
+                ai,
+                unit_ai_tuning,
+            )?,
             OrderKind::Wait => {
                 // case 0x2d8: the wait's action value, leaving a patrol order, then the order
                 // itself; the tail finds it the AI's already
@@ -189,20 +195,22 @@ impl UnitAi {
         let (at, player_kind) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
-            (OrderKind::Attack, Some(t)) => self.attack_slot(t, true, at, side, ai)?,
+            (OrderKind::Attack, Some(t)) => self.attack_slot(t, TargetRules::Any, at, side, ai)?,
             (OrderKind::Defend, target) => {
                 if roles.of_master(at.master).contains(MasterRoles::DEFENDLESS) {
                     return Ok(false);
                 }
                 match target {
-                    None => self.defend_point(o.point.ground(), o.range, true, at),
-                    Some(t) => self.defend_object(t, o.range, true, at, side)?,
+                    None => self.defend_point(o.point.ground(), o.range, OrderForce::Forced, at),
+                    Some(t) => self.defend_object(t, o.range, OrderForce::Forced, at, side)?,
                 }
             }
-            (OrderKind::RunAway, _) => self.run_away(true, at, player_kind, ai, side)?,
+            (OrderKind::RunAway, _) => {
+                self.run_away(OrderForce::Forced, at, player_kind, ai, side)?
+            }
             (OrderKind::SeekAndDestroy, Some(t)) => {
                 let tiles = o.point.tile();
-                self.seek_and_destroy(t, tiles, true, at, side)?
+                self.seek_and_destroy(t, tiles, OrderForce::Forced, at, side)?
             }
             (OrderKind::AttackRoundup, Some(t)) => self.attack_roundup(t, at, side)?,
             (OrderKind::AttackMove, target) => {
@@ -212,7 +220,7 @@ impl UnitAi {
                         .contains(ClassRoles::ATTACK_MOVE_ATTACKS)
                 {
                     *attack_move = true;
-                    self.attack_slot(t, true, at, side, ai)?
+                    self.attack_slot(t, TargetRules::Any, at, side, ai)?
                 } else {
                     let m = self.move_to(order_move(o));
                     if let Some(m) = m {
@@ -241,7 +249,7 @@ impl UnitAi {
         // the hunt's stops the unit (`hunt_order`)
         Ok(match (o.order, o.target) {
             (OrderKind::Build, Some(t)) => {
-                self.build_object(FoundationId::new(t), true, at, side, rng)?
+                self.build_object(FoundationId::new(t), OrderForce::Forced, at, side, rng)?
             }
             (OrderKind::Heal | OrderKind::Convert | OrderKind::Repair, Some(t)) => {
                 let (action, command) = match o.order {
@@ -249,7 +257,7 @@ impl UnitAi {
                     OrderKind::Convert => (AiAction::Convert, UnitCommand::Convert(t)),
                     _ => (AiAction::Repair, UnitCommand::Repair(t)),
                 };
-                self.work_object(t, true, (action, command), (at, side))?
+                self.work_object(t, OrderForce::Forced, (action, command), (at, side))?
             }
             (OrderKind::Gather, Some(t)) => self.gather_order(t, at, side, rng)?,
             (OrderKind::Hunt | OrderKind::AutoBoarLuring, target) => {
@@ -261,7 +269,7 @@ impl UnitAi {
             }
             (OrderKind::Foundation, target) => {
                 let waits = match target {
-                    Some(t) => self.wait_for_foundation(t, true, side)?,
+                    Some(t) => self.wait_for_foundation(t, OrderForce::Forced, side)?,
                     None => false,
                 };
                 self.set_action(Some(AiAction::WaitSolidify));
@@ -283,12 +291,18 @@ impl UnitAi {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): its lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
-            (OrderKind::Follow, Some(t)) => self.follow_object(t, o.range, true, at, side, rng)?,
-            (OrderKind::Transport, _) => self.transport_to(o.point, true, side)?,
-            (OrderKind::Enter, Some(t)) => self.enter_object(t, true, (at, side))?,
+            (OrderKind::Follow, Some(t)) => {
+                self.follow_object(t, o.range, OrderForce::Forced, at, side, rng)?
+            }
+            (OrderKind::Transport, _) => self.transport_to(o.point, OrderForce::Forced, side)?,
+            (OrderKind::Enter, Some(t)) => self.enter_object(t, OrderForce::Forced, (at, side))?,
             (OrderKind::Unload | OrderKind::UnloadOverWall, _) => {
                 let over_wall = o.order == OrderKind::UnloadOverWall;
-                self.unload_at(o.point.ground(), (true, over_wall), (at, side))?
+                self.unload_at(
+                    o.point.ground(),
+                    (OrderForce::Forced, over_wall),
+                    (at, side),
+                )?
             }
             _ => false,
         })
@@ -420,17 +434,17 @@ impl UnitAi {
             .map_or_else(|| side.seen_unit(id), |u| Ok(Some(*u)))
     }
 
-    /// `AttackObject` (slot 0xb8) forced, by the unit AI's type, on `target`, `any` target or
-    /// not: the civilian's (`FUN_140c17370`, [`UnitAi::civilian_attack`]: an animal or a tree it
-    /// hunts, any other it attacks, not `any`); the soldier's (`FUN_140c17550`) the base's, then
-    /// a member of a group the world holds stops moving ([`UnitSide::group_attack_stop`]); the
-    /// others' the base's ([`UnitAi::attack_object`]). The priest's (`FUN_140c17490`) asks its
-    /// slot 0x1b8 (`FUN_140c1af00`) whether to convert the target first: not modelled, the base's
-    /// stops at the priest's slot 0xa0, which is not either.
+    /// `AttackObject` (slot 0xb8) forced, by the unit AI's type, on `target` by `rules`: the
+    /// civilian's (`FUN_140c17370`, [`UnitAi::civilian_attack`]: an animal or a tree it hunts, any
+    /// other it attacks by its own rules); the soldier's (`FUN_140c17550`) the base's, then a
+    /// member of a group the world holds stops moving ([`UnitSide::group_attack_stop`]); the
+    /// others' the base's ([`UnitAi::attack_object`]). The priest's (`FUN_140c17490`) asks its slot
+    /// 0x1b8 (`FUN_140c1af00`) whether to convert the target first: not modelled, the base's stops
+    /// at the priest's slot 0xa0, which is not either.
     pub(super) fn attack_slot(
         &mut self,
         target: ObjectId,
-        any: bool,
+        rules: TargetRules,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
@@ -438,7 +452,7 @@ impl UnitAi {
         match self.ai_kind {
             CIVILIAN => self.civilian_attack(target, at, side, rng),
             SOLDIER_AI => {
-                if !self.attack_object(target, true, any, at, side)? {
+                if !self.attack_object(target, OrderForce::Forced, rules, at, side)? {
                     return Ok(false);
                 }
                 if at.group.is_some() {
@@ -446,13 +460,13 @@ impl UnitAi {
                 }
                 Ok(true)
             }
-            _ => self.attack_object(target, true, any, at, side),
+            _ => self.attack_object(target, OrderForce::Forced, rules, at, side),
         }
     }
 
     /// `attackRoundupObject` (slot 0xc0, `FUN_140c43aa0`) on `target`: the AI's own target
     /// ("I'm already attacking that target") or one the world does not hold takes nothing; then
-    /// slot 0xa0 not `any` ([`UnitAi::attack_check`]) must let it attack the target; with an
+    /// slot 0xa0 by its own rules ([`UnitAi::attack_check`]) must let it attack the target; with an
     /// action value the unit must reach the target within its range (slot 0x3d0,
     /// [`UnitSide::reaches`]: "can't path to new target"). Then the unit's attack command, forced
     /// ([`UnitAi::attack_command`]), and on success the action is the attack (600, the last action
@@ -467,13 +481,13 @@ impl UnitAi {
         if self.current_target == Some(target) {
             return Ok(false);
         }
-        let Some((class, position)) = self.attack_check(target, false, at, side)? else {
+        let Some((class, position)) = self.attack_check(target, TargetRules::Own, at, side)? else {
             return Ok(false);
         };
         if self.current_action.is_some() && !side.reaches(target, at.weapon_range)? {
             return Ok(false);
         }
-        if !self.attack_command(target, true, at, side)? {
+        if !self.attack_command(target, OrderForce::Forced, at, side)? {
             return Ok(false);
         }
         self.set_action(Some(AiAction::Attack));

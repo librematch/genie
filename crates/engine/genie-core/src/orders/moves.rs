@@ -25,6 +25,7 @@ use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::task_finder::Diplomacy;
@@ -403,7 +404,7 @@ impl World {
             .of_class(master.class)
             .contains(ClassRoles::LIVESTOCK)
             && let Some(target) = order.target
-            && !self.enter_command(player, idx, target, false)?
+            && !self.enter_command(player, idx, target, OrderForce::Unforced)?
         {
             let at = self
                 .spatial

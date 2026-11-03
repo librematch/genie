@@ -61,6 +61,7 @@ pub(crate) use self::constructor::BeginLayer;
 pub use self::constructor::{arms, arms_looking, engagement, gaps};
 use self::hits::{AfterHit, after_hit, blast_so_far};
 pub(crate) use self::hits::{Hit, strike};
+pub use self::ready_to_attack::AtOnce;
 #[cfg(test)]
 use self::ready_to_attack::in_range;
 use self::sprites::{NO_OBJECT_STREAM, set_attack_timer};

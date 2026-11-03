@@ -36,6 +36,7 @@ use crate::orders::nearest_table_site;
 use crate::orders::object_gone;
 use crate::players::PlayerId;
 use crate::players::UnitRelation;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker, patrol_information, town_centre};
@@ -453,7 +454,7 @@ impl UnitSide for UnitView<'_, '_> {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         ai: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         let roles = &self.c.w.model.roles.clone();

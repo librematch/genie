@@ -54,25 +54,35 @@ struct MemberView {
     attacking: bool,
 }
 
+/// What the group statistics (`FUN_14100bcb0`'s `param_2`) do with a member far from its slot
+/// ([`World::group_statistics`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FarMembers {
+    /// It leaves the group (1).
+    Leave,
+    /// It stays, untested (0).
+    Stay,
+}
+
 impl World {
     /// `FUN_14100bcb0` with `far` (`param_2`): the statistics start over (the centroid, the largest
     /// radius and range, the spacing sums and the searches' objects at 0, the smallest radius,
     /// range and ranged range at `f32::MAX`); each member the world holds then, in the members'
-    /// order, lists the objects its unit AI's search finds ([`World::member_objects`]); with `far`,
-    /// one far from its slot ([`World::far_from_slot`]) leaves the group (`removeUnit` with target
-    /// -1, [`World::remove_unit`]) and, when it left, stops (slot 0x5d0) and the next member takes
-    /// its index; either way it counts in no statistic. Any other adds its place (slot 0x520) to
-    /// the centroid and its radius ([`FormationUnit`]) to the spacing, and takes part in the
-    /// largest and smallest radius, the slowest speed (slot 0x208) and the ranges (slot 0x230; the
-    /// ranged ones only above 0); its seconds since attacking are 0 in the attack action (600),
-    /// else they grow by the update's time. With members, the centroid and the desired height are
-    /// their means, the spacing twice the largest radius, the total spacing `(largest + sum) +
-    /// (largest + sum)` in that order, the stored positions' desired length the members' count
-    /// times the spacing; the motion's top speed is the slowest member's (divided by
-    /// `GroupTuning::slow_group_factor` with [`GroupFlags::CATCHING_UP`]), the seconds not under attack 0 when
-    /// a member is under attack, else they grow by the update's time; a member inside another
-    /// object stops ([`World::stop_if_inside`]); each sub-formation's spacing is twice its widest
-    /// unit's radius and its attack range its units' largest against the group's target
+    /// order, lists the objects its unit AI's search finds ([`World::member_objects`]); with
+    /// [`FarMembers::Leave`], one far from its slot ([`World::far_from_slot`]) leaves the group
+    /// (`removeUnit` with target -1, [`World::remove_unit`]) and, when it left, stops (slot 0x5d0)
+    /// and the next member takes its index; either way it counts in no statistic. Any other adds
+    /// its place (slot 0x520) to the centroid and its radius ([`FormationUnit`]) to the spacing,
+    /// and takes part in the largest and smallest radius, the slowest speed (slot 0x208) and the
+    /// ranges (slot 0x230; the ranged ones only above 0); its seconds since attacking are 0 in the
+    /// attack action (600), else they grow by the update's time. With members, the centroid and the
+    /// desired height are their means, the spacing twice the largest radius, the total spacing
+    /// `(largest + sum) + (largest + sum)` in that order, the stored positions' desired length the
+    /// members' count times the spacing; the motion's top speed is the slowest member's (divided by
+    /// `GroupTuning::slow_group_factor` with [`GroupFlags::CATCHING_UP`]), the seconds not under
+    /// attack 0 when a member is under attack, else they grow by the update's time; a member inside
+    /// another object stops ([`World::stop_if_inside`]); each sub-formation's spacing is twice its
+    /// widest unit's radius and its attack range its units' largest against the group's target
     /// ([`World::range_against`]), its units looked up in the world's table; with
     /// [`MotionFlags::NEW`] the formation type follows ([`World::calc_formation_kind`]). Without
     /// one the smallest radius, the spacing and the smallest ranges are 0.
@@ -80,7 +90,7 @@ impl World {
     /// Not modelled: `+0x478` (a member's `+0x30c`; the group holds no such field), a charge's
     /// range against a target, and the attack plan's re-attack (`FUN_14100f7f0`) against a
     /// target the world holds.
-    pub fn group_statistics(&mut self, group: GroupId, far: bool) -> Result<(), GenieError> {
+    pub fn group_statistics(&mut self, group: GroupId, far: FarMembers) -> Result<(), GenieError> {
         if self.statistics_only(group, far)? {
             self.calc_formation_kind(group)?;
         }
@@ -94,7 +104,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn statistics_only(&mut self, group: GroupId, far: bool) -> Result<bool, GenieError> {
+    pub fn statistics_only(&mut self, group: GroupId, far: FarMembers) -> Result<bool, GenieError> {
         let dt = self.dt_seconds;
         let (views, objects) = self.member_views(group, far)?;
         let g = self.groups.held_mut(group)?;
@@ -160,7 +170,7 @@ impl World {
     fn member_views(
         &mut self,
         group: GroupId,
-        far: bool,
+        far: FarMembers,
     ) -> Result<(MemberViews, Vec<ObjectId>), GenieError> {
         // each member's view in the members' order, its search first (FUN_140c65c60 before
         // anything else of it), then the far test; the index the member has then, which a
@@ -201,7 +211,7 @@ impl World {
                 attacking: ai.current_action == Some(AiAction::Attack),
             };
             self.member_objects(id, &mut objects)?;
-            if far && self.far_from_slot(group, &view, largest)? {
+            if far == FarMembers::Leave && self.far_from_slot(group, &view, largest)? {
                 if self.remove_unit(group, id, None, LeavingWalk::Stands)? {
                     if self.object(id).is_some()
                         && let Some(m) = self.parts.mover_mut(id)
@@ -947,7 +957,7 @@ mod tests {
         g.attack_plan_kind = 1;
         g.current_command = GroupCommandKind::ATTACK;
         g.objects = vec![object_id(77)];
-        let _ = t.statistics_only(group_id(1), false).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Stay).unwrap();
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(g.unit_kinds[0].attack_range, Distance::new(6.0));
         // the searches fill their own list (+0x49c), not the units kept apart (+0x458)
@@ -960,7 +970,7 @@ mod tests {
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.current_target.target = GroupTarget::of_saved(20, -1);
         g.attack_plan_kind = 1;
-        assert!(t.statistics_only(group_id(1), false).is_err());
+        assert!(t.statistics_only(group_id(1), FarMembers::Stay).is_err());
     }
 
     /// `FUN_14100bcb0` with `far`: member 11, 24 from its slot on the ground and first, leaves
@@ -1025,7 +1035,7 @@ mod tests {
                 .collect()
         };
         let mut t = world(1.0, [11, 10]);
-        let _ = t.statistics_only(group_id(1), true).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
         assert_eq!(ids(&t), [object_id(10)]);
         let u = t.object(object_id(11)).unwrap().1;
         assert_eq!(u.group.id, None);
@@ -1045,27 +1055,27 @@ mod tests {
             .as_mut()
             .unwrap()
             .kind = FormationKind::Staggered;
-        let _ = t.statistics_only(group_id(1), true).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
         let mut t = world(2.5, [10, 11]);
-        let _ = t.statistics_only(group_id(1), true).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
         assert_eq!(ids(&t), [object_id(10), object_id(11)]);
         let mut t = world(2.5, [11, 10]);
-        let _ = t.statistics_only(group_id(1), true).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
         assert_eq!(ids(&t), [object_id(10)]);
         // no far test without far, on a patrol, with [`GroupFlags::PATROL`]
         let mut t = world(1.0, [11, 10]);
-        let _ = t.statistics_only(group_id(1), false).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Stay).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
         let mut t = world(1.0, [11, 10]);
         t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::PATROL;
-        let _ = t.statistics_only(group_id(1), true).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
         let mut t = world(1.0, [11, 10]);
         let paths = &mut t.groups.get_mut(group_id(1)).unwrap().motion.paths;
         paths[0].has_path = true;
         paths[0].path_flags = PathFlags::LOOPS;
-        let _ = t.statistics_only(group_id(1), true).unwrap();
+        let _ = t.statistics_only(group_id(1), FarMembers::Leave).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
     }
 }

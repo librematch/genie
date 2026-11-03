@@ -31,6 +31,15 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 
+/// Whether readyToAttack (`FUN_140a7f9d0`'s third argument) tests the ready-at-once case.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AtOnce {
+    /// It does (0).
+    Tested,
+    /// It does not (1, `set_state(7)`'s range clamp).
+    Skipped,
+}
+
 impl Attack {
     /// `set_state(6)` (case 6): with a target or a point (`+0x38` not −1, `UCOMISS`: a NaN one
     /// is), the range test ([`Attack::ready_to_attack`]); in reach and ready, the swing
@@ -54,7 +63,7 @@ impl Attack {
             }
             return self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
         }
-        match self.ready_to_attack(unit, g, f, r, false)? {
+        match self.ready_to_attack(unit, g, f, r, AtOnce::Tested)? {
             Readiness::Ready => self.set_swing(unit, g, f, r),
             Readiness::Waiting => Ok(()),
             Readiness::Away(gap) => self.follow(unit, g, r, f, gap),
@@ -88,8 +97,8 @@ impl Attack {
         Ok(())
     }
 
-    /// readyToAttack (`FUN_140a7f9d0`) on an object; `skip_ready` is its third argument (1 from
-    /// `set_state(7)`'s range clamp: no ready-at-once test). A target of a player (not Gaia) out
+    /// readyToAttack (`FUN_140a7f9d0`) on an object; `at_once` is its third argument (1 from
+    /// `set_state(7)`'s range clamp: [`AtOnce::Skipped`]). A target of a player (not Gaia) out
     /// of the unit's player's sight (its slot 0x1e0 neither 0xf nor 0x80 with its master's fog
     /// flag) fails the attack (`set_state` 13) unless the unit AI's stance (`+0x1a9`) is 0, the
     /// top speed above 0 (`COMISS`/`JBE`) and canMoveToAttack 1, which waits
@@ -114,7 +123,7 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-        skip_ready: bool,
+        at_once: AtOnce,
     ) -> Result<Readiness, GenieError> {
         let move_to_tuning = &g.by_id.tuning().move_to;
         let sprite_tuning = g.by_id.tuning().sprite;
@@ -142,7 +151,9 @@ impl Attack {
             gap
         };
         let mobile = MasterKind::MOVING <= f.own.kind && Speed::ZERO < speed;
-        if !skip_ready && self.ready_at_once(t.position, near, mobile || r.volley_under_way) {
+        if at_once == AtOnce::Tested
+            && self.ready_at_once(t.position, near, mobile || r.volley_under_way)
+        {
             return self.face(
                 (at, g.motion.mover_mut()),
                 (t.position, g.by_id.combat_of(unit.id).attack_timer),

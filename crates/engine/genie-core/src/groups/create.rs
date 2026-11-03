@@ -445,6 +445,7 @@ impl World {
 
 #[cfg(test)]
 mod tests {
+    use crate::groups::FarMembers;
     use crate::groups::FormationCategory;
     use crate::groups::FormationKind;
     use crate::groups::GroupFlags;
@@ -766,11 +767,11 @@ mod tests {
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags |= GroupFlags::RELAYOUT;
         g.motion.flags &= !MotionFlags::NEW;
-        assert!(!t.statistics_only(group_id(1), false).unwrap());
+        assert!(!t.statistics_only(group_id(1), FarMembers::Stay).unwrap());
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.flags &= !GroupFlags::RELAYOUT;
         g.motion.flags |= MotionFlags::NEW;
-        assert!(t.statistics_only(group_id(1), false).unwrap());
+        assert!(t.statistics_only(group_id(1), FarMembers::Stay).unwrap());
     }
 
     /// `FUN_14100d140` writes the formation type of every member `FUN_1415417a0` finds with a

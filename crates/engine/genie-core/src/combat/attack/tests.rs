@@ -1,6 +1,7 @@
 use super::*;
 use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
+use crate::combat::attack::AtOnce;
 use crate::combat::damage::Allied;
 use crate::combat::missile::StrikeResult;
 use crate::construction::MainBuildingId;
@@ -1204,7 +1205,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
             target(),
         );
         let mut a = soldier_attack(7, Distance::new(4.0), 2.0, Position::from([NONE; 3]));
-        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
+        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         assert_eq!(
             (a.state, rig.posted()),
@@ -1224,7 +1225,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
     let mut a = soldier_attack(7, Distance::new(4.0), 2.0, Position::from([NONE; 3]));
     a.voice = Voice::Quiet;
     let _ = rig
-        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested))
         .unwrap();
     assert_eq!(rig.posted(), Vec::new());
 }
@@ -1248,7 +1249,7 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
         rig.r.can_move = can_move;
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested))
             .unwrap();
         assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
         assert_eq!(matches!(r, Readiness::Away(_)), follows);
@@ -1338,7 +1339,7 @@ fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
         rig.r.stance = stance;
         let mut a = soldier_attack(7, Distance::new(4.0), 0.0, at);
         a.seen = at;
-        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
+        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         if fails {
             assert_eq!(a.state.bare(), AttackState::Failed);
@@ -1559,7 +1560,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
 #[test]
 fn ready_to_attack_at_once_test_and_its_nan_paths() {
     let at = Position::new(11.0, 10.0, 0.0);
-    let run = |point: Position, skip: bool, range: Distance, timer: f32| {
+    let run = |point: Position, at_once: AtOnce, range: Distance, timer: f32| {
         let victim = Victim {
             id: object_id(7),
             position: at,
@@ -1573,34 +1574,34 @@ fn ready_to_attack_at_once_test_and_its_nan_paths() {
         rig.combat_mut().attack_timer = Seconds::new(timer);
         let mut a = soldier_attack(7, range, 0.0, point);
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, at_once))
             .unwrap();
         (r, a.point)
     };
     assert!(matches!(
-        run(at, false, Distance::ZERO, 0.0).0,
+        run(at, AtOnce::Tested, Distance::ZERO, 0.0).0,
         Readiness::Ready
     ));
     // the third argument skips it: the gap 0.6 lies beyond a reach of 0.5
     assert!(matches!(
-        run(at, true, Distance::ZERO, 0.0).0,
+        run(at, AtOnce::Skipped, Distance::ZERO, 0.0).0,
         Readiness::Away(_)
     ));
     // a NaN point: moved and far, the reach decides (2 > 0.6) and the point follows
     let (r, point) = run(
         Position::new(f32::NAN, 10.0, 0.0),
-        false,
+        AtOnce::Tested,
         Distance::new(2.0),
         0.0,
     );
     assert!(matches!(r, Readiness::Ready));
     assert_eq!(point, at);
     assert!(matches!(
-        run(at, false, Distance::ZERO, f32::NAN).0,
+        run(at, AtOnce::Tested, Distance::ZERO, f32::NAN).0,
         Readiness::Ready
     ));
     assert!(matches!(
-        run(at, false, Distance::ZERO, 0.5).0,
+        run(at, AtOnce::Tested, Distance::ZERO, 0.5).0,
         Readiness::Waiting
     ));
 }
@@ -2381,7 +2382,7 @@ fn gate_reach_is_to_its_nearest_part() {
     rig.r.can_move = false;
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     let r = rig
-        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested))
         .unwrap();
     assert!(matches!(r, Readiness::Ready));
     assert_eq!(a.point, gate_at);
@@ -2529,7 +2530,7 @@ fn ready_to_attack_leash_fails_target_too_far_from_the_unit_ai_point() {
         (rig.r.stance, rig.r.state_position) = (UnitStance::Defensive, centre);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested))
             .unwrap();
         assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
         assert_eq!(matches!(r, Readiness::Away(_)), follows, "{centre:?}");

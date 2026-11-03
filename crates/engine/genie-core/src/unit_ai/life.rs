@@ -13,6 +13,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Attackers;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::UnitAiKind;
@@ -525,7 +526,7 @@ impl UnitAi {
     /// always gives 1, but for classes 51 and 54 (`FUN_141216c50`, their packing), which it
     /// does not run.
     pub(super) const fn move_to(&mut self, m: AiMove) -> Option<AiMove> {
-        if !m.force && self.current_action.is_some() {
+        if matches!(m.force, OrderForce::Unforced) && self.current_action.is_some() {
             return None;
         }
         self.set_action(Some(AiAction::Move));

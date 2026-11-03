@@ -26,6 +26,7 @@ use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::CostCount;
+use crate::production::PopulationTest;
 use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_kind;
 use crate::world::World;
@@ -132,7 +133,7 @@ impl World {
                 masters,
                 master,
                 n.factor(),
-                false,
+                PopulationTest::Skipped,
                 &*player,
                 &self.model.roles,
                 self.model.slots,
@@ -405,7 +406,7 @@ impl World {
                 masters,
                 master,
                 ONE_FARM,
-                false,
+                PopulationTest::Skipped,
                 self.players.player(p)?,
                 &self.model.roles,
                 self.model.slots,

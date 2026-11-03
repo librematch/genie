@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::AttackTargetId;
+use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
@@ -408,7 +409,7 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         let sprite_tuning = c.w.model.tuning.sprite;
         let mut g = c.w.attack_ground(unit.id);
-        match self.ready_to_attack(unit, &mut g, f, r, false)? {
+        match self.ready_to_attack(unit, &mut g, f, r, AtOnce::Tested)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
                 self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;

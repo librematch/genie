@@ -16,6 +16,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::{
     AiCommand, Attacked, Duel, Effect, Found, Gatherable, NearestAttacker, OffFootprint,
     PatrolPath, ResourceSearch, Search, Seeker, Surroundings, TargetFlags, UnitAi, UnitCommand,
@@ -77,7 +78,7 @@ impl UnitSide for Vec<Effect> {
         Err(NO_WORLD)
     }
 
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(NO_WORLD)
     }
 
@@ -177,7 +178,7 @@ impl UnitSide for With<'_> {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         ai: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         let attacked = self.side.attack(target, force, ai)?;

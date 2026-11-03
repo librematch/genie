@@ -16,6 +16,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::players::Posture;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -124,7 +125,7 @@ pub(super) const fn order_move(o: &QueuedOrder) -> AiMove {
     AiMove {
         point: o.point,
         range: o.range,
-        force: true,
+        force: OrderForce::Forced,
         walk: true,
     }
 }

@@ -398,6 +398,17 @@ pub struct Seen {
     pub sight: TileSight,
 }
 
+/// The game's `force` argument of a unit AI's order, its attack command and its move
+/// ([`AiMove::force`]): forced, the order replaces what the AI or the unit does; else each
+/// order's own test decides (most fail while the AI has an action value).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OrderForce {
+    /// Forced (1).
+    Forced,
+    /// Not forced (0).
+    Unforced,
+}
+
 /// A move the unit AI gives its unit (unit-AI slot 0x130, `FUN_140c55620`, to the unit's slot
 /// 0x340): a `MoveTo` to `point` within `range`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -406,8 +417,8 @@ pub struct AiMove {
     pub point: Position,
     /// The range within which it arrives.
     pub range: Distance,
-    /// The sixth argument: the move replaces even a `MoveTo` to the same point.
-    pub force: bool,
+    /// The sixth argument: forced, the move replaces even a `MoveTo` to the same point.
+    pub force: OrderForce,
     /// The seventh: the unit walks (its master's walking sprite, `+0x748`), not runs.
     pub walk: bool,
 }

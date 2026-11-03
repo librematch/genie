@@ -36,17 +36,26 @@ pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
         .is_some_and(|&f| ClassFlags::from_bits_retain(f).intersects(flags))
 }
 
+/// Which copy of the garrison types' switch [`garrison_kind_takes`] runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GarrisonSwitch {
+    /// The garrison's (`FUN_14120eb10`), which takes the relics (class 42) in.
+    Garrison,
+    /// The task finder's (`FUN_1412784d0`), which leaves them out.
+    TaskFinder,
+}
+
 /// Whether `garrison_type` (a building master's `+0x9bc`) takes in a unit of `class` and master
 /// `id` (the switch of `FUN_14120eb10` on the class, [`GarrisonKinds`]'s bits; infantry not of
 /// masters 1263, 1811, monks not of masters 775, 1715, 1822); then cavalry for masters 1263,
 /// 775, 1715 and 1822 and monks for masters 1811 and 1808, whatever their class. The task
-/// finder's copy of the switch (`FUN_1412784d0`) leaves class 42 out (`with_42` false).
+/// finder's copy of the switch (`FUN_1412784d0`) leaves class 42 out ([`GarrisonSwitch`]).
 #[must_use]
 pub fn garrison_kind_takes(
     garrison_kind: GarrisonKinds,
     class: ClassId,
     id: MasterId,
-    with_42: bool,
+    switch: GarrisonSwitch,
     roles: &Roles,
 ) -> bool {
     let bit = |kind| garrison_kind.contains(kind);
@@ -92,7 +101,7 @@ pub fn garrison_kind_takes(
         ) {
             bit(GarrisonKinds::SIEGE)
         } else if held.intersects(ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC)
-            || (held.contains(ClassRoles::RELIC) && with_42)
+            || (held.contains(ClassRoles::RELIC) && switch == GarrisonSwitch::Garrison)
         {
             !roles.of_master(id).contains(MasterRoles::MISSIONARY)
                 && !roles.of_master(id).contains(MasterRoles::JADWIGA)
@@ -242,7 +251,13 @@ impl World {
             return Ok(false);
         }
         let garrison_kind = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_kind);
-        if !garrison_kind_takes(garrison_kind, unit.class, unit.id, true, &self.model.roles) {
+        if !garrison_kind_takes(
+            garrison_kind,
+            unit.class,
+            unit.id,
+            GarrisonSwitch::Garrison,
+            &self.model.roles,
+        ) {
             return Ok(false);
         }
         Ok(unchecked || self.has_room(bp, b, None)?)

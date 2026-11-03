@@ -10,6 +10,7 @@ use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::facing::facet_of_angle;
 use crate::objects::layers::Action;
+use crate::objects::lifecycle::SpritePlay;
 use crate::objects::lifecycle::death_parts::forget_resource;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::MasterKind;
@@ -39,18 +40,21 @@ impl Unit {
             ));
         }
         // the sprite list's slot 0x20 on the current sprite (FUN_1413b38a0)
-        let animating = self.sprite.is_some_and(|s| {
+        let sprite = if self.sprite.is_some_and(|s| {
             s.animate != AnimateState::Stopped && s.graphic.flags.contains(SpriteFlags::ANIMATED)
-        });
-        let leaves =
-            if self
-                .life
-                .update(c.dt.seconds(), c.w.streams.get(Stream::Object), animating)?
-            {
-                Outcome::Leave
-            } else {
-                Outcome::Stay
-            };
+        }) {
+            SpritePlay::Animating
+        } else {
+            SpritePlay::Still
+        };
+        let leaves = if self
+            .life
+            .update(c.dt.seconds(), c.w.streams.get(Stream::Object), sprite)?
+        {
+            Outcome::Leave
+        } else {
+            Outcome::Stay
+        };
         self.state_set_off(actions, c, before, roles)?;
         Ok(leaves)
     }

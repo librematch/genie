@@ -212,7 +212,7 @@ impl World {
                         a,
                         b,
                         formations,
-                        false,
+                        JoinTest::Count,
                         &mut path,
                         &mut split.far,
                         &self.model.tuning.order,
@@ -232,7 +232,7 @@ impl World {
                         &chosen,
                         left.checked(i)?,
                         formations,
-                        true,
+                        JoinTest::Group,
                         &mut path,
                         &mut split.far,
                         &self.model.tuning.order,
@@ -378,10 +378,20 @@ pub(super) const MAX_UNGROUPED: MasterKind = MasterKind::of_data(69);
 /// `DAT_1439e60e3` (1 at run time) holds.
 const SPLIT_BY_PATH: bool = true;
 
+/// What [`splits_together`] tests for: the count of the units that join each, or the chosen
+/// unit's group.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum JoinTest {
+    /// The count: who joins whom.
+    Count,
+    /// The chosen unit's group: who joins it, in a state of 2 or more.
+    Group,
+}
+
 /// `FUN_140fd76d0`'s test whether `b` joins `a`: both above type 69, both of formation category
 /// 0 or neither, the same object flags' bit 1, speeds within `OrderTuning::split_speed_gap` where the player
-/// breaks formations by speed (`COMISS`, `JA`: a NaN gap is within), then (`member`: for the
-/// chosen unit's group, also `b` in a state of 2 or more) within the player's influence distance
+/// breaks formations by speed (`COMISS`, `JA`: a NaN gap is within), then (for
+/// [`JoinTest::Group`], also `b` in a state of 2 or more) within the player's influence distance
 /// on the ground (between where each last moved to, slot 0x520: `FUN_14087e560` with the height
 /// zeroed; `COMISS`, `JA`: a NaN distance is within). Below `OrderTuning::split_path_reach` (`COMISS`, `JBE`:
 /// a NaN distance is not) the game measures a path instead, when the planner of `b`'s
@@ -393,7 +403,7 @@ pub(super) fn splits_together(
     a: &Splittable,
     b: &Splittable,
     f: Formations,
-    member: bool,
+    test: JoinTest,
     path: &mut SplitPath<'_>,
     far: &mut BTreeSet<ObjectId>,
     order_tuning: &OrderTuning,
@@ -407,7 +417,7 @@ pub(super) fn splits_together(
     if f.by_speed && order_tuning.split_speed_gap < (a.speed - b.speed).get().abs() {
         return Ok(false);
     }
-    if member && b.state < ObjectState::Alive {
+    if test == JoinTest::Group && b.state < ObjectState::Alive {
         return Ok(false);
     }
     let (dx, dy) = (

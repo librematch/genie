@@ -7,6 +7,7 @@ use crate::combat::victims::{readable, victim, write_back};
 use crate::construction::FoundationId;
 use crate::gathering::DropSiteId;
 use crate::gathering::GatherTargetId;
+use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::gather::Walks;
 use crate::gathering::gather::{
     FARM_FOOD_SOLD, GatherAction, GatherReads, GatherState, Next, productivity_of,
@@ -467,7 +468,7 @@ impl Unit {
                 &mut w,
                 others,
                 ActionState::new(state.get()),
-                false,
+                SitePlace::Anywhere,
                 by_id,
             )?
             .map_or(0, |s| s.id().get())

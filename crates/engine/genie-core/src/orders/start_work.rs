@@ -64,11 +64,20 @@ enum Start {
     CartSearch,
 }
 
-/// The pass's choice for an object of the decoded `class`: a villager or fishing ship works,
-/// else a `building` (master type 80) whose master has a task of action type 0x99 (`cart_task`,
-/// `FUN_1415c60b0`) searches. The caller then tests that it is ready (slot 0x2d0 with 1: its
-/// top action may be interrupted and its unit AI holds no order) and has a unit AI.
-fn start_of(class: ClassId, building: bool, cart_task: bool, roles: &Roles) -> Option<Start> {
+/// Whether a master has a task of action type 0x99 (`FUN_1415c60b0`), a mule cart's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CartTask {
+    /// It has one.
+    Held,
+    /// It has none.
+    Lacking,
+}
+
+/// The pass's choice for an object of the decoded `class` and master type `kind`: a villager or
+/// fishing ship works, else a building (master type 80) whose master has a task of action type 0x99
+/// (`cart_task`, `FUN_1415c60b0`) searches. The caller then tests that it is ready (slot 0x2d0 with
+/// 1: its top action may be interrupted and its unit AI holds no order) and has a unit AI.
+fn start_of(class: ClassId, kind: MasterKind, cart_task: CartTask, roles: &Roles) -> Option<Start> {
     // The classes the pass puts to work: villagers and fishing ships (decoded 4 and 21).
     // The farm class a unit's tile is searched for, and the fish trap a fishing ship takes.
     if roles
@@ -77,7 +86,7 @@ fn start_of(class: ClassId, building: bool, cart_task: bool, roles: &Roles) -> O
     {
         return Some(Start::Work);
     }
-    if building && cart_task {
+    if kind == MasterKind::BUILDING && cart_task == CartTask::Held {
         return Some(Start::CartSearch);
     }
     None
@@ -96,9 +105,14 @@ impl World {
             let unit = &self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
             let class = master.class;
-            let building = master.kind == MasterKind::BUILDING;
-            let cart_task = building && self.has_task(p, unit.life.master_id, CART_TASK)?;
-            let Some(start) = start_of(class, building, cart_task, &self.model.roles) else {
+            let cart_task = if master.kind == MasterKind::BUILDING
+                && self.has_task(p, unit.life.master_id, CART_TASK)?
+            {
+                CartTask::Held
+            } else {
+                CartTask::Lacking
+            };
+            let Some(start) = start_of(class, master.kind, cart_task, &self.model.roles) else {
                 i = i.next();
                 continue;
             };
@@ -366,27 +380,57 @@ mod tests {
     #[test]
     fn the_start_pass_works_villagers_and_lets_mule_carts_search() {
         assert_eq!(
-            start_of(class::VILLAGER, false, false, &roles()),
+            start_of(
+                class::VILLAGER,
+                MasterKind::COMBAT,
+                CartTask::Lacking,
+                &roles()
+            ),
             Some(Start::Work)
         );
         assert_eq!(
-            start_of(class::FISHING_SHIP, false, false, &roles()),
+            start_of(
+                class::FISHING_SHIP,
+                MasterKind::COMBAT,
+                CartTask::Lacking,
+                &roles()
+            ),
             Some(Start::Work)
         );
         assert_eq!(
-            start_of(ClassId::of_master(99), true, true, &roles()),
+            start_of(
+                ClassId::of_master(99),
+                MasterKind::BUILDING,
+                CartTask::Held,
+                &roles()
+            ),
             Some(Start::CartSearch)
         );
         assert_eq!(
-            start_of(ClassId::of_master(99), true, false, &roles()),
+            start_of(
+                ClassId::of_master(99),
+                MasterKind::BUILDING,
+                CartTask::Lacking,
+                &roles()
+            ),
             None
         );
         assert_eq!(
-            start_of(ClassId::of_master(99), false, true, &roles()),
+            start_of(
+                ClassId::of_master(99),
+                MasterKind::COMBAT,
+                CartTask::Held,
+                &roles()
+            ),
             None
         );
         assert_eq!(
-            start_of(ClassId::of_master(99), false, false, &roles()),
+            start_of(
+                ClassId::of_master(99),
+                MasterKind::COMBAT,
+                CartTask::Lacking,
+                &roles()
+            ),
             None
         );
     }

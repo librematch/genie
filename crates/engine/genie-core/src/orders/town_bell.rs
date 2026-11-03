@@ -29,6 +29,7 @@ use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiMove;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::world::World;
@@ -504,7 +505,7 @@ impl World {
                 AiMove {
                     point: Position::new(x, y, 0.0),
                     range: Distance::ZERO,
-                    force: true,
+                    force: OrderForce::Forced,
                     walk: false,
                 },
             )?,

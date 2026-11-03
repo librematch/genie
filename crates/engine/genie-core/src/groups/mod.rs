@@ -75,6 +75,7 @@ mod motion;
 mod order;
 mod place;
 mod stats;
+pub use self::stats::FarMembers;
 mod steer;
 mod target;
 mod task;

@@ -16,10 +16,12 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Issuer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, Named, Notify, OrderTargetKind, Pick,
@@ -124,7 +126,7 @@ impl UnitAi {
             if at.speed < Speed::new(STILL) {
                 return Ok(GO_ON);
             }
-            let ran = self.run_away(true, at, player_kind, ai_rng, side)?;
+            let ran = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
             return Ok(if ran { BREAK } else { GO_ON });
         }
         if self.best_this_update != Some(attacker_id) {
@@ -231,7 +233,7 @@ impl UnitAi {
                 return self.strike_back(attacker_id, at, ai_rng, side);
             }
             if self.current_action != Some(AiAction::Move) {
-                let _ = self.run_away(true, at, player_kind, ai_rng, side)?;
+                let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
             }
             return Ok(BREAK);
         };
@@ -285,7 +287,7 @@ impl UnitAi {
                 self.save_patrol(side);
             }
             self.ask_for_help(attacker_id, at, PlayerKind::Computer, side)?;
-            if self.attack_slot(attacker_id, true, at, side, ai_rng)? {
+            if self.attack_slot(attacker_id, TargetRules::Any, at, side, ai_rng)? {
                 self.leave_patrol_timers(ai_rng);
                 self.current_order = None;
             }
@@ -325,7 +327,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_slot(attacker, true, at, side, ai_rng)? {
+        if self.attack_slot(attacker, TargetRules::Any, at, side, ai_rng)? {
             self.leave_patrol_timers(ai_rng);
             self.current_order = None;
         }
@@ -359,7 +361,7 @@ impl UnitAi {
             && self.stance == UnitStance::Aggressive
         {
             // slot 0xb8 forced, by the type
-            let _ = self.attack_slot(met, false, at, side, rng)?;
+            let _ = self.attack_slot(met, TargetRules::Own, at, side, rng)?;
         }
         Ok(GO_ON)
     }
@@ -396,7 +398,7 @@ impl UnitAi {
                 AiMove {
                     point: spot.with_height(off.z),
                     range: Distance::ZERO,
-                    force: true,
+                    force: OrderForce::Forced,
                     // The prey animals' class, whose move off a footprint runs (slot 0x148's seventh argument).
                     // The villagers' class.
                     walk: !roles.of_class(off.class).contains(ClassRoles::PREY),
@@ -441,7 +443,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
-        if !m.force && self.current_action.is_some() {
+        if m.force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         side.effect_now(Effect::Command(AiCommand::MoveAside(m)), self, rng)?;

@@ -2,6 +2,7 @@
 //! lock to the formation the command names.
 
 use crate::GenieError;
+use crate::groups::FarMembers;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::common_group;
@@ -112,7 +113,7 @@ impl World {
                 self.stop_marcher(at)?;
             }
         }
-        self.group_statistics(id, false)?;
+        self.group_statistics(id, FarMembers::Stay)?;
         self.set_initial_position(id)?;
         Ok(id)
     }

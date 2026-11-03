@@ -45,8 +45,8 @@ pub use self::batch::Batch;
 pub use self::button::{LocationButton, QueueButton};
 pub use self::cost_count::CostCount;
 pub use self::costs::{
-    as_entry_costs, cost_test, costed, master_costs, pay, refund, refund_master, refund_research,
-    refund_tech,
+    PopulationTest, as_entry_costs, cost_test, costed, master_costs, pay, refund, refund_master,
+    refund_research, refund_tech,
 };
 pub use self::hotkey::HotkeyId;
 pub use self::make_obj_state::MakeObjState;
@@ -1034,7 +1034,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::new(2.0),
-                true,
+                PopulationTest::Tested,
                 &h,
                 &roles(),
                 slots()
@@ -1046,7 +1046,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::new(3.0),
-                true,
+                PopulationTest::Tested,
                 &h,
                 &roles(),
                 slots()
@@ -1060,7 +1060,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
-                true,
+                PopulationTest::Tested,
                 &h,
                 &roles(),
                 slots()
@@ -1073,7 +1073,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
-                true,
+                PopulationTest::Tested,
                 &h,
                 &roles(),
                 slots()
@@ -1085,7 +1085,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
-                false,
+                PopulationTest::Skipped,
                 &h,
                 &roles(),
                 slots()
@@ -1100,7 +1100,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
-                true,
+                PopulationTest::Tested,
                 &h,
                 &roles(),
                 slots()
@@ -1113,7 +1113,7 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::new(f32::NAN),
-                false,
+                PopulationTest::Skipped,
                 &h,
                 &roles(),
                 slots()
@@ -1125,7 +1125,7 @@ mod tests {
                 &ms,
                 ids::MARKET,
                 CostCount::ONE,
-                false,
+                PopulationTest::Skipped,
                 &h,
                 &roles(),
                 slots()
@@ -1141,7 +1141,7 @@ mod tests {
                 &low,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
-                false,
+                PopulationTest::Skipped,
                 &h,
                 &roles(),
                 slots()

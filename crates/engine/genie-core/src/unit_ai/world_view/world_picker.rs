@@ -29,6 +29,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relations;
 use crate::unit_ai::NearestAttacker;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::best_target::{AttackCategory, Candidate, Searcher, Thing, order_weights};
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::Foreign;
@@ -137,12 +138,13 @@ impl WorldPicker<'_> {
     }
 
     /// The priest's slot 0x1b8 of object `who` (a unit AI of another type answers false): may it
-    /// convert object `whom`, `any` not asking its faith ([`crate::unit_ai::can_convert`]).
+    /// convert object `whom`, [`TargetRules::Any`] not asking its faith
+    /// ([`crate::unit_ai::can_convert`]).
     pub(super) fn converts(
         &self,
         who: ObjectId,
         whom: ObjectId,
-        any: bool,
+        rules: TargetRules,
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
@@ -173,7 +175,7 @@ impl WorldPicker<'_> {
         Ok(can_convert(
             &converter,
             target.as_ref(),
-            any,
+            rules,
             roles,
             unit_ai_tuning,
         ))
@@ -258,7 +260,7 @@ impl WorldPicker<'_> {
     ) -> Result<Duel, GenieError> {
         let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
         Ok(Duel {
-            converts: self.converts(other, self.me, true, roles, unit_ai_tuning)?,
+            converts: self.converts(other, self.me, TargetRules::Any, roles, unit_ai_tuning)?,
             attacks: attacks(om),
             harms: self.damage(spatial, other, self.me, roles, damage_tuning)?,
             harmed: self.damage(spatial, self.me, other, roles, damage_tuning)?,
@@ -546,7 +548,8 @@ impl AttackPicker for WorldPicker<'_> {
             "a searching unit of a master the slice does not have",
         ))?;
         let damage = self.damage(spatial, self.me, id, roles, damage_tuning)?;
-        let armed = 0.0 < attacks(m) || self.converts(id, self.me, true, roles, unit_ai_tuning)?;
+        let armed = 0.0 < attacks(m)
+            || self.converts(id, self.me, TargetRules::Any, roles, unit_ai_tuning)?;
         Ok(Candidate {
             id,
             distance,
@@ -562,7 +565,7 @@ impl AttackPicker for WorldPicker<'_> {
             hp: t.life.hp,
             reload: self.parts.combat_of(me.id).reload_stinger
                 + (mm.combat_part().reload - self.parts.combat_of(me.id).reload_powerup),
-            workable: self.converts(self.me, id, false, roles, unit_ai_tuning)?,
+            workable: self.converts(self.me, id, TargetRules::Own, roles, unit_ai_tuning)?,
             current: self.seeker.is_some_and(|s| s.target == Some(id)),
         })
     }
@@ -604,7 +607,8 @@ impl AttackPicker for WorldPicker<'_> {
         let roles = self.by_id.roles();
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(0.0 < attacks(m) || self.converts(id, self.me, true, roles, unit_ai_tuning)?)
+        Ok(0.0 < attacks(m)
+            || self.converts(id, self.me, TargetRules::Any, roles, unit_ai_tuning)?)
     }
 
     /// The quick path (slot 0x3e0) within `range`, with its master's terrain mask and radius on

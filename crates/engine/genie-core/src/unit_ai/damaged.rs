@@ -22,6 +22,7 @@ use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetKind;
@@ -109,7 +110,7 @@ impl UnitAi {
             }
             self.queue_current(at)?;
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
-            let _ = self.run_away(true, at, player_kind, ai_rng, side)?;
+            let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
             return Ok(BREAK);
         }
         // "I have a GAIA attacker" (or a harmless one): with an order not on the attacker, the current order goes back
@@ -208,7 +209,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         if !at.busy || held_action_state(at.action_state)?.get() == 2 {
-            let _ = self.run_away(true, at, player_kind, ai_rng, side)?;
+            let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
         }
         Ok(BREAK)
     }
@@ -305,7 +306,7 @@ impl UnitAi {
             self.queue_current(at)?;
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
         }
-        let _ = self.run_away(true, at, player_kind, ai_rng, side)?;
+        let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
         Ok(BREAK)
     }
 
@@ -346,7 +347,7 @@ impl UnitAi {
         if self.current_action != Some(AiAction::Move) {
             self.queue_current(at)?;
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
-            let _ = self.run_away(true, at, player_kind, ai_rng, side)?;
+            let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
         }
         Ok(BREAK)
     }
@@ -395,7 +396,8 @@ impl UnitAi {
         if let Some(site) = best.0
             && side.reaches(site, Distance::new(unit_ai_tuning.foundation_reach))?
         {
-            let _ = self.build_object(FoundationId::new(site), true, at, side, rng)?;
+            let _ =
+                self.build_object(FoundationId::new(site), OrderForce::Forced, at, side, rng)?;
             return Ok(BREAK);
         }
         if player_kind.is_computer() {

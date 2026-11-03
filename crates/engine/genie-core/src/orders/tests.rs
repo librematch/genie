@@ -69,6 +69,7 @@ use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::ControlKey;
+use crate::orders::split::JoinTest;
 use crate::orders::split::splits_together;
 use crate::ownership::artifact::Artifact;
 use crate::pathing::Pathing;
@@ -4000,7 +4001,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &sheep,
             f,
-            false,
+            JoinTest::Count,
             &mut none,
             &mut away,
             &tuning().order
@@ -4016,7 +4017,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &other,
             f,
-            false,
+            JoinTest::Count,
             &mut short,
             &mut away,
             &tuning().order
@@ -4029,7 +4030,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &other,
             f,
-            false,
+            JoinTest::Count,
             &mut long,
             &mut away,
             &tuning().order
@@ -4043,7 +4044,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &other,
             f,
-            false,
+            JoinTest::Count,
             &mut nearest,
             &mut away,
             &tuning().order
@@ -4059,7 +4060,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &other,
             f,
-            false,
+            JoinTest::Count,
             &mut lost,
             &mut away,
             &tuning().order
@@ -4076,7 +4077,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &nowhere,
             f,
-            false,
+            JoinTest::Count,
             &mut short,
             &mut away,
             &tuning().order
@@ -4089,7 +4090,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &far,
             f,
-            false,
+            JoinTest::Count,
             &mut none,
             &mut away,
             &tuning().order
@@ -4105,7 +4106,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &far,
             wide,
-            false,
+            JoinTest::Count,
             &mut none,
             &mut away,
             &tuning().order
@@ -4122,7 +4123,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
             &scout,
             &born,
             wide,
-            true,
+            JoinTest::Group,
             &mut none,
             &mut away,
             &tuning().order

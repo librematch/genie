@@ -11,11 +11,13 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
     ARTIFACT_AI, CIVILIAN, Notify, QueuedOrder, SIEGE_AI, SIEGE_TOWER_AI, Surroundings, UnitAi,
@@ -110,7 +112,7 @@ impl UnitAi {
     }
 
     /// `AttackObject` (slot 0xb8, `FUN_140c43720`): `+0x1d5` clears; not `force`d, an AI with an
-    /// action fails (false). The target must pass [`UnitAi::attack_check`] with `any`; then the
+    /// action fails (false). The target must pass [`UnitAi::attack_check`] by `rules`; then the
     /// unit's attack command ([`UnitAi::attack_command`]), on success the action is the attack
     /// (600, the last action keeping the old) and the target its point and class
     /// (`FUN_140c64c10`). The group flag's attack by the unit's group (behind the byte
@@ -118,15 +120,15 @@ impl UnitAi {
     pub(super) fn attack_object(
         &mut self,
         target: ObjectId,
-        force: bool,
-        any: bool,
+        force: OrderForce,
+        rules: TargetRules,
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
-        let Some((class, position)) = self.attack_check(target, any, at, side)? else {
+        let Some((class, position)) = self.attack_check(target, rules, at, side)? else {
             return Ok(false);
         };
         if !self.attack_command(target, force, at, side)? {
@@ -138,7 +140,7 @@ impl UnitAi {
     }
 
     /// `AttackObject`'s test of `target` (`FUN_140c43720`, and `attackRoundupObject`'s): the world
-    /// must hold it and its slot 0xa0 with `any` must let it attack the target: the base's
+    /// must hold it and its slot 0xa0 by `rules` must let it attack the target: the base's
     /// (`FUN_140c48400`: the boar's, the ranged units', the ships', the artifact's, the siege
     /// tower's and the livestock's) anything, the building's (`FUN_140c18b60`) nothing, the
     /// lion's ([`lion_may_attack`]), the civilian's ([`civilian_may_attack`]), the soldier's, the
@@ -148,7 +150,7 @@ impl UnitAi {
     pub(super) fn attack_check(
         &self,
         target: ObjectId,
-        any: bool,
+        rules: TargetRules,
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
@@ -175,7 +177,9 @@ impl UnitAi {
             | ARTIFACT_AI
             | SIEGE_TOWER_AI
             | UnitAiKind::LIVESTOCK => true,
-            UnitAiKind::LION => any || lion_may_attack(at.attack_priority, t.class, roles),
+            UnitAiKind::LION => {
+                rules == TargetRules::Any || lion_may_attack(at.attack_priority, t.class, roles)
+            }
             CIVILIAN => civilian_may_attack(at.attack_priority, t.class, roles),
             // FUN_140c18b60
             UnitAiKind::BUILDING => false,
@@ -195,7 +199,7 @@ impl UnitAi {
     pub(super) fn attack_command(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -210,7 +214,7 @@ impl UnitAi {
     /// caller in the slice passes it (the damage notify and the unit in the way): an object the
     /// world does not hold (`FUN_1415417a0`) gets nothing (false); an animal or a tree (classes 9,
     /// 10 and 15) is hunted (slot 0xc8, [`UnitAi::hunt_object`]); any other goes to the base
-    /// `AttackObject` with `any` 0 and the group flag 1 ([`UnitAi::attack_object`]). True when
+    /// `AttackObject` by its own rules and the group flag 1 ([`UnitAi::attack_object`]). True when
     /// it hunts or attacks.
     pub(super) fn civilian_attack(
         &mut self,
@@ -234,7 +238,7 @@ impl UnitAi {
             self.hunt_object(target, t.class, t.position, at, side, rng)?;
             return Ok(true);
         }
-        self.attack_object(target, true, false, at, side)
+        self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)
     }
 
     /// The attackers' upkeep of the full update (`0x140c6741b`): with none, a unit under attack

@@ -13,6 +13,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::players::PlayerId;
+use crate::unit_ai::OrderForce;
 
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntMove;
@@ -171,7 +172,7 @@ impl Unit {
                 "an AI move of an unpacked trebuchet (class 54: its Pack action, FUN_140ad4ff0)",
             ));
         }
-        if !m.force
+        if m.force == OrderForce::Unforced
             && actions.top_action_kind() == Some(MOVE_TO)
             && actions.list.move_to().is_some_and(|mt| mt.point == m.point)
         {

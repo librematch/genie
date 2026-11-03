@@ -14,7 +14,9 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, BREAK, DEAD, Effect, GO_ON, Memory, Notify, Pick, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE,
@@ -23,6 +25,15 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
+
+/// What `evasiveMoveTo` (`FUN_140c4d140`'s `tries`) does with a point the unit could not stand at.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BadPoint {
+    /// It moves, five times at most (1).
+    Moves,
+    /// It stays (0).
+    Kept,
+}
 
 impl UnitAi {
     /// The hunted animal's damage notify (`FUN_140c26420`, case 500, "I took some damage from
@@ -56,22 +67,26 @@ impl UnitAi {
         // the game also tests the action values 0x25f and 0x268 here, which no unit AI holds
         // ([`AiAction`])
         // The class of the king's branch of the hunted animal's idle check (`-0xe71` raw).
-        let uncon = !roles.of_some_class(at.class).contains(ClassRoles::KING);
-        let _ = self.run_away(uncon, at, player_kind, ai_rng, side)?;
+        let force = if roles.of_some_class(at.class).contains(ClassRoles::KING) {
+            OrderForce::Unforced
+        } else {
+            OrderForce::Forced
+        };
+        let _ = self.run_away(force, at, player_kind, ai_rng, side)?;
         Ok(BREAK)
     }
 
-    /// `runAwayFromAttackers` (`FUN_140c5e900`) with no unit to run from but its attackers: a
-    /// unit in stand ground or no attack (stances 2 and 3) of a player other than Gaia stays, and
-    /// so does one with an action value unless `uncon`. Else it runs away from the sum of the
+    /// `runAwayFromAttackers` (`FUN_140c5e900`) with no unit to run from but its attackers: a unit
+    /// in stand ground or no attack (stances 2 and 3) of a player other than Gaia stays, and so
+    /// does one with an action value unless forced (`uncon`). Else it runs away from the sum of the
     /// vectors to its attackers the world holds (a random one when they cancel out: two draws of
     /// the AI stream), by twice its speed, a defensive unit of a player at most 5 tiles from its
-    /// state position, through `evasiveMoveTo` with both its flags ([`UnitAi::evasive_move`]).
-    /// A computer's unit attacked by class 22 (its group's runs) and a computer's transport
-    /// ship are not modelled; neither are unit groups (`+0x6d0`). True when the unit moves.
+    /// state position, through `evasiveMoveTo` with both its flags ([`UnitAi::evasive_move`]). A
+    /// computer's unit attacked by class 22 (its group's runs) and a computer's transport ship are
+    /// not modelled; neither are unit groups (`+0x6d0`). True when the unit moves.
     pub(super) fn run_away(
         &mut self,
-        uncon: bool,
+        force: OrderForce,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
@@ -101,7 +116,7 @@ impl UnitAi {
         {
             return Ok(false);
         }
-        if !uncon && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
@@ -150,27 +165,33 @@ impl UnitAi {
                 ey = self.state_position.y() - (vy / d) * unit_ai_tuning.run_leash;
             }
         }
-        self.evasive_move(Position::new(ex, ey, z), (true, true), at, ai, side)
+        self.evasive_move(
+            Position::new(ex, ey, z),
+            (OrderForce::Forced, BadPoint::Moves),
+            at,
+            ai,
+            side,
+        )
     }
 
     /// `evasiveMoveTo` (the unit AI's slot 0x150, `FUN_140c4d140`) to `point` with its flags
-    /// `(uncon, tries)`: without `uncon` a unit with an action value stays. A coordinate that is
-    /// not a number becomes the unit's own plus one (minus one above 5); the point is held on the
-    /// map (below 0 to 0, at the far edge one tile in). With `tries`, a point the unit could not
-    /// stand at (its slot 0x278) moves by up to 3 on each axis, five times at most, each move
-    /// four draws of the AI stream (the x sign, its amount, the y sign, its amount), held on the
-    /// map again. Then the unit's move there (slot 0x340, forced, running, range 0): the AI holds
-    /// the move action and the point without a target. True when it moves.
+    /// `(uncon, tries)` (`force`, `bad`): unforced a unit with an action value stays. A coordinate
+    /// that is not a number becomes the unit's own plus one (minus one above 5); the point is held
+    /// on the map (below 0 to 0, at the far edge one tile in). With [`BadPoint::Moves`], a point
+    /// the unit could not stand at (its slot 0x278) moves by up to 3 on each axis, five times at
+    /// most, each move four draws of the AI stream (the x sign, its amount, the y sign, its
+    /// amount), held on the map again. Then the unit's move there (slot 0x340, forced, running,
+    /// range 0): the AI holds the move action and the point without a target. True when it moves.
     pub(super) fn evasive_move(
         &mut self,
         point: Position,
-        (uncon, tries): (bool, bool),
+        (force, bad): (OrderForce, BadPoint),
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
-        if !uncon && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let near = |p: f32, own: f32| {
@@ -194,7 +215,7 @@ impl UnitAi {
         };
         let mut x = held(near(point.x(), at.position.x()), at.map.width());
         let mut y = held(near(point.y(), at.position.y()), at.map.height());
-        if tries {
+        if bad == BadPoint::Moves {
             for _ in 0..5 {
                 if side.can_stand(Point::new(x, y))? {
                     break;
@@ -213,7 +234,7 @@ impl UnitAi {
         let m = self.move_to(AiMove {
             point: Position::new(x, y, point.z()),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         });
         if let Some(m) = m {
@@ -258,10 +279,10 @@ impl UnitAi {
             .of_class(attacker.class)
             .contains(ClassRoles::VILLAGER);
         let furious = if self.current_action == Some(AiAction::Attack) {
-            let _ = self.attack_object(target, false, false, at, side)?;
+            let _ = self.attack_object(target, OrderForce::Unforced, TargetRules::Own, at, side)?;
             true
         } else {
-            let _ = self.attack_object(target, true, false, at, side)?;
+            let _ = self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?;
             self.idle_timer = Millis::ZERO;
             villager
         };
@@ -370,7 +391,13 @@ impl UnitAi {
                 if let Some(found) = side.foundation_search()?
                     && side.reaches(found, Distance::new(unit_ai_tuning.foundation_reach))?
                 {
-                    let _ = self.build_object(FoundationId::new(found), true, at, side, rng)?;
+                    let _ = self.build_object(
+                        FoundationId::new(found),
+                        OrderForce::Forced,
+                        at,
+                        side,
+                        rng,
+                    )?;
                     return Ok(BREAK);
                 }
                 if player_kind.is_computer() {

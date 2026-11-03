@@ -56,6 +56,7 @@ mod unit_stance;
 mod update;
 pub(crate) mod world_view;
 
+pub use self::actions::OrderTest;
 pub use self::ai_action::AiAction;
 pub use self::ai_kind::UnitAiKind;
 use self::attack_pick::point_gap_squared;
@@ -67,7 +68,7 @@ pub use self::attack_pick::{
 pub use self::attack_picker::{AttackPicker, NoAttack};
 pub(crate) use self::attack_rules::patrol_distance;
 pub use self::attack_rules::{
-    Attacked, Convertee, Converter, attack_sight, attacks_neutral, can_convert,
+    Attacked, Convertee, Converter, TargetRules, attack_sight, attacks_neutral, can_convert,
     kind_attacks_neutral, priest_attacks_neutral, siege_attacks_neutral, siege_can_attack,
     soldier_attacks_neutral,
 };
@@ -115,8 +116,8 @@ pub use self::side::{
 };
 pub use self::stop_order::StopOrder;
 pub use self::surroundings::{
-    AiMove, Duel, Found, GroupState, Home, Seen, Surroundings, TopTarget, UnitSeen, flood_search,
-    no_search,
+    AiMove, Duel, Found, GroupState, Home, OrderForce, Seen, Surroundings, TopTarget, UnitSeen,
+    flood_search, no_search,
 };
 use self::surroundings::{LiveTop, group_lets_idle};
 pub use self::target_kind::OrderTargetKind;

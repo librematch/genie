@@ -1,6 +1,7 @@
 //! State 4's walk to the target and state 7's swing with its hit and its trample.
 
 use crate::combat::Charge;
+use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
@@ -324,7 +325,9 @@ impl Attack {
             // readyToAttack with its third argument 0: a target out of reach is followed
             // (`set_state` 4); a ready unit only faces it; the swing goes on either way
             AfterHit::Recheck => {
-                if let Readiness::Away(gap) = self.ready_to_attack(unit, &mut g, f, r, false)? {
+                if let Readiness::Away(gap) =
+                    self.ready_to_attack(unit, &mut g, f, r, AtOnce::Tested)?
+                {
                     self.follow(unit, &mut g, r, f, gap)?;
                 }
             }

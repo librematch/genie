@@ -11,6 +11,9 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::players::PlayerKind;
 use crate::players::QueryRelation;
+use crate::unit_ai::OrderForce;
+use crate::unit_ai::TargetRules;
+use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
     BOAR_WANDER, Effect, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH, HUNTED_STEP,
@@ -64,7 +67,7 @@ impl UnitAi {
         let go_home = AiMove {
             point: home.origin.with_z(z),
             range: AI_MOVE_RANGE,
-            force: true,
+            force: OrderForce::Forced,
             walk: true,
         };
         if home.go_home {
@@ -142,7 +145,7 @@ impl UnitAi {
         let (dx, dy) = (other.x() - x, other.y() - y);
         let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
-        let _ = self.evasive_move(point, (true, false), at, ai, side)?;
+        let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
         Ok(true)
     }
 
@@ -184,7 +187,7 @@ impl UnitAi {
         let go_home = AiMove {
             point: h.origin.with_z(z),
             range: AI_MOVE_RANGE,
-            force: true,
+            force: OrderForce::Forced,
             walk: true,
         };
         let leash = h.leash.squared();
@@ -335,7 +338,7 @@ impl UnitAi {
         if Distance::ZERO <= reach && reach.squared() < t.gap_squared {
             return Ok(false);
         }
-        let _ = self.attack_object(id, false, false, at, side)?;
+        let _ = self.attack_object(id, OrderForce::Unforced, TargetRules::Own, at, side)?;
         Ok(true)
     }
 }

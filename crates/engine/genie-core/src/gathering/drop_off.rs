@@ -2,6 +2,9 @@
 
 use crate::GenieError;
 use crate::gathering::DropSiteId;
+use crate::gathering::drop_sites::DropMeasure;
+use crate::gathering::drop_sites::SitePlace;
+use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::drop_sites::{Seeker, drop_site_search};
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::unit::NO_GATHER;
@@ -502,19 +505,25 @@ impl Unit {
                 "a drop-off of a player without masters",
             ))?;
             let sites = &master.action_part().drop_sites;
-            site =
-                match self.drop_site_from((actions, Some(mover)), c, others, state, true, by_id)? {
-                    Some(s) => Some(s),
-                    None => drop_site_search(
-                        others.own_iter(),
-                        OwnerMasters::new(c.masters.own, Some(masters)),
-                        sites,
-                        self.position(),
-                        None,
-                        (true, Some(ActionKind::UNPACK)),
-                        by_id,
-                    )?,
-                };
+            site = match self.drop_site_from(
+                (actions, Some(mover)),
+                c,
+                others,
+                state,
+                SitePlace::Outside,
+                by_id,
+            )? {
+                Some(s) => Some(s),
+                None => drop_site_search(
+                    others.own_iter(),
+                    OwnerMasters::new(c.masters.own, Some(masters)),
+                    sites,
+                    self.position(),
+                    None,
+                    (SitePlace::Outside, Some(ActionKind::UNPACK)),
+                    by_id,
+                )?,
+            };
         }
         let Some(site) = site else {
             return Ok((None, Distance::ZERO));
@@ -530,39 +539,47 @@ impl Unit {
         ))
     }
 
-    /// `FUN_1411671e0` from the unit with its `mover` (`state` its action's, which the planner reads) over its
-    /// master's drop sites (`+0x7a0`): [`drop_site_search`] with the unit as the seeker, by path
-    /// for a human player (its argument 9, `FUN_141659cf0` false), skipping objects inside others
-    /// when `outside` (its argument 10) and those at work on `0x7d` or `0x7c` (its argument 8).
+    /// `FUN_1411671e0` from the unit with its `mover` (`state` its action's, which the planner
+    /// reads) over its master's drop sites (`+0x7a0`): [`drop_site_search`] with the unit as the
+    /// seeker, by path for a human player (its argument 9, `FUN_141659cf0` false), skipping objects
+    /// inside others when `place` is [`SitePlace::Outside`] (its argument 10) and those at work on
+    /// `0x7d` or `0x7c` (its argument 8).
     pub(crate) fn drop_site_from(
         &self,
         (actions, mover): (&Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
-        outside: bool,
+        place: SitePlace,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
-        let by_path = !c.player_kind.is_computer();
+        let nearest = if c.player_kind.is_computer() {
+            DropMeasure::ByDistance
+        } else {
+            DropMeasure::ByPath
+        };
         self.drop_site_with(
             (actions, mover),
             c,
             others,
             state,
-            (outside, by_path, Some(ActionKind::UNPACK)),
+            SiteSearch {
+                place,
+                nearest,
+                at_work: Some(ActionKind::UNPACK),
+            },
             by_id,
         )
     }
 
-    /// [`Unit::drop_site_from`] with the search's arguments 10, 9 and 8: `outside`, `by_path`
-    /// and the action type `at_work` it passes over (−1 none).
+    /// [`Unit::drop_site_from`] with the search's arguments 10, 9 and 8 (`search`).
     pub(crate) fn drop_site_with(
         &self,
         (actions, mover): (&Action, Option<&Mover>),
         c: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
-        (outside, by_path, at_work): (bool, bool, Option<ActionKind>),
+        search: SiteSearch,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
         let masters = c.masters.table.ok_or(GenieError::unsupported(
@@ -598,7 +615,7 @@ impl Unit {
             spatial: c.spatial,
             zones,
             class: master.class,
-            by_path,
+            nearest: search.nearest,
         };
         drop_site_search(
             others.own_iter(),
@@ -606,7 +623,7 @@ impl Unit {
             &master.action_part().drop_sites,
             self.position(),
             Some(seeker),
-            (outside, at_work),
+            (search.place, search.at_work),
             by_id,
         )
     }

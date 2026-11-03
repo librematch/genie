@@ -19,6 +19,7 @@ use crate::objects::{ObjectState, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::{
     Attacked, Duel, Effect, Found, Notify, PatrolPath, Search, Seeker, UnitAi, UnitSeen,
 };
@@ -45,7 +46,7 @@ pub trait UnitSide {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         ai: &UnitAi,
     ) -> Result<Attacked, GenieError>;
 
@@ -518,7 +519,7 @@ impl<F: FnMut(&Search<'_>) -> Result<Found, GenieError>> UnitSide for F {
         self(search)
     }
 
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported(
             "a unit AI's attack without its unit",
         ))

@@ -6,6 +6,7 @@ use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
 use crate::construction::MainBuildingId;
 use crate::garrison::GarrisonScope;
+use crate::garrison::GarrisonSwitch;
 use crate::garrison::ShelterReach;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
@@ -1169,28 +1170,28 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::VILLAGER,
         ids::VILLAGER_MALE,
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     assert!(garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
         master_id(74),
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     assert!(!garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_12,
         master_id(38),
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     assert!(garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::MONK,
         master_id(125),
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     // master 1811 is no infantry, but a monk
@@ -1198,14 +1199,14 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
         ids::WARRIOR_PRIEST,
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     assert!(!garrison_kind_takes(
         GarrisonKinds::INFANTRY,
         class::CLASS_6,
         ids::WARRIOR_PRIEST,
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     // a tower's 3 takes no monk; the task finder takes no class 42
@@ -1213,21 +1214,21 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY,
         class::MONK,
         master_id(125),
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     assert!(garrison_kind_takes(
         GarrisonKinds::MONKS,
         class::RELIC,
         master_id(1),
-        true,
+        GarrisonSwitch::Garrison,
         &roles()
     ));
     assert!(!garrison_kind_takes(
         GarrisonKinds::MONKS,
         class::RELIC,
         master_id(1),
-        false,
+        GarrisonSwitch::TaskFinder,
         &roles()
     ));
 }

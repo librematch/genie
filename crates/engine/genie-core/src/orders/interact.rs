@@ -1,6 +1,7 @@
 //! An interact order's unit, an order on a target, MOVE and its groups.
 
 use crate::GenieError;
+use crate::groups::FarMembers;
 use crate::groups::FormationKind;
 use crate::groups::common_group;
 use crate::groups::{CommandArgs, GroupId};
@@ -443,7 +444,7 @@ impl World {
                 for &unit in units {
                     let _ = self.add_to_group(id, unit)?;
                 }
-                self.group_statistics(id, false)?;
+                self.group_statistics(id, FarMembers::Stay)?;
                 self.set_initial_position(id)?;
                 id
             };

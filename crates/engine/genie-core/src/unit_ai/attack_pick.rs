@@ -28,6 +28,7 @@ use crate::players::QueryRelation;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::Ask;
@@ -318,7 +319,7 @@ pub fn can_attack(
         BUILDING_AI => Ok(false),
         UnitAiKind::TOWER => tower_can_attack(me, t, roles, unit_ai_tuning),
         UnitAiKind::SOLDIER => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
-        SIEGE_AI => siege_can_attack(me, seeker, t, false, roles, unit_ai_tuning),
+        SIEGE_AI => siege_can_attack(me, seeker, t, TargetRules::Own, roles, unit_ai_tuning),
         _ => Err(GenieError::unsupported(
             "an attack check (slot 0xa0) of a unit-AI type not modelled",
         )),

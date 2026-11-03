@@ -15,6 +15,7 @@
 use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::construction::repair::REPAIR;
+use crate::garrison::GarrisonSwitch;
 use crate::garrison::{ENTER, garrison_kind_takes, is_garrison_task};
 use crate::gathering::PastureId;
 use crate::gathering::hunt::HUNT;
@@ -334,7 +335,13 @@ fn garrison_task<'m>(
             .master
             .building
             .map_or(GarrisonKinds::NONE, |b| b.garrison_kind);
-        let takes = garrison_kind_takes(garrison_kind, list.class, list.id, false, roles);
+        let takes = garrison_kind_takes(
+            garrison_kind,
+            list.class,
+            list.id,
+            GarrisonSwitch::TaskFinder,
+            roles,
+        );
         if let Some(task) = first(list, |t| is_garrison_task(t, roles)).filter(|_| takes) {
             if matches!(t.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
                 return Err(GenieError::unsupported(

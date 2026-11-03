@@ -17,6 +17,7 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiKind;
@@ -38,11 +39,11 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         range: Distance,
-        force: bool,
+        force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let Some(t) = Self::world_object(target, at, side)? else {
@@ -63,10 +64,10 @@ impl UnitAi {
         &mut self,
         point: Point,
         range: Distance,
-        force: bool,
+        force: OrderForce,
         at: &Surroundings,
     ) -> bool {
-        if !force && self.current_action.is_some() {
+        if matches!(force, OrderForce::Unforced) && self.current_action.is_some() {
             return false;
         }
         self.set_action(Some(AiAction::Defend));
@@ -91,12 +92,14 @@ impl UnitAi {
     pub(crate) fn build_object(
         &mut self,
         target: FoundationId,
-        force: bool,
+        force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
-        if (!force && self.current_action == Some(AiAction::Build)) || !side.builds(target)? {
+        if (force == OrderForce::Unforced && self.current_action == Some(AiAction::Build))
+            || !side.builds(target)?
+        {
             return Ok(false);
         }
         side.effect_now(Effect::Command(AiCommand::BuildObject(target)), self, rng)?;
@@ -117,11 +120,11 @@ impl UnitAi {
     pub(super) fn work_object(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         (action, command): (AiAction, UnitCommand),
         (at, side): (&Surroundings, &mut dyn UnitSide),
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action == Some(action) {
+        if force == OrderForce::Unforced && self.current_action == Some(action) {
             return Ok(false);
         }
         if !side.command(command)? {
@@ -194,12 +197,12 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         range: Distance,
-        force: bool,
+        force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let Some(t) = Self::world_object(target, at, side)? else {
@@ -234,14 +237,14 @@ impl UnitAi {
     pub(super) fn enter_object(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         (at, side): (&Surroundings, &mut dyn UnitSide),
     ) -> Result<bool, GenieError> {
         let held = Self::world_object(target, at, side)?;
         if self.ai_kind == CIVILIAN && held.is_none() {
             return Ok(false);
         }
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         if !side.command(UnitCommand::Enter(target))? {
@@ -263,10 +266,10 @@ impl UnitAi {
     pub(super) fn transport_to(
         &mut self,
         point: Position,
-        force: bool,
+        force: OrderForce,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         if !side.command(UnitCommand::Transport(point))? {
@@ -285,10 +288,10 @@ impl UnitAi {
     pub(super) fn unload_at(
         &mut self,
         point: Point,
-        (force, over_wall): (bool, bool),
+        (force, over_wall): (OrderForce, bool),
         (at, side): (&Surroundings, &mut dyn UnitSide),
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let to = point.with_height(at.position.z());
@@ -312,12 +315,12 @@ impl UnitAi {
         &mut self,
         target: ObjectId,
         tile: Tile,
-        force: bool,
+        force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         if !self.attack_command(target, force, at, side)? {
@@ -340,12 +343,12 @@ impl UnitAi {
     pub(super) fn explore_and_destroy(
         &mut self,
         tile: Tile,
-        force: bool,
+        force: OrderForce,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let point = Point::new(tile.x() as f32, tile.y() as f32);
@@ -424,7 +427,7 @@ impl UnitAi {
         let Some(m) = self.move_to(AiMove {
             point: o.point,
             range: o.range,
-            force: true,
+            force: OrderForce::Forced,
             walk: true,
         }) else {
             return Ok(OrderOutcome::NotTaken);
@@ -463,10 +466,10 @@ impl UnitAi {
     pub(super) fn wait_for_foundation(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
-        if !force && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         if !side.wait_solidify(target)? {

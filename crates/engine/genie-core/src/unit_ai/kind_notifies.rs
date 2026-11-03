@@ -12,8 +12,10 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, Surroundings, UnitAi, UnitSide,
     VILLAGER_NOTIFY, alert_owner, back_up, dodges,
@@ -133,7 +135,7 @@ impl UnitAi {
             && !below_or_unordered(at.los.squared().get(), gap.get())
             && !flags.contains(ObjectFlags::SCOUT)
         {
-            let _ = self.attack_object(target, true, false, at, side)?;
+            let _ = self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?;
             return Ok(BREAK);
         }
         // "Target is invalid or no longer visible, stopping pursuit.": the target
@@ -386,7 +388,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
-        let _ = self.run_away(true, at, player_kind, ai_rng, side)?;
+        let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
         Ok(BREAK)
     }
 

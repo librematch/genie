@@ -43,9 +43,37 @@ pub(crate) struct Seeker<'a, 'b> {
     pub(crate) zones: &'a ZoneMap,
     /// Its master's class.
     pub(crate) class: ClassId,
-    /// The nearest is by path (`FUN_1411671e0`'s argument 9: a human player's); else by the
-    /// squared distance of the centres, of the objects the planner reaches.
-    pub(crate) by_path: bool,
+    /// How the nearest is measured (`FUN_1411671e0`'s argument 9: by path a human player's).
+    pub(crate) nearest: DropMeasure,
+}
+
+/// How a drop-site search (`FUN_1411671e0`'s argument 9) measures the nearest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DropMeasure {
+    /// By path (1): the path's length, of the objects the planner reaches.
+    ByPath,
+    /// By the squared distance of the centres (0).
+    ByDistance,
+}
+
+/// Which drop sites a search counts (`FUN_1411671e0`'s argument 10).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SitePlace {
+    /// Only those not inside another object (1).
+    Outside,
+    /// Any (0).
+    Anywhere,
+}
+
+/// A drop-site search's arguments 10, 9 and 8 (`FUN_1411671e0`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SiteSearch {
+    /// Which drop sites count.
+    pub(crate) place: SitePlace,
+    /// How the nearest is measured.
+    pub(crate) nearest: DropMeasure,
+    /// The action type a drop site at work on it is passed over for (−1 none).
+    pub(crate) at_work: Option<ActionKind>,
 }
 
 /// The point of a search from no point (`DAT_14330ec20`): at or below it on either axis the
@@ -76,7 +104,7 @@ impl Seeker<'_, '_> {
         &mut self,
         o: &Unit,
         master: &Master,
-        by_path: bool,
+        nearest: DropMeasure,
         squared: f32,
         last: &mut f32,
         by_id: ObjectsRef<'_>,
@@ -100,8 +128,8 @@ impl Seeker<'_, '_> {
             tile_path_tuning,
         )?;
         Ok(match planned {
-            Some((found, length)) if counted(found, by_path, self.fishing(roles), near) => {
-                if !by_path {
+            Some((found, length)) if counted(found, nearest, roles.of_class(self.class), near) => {
+                if nearest == DropMeasure::ByDistance {
                     return Ok(Some(squared));
                 }
                 *last = length.get();
@@ -122,7 +150,7 @@ impl Seeker<'_, '_> {
             }
             // the planner's other results pass the object over
             Some(_) => None,
-            None if by_path => Some(*last),
+            None if nearest == DropMeasure::ByPath => Some(*last),
             None => Some(squared),
         })
     }
@@ -149,25 +177,30 @@ impl Seeker<'_, '_> {
 }
 
 /// Whether the planner's result `found` lets a drop site count in [`drop_site_search`]: a path
-/// to it or into its range (below 2), or for a fishing ship seeking by path one the planner
-/// does not reach (3, the game's `3 <= result`) whose footprint lies `near` (`TurnTuning::fishing_reach`).
+/// to it or into its range (below 2), or for a fishing ship (a seeker whose class `seeker`
+/// holds [`ClassRoles::FISHING_SHIP`]) seeking by path one the planner does not reach (3, the
+/// game's `3 <= result`) whose footprint lies `near` (`TurnTuning::fishing_reach`).
 pub(crate) fn counted(
     found: Found,
-    by_path: bool,
-    fishing: bool,
+    nearest: DropMeasure,
+    seeker: ClassRoles,
     near: impl FnOnce() -> bool,
 ) -> bool {
-    found.reaches() || (by_path && fishing && found == Found::Nothing && near())
+    found.reaches()
+        || (nearest == DropMeasure::ByPath
+            && seeker.contains(ClassRoles::FISHING_SHIP)
+            && found == Found::Nothing
+            && near())
 }
 
 /// A search for drop sites (`FUN_1411671e0`: in state 2, not at work on the action type `at_work`
 /// (its argument 8: an object of type 40 up whose top action is of that type, or `0x7c` too for
 /// `0x7d`, as the Gather's `set_state` 8 and 3 call it; −1 none), not inside another when
-/// `outside`): of the player's live objects (`units`, in list order) of a
+/// `place` is [`SitePlace::Outside`]): of the player's live objects (`units`, in list order) of a
 /// master in `sites`, the nearest to `at`. With the `seeker`, only objects in its zone count (its
 /// restriction's zone of its tile against each object's tile) and only those the tile planner
 /// reaches (its goal or its range; radii the seeker's and the object's, [`Mover::plan_length`]),
-/// the nearest by path ([`Seeker::by_path`]): the path's length, within 10 tiles the shorter of
+/// the nearest by path ([`Seeker::nearest`]): the path's length, within 10 tiles the shorter of
 /// it and the seeker's short path (slot 0x3e8 within 0.1, [`Mover::short_reach`]); else by the
 /// squared distance of the centres. Without a planner the game keeps the distance it last
 /// measured (of an earlier object, else the largest float) by path. Without a seeker, by the
@@ -184,7 +217,7 @@ pub(crate) fn drop_site_search<'u>(
     sites: &[MasterId],
     at: Position,
     mut seeker: Option<Seeker<'_, '_>>,
-    (outside, at_work): (bool, Option<ActionKind>),
+    (place, at_work): (SitePlace, Option<ActionKind>),
     by_id: ObjectsRef<'_>,
 ) -> Result<Option<DropSiteId>, GenieError> {
     let roles = by_id.roles();
@@ -195,7 +228,10 @@ pub(crate) fn drop_site_search<'u>(
         .as_ref()
         .filter(|_| !fishing && !pointless)
         .map(|s| s.zones.zone(Tile::new(x as i32, y as i32)));
-    let mut by_path = seeker.as_ref().is_some_and(|s| s.by_path) && !pointless;
+    let mut nearest = seeker
+        .as_ref()
+        .filter(|_| !pointless)
+        .map_or(DropMeasure::ByDistance, |s| s.nearest);
     let mut best: Option<DropSiteId> = None;
     let mut best_d = NO_DROP_DISTANCE;
     let mut last = NO_DROP_DISTANCE;
@@ -225,7 +261,7 @@ pub(crate) fn drop_site_search<'u>(
                         k == at_work || (at_work == ActionKind::UNPACK && k == ActionKind::PACK)
                     })
         });
-        if busy || (outside && o.life.inside.is_some()) {
+        if busy || (place == SitePlace::Outside && o.life.inside.is_some()) {
             continue;
         }
         if let Some(farm) = seeker
@@ -235,12 +271,12 @@ pub(crate) fn drop_site_search<'u>(
             .flatten()
         {
             (x, y) = (farm.x(), farm.y());
-            by_path = false;
+            nearest = DropMeasure::ByDistance;
         }
         let (dx, dy) = (x - o.position().x(), y - o.position().y());
         let squared = dy * dy + dx * dx;
         let d = match seeker.as_mut() {
-            Some(s) => match s.measure(o, master, by_path, squared, &mut last, by_id)? {
+            Some(s) => match s.measure(o, master, nearest, squared, &mut last, by_id)? {
                 Some(d) => d,
                 None => continue,
             },
@@ -455,7 +491,7 @@ mod tests {
             spatial: &mut spatial,
             zones: &zones,
             class,
-            by_path: true,
+            nearest: DropMeasure::ByPath,
         };
         drop_site_search(
             units,
@@ -463,7 +499,7 @@ mod tests {
             &SITES,
             at,
             Some(seeker),
-            (false, None),
+            (SitePlace::Anywhere, None),
             ObjectsRef::empty(),
         )
     }

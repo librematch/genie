@@ -15,8 +15,10 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::NearestAttacker;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::category;
 use crate::unit_ai::{
@@ -276,7 +278,7 @@ impl UnitAi {
         let Some(id) = id.filter(|&id| Some(id) != self.current_target) else {
             return Ok(9);
         };
-        let _ = self.attack_slot(id, false, at, side, rng)?;
+        let _ = self.attack_slot(id, TargetRules::Own, at, side, rng)?;
         Ok(10)
     }
 
@@ -441,7 +443,7 @@ impl UnitAi {
                 let m = self.move_to(AiMove {
                     point: self.target_point,
                     range: self.desired_distance,
-                    force: true,
+                    force: OrderForce::Forced,
                     walk: false,
                 });
                 if let Some(m) = m {
@@ -453,7 +455,7 @@ impl UnitAi {
         if let Some((target, _)) = defended {
             match side.defended_attacker(target)? {
                 NearestAttacker::Attacker(attacker) => {
-                    let _ = self.attack_slot(attacker, true, at, side, ai)?;
+                    let _ = self.attack_slot(attacker, TargetRules::Any, at, side, ai)?;
                     return Ok(true);
                 }
                 NearestAttacker::NoAttacker => {

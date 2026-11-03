@@ -45,6 +45,9 @@ use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
 use crate::gathering::QueueCount;
 use crate::gathering::closest_resource::search_origin;
+use crate::gathering::drop_sites::DropMeasure;
+use crate::gathering::drop_sites::SitePlace;
+use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::unit::give_load;
 use crate::gathering::gather::{GATHER, GatherAction, Resource, StopRate};
@@ -232,6 +235,7 @@ use crate::unit_ai::AiLayer;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetKind;
@@ -263,6 +267,7 @@ use crate::vision::registry::{Record, Registry};
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::vision::visibility::{Visibility as VisionVisibility, VisibleMap};
 use crate::world::checkpoint::TopAction;
+use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::parts::{Object, Part, PartTable, no_own_masters};
 use crate::world::player::Player;
@@ -4405,7 +4410,7 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
     let walk = AiMove {
         point: Position::new(20.0, 20.0, 0.0),
         range: Distance::ZERO,
-        force: false,
+        force: OrderForce::Unforced,
         walk: false,
     };
     assert!(with_effects(&mut t, vec![Effect::Move(walk)]).is_err());
@@ -7041,7 +7046,12 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
         )
         .unwrap();
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(4242), true),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(4242),
+            OrderForce::Forced
+        ),
         Ok(false)
     );
     assert_eq!(
@@ -7053,7 +7063,12 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
         None
     );
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), true),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Forced
+        ),
         Ok(true)
     );
     let first = t
@@ -7079,7 +7094,12 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
         .unwrap()
         .timer = Seconds::new(7.0);
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), false),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Unforced
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -7093,7 +7113,12 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
         Seconds::new(7.0)
     );
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), true),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Forced
+        ),
         Ok(true)
     );
     assert_eq!(
@@ -7116,7 +7141,12 @@ fn an_enter_of_unit_inside_an_object_fails_at_its_start() {
     let mut t = enter_world(vec![], 5);
     t.players[1].objects[ListIndex::new(0)].life.inside = Some(ContainerId::new(object_id(4242)));
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), true),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Forced
+        ),
         Ok(true)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -7213,7 +7243,12 @@ fn livestock_enter_world() -> World {
 fn livestock_enter_command_becomes_its_artifact_sub_action() {
     let mut t = livestock_enter_world();
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), false),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Unforced
+        ),
         Ok(true)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -7362,7 +7397,12 @@ fn livestock_second_enter_command_stops_the_walk_and_lets_the_old_enter_target_g
     // the old Enter took the house
     t.players[1].objects[ListIndex::new(1)].workers = WorkerCount::of_data(1);
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), true),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Forced
+        ),
         Ok(true)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -8104,7 +8144,7 @@ fn the_ai_move_at_once_matches_the_one_after_the_update() {
     let m = AiMove {
         point: Position::new(35.0, 80.0, 0.0),
         range: Distance::ZERO,
-        force: true,
+        force: OrderForce::Forced,
         walk: false,
     };
     later
@@ -14870,7 +14910,12 @@ fn restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
         .expect("the saved patrol's move");
     assert_eq!(
         (run.point, run.range, run.force, run.walk),
-        (Position::new(30.0, 20.25, 0.5), Distance::ZERO, true, false)
+        (
+            Position::new(30.0, 20.25, 0.5),
+            Distance::ZERO,
+            OrderForce::Forced,
+            false
+        )
     );
     assert_eq!(
         motion.mover().unwrap().user_waypoints,
@@ -15940,7 +15985,7 @@ fn forced(walk: bool) -> AiMove {
     AiMove {
         point: AI_POINT,
         range: Distance::new(0.5),
-        force: true,
+        force: OrderForce::Forced,
         walk,
     }
 }
@@ -16122,7 +16167,7 @@ fn an_ai_move_hands_the_point_to_hunt_without_work_range() {
 #[test]
 fn an_unforced_ai_move_leaves_move_to_the_same_point() {
     let unforced = AiMove {
-        force: false,
+        force: OrderForce::Unforced,
         ..forced(false)
     };
     let old = MoveToAction::to_point(AI_POINT, Distance::ZERO, None, None);
@@ -16381,7 +16426,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
 /// 448, class 47, 426049998's) on Gaia's wolf 50 half a tile east, its attack timer `timer`, inside
 /// `inside` if any: the scout (with its parts) and what the command answered and took.
 fn scout_attack(timer: f32, inside: Option<ObjectId>) -> (Object, Attacked, Vec<i32>) {
-    scout_attack_on(timer, inside, None, false)
+    scout_attack_on(timer, inside, None, OrderForce::Unforced)
 }
 
 /// `f` on the unit AI's side ([`crate::unit_ai::world_view::UnitView`]) of the first of player
@@ -16474,7 +16519,7 @@ fn scout_attack_on(
     timer: f32,
     inside: Option<ObjectId>,
     own: Option<&Attack>,
-    force: bool,
+    force: OrderForce,
 ) -> (Object, Attacked, Vec<i32>) {
     use crate::unit_ai::UnitSide;
     let standing = Graphic {
@@ -16605,7 +16650,7 @@ fn scout_attack_on(
 /// answer, its owner's attribute 4 as the command returns and its owner's tracker after it.
 fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker) {
     use crate::unit_ai::UnitSide;
-    let (timer, inside, own, force) = (0.0, None, None, true);
+    let (timer, inside, own, force) = (0.0, None, None, OrderForce::Forced);
     let attacker_master = who.id;
     let standing = Graphic {
         id: SpriteId::named(300),
@@ -17050,7 +17095,8 @@ fn an_attack_command_on_its_own_attack_target_asks_that_attack_again() {
         seen: Position::new(-1.0, -1.0, -1.0),
         ..own_attack(50, -1, state)
     };
-    let (o, attacked, takes) = scout_attack_on(0.0, None, Some(&own(AttackState::Done)), true);
+    let (o, attacked, takes) =
+        scout_attack_on(0.0, None, Some(&own(AttackState::Done)), OrderForce::Forced);
     assert_eq!((attacked.attacks, takes), (true, vec![]));
     let a = o
         .parts
@@ -17071,14 +17117,19 @@ fn an_attack_command_on_its_own_attack_target_asks_that_attack_again() {
         0.0,
         None,
         Some(&own(AttackState::Move { move_to: None })),
-        true,
+        OrderForce::Forced,
     );
     assert!(attacked.attacks);
     assert_eq!(
         o.parts.actions.list.attack().map(|a| a.seen),
         Some(Position::from([-1.0; 3]))
     );
-    let (o, _, _) = scout_attack_on(0.0, None, Some(&own(AttackState::Done)), false);
+    let (o, _, _) = scout_attack_on(
+        0.0,
+        None,
+        Some(&own(AttackState::Done)),
+        OrderForce::Unforced,
+    );
     assert_eq!(
         o.parts.actions.list.attack().map(|a| a.seen),
         Some(Position::from([-1.0; 3]))
@@ -17886,13 +17937,48 @@ fn stop_error_names_the_command_or_the_object_it_happened_on() {
 fn fishing_ship_counts_near_drop_site_its_path_does_not_reach() {
     use crate::gathering::drop_sites::counted;
     use crate::pathing::tile_path::Found;
-    assert!(counted(Found::OffMap, true, false, || false));
-    assert!(counted(Found::Goal, false, false, || false));
-    assert!(!counted(Found::Nearest, true, true, || true));
-    assert!(!counted(Found::Nothing, true, false, || true));
-    assert!(counted(Found::Nothing, true, true, || true));
-    assert!(!counted(Found::Nothing, true, true, || false));
-    assert!(!counted(Found::Nothing, false, true, || true));
+    assert!(counted(
+        Found::OffMap,
+        DropMeasure::ByPath,
+        ClassRoles::VILLAGER,
+        || false
+    ));
+    assert!(counted(
+        Found::Goal,
+        DropMeasure::ByDistance,
+        ClassRoles::VILLAGER,
+        || false
+    ));
+    assert!(!counted(
+        Found::Nearest,
+        DropMeasure::ByPath,
+        ClassRoles::FISHING_SHIP,
+        || true
+    ));
+    assert!(!counted(
+        Found::Nothing,
+        DropMeasure::ByPath,
+        ClassRoles::VILLAGER,
+        || true
+    ));
+    assert!(counted(
+        Found::Nothing,
+        DropMeasure::ByPath,
+        ClassRoles::FISHING_SHIP,
+        || true
+    ));
+    assert!(!counted(
+        Found::Nothing,
+        DropMeasure::ByPath,
+        ClassRoles::FISHING_SHIP,
+        || false
+    ));
+    assert!(!counted(
+        Found::Nothing,
+        DropMeasure::ByDistance,
+        ClassRoles::FISHING_SHIP,
+        || true
+    ));
 }
 
 /// `TRIBE_Building_Object::update`'s farm stage (`0x1411ca2ef`): a farm lays 29 to 31 by its
@@ -18059,7 +18145,12 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
     };
     place(&mut t, Position::new(30.0, 91.0, 0.0));
     assert_eq!(
-        t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(10028), false),
+        t.enter_command(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(10028),
+            OrderForce::Unforced
+        ),
         Ok(true)
     );
     assert_eq!(t.players[1].objects[ListIndex::new(0)].life.inside, None);
@@ -19558,7 +19649,7 @@ fn loaded_builder_drop_off_finds_its_town_centre() {
 /// world first.
 fn drop_site_sought(
     setup: impl FnOnce(&mut World),
-    args: (bool, bool, Option<ActionKind>),
+    args: SiteSearch,
 ) -> Result<Option<DropSiteId>, GenieError> {
     let mut t = forage_world();
     let mut far = t.object_of(&t.players[1].objects[ListIndex::new(2)]);
@@ -19620,11 +19711,25 @@ fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
     use crate::gathering::make::{MAKE, MakeAction};
     let keep = |_: &mut World| ();
     assert_eq!(
-        drop_site_sought(keep, (false, true, None)),
+        drop_site_sought(
+            keep,
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByPath,
+                at_work: None,
+            }
+        ),
         Ok(Some(DropSiteId::new(object_id(700))))
     );
     assert_eq!(
-        drop_site_sought(keep, (false, false, None)),
+        drop_site_sought(
+            keep,
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByDistance,
+                at_work: None,
+            }
+        ),
         Ok(Some(DropSiteId::new(object_id(700))))
     );
     let inside = |t: &mut World| {
@@ -19632,11 +19737,25 @@ fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
             Some(ContainerId::new(object_id(9175)));
     };
     assert_eq!(
-        drop_site_sought(inside, (true, true, None)),
+        drop_site_sought(
+            inside,
+            SiteSearch {
+                place: SitePlace::Outside,
+                nearest: DropMeasure::ByPath,
+                at_work: None,
+            }
+        ),
         Ok(Some(DropSiteId::new(object_id(701))))
     );
     assert_eq!(
-        drop_site_sought(inside, (false, true, None)),
+        drop_site_sought(
+            inside,
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByPath,
+                at_work: None,
+            }
+        ),
         Ok(Some(DropSiteId::new(object_id(700))))
     );
     let making = |t: &mut World| {
@@ -19653,11 +19772,25 @@ fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
             }));
     };
     assert_eq!(
-        drop_site_sought(making, (false, true, Some(MAKE))),
+        drop_site_sought(
+            making,
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByPath,
+                at_work: Some(MAKE),
+            }
+        ),
         Ok(Some(DropSiteId::new(object_id(701))))
     );
     assert_eq!(
-        drop_site_sought(making, (false, true, None)),
+        drop_site_sought(
+            making,
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByPath,
+                at_work: None,
+            }
+        ),
         Ok(Some(DropSiteId::new(object_id(700))))
     );
     let unknown = |t: &mut World| {
@@ -19672,9 +19805,16 @@ fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
         t.players[1].objects[ListIndex::new(2)].life.master_id = master_id(999);
     };
     assert_eq!(
-        drop_site_sought(unknown, (false, true, None))
-            .unwrap_err()
-            .reason(),
+        drop_site_sought(
+            unknown,
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByPath,
+                at_work: None,
+            }
+        )
+        .unwrap_err()
+        .reason(),
         OBJECT_MASTER.reason()
     );
 }
@@ -21918,7 +22058,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
     let aside = AiMove {
         point: Position::new(25.0, 89.5, 0.0),
         range: Distance::ZERO,
-        force: false,
+        force: OrderForce::Unforced,
         walk: false,
     };
     assert_eq!(

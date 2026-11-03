@@ -15,8 +15,10 @@ use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::OrderTest;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
@@ -103,7 +105,7 @@ impl UnitAi {
         if self.current_action.is_none()
             && (!busy || (!self.orders.is_empty() && side.interruptible_now()?))
             && result != 0xd
-            && self.can_order(at, false)
+            && self.can_order(at, OrderTest::Any)
             && at.group.is_none_or(|g| g.idle)
             && !at.garrisoned
         {
@@ -593,7 +595,7 @@ impl UnitAi {
             let m = self.move_to(AiMove {
                 point: self.target_point,
                 range: at.weapon_range,
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             });
             if let Some(m) = m {

@@ -33,6 +33,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiMove;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
@@ -181,7 +182,7 @@ impl Unit {
         Some(AiMove {
             point: Position::new(w.x(), w.y(), w.height()),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })
     }

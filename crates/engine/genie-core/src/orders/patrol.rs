@@ -1,6 +1,7 @@
 //! PATROL, the attack move and their sweep, and the group the splitter keeps.
 
 use crate::GenieError;
+use crate::groups::FarMembers;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::{CommandMoveTo, common_group};
@@ -25,6 +26,7 @@ use crate::pathing::tile_path::{Found, Path, Request};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiMove;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::world::Millis;
 use crate::world::World;
@@ -184,7 +186,7 @@ impl World {
                 for &unit in &units {
                     let _ = self.add_to_group(id, unit)?;
                 }
-                self.group_statistics(id, false)?;
+                self.group_statistics(id, FarMembers::Stay)?;
                 self.set_initial_position(id)?;
                 id
             };
@@ -399,7 +401,11 @@ impl World {
             let walk = AiMove {
                 point: Position::new(lx, ly, z),
                 range: Distance::ZERO,
-                force: sweep.patrol,
+                force: if sweep.patrol {
+                    OrderForce::Forced
+                } else {
+                    OrderForce::Unforced
+                },
                 walk: true,
             };
             self.move_aside(p, idx, walk)?;

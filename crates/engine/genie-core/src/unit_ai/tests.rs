@@ -56,10 +56,14 @@ use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::OrderTest;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::attack_orders::OrderNow;
+use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
 
@@ -209,7 +213,7 @@ fn rng() -> Well512 {
 /// as many stops before each).
 #[derive(Default)]
 struct Recorder {
-    attacks: Vec<(ObjectId, bool)>,
+    attacks: Vec<(ObjectId, OrderForce)>,
     under_attack: Option<bool>,
     stops: Vec<usize>,
     caps: Vec<(WorldTime, usize)>,
@@ -268,7 +272,7 @@ impl UnitSide for Recorder {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         _: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         self.attacks.push((target, force));
@@ -338,7 +342,7 @@ impl UnitSide for HelpSide {
             retries: [None; 3],
         })
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -420,7 +424,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(can_convert(
         &monk,
         Some(&knight),
-        false,
+        TargetRules::Own,
         &roles(),
         &tuning().unit_ai
     ));
@@ -431,18 +435,24 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(!can_convert(
         &tired,
         Some(&knight),
-        false,
+        TargetRules::Own,
         &roles(),
         &tuning().unit_ai
     ));
     assert!(can_convert(
         &tired,
         Some(&knight),
-        true,
+        TargetRules::Any,
         &roles(),
         &tuning().unit_ai
     ));
-    assert!(!can_convert(&monk, None, true, &roles(), &tuning().unit_ai));
+    assert!(!can_convert(
+        &monk,
+        None,
+        TargetRules::Any,
+        &roles(),
+        &tuning().unit_ai
+    ));
     let gaia = Convertee {
         owner: PlayerId::new(0),
         ..knight
@@ -450,7 +460,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(!can_convert(
         &monk,
         Some(&gaia),
-        true,
+        TargetRules::Any,
         &roles(),
         &tuning().unit_ai
     ));
@@ -461,7 +471,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(!can_convert(
         &monk,
         Some(&sheep),
-        true,
+        TargetRules::Any,
         &roles(),
         &tuning().unit_ai
     ));
@@ -473,7 +483,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(!can_convert(
         &monk,
         Some(&tc),
-        true,
+        TargetRules::Any,
         &roles(),
         &tuning().unit_ai
     ));
@@ -484,7 +494,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(!can_convert(
         &monk,
         Some(&hero),
-        true,
+        TargetRules::Any,
         &roles(),
         &tuning().unit_ai
     ));
@@ -497,7 +507,7 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
     assert!(!can_convert(
         &monk,
         Some(&house),
-        true,
+        TargetRules::Any,
         &roles(),
         &tuning().unit_ai
     ));
@@ -664,7 +674,7 @@ impl UnitSide for OffSide {
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
         Err(GenieError::unsupported("no search here"))
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -748,7 +758,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
         vec![Effect::Command(AiCommand::MoveAside(AiMove {
             point: Position::new(29.5, 89.5, 2.0),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: true,
         }))]
     );
@@ -829,7 +839,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         vec![Effect::Command(AiCommand::MoveAside(AiMove {
             point: Position::new(164.5, 51.5, 0.0),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         }))]
     );
@@ -851,7 +861,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
     ai.stop_with(StopOrder::Keep, None, &mut side, &mut rng(), &roles())
         .unwrap();
     assert_eq!(
-        ai.attack_command(object_id(70), true, &at, &mut side),
+        ai.attack_command(object_id(70), OrderForce::Forced, &at, &mut side),
         Ok(true)
     );
     assert_eq!(
@@ -859,7 +869,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
         (
             vec![(HUMAN_ORDER_CAP, 0)],
             vec![0],
-            vec![(object_id(70), true)]
+            vec![(object_id(70), OrderForce::Forced)]
         )
     );
 }
@@ -878,7 +888,7 @@ impl UnitSide for WaitSide {
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
         Err(GenieError::unsupported("no search here"))
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -1093,7 +1103,7 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
     };
     let mut side = WaitSide(true, Vec::new());
     assert_eq!(
-        ai.wait_for_foundation(object_id(10028), false, &mut side),
+        ai.wait_for_foundation(object_id(10028), OrderForce::Unforced, &mut side),
         Ok(false)
     );
     assert_eq!(side.1, Vec::new());
@@ -1103,7 +1113,7 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
     );
     let mut refused = WaitSide(false, Vec::new());
     assert_eq!(
-        ai.wait_for_foundation(object_id(10028), true, &mut refused),
+        ai.wait_for_foundation(object_id(10028), OrderForce::Forced, &mut refused),
         Ok(false)
     );
     assert_eq!(refused.1, vec![object_id(10028)]);
@@ -1112,7 +1122,7 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
         (Some(AiAction::Gather), Some(AiAction::Heal))
     );
     assert_eq!(
-        ai.wait_for_foundation(object_id(10028), true, &mut side),
+        ai.wait_for_foundation(object_id(10028), OrderForce::Forced, &mut side),
         Ok(true)
     );
     assert_eq!(
@@ -1124,7 +1134,7 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
         ..UnitAi::default()
     };
     assert_eq!(
-        idle.wait_for_foundation(object_id(10028), false, &mut side),
+        idle.wait_for_foundation(object_id(10028), OrderForce::Unforced, &mut side),
         Ok(true)
     );
     assert_eq!(
@@ -1169,7 +1179,7 @@ impl UnitSide for ResourceSide {
     fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
         Ok(self.foundation.is_some_and(|(_, reaches)| reaches))
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -1552,7 +1562,7 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
     assert_eq!(
         u.build_object(
             FoundationId::new(object_id(10028)),
-            true,
+            OrderForce::Forced,
             &at,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
@@ -1566,7 +1576,7 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
     assert_eq!(
         u.build_object(
             FoundationId::new(object_id(10028)),
-            true,
+            OrderForce::Forced,
             &at,
             &mut With::new(&mut side, &mut fx),
             &mut rng()
@@ -1824,7 +1834,7 @@ fn boar_attacks_its_first_attacker_and_keeps_it() {
         (u.attackers.clone(), side.attacks.clone()),
         (
             Attackers::of_saved(&[10049]),
-            vec![(object_id(10049), true)]
+            vec![(object_id(10049), OrderForce::Forced)]
         )
     );
     assert_eq!(
@@ -1844,7 +1854,7 @@ fn boar_attacks_its_first_attacker_and_keeps_it() {
         &mut With::new(&mut side, &mut fx),
     );
     assert_eq!(u.attackers, Attackers::of_saved(&[10049, 10050]));
-    assert_eq!(side.attacks, vec![(object_id(10049), true)]);
+    assert_eq!(side.attacks, vec![(object_id(10049), OrderForce::Forced)]);
     assert_eq!(u.current_target, Some(object_id(10049)));
 }
 
@@ -1898,7 +1908,7 @@ fn stop_before_an_attack_command_runs_first() {
     // the stop came with no attack before it, the attack after it
     assert_eq!(
         (side.stops, side.attacks),
-        (vec![0], vec![(object_id(27240), true)])
+        (vec![0], vec![(object_id(27240), OrderForce::Forced)])
     );
     assert_eq!(side.fx, vec![Effect::Stop]);
     assert_eq!(
@@ -1983,7 +1993,7 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
     );
     assert_eq!(
         (r, side.attacks.clone()),
-        (Ok(GO_ON), vec![(object_id(29001), true)])
+        (Ok(GO_ON), vec![(object_id(29001), OrderForce::Forced)])
     );
     assert_eq!(wolf.current_target, Some(object_id(29001)));
     let mut defensive = UnitAi {
@@ -2008,7 +2018,7 @@ struct LionSide {
     found: [i32; 2],
     searches: usize,
     seen: UnitSeen,
-    attacks: Vec<(ObjectId, bool)>,
+    attacks: Vec<(ObjectId, OrderForce)>,
 }
 
 impl UnitSide for LionSide {
@@ -2031,7 +2041,7 @@ impl UnitSide for LionSide {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         _: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         self.attacks.push((target, force));
@@ -2107,7 +2117,7 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
         run([700, -1], DistanceSquared::new(3.9)),
         (
             true,
-            vec![(object_id(700), false)],
+            vec![(object_id(700), OrderForce::Unforced)],
             Some(AiAction::Attack),
             Some(object_id(700))
         )
@@ -2121,7 +2131,7 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
         run([-1, 701], DistanceSquared::new(1.7)),
         (
             true,
-            vec![(object_id(701), false)],
+            vec![(object_id(701), OrderForce::Unforced)],
             Some(AiAction::Attack),
             Some(object_id(701))
         )
@@ -2135,7 +2145,7 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
 /// A soldier's world: what its `bestUnitToAttack` finds and the attack commands it gave.
 struct SoldierSide {
     found: i32,
-    attacks: Vec<(ObjectId, bool)>,
+    attacks: Vec<(ObjectId, OrderForce)>,
     patrol: Option<(PatrolPath, WaypointIndex)>,
     /// Slot 0xa0 refuses every target.
     refuses: bool,
@@ -2159,7 +2169,7 @@ impl UnitSide for SoldierSide {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         _: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         self.attacks.push((target, force));
@@ -2223,7 +2233,12 @@ impl UnitSide for DamageSide {
             retries: [None; 3],
         })
     }
-    fn attack(&mut self, target: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(
+        &mut self,
+        target: ObjectId,
+        _: OrderForce,
+        _: &UnitAi,
+    ) -> Result<Attacked, GenieError> {
         self.attacks.push(target);
         Ok(Attacked {
             attacks: true,
@@ -3133,7 +3148,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
         vec![Effect::Move(AiMove {
             point: Position::new(20.0, 10.0, 0.0),
             range: Distance::new(2.5),
-            force: true,
+            force: OrderForce::Forced,
             walk: false
         })]
     );
@@ -3791,7 +3806,7 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
         (scout, side.attacks, fx)
     };
     let (scout, attacks, _) = run(26000);
-    assert_eq!(attacks, vec![(object_id(26000), true)]);
+    assert_eq!(attacks, vec![(object_id(26000), OrderForce::Forced)]);
     assert_eq!(
         (
             scout.current_action,
@@ -4333,7 +4348,7 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
             Effect::Move(AiMove {
                 point: Position::new(10.0, 10.0, 0.0),
                 range: Distance::new(1.0),
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             })
         ]
@@ -4700,7 +4715,7 @@ impl UnitSide for ArtifactSide {
             .push((search.radius.get(), search.classes.to_vec(), reach));
         Ok(self.found)
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Ok(Attacked {
             attacks: false,
             posted: Vec::new(),
@@ -4749,7 +4764,7 @@ impl UnitSide for ScoutSide {
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
         Err(GenieError::unsupported("no search here"))
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -5647,7 +5662,7 @@ fn boar_wanders_up_to_three_tiles_once_in_seven() {
         AiMove {
             point,
             range: Distance::new(0.5),
-            force: true,
+            force: OrderForce::Forced,
             walk: true,
         }
     );
@@ -5985,7 +6000,7 @@ fn deer_that_sees_an_object_evades_it() {
         (
             Position::new(31.5 - 1.2 * 3.0, 106.5, 0.0),
             Distance::ZERO,
-            true,
+            OrderForce::Forced,
             false
         )
     );
@@ -6108,7 +6123,7 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
         vec![Effect::Move(AiMove {
             point: Position::new(89.09375, 60.677_082, 0.0),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: true,
         })]
     );
@@ -6887,7 +6902,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
             Effect::Move(AiMove {
                 point: Position::new(30.0, 88.0, 0.0),
                 range: Distance::ZERO,
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             })
         ]
@@ -7132,7 +7147,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
             Effect::Move(AiMove {
                 point: Position::new(25.0, 92.5, 0.0),
                 range: Distance::new(1.0),
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             })
         ]
@@ -7563,20 +7578,20 @@ fn unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
         unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
-    assert!(u.can_order(&plain, false));
-    assert!(!u.can_order(&plain, true));
-    assert!(u.can_order(&carter, false));
-    assert!(u.can_order(&carter, true));
+    assert!(u.can_order(&plain, OrderTest::Any));
+    assert!(!u.can_order(&plain, OrderTest::TaskOnly));
+    assert!(u.can_order(&carter, OrderTest::Any));
+    assert!(u.can_order(&carter, OrderTest::TaskOnly));
     u.current_action = Some(AiAction::Gather);
-    assert!(!u.can_order(&carter, false));
-    assert!(!u.can_order(&carter, true));
-    assert!(u.can_order(&plain, false));
+    assert!(!u.can_order(&carter, OrderTest::Any));
+    assert!(!u.can_order(&carter, OrderTest::TaskOnly));
+    assert!(u.can_order(&plain, OrderTest::Any));
     u.current_action = None;
     let targeted = Surroundings {
         target: Some(Seen::default()),
         ..carter
     };
-    assert!(!u.can_order(&targeted, true));
+    assert!(!u.can_order(&targeted, OrderTest::TaskOnly));
 }
 
 /// `FUN_140c1a760` at `LAB_140c1aa59`: an enemy building (master type `'P'`) passes the
@@ -7756,7 +7771,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
             Effect::Move(AiMove {
                 point: Position::new(10.0, 11.0, 0.0),
                 range: Distance::new(0.5),
-                force: true,
+                force: OrderForce::Forced,
                 walk: true,
             })
         ]
@@ -7844,7 +7859,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
     )
     .unwrap();
     assert_eq!(fx, Vec::new());
-    assert_eq!(side.attacks, [(object_id(51), true)]);
+    assert_eq!(side.attacks, [(object_id(51), OrderForce::Forced)]);
     assert_eq!(
         (
             u.current_target,
@@ -7897,7 +7912,7 @@ fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
         vec![Effect::Move(AiMove {
             point: Position::new(10.0, 10.0, 2.5),
             range: Distance::new(1.0),
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })]
     );
@@ -7968,7 +7983,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
             Effect::Move(AiMove {
                 point: Position::new(25.0, 92.5, 0.0),
                 range: Distance::new(1.0),
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             })
         ]
@@ -8226,7 +8241,7 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
             Effect::Move(AiMove {
                 point: Position::new(5.0, 6.0, 0.0),
                 range: Distance::new(0.25),
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             })
         ]
@@ -8374,7 +8389,7 @@ fn an_idle_tower_attacks_what_its_search_found() {
         )
         .unwrap();
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
-    assert_eq!(side.attacks, vec![(object_id(9731), true)]);
+    assert_eq!(side.attacks, vec![(object_id(9731), OrderForce::Forced)]);
     assert_eq!(
         (u.current_action, u.current_target),
         (Some(AiAction::Attack), Some(object_id(9731)))
@@ -8520,7 +8535,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
         ),
         Ok(true)
     );
-    assert_eq!(side.attacks, vec![(object_id(9800), true)]);
+    assert_eq!(side.attacks, vec![(object_id(9800), OrderForce::Forced)]);
     assert_eq!(
         (u.current_action, u.current_target),
         (Some(AiAction::Attack), Some(object_id(9800)))
@@ -8555,7 +8570,10 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
     );
     assert_eq!(
         side.attacks,
-        vec![(object_id(9800), true), (object_id(9802), true)]
+        vec![
+            (object_id(9800), OrderForce::Forced),
+            (object_id(9802), OrderForce::Forced)
+        ]
     );
 }
 
@@ -8579,7 +8597,13 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
     ] {
         let mut u = idle(ai_kind);
         let mut side = Recorder::default();
-        let r = u.attack_object(object_id(9800), true, false, &at, &mut side);
+        let r = u.attack_object(
+            object_id(9800),
+            OrderForce::Forced,
+            TargetRules::Own,
+            &at,
+            &mut side,
+        );
         assert_eq!(r, Ok(attacks), "type {ai_kind}");
     }
 }
@@ -8722,7 +8746,11 @@ fn lion_drops_moved_target_out_of_its_sight() {
     let (r, fx, side) = handled(&mut u, n, &at(15.0), PlayerKind::Human);
     assert_eq!(
         (r, fx, side.attacks),
-        (Ok(BREAK), vec![], vec![(object_id(700), true)])
+        (
+            Ok(BREAK),
+            vec![],
+            vec![(object_id(700), OrderForce::Forced)]
+        )
     );
     assert_eq!(
         (u.current_target, u.current_action),
@@ -8912,7 +8940,7 @@ impl UnitSide for StandSide {
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
         Err(GenieError::unsupported("no search here"))
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -8968,7 +8996,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     assert_eq!(
         busy.evasive_move(
             Position::new(12.0, 22.0, 1.5),
-            (false, true),
+            (OrderForce::Unforced, BadPoint::Moves),
             &at,
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
@@ -8993,7 +9021,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     assert_eq!(
         u.evasive_move(
             Position::new(12.0, 22.0, 1.5),
-            (false, true),
+            (OrderForce::Unforced, BadPoint::Moves),
             &at,
             &mut r,
             &mut With::new(&mut side, &mut fx)
@@ -9010,7 +9038,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
         vec![Effect::Move(AiMove {
             point: Position::new(ex, ey, 1.5),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })]
     );
@@ -9027,7 +9055,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     };
     let _ = u.evasive_move(
         Position::new(70.0, -3.0, 0.0),
-        (true, false),
+        (OrderForce::Forced, BadPoint::Kept),
         &at,
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
@@ -9055,10 +9083,19 @@ fn move_off_footprint_needs_force_or_no_action() {
         ..idle(UnitAiKind::CIVILIAN)
     };
     let mut fx = Vec::new();
-    assert!(!u.move_aside(m(false), &mut fx, &mut rng()).unwrap());
+    assert!(
+        !u.move_aside(m(OrderForce::Unforced), &mut fx, &mut rng())
+            .unwrap()
+    );
     assert_eq!((fx.len(), u.current_action), (0, Some(AiAction::Gather)));
-    assert!(u.move_aside(m(true), &mut fx, &mut rng()).unwrap());
-    assert_eq!(fx, vec![Effect::Command(AiCommand::MoveAside(m(true)))]);
+    assert!(
+        u.move_aside(m(OrderForce::Forced), &mut fx, &mut rng())
+            .unwrap()
+    );
+    assert_eq!(
+        fx,
+        vec![Effect::Command(AiCommand::MoveAside(m(OrderForce::Forced)))]
+    );
     assert_eq!(
         (u.last_action, u.current_action, u.current_target),
         (
@@ -9069,8 +9106,17 @@ fn move_off_footprint_needs_force_or_no_action() {
     );
     let mut idle_unit = idle(UnitAiKind::CIVILIAN);
     let mut fx = Vec::new();
-    assert!(idle_unit.move_aside(m(false), &mut fx, &mut rng()).unwrap());
-    assert_eq!(fx, vec![Effect::Command(AiCommand::MoveAside(m(false)))]);
+    assert!(
+        idle_unit
+            .move_aside(m(OrderForce::Unforced), &mut fx, &mut rng())
+            .unwrap()
+    );
+    assert_eq!(
+        fx,
+        vec![Effect::Command(AiCommand::MoveAside(m(
+            OrderForce::Unforced
+        )))]
+    );
 }
 
 /// Slot 0x130 (`FUN_140c55620`): unforced, a unit AI with an action value takes no move;
@@ -9093,9 +9139,12 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
         ..idle(UnitAiKind::BOAR)
     };
     let before = u.clone();
-    assert_eq!(u.move_to(m(false)), None);
+    assert_eq!(u.move_to(m(OrderForce::Unforced)), None);
     assert_eq!(u, before);
-    assert_eq!(u.move_to(m(true)), Some(m(true)));
+    assert_eq!(
+        u.move_to(m(OrderForce::Forced)),
+        Some(m(OrderForce::Forced))
+    );
     assert_eq!(
         (u.last_action, u.current_action),
         (Some(AiAction::Attack), Some(AiAction::Move))
@@ -9380,7 +9429,7 @@ fn human_player_king_runs_from_its_attacker() {
         vec![Effect::Move(AiMove {
             point: Position::new(18.0, 30.0, 0.0),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })]
     );
@@ -9453,7 +9502,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         vec![Effect::Move(AiMove {
             point,
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })]
     };
@@ -9467,7 +9516,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
             ..runner(vec![77])
         };
         assert_eq!(
-            run(&mut u, &at, true, PlayerKind::Human),
+            run(&mut u, &at, OrderForce::Forced, PlayerKind::Human),
             (Ok(false), vec![])
         );
         let gaia = Surroundings {
@@ -9479,7 +9528,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
             ..runner(vec![77])
         };
         assert_eq!(
-            run(&mut u, &gaia, true, PlayerKind::Human).1,
+            run(&mut u, &gaia, OrderForce::Forced, PlayerKind::Human).1,
             to(Position::new(18.0, 30.0, 0.0))
         );
     }
@@ -9488,12 +9537,12 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         ..runner(vec![77])
     };
     assert_eq!(
-        run(&mut u, &at, false, PlayerKind::Human),
+        run(&mut u, &at, OrderForce::Unforced, PlayerKind::Human),
         (Ok(false), vec![])
     );
     let mut u = runner(vec![77, 4242]);
     assert_eq!(
-        run(&mut u, &at, true, PlayerKind::Human).1,
+        run(&mut u, &at, OrderForce::Forced, PlayerKind::Human).1,
         to(Position::new(18.0, 30.0, 0.0))
     );
     // 77 and 78 on either side: the way two draws give
@@ -9506,7 +9555,10 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     let d = sqrt(vy * vy + vx * vx);
     let away = Position::new(20.0 - (vx / d) * 2.0, 30.0 - (vy / d) * 2.0, 0.0);
     let mut u = runner(vec![77, 78]);
-    assert_eq!(run(&mut u, &at, true, PlayerKind::Human).1, to(away));
+    assert_eq!(
+        run(&mut u, &at, OrderForce::Forced, PlayerKind::Human).1,
+        to(away)
+    );
     // a defensive unit with its state position 5 tiles east runs no farther than that
     let mut u = UnitAi {
         stance: UnitStance::Defensive,
@@ -9514,27 +9566,42 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         ..runner(vec![77])
     };
     assert_eq!(
-        run(&mut u, &at, true, PlayerKind::Human).1,
+        run(&mut u, &at, OrderForce::Forced, PlayerKind::Human).1,
         to(Position::new(20.0, 30.0, 0.0))
     );
     assert!(
-        run(&mut runner(vec![79]), &at, true, PlayerKind::Computer)
-            .0
-            .is_err()
+        run(
+            &mut runner(vec![79]),
+            &at,
+            OrderForce::Forced,
+            PlayerKind::Computer
+        )
+        .0
+        .is_err()
     );
     let ship = Surroundings {
         class: Some(class::TRANSPORT),
         ..at.clone()
     };
     assert!(
-        run(&mut runner(vec![77]), &ship, true, PlayerKind::Computer)
-            .0
-            .is_err()
+        run(
+            &mut runner(vec![77]),
+            &ship,
+            OrderForce::Forced,
+            PlayerKind::Computer
+        )
+        .0
+        .is_err()
     );
     assert!(
-        run(&mut idle(SIEGE_AI), &at, true, PlayerKind::Computer)
-            .0
-            .is_err()
+        run(
+            &mut idle(SIEGE_AI),
+            &at,
+            OrderForce::Forced,
+            PlayerKind::Computer
+        )
+        .0
+        .is_err()
     );
 }
 
@@ -9838,7 +9905,7 @@ fn patrol_saves_itself_and_attacks_what_it_finds() {
             &mut side,
         )
         .unwrap();
-    assert_eq!(side.attacks, vec![(object_id(77), true)]);
+    assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
     assert_eq!(
         (u.current_order, u.last_order),
         (None, Some(OrderKind::Wait))
@@ -9917,7 +9984,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
         ),
         Ok(true)
     );
-    assert_eq!(side.attacks, vec![(object_id(50), true)]);
+    assert_eq!(side.attacks, vec![(object_id(50), OrderForce::Forced)]);
     // too far: the search's 77
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
@@ -9935,7 +10002,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
         ),
         Ok(true)
     );
-    assert_eq!(side.attacks, vec![(object_id(77), true)]);
+    assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
 }
 
 /// The soldier's idle check's other ways (`FUN_140c20db0`): master 706 checks nothing; with
@@ -9971,7 +10038,7 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     assert_eq!(idle(&mut u, &at, &mut s, PlayerKind::Human), Ok(true));
     assert_eq!(
         (s.attacks, u.current_order),
-        (vec![(object_id(60), true)], None)
+        (vec![(object_id(60), OrderForce::Forced)], None)
     );
     let (mut u, at) = patroller(0);
     assert!(idle(&mut u, &at, &mut side(77), PlayerKind::Computer).is_err());
@@ -10474,7 +10541,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
         vec![Effect::Move(AiMove {
             point: Position::new(18.0, 30.0, 0.0),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })]
     );
@@ -10694,14 +10761,20 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
         };
         let mut side = Recorder::default();
         assert_eq!(
-            u.attack_object(object_id(77), true, false, &at, &mut side),
+            u.attack_object(
+                object_id(77),
+                OrderForce::Forced,
+                TargetRules::Own,
+                &at,
+                &mut side
+            ),
             Ok(true),
             "type {ai_kind}"
         );
         assert_eq!(
             (side.attacks, u.current_action, u.current_target),
             (
-                vec![(object_id(77), true)],
+                vec![(object_id(77), OrderForce::Forced)],
                 Some(AiAction::Attack),
                 Some(object_id(77))
             )
@@ -10736,7 +10809,7 @@ impl UnitSide for ShipSide {
             self.found.remove(0)
         })
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -10831,7 +10904,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
             Effect::Move(AiMove {
                 point: Position::new(13.0, 30.0, 0.0),
                 range: Distance::ZERO,
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             }),
         ]
@@ -11191,7 +11264,7 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
         ..IDLE
     };
     let check = |me: &Attacker, s: &Seeker, t: &Target| {
-        siege_can_attack(me, s, t, false, &roles(), &tuning().unit_ai)
+        siege_can_attack(me, s, t, TargetRules::Own, &roles(), &tuning().unit_ai)
     };
     assert_eq!(
         check(&MANGONEL, &seeker(UnitStance::Aggressive), &villager(40.0)),
@@ -11289,7 +11362,7 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
             &packed,
             &seeker(UnitStance::Aggressive),
             &villager(30.0),
-            true,
+            TargetRules::Any,
             &roles(),
             &tuning().unit_ai
         ),
@@ -11395,7 +11468,7 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
 struct SiegeSide {
     found: Option<Found>,
     allowed: Option<(ClassId, Position)>,
-    attacks: Vec<(ObjectId, bool)>,
+    attacks: Vec<(ObjectId, OrderForce)>,
     reach: bool,
     searches: usize,
 }
@@ -11411,7 +11484,7 @@ impl UnitSide for SiegeSide {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         _: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         self.attacks.push((target, force));
@@ -11485,7 +11558,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
         Ok(true)
     );
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
-    assert_eq!(side.attacks, vec![(object_id(77), true)]);
+    assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
     assert_eq!(
         (u.current_action, u.current_target, u.current_order),
         (Some(AiAction::Attack), Some(object_id(77)), None)
@@ -11600,7 +11673,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
     );
     assert_eq!(
         (u.retarget_disabled, side.attacks.clone()),
-        (0, vec![(object_id(88), true)])
+        (0, vec![(object_id(88), OrderForce::Forced)])
     );
 }
 
@@ -11684,7 +11757,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
     let mut fx = Vec::new();
     assert_eq!(
         u.run_away(
-            true,
+            OrderForce::Forced,
             &pinned,
             PlayerKind::Human,
             &mut rng(),
@@ -11754,7 +11827,7 @@ impl UnitSide for TailSide {
     fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
         Err(GenieError::unsupported("no search here"))
     }
-    fn attack(&mut self, _: ObjectId, _: bool, _: &UnitAi) -> Result<Attacked, GenieError> {
+    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
         Err(GenieError::unsupported("no attack here"))
     }
     fn set_under_attack(&mut self, _: bool) {}
@@ -11978,7 +12051,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
         Effect::Move(AiMove {
             point: Position::new(1.0, 2.0, 0.0),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         }),
     ] {
@@ -12115,7 +12188,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
         Effect::Move(AiMove {
             point: Position::new(10.0, 10.0, 0.0),
             range: Distance::new(WALK_BACK),
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })
     );
@@ -12364,7 +12437,7 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
 #[derive(Default)]
 struct OrderSide {
     world: Vec<UnitSeen>,
-    attacks: Vec<(ObjectId, bool)>,
+    attacks: Vec<(ObjectId, OrderForce)>,
     commands: Vec<UnitCommand>,
     refuses: bool,
     reach: bool,
@@ -12410,7 +12483,7 @@ impl UnitSide for OrderSide {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         _: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         self.attacks.push((target, force));
@@ -12592,7 +12665,7 @@ fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
         &mut side,
     );
     assert_eq!((r, fx), (Ok(OrderOutcome::Taken), Vec::new()));
-    assert_eq!(side.attacks, [(object_id(70), true)]);
+    assert_eq!(side.attacks, [(object_id(70), OrderForce::Forced)]);
     assert_eq!(side.group_stops, 0);
     assert_eq!(
         (u.current_order, u.order_priority.get(), u.current_action),
@@ -12963,7 +13036,7 @@ fn the_run_away_order_runs_from_the_unit_attackers() {
         vec![Effect::Move(AiMove {
             point: Position::new(5.0, 6.0, 0.25),
             range: Distance::ZERO,
-            force: true,
+            force: OrderForce::Forced,
             walk: false,
         })]
     );
@@ -13090,7 +13163,7 @@ fn the_move_orders_move_to_their_point_within_their_range() {
                 vec![Effect::Move(AiMove {
                     point: Position::new(12.7, 30.2, 0.5),
                     range: Distance::new(3.0),
-                    force: true,
+                    force: OrderForce::Forced,
                     walk: true,
                 })]
             )
@@ -13278,7 +13351,7 @@ fn seek_and_destroy_attacks_and_explore_and_destroy_explores_at_tiles() {
     let mut u = idle(SOLDIER_AI);
     let (r, fx, _) = run_order(&mut u, queued(seek, 70), class::CLASS_6, &mut side);
     assert_eq!((r, fx), (Ok(OrderOutcome::Taken), Vec::new()));
-    assert_eq!(side.attacks, [(object_id(70), true)]);
+    assert_eq!(side.attacks, [(object_id(70), OrderForce::Forced)]);
     assert_eq!(
         (
             u.current_order,
@@ -13416,7 +13489,7 @@ fn the_order_on_target_goes_to_the_caller_or_moves_to_gone_one_point() {
             vec![Effect::Move(AiMove {
                 point: Position::new(12.7, 30.2, 0.5),
                 range: Distance::new(3.0),
-                force: true,
+                force: OrderForce::Forced,
                 walk: true,
             })]
         );
@@ -14025,7 +14098,7 @@ impl UnitSide for RetargetSide {
     fn attack(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         ai: &UnitAi,
     ) -> Result<Attacked, GenieError> {
         self.soldier.attack(target, force, ai)
@@ -14190,17 +14263,17 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
     };
     assert_eq!(
         attacked(40, 30, PlayerKind::Human),
-        (Ok(10), vec![(object_id(30), true)])
+        (Ok(10), vec![(object_id(30), OrderForce::Forced)])
     );
     assert_eq!(attacked(40, 40, PlayerKind::Human), (Ok(10), vec![]));
     assert_eq!(attacked(30, 41, PlayerKind::Human), (Ok(10), vec![]));
     assert_eq!(
         attacked(43, 41, PlayerKind::Human),
-        (Ok(10), vec![(object_id(40), true)])
+        (Ok(10), vec![(object_id(40), OrderForce::Forced)])
     );
     assert_eq!(
         attacked(40, 42, PlayerKind::Human),
-        (Ok(10), vec![(object_id(42), true)])
+        (Ok(10), vec![(object_id(42), OrderForce::Forced)])
     );
     assert_eq!(attacked(43, 43, PlayerKind::Human), (Ok(10), vec![]));
     assert_eq!(attacked(30, 30, PlayerKind::Human), (Ok(9), vec![]));
@@ -14217,6 +14290,6 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
     );
     assert_eq!(
         (r, side.soldier.attacks),
-        (Ok(10), vec![(object_id(30), true)])
+        (Ok(10), vec![(object_id(30), OrderForce::Forced)])
     );
 }

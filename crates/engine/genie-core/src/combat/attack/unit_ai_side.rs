@@ -26,6 +26,7 @@ use crate::objects::masters::{Master, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::unit_ai::Attacked;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::world::SideWorld;
@@ -56,7 +57,7 @@ impl UnitView<'_, '_> {
     pub(crate) fn start_attack_now(
         &mut self,
         target: ObjectId,
-        force: bool,
+        force: OrderForce,
         ai: &UnitAi,
         roles: &Roles,
     ) -> Result<Attacked, GenieError> {
@@ -84,7 +85,7 @@ impl UnitView<'_, '_> {
             .attack()
             .is_some_and(|a| a.target.map(AttackTargetId::id) == Some(target))
         {
-            if force {
+            if force == OrderForce::Forced {
                 self.attack_again(target, &t, master, ai, roles)?;
             }
             return Ok(Attacked {

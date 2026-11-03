@@ -2,6 +2,7 @@
 //! the lines' ranges and the relayout.
 
 use crate::GenieError;
+use crate::groups::FarMembers;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
@@ -51,7 +52,7 @@ impl World {
         let far = if g.command_queue.is_empty() {
             self.kept_apart_leave(group)?
         } else {
-            false
+            FarMembers::Stay
         };
         if self
             .groups
@@ -105,13 +106,13 @@ impl World {
     /// [`World::awake_update`] without queued commands: when the group keeps every member apart
     /// (`+0x468` equal to the member count), its target is not pending, it walks no patrol and
     /// [`GroupFlags::PATROL`] is clear, each kept-apart unit leaves (`removeUnit` with target −1;
-    /// one that is no member leaves the list instead, `FUN_140a63bd0`). The statistics' far flag:
-    /// no queued command and [`MotionFlags::NEW`] clear.
+    /// one that is no member leaves the list instead, `FUN_140a63bd0`). The statistics' far members
+    /// leave with no queued command and [`MotionFlags::NEW`] clear, else they stay.
     ///
     /// # Errors
     ///
     /// What the target's test and the leaving do not model.
-    pub(super) fn kept_apart_leave(&mut self, group: GroupId) -> Result<bool, GenieError> {
+    pub(super) fn kept_apart_leave(&mut self, group: GroupId) -> Result<FarMembers, GenieError> {
         let g = self.groups.held(group)?;
         let patrol =
             top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
@@ -128,7 +129,13 @@ impl World {
             }
         }
         let g = self.groups.held(group)?;
-        Ok(g.command_queue.is_empty() && !g.motion.flags.contains(MotionFlags::NEW))
+        Ok(
+            if g.command_queue.is_empty() && !g.motion.flags.contains(MotionFlags::NEW) {
+                FarMembers::Leave
+            } else {
+                FarMembers::Stay
+            },
+        )
     }
 
     /// [`World::awake_update`] with [`GroupFlags::LEAD_TO_TARGET`]: the lead is the member nearest
@@ -139,7 +146,11 @@ impl World {
     /// # Errors
     ///
     /// What the motion update and the statistics do not model.
-    pub(super) fn lead_to_target(&mut self, group: GroupId, far: bool) -> Result<(), GenieError> {
+    pub(super) fn lead_to_target(
+        &mut self,
+        group: GroupId,
+        far: FarMembers,
+    ) -> Result<(), GenieError> {
         let lead = self.nearest_to_target(group);
         self.groups.held_mut(group)?.motion.lead = lead;
         if lead.is_none() {
@@ -187,7 +198,7 @@ impl World {
     pub(super) fn after_motion(
         &mut self,
         group: GroupId,
-        far: bool,
+        far: FarMembers,
         forward: BVector,
     ) -> Result<bool, GenieError> {
         if self.groups.held(group)?.flags.contains(GroupFlags::TURN) {

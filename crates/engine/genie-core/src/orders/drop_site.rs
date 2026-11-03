@@ -3,6 +3,9 @@
 
 use crate::GenieError;
 use crate::gathering::DropSiteId;
+use crate::gathering::drop_sites::DropMeasure;
+use crate::gathering::drop_sites::SitePlace;
+use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::drop_sites::drop_site_search;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
@@ -134,7 +137,7 @@ impl World {
                 &master.action_part().drop_sites,
                 unit.position(),
                 None,
-                (false, None),
+                (SitePlace::Anywhere, None),
                 by_id,
             );
         }
@@ -160,7 +163,11 @@ impl World {
             &mut world,
             others,
             state,
-            (false, false, None),
+            SiteSearch {
+                place: SitePlace::Anywhere,
+                nearest: DropMeasure::ByDistance,
+                at_work: None,
+            },
             by_id,
         )
     }

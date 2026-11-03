@@ -24,6 +24,16 @@ use genie_model::objects::lifecycle::object_state;
 
 pub use self::master_data::MasterData;
 pub use self::object_state::ObjectState;
+
+/// Whether an object's current sprite still animates (the sprite list's slot 0x20,
+/// `FUN_1413b8790` -> `FUN_1413b38a0`: its animate flag on and the graphic animated).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpritePlay {
+    /// It animates.
+    Animating,
+    /// It stands still, or there is none.
+    Still,
+}
 use crate::garrison::ContainerId;
 use crate::objects::FacetCount;
 use crate::world::player::Player;
@@ -149,14 +159,13 @@ impl Lifecycle {
     }
 
     /// One update of `dt_seconds` ([`Millis::seconds`](crate::world::Millis::seconds)), with the
-    /// tick's Object stream and whether the object's current sprite still animates (the sprite
-    /// list's slot 0x20, `FUN_1413b8790` -> `FUN_1413b38a0`: its animate flag on and the graphic
-    /// animated). True when the object leaves its list.
+    /// tick's Object stream and whether the object's current sprite still animates (`sprite`).
+    /// True when the object leaves its list.
     pub fn update(
         &mut self,
         dt_seconds: Seconds,
         object: &mut Well512,
-        animating: bool,
+        sprite: SpritePlay,
     ) -> Result<bool, GenieError> {
         if self.goto_sleep {
             // the object's update moves it to the sleeping list first (`Unit::update`)
@@ -185,7 +194,7 @@ impl Lifecycle {
             // RGE_Animated_Object::update: the dying sprite plays; once it stops, state 5 (the
             // caller clears the animation speed, `+0x7b8`, and leaves the remains)
             ObjectState::DyingSprite => {
-                if !animating {
+                if sprite == SpritePlay::Still {
                     self.state = ObjectState::Dead;
                 }
                 Ok(false)
@@ -274,7 +283,7 @@ mod tests {
         let mut states = Vec::new();
         for i in 1..=limit {
             if life
-                .update(dt.seconds(), &mut Well512::default(), false)
+                .update(dt.seconds(), &mut Well512::default(), SpritePlay::Still)
                 .unwrap()
             {
                 return (states, Some(i));
@@ -344,7 +353,11 @@ mod tests {
             ..dead(Class::Static)
         };
         let _ = life
-            .update(Millis::new(104).seconds(), &mut Well512::default(), false)
+            .update(
+                Millis::new(104).seconds(),
+                &mut Well512::default(),
+                SpritePlay::Still,
+            )
             .unwrap();
         assert_eq!(
             (life.state, life.amount),
@@ -365,7 +378,11 @@ mod tests {
         };
         let step = |mut l: Lifecycle| {
             let _ = l
-                .update(Seconds::new(0.025), &mut Well512::default(), true)
+                .update(
+                    Seconds::new(0.025),
+                    &mut Well512::default(),
+                    SpritePlay::Animating,
+                )
                 .unwrap();
             l.state
         };
@@ -386,11 +403,17 @@ mod tests {
             ..dead(Class::Animated)
         };
         let mut rng = Well512::default();
-        let _ = sheep.update(Seconds::new(0.025), &mut rng, true).unwrap();
+        let _ = sheep
+            .update(Seconds::new(0.025), &mut rng, SpritePlay::Animating)
+            .unwrap();
         assert_eq!(sheep.state, ObjectState::DyingSprite);
-        let _ = sheep.update(Seconds::new(0.025), &mut rng, true).unwrap();
+        let _ = sheep
+            .update(Seconds::new(0.025), &mut rng, SpritePlay::Animating)
+            .unwrap();
         assert_eq!(sheep.state, ObjectState::DyingSprite);
-        let _ = sheep.update(Seconds::new(0.025), &mut rng, false).unwrap();
+        let _ = sheep
+            .update(Seconds::new(0.025), &mut rng, SpritePlay::Still)
+            .unwrap();
         assert_eq!(sheep.state, ObjectState::Dead);
     }
 
@@ -405,7 +428,11 @@ mod tests {
         };
         marlin.state = ObjectState::Alive;
         let _ = marlin
-            .update(Seconds::new(0.025), &mut Well512::default(), false)
+            .update(
+                Seconds::new(0.025),
+                &mut Well512::default(),
+                SpritePlay::Still,
+            )
             .unwrap();
         assert_eq!(marlin.state, ObjectState::Dead);
     }
@@ -437,8 +464,12 @@ mod tests {
         ];
         for (i, mut life) in cases.into_iter().enumerate() {
             assert!(
-                life.update(Seconds::new(0.104), &mut Well512::default(), false)
-                    .is_err(),
+                life.update(
+                    Seconds::new(0.104),
+                    &mut Well512::default(),
+                    SpritePlay::Still
+                )
+                .is_err(),
                 "case {i}"
             );
         }
@@ -454,12 +485,12 @@ mod tests {
         };
         let mut object = Well512::default();
         assert_eq!(
-            life.update(Seconds::new(0.104), &mut object, false),
+            life.update(Seconds::new(0.104), &mut object, SpritePlay::Still),
             Ok(false)
         );
         assert_eq!(life.state, ObjectState::Gone);
         assert_eq!(
-            life.update(Seconds::new(0.104), &mut object, false),
+            life.update(Seconds::new(0.104), &mut object, SpritePlay::Still),
             Ok(true)
         );
     }
@@ -477,13 +508,17 @@ mod tests {
         };
         let mut object = Well512::default();
         object.set_seed(1);
-        let _ = tree.update(Seconds::new(0.02), &mut object, false).unwrap();
+        let _ = tree
+            .update(Seconds::new(0.02), &mut object, SpritePlay::Still)
+            .unwrap();
         assert_eq!(
             (tree.state, tree.amount, object.draws),
             (ObjectState::Dying, Amount::new(100.0), 1)
         );
         // dead with its wood, it waits (no decay) and draws nothing more
-        let _ = tree.update(Seconds::new(0.02), &mut object, false).unwrap();
+        let _ = tree
+            .update(Seconds::new(0.02), &mut object, SpritePlay::Still)
+            .unwrap();
         assert_eq!((tree.state, object.draws), (ObjectState::Dying, 1));
     }
 
@@ -492,7 +527,11 @@ mod tests {
         let mut life = dead(Class::Animated);
         assert!(life.is_alive());
         let _ = life
-            .update(Seconds::new(0.104), &mut Well512::default(), false)
+            .update(
+                Seconds::new(0.104),
+                &mut Well512::default(),
+                SpritePlay::Still,
+            )
             .unwrap();
         assert!(!life.is_alive());
     }

@@ -12,6 +12,7 @@ use crate::orders::Dispatch;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
@@ -26,6 +27,15 @@ use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
+
+/// Which units [`UnitAi::can_order`] lets take orders (`FUN_140c4eea0`'s second argument).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OrderTest {
+    /// Any that passes the test (0).
+    Any,
+    /// Only one whose master has a task of action type 0x99 (1).
+    TaskOnly,
+}
 
 impl UnitAi {
     /// The base handler's case `0x1f9` ("Action %d has failed.", `FUN_140c589c0`): with an order
@@ -332,7 +342,7 @@ impl UnitAi {
             Effect::Move(AiMove {
                 point: Position::new(x, y, at.position.z()),
                 range: Distance::new(WALK_BACK),
-                force: true,
+                force: OrderForce::Forced,
                 walk: false,
             }),
             self,
@@ -376,7 +386,7 @@ impl UnitAi {
                     | OrderKind::AutoBoarLuring
             )
         );
-        if ends && self.can_order(at, false) {
+        if ends && self.can_order(at, OrderTest::Any) {
             self.remove_target();
             self.leave_patrol_timers(ai);
             self.current_order = None;
@@ -423,14 +433,14 @@ impl UnitAi {
 
     /// `FUN_140c4eea0`: a unit takes orders unless its master has a task of action type 0x99
     /// (`FUN_1415c60b0`) and its target exists in the world (`FUN_1415417a0` on `+0x48`) or it
-    /// has an action value (`+0x44`). With `task_only` (its second argument, which the full
-    /// update and `FUN_140c68980` pass as 0 and only the slot 4 of `FUN_140c2bd20` as 1) a unit
-    /// that passes the test takes orders only with that task.
-    pub(super) const fn can_order(&self, at: &Surroundings, task_only: bool) -> bool {
+    /// has an action value (`+0x44`). With [`OrderTest::TaskOnly`] (its second argument, which
+    /// the full update and `FUN_140c68980` pass as 0 and only the slot 4 of `FUN_140c2bd20` as 1)
+    /// a unit that passes the test takes orders only with that task.
+    pub(super) const fn can_order(&self, at: &Surroundings, test: OrderTest) -> bool {
         if at.task_0x99 && (at.target.is_some() || self.current_action.is_some()) {
             return false;
         }
-        !task_only || at.task_0x99
+        matches!(test, OrderTest::Any) || at.task_0x99
     }
 
     /// The unit AI between its owner's turns (`FUN_140c68980`, from `RGE_Combat_Object::update`
@@ -455,7 +465,7 @@ impl UnitAi {
         if (self.current_action.is_some() || at.busy) && !at.interruptible {
             return Ok(());
         }
-        if self.can_order(at, false) {
+        if self.can_order(at, OrderTest::Any) {
             self.run_orders(at, side, player_kind, ai)?;
         }
         Ok(())

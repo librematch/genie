@@ -11,9 +11,12 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::{
     ARTIFACT_AI, AttackAsk, BOAR_AI, CIVILIAN, FISHING_AI, FISHING_CARED, Found, Memory, Pick,
     SIEGE_AI, SIEGE_CARED, SIEGE_TOWER_AI, SOLDIER_AI, SOLDIER_CARED, Search, Seeker, Surroundings,
@@ -133,7 +136,7 @@ impl UnitAi {
         let dy = u.position.y() - y;
         let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
-        let _ = self.evasive_move(point, (true, true), at, ai, side)?;
+        let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Moves), at, ai, side)?;
         Ok(true)
     }
 
@@ -217,7 +220,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_object(target, true, false, at, side)? {
+        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)? {
             if self.current_order != Some(OrderKind::Defend) {
                 self.set_order_with(None, false, ai);
             }
@@ -438,7 +441,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_slot(target, false, at, side, ai)? {
+        if self.attack_slot(target, TargetRules::Own, at, side, ai)? {
             if self.retarget_disabled == 0 && self.current_order != Some(OrderKind::Defend) {
                 self.set_order_with(None, false, ai);
             }
@@ -596,7 +599,7 @@ impl UnitAi {
             return Ok(false);
         };
         // slot 0xb8 with 1 (`+0x1d5` then 1, not held)
-        self.attack_object(id, true, false, at, side)
+        self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side)
     }
 
     /// What `bestUnitToAttack` reads of this unit AI ([`Seeker`]), its current target's master

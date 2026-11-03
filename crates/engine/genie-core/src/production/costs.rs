@@ -174,19 +174,28 @@ pub fn costed<'m>(masters: &'m Masters, m: &'m Master) -> (&'m Master, bool) {
         .map_or((head, false), |stack| (stack, true))
 }
 
-/// `FUN_141618db0` without a reason out and without the pending debits (`param_6`, `param_7`
-/// 0): the player can pay `count` units of its master `master`. A master the player lacks or
-/// of a type below 70 cannot. Each cost entry of the costed master ([`costed`]) with an
-/// attribute (and paid, for an annex's) needs its amount times `count` at most what the
-/// attribute holds (`COMISS`, `JA`: a NaN passes); the population's entry (attribute 4) is
-/// tested only with `population` (`param_5` 0): the population (attribute 11) below the cap
-/// (32), and the queued units (80) plus the population plus the need at most the cap or the
-/// headroom (4) plus the population, the smaller.
+/// Whether [`cost_test`] tests the population's cost entry (`FUN_141618db0`'s `param_5`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PopulationTest {
+    /// The population's entry is tested (`param_5` 0).
+    Tested,
+    /// It is passed over (`param_5` 1).
+    Skipped,
+}
+
+/// `FUN_141618db0` without a reason out and without the pending debits (`param_6`, `param_7` 0):
+/// the player can pay `count` units of its master `master`. A master the player lacks or of a type
+/// below 70 cannot. Each cost entry of the costed master ([`costed`]) with an attribute (and paid,
+/// for an annex's) needs its amount times `count` at most what the attribute holds (`COMISS`, `JA`:
+/// a NaN passes); the population's entry (attribute 4) is tested only with
+/// [`PopulationTest::Tested`] (`param_5` 0): the population (attribute 11) below the cap (32), and
+/// the queued units (80) plus the population plus the need at most the cap or the headroom (4) plus
+/// the population, the smaller.
 pub fn cost_test(
     masters: &Masters,
     master: MasterId,
     count: CostCount,
-    population: bool,
+    population: PopulationTest,
     attributes: &dyn Attributes,
     roles: &Roles,
     slots: Slots,
@@ -207,7 +216,7 @@ pub fn cost_test(
             .of_attribute(attribute)
             .contains(AttributeRoles::HEADROOM)
         {
-            if !population {
+            if population == PopulationTest::Skipped {
                 continue;
             }
             let pop = attributes.get(slots.attribute.population)?;
@@ -233,9 +242,10 @@ pub fn cost_test(
 }
 
 /// `FUN_14162fb60`: when the player can pay `count` units of master `master` without the
-/// population's test ([`cost_test`] with `param_5` 1), each of the master's own cost entries
-/// with an attribute and a paid flag comes off its attribute, its amount times `count`
-/// (straight into the attribute; the statistics `FUN_14097daf0` are not the simulation's).
+/// population's test ([`cost_test`] with [`PopulationTest::Skipped`], `param_5` 1), each of the
+/// master's own cost entries with an attribute and a paid flag comes off its attribute, its amount
+/// times `count` (straight into the attribute; the statistics `FUN_14097daf0` are not the
+/// simulation's).
 pub fn pay(
     masters: &Masters,
     master: MasterId,
@@ -244,7 +254,15 @@ pub fn pay(
     roles: &Roles,
     slots: Slots,
 ) -> Result<bool, GenieError> {
-    if !cost_test(masters, master, count, false, &*attributes, roles, slots)? {
+    if !cost_test(
+        masters,
+        master,
+        count,
+        PopulationTest::Skipped,
+        &*attributes,
+        roles,
+        slots,
+    )? {
         return Ok(false);
     }
     // the cost test found the master
@@ -276,7 +294,15 @@ pub fn master_costs(
 ) -> Result<[(Option<AttributeId>, CostAmount); 3], GenieError> {
     use crate::math::conversions::cvttss2si;
     let mut out = [(None, 0i16); 3];
-    let can = cost_test(masters, master, ONE, true, attributes, roles, slots)?;
+    let can = cost_test(
+        masters,
+        master,
+        ONE,
+        PopulationTest::Tested,
+        attributes,
+        roles,
+        slots,
+    )?;
     let Some(m) = masters.get(master).filter(|m| MasterKind::COMBAT <= m.kind) else {
         return Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))));
     };
