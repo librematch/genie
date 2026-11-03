@@ -7,7 +7,7 @@ use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{
-    Around, Changed, DropDraws, MapShore, NONE, Ship, Shore, TRANSPORT, TransportAction, in_zone,
+    Around, Changed, DropDraws, MapShore, NONE, Ship, TRANSPORT, TransportAction, in_zone,
     retry_point,
 };
 use crate::map::Distance;
@@ -207,7 +207,7 @@ impl World {
 
     /// The unload of the Transport of player `p`'s object at `i` in its update's state 6
     /// (`FUN_140aa3ba0`, [`Updated::Unload`]): the units inside go ashore in the zone of
-    /// the point's tile ([`Shore::zone`]; any zone without a point) ([`World::unload_all`]).
+    /// the point's tile ([`MapShore::zone`]; any zone without a point) ([`World::unload_all`]).
     /// With none ashore the point moves ([`retry_point`], the Action stream) and the Transport
     /// sails there to unload (`set_state(4)`, then `+0x68`) when a draw found land, else the
     /// owner hears 0x207 (no unload there); with some ashore and more inside the owner hears

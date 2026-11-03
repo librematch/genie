@@ -8,7 +8,7 @@ use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{
-    Changed, MapShore, NO_TRANSPORT, NONE, Ship, Shore, TransportAction, TransportReads, Updated,
+    Changed, MapShore, NO_TRANSPORT, NONE, Ship, TransportAction, TransportReads, Updated,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -80,7 +80,7 @@ impl TransportAction {
         &mut self,
         call: StartCall,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
@@ -104,7 +104,7 @@ impl TransportAction {
     /// `set_state` (slot 16, `FUN_140aa42a0`): its sub-actions go first (`FUN_140a98620`: a
     /// `MoveTo`'s teardown stops the unit, [`Changed::stopped`]), then the state. State 2 shows
     /// the master's standing sprite ([`Changed::stands`]). States 4 and 11 sail: the point
-    /// becomes the shore point on the way from the unit's place ([`Shore::shore_point`]) when
+    /// becomes the shore point on the way from the unit's place ([`MapShore::shore_point`]) when
     /// there is one; then a quiet `MoveTo` to the point within `TransportTuning::move_range` (`FUN_140aa0d30`
     /// with no task: the master's `+0x748` sprite; `FUN_140a7a170` with 1) joins the list
     /// (`FUN_140a977e0`, for a unit in a state below 3) and starts (`0x140aa2100`: a point is
@@ -118,7 +118,7 @@ impl TransportAction {
         &mut self,
         state: TransportState,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
@@ -162,7 +162,7 @@ impl TransportAction {
         &mut self,
         point: Position,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
@@ -185,7 +185,7 @@ impl TransportAction {
     pub fn stop(
         &mut self,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
@@ -201,9 +201,9 @@ impl TransportAction {
     /// Slot 9 (`FUN_140aa4830`), the work order on `point` (x, y and the height) naming `target`
     /// ([`TransportTarget::Ship`] the unit itself, as the unload command's); `+0x34` becomes 1.
     /// Near enough to unload there — a tile of the zone of the point's tile (`CVTTSS2SI`,
-    /// [`Shore::zone`]) within `TransportTuning::near` of the unit ([`Shore::near`], exactly 1),
-    /// and the point within `TransportTuning::unload_reach_squared` of the unit's footprint on the
-    /// ground (each axis' gap past the master's radius, `MAXSS` with 0: a NaN gap stays;
+    /// [`MapShore::zone`]) within `TransportTuning::near` of the unit ([`MapShore::near`], exactly
+    /// 1), and the point within `TransportTuning::unload_reach_squared` of the unit's footprint on
+    /// the ground (each axis' gap past the master's radius, `MAXSS` with 0: a NaN gap stays;
     /// `COMISS`/`JC`: a NaN is not within) — it takes the point and unloads (`set_state(6)`). Else
     /// a point below 0 on either axis (`COMISS`/`JC`: a NaN too) changes nothing; any other becomes
     /// the point, and the unit sails there to unload (`set_state(4)`) from the unit itself, else
@@ -217,7 +217,7 @@ impl TransportAction {
         point: Position,
         target: TransportTarget,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
@@ -334,10 +334,10 @@ impl TransportAction {
     /// without one the list answers 1) unloads (4: `set_state(6)`) or idles (11:
     /// `set_state(2)`). State 13 tells the unit's AI it failed (0x1f9 with the Transport's action
     /// value, slot 0x328), idles and returns 3. State 6 unloads:
-    /// - with a point, its zone's tile ([`Shore::zone`]) must lie within `TransportTuning::near` of the unit
-    ///   ([`Shore::near`]), else the owner hears that it cannot unload there (0x207, its slot
-    ///   0x2e8: [`crate::unit_ai::alert_owner`] for a computer player); `+0x68` clears either
-    ///   way.
+    /// - with a point, its zone's tile ([`MapShore::zone`]) must lie within `TransportTuning::near`
+    ///   of the unit ([`MapShore::near`]), else the owner hears that it cannot unload there (0x207,
+    ///   its slot 0x2e8: [`crate::unit_ai::alert_owner`] for a computer player); `+0x68` clears
+    ///   either way.
     /// - with units inside, a unit beside the shore ([`TransportAction::next_to_shore`]) unloads
     ///   ([`Updated::Unload`]); one that is not, over water at the point (`FUN_1413fbf30`,
     ///   `FUN_1413fc2b0`: the terrain table's bits 0 to 2 at the point's tile) waits there, else
@@ -351,7 +351,7 @@ impl TransportAction {
     pub(crate) fn state_update(
         &mut self,
         walked: UpdateCode,
-        (ship, shore): (&Ship<'_>, &mut impl Shore),
+        (ship, shore): (&Ship<'_>, &mut MapShore<'_>),
         (unit, mut motion, ais): (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
         player_kind: PlayerKind,
@@ -434,7 +434,7 @@ impl TransportAction {
     pub fn unloaded(
         &mut self,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
@@ -528,9 +528,10 @@ impl TransportAction {
 
     /// `FUN_140aa3f40` (HD's `next_to_drop_off_terrain`), without a task (`+0x48`; a task whose
     /// `+0x16` is −1 would answer yes): a tile about the unit's footprint grown by
-    /// `TransportTuning::shore_margin` (each edge cut by `CVTTSS2SI`, kept on the map) of the point's zone
-    /// ([`Shore::zone`]), or without a point (x [`NONE`]) a land tile (the terrain table's bits 3
-    /// and 4, `FUN_1413fbee0` and `FUN_1413fc270`); row by row, each from its least x.
+    /// `TransportTuning::shore_margin` (each edge cut by `CVTTSS2SI`, kept on the map) of the
+    /// point's zone ([`MapShore::zone`]), or without a point (x [`NONE`]) a land tile (the terrain
+    /// table's bits 3 and 4, `FUN_1413fbee0` and `FUN_1413fc270`); row by row, each from its least
+    /// x.
     ///
     /// # Errors
     ///
@@ -538,7 +539,7 @@ impl TransportAction {
     pub fn next_to_shore(
         &self,
         ship: &Ship<'_>,
-        shore: &mut impl Shore,
+        shore: &mut MapShore<'_>,
         transport_tuning: &TransportTuning,
     ) -> Result<bool, GenieError> {
         let (ux, uy) = (ship.position.x(), ship.position.y());

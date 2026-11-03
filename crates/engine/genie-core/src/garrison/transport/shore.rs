@@ -3,7 +3,7 @@
 
 use crate::GenieError;
 use crate::garrison::transport::{
-    DEEP_WATER, DRAW_SCALE, DROP_TRIES, RETRIES, RETRY_STEP, STACK_PLACE, Shore, WATER,
+    DEEP_WATER, DRAW_SCALE, DROP_TRIES, RETRIES, RETRY_STEP, STACK_PLACE, WATER,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -202,10 +202,11 @@ pub(crate) fn in_zone(
     .ok_or(GenieError::unreachable("a zone adjacency past its table"))
 }
 
-/// The map as a unit's Transport reads it ([`Shore`]): the map's terrain, the zone maps and the
+/// The map as a unit's Transport reads it: the map's terrain, the zone maps and the
 /// planners, the unit's terrain restriction (its master's `+0x606`; none below 0), its tile and
 /// the tile paths' tuning values (the shore point's walk).
-pub(crate) struct MapShore<'a> {
+#[derive(Debug)]
+pub struct MapShore<'a> {
     pub(super) terrain: &'a Terrain,
     pub(super) zones: &'a mut Zones,
     pub(super) pathing: &'a mut Pathing,
@@ -256,17 +257,27 @@ impl<'a> MapShore<'a> {
             values,
         )?))
     }
-}
 
-impl Shore for MapShore<'_> {
-    fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError> {
+    /// `FUN_1411958c0`: the unit's zone (its restriction's zone map, `FUN_1411931c0`) at `tile`:
+    /// 0 for a tile below 0, or without a zone map.
+    ///
+    /// # Errors
+    ///
+    /// A map the caller cannot read.
+    pub(crate) fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError> {
         if tile.x() < 0 || tile.y() < 0 {
             return Ok(ZoneId::OFF_MAP);
         }
         Ok(self.zone_map()?.map_or(ZoneId::OFF_MAP, |m| m.zone(tile)))
     }
 
-    fn near(&mut self, zone: ZoneId, reach: Distance) -> Result<bool, GenieError> {
+    /// `FUN_1411a7570`: a tile of zone `zone` lies within `reach` of the unit's tile (its place
+    /// cut by `CVTTSS2SI`, [`crate::pathing::zones::ZoneMap::near`]); no without a zone map.
+    ///
+    /// # Errors
+    ///
+    /// A map the caller cannot read.
+    pub(crate) fn near(&mut self, zone: ZoneId, reach: Distance) -> Result<bool, GenieError> {
         let tile = self.tile;
         // the game passes the zone's low byte
         let zone = ZoneId::new(u16::from(zone.byte()));
@@ -275,11 +286,26 @@ impl Shore for MapShore<'_> {
             .is_some_and(|m| m.near(zone, tile, reach).is_some()))
     }
 
-    fn flags(&self, tile: Tile) -> TerrainFlags {
+    /// The terrain table's flags of `tile`, its x and y shorts
+    /// ([`crate::map::terrain::Terrain::flags_at`]).
+    #[must_use]
+    pub(crate) fn flags(&self, tile: Tile) -> TerrainFlags {
         self.terrain.flags_at(tile)
     }
 
-    fn shore_point(&mut self, from: Point, to: Point) -> Result<Option<Point>, GenieError> {
+    /// `FUN_140f7c390` with the planner of the unit's restriction (`FUN_140f7cb30`, none without a
+    /// master): the last point of the planner's path from `from` to `to` whose tile has an edge
+    /// ([`crate::pathing::tile_path::Planner::last_open_point`]); None without a planner or such a
+    /// point.
+    ///
+    /// # Errors
+    ///
+    /// What the planner's searches fail on.
+    pub(crate) fn shore_point(
+        &mut self,
+        from: Point,
+        to: Point,
+    ) -> Result<Option<Point>, GenieError> {
         let Some(planner) = self
             .restriction
             .and_then(|r| self.pathing.planner(r, self.tiles))

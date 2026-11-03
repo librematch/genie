@@ -1,12 +1,12 @@
-//! The Transport action (`RGE_Action_Transport`, type 12, vtable `0x142ed61e8`): a transport's
-//! sail to a point and its unload there. The unit's unload command (slot 0x3a8, `FUN_14108d050`,
-//! which the unit AI's unload order 0x2d1 runs) makes one at the unit's place and gives it the
-//! order's point as its work ([`TransportAction::work`]): near enough it unloads at once (state
-//! 6), else it sails toward the point (state 4, a quiet `MoveTo` sub-action to the last point of
-//! the planner's path that a unit can cross, [`Shore::shore_point`]) and unloads where that ends.
-//! The unload (`FUN_140aa3ba0`, the caller's) puts the units inside ashore where a drop location
-//! is free (`World::drop_location`); when none goes, the action sails to a random point about
-//! the old one ([`retry_point`]) and tries again.
+//! The Transport action (`RGE_Action_Transport`, type 12, vtable `0x142ed61e8`): a transport's sail
+//! to a point and its unload there. The unit's unload command (slot 0x3a8, `FUN_14108d050`, which
+//! the unit AI's unload order 0x2d1 runs) makes one at the unit's place and gives it the order's
+//! point as its work ([`TransportAction::work`]): near enough it unloads at once (state 6), else it
+//! sails toward the point (state 4, a quiet `MoveTo` sub-action to the last point of the planner's
+//! path that a unit can cross, [`MapShore::shore_point`]) and unloads where that ends. The unload
+//! (`FUN_140aa3ba0`, the caller's) puts the units inside ashore where a drop location is free
+//! (`World::drop_location`); when none goes, the action sails to a random point about the old one
+//! ([`retry_point`]) and tries again.
 //!
 //! 158041: the constructor `FUN_140aa3ab0`, `first_in_stack` `0x140aa3e10` (slot 5), update
 //! `0x140aa4640` (slot 6), stop `0x140aa4620` (slot 7), `move_to` `0x140aa3e40` (slot 8), work
@@ -14,20 +14,15 @@
 //! (HD's `next_to_drop_off_terrain`).
 
 use crate::GenieError;
-use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
-use crate::map::Point;
 use crate::map::Position;
-use crate::map::TerrainFlags;
 use crate::map::TerrainId;
-use crate::map::Tile;
 use crate::movement::move_to::{MoveDefaults, MoveToReads};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ActionKind;
 use crate::objects::sprite::Graphic;
-use crate::pathing::zones::ZoneId;
 use genie_diff::Diff;
 
 mod action;
@@ -39,7 +34,7 @@ mod unload;
 mod work;
 
 pub use self::shore::Around;
-pub(crate) use self::shore::MapShore;
+pub use self::shore::MapShore;
 pub(crate) use self::shore::{DropDraws, in_zone, retry_point};
 pub use self::transport_mode::TransportMode;
 pub use self::transport_state::TransportState;
@@ -131,35 +126,6 @@ pub struct Ship<'a> {
     /// The sprite its maker gives a `MoveTo` (`+0x58`): the task's moving one, without a task
     /// the master's walking sprite ([`TransportAction::given_sprite`]).
     pub given: Option<SpriteId>,
-}
-
-/// What the Transport reads of the map about its unit (the caller's).
-pub trait Shore {
-    /// `FUN_1411958c0`: the unit's zone (its restriction's zone map, `FUN_1411931c0`) at `tile`:
-    /// 0 for a tile below 0, or without a zone map.
-    ///
-    /// # Errors
-    ///
-    /// A map the caller cannot read.
-    fn zone(&mut self, tile: Tile) -> Result<ZoneId, GenieError>;
-    /// `FUN_1411a7570`: a tile of zone `zone` lies within `reach` of the unit's tile (its place
-    /// cut by `CVTTSS2SI`, [`crate::pathing::zones::ZoneMap::near`]); no without a zone map.
-    ///
-    /// # Errors
-    ///
-    /// A map the caller cannot read.
-    fn near(&mut self, zone: ZoneId, reach: Distance) -> Result<bool, GenieError>;
-    /// The terrain table's flags of `tile`, its x and y shorts
-    /// ([`crate::map::terrain::Terrain::flags_at`]).
-    fn flags(&self, tile: Tile) -> TerrainFlags;
-    /// `FUN_140f7c390` with the planner of the unit's restriction (`FUN_140f7cb30`, none without
-    /// a master): the last point of the planner's path from `from` to `to` whose tile has an edge
-    /// ([`crate::pathing::tile_path::Planner::last_open_point`]); None without a planner or such a point.
-    ///
-    /// # Errors
-    ///
-    /// What the planner's searches fail on.
-    fn shore_point(&mut self, from: Point, to: Point) -> Result<Option<Point>, GenieError>;
 }
 
 /// What a state change leaves to its caller.
