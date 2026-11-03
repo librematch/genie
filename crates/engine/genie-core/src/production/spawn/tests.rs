@@ -12,6 +12,7 @@ use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::TileOffset;
 use crate::map::TileRect;
+use crate::map::spatial::TileSight;
 use crate::movement::Speed;
 use crate::movement::move_to::TargetMoved;
 use crate::objects::HitPoints;
@@ -28,6 +29,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::RecycleMode;
@@ -37,7 +39,6 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::orders::OrderSource;
 use crate::orders::town_bell::BellShelter;
-use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::production::spawn::NearFlags;
@@ -50,6 +51,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::scene::{Scene, Thing, walking};
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
@@ -59,7 +61,6 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::VisionBits;
-use crate::vision::VisionMasks;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -141,68 +142,63 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
     );
 }
 
+/// The hill test (mode `mode`) of tile `at` in the box whose corner is (2, 5), the corner's
+/// elevation 3, on a 10 by 10 map at elevation 3 with the tiles `raised` at their own: the
+/// tile's shape, as the map's load makes it of the elevations about it, and whether it fails.
+fn hill_test(mode: u8, at: [i32; 2], raised: &[([i32; 2], u8)]) -> (u8, bool) {
+    let scene = raised.iter().fold(
+        Scene::open(GridSize::new(10, 10)).elevation(3),
+        |scene, &(t, e)| scene.elevation_on([Tile::from(t)], e),
+    );
+    let w = scene.build();
+    let map = WorldMap { turns: &w };
+    let tile = Tile::from(at);
+    let shape = map.shape(tile).unwrap();
+    let fails = hill_fails(
+        HillMode::of_data(mode),
+        &map,
+        tile,
+        Tile::new(2, 5),
+        Some(3),
+    )
+    .unwrap();
+    (shape, fails)
+}
+
+/// Mode 1 takes flat ground and the four side slopes (shapes 5 to 8) but no saddle or corner,
+/// mode 2 flat ground alone, mode 3 a tile of the box's first column or last row within one
+/// step of the corner's elevation; the other modes take any tile.
+#[test]
+fn hill_mode_takes_flat_ground_side_slopes_or_an_edge_within_one_step() {
+    let at = [3, 3];
+    // mode 1: flat, the tile west of it one step up (5), the one east (8); a saddle (2: north
+    // east up, west and south down) and a corner (9: south west up) fail
+    assert_eq!(hill_test(1, at, &[]), (0, false));
+    assert_eq!(hill_test(1, at, &[([2, 3], 4)]), (5, false));
+    assert_eq!(hill_test(1, at, &[([4, 3], 4)]), (8, false));
+    assert_eq!(
+        hill_test(1, at, &[([4, 2], 4), ([2, 3], 2), ([3, 4], 2)]),
+        (2, true)
+    );
+    assert_eq!(hill_test(1, at, &[([2, 4], 4)]), (9, true));
+    // mode 2: flat alone; north up (6) fails
+    assert_eq!(hill_test(2, at, &[]), (0, false));
+    assert_eq!(hill_test(2, at, &[([3, 2], 4)]), (6, true));
+    // mode 3: (2, 3) on the first column within one step passes, two steps up fails; (4, 5) on
+    // the last row two steps down fails; (4, 4) on neither passes at any elevation
+    assert!(!hill_test(3, [2, 3], &[([2, 3], 4)]).1);
+    assert!(hill_test(3, [2, 3], &[([2, 3], 5)]).1);
+    assert!(hill_test(3, [4, 5], &[([4, 5], 1)]).1);
+    assert!(!hill_test(3, [4, 4], &[([4, 4], 7)]).1);
+    // the other modes take any tile: a corner (12: south east up) at elevation 9
+    assert_eq!(hill_test(0, at, &[([3, 3], 9), ([4, 4], 10)]), (12, false));
+}
+
 /// MarvinBlue/426048731's TC 9149 at (104, 47), radii 2: its gather point (107.2451,
 /// 46.075863) lies right and below, so the right side's lower half (6) comes first among the
 /// sides the first pass tries; the villager (radius 0.2) steps by 0.5 from (106.5, 47.5).
 /// The sheep 9520 at (106.68, 47.15) blocks the first two candidates and stays (livestock in
 /// state 2), so each ends its spot; (106.5, 46.5) is free.
-/// A map of one tile's shape and elevation for the hill test.
-struct Hill(u8, u8);
-
-impl PlaceMap for Hill {
-    fn size(&self) -> GridSize {
-        GridSize::new(10, 10)
-    }
-    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
-        Ok(TerrainId::named(0))
-    }
-    fn explored(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn visible(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn vision(&self, _: PlayerId) -> VisionMasks {
-        VisionMasks::default()
-    }
-    fn elevation(&self, _: Tile) -> Option<u8> {
-        Some(self.1)
-    }
-    fn shape(&self, _: Tile) -> Option<u8> {
-        Some(self.0)
-    }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
-        a == b
-    }
-    fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {
-        Ok(Vec::new())
-    }
-}
-
-#[test]
-fn hill_mode_takes_flat_ground_side_slopes_or_an_edge_within_one_step() {
-    let fails = |mode, shape, elevation, at| {
-        hill_fails(
-            HillMode::of_data(mode),
-            &Hill(shape, elevation),
-            Tile::from(at),
-            Tile::new(2, 5),
-            Some(3),
-        )
-        .unwrap()
-    };
-    // mode 1: flat and the four side slopes (5 to 8) pass, corners and saddles fail
-    assert!(!fails(1, 0, 3, [3, 3]) && !fails(1, 5, 3, [3, 3]) && !fails(1, 8, 3, [3, 3]));
-    assert!(fails(1, 2, 3, [3, 3]) && fails(1, 9, 3, [3, 3]));
-    // mode 2: flat alone
-    assert!(!fails(2, 0, 3, [3, 3]) && fails(2, 6, 3, [3, 3]));
-    // mode 3: the first column and the last row within one step of the corner's elevation
-    assert!(!fails(3, 9, 4, [2, 3]) && fails(3, 0, 5, [2, 3]) && fails(3, 0, 1, [4, 5]));
-    assert!(!fails(3, 0, 7, [4, 4]));
-    // the other modes take any tile
-    assert!(!fails(0, 12, 9, [3, 3]));
-}
-
 #[test]
 fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
     let site = Site {
@@ -297,63 +293,55 @@ fn livestock_stays_alive_tree_only_once_dead() {
     );
 }
 
-/// A map the player explored but does not see now, with its masks.
-struct Fogged(Vec<Near>, [u64; 2]);
+/// The sheep 9520's master (705): livestock of radii 0.35 that walks, 7 hit points.
+fn sheep_master() -> Master {
+    Master {
+        id: master_id(705),
+        kind: MasterKind::COMBAT,
+        class: class::LIVESTOCK,
+        radius: Footprint::new(0.35, 0.35),
+        height: Distance::new(0.5),
+        obstruction_kind: ObstructionKind::CIRCLE,
+        fog_visibility: FogVisibility::INVISIBLE,
+        hit_points: MasterHitPoints::of_data(7),
+        move_stats: Some(walking(Speed::new(0.7))),
+        ..Master::default()
+    }
+}
 
-impl PlaceMap for Fogged {
-    fn size(&self) -> GridSize {
-        GridSize::new(120, 120)
-    }
-    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
-        Ok(TerrainId::named(0))
-    }
-    fn explored(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn visible(&self, _: PlayerId, _: Tile) -> bool {
-        false
-    }
-    fn vision(&self, _: PlayerId) -> VisionMasks {
-        let [visible, explored] = self.1.map(VisionBits::from_bits_retain);
-        VisionMasks { visible, explored }
-    }
-    fn elevation(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn shape(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
-        a == b
-    }
-    fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
-        Ok(self
-            .0
-            .iter()
-            .filter(|o| o.position.tile() == tile)
-            .copied()
-            .collect())
+/// Gaia's sheep 9520 at (106.68, 47.15), alive: the world's object that reads as
+/// [`sheep`].
+fn sheep_thing() -> Thing {
+    Thing::new(
+        9520,
+        PlayerId::GAIA,
+        sheep_master(),
+        Position::new(106.68481, 47.14652, 0.0),
+    )
+}
+
+/// A house's master: a building of radii 1 and obstruction type 2, without a fog visibility.
+fn house_master() -> Master {
+    Master {
+        id: ids::HOUSE,
+        kind: MasterKind::BUILDING,
+        class: class::BUILDING,
+        radius: Footprint::new(1.0, 1.0),
+        height: Distance::new(2.0),
+        obstruction_kind: ObstructionKind::KIND_2,
+        obstruction_class: ObstructionClass::UNIT,
+        fog_visibility: FogVisibility::INVISIBLE,
+        hit_points: MasterHitPoints::of_data(550),
+        ..Master::default()
     }
 }
 
 /// In the fog, of the objects without a fog visibility only the player's own block a BUILD,
-/// and another player's building whose visibility mask meets both the player's masks.
+/// and another player's building whose registry mask meets both the player's masks: player
+/// 1 explored the map and sees none of it; player 2's house 500 at (20.5, 20.5) was last seen
+/// by the players of its mask.
 #[test]
 fn fogged_building_blocks_build_by_its_visibility_mask() {
-    let house = Near {
-        id: object_id(500),
-        position: Position::new(20.5, 20.5, 0.0),
-        radius: Footprint::new(1.0, 1.0),
-        kind: MasterKind::BUILDING,
-        class: class::BUILDING,
-        master: ids::HOUSE,
-        obstruction_kind: ObstructionKind::KIND_2,
-        flags: NearFlags::empty(),
-        player: PlayerId::new(2),
-        state: ObjectState::Alive,
-        fog_mask: Some(VisionBits::from_bits_retain((1 << 1) | (1 << 33))),
-        ..sheep(ObjectState::Alive)
-    };
     let site = BuildSite {
         player: PlayerId::new(1),
         checks: SiteChecks::HUMAN,
@@ -361,15 +349,24 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         tall: false,
         class: class::BUILDING,
         obstructs: true,
-        restriction: &Restriction::new(vec![1.0]),
+        restriction: &Restriction::new(vec![1.0, 0.0]),
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
         own: &[],
     };
-    let test = |o: Near, masks: [u64; 2]| {
+    let test = |owner, seen_by| {
+        let house = Thing {
+            seen_by,
+            ..Thing::new(500, owner, house_master(), Position::new(20.5, 20.5, 0.0))
+        };
+        let w = Scene::open(GridSize::new(120, 120))
+            .sight(TileSight::Explored)
+            .players(2)
+            .thing(house)
+            .build();
         build_placement(
             &site,
-            &Fogged(vec![o], masks),
+            &WorldMap { turns: &w },
             Point::new(21.0, 21.0),
             &roles(),
             &tuning().spawn,
@@ -377,65 +374,31 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         .unwrap()
         .code()
     };
-    // the house's mask meets what player 1 sees and explored: it blocks
-    assert_eq!(test(house, [1 << 1, 1 << 33]), 6);
-    // not what it sees: another player's house in the fog passes
-    assert_eq!(test(house, [1 << 2, 1 << 33]), 0);
-    // without a UMV entry neither, but its own does
-    let unmasked = Near {
-        fog_mask: None,
-        ..house
-    };
-    assert_eq!(test(unmasked, [1 << 1, 1 << 33]), 0);
+    let (one, two) = (PlayerId::new(1), PlayerId::new(2));
+    // player 1 saw the house: its mask meets what player 1 sees and explored, it blocks
     assert_eq!(
         test(
-            Near {
-                player: PlayerId::new(1),
-                ..unmasked
-            },
-            [0, 0]
+            two,
+            Some(VisionBits::visible(one) | VisionBits::explored(one))
         ),
         6
     );
+    // seen by player 2 alone (player 1's explored bit kept): another player's house in the
+    // fog passes
+    assert_eq!(
+        test(
+            two,
+            Some(VisionBits::visible(two) | VisionBits::explored(one))
+        ),
+        0
+    );
+    // outside the registry neither, but the player's own does
+    assert_eq!(test(two, None), 0);
+    assert_eq!(test(one, None), 6);
 }
 
-struct Flat(Vec<Near>);
-
-impl PlaceMap for Flat {
-    fn size(&self) -> GridSize {
-        GridSize::new(120, 120)
-    }
-    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
-        Ok(TerrainId::named(0))
-    }
-    fn explored(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn visible(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn vision(&self, _: PlayerId) -> VisionMasks {
-        VisionMasks::default()
-    }
-    fn elevation(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn shape(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
-        a == b
-    }
-    fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
-        Ok(self
-            .0
-            .iter()
-            .filter(|o| o.position.tile() == tile)
-            .copied()
-            .collect())
-    }
-}
-
+/// The world's sheep reads as [`sheep`] on its tile; it blocks a villager (radius 0.2) at the
+/// points whose box overlaps its own.
 #[test]
 fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
     let villager = Placing {
@@ -443,11 +406,18 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
-        restriction: &Restriction::new(vec![1.0]),
+        restriction: &Restriction::new(vec![1.0, 0.0]),
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
     };
-    let map = Flat(vec![sheep(ObjectState::Alive)]);
+    let w = Scene::open(GridSize::new(120, 120))
+        .thing(sheep_thing())
+        .build();
+    let map = WorldMap { turns: &w };
+    assert_eq!(
+        map.objects(Tile::new(106, 47)),
+        Ok(vec![sheep(ObjectState::Alive)])
+    );
     let at = |x, y| {
         placement(
             &villager,
@@ -464,8 +434,9 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
     assert_eq!(at(106.5, 46.5), Tested::Free);
 }
 
-/// Two objects on one tile that block the point differently: the first of the tile's list
-/// reports (the game's scan, `FUN_141264db0`), whichever stays.
+/// Two objects on one tile that block the point differently, a sheep that stays (state 2) and
+/// a soldier that does not: the first of the tile's list (the one placed first) reports
+/// (the game's scan, `FUN_141264db0`), whichever stays.
 #[test]
 fn the_first_object_of_tile_list_reports_the_block() {
     let villager = Placing {
@@ -473,21 +444,26 @@ fn the_first_object_of_tile_list_reports_the_block() {
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         class: class::VILLAGER,
-        restriction: &Restriction::new(vec![1.0]),
+        restriction: &Restriction::new(vec![1.0, 0.0]),
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
     };
-    // a sheep that stays (state 2) and a soldier that does not, on the same tile
-    let soldier = Near {
-        id: object_id(9521),
-        class: class::CLASS_6,
-        master: master_id(4),
-        ..sheep(ObjectState::Alive)
+    let soldier = || {
+        let master = Master {
+            id: master_id(4),
+            class: class::CLASS_6,
+            ..sheep_master()
+        };
+        Thing::new(9521, PlayerId::GAIA, master, sheep_thing().at)
     };
-    let at = |list: Vec<Near>| {
+    let at = |first: Thing, second: Thing| {
+        let w = Scene::open(GridSize::new(120, 120))
+            .thing(first)
+            .thing(second)
+            .build();
         placement(
             &villager,
-            &Flat(list),
+            &WorldMap { turns: &w },
             Point::new(106.5, 47.5),
             ZoneTest::Skipped,
             &roles(),
@@ -496,11 +472,11 @@ fn the_first_object_of_tile_list_reports_the_block() {
         .unwrap()
     };
     assert_eq!(
-        at(vec![sheep(ObjectState::Alive), soldier]),
+        at(sheep_thing(), soldier()),
         Tested::Blocked { stays: true }
     );
     assert_eq!(
-        at(vec![soldier, sheep(ObjectState::Alive)]),
+        at(soldier(), sheep_thing()),
         Tested::Blocked { stays: false }
     );
 }
@@ -1143,37 +1119,9 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
     );
 }
 
-/// A map of `Flat`'s ground the player never explored.
-struct Dark;
-
-impl PlaceMap for Dark {
-    fn size(&self) -> GridSize {
-        GridSize::new(120, 120)
-    }
-    fn terrain(&self, _: Tile) -> Result<TerrainId, GenieError> {
-        Ok(TerrainId::named(0))
-    }
-    fn explored(&self, _: PlayerId, _: Tile) -> bool {
-        false
-    }
-    fn visible(&self, _: PlayerId, _: Tile) -> bool {
-        false
-    }
-    fn vision(&self, _: PlayerId) -> VisionMasks {
-        VisionMasks::default()
-    }
-    fn elevation(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn shape(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
-        a == b
-    }
-    fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {
-        Ok(Vec::new())
-    }
+/// A map of 120 by 120 tiles of land that player 1 sees as `sight`, without objects.
+fn plain(sight: TileSight) -> World {
+    Scene::open(GridSize::new(120, 120)).sight(sight).build()
 }
 
 /// Player 1's house site (class 3, radii 1, obstructing, no height) on terrain 0, which `restriction`
@@ -1205,7 +1153,8 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
     use crate::production::spawn::placement_test::build_static_test;
     let open_values = Restriction::new(vec![1.0]);
     let open = house_site(&open_values, true);
-    let flat = Flat(Vec::new());
+    let seen = plain(TileSight::Seen);
+    let flat = WorldMap { turns: &seen };
     assert_eq!(
         build_static_test(&open, &flat, Point::new(50.0, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code)),
@@ -1228,15 +1177,17 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
             .map(|c| c.map(PlacementCode::code)),
         Ok(Some(2))
     );
+    let unknown = plain(TileSight::Unknown);
+    let dark = WorldMap { turns: &unknown };
     assert_eq!(
-        build_static_test(&open, &Dark, Point::new(50.0, 50.0), &tuning().spawn)
+        build_static_test(&open, &dark, Point::new(50.0, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code)),
         Ok(Some(5))
     );
     let computer_values = Restriction::new(vec![1.0]);
     let computer = house_site(&computer_values, false);
     assert_eq!(
-        build_static_test(&computer, &Dark, Point::new(50.0, 50.0), &tuning().spawn)
+        build_static_test(&computer, &dark, Point::new(50.0, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code)),
         Ok(None)
     );
@@ -1270,14 +1221,18 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     use crate::production::spawn::placement_test::build_sees;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
-    let flat = Flat(Vec::new());
-    let fogged = Fogged(Vec::new(), [0; 2]);
+    let seen = plain(TileSight::Seen);
+    let flat = WorldMap { turns: &seen };
+    let explored = plain(TileSight::Explored);
+    let fogged = WorldMap { turns: &explored };
+    let unknown = plain(TileSight::Unknown);
+    let dark = WorldMap { turns: &unknown };
     let o = |player, fog_visibility| Near {
         player,
         fog_visibility,
         ..sheep(ObjectState::Alive)
     };
-    let sees = |map: &dyn PlaceMap, o: Near, sight| build_sees(&site, map, &o, sight, &roles());
+    let sees = |map: &WorldMap<'_>, o: Near, sight| build_sees(&site, map, &o, sight, &roles());
     assert_eq!(
         sees(
             &flat,
@@ -1320,7 +1275,7 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
     );
     assert_eq!(
         sees(
-            &Dark,
+            &dark,
             o(PlayerId::new(2), FogVisibility::INVISIBLE),
             (false, false)
         ),
@@ -1346,7 +1301,8 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
     use crate::production::spawn::placement_test::build_ignores;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
-    let flat = Flat(Vec::new());
+    let seen = plain(TileSight::Seen);
+    let flat = WorldMap { turns: &seen };
     let house = Near {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
@@ -1425,7 +1381,8 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     use crate::production::spawn::placement_test::build_passes;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
-    let flat = Flat(Vec::new());
+    let seen = plain(TileSight::Seen);
+    let flat = WorldMap { turns: &seen };
     let walker = Near {
         kind: MasterKind::COMBAT,
         class: class::CLASS_6,
@@ -1486,7 +1443,8 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
     use crate::production::spawn::placement_test::blocks_build;
     let site_values = Restriction::new(vec![1.0]);
     let site = house_site(&site_values, true);
-    let flat = Flat(Vec::new());
+    let seen = plain(TileSight::Seen);
+    let flat = WorldMap { turns: &seen };
     let house = Near {
         id: object_id(500),
         position: Position::new(20.5, 20.5, 0.0),
@@ -1562,28 +1520,30 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
 }
 
 /// The Build's test ([`BuildSite::scans`]) runs the static scans for a site with a height: they
-/// find a dying house (state 4) that BUILD's own scan passes over, but not one of the site's own,
-/// a desolid foundation, or anything for a site without a height.
+/// find player 2's dying house 600 at (21.5, 21.5) (state 4) that BUILD's own scan passes over,
+/// but not one of the site's own, a desolid foundation, or anything for a site without a height.
 #[test]
 fn the_build_static_scans_find_dying_house_build_passes_over() {
-    let house = Near {
-        id: object_id(600),
-        position: Position::new(21.5, 21.5, 0.0),
-        radius: Footprint::new(1.0, 1.0),
-        kind: MasterKind::BUILDING,
-        class: class::BUILDING,
-        flags: NearFlags::empty(),
-        player: PlayerId::new(2),
+    let house = |desolid| Thing {
         state: ObjectState::DyingSprite,
-        obstruction_kind: ObstructionKind::KIND_2,
-        ..sheep(ObjectState::Alive)
+        desolid,
+        ..Thing::new(
+            600,
+            PlayerId::new(2),
+            house_master(),
+            Position::new(21.5, 21.5, 0.0),
+        )
     };
-    let build_values = Restriction::new(vec![1.0]);
+    let build_values = Restriction::new(vec![1.0, 0.0]);
     let build = house_site(&build_values, false);
-    let test = |site: &BuildSite<'_>, o: Near| {
+    let test = |site: &BuildSite<'_>, house: Thing| {
+        let w = Scene::open(GridSize::new(120, 120))
+            .players(2)
+            .thing(house)
+            .build();
         build_placement(
             site,
-            &Flat(vec![o]),
+            &WorldMap { turns: &w },
             Point::new(21.0, 21.0),
             &roles(),
             &tuning().spawn,
@@ -1591,90 +1551,47 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
         .unwrap()
         .code()
     };
-    assert_eq!(test(&build, house), 0);
+    assert_eq!(test(&build, house(false)), 0);
     let scans = BuildSite {
         tall: true,
         checks: SiteChecks::SCANS,
         ..build
     };
-    assert_eq!(test(&scans, house), 6);
+    assert_eq!(test(&scans, house(false)), 6);
     assert_eq!(
         test(
             &BuildSite {
                 own: &[object_id(600)],
                 ..scans
             },
-            house
+            house(false)
         ),
         0
     );
-    assert_eq!(
-        test(
-            &scans,
-            Near {
-                flags: NearFlags::DESOLID,
-                ..house
-            }
-        ),
-        0
-    );
+    assert_eq!(test(&scans, house(true)), 0);
     assert_eq!(
         test(
             &BuildSite {
                 tall: false,
                 ..scans
             },
-            house
+            house(false)
         ),
         0
     );
 }
 
-/// A 3×3 map of terrains `kinds` (row by row) whose terrain `t` has the flags `flags[t]`, for
-/// the placement terrains' test ([`placement_terrains`]).
-struct Terrains {
-    kinds: [u8; 9],
-    flags: Vec<TerrainFlags>,
-}
-
-impl PlaceMap for Terrains {
-    fn size(&self) -> GridSize {
-        GridSize::new(3, 3)
-    }
-    fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError> {
-        let i = self
-            .size()
-            .index(tile)
-            .ok_or(GenieError::unsupported("off the map"))?;
-        Ok(TerrainId::named(self.kinds[i]))
-    }
-    fn terrain_flags(&self, t: usize) -> Option<TerrainFlags> {
-        self.flags.get(t).copied()
-    }
-    fn terrain_count(&self) -> usize {
-        self.flags.len()
-    }
-    fn explored(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn visible(&self, _: PlayerId, _: Tile) -> bool {
-        true
-    }
-    fn vision(&self, _: PlayerId) -> VisionMasks {
-        VisionMasks::default()
-    }
-    fn elevation(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn shape(&self, _: Tile) -> Option<u8> {
-        Some(0)
-    }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
-        a == b
-    }
-    fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {
-        Ok(Vec::new())
-    }
+/// A 3×3 map whose tile `i` (row by row) is of terrain `kinds[i]` and whose terrain `t` has the
+/// flags `flags[t]`, for the placement terrains' test ([`placement_terrains`]).
+fn terrains(kinds: [u8; 9], flags: Vec<TerrainFlags>) -> World {
+    let scene = (0..9).fold(
+        Scene::open(GridSize::new(3, 3)).terrains(flags),
+        |scene, i| {
+            let tile = Tile::new(i % 3, i / 3);
+            scene.terrain_on([tile], TerrainId::named(kinds[i as usize]))
+        },
+    );
+    scene.build()
 }
 
 /// The point's tile must be of one of the master's terrains or share shallow water or shallows
@@ -1684,15 +1601,16 @@ impl PlaceMap for Terrains {
 fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
     use crate::production::spawn::terrains::point_terrain_allows;
     // terrains 0 (land), 1 and 2 (shallow water), 3 (shallows)
-    let map = Terrains {
-        kinds: [0, 1, 2, 3, 0, 0, 0, 0, 0],
-        flags: vec![
+    let w = terrains(
+        [0, 1, 2, 3, 0, 0, 0, 0, 0],
+        vec![
             TerrainFlags::NONE,
             TerrainFlags::SHALLOW_WATER,
             TerrainFlags::SHALLOW_WATER,
             TerrainFlags::SHALLOWS,
         ],
-    };
+    );
+    let map = WorldMap { turns: &w };
     let t = |id: u8| Some(TerrainId::named(id));
     let at = |i: i32| Tile::new(i % 3, i / 3);
     assert_eq!(point_terrain_allows(&map, [t(1), t(3)], at(1)), Ok(true));
@@ -1708,16 +1626,17 @@ fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
 #[test]
 fn side_terrains_take_the_others_of_shared_flag() {
     use crate::production::spawn::terrains::side_terrains;
-    let map = Terrains {
-        kinds: [0; 9],
-        flags: vec![
+    let w = terrains(
+        [0; 9],
+        vec![
             TerrainFlags::NONE,
             TerrainFlags::ICE,
             TerrainFlags::ICE,
             TerrainFlags::BEACH,
             TerrainFlags::ICE | TerrainFlags::BEACH,
         ],
-    };
+    );
+    let map = WorldMap { turns: &w };
     let t = |id: u8| Some(TerrainId::named(id));
     let ids = |v: &[u8]| v.iter().copied().map(TerrainId::named).collect::<Vec<_>>();
     assert_eq!(side_terrains(&map, [t(0), t(0)]), Ok(ids(&[0, 0])));
@@ -1731,10 +1650,8 @@ fn side_terrains_take_the_others_of_shared_flag() {
 #[test]
 fn master_placement_terrains_test_the_point_and_the_tiles_beside() {
     // the centre (1, 1) of terrain 5, the tile right of it (2, 1) of terrain 6
-    let map = Terrains {
-        kinds: [0, 0, 0, 0, 5, 6, 0, 0, 0],
-        flags: vec![TerrainFlags::NONE; 8],
-    };
+    let w = terrains([0, 0, 0, 0, 5, 6, 0, 0, 0], vec![TerrainFlags::NONE; 8]);
+    let map = WorldMap { turns: &w };
     let t = |id: u8| Some(TerrainId::named(id));
     let centre = Point::new(1.5, 1.5);
     let whole = TileRect::new(0, 0, 2, 2);

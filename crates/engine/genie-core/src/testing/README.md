@@ -16,12 +16,12 @@ the two equal. The module exists in test builds only.
 | [`class.rs`](class.rs) | The classes genie-core's tests name: build 158041's `.dat` values, as the tests' masters carry them. |
 | [`ids.rs`](ids.rs) | The masters genie-core's tests name: build 158041's `.dat` ids, as the tests' objects carry them, by the names the engine's constants had. |
 | [`mod.rs`](mod.rs) | What genie-core's tests build their game data from: each build's layer as the generated fixture states it (FD-046-D08), so a test needs no Nickel, and the classes, masters and player attributes the tests name. |
-| [`scene.rs`](scene.rs) | A test's world drawn as text (FD-043-D47): the map's tiles, what the scene's player sees of them and the scout on it, built into a `World` whose layers agree. |
+| [`scene.rs`](scene.rs) | A test's world drawn as text (FD-043-D47): the map's tiles, their terrains and elevations, what the scene's player sees of them, the scout and the other objects on it, built into a `World` whose layers agree. |
 <!-- /files -->
 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../combat/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`pathing`](../pathing/), [`players`](../players/), [`vision`](../vision/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`construction`](../construction/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`vision`](../vision/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

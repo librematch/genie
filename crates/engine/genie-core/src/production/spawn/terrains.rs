@@ -15,7 +15,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::HillMode;
 use crate::objects::masters::PlacementTerrains;
 use crate::players::PlayerId;
-use crate::production::spawn::PlaceMap;
+use crate::production::spawn::WorldMap;
 
 bitflags::bitflags! {
     /// What BUILD's placement test runs ([`BuildSite`]).
@@ -64,7 +64,7 @@ pub struct BuildSite<'a> {
 /// step of the `base` elevation; the other modes take any. True when the tile fails (code 3).
 pub(super) fn hill_fails(
     mode: HillMode,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     tile: Tile,
     corner: Tile,
     base: Option<u8>,
@@ -93,7 +93,7 @@ pub(super) fn hill_fails(
 /// y1) around point `p`: false where they refuse it (the test's code 1). With a terrain, the
 /// point's tile must be of one of the two, or share shallow water or shallows
 /// ([`TerrainFlags::SHALLOW_WATER`], [`TerrainFlags::SHALLOWS`]: the terrains' `.dat` flags,
-/// [`PlaceMap::terrain_flags`]) with them, and the box shrinks to that tile. With a side terrain,
+/// [`WorldMap::terrain_flags`]) with them, and the box shrinks to that tile. With a side terrain,
 /// one of the tiles beside the box (the row below, the column right, the row above and the column
 /// left) must be of a side terrain, or of a terrain with ice or beach ([`TerrainFlags::ICE`],
 /// [`TerrainFlags::BEACH`]) when a side terrain has it. A terrain of −1 beside one of 0 or more
@@ -102,9 +102,9 @@ pub(super) fn hill_fails(
 /// # Errors
 ///
 /// Where the map cannot tell.
-pub fn placement_terrains(
+pub(crate) fn placement_terrains(
     placement: PlacementTerrains,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     p: Point,
     b: TileRect,
 ) -> Result<bool, GenieError> {
@@ -132,13 +132,13 @@ pub fn placement_terrains(
     Ok(false)
 }
 
-/// [`placement_terrains`]'s flags of terrain `t` (the `.dat`'s, [`PlaceMap::terrain_flags`]).
+/// [`placement_terrains`]'s flags of terrain `t` (the `.dat`'s, [`WorldMap::terrain_flags`]).
 ///
 /// # Errors
 ///
 /// A terrain of −1 or beyond the terrains (its flags read past the table), not modelled.
 pub(super) fn placement_flags(
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     t: Option<TerrainId>,
 ) -> Result<TerrainFlags, GenieError> {
     t.and_then(|t| map.terrain_flags(t.index()))
@@ -154,7 +154,7 @@ pub(super) fn placement_flags(
 ///
 /// Where the map cannot tell, and a terrain whose flags it does not hold.
 pub(super) fn point_terrain_allows(
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     [t1, t2]: [Option<TerrainId>; 2],
     at: Tile,
 ) -> Result<bool, GenieError> {
@@ -179,7 +179,7 @@ pub(super) fn point_terrain_allows(
 ///
 /// A terrain whose flags the map does not hold.
 pub(super) fn side_terrains(
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     [side1, side2]: [Option<TerrainId>; 2],
 ) -> Result<Vec<TerrainId>, GenieError> {
     let (f1, f2) = (placement_flags(map, side1)?, placement_flags(map, side2)?);

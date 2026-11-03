@@ -1,9 +1,13 @@
-//! A test's world drawn as text (FD-043-D47): the map's tiles, what the scene's player sees of
-//! them and the scout on it, built into a [`World`] whose layers agree. A tile's land or water
-//! is its class in the obstruction manager's words, its terrain for the zones and the path
-//! planners and its restrictions' value; a rock is a static record on its tile; the sight is the
-//! unified map's words. Tests build their world here instead of standing in for its reads.
+//! A test's world drawn as text (FD-043-D47): the map's tiles, their terrains and elevations,
+//! what the scene's player sees of them, the scout and the other objects on it, built into a
+//! [`World`] whose layers agree. A tile's terrain is its class in the obstruction manager's
+//! words, its kind for the zones and the path planners and its restrictions' value; an
+//! elevation makes the tiles' shapes as the map's load does; a rock is a static record on its
+//! tile; the sight is the unified map's words; an object ([`Thing`]) is filed as the game files
+//! a new one. Tests build their world here instead of standing in for its reads.
 
+use crate::construction::BuilderCount;
+use crate::construction::build::Construction;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -11,6 +15,7 @@ use crate::map::Position;
 use crate::map::Radii;
 use crate::map::Restriction;
 use crate::map::RestrictionId;
+use crate::map::Snow;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::TerrainMask;
@@ -23,6 +28,7 @@ use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::Me;
 use crate::movement::MoveAlgorithm;
+use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
@@ -32,6 +38,7 @@ use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Building;
 use crate::objects::layers::{Animated, Static};
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::BuildableOn;
@@ -42,16 +49,19 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::Unit;
+use crate::ownership::CaptureKind;
 use crate::pathing::Pathing;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::testing::class;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
-use crate::vision::visibility::{Visibility, VisibleMap};
+use crate::vision::registry::{CLASSES, Entry, Registry, UnitUpdate};
+use crate::vision::visibility::{BuildingSight, Seer, Visibility, VisibleMap};
 use crate::world::FrameSeed;
 use crate::world::Millis;
 use crate::world::Seconds;
+use crate::world::WholeSeconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::parts::Object;
@@ -74,6 +84,12 @@ pub fn scout_id() -> ObjectId {
 /// The scout's master in a scene's world.
 pub const SCOUT_MASTER: MasterId = MasterId::named(448);
 
+/// Land's terrain, which every restriction passes.
+pub const LAND: TerrainId = TerrainId::named(0);
+/// Water's terrain in the scene's own table ([`Scene::terrains`] replaces it), which no
+/// restriction passes.
+pub const WATER: TerrainId = TerrainId::named(1);
+
 /// The first rock's id; the others follow in the order the scene placed them.
 const FIRST_ROCK: i32 = 1000;
 
@@ -81,10 +97,6 @@ const FIRST_ROCK: i32 = 1000;
 const LAND_CLASS: u8 = 4;
 /// A water tile's class: one the scout's terrain mask does not hold.
 const WATER_CLASS: u8 = 1;
-/// Land's terrain, which every restriction passes.
-const LAND: u8 = 0;
-/// Water's terrain, which no restriction passes.
-const WATER: u8 = 1;
 /// The restrictions of a scene's terrain: as many as the scout's restriction needs.
 const RESTRICTIONS: usize = 8;
 
@@ -95,29 +107,88 @@ struct Scout {
     line_of_sight: Distance,
 }
 
+/// An object of a scene beside its scout: of any master and player, at its place
+/// ([`Scene::thing`]).
+#[derive(Clone, Debug)]
+pub struct Thing {
+    /// Its id.
+    pub id: ObjectId,
+    /// Its owner.
+    pub player: PlayerId,
+    /// Its master, which every player's table of the scene holds.
+    pub master: Master,
+    /// Its place.
+    pub at: Position,
+    /// Its state.
+    pub state: ObjectState,
+    /// Its hit points.
+    pub hp: HitPoints,
+    /// In the sight registry, the mask its last sight update found (`RGE_Combat_Object::update`'s,
+    /// [`Visibility::combat_sight`]): the players who saw its tiles then, whose lists hold it
+    /// and whose bits its entry keeps after they look away; a building with its UMV entry. None
+    /// for an object outside the registry.
+    pub seen_by: Option<VisionBits>,
+    /// A foundation no builder has started: desolid, without its obstruction record.
+    pub desolid: bool,
+}
+
+impl Thing {
+    /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points,
+    /// outside the sight registry, not a foundation.
+    ///
+    /// # Panics
+    ///
+    /// An id the game does not give.
+    #[must_use]
+    pub fn new(id: i32, player: PlayerId, master: Master, at: Position) -> Self {
+        Self {
+            id: ObjectId::try_from(id).expect("a valid id"),
+            player,
+            hp: HitPoints::new(f32::from(master.hit_points.get())),
+            master,
+            at,
+            state: ObjectState::Alive,
+            seen_by: None,
+            desolid: false,
+        }
+    }
+}
+
 /// A test's map and what stands on it, built into a [`World`] by [`Scene::build`].
 #[derive(Clone, Debug)]
 pub struct Scene {
     size: GridSize,
-    /// Each tile's water, row by row from y 0.
-    water: Vec<bool>,
+    /// Each tile's terrain, row by row from y 0.
+    terrain: Vec<TerrainId>,
+    /// The terrain table: each terrain's flags, by its id.
+    terrains: Vec<TerrainFlags>,
+    /// Each tile's elevation, row by row.
+    elevation: Vec<u8>,
     rocks: Vec<Tile>,
     /// What [`PLAYER`] sees of each tile, row by row.
     sight: Vec<TileSight>,
     scout: Option<Scout>,
+    /// The players past Gaia.
+    players: u8,
+    things: Vec<Thing>,
 }
 
 impl Scene {
-    /// A map of `size` tiles of land, every tile seen by [`PLAYER`].
+    /// A map of `size` tiles of land at elevation 0, every tile seen by [`PLAYER`], the only
+    /// player past Gaia; its terrain table holds [`LAND`] and [`WATER`].
     #[must_use]
     pub fn open(size: GridSize) -> Self {
         let n = (size.width() * size.height()) as usize;
         Self {
             size,
-            water: vec![false; n],
+            terrain: vec![LAND; n],
+            terrains: vec![TerrainFlags::NONE, TerrainFlags::WATER],
+            elevation: vec![0; n],
             rocks: Vec::new(),
             sight: vec![TileSight::Seen; n],
             scout: None,
+            players: 1,
+            things: Vec::new(),
         }
     }
 
@@ -146,13 +217,45 @@ impl Scene {
         scene
     }
 
-    /// The tiles `tiles` are water.
+    /// The tiles `tiles` are water ([`WATER`]).
     #[must_use]
-    pub fn water(mut self, tiles: impl IntoIterator<Item = Tile>) -> Self {
+    pub fn water(self, tiles: impl IntoIterator<Item = Tile>) -> Self {
+        self.terrain_on(tiles, WATER)
+    }
+
+    /// The terrain table: terrain `t` has the flags `flags[t]`. A terrain with water is of the
+    /// water class and no restriction passes it; every other is of the land class and passes.
+    #[must_use]
+    pub fn terrains(mut self, flags: impl IntoIterator<Item = TerrainFlags>) -> Self {
+        self.terrains = flags.into_iter().collect();
+        self
+    }
+
+    /// The tiles `tiles` are of terrain `terrain`.
+    #[must_use]
+    pub fn terrain_on(mut self, tiles: impl IntoIterator<Item = Tile>, terrain: TerrainId) -> Self {
         for t in tiles {
             let i = self.index(t);
-            self.water[i] = true;
+            self.terrain[i] = terrain;
         }
+        self
+    }
+
+    /// The tiles `tiles` lie at elevation `elevation`; the map's load makes the shapes of the
+    /// tiles about them ([`Terrain::set_elevations`]).
+    #[must_use]
+    pub fn elevation_on(mut self, tiles: impl IntoIterator<Item = Tile>, elevation: u8) -> Self {
+        for t in tiles {
+            let i = self.index(t);
+            self.elevation[i] = elevation;
+        }
+        self
+    }
+
+    /// Every tile lies at elevation `elevation`.
+    #[must_use]
+    pub fn elevation(mut self, elevation: u8) -> Self {
+        self.elevation.fill(elevation);
         self
     }
 
@@ -189,67 +292,101 @@ impl Scene {
         self
     }
 
-    /// The world: Gaia and [`PLAYER`], the map's tiles, terrain, path planners and sight, the
-    /// rocks and the scout.
+    /// The world holds `players` players past Gaia, of no relation to each other.
+    #[must_use]
+    pub const fn players(mut self, players: u8) -> Self {
+        self.players = players;
+        self
+    }
+
+    /// The object `thing` stands on the map, after the objects placed before it on its tile.
+    #[must_use]
+    pub fn thing(mut self, thing: Thing) -> Self {
+        self.things.push(thing);
+        self
+    }
+
+    /// The world: Gaia and the players, the map's tiles, terrain, path planners and sight, the
+    /// rocks, the scout and the objects.
     ///
     /// # Panics
     ///
-    /// More rocks than ids.
+    /// More rocks than ids, an object of a player the scene has not got, or a building in the
+    /// sight registry whose footprint leaves the map.
     #[must_use]
     pub fn build(self) -> World {
         let size = self.size;
-        let n = self.water.len();
+        let players = usize::from(self.players) + 1;
         let mut w = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(0),
             PLAYER,
-            vec![Millis::ZERO; 2],
-            vec![Player::default(), Player::default()],
+            vec![Millis::ZERO; players],
+            vec![Player::default(); players],
         );
+        let wet = |t: &TerrainId| {
+            self.terrains
+                .get(t.index())
+                .is_some_and(|f| f.contains(TerrainFlags::WATER))
+        };
         let classes = self
-            .water
+            .terrain
             .iter()
-            .map(|&wet| if wet { WATER_CLASS } else { LAND_CLASS });
-        let kinds: Vec<u8> = self
-            .water
-            .iter()
-            .map(|&wet| if wet { WATER } else { LAND })
-            .collect();
+            .map(|t| if wet(t) { WATER_CLASS } else { LAND_CLASS });
         w.spatial = Spatial::with_tiles(size, Tiles::new(size, classes.collect()));
-        let restrictions = vec![Restriction::new(vec![1.0, 0.0]); RESTRICTIONS];
-        let kind = |flags| TerrainKind {
+        let values = self.terrains.iter().map(|f| {
+            if f.contains(TerrainFlags::WATER) {
+                0.0
+            } else {
+                1.0
+            }
+        });
+        let restrictions = vec![Restriction::new(values.collect()); RESTRICTIONS];
+        let kinds = self.terrains.iter().map(|&flags| TerrainKind {
             shown: true,
             flags,
             forest: false,
-        };
+        });
         let mut terrain = Terrain::new(
             size,
-            kinds
+            self.terrain
                 .iter()
-                .map(|&k| TileTerrain::of_save(k, 255, -1))
+                .map(|k| TileTerrain::of_save(k.get(), 255, -1))
                 .collect(),
-            vec![kind(TerrainFlags::NONE), kind(TerrainFlags::WATER)],
+            kinds.collect(),
             restrictions.clone(),
         );
-        terrain.set_elevations(vec![0; n]);
+        terrain.set_elevations(self.elevation.clone());
         w.spatial.terrain = Some(terrain);
-        w.pathing = Pathing::new(
-            size,
-            kinds.into_iter().map(TerrainId::named).collect(),
-            restrictions,
-            0,
-        );
+        w.pathing = Pathing::new(size, self.terrain.clone(), restrictions, 0);
         w.pathing.start_mesh(size.width() as u32);
-        w.spatial.sight = Some(sight(size, &self.sight));
+        w.spatial.sight = Some(sight(size, &self.sight, players));
         for (i, &t) in self.rocks.iter().enumerate() {
             let id = ObjectId::try_from(FIRST_ROCK + i as i32).expect("a valid id");
             w.spatial.insert(id, rock(t));
         }
+        if self.scout.is_some() || !self.things.is_empty() {
+            let masters = self.masters();
+            w.model.masters = (0..players).map(|_| Arc::new(masters.clone())).collect();
+        }
         if let Some(scout) = self.scout {
             place_scout(&mut w, scout);
         }
+        for thing in self.things {
+            place_thing(&mut w, thing);
+        }
         w.reindex();
         w
+    }
+
+    /// The masters every player's table holds: the scout's and the objects'.
+    fn masters(&self) -> Masters {
+        let scout = self.scout.map(|s| scout_master(s.line_of_sight));
+        Masters::new(
+            scout
+                .into_iter()
+                .chain(self.things.iter().map(|t| t.master.clone())),
+        )
     }
 
     /// The tile's index in the scene's rows.
@@ -258,8 +395,9 @@ impl Scene {
     }
 }
 
-/// The unified map's words for [`PLAYER`]'s `sight` of each tile; Gaia sees nothing.
-fn sight(size: GridSize, sight: &[TileSight]) -> Visibility {
+/// The unified map's words for [`PLAYER`]'s `sight` of each tile, in a world of `players`;
+/// the others see nothing.
+fn sight(size: GridSize, sight: &[TileSight], players: usize) -> Visibility {
     let word = |s: &TileSight| match s {
         TileSight::Unknown => VisionBits::empty(),
         TileSight::Explored => VisionBits::explored(PLAYER),
@@ -267,7 +405,7 @@ fn sight(size: GridSize, sight: &[TileSight]) -> Visibility {
     };
     Visibility::new(
         size,
-        (0..2)
+        (0..players)
             .map(|_| VisibleMap {
                 counts: vec![0; sight.len()],
                 explored: TileCount::ZERO,
@@ -276,7 +414,7 @@ fn sight(size: GridSize, sight: &[TileSight]) -> Visibility {
         sight.iter().map(word).collect(),
         Vec::new(),
         0,
-        vec![PlayerKind::Human; 2],
+        vec![PlayerKind::Human; players],
     )
 }
 
@@ -300,13 +438,19 @@ fn rock(t: Tile) -> Placed {
     }
 }
 
-/// The scout's movement: a walker of radius 0.2 at 0.8 tiles a second, its restriction 7 and
-/// terrain mask 6 (the land's class).
+/// The scout's movement: a walker of radius 0.2 at 0.8 tiles a second ([`walking`]).
 fn walk_stats() -> MoveStats {
+    walking(Speed::new(0.8))
+}
+
+/// A walker's movement at `speed` tiles a second: of radius 0.2, its restriction 7 and terrain
+/// mask 6 (the land's class), turning at once.
+#[must_use]
+pub fn walking(speed: Speed) -> MoveStats {
     MoveStats {
         fly_mode: FlyMode::GROUND,
-        speed: Speed::new(0.8),
-        base: Speed::new(0.8),
+        speed,
+        base: speed,
         turn_rate: TurnRate::MAX,
         turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
@@ -322,23 +466,22 @@ fn walk_stats() -> MoveStats {
     }
 }
 
-/// The scout, its master in both players' tables and its standing mover, last moved at its
-/// place.
-fn place_scout(w: &mut World, scout: Scout) {
-    let master = Master {
+/// The scout's master: a walking villager of `line_of_sight`.
+fn scout_master(line_of_sight: Distance) -> Master {
+    Master {
         id: SCOUT_MASTER,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         radius: Footprint::new(0.2, 0.2),
         height: Distance::new(1.0),
-        line_of_sight: scout.line_of_sight,
+        line_of_sight,
         move_stats: Some(walk_stats()),
         ..Master::default()
-    };
-    w.model.masters = vec![
-        Arc::new(Masters::new([master.clone()])),
-        Arc::new(Masters::new([master])),
-    ];
+    }
+}
+
+/// The scout and its standing mover, last moved at its place.
+fn place_scout(w: &mut World, scout: Scout) {
     let unit = Unit {
         id: scout_id(),
         place: Static::at(scout.at),
@@ -375,6 +518,149 @@ fn place_scout(w: &mut World, scout: Scout) {
     let _ = w
         .push_live(PLAYER, Object::moving(unit, mover))
         .expect("the scout joins its player");
+}
+
+/// The object as the make action's spawn files a new one (`FUN_140ad0240`): its row in its
+/// owner's list, a foundation's construction, its record on its tile (one with radii and a
+/// height whose master obstructs, a desolid foundation none), the path planners' standing
+/// object, and in the sight registry its seer, its UMV entry and its entry.
+fn place_thing(w: &mut World, thing: Thing) {
+    let Thing {
+        id,
+        player,
+        ref master,
+        at,
+        state,
+        hp,
+        seen_by,
+        desolid,
+    } = thing;
+    let unit = Unit {
+        id,
+        place: Static::at(at),
+        life: Lifecycle {
+            state,
+            hp,
+            master_id: master.id,
+            ..Lifecycle::default()
+        },
+        ..Unit::default()
+    };
+    let object = if desolid {
+        Object::with_building(unit, foundation(master))
+    } else {
+        Object::from(unit)
+    };
+    let _ = w
+        .push_live(player, object)
+        .expect("the object joins its player");
+    let solid = 0.0 < master.radius.x() && 0.0 < master.radius.y() && master.is_tall();
+    let placed = Placed {
+        position: at,
+        radius: master.radius,
+        class: master.class,
+        player,
+        master: master.id,
+        obstruction_kind: master.obstruction_kind,
+        buildable_on: master.buildable_on,
+        tall: master.is_tall(),
+        moves: master.moves(),
+        unknown: None,
+        obstruction: (master.obstruction_kind != ObstructionKind::NONE && solid && !desolid)
+            .then_some(Obstruction {
+                kind: master.obstruction_kind,
+                class: master.obstruction_class,
+            }),
+    };
+    w.spatial.insert(id, placed);
+    w.pathing.moved(id, &placed, MoveState::Standing);
+    w.pathing.tiles_changed(w.spatial.take_changes());
+    if let Some(mask) = seen_by {
+        register(w, &thing, mask);
+    }
+}
+
+/// A desolid foundation's construction: no work yet, no builder.
+fn foundation(master: &Master) -> Building {
+    Building {
+        construction: Some(Construction {
+            progress: Seconds::ZERO,
+            desolid: true,
+            builders: BuilderCount::of_data(0),
+            hit_points: master.hit_points,
+            build_time: WholeSeconds::of_data(0),
+            record: Obstruction {
+                kind: master.obstruction_kind,
+                class: master.obstruction_class,
+            },
+            snow: Snow::None,
+            sprite_override: false,
+        }),
+        ..Building::default()
+    }
+}
+
+/// The object enters the sight registry: its seer with a building's sight and UMV entry
+/// ([`Visibility::link_building`]), then what its sight update writes when it finds `mask`
+/// ([`Visibility::combat_sight`]): the entry's mask and the records in the lists of the
+/// players of `mask` ([`Registry::update_unit`]).
+fn register(w: &mut World, thing: &Thing, mask: VisionBits) {
+    let Thing {
+        id,
+        player,
+        ref master,
+        at,
+        state,
+        desolid,
+        ..
+    } = *thing;
+    let building = master.kind == MasterKind::BUILDING;
+    let players = w.players.len();
+    let tuning = w.model.tuning.visibility;
+    let v = w.spatial.sight.as_mut().expect("the scene's sight");
+    let umv = if building {
+        v.link_building(at, master.radius, tuning)
+            .expect("a footprint on the map")
+    } else {
+        0
+    };
+    v.add_seer(
+        id,
+        Seer {
+            player,
+            master: master.id,
+            los: master.line_of_sight,
+            state,
+            explored: false,
+            building: building.then_some(if desolid {
+                BuildingSight::Unstarted
+            } else {
+                BuildingSight::Built
+            }),
+            umv: u8::try_from(umv).expect("a UMV entry of a byte"),
+            capture: CaptureKind::None,
+            kind: master.kind,
+        },
+    );
+    let registry = v
+        .registry
+        .get_or_insert_with(|| Registry::new(players, CLASSES));
+    registry
+        .entries
+        .get_or_insert_with(id, Entry::default)
+        .expect("an object's entry")
+        .mask = mask;
+    registry
+        .update_unit(UnitUpdate {
+            id,
+            owner: player,
+            position: at.ground(),
+            radii: master.radius,
+            class: master.class,
+            old: VisionBits::empty(),
+            new: mask,
+        })
+        .expect("a class of the registry");
 }
 
 /// The scout's reads for its searches ([`ScoutArea::of`]), the map's size and its line of

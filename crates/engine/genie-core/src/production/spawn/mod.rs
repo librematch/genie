@@ -25,13 +25,15 @@ mod world_map;
 
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
-pub use self::placement_test::{PlaceMap, Placing, ZoneTest, build_placement, placement};
+pub use self::placement_test::{Placing, ZoneTest};
+pub(crate) use self::placement_test::{build_placement, placement};
 use self::search::corner_tiles;
 pub use self::search::spawn_point;
 #[cfg(test)]
 use self::search::{Spot, try_spot};
 use self::terrains::hill_fails;
-pub use self::terrains::{BuildSite, SiteChecks, placement_terrains};
+pub(crate) use self::terrains::placement_terrains;
+pub use self::terrains::{BuildSite, SiteChecks};
 pub(crate) use self::world_map::WorldMap;
 #[cfg(test)]
 use crate::GenieError;

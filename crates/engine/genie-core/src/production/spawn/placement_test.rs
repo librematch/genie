@@ -6,8 +6,6 @@ use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Restriction;
-use crate::map::TerrainFlags;
-use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
 use crate::objects::ObjectState;
@@ -21,9 +19,9 @@ use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::SiteChecks;
+use crate::production::spawn::WorldMap;
 use crate::production::spawn::{BuildSite, Tested, hill_fails, placement_terrains};
 use crate::production::spawn::{Near, NearFlags};
-use crate::vision::VisionMasks;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpawnTuning;
@@ -54,40 +52,6 @@ pub struct Placing<'a> {
     pub placement: PlacementTerrains,
 }
 
-/// What the placement test reads of the map.
-pub trait PlaceMap {
-    /// The map's size in tiles.
-    fn size(&self) -> GridSize;
-    /// A tile's terrain (the map tile's `+0x9`).
-    fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError>;
-    /// Terrain `t`'s flags (the `.dat`'s `is_water` byte, the map's terrain record `+2`), None
-    /// beyond the terrains.
-    fn terrain_flags(&self, _t: usize) -> Option<TerrainFlags> {
-        None
-    }
-    /// How many terrains the map's table holds.
-    fn terrain_count(&self) -> usize {
-        0
-    }
-    /// `FUN_141663500` is not 0: the player sees or saw the tile.
-    fn explored(&self, player: PlayerId, tile: Tile) -> bool;
-    /// The player sees the tile now (its mask `+0x2a8` meets the tile's visible bits).
-    fn visible(&self, player: PlayerId, tile: Tile) -> bool;
-    /// The player's masks: what it sees (`+0x2a8`) and what it explored (`+0x2a0`).
-    fn vision(&self, player: PlayerId) -> VisionMasks;
-    /// A tile's elevation (`+0x14`), when the map holds it.
-    fn elevation(&self, tile: Tile) -> Option<u8>;
-    /// A tile's shape (`+0x8`, [`crate::map::terrain::Terrain::set_elevations`]), when the map holds
-    /// it.
-    fn shape(&self, tile: Tile) -> Option<u8>;
-    /// Player `a` counts player `b` as an ally (`FUN_141663dc0`): itself; never Gaia; relation 0,
-    /// or by `test` relation 4 too (the zone mode's relation 1 is not modelled).
-    fn allied(&self, a: PlayerId, b: PlayerId, test: AllyTest) -> bool;
-    /// The objects on `tile` (their centre there), in the tile list's order; `Err` where it
-    /// cannot tell.
-    fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError>;
-}
-
 /// The tiles within `SpawnTuning::reach` of a point, clamped to the map (`(int)` of each bound, then the map's
 /// edges), row by row.
 pub(super) fn reach(
@@ -109,7 +73,7 @@ pub(super) type Found = (Tile, Near);
 /// The objects whose box overlaps a box of radii `r` at `p` among those `counts` lets through,
 /// with their tile, in the scan's order.
 pub(super) fn overlapping(
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     p: Point,
     r: Footprint,
     counts: &dyn Fn(&Near) -> Option<bool>,
@@ -149,9 +113,9 @@ pub(super) fn overlapping(
 /// overlaps the clearance box: 6. Not modelled: the placement terrains, hill modes, the zone test
 /// (`FUN_1415c6400`), the editor (game mode 4), a fogged object of fog visibility 3, game type 7's
 /// test of allies.
-pub fn build_placement(
+pub(crate) fn build_placement(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     p: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
@@ -200,7 +164,7 @@ pub fn build_placement(
 /// true when one does (the game's code 6).
 fn static_scans_find(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     p: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
@@ -249,7 +213,7 @@ fn static_scans_find(
 /// when the box passes; a zone mode is not modelled.
 pub(super) fn build_static_test(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     p: Point,
     spawn_tuning: &SpawnTuning,
 ) -> Result<Option<PlacementCode>, GenieError> {
@@ -330,7 +294,7 @@ pub(super) fn build_scan_range(v: f32, size: i32, spawn_tuning: &SpawnTuning) ->
 /// object of fog visibility 3 is not modelled.
 pub(super) fn build_sees(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     o: &Near,
     (seen, visible): (bool, bool),
     roles: &Roles,
@@ -374,7 +338,7 @@ pub(super) fn build_sees(
 /// holding food, wood, stone or gold.
 pub(super) fn blocks_build(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     o: &Near,
     at: Point,
     roles: &Roles,
@@ -413,7 +377,7 @@ pub(super) fn blocks_build(
 /// that is not an ally both ways.
 pub(super) fn build_ignores(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     o: &Near,
     roles: &Roles,
 ) -> bool {
@@ -439,7 +403,7 @@ pub(super) fn build_ignores(
 /// one buildable on, a felled tree off a forest.
 pub(super) fn build_passes(
     site: &BuildSite<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     o: &Near,
     roles: &Roles,
 ) -> bool {
@@ -484,9 +448,9 @@ pub enum ZoneTest {
 /// the first one. The editor's case (the game's mode 4), the placement terrains, the hill modes,
 /// the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1) and the moving objects' own
 /// check (`DAT_143f01833`, probed 0) are not modelled.
-pub fn placement(
+pub(crate) fn placement(
     me: &Placing<'_>,
-    map: &dyn PlaceMap,
+    map: &WorldMap<'_>,
     p: Point,
     zones: ZoneTest,
     roles: &Roles,

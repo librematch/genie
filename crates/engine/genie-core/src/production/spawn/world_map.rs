@@ -11,8 +11,8 @@ use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::NO_RELATIONS;
 use crate::players::PlayerId;
+use crate::production::spawn::Near;
 use crate::production::spawn::NearFlags;
-use crate::production::spawn::{Near, PlaceMap};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::World;
@@ -24,8 +24,10 @@ pub(crate) struct WorldMap<'a> {
     pub(crate) turns: &'a World,
 }
 
-impl PlaceMap for WorldMap<'_> {
-    fn terrain_flags(&self, t: usize) -> Option<TerrainFlags> {
+impl WorldMap<'_> {
+    /// Terrain `t`'s flags (the `.dat`'s `is_water` byte, the map's terrain record `+2`), None
+    /// beyond the terrains.
+    pub(crate) fn terrain_flags(&self, t: usize) -> Option<TerrainFlags> {
         self.turns
             .spatial
             .terrain
@@ -34,7 +36,8 @@ impl PlaceMap for WorldMap<'_> {
             .map(|k| k.flags)
     }
 
-    fn terrain_count(&self) -> usize {
+    /// How many terrains the map's table holds.
+    pub(crate) fn terrain_count(&self) -> usize {
         self.turns
             .spatial
             .terrain
@@ -42,11 +45,17 @@ impl PlaceMap for WorldMap<'_> {
             .map_or(0, |m| m.terrains.len())
     }
 
-    fn size(&self) -> GridSize {
+    /// The map's size in tiles.
+    pub(crate) const fn size(&self) -> GridSize {
         self.turns.spatial.map
     }
 
-    fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError> {
+    /// A tile's terrain (the map tile's `+0x9`).
+    ///
+    /// # Errors
+    ///
+    /// A map without its terrain, or a tile off it.
+    pub(crate) fn terrain(&self, tile: Tile) -> Result<TerrainId, GenieError> {
         let t = self
             .turns
             .spatial
@@ -60,32 +69,40 @@ impl PlaceMap for WorldMap<'_> {
         ))
     }
 
-    fn explored(&self, player: PlayerId, tile: Tile) -> bool {
+    /// `FUN_141663500` is not 0: the player sees or saw the tile.
+    pub(crate) fn explored(&self, player: PlayerId, tile: Tile) -> bool {
         // without the sight the spawn stops before (World::spawn)
         self.turns.spatial.explored(player, tile).unwrap_or(false)
     }
 
-    fn visible(&self, player: PlayerId, tile: Tile) -> bool {
+    /// The player sees the tile now (its mask `+0x2a8` meets the tile's visible bits).
+    pub(crate) fn visible(&self, player: PlayerId, tile: Tile) -> bool {
         self.turns.spatial.visible(player, tile)
     }
 
-    fn vision(&self, player: PlayerId) -> VisionMasks {
+    /// The player's masks: what it sees (`+0x2a8`) and what it explored (`+0x2a0`).
+    pub(crate) fn vision(&self, player: PlayerId) -> VisionMasks {
         self.turns.spatial.vision(player)
     }
 
-    fn elevation(&self, tile: Tile) -> Option<u8> {
+    /// A tile's elevation (`+0x14`), when the map holds it.
+    pub(crate) fn elevation(&self, tile: Tile) -> Option<u8> {
         let t = self.turns.spatial.terrain.as_ref()?;
         let i = self.turns.spatial.map.index(tile)?;
         t.elevations.get(i).copied()
     }
 
-    fn shape(&self, tile: Tile) -> Option<u8> {
+    /// A tile's shape (`+0x8`, [`crate::map::terrain::Terrain::set_elevations`]), when the map
+    /// holds it.
+    pub(crate) fn shape(&self, tile: Tile) -> Option<u8> {
         let t = self.turns.spatial.terrain.as_ref()?;
         let i = self.turns.spatial.map.index(tile)?;
         t.shapes.get(i).copied()
     }
 
-    fn allied(&self, a: PlayerId, b: PlayerId, test: AllyTest) -> bool {
+    /// Player `a` counts player `b` as an ally (`FUN_141663dc0`): itself; never Gaia; relation 0,
+    /// or by `test` relation 4 too (the zone mode's relation 1 is not modelled).
+    pub(crate) fn allied(&self, a: PlayerId, b: PlayerId, test: AllyTest) -> bool {
         let relations = self
             .turns
             .players
@@ -94,7 +111,12 @@ impl PlaceMap for WorldMap<'_> {
         task_finder_allied(relations, a, b, test)
     }
 
-    fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
+    /// The objects on `tile` (their centre there), in the tile list's order.
+    ///
+    /// # Errors
+    ///
+    /// An object the slice does not update, or one without its master.
+    pub(crate) fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
         let t = self.turns;
         t.spatial
             .objects_on(tile)
