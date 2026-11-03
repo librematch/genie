@@ -1,10 +1,11 @@
 //! A `.dat` master's work-command values (genie-core's [`work::Master`]): its tasks with their
 //! sound events, its costs in their slots and the rest the work command reads.
 
-use genie_dat::de::{Bird, Creatable, DeadFish, Sound, Task, Type50, Unit};
+use genie_dat::de::{Bird, Creatable, DeadFish, Projectile, Sound, Task, Type50, Unit};
 use genie_model::GenieError;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
+use genie_model::combat::missile::{ArcRatio, HitMode, ProjectileKind, SmartMode, VanishMode};
 use genie_model::map::Distance;
 use genie_model::map::RestrictionId;
 use genie_model::map::TerrainId;
@@ -211,6 +212,7 @@ pub(super) fn dat_work(
         moving: unit.dead_fish.as_ref().map(dat_moving),
         creatable: unit.creatable.as_ref().map(dat_creatable).transpose()?,
         combat: unit.type50.as_ref().map(dat_combat),
+        missile: unit.projectile.as_ref().map(dat_missile),
         action: unit
             .bird
             .as_ref()
@@ -232,6 +234,18 @@ const fn dat_moving(d: &DeadFish) -> work::MovingPart {
             mode: work::TrailMode::of_data(d.tracking_unit_mode),
             density: work::TrailDensity::new(d.tracking_unit_density),
         },
+    }
+}
+
+/// The missile layer of a `.dat` unit's projectile section ([`work::MissilePart`], genieutils'
+/// `Projectile`): its projectile type, smart, hit and vanish modes and its arc.
+const fn dat_missile(p: &Projectile) -> work::MissilePart {
+    work::MissilePart {
+        projectile_kind: ProjectileKind::of_data(p.projectile_type),
+        smart_mode: SmartMode::from_bits_retain(p.smart_mode),
+        hit_mode: HitMode::of_data(p.hit_mode),
+        vanish_mode: VanishMode::from_bits_retain(p.vanish_mode),
+        arc: ArcRatio::new(p.projectile_arc),
     }
 }
 
@@ -367,13 +381,17 @@ pub fn attributes<const N: usize>(
 #[cfg(test)]
 mod tests {
     use crate::dat::dat_work::dat_action;
+    use crate::dat::dat_work::dat_missile;
     use crate::dat::dat_work::dat_moving;
     use genie_dat::de::Bird;
     use genie_dat::de::DeadFish;
+    use genie_dat::de::Projectile;
+    use genie_model::combat::missile::{ArcRatio, HitMode, ProjectileKind, SmartMode, VanishMode};
     use genie_model::map::Distance;
     use genie_model::objects::SpriteId;
     use genie_model::objects::WorkRate;
     use genie_model::objects::masters::MasterField;
+    use genie_model::objects::masters::MissilePart;
     use genie_model::objects::masters::{MasterId, RunPattern, TaskGroup, TaskIndex};
     use genie_model::objects::masters::{Trail, TrailDensity, TrailMode};
     use genie_model::world::Seconds;
@@ -449,6 +467,29 @@ mod tests {
                 unit: MasterField::of_data(1002),
                 mode: TrailMode::of_data(1),
                 density: TrailDensity::new(0.5),
+            }
+        );
+    }
+
+    /// The missile layer holds the projectile section's type, modes and arc.
+    #[test]
+    fn the_missile_layer_holds_the_projectile_sections_values() {
+        let part = dat_missile(&Projectile {
+            projectile_type: 1,
+            smart_mode: 1,
+            hit_mode: 2,
+            vanish_mode: 1,
+            area_effect_specials: 0,
+            projectile_arc: 0.25,
+        });
+        assert_eq!(
+            part,
+            MissilePart {
+                projectile_kind: ProjectileKind::of_data(1),
+                smart_mode: SmartMode::from_bits_retain(1),
+                hit_mode: HitMode::of_data(2),
+                vanish_mode: VanishMode::from_bits_retain(1),
+                arc: ArcRatio::new(0.25),
             }
         );
     }

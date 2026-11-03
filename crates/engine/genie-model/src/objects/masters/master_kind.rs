@@ -96,6 +96,14 @@ impl MasterKind {
         Self::RGE_COMBAT.0 <= self.0 && self.0 != 90
     }
 
+    /// Whether a master of this type holds the missile layer (`RGE_Master_Missile_Object`'s
+    /// values, `+0x880`..`+0x888`): the `.dat` reads the projectile section for the type 60 only;
+    /// the save holds the RGE missile part for it.
+    #[must_use]
+    pub const fn has_missile_layer(self) -> bool {
+        self.0 == Self::MISSILE.0
+    }
+
     /// Whether a master of this type holds the creatable layer (`TRIBE_Master_Combat_Object`'s
     /// values, `+0x880`..`+0x94f`): the `.dat` reads the creatable section for the types 70 and
     /// up but 90, one of the data's own types; the save holds the TRIBE combat part for 70 and 80.

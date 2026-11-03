@@ -130,7 +130,7 @@ impl Unit {
         roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        let stats = master.missile_stats.ok_or(GenieError::unsupported(
+        let stats = master.missile_stats().ok_or(GenieError::unsupported(
             "a missile whose master has no flight",
         ))?;
         let Some(action) = slot.as_mut() else {

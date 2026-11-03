@@ -5,7 +5,6 @@ use crate::combat::Firepower;
 use crate::combat::MissileCount;
 use crate::combat::missile::ArcRatio;
 use crate::combat::missile::HitMode;
-use crate::combat::missile::MissileStats;
 use crate::combat::missile::ProjectileKind;
 use crate::combat::missile::SmartMode;
 use crate::combat::missile::VanishMode;
@@ -984,21 +983,18 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
 #[test]
 fn missile_smart_mode_multiply_sets_it() {
     let mut m = of_type(MasterKind::MISSILE);
-    m.missile_stats = Some(MissileStats {
+    m.missile = Some(MissilePart {
         projectile_kind: ProjectileKind::STRAIGHT,
         smart_mode: SmartMode::LEADS_TARGET,
         hit_mode: HitMode::TARGET_ALONE,
         vanish_mode: VanishMode::NONE,
         arc: ArcRatio::new(0.5),
-        speed: Speed::new(7.0),
-        radius: Radii::ZERO,
-        fly_mode: FlyMode::GROUND,
     });
     m.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
     m.multiply_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 3.0, &world(false));
     m.multiply_attribute(MasterAttribute::PROJECTILE_ARC, 0.5, &world(false));
     m.multiply_attribute(MasterAttribute::ATTACK_RELOAD_TIME, 0.5, &world(false));
-    let s = m.missile_stats.unwrap();
+    let s = m.missile.unwrap();
     assert_eq!(
         (s.smart_mode, s.arc, m.combat_part().reload),
         (
@@ -1576,21 +1572,18 @@ fn the_combat_master_own_values_change() {
 #[test]
 fn the_missile_building_and_animated_setters() {
     let mut m = of_type(MasterKind::MISSILE);
-    m.missile_stats = Some(MissileStats {
+    m.missile = Some(MissilePart {
         projectile_kind: ProjectileKind::STRAIGHT,
         smart_mode: SmartMode::NONE,
         hit_mode: HitMode::of_data(1),
         vanish_mode: VanishMode::NONE,
         arc: ArcRatio::new(0.25),
-        speed: Speed::new(7.0),
-        radius: Radii::ZERO,
-        fly_mode: FlyMode::GROUND,
     });
     m.add_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 1.0, &world(false));
     m.add_attribute(MasterAttribute::PROJECTILE_HIT_MODE, 1.0, &world(false));
     m.add_attribute(MasterAttribute::PROJECTILE_ARC, 0.25, &world(false));
     m.set_attribute(MasterAttribute::MAXIMUM_RANGE, 5.0, &world(false));
-    let s = m.missile_stats.unwrap();
+    let s = m.missile.unwrap();
     assert_eq!(
         (s.smart_mode, s.hit_mode, s.arc),
         (

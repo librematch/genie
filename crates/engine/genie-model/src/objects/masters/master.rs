@@ -1,6 +1,5 @@
 //! A master and the players' tables of them: the `.dat`'s unit records as the engine reads them (FD-046).
 
-use crate::combat::missile::MissileStats;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
@@ -40,6 +39,7 @@ use crate::objects::masters::InterfaceKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MinimapMode;
+use crate::objects::masters::MissilePart;
 use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
@@ -265,8 +265,9 @@ pub struct Master {
     /// The moving layer (types 30 and up but 90, `+0x748`..`+0x764`): sprites, turn speed, trail;
     /// None for other masters.
     pub moving: Option<MovingPart>,
-    /// A missile master's flight (type 60, [`crate::combat::missile::MissileStats`]).
-    pub missile_stats: Option<MissileStats>,
+    /// The missile layer (type 60, `+0x880`..`+0x888`): projectile type, modes and arc; None for
+    /// other masters. Its flight reads [`Master::missile_stats`].
+    pub missile: Option<MissilePart>,
     /// What a unit of this master moves with, its speed with the master's walking sprite (the
     /// run sprite `+0x750` if it has one, else the move sprite `+0x748`); None for a master that
     /// does not move.

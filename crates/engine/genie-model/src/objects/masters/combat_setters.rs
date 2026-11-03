@@ -284,7 +284,7 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if let Some(m) = self.missile_stats.as_mut() {
+        if let Some(m) = self.missile.as_mut() {
             match attribute {
                 MasterAttribute::PROJECTILE_SMART_MODE => {
                     m.smart_mode = SmartMode::from_bits_retain(low8(v));
@@ -307,7 +307,7 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if let Some(m) = self.missile_stats.as_mut() {
+        if let Some(m) = self.missile.as_mut() {
             match attribute {
                 MasterAttribute::PROJECTILE_SMART_MODE => {
                     m.smart_mode =
@@ -333,7 +333,7 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if let Some(m) = self.missile_stats.as_mut() {
+        if let Some(m) = self.missile.as_mut() {
             match attribute {
                 MasterAttribute::PROJECTILE_SMART_MODE => {
                     m.smart_mode = SmartMode::from_bits_retain(low8(v));

@@ -14,7 +14,7 @@ use genie_model::combat::MissileCount;
 use genie_model::combat::missile::MissSpread;
 use genie_model::combat::missile::SmartMode;
 use genie_model::combat::missile::VanishMode;
-use genie_model::combat::missile::{ArcRatio, HitMode, MissileStats};
+use genie_model::combat::missile::{ArcRatio, HitMode};
 use genie_model::map::Distance;
 use genie_model::map::Footprint;
 use genie_model::map::Offset;
@@ -47,6 +47,7 @@ use genie_model::objects::masters::HeroFlags;
 use genie_model::objects::masters::HitChance;
 use genie_model::objects::masters::InvulnerabilityLevel;
 use genie_model::objects::masters::MasterField;
+use genie_model::objects::masters::MissilePart;
 use genie_model::objects::masters::MovingPart;
 use genie_model::objects::masters::ObjectFlags;
 use genie_model::objects::masters::RunPattern;
@@ -395,14 +396,13 @@ pub fn work_masters(
             // `+0x950`, the first (`tempId`)
             b.construction_sprite = SpriteId::of_data(saved.temp_id.cast_signed());
         }
-        // a missile master's flight: the save's three bytes and arc, the data file's projectile
+        // a missile master's layer: the save's three bytes and arc, the data file's projectile
         // type
-        if let Some(mm) = m
+        work.missile = m
             .rge_master
             .as_deref()
             .and_then(|r| r.rge_master_missile_object.as_deref())
-        {
-            work.missile_stats = Some(MissileStats {
+            .map(|mm| MissilePart {
                 projectile_kind: MasterId::of_data(s.copy_id())
                     .and_then(|m| table.projectile_type(civ, m))
                     .unwrap_or_default(),
@@ -410,13 +410,7 @@ pub fn work_masters(
                 hit_mode: HitMode::of_data(mm.missile_hit_info),
                 vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
                 arc: ArcRatio::new(mm.ballistics_ratio),
-                speed: animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed)),
-                radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
-                fly_mode: MasterId::of_data(s.copy_id())
-                    .and_then(|m| table.fly_mode(civ, m))
-                    .unwrap_or_default(),
             });
-        }
         work.damage_sprites = !s.damage_sprite.is_empty();
         // what the masters' attribute setters change: the top and turn speeds (+0x740,
         // +0x758), the damage sprites (+0x638) and the train locations (+0x898)

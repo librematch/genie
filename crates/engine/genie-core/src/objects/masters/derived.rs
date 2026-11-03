@@ -76,9 +76,9 @@ pub fn follow_moving(
 }
 
 /// The values the slice derives from master `master`'s after attribute `attribute` changed: its
-/// height test, its missile's flight, whether it has damage sprites, its train locations' ids
-/// and first time, and what a unit moving with it reads
-/// ([`follow_moving`]).
+/// height test, whether it has damage sprites, its train locations' ids and first time, and what
+/// a unit moving with it reads ([`follow_moving`]); a missile's flight reads the master as it
+/// is ([`Master::missile_stats`]).
 pub fn follow(
     master: &mut Master,
     attribute: MasterAttribute,
@@ -89,15 +89,6 @@ pub fn follow(
     match attribute {
         MasterAttribute::SIZE_X | MasterAttribute::SIZE_Y | MasterAttribute::SIZE_Z => {
             master.tall = Distance::ZERO < master.height;
-            if let Some(m) = master.missile_stats.as_mut() {
-                m.radius = master.radius.with_height(master.height.get());
-            }
-        }
-        MasterAttribute::MOVEMENT_SPEED => {
-            let speed = master.animated_part().max_speed;
-            if let Some(m) = master.missile_stats.as_mut() {
-                m.speed = speed;
-            }
         }
         MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
             master.damage_sprites = !master.damage_graphics.is_empty();

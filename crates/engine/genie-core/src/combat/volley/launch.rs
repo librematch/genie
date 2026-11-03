@@ -71,7 +71,7 @@ impl Unit {
         let made = player_master(&c.w.model.masters, c.player, shot.made).ok_or(
             GenieError::unsupported("a missile its player's masters do not have"),
         )?;
-        let stats = made.missile_stats.ok_or(GenieError::unsupported(
+        let stats = made.missile_stats().ok_or(GenieError::unsupported(
             "a missile master without its flight",
         ))?;
         if !made.recyclable {

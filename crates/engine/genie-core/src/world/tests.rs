@@ -8,9 +8,7 @@ use crate::combat::damage::ArmorPair;
 use crate::combat::damage::{Kill, Razed, Victim};
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::SmartMode;
-use crate::combat::missile::{
-    MissSpread, Missile, MissileState, MissileStats, ProjectileKind, StrikeResult,
-};
+use crate::combat::missile::{MissSpread, Missile, MissileState, ProjectileKind, StrikeResult};
 use crate::combat::victims::{KillLeft, file_kill, write_back};
 use crate::combat::volley::Aimed;
 use crate::combat::{AttackCount, AttackTargetId, MissileCount};
@@ -117,6 +115,7 @@ use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
@@ -138,6 +137,7 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MissilePart;
 use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
@@ -18235,11 +18235,11 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
             base: Speed::new(7.0),
             ..walker().stats
         }),
-        missile_stats: Some(MissileStats {
-            speed: Speed::new(7.0),
-            radius: Radii::new(0.1, 0.1, 0.0),
-            ..MissileStats::default()
+        // the flight reads the speed and the radii
+        animated: Some(AnimatedPart {
+            max_speed: Speed::new(7.0),
         }),
+        missile: Some(MissilePart::default()),
         ..Master::default()
     };
     let deer = Master {
@@ -18774,10 +18774,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
         (
             |t| {
                 for m in &mut t.model.masters {
-                    Arc::make_mut(m)
-                        .get_mut(master_id(363))
-                        .unwrap()
-                        .missile_stats = None;
+                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().missile = None;
                 }
             },
             "a missile master without its flight",
@@ -18788,7 +18785,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
                     if let Some(s) = Arc::make_mut(m)
                         .get_mut(master_id(363))
                         .unwrap()
-                        .missile_stats
+                        .missile
                         .as_mut()
                     {
                         s.smart_mode = SmartMode::LEADS_TARGET;
@@ -18803,7 +18800,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
                     if let Some(s) = Arc::make_mut(m)
                         .get_mut(master_id(363))
                         .unwrap()
-                        .missile_stats
+                        .missile
                         .as_mut()
                     {
                         s.projectile_kind = ProjectileKind::of_data(1);

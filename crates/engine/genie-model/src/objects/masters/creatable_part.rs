@@ -23,6 +23,7 @@ use crate::objects::masters::InvulnerabilityLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MissilePart;
 use crate::objects::masters::MovingPart;
 use crate::objects::masters::SpacingModifier;
 use crate::objects::masters::SpecialAttack;
@@ -117,7 +118,8 @@ impl Master {
     /// A master of type `kind` with the defaults of the layers its type holds (the animated layer
     /// for [`MasterKind::has_animated_layer`], the moving one for
     /// [`MasterKind::has_moving_layer`], the action one for [`MasterKind::has_action_layer`], the
-    /// combat one for [`MasterKind::has_combat_layer`], the creatable one for
+    /// combat one for [`MasterKind::has_combat_layer`], the missile one for
+    /// [`MasterKind::has_missile_layer`], the creatable one for
     /// [`MasterKind::has_creatable_layer`]).
     #[must_use]
     pub fn of_kind(kind: MasterKind) -> Self {
@@ -127,6 +129,7 @@ impl Master {
             moving: kind.has_moving_layer().then(MovingPart::default),
             action: kind.has_action_layer().then(ActionPart::default),
             combat: kind.has_combat_layer().then(CombatPart::default),
+            missile: kind.has_missile_layer().then(MissilePart::default),
             creatable: kind.has_creatable_layer().then(CreatablePart::default),
             ..Self::default()
         }
