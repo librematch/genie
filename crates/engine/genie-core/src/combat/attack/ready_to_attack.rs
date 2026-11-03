@@ -4,8 +4,8 @@
 use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{
-    Attack, AttackReads, Fight, Ground, HALF, NO_RANGE, NONE, Readiness, SHORT_RANGE_GAP,
-    TARGET_GONE, face_target, move_reads,
+    Attack, AttackReads, Fight, Ground, HALF, NO_RANGE, NONE, Readiness, TARGET_GONE, face_target,
+    move_reads,
 };
 use crate::map::Distance;
 use crate::map::Position;
@@ -44,7 +44,6 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-        roles: &Roles,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::Ready, g.motion.reborrow())?;
         if self.target.is_none() && self.point.x() == NONE {
@@ -53,8 +52,8 @@ impl Attack {
             }
             return self.finish(unit, g.motion.reborrow(), g.sprite_rng);
         }
-        match self.ready_to_attack(unit, g, f, r, false, roles)? {
-            Readiness::Ready => self.set_swing(unit, g, f, r, roles),
+        match self.ready_to_attack(unit, g, f, r, false)? {
+            Readiness::Ready => self.set_swing(unit, g, f, r),
             Readiness::Waiting => Ok(()),
             Readiness::Away(gap) => self.follow(unit, g, r, f, gap),
         }
@@ -106,8 +105,9 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         skip_ready: bool,
-        roles: &Roles,
     ) -> Result<Readiness, GenieError> {
+        let roles = g.by_id.roles();
+        let attack_tuning = &g.by_id.tuning().attack;
         let (target, t) = self.held_target(g.map)?;
         let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
         if target_unseen(g.map, f, &t)? {
@@ -125,7 +125,7 @@ impl Attack {
             .ok_or(ATTACKER_UNMOVING)?;
         let gap = footprint_gap(at, ground, t.position, t.radius);
         let near = if self.range <= Distance::new(NO_RANGE) {
-            gap + SHORT_RANGE_GAP
+            gap + Distance::new(attack_tuning.short_range_gap)
         } else {
             gap
         };
@@ -162,7 +162,8 @@ impl Attack {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
             }
-            if (r.stance == UnitStance::DEFENSIVE && self.off_leash(t.position, r.state_position))
+            if (r.stance == UnitStance::DEFENSIVE
+                && self.off_leash(t.position, r.state_position, attack_tuning))
                 || speed == Speed::ZERO
                 || !r.can_move
             {

@@ -88,7 +88,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
     world.next_reusable_object_id = -5;
     world.local_player_index = 1;
     save.world.player_teams = vec![0, 2];
-    let turns = slice(&save, None);
+    let turns = slice(&save, None).unwrap();
     assert_eq!(
         (
             turns.world_time,
@@ -132,7 +132,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
 fn resign_is_not_drop() {
     let mut player = human(Vec::new());
     human_mut(&mut player).base.resigned = 1;
-    let turns = slice(&header(vec![gaia(Vec::new()), player]), None);
+    let turns = slice(&header(vec![gaia(Vec::new()), player]), None).unwrap();
     assert!(turns.players[1].resigned && !turns.players[1].dropped);
 }
 
@@ -146,7 +146,7 @@ fn technology_state_of_none_stops_every_player() {
             state,
             ..TechPlayerTree::default()
         }];
-        slice(&header(vec![gaia(Vec::new()), player]), None)
+        slice(&header(vec![gaia(Vec::new()), player]), None).unwrap()
     };
     let turns = with(4);
     assert_eq!(turns.players[1].techs[0].state, ResearchState::Queued);
@@ -171,7 +171,7 @@ fn the_slice_takes_the_master_tables() {
     );
     table.time_slice = HistoryUpdates::of_data(9);
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
-    let turns = slice(&save, Some(&table));
+    let turns = slice(&save, Some(&table)).unwrap();
     assert_eq!(turns.history_period, HistoryUpdates::of_data(9));
     assert_eq!(turns.model.masters.len(), 2);
     assert_eq!(turns.spatial.fastest.to_bits(), 0.0_f32.to_bits());
@@ -193,7 +193,7 @@ fn unit_inside_building_is_in_its_garrison() {
         gaia(Vec::new()),
         human(vec![building_object(10, 12), inside]),
     ]);
-    let turns = slice(&save, Some(&table));
+    let turns = slice(&save, Some(&table)).unwrap();
     let building = turns.players[1]
         .objects
         .iter()

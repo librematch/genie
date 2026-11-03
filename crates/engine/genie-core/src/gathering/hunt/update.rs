@@ -320,6 +320,7 @@ impl HuntAction {
             mover,
             &reads,
             roles,
+            &c.w.model.tuning.attack,
         )?;
         if arrived {
             a.arrived_sprite(

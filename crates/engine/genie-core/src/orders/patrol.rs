@@ -379,7 +379,7 @@ impl World {
         let (lx, ly) = (last.x(), last.y());
         if let Some(m) = self.parts.mover_mut(id) {
             for w in before {
-                m.add_user_waypoint(Position::new(w.x(), w.y(), z));
+                m.add_user_waypoint(Position::new(w.x(), w.y(), z), &self.model.tuning.movement);
             }
         }
         // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep)

@@ -8,7 +8,6 @@ use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::map::WholeDistance;
 use genie_core::objects::ListIndex;
-use genie_core::objects::masters::CostAmount;
 use genie_core::players::Amount;
 use genie_core::players::Chance;
 use genie_core::players::CivId;
@@ -18,19 +17,12 @@ use genie_core::players::Team;
 use genie_core::players::game_status::Fealty;
 use genie_core::players::game_status::GameStatus;
 use genie_core::players::game_status::VictoryState;
-use genie_core::production::LocationButton;
-use genie_core::technology::CostOverride;
-use genie_core::technology::EffectId;
-use genie_core::technology::OverrideUse;
-use genie_core::technology::ResearchCap;
-use genie_core::technology::ResearchCount;
 use genie_core::world::FrameSeed;
 use genie_core::world::Millis;
 use genie_core::world::Model;
 use genie_core::world::PlayState;
 use genie_core::world::Seconds;
 use genie_core::world::Tick;
-use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
 use genie_model::layer::BuildLayer;
 use genie_nickel::layer::build_layer;
@@ -40,6 +32,7 @@ use std::sync::LazyLock;
 mod player_parts;
 
 use self::player_parts::ai_settings;
+pub(super) use self::player_parts::tech_state;
 pub use self::player_parts::{ai_module, history};
 
 use crate::masters::{MasterTable, TerrainTable};
@@ -58,11 +51,9 @@ use genie_core::objects::unit::Unit;
 use genie_core::pathing::zones::{ZoneMap, Zones};
 use genie_core::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
 use genie_core::players::PlayerId;
-use genie_core::players::attribute::AttributeId;
 use genie_core::players::tracker::Tracker;
 use genie_core::players::world_player::VictoryTimes;
 use genie_core::players::{PlayerSet, PlayerType, Posture, Relations, Stance};
-use genie_core::technology::{Location, ResearchState, TechState};
 use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::world::parts::ObjectParts;
@@ -73,53 +64,9 @@ use genie_core::world::{
     Visibility,
 };
 use genie_core::world::{Player, World};
-use genie_save::generated::world::{GameOptions, TechPlayerTree};
+use genie_save::generated::world::GameOptions;
 use genie_save::{Header, PlayerSection};
 use std::mem::take;
-
-/// A player's saved state of one technology (`Tech_Player_Tree`).
-///
-/// # Errors
-///
-/// A saved state that names none.
-pub(super) fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
-    let o = |j: usize| {
-        t.cost_override
-            .get(j)
-            .map_or(CostOverride::UNSET, |e| CostOverride {
-                amount: CostAmount::of_data(e.tech_player_tree_cost_amount_override as i16),
-                attribute: AttributeId::of_data(
-                    e.tech_player_tree_cost_attribute_type_override as i16,
-                ),
-                used: OverrideUse::of_data(e.tech_player_tree_cost_attribute_used_override as i16),
-            })
-    };
-    Ok(TechState {
-        research_done: Seconds::new(t.research_done),
-        state: ResearchState::of_int(t.state)?,
-        cost_adj: [0, 1, 2].map(|j| CostAmount::of_data(t.cost_adj.get(j).copied().unwrap_or(0))),
-        times_researched: ResearchCount::of_data(t.tech_player_tree_times_researched as i16),
-        allow_multiple: t.tech_player_tree_allow_multiple_research != 0,
-        stack: t.tech_player_tree_stack_tech != 0,
-        overrides: [o(0), o(1), o(2)],
-        research_cap: ResearchCap::of_data(t.tech_player_tree_research_cap as i16),
-        pending: ResearchCount::of_data(t.tech_player_tree_pending_count as i16),
-        enabled: t.tech_player_tree_enabled_tech != 0,
-        effect_override: EffectId::of_data(t.tech_player_tree_effect_override as i16),
-        building_master: MasterId::of_data(t.tech_player_tree_research_building_master_id as i16),
-        locations: t
-            .location
-            .iter()
-            .flatten()
-            .map(|l| Location {
-                building: MasterId::of_data(l.location_research_location_id as i16),
-                time: WholeSeconds::of_data(l.location_research_time.cast_signed()),
-                button: LocationButton::of_data(l.location_button_location_id),
-                adjustment: Seconds::new(f32::from_bits(l.location_research_adjustment)),
-            })
-            .collect(),
-    })
-}
 
 /// The build genie-oracle's import reads, its saves' and its `.dat`'s: its layer applies.
 const LAYER_BUILD: u32 = 158_041;
@@ -149,7 +96,14 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {
 ///
 /// [`header_slice`]: crate::header_runs::header_slice
 /// [`simulate_word9`]: crate::header_runs::simulate_word9
-pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
+///
+/// # Errors
+///
+/// The build layer does not evaluate ([`layer`]); what else the slice does not model of the save
+/// stops every player instead.
+pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<World, GenieError> {
+    let build = layer()?;
+    let missile_tuning = &build.tuning.missile;
     let victory = &header.world.base_world.victory_conditions;
     // a technology state that names none stops every player once the world stands
     let (mut techs, tech_error) = match header
@@ -187,6 +141,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
                             civ,
                             masters,
                             header.players().len(),
+                            missile_tuning,
                         );
                         if whole.parts != ObjectParts::default() {
                             parts.push((whole.unit.id, whole.parts));
@@ -457,10 +412,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
             effects: Arc::new(table.effects.clone()),
             ..Model::default()
         };
-        match layer() {
-            Ok(layer) => turns.model = take(&mut turns.model).with_layer(layer),
-            Err(e) => stop_all(&mut turns, &e),
-        }
+        turns.model = take(&mut turns.model).with_layer(build);
         // the players' unit masters (type 70), Gaia's left out
         let all = || {
             turns
@@ -498,7 +450,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> World {
     }
     // the spatial index's views of the loaded annexes, relations and task 0x99 masters
     turns.sync_world();
-    turns
+    Ok(turns)
 }
 
 /// The saved objects' parts into the world's tables ([`World::load_parts`]); a part of an object

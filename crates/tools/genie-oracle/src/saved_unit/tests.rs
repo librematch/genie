@@ -1,6 +1,6 @@
 use crate::fixtures::{
     action_list, building_mut, building_object, combat_master, combat_mut, combat_object,
-    with_masters,
+    missile_tuning, with_masters,
 };
 use crate::masters::{DefaultAction, MasterTable};
 use crate::saved_unit::object as saved_unit_object;
@@ -35,6 +35,7 @@ fn an_object_without_its_static_part_is_unmodelled() {
         CivId::GAIA,
         None,
         PLAYERS,
+        &missile_tuning(),
     );
     assert_eq!(u.unit.id, ObjectId::UNSAVED);
     assert!(u.parts.unread.is_some());
@@ -60,6 +61,7 @@ fn saved_building_parts_are_its_object_s() {
             CivId::GAIA,
             None,
             PLAYERS,
+            &missile_tuning(),
         )
     };
     let o = whole(1);
@@ -100,6 +102,7 @@ fn livestock_starts_with_its_artifact() {
         CivId::GAIA,
         Some(&table),
         PLAYERS,
+        &missile_tuning(),
     );
     assert_eq!(u.unit.id, object_id(5));
     assert!(u.parts.actions.list.artifact().is_some());
@@ -118,6 +121,7 @@ fn without_table_the_default_task_is_reported() {
         CivId::GAIA,
         None,
         PLAYERS,
+        &missile_tuning(),
     );
     assert_eq!(
         u.parts.actions.default_task,
@@ -148,6 +152,7 @@ fn saved_action_the_slice_does_not_model_is_reported() {
         CivId::GAIA,
         None,
         PLAYERS,
+        &missile_tuning(),
     );
     assert!(u.parts.unread.is_some());
     assert_ne!(u.parts.actions.default_task, DefaultTask::Fly);
@@ -188,6 +193,7 @@ fn missile_without_its_action_keeps_flying() {
         CivId::GAIA,
         None,
         PLAYERS,
+        &missile_tuning(),
     );
     let (u, flying) = (o.unit, o.parts.missile.unwrap());
     assert_eq!(flying.fired_from, Some(ShooterId::new(object_id(900))));
@@ -245,6 +251,7 @@ fn build_work_rate_takes_the_builder_powerup() {
         CivId::GAIA,
         None,
         PLAYERS,
+        &missile_tuning(),
     );
     let b = o.parts.actions.list.build().copied().unwrap();
     assert_eq!(b.task.work_rate.get().to_bits(), 2.5_f32.to_bits());
@@ -272,6 +279,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
             CivId::GAIA,
             None,
             PLAYERS,
+            &missile_tuning(),
         )
     };
     let bell = whole(&object).parts.town_bell;

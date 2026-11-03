@@ -3,8 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::damage::{
-    Armored, Attacker, Building, EPSILON, FACING, LEAST_CLASS_HIT, MINUS_FACING, ONE,
-    RETALIATION_RANGE, RETALIATION_SCALE, Razed, SPECIAL, Victim, charge_hit, damage, effective,
+    Armored, Attacker, Building, EPSILON, ONE, Razed, Victim, charge_hit, damage, effective,
     elevation_factor, facing_offset, hp_floor, lose, special_charge_ready,
 };
 use crate::world::slots::CheckedIndex;
@@ -66,7 +65,7 @@ pub fn take(
     blast_taken: HitPoints,
     layer: HitLayer<'_>,
 ) -> Result<(), GenieError> {
-    let HitLayer { roles, slots } = layer;
+    let HitLayer { roles, .. } = layer;
     match t.kind {
         MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken, layer),
         MasterKind::RGE_COMBAT | MasterKind::MISSILE => {
@@ -78,7 +77,7 @@ pub fn take(
                 factor,
                 blast_taken,
             };
-            take_building(t, src, others, strike, true, roles, slots).map(|_| ())
+            take_building(t, src, others, strike, true, layer).map(|_| ())
         }
         _ => {
             take_static(t, &src.source, weapons, factor, roles);
@@ -147,7 +146,7 @@ fn kill_counts(
 /// `blast_taken`) and takes its hit points when that hit got past its hit point test. Else at 0
 /// hit points or fewer (`COMISS 0, hp` / `JNC`: a NaN goes on) nothing happens. The damage
 /// ([`damage`]); without a blast's damage so far (`UCOMISS blast_taken, 0`: exactly 0), a hit
-/// that took less than its least ([`ONE`]; [`LEAST_CLASS_HIT`] from the
+/// that took less than its least ([`ONE`]; `DamageTuning::least_class_hit` from the
 /// [`LEAST_HIT_CLASSES`] under the game's setting `+0x680` at 1) takes the least again (slot
 /// 0xb0 with it; `COMISS least, lost` / `JBE` past). Not held: the statistics (`FUN_1417783d0`)
 /// and the local player's telemetry (`FUN_140a4b540`). A player's building (`+0x718` above 0)
@@ -167,9 +166,13 @@ pub(super) fn take_building(
     others: &mut [&mut Victim],
     strike: Strike<'_>,
     forward: bool,
-    roles: &Roles,
-    slots: Slots,
+    layer: HitLayer<'_>,
 ) -> Result<bool, GenieError> {
+    let HitLayer {
+        roles,
+        slots,
+        damage_tuning,
+    } = layer;
     let Strike {
         weapons,
         factor,
@@ -178,7 +181,7 @@ pub(super) fn take_building(
     let before = t.hp;
     let main = t.building.as_ref().and_then(|b| b.main);
     if forward && let Some(main) = main {
-        return forward_to_main(t, src, others, strike, main, roles, slots);
+        return forward_to_main(t, src, others, strike, main, layer);
     }
     if HitPoints::ZERO >= t.hp {
         return Ok(false);
@@ -192,7 +195,7 @@ pub(super) fn take_building(
                 .of_class(src.source.class)
                 .contains(ClassRoles::LEAST_HIT)
         {
-            LEAST_CLASS_HIT
+            damage_tuning.least_class_hit
         } else {
             ONE
         };
@@ -256,15 +259,14 @@ fn forward_to_main(
     others: &mut [&mut Victim],
     strike: Strike<'_>,
     main: MainBuildingId,
-    roles: &Roles,
-    slots: Slots,
+    layer: HitLayer<'_>,
 ) -> Result<bool, GenieError> {
     let k = others
         .iter()
         .position(|v| v.id == main.id())
         .ok_or(NOT_HELD)?;
     let mut m = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
-    let struck = take_building(&mut m, src, others, strike, false, roles, slots);
+    let struck = take_building(&mut m, src, others, strike, false, layer);
     let annexed = m
         .building
         .as_ref()
@@ -370,7 +372,11 @@ pub(super) fn take_unit(
     blast_taken: HitPoints,
     layer: HitLayer<'_>,
 ) -> Result<(), GenieError> {
-    let HitLayer { roles, slots } = layer;
+    let HitLayer {
+        roles,
+        damage_tuning,
+        ..
+    } = layer;
     let before = effective(t);
     if t.hp < HitPoints::new(1.0) {
         return Ok(());
@@ -381,8 +387,8 @@ pub(super) fn take_unit(
     let mut factor = factor;
     if a.special_attack == SpecialAttack::FRONT_DEFENCE && !a.busy {
         let off = facing_to(&a, t.position, src)?;
-        if MINUS_FACING < off && off < FACING {
-            factor *= SPECIAL;
+        if damage_tuning.minus_facing < off && off < damage_tuning.facing {
+            factor *= damage_tuning.special;
             if a.special_graphic {
                 return Err(GenieError::unsupported(
                     "a special attack's sprite (master +0x8e8)",
@@ -390,7 +396,7 @@ pub(super) fn take_unit(
             }
         }
     }
-    if retaliates(t, src, others, &a, roles, slots)? {
+    if retaliates(t, src, others, &a, layer)? {
         factor = 0.0;
     }
     damage(t, src, weapons, factor, blast_taken, roles)?;
@@ -423,11 +429,12 @@ pub(super) fn retaliates(
     src: &mut Victim,
     others: &mut [&mut Victim],
     a: &Armored,
-    roles: &Roles,
-    slots: Slots,
+    layer: HitLayer<'_>,
 ) -> Result<bool, GenieError> {
+    let HitLayer { damage_tuning, .. } = layer;
     let reach = src.source.weapon_range;
-    let melee = reach <= Distance::new(RETALIATION_RANGE) && RETALIATION_RANGE != reach.get();
+    let melee = reach <= Distance::new(damage_tuning.retaliation_range)
+        && damage_tuning.retaliation_range != reach.get();
     // the conditions are pure: the ones the slice holds decide first
     if !(a.special_attack == SpecialAttack::RETALIATION && a.unit_ai && !a.busy && melee) {
         return Ok(false);
@@ -439,23 +446,15 @@ pub(super) fn retaliates(
         return Ok(false);
     }
     let off = facing_to(a, t.position, src)?;
-    if !(MINUS_FACING < off && off < FACING) {
+    if !(damage_tuning.minus_facing < off && off < damage_tuning.facing) {
         return Ok(false);
     }
-    let mut f = elevation_factor(t.position.z(), t.attack_elevation, src);
+    let mut f = elevation_factor(t.position.z(), t.attack_elevation, src, damage_tuning);
     if src.kind == MasterKind::COMBAT && special_charge_ready(&src.source)? {
-        f *= RETALIATION_SCALE;
+        f *= damage_tuning.retaliation_scale;
     }
     let w = t.weapons.clone();
-    take(
-        src,
-        t,
-        others,
-        &w,
-        f,
-        HitPoints::ZERO,
-        HitLayer { roles, slots },
-    )?;
+    take(src, t, others, &w, f, HitPoints::ZERO, layer)?;
     Ok(src.hp <= HitPoints::new(1.0))
 }
 

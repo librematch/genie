@@ -1,11 +1,15 @@
 //! A player's saved parts the setup imports: its AI settings, its history and its AI module.
 
+use genie_core::GenieError;
 use genie_core::map::Distance;
 use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::map::WholeDistance;
 use genie_core::movement::explore::InfluenceMap;
+use genie_core::objects::masters::CostAmount;
+use genie_core::objects::masters::MasterId;
 use genie_core::players::ai_module::AiModule;
+use genie_core::players::attribute::AttributeId;
 use genie_core::players::history::HistoryEntry;
 use genie_core::players::history::HistoryUpdates;
 use genie_core::players::history::Population;
@@ -13,9 +17,19 @@ use genie_core::players::history::Share;
 use genie_core::players::history::Tally;
 use genie_core::players::history::TimeSlice;
 use genie_core::players::history::{Event, EventKind, History};
+use genie_core::production::LocationButton;
+use genie_core::technology::CostOverride;
+use genie_core::technology::EffectId;
+use genie_core::technology::OverrideUse;
+use genie_core::technology::ResearchCap;
+use genie_core::technology::ResearchCount;
+use genie_core::technology::{Location, ResearchState, TechState};
 use genie_core::world::AiSettings;
+use genie_core::world::Seconds;
+use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
 use genie_core::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
+use genie_save::generated::world::TechPlayerTree;
 use genie_save::generated::world::{History as WorldHistory, TribeMainDecisionAi, WorldPlayerBase};
 
 /// A player's AI settings as saved (`WorldPlayerBase::save`, `FUN_14166b820`), which GAME's
@@ -139,4 +153,48 @@ pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
             slot_times: m.tribe_tactical_ai_module.slot_times.clone(),
         },
     }
+}
+
+/// A player's saved state of one technology (`Tech_Player_Tree`).
+///
+/// # Errors
+///
+/// A saved state that names none.
+pub(crate) fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
+    let o = |j: usize| {
+        t.cost_override
+            .get(j)
+            .map_or(CostOverride::UNSET, |e| CostOverride {
+                amount: CostAmount::of_data(e.tech_player_tree_cost_amount_override as i16),
+                attribute: AttributeId::of_data(
+                    e.tech_player_tree_cost_attribute_type_override as i16,
+                ),
+                used: OverrideUse::of_data(e.tech_player_tree_cost_attribute_used_override as i16),
+            })
+    };
+    Ok(TechState {
+        research_done: Seconds::new(t.research_done),
+        state: ResearchState::of_int(t.state)?,
+        cost_adj: [0, 1, 2].map(|j| CostAmount::of_data(t.cost_adj.get(j).copied().unwrap_or(0))),
+        times_researched: ResearchCount::of_data(t.tech_player_tree_times_researched as i16),
+        allow_multiple: t.tech_player_tree_allow_multiple_research != 0,
+        stack: t.tech_player_tree_stack_tech != 0,
+        overrides: [o(0), o(1), o(2)],
+        research_cap: ResearchCap::of_data(t.tech_player_tree_research_cap as i16),
+        pending: ResearchCount::of_data(t.tech_player_tree_pending_count as i16),
+        enabled: t.tech_player_tree_enabled_tech != 0,
+        effect_override: EffectId::of_data(t.tech_player_tree_effect_override as i16),
+        building_master: MasterId::of_data(t.tech_player_tree_research_building_master_id as i16),
+        locations: t
+            .location
+            .iter()
+            .flatten()
+            .map(|l| Location {
+                building: MasterId::of_data(l.location_research_location_id as i16),
+                time: WholeSeconds::of_data(l.location_research_time.cast_signed()),
+                button: LocationButton::of_data(l.location_button_location_id),
+                adjustment: Seconds::new(f32::from_bits(l.location_research_adjustment)),
+            })
+            .collect(),
+    })
 }

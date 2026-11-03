@@ -11,12 +11,11 @@
 
 use self::long_walk::{Reach, include_kept, may_plan, owner_number, reach};
 use self::path_points::{
-    ALLY_PAUSE, AfterRequest, Avoided, FAST_TURN, Goal, Next, OTHER_PAUSE, STUCK_PAUSE, cut_path,
-    ground, ground_line, moved_far, point_or_zero, point_or_zero_of, short_range, split, too_short,
+    AfterRequest, Avoided, Goal, Next, cut_path, ground, ground_line, moved_far, point_or_zero,
+    point_or_zero_of, short_range, split, too_short,
 };
 use crate::GenieError;
 use crate::map::Distance;
-use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Position;
@@ -85,17 +84,7 @@ use self::request::LongAsk;
 use crate::groups::{GroupId, UnitGroups};
 #[cfg(test)]
 use crate::math::image::movement::TWO_PI;
-use crate::math::image::movement::{
-    CLOSE as MOVEMENT_CLOSE, EDGE_GAP as MOVEMENT_EDGE_GAP,
-    EDGE_POSITION_GAP as MOVEMENT_EDGE_POSITION_GAP, EPSILON as MOVEMENT_EPSILON,
-    FAR as MOVEMENT_FAR, LONG_PATH_GROW as MOVEMENT_LONG_PATH_GROW,
-    LOOK_AHEAD as MOVEMENT_LOOK_AHEAD, NEW_PATHER_RADIUS as MOVEMENT_NEW_PATHER_RADIUS,
-    PUSHED as MOVEMENT_PUSHED, RANGE_FLOOR as MOVEMENT_RANGE_FLOOR,
-    REACH_NEAR as MOVEMENT_REACH_NEAR, REACH_SHORT as MOVEMENT_REACH_SHORT,
-    SHORT_REACH as MOVEMENT_SHORT_REACH, SHORTEST as MOVEMENT_SHORTEST, SPLIT as MOVEMENT_SPLIT,
-    STRAIGHT_GROW as MOVEMENT_STRAIGHT_GROW, TARGET_SHORT_REACH as MOVEMENT_TARGET_SHORT_REACH,
-    USER_WAYPOINT_MIDDLE as MOVEMENT_USER_WAYPOINT_MIDDLE, WIDE_RANGE as MOVEMENT_WIDE_RANGE,
-};
+use crate::math::image::movement::{EPSILON as MOVEMENT_EPSILON, FAR as MOVEMENT_FAR};
 #[cfg(test)]
 use crate::math::rng::Well512;
 use crate::objects::facing::SpriteFacets;
@@ -110,6 +99,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MovementTuning;
 pub use genie_model::movement::{Turning, turn_rate, turning};
 
 /// The velocity data (`+0x868`): velocity and acceleration in the unit's own frame; component 2 is
@@ -294,23 +284,7 @@ pub enum Motion {
 const EPSILON: f32 = MOVEMENT_EPSILON;
 /// The world's up axis (`DAT_143cc2f30`), the yaw's axis.
 const UP: BVector = BVector::new(0.0, 1.0, 0.0);
-/// How far inside the map's edge a moving unit's footprint stays (`DAT_142eb99cc`), and how far
-/// below the edge a position stays (`DAT_142eb1e9c`).
-const EDGE_GAP: f32 = MOVEMENT_EDGE_GAP;
-const EDGE_POSITION_GAP: f32 = MOVEMENT_EDGE_POSITION_GAP;
-/// A walk to a point checks its range only above this (`DAT_142eb5690`).
-const RANGE_FLOOR: f32 = MOVEMENT_RANGE_FLOOR;
-/// A point within this many tiles is the short pather's to reach (`FUN_140fa0370`,
-/// `DAT_142eb0f4c`).
-const REACH_SHORT: f32 = MOVEMENT_REACH_SHORT;
-/// A point whose squared gap to the unit's footprint is below this is not reached when the
-/// short pather did not reach it (`FUN_140fa0370`, `DAT_14330eb8c`).
-const REACH_NEAR: DistanceSquared = DistanceSquared::new(MOVEMENT_REACH_NEAR);
 
-const WIDE_RANGE: Distance = Distance::new(MOVEMENT_WIDE_RANGE);
-/// A long path's stretch is checked for walls with the unit's radius times this
-/// (`DAT_142e85190`).
-const LONG_PATH_GROW: f32 = MOVEMENT_LONG_PATH_GROW;
 /// No distance (`DAT_14330ebf4`).
 const FAR: f32 = MOVEMENT_FAR;
 /// The motion step's switches (`DAT_1439e3cc0`, `DAT_1439e3cc4`, `DAT_1439e3cc8`): the short
@@ -318,14 +292,6 @@ const FAR: f32 = MOVEMENT_FAR;
 const SHORT_PATHER: bool = true;
 const TILE_PATHER: bool = true;
 const LONG_PATHER: bool = true;
-/// The short pather serves a waypoint this near (`DAT_142ec9ec0`), and one this near a target
-/// before the tile pathfinder (`DAT_142eb0f4c`).
-const SHORT_REACH: f32 = MOVEMENT_SHORT_REACH;
-const TARGET_SHORT_REACH: f32 = MOVEMENT_TARGET_SHORT_REACH;
-/// A waypoint or target nearer than this takes the close-in path (`DAT_14330eb8c`).
-const CLOSE: f32 = MOVEMENT_CLOSE;
-/// A unit pushed into a met object counts beyond its radius times this (`DAT_142eb880c`).
-const PUSHED: f32 = MOVEMENT_PUSHED;
 
 /// `FUN_1411615a0`: how deep two boxes (centre, radii on the ground) overlap, the lesser of the
 /// two axes; 0 when they do not.
@@ -342,15 +308,6 @@ fn overlap(a: BVector, radius_a: Footprint, b: BVector, radius_b: Footprint) -> 
     fmath::minss(x, y)
 }
 
-/// A unit's own waypoint on a tile's edge moves this far into the tile (`FUN_14114e920`,
-/// `DAT_142e7f384`).
-const USER_WAYPOINT_MIDDLE: f32 = MOVEMENT_USER_WAYPOINT_MIDDLE;
-/// How far level 0's look ahead reaches on its parent's path, squared (`DAT_14330ebcc`).
-const LOOK_AHEAD: f32 = MOVEMENT_LOOK_AHEAD;
-/// `FUN_141142750` grows the walk's query by the unit's radius times `DAT_142e7f384`.
-const STRAIGHT_GROW: f32 = MOVEMENT_STRAIGHT_GROW;
-/// A path shorter than this is too short (`DAT_142eb99cc`).
-const SHORTEST: Distance = Distance::new(MOVEMENT_SHORTEST);
 /// The point `FUN_140f9bcd0` returns outside a path: `DAT_143f0dc88`, in `.bss` (zero at the
 /// load; probed zero in records/425906646 with no write in the update after).
 pub(crate) const OUTSIDE_PATH: BVector = BVector::ZERO;
@@ -359,16 +316,8 @@ pub(crate) const OUTSIDE_PATH: BVector = BVector::ZERO;
 /// when it is longer than this and than 1.25 times the way (`DAT_14330ebb8`, `DAT_142eb56a8`).
 const LONG: Distance = Distance::new(5.0);
 const DETOUR: f32 = 1.25;
-/// A new level's stretches longer than this squared get a midpoint (`DAT_142ed6f20`).
-const SPLIT: f32 = MOVEMENT_SPLIT;
 /// How many plans one motion step makes at most.
 const PLANS: StepPlans = StepPlans::new(3);
-/// What a gate's annex's gap loses against the gate's own (`XMM14`, the motion step's load at
-/// 0x1411510e7, the same as [`RANGE_FLOOR`]'s).
-const ANNEX_GAP: Distance = Distance::new(MOVEMENT_RANGE_FLOOR);
-/// The widest unit the new short pather takes (`DAT_142e7f384`, `FUN_140f9e540`'s load at
-/// 0x140f9e713).
-const NEW_PATHER_RADIUS: f32 = MOVEMENT_NEW_PATHER_RADIUS;
 /// The motion step's include list (`DAT_143f4a000`, its count `local_19bc`) holds at most 0x100
 /// kept hits (`CMP RCX, 0x100; JGE` at 0x1411547cc).
 const INCLUDED: usize = 0x100;
@@ -485,12 +434,17 @@ impl PathData {
 /// tile or more without a target; with one (its own gap, `FUN_14118f680`, and its master), its
 /// gap a tile or more (`COMISS`/`JNC` at 0x141152f0e: a NaN is near) or its master 45 however
 /// near.
-fn far_waypoint(way: Distance, target: Option<(Distance, MasterId)>, roles: &Roles) -> bool {
+fn far_waypoint(
+    way: Distance,
+    target: Option<(Distance, MasterId)>,
+    roles: &Roles,
+    movement_tuning: &MovementTuning,
+) -> bool {
     let way = way.get();
-    target.map_or(CLOSE <= way, |(gap, master)| {
+    target.map_or(movement_tuning.close <= way, |(gap, master)| {
         // A target of this master (raw `0x60c9`) or class gives the tile planner of a reach test this
         // much more range (`FUN_140fa0370`, `DAT_142eb1c98`).
-        CLOSE <= gap.get() || roles.of_master(master).contains(MasterRoles::DOCK)
+        movement_tuning.close <= gap.get() || roles.of_master(master).contains(MasterRoles::DOCK)
     })
 }
 

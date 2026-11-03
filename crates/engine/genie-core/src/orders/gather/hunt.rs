@@ -95,6 +95,7 @@ impl World {
             arms,
             mover,
             &self.model.roles,
+            &self.model.tuning.attack,
         )?;
         Held {
             kind: unit.life.attribute_type,

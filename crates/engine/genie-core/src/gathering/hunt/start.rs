@@ -29,6 +29,7 @@ use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::AttackTuning;
 use crate::world::step::Step;
 
 /// Who walks to a hunt's point ([`HuntAction::update_point_walk`]).
@@ -139,6 +140,7 @@ impl HuntAction {
         arms: Arms,
         mover: &mut Mover,
         roles: &Roles,
+        attack_tuning: &AttackTuning,
     ) -> Result<(Self, bool), GenieError> {
         let HuntStart {
             task,
@@ -197,7 +199,7 @@ impl HuntAction {
             player,
             walks: &walks,
         };
-        let arrived = hunt.chase(chase, attack, arms, mover, roles)?;
+        let arrived = hunt.chase(chase, attack, arms, mover, roles, attack_tuning)?;
         Ok((hunt, arrived))
     }
 
@@ -215,6 +217,7 @@ impl HuntAction {
         arms: Arms,
         mover: &mut Mover,
         roles: &Roles,
+        attack_tuning: &AttackTuning,
     ) -> Result<bool, GenieError> {
         let HuntChase {
             target,
@@ -252,7 +255,8 @@ impl HuntAction {
         }
         self.state = HuntState::Attack { attack: None };
         let reads = walks.live(mover);
-        let (a, arrived) = Attack::start(target.id, attack, arms, mover, &reads, roles)?;
+        let (a, arrived) =
+            Attack::start(target.id, attack, arms, mover, &reads, roles, attack_tuning)?;
         self.state = HuntState::Attack { attack: Some(a) };
         Ok(arrived)
     }
@@ -274,6 +278,7 @@ impl HuntAction {
         arms: Arms,
         mover: &mut Mover,
         roles: &Roles,
+        attack_tuning: &AttackTuning,
     ) -> Result<Option<bool>, GenieError> {
         let HuntRetarget {
             target,
@@ -309,7 +314,8 @@ impl HuntAction {
             player,
             walks: &walks,
         };
-        self.chase(chase, attack, arms, mover, roles).map(Some)
+        self.chase(chase, attack, arms, mover, roles, attack_tuning)
+            .map(Some)
     }
 
     /// Slot 0x40 (`FUN_140ac52c0`): the hunt takes a move's `target` (None for a point) and

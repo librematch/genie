@@ -74,11 +74,7 @@ pub use self::work_slots::{Mark, Wielder, Worked};
 use crate::combat::damage;
 use crate::combat::volley::armed;
 use crate::combat::{AttackTargetId, MissileCount};
-use crate::math::image::attack::{
-    EPSILON as ATTACK_EPSILON, LEASH_SLACK as ATTACK_LEASH_SLACK, NONE as ATTACK_NONE,
-    RELOAD_MS as ATTACK_RELOAD_MS, SEEN_RANGE as ATTACK_SEEN_RANGE,
-    SHORT_RANGE_GAP as ATTACK_SHORT_RANGE_GAP, TOUCH as ATTACK_TOUCH,
-};
+use crate::math::image::attack::{EPSILON as ATTACK_EPSILON, NONE as ATTACK_NONE};
 #[cfg(test)]
 use crate::movement::Mover;
 use crate::objects::layers::Combat;
@@ -101,20 +97,12 @@ pub(super) const TARGET_GONE: GenieError =
 /// `-0.5` (`DAT_142eb6e58`) and the reach by `0.5` (`DAT_142e7f384`).
 const NO_RANGE: f32 = 0.1;
 const HALF: f32 = 0.5;
-/// The squared reach of an attack without a range (`DAT_142ed48e4`): `0x3c23d70b`, which is
-/// `0.1f * 0.1f`, one ULP above `0.01f`.
-const TOUCH: DistanceSquared = DistanceSquared::new(ATTACK_TOUCH);
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`).
 const EPSILON: f32 = ATTACK_EPSILON;
 /// The point an attack on an object has none of (`DAT_14330ec20`).
 const NONE: f32 = ATTACK_NONE;
-/// The milliseconds of a second the reload world time counts (`FUN_141089820`).
-const RELOAD_MS: f32 = ATTACK_RELOAD_MS;
 /// The hit chance's scale (`0x7fffffff`, the low word of a 64-bit Object-stream draw).
 const DRAW_SCALE: i64 = 0x7fff_ffff;
-/// The least range of a unit that walks onto the point where it saw its target
-/// (`DAT_14330eb8c`, [`AttackState::GotoPoint`]).
-const SEEN_RANGE: f32 = ATTACK_SEEN_RANGE;
 
 /// The sprites and frames the Attack takes from its constructor.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
@@ -464,6 +452,7 @@ impl World {
                     graphics,
                     masters,
                     roles,
+                    tuning,
                     ..
                 },
             ..
@@ -488,6 +477,7 @@ impl World {
                     motions,
                 ),
                 roles,
+                tuning,
             ),
             motion: MotionMut::new(motion),
         }
@@ -501,13 +491,6 @@ pub(crate) fn set_walker_anim(mut motion: MotionMut<'_>, speed: Speed) {
         m.animated.speed = speed;
     }
 }
-
-/// readyToAttack's gap for a range up to [`NO_RANGE`]: half a tile less (`DAT_142eb6e58`).
-const SHORT_RANGE_GAP: Distance = Distance::new(ATTACK_SHORT_RANGE_GAP);
-
-/// readyToAttack's leash of stance 1 lets a target this much past the range from the unit AI's
-/// `state_position` (`DAT_14330ebb8`, read by `ADDSS` at `0x140a80051`).
-const LEASH_SLACK: Distance = Distance::new(ATTACK_LEASH_SLACK);
 
 /// An Attack in a state that walks to its target object, without one.
 const ATTACK_WITHOUT_TARGET: GenieError =

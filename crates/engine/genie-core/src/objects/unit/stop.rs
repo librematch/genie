@@ -205,6 +205,7 @@ impl Unit {
                     _ => Self::restore_patrol(
                         c.w.parts.unit_ai.get(self.id),
                         c.w.parts.motion.mover_mut(self.id),
+                        &c.w.model.tuning.movement,
                     ),
                 };
                 m.map_or(Ok(()), |m| self.ai_move(actions, m, class, c, roles))

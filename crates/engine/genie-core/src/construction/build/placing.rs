@@ -403,6 +403,7 @@ impl BuildAction {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;

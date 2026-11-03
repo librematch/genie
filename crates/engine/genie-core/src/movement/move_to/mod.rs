@@ -572,6 +572,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+
     #[cfg(test)]
     use crate::unit_ai::{AiAction, Inbox, NotifyKind, UnitAi};
 

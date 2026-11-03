@@ -2,9 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
-use crate::combat::damage::{
-    Attacker, ElevationBonus, Facing, HIGHER, LOWER, RELIC_BOOST, SPECIFIC_RELIC_BOOST, Victim,
-};
+use crate::combat::damage::{Attacker, ElevationBonus, Facing, Victim};
 use crate::map::Position;
 use crate::objects::RelicCount;
 use crate::objects::Relics;
@@ -16,25 +14,31 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::DamageTuning;
 
 /// Slot 0x1f0 of a combat object (`FUN_14120d780`) at height `z` whose player has `own` as
 /// attributes 211 and 212: a hit from higher up gains 25% and attributes 211 and the target's
 /// 272, one from lower down 75% and attributes 212 and 273.
 #[must_use]
-pub fn elevation_factor(z: f32, own: ElevationBonus, to: &Victim) -> f32 {
+pub fn elevation_factor(
+    z: f32,
+    own: ElevationBonus,
+    to: &Victim,
+    damage_tuning: &DamageTuning,
+) -> f32 {
     let tz = to.position.z();
     if tz < z {
-        own.higher + HIGHER + to.elevation.higher
+        own.higher + damage_tuning.higher + to.elevation.higher
     } else if z < tz {
-        own.lower + LOWER + to.elevation.lower
+        own.lower + damage_tuning.lower + to.elevation.lower
     } else {
         1.0
     }
 }
 
 /// Slot 0x1f0 of a building (`FUN_1411cc890`): the combat object's `factor`
-/// ([`elevation_factor`]), times [`SPECIFIC_RELIC_BOOST`] while its `specific_relic_count`
-/// (`+0xc24`, [`Relics::specific`]) is above 0, else [`RELIC_BOOST`] while its `relic_count`
+/// ([`elevation_factor`]), times `DamageTuning::specific_relic_boost` while its `specific_relic_count`
+/// (`+0xc24`, [`Relics::specific`]) is above 0, else `DamageTuning::relic_boost` while its `relic_count`
 /// (`+0xc20`, [`Relics::count`]) is; a building victim (type 80, `kind`) divides it by the same of its own counts
 /// (`victim_relics`). Each count compares signed.
 #[must_use]
@@ -43,19 +47,20 @@ pub fn building_elevation_factor(
     relics: Relics,
     kind: MasterKind,
     victim_relics: Relics,
+    damage_tuning: &DamageTuning,
 ) -> f32 {
     let mut f = factor;
     if RelicCount::ZERO < relics.specific {
-        f *= SPECIFIC_RELIC_BOOST;
+        f *= damage_tuning.specific_relic_boost;
     } else if RelicCount::ZERO < relics.count {
-        f *= RELIC_BOOST;
+        f *= damage_tuning.relic_boost;
     }
     if kind == MasterKind::BUILDING {
         if RelicCount::ZERO < victim_relics.specific {
-            return f / SPECIFIC_RELIC_BOOST;
+            return f / damage_tuning.specific_relic_boost;
         }
         if RelicCount::ZERO < victim_relics.count {
-            f /= RELIC_BOOST;
+            f /= damage_tuning.relic_boost;
         }
     }
     f

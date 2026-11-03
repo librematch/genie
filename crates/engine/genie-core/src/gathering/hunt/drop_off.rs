@@ -228,15 +228,9 @@ impl Unit {
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let (mover, by_id) = c.w.parts.lend_mover(
-            self.id,
-            (
-                &c.w.players,
-                &c.w.index,
-                &c.w.model.masters,
-                &c.w.model.roles,
-            ),
-        );
+        let (mover, by_id) =
+            c.w.parts
+                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));
         let w = DropWorld {
             masters: by_id.masters().of(c.player),
             spatial: &mut c.w.spatial,

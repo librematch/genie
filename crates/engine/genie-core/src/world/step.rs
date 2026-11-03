@@ -96,7 +96,13 @@ impl World {
             players,
             index,
             parts,
-            model: Model { masters, roles, .. },
+            model:
+                Model {
+                    masters,
+                    roles,
+                    tuning,
+                    ..
+                },
             ..
         } = self;
         let (object, sprite_rng) = streams.object_and_sprite();
@@ -126,6 +132,7 @@ impl World {
                     motions,
                 ),
                 roles,
+                tuning,
             ),
         };
         let beside = Beside {
@@ -305,6 +312,7 @@ impl Step<'_> {
                         motions,
                     ),
                     &self.w.model.roles,
+                    &self.w.model.tuning,
                 ),
             },
             sprite,

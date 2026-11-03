@@ -1,8 +1,10 @@
 //! Save parts for the tests, built from the generated layouts' defaults: genie holds no game
 //! saves (FD-044), so a test builds the few fields its routine reads and leaves the rest zero.
 
+use crate::layer;
 use flate2::write::DeflateEncoder;
 use genie_core::objects::masters::ActionKind;
+use genie_core::world::layer::generated::MissileTuning;
 use genie_rec::de::Op;
 use genie_save::Header;
 use genie_save::Positioned;
@@ -312,4 +314,9 @@ pub(crate) fn with_masters(masters: Vec<Master>) -> PlayerObjects {
         }),
         ..PlayerObjects::default()
     }
+}
+
+/// Build 158041's missile tuning, which the import reads from the build layer.
+pub(crate) fn missile_tuning() -> MissileTuning {
+    layer().unwrap().tuning.missile
 }

@@ -283,7 +283,7 @@ pub(super) fn loaded_slice(
     masters: Option<&MasterTable>,
     dumps: Dumps<'_>,
 ) -> Result<World, Error> {
-    let mut turns = slice(header, masters);
+    let mut turns = slice(header, masters).map_err(Error::Unmodelled)?;
     load_dumps(&mut turns, dumps)?;
     watch_at_load(&mut turns);
     Ok(turns)

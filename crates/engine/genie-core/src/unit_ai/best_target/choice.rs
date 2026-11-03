@@ -20,6 +20,7 @@ use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::BestTargetTuning;
 use crate::world::slots::CheckedIndex;
 use std::mem::take;
 
@@ -173,14 +174,19 @@ pub fn best_unit_to_attack(
     lists: &ByRelation<Vec<ObjectId>>,
     world: &mut dyn Battlefield,
     roles: &Roles,
+    best_target_tuning: &BestTargetTuning,
 ) -> Result<Choice, crate::GenieError> {
     let current = current_target(me, world)?;
     let walls = attacks_walls(me, roles);
     let mut st = Statistics::default();
-    let narrowed = add_current(me, ask, current, &mut st, world, roles)?;
-    add_extra(me, ask, &mut st, world, roles)?;
+    let narrowed = add_current(me, ask, current, &mut st, world, roles, best_target_tuning)?;
+    add_extra(me, ask, &mut st, world, roles, best_target_tuning)?;
     let mut walked = Walked::new(narrowed, walls);
-    walked.walk_lists(me, ask, lists, &mut st, world, roles)?;
+    let layer = WalkLayer {
+        roles,
+        best_target_tuning,
+    };
+    walked.walk_lists(me, ask, lists, &mut st, world, layer)?;
     if walls && !walked.beyond_walls && walked.gate.0.is_some() {
         return Ok(Choice {
             target: walked.gate.0,
@@ -188,7 +194,7 @@ pub fn best_unit_to_attack(
         });
     }
     if st.entries.is_empty() {
-        walked.walk_later(me, ask, &mut st, world, roles)?;
+        walked.walk_later(me, ask, &mut st, world, layer)?;
         if st.entries.is_empty() {
             return Ok(Choice {
                 target: walked.last_resort(),
@@ -196,7 +202,7 @@ pub fn best_unit_to_attack(
             });
         }
     }
-    let ranked = rank_entries(me, &mut st, world, roles)?;
+    let ranked = rank_entries(me, &mut st, world, roles, best_target_tuning)?;
     choose(me, ask, current, &st, ranked, world, walked.last_resort())
 }
 
@@ -238,6 +244,7 @@ fn add_current(
     st: &mut Statistics,
     world: &mut dyn Battlefield,
     roles: &Roles,
+    best_target_tuning: &BestTargetTuning,
 ) -> Result<Option<AttackCategory>, crate::GenieError> {
     let Some((target, t)) =
         current.filter(|(_, t)| t.distance <= me.range || Speed::ZERO < me.speed)
@@ -245,7 +252,7 @@ fn add_current(
         return Ok(None);
     };
     let k = category(t.master, t.class, roles);
-    st.add(&world.candidate(target, t.distance, k)?);
+    st.add(&world.candidate(target, t.distance, k)?, best_target_tuning);
     let narrows = !ask.idle
         && t.distance <= ask.distance
         && !roles
@@ -263,6 +270,7 @@ pub(super) fn add_extra(
     st: &mut Statistics,
     world: &mut dyn Battlefield,
     roles: &Roles,
+    best_target_tuning: &BestTargetTuning,
 ) -> Result<(), crate::GenieError> {
     for &id in &ask.extra {
         if Some(id) == me.target {
@@ -281,7 +289,10 @@ pub(super) fn add_extra(
             }
             gap = gap + me.weapon_range + Distance::new(ONE);
         }
-        st.add(&world.candidate(id, gap, category(t.master, t.class, roles))?);
+        st.add(
+            &world.candidate(id, gap, category(t.master, t.class, roles))?,
+            best_target_tuning,
+        );
     }
     Ok(())
 }
@@ -293,6 +304,15 @@ struct Listed {
     id: ObjectId,
     /// Its list.
     relation: UnitRelation,
+}
+
+/// What the walks read of the build layer (FD-046-D45, D49): the roles of the classes they
+/// meet and the target search's tuning values, one argument of [`Walked::walk_lists`] and
+/// [`Walked::walk_later`].
+#[derive(Clone, Copy)]
+struct WalkLayer<'a> {
+    roles: &'a Roles,
+    best_target_tuning: &'a BestTargetTuning,
 }
 
 /// The relation lists' walks (the main one and the retry walk): the category the search keeps
@@ -332,8 +352,12 @@ impl Walked {
         lists: &ByRelation<Vec<ObjectId>>,
         st: &mut Statistics,
         world: &mut dyn Battlefield,
-        roles: &Roles,
+        layer: WalkLayer<'_>,
     ) -> Result<(), crate::GenieError> {
+        let WalkLayer {
+            roles,
+            best_target_tuning,
+        } = layer;
         let lowest = if me.scenario && !me.player_type.is_computer() {
             UnitRelation::ALLY
         } else {
@@ -376,7 +400,7 @@ impl Walked {
                         self.beyond_walls = true;
                     }
                 }
-                st.add(&world.candidate(id, gap, k)?);
+                st.add(&world.candidate(id, gap, k)?, best_target_tuning);
             }
         }
         Ok(())
@@ -391,8 +415,12 @@ impl Walked {
         ask: &Ask,
         st: &mut Statistics,
         world: &mut dyn Battlefield,
-        roles: &Roles,
+        layer: WalkLayer<'_>,
     ) -> Result<(), crate::GenieError> {
+        let WalkLayer {
+            roles,
+            best_target_tuning,
+        } = layer;
         for (id, relation) in take(&mut self.later) {
             let listed = Listed { id, relation };
             let Some((t, gap, k)) = self.counted(me, ask, listed, me.range, world, roles)? else {
@@ -409,7 +437,7 @@ impl Walked {
                 }
             };
             if counts {
-                st.add(&world.candidate(id, gap, k)?);
+                st.add(&world.candidate(id, gap, k)?, best_target_tuning);
             }
         }
         Ok(())
@@ -463,25 +491,34 @@ fn rank_entries(
     st: &mut Statistics,
     world: &mut dyn Battlefield,
     roles: &Roles,
+    best_target_tuning: &BestTargetTuning,
 ) -> Result<bool, crate::GenieError> {
-    st.score(&me.weights, me.targeting, &mut |id| world.armored(id))?;
+    st.score(
+        &me.weights,
+        me.targeting,
+        &mut |id| world.armored(id),
+        best_target_tuning,
+    )?;
     let ranked = me.attack_priority == AttackPriority::PRIORITY_1
         || (me.attack_priority == AttackPriority::PRIORITY_0
             && !roles
                 .of_master(me.master)
                 .contains(MasterRoles::MOVING_RULE_EXEMPT));
-    st.rank(&mut |e| {
-        if !e.fixed || e.category == Some(AttackCategory::SIEGE) {
-            return Ok(i32::from(ranked) << 2);
-        }
-        if EPSILON < (world.weapon_range(e.id)?).get() {
-            return Ok(3);
-        }
-        let farm = world
-            .thing(e.id)?
-            .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::FARM));
-        Ok(if farm { 1 } else { 2 })
-    })?;
+    st.rank(
+        &mut |e| {
+            if !e.fixed || e.category == Some(AttackCategory::SIEGE) {
+                return Ok(i32::from(ranked) << 2);
+            }
+            if EPSILON < (world.weapon_range(e.id)?).get() {
+                return Ok(3);
+            }
+            let farm = world
+                .thing(e.id)?
+                .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::FARM));
+            Ok(if farm { 1 } else { 2 })
+        },
+        best_target_tuning,
+    )?;
     st.sort()?;
     Ok(ranked)
 }

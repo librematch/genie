@@ -19,6 +19,7 @@ use crate::test_ids::{attack_category, category_of};
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
 use crate::world::Seconds;
@@ -49,20 +50,29 @@ fn candidate(id: i32, distance: Distance, speed: f32) -> Candidate {
 #[test]
 fn the_statistics_count_bound_and_time_each_object() {
     let mut st = Statistics::default();
-    st.add(&candidate(1, Distance::new(3.0), 1.0));
-    st.add(&Candidate {
-        current: true,
-        class: class::BUILDING,
-        damage: HitPoints::ZERO,
-        workable: true,
-        ..candidate(2, Distance::new(0.5), 0.0)
-    });
-    st.add(&Candidate {
-        damage: HitPoints::ZERO,
-        category: None,
-        armed: false,
-        ..candidate(3, Distance::new(7.0), 2.0)
-    });
+    st.add(
+        &candidate(1, Distance::new(3.0), 1.0),
+        &tuning().best_target,
+    );
+    st.add(
+        &Candidate {
+            current: true,
+            class: class::BUILDING,
+            damage: HitPoints::ZERO,
+            workable: true,
+            ..candidate(2, Distance::new(0.5), 0.0)
+        },
+        &tuning().best_target,
+    );
+    st.add(
+        &Candidate {
+            damage: HitPoints::ZERO,
+            category: None,
+            armed: false,
+            ..candidate(3, Distance::new(7.0), 2.0)
+        },
+        &tuning().best_target,
+    );
     let gaps = |least, most| Bounds {
         least: Distance::new(least),
         most: Distance::new(most),
@@ -95,16 +105,31 @@ fn the_statistics_count_bound_and_time_each_object() {
 #[test]
 fn the_scores_rank_and_sort_the_entries() {
     let mut st = Statistics::default();
-    st.add(&candidate(5, Distance::new(2.0), 1.0));
-    st.add(&Candidate {
-        hp: HitPoints::new(80.0),
-        ..candidate(4, Distance::new(6.0), 1.0)
-    });
-    st.add(&candidate(9, Distance::new(4.0), 0.0));
+    st.add(
+        &candidate(5, Distance::new(2.0), 1.0),
+        &tuning().best_target,
+    );
+    st.add(
+        &Candidate {
+            hp: HitPoints::new(80.0),
+            ..candidate(4, Distance::new(6.0), 1.0)
+        },
+        &tuning().best_target,
+    );
+    st.add(
+        &candidate(9, Distance::new(4.0), 0.0),
+        &tuning().best_target,
+    );
     let mut weights = ByCategory::default();
     weights[category_of(1)] = OrderWeight::new(0.5);
     let targeting = (TargetingMode::of_data(0), Percent::new(0));
-    st.score(&weights, targeting, &mut |_| Ok(false)).unwrap();
+    st.score(
+        &weights,
+        targeting,
+        &mut |_| Ok(false),
+        &tuning().best_target,
+    )
+    .unwrap();
     let scores: Vec<(f32, f32, f32, f32)> = st
         .entries
         .iter()
@@ -128,7 +153,8 @@ fn the_scores_rank_and_sort_the_entries() {
             (10.0, 37.5, 5.0, 52.5)
         ]
     );
-    st.rank(&mut |e| Ok(i32::from(!e.moving))).unwrap();
+    st.rank(&mut |e| Ok(i32::from(!e.moving)), &tuning().best_target)
+        .unwrap();
     st.sort().unwrap();
     let ids: Vec<ObjectId> = st.order.iter().map(|&i| st.entries[i].id).collect();
     assert_eq!(ids, [object_id(9), object_id(5), object_id(4)]);
@@ -159,6 +185,7 @@ fn the_order_history_weighs_the_last_minute_categories() {
             record(WorldTime::from_millis(99_000), 2),
         ],
         WorldTime::from_millis(100_000),
+        &tuning().best_target,
     );
     assert_eq!(w[category_of(1)].get(), 1.0 + 30_000.0 / 60_000.0);
     assert_eq!(w[category_of(3)], OrderWeight::ZERO);
@@ -303,7 +330,15 @@ fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
         any_class: true,
         ..Ask::default()
     };
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &soldier(),
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert_eq!(field.asked, [('q', object_id(7)), ('q', object_id(9))]);
     assert_eq!(c.retries, []);
@@ -311,7 +346,15 @@ fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
     field.quick.clear();
     field.paths = vec![object_id(9)];
     field.asked.clear();
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &soldier(),
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert_eq!(
         field.asked,
@@ -347,7 +390,15 @@ fn failed_paths_become_retarget_entries() {
         any_class: true,
         ..Ask::default()
     };
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &soldier(),
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, None);
     let mut retries = c.retries;
     retries.sort_unstable();
@@ -363,7 +414,15 @@ fn failed_paths_become_retarget_entries() {
         ..soldier()
     };
     field.asked.clear();
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, None);
     assert_eq!(field.asked, [('q', object_id(7)), ('p', object_id(7))]);
     // with 7 a retarget entry too, the retry walk takes both
@@ -373,7 +432,15 @@ fn failed_paths_become_retarget_entries() {
     };
     field.paths = vec![object_id(9)];
     field.asked.clear();
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(9)));
 }
 
@@ -428,7 +495,15 @@ fn the_lists_pass_over_what_the_unit_may_not_attack() {
         min_range: Distance::new(0.2),
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(36)));
     assert_eq!(field.asked, [('q', object_id(36))]);
 }
@@ -461,9 +536,25 @@ fn walls_and_gates_count_for_unit_that_attacks_walls() {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(22)));
-    let c = best_unit_to_attack(&soldier(), &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &soldier(),
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, None);
 }
 
@@ -545,7 +636,7 @@ fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
     };
     let counted = |me: &Searcher, field: &mut Field| {
         let mut st = Statistics::default();
-        add_extra(me, &ask, &mut st, field, &roles()).unwrap();
+        add_extra(me, &ask, &mut st, field, &roles(), &tuning().best_target).unwrap();
         st.entries
             .iter()
             .map(|e| (e.id, e.distance.get()))
@@ -591,7 +682,15 @@ fn gate_answers_at_once_only_among_walls() {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(7)));
     assert!(field.asked.contains(&('q', object_id(7))));
 }
@@ -621,7 +720,15 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
         target: Some(object_id(7)),
         ..soldier()
     };
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(
         (c.target, &field.asked[..]),
         (Some(object_id(7)), &[('p', object_id(7))][..])
@@ -631,17 +738,41 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
         paths: 0,
         ..ask.clone()
     };
-    let c = best_unit_to_attack(&me, &at_once, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &at_once,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!((c.target, field.asked.len()), (Some(object_id(7)), 0));
     field.paths.clear();
     field.quick = vec![object_id(9)];
-    let c = best_unit_to_attack(&me, &ask, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &ask,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert_eq!(field.asked[0], ('p', object_id(7)));
     field.asked.clear();
     let idle = Ask { idle: true, ..ask };
     field.paths = vec![object_id(7)];
-    let c = best_unit_to_attack(&me, &idle, &lists, &mut field, &roles()).unwrap();
+    let c = best_unit_to_attack(
+        &me,
+        &idle,
+        &lists,
+        &mut field,
+        &roles(),
+        &tuning().best_target,
+    )
+    .unwrap();
     assert_eq!(c.target, Some(object_id(9)));
     assert!(!field.asked.contains(&('p', object_id(7))));
 }

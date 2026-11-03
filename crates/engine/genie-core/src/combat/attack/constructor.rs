@@ -7,8 +7,8 @@ use crate::combat::abilities::Look;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::TARGET_GONE;
 use crate::combat::attack::{
-    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, LEASH_SLACK, NONE,
-    Posted, Posts, face_target,
+    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, NONE, Posted,
+    Posts, face_target,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -44,7 +44,16 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::AttackTuning;
 use crate::world::step::Step;
+
+/// What an Attack's start reads of the build layer (FD-046-D45, D49): the roles of the unit's
+/// master and the attack's tuning values, one argument of [`Attack::begin`].
+#[derive(Clone, Copy, Debug)]
+pub(super) struct BeginLayer<'a> {
+    roles: &'a Roles,
+    attack_tuning: &'a AttackTuning,
+}
 
 impl Attack {
     /// The constructor (`FUN_140a7c210`) on `target`: the range and least range of `e`, its
@@ -93,6 +102,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         roles: &Roles,
+        attack_tuning: &AttackTuning,
     ) -> Result<(Self, bool), GenieError> {
         let mut a = Self {
             voice: Voice::Quiet,
@@ -114,7 +124,10 @@ impl Attack {
             mover,
             &mut posted,
             reads,
-            roles,
+            BeginLayer {
+                roles,
+                attack_tuning,
+            },
         )?;
         if begun.ready {
             return Err(GenieError::unsupported(
@@ -150,6 +163,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
     ) -> Result<(Self, Begun, Vec<Posted>), GenieError> {
+        let attack_tuning = &by_id.tuning().attack;
         let roles = by_id.roles();
         let e = cmd.engagement;
         let t = *world.get_known(cmd.target)?.ok_or(TARGET_GONE)?;
@@ -171,7 +185,10 @@ impl Attack {
             mover,
             &mut posted,
             reads,
-            roles,
+            BeginLayer {
+                roles,
+                attack_tuning,
+            },
         )?;
         Ok((attack, begun, posted))
     }
@@ -207,15 +224,9 @@ impl Attack {
             ),
             roles,
         )?;
-        let (mover, by_id) = c.w.parts.lend_mover(
-            unit.id,
-            (
-                &c.w.players,
-                &c.w.index,
-                &c.w.model.masters,
-                &c.w.model.roles,
-            ),
-        );
+        let (mover, by_id) =
+            c.w.parts
+                .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.model));
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
             Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
@@ -233,15 +244,9 @@ impl Attack {
             let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
                 "an attack's target the slice does not hold live",
             ))?;
-            let (motion, by_id) = c.w.parts.lend_motion(
-                unit.id,
-                (
-                    &c.w.players,
-                    &c.w.index,
-                    &c.w.model.masters,
-                    &c.w.model.roles,
-                ),
-            );
+            let (motion, by_id) =
+                c.w.parts
+                    .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.model));
             let mut g = Ground {
                 map: &c.w.spatial,
                 sprite_rng: c.w.streams.get(Stream::Sprite),
@@ -251,7 +256,7 @@ impl Attack {
                 by_id,
                 motion,
             };
-            attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads, roles)?;
+            attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }
         if begun.arrived {
             unit.shows_standing_sprite(
@@ -282,7 +287,7 @@ impl Attack {
     /// decides, by the gap (`FUN_14118f680`): below the least range (`COMISS`/`JA`) a unit's own
     /// Attack posts 0x1fe (−1, −1, −1) and a unit that may not move fails; beyond the reach (the
     /// range, half a tile more up to [`NO_RANGE`]; `COMISS`/`JBE`: a NaN gap is within) it posts
-    /// 0x1fd, then stance 1's leash fails a target [`LEASH_SLACK`] past the range from the unit
+    /// 0x1fd, then stance 1's leash fails a target `AttackTuning::leash_slack` past the range from the unit
     /// AI's `state_position` (`FUN_14099ef70`'s root, `COMISS`/`JNC`: a NaN distance holds), a unit
     /// that may move turns to state 4, any other fails. The reach is to `reach_gap`, a gate's
     /// nearest of it and its first two parts ([`crate::movement::gate_gap`]). Within it the
@@ -297,8 +302,12 @@ impl Attack {
         mover: &mut Mover,
         posted: &mut Vec<(NotifyKind, [i32; 3])>,
         reads: &MoveToReads<'_>,
-        roles: &Roles,
+        layer: BeginLayer<'_>,
     ) -> Result<Begun, GenieError> {
+        let BeginLayer {
+            roles,
+            attack_tuning,
+        } = layer;
         let movable = e.speed != Speed::ZERO && e.can_move;
         let mut failed_first = false;
         let mut ready_end = false;
@@ -320,7 +329,7 @@ impl Attack {
                 posted.push((NotifyKind::OUT_OF_REACH, [0; 3]));
             }
             if (e.stance == UnitStance::DEFENSIVE
-                && self.off_leash(e.target_position, e.state_position))
+                && self.off_leash(e.target_position, e.state_position, attack_tuning))
                 || !movable
             {
                 failed_first = true;
@@ -356,10 +365,15 @@ impl Attack {
 
     /// readyToAttack's leash of stance 1 on a target at `at` out of reach: its distance from the
     /// unit AI's `state_position` (`+0x1ac`, `+0x1b0`; `FUN_14099ef70` of y's square plus x's) at
-    /// least the range plus [`LEASH_SLACK`] (`COMISS`/`JNC`: a NaN distance is within).
-    pub(super) fn off_leash(&self, at: Position, centre: Point) -> bool {
+    /// least the range plus `AttackTuning::leash_slack` (`COMISS`/`JNC`: a NaN distance is within).
+    pub(super) fn off_leash(
+        &self,
+        at: Position,
+        centre: Point,
+        attack_tuning: &AttackTuning,
+    ) -> bool {
         let (dx, dy) = (at.x() - centre.x(), at.y() - centre.y());
-        sqrt(dy * dy + dx * dx) >= (self.range + LEASH_SLACK).get()
+        sqrt(dy * dy + dx * dx) >= (self.range + Distance::new(attack_tuning.leash_slack)).get()
     }
 
     /// The start's `set_state(13)` for a unit that cannot move out of reach of its target
@@ -398,9 +412,8 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-        roles: &Roles,
     ) -> Result<(), GenieError> {
-        self.ready(unit, g, f, r, roles)
+        self.ready(unit, g, f, r)
     }
 }
 

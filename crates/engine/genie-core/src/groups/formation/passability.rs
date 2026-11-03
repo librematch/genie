@@ -393,6 +393,7 @@ impl World {
                     &self.model.masters,
                     &self.parts,
                     &self.model.roles,
+                    &self.model.tuning,
                 ),
             )? {
                 unreachable.push(j);
@@ -511,6 +512,7 @@ impl World {
                     &self.model.masters,
                     &self.parts,
                     &self.model.roles,
+                    &self.model.tuning,
                 ),
             )?
         {

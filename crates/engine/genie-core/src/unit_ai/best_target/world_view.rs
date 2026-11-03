@@ -2,7 +2,6 @@
 //! world ([`Battlefield`]).
 
 use crate::map::Distance;
-use crate::math::image::best_target::ORDER_WINDOW as BEST_TARGET_ORDER_WINDOW;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -19,9 +18,6 @@ use crate::unit_ai::best_target::{AttackCategory, ByCategory};
 use crate::unit_ai::{AiAction, OrderKind};
 use crate::world::WorldTime;
 use crate::world::{Percent, TargetingMode};
-
-/// The order history's window (`DAT_142efe420`, 60000 ms as a float).
-pub(super) const ORDER_WINDOW: f32 = BEST_TARGET_ORDER_WINDOW;
 
 /// What `bestUnitToAttack` reads of the unit whose AI searches, and of that AI.
 #[derive(Clone, Debug, Default, PartialEq)]

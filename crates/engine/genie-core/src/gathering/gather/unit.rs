@@ -437,6 +437,7 @@ impl Unit {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let gather = actions.list.gather().ok_or(NO_GATHER)?;

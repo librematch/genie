@@ -6,8 +6,7 @@ use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
-    AiOrder, Attack, AttackReads, Fight, NO_RANGE, NONE, Readiness, SEEN_RANGE, TOUCH, move_reads,
-    set_walker_anim,
+    AiOrder, Attack, AttackReads, Fight, NO_RANGE, NONE, Readiness, move_reads, set_walker_anim,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -38,6 +37,7 @@ use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::AttackTuning;
 use crate::world::lets::release;
 use crate::world::step::Step;
 
@@ -189,8 +189,8 @@ impl Attack {
             AttackState::Move { .. }
             | AttackState::GotoSeen { .. }
             | AttackState::GotoPoint { .. } => self.walk(c, unit, me, f, r, (t.position, t.radius)),
-            AttackState::Ready => self.ready_step(c, unit, f, r, alive, roles),
-            AttackState::Swing => self.swing(c, unit, actions, f, r, roles),
+            AttackState::Ready => self.ready_step(c, unit, f, r, alive),
+            AttackState::Swing => self.swing(c, unit, actions, f, r),
             AttackState::Killed => self.killed_step(c, unit),
             // case 0xc: a failed attack posts 0x1f9 with 600 every update (quiet or not), the
             // unit's animation stops and the update returns 3
@@ -384,16 +384,15 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         alive: bool,
-        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         let mut g = c.w.attack_ground(unit.id);
-        match self.ready_to_attack(unit, &mut g, f, r, false, roles)? {
+        match self.ready_to_attack(unit, &mut g, f, r, false)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
                 self.finish(unit, g.motion.reborrow(), g.sprite_rng)?;
                 return Ok(UpdateCode::CODE_5);
             }
-            Readiness::Ready => self.set_swing(unit, &mut g, f, r, roles)?,
+            Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
             Readiness::Waiting => {}
             Readiness::Away(gap) => self.follow(unit, &mut g, r, f, gap)?,
         }
@@ -492,7 +491,7 @@ impl Attack {
     /// States 5 and 11 once their `MoveTo` arrived (cases 4 and 10, its update 1 or 2): a target
     /// the unit's player sees (the target's slot 0x1e0: 0xf, or 0x80 with its master's fog flag)
     /// makes it ready (`set_state` 6). Out of sight, a human player's unit in state 5 with a range
-    /// of at least [`SEEN_RANGE`] (`COMISS`: a NaN is not) walks onto the point (`set_state` 11:
+    /// of at least `AttackTuning::seen_range` (`COMISS`: a NaN is not) walks onto the point (`set_state` 11:
     /// the sub-actions go, the range is slot 0x238's, a `MoveTo` without a range to where the
     /// target was seen); any other lets the target go (slot 0x68 with none) and fails
     /// (`set_state` 13), a unit's own Attack posting 0x1f9 with 600, and returns 3.
@@ -503,15 +502,14 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         target: Position,
-        roles: &Roles,
     ) -> Result<UpdateCode, GenieError> {
         if sees(&c.w.spatial, f, target)? {
-            self.ready(unit, &mut c.w.attack_ground(unit.id), f, r, roles)?;
+            self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
             return Ok(UpdateCode::UNDER_WAY);
         }
         if matches!(self.state, AttackState::GotoSeen { .. })
             && f.own.player != PlayerId::new(0)
-            && SEEN_RANGE <= self.range.get()
+            && c.w.model.tuning.attack.seen_range <= self.range.get()
             && !r.player_type.is_computer()
         {
             self.enter(
@@ -580,11 +578,11 @@ pub(super) fn let_go(
 }
 
 /// The squared reach of an attack of `range` (`FUN_140a82ae0` at `0x140a83950`): the range squared,
-/// or [`TOUCH`] for a range of at most [`NO_RANGE`].
-pub(super) fn squared_reach(range: Distance) -> DistanceSquared {
+/// or `AttackTuning::touch` for a range of at most [`NO_RANGE`].
+pub(super) fn squared_reach(range: Distance, attack_tuning: &AttackTuning) -> DistanceSquared {
     if NO_RANGE < range.get() {
         range.squared()
     } else {
-        TOUCH
+        DistanceSquared::new(attack_tuning.touch)
     }
 }

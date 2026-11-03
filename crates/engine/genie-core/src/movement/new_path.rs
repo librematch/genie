@@ -17,10 +17,11 @@ use crate::movement::PathState;
 use crate::movement::PlanTries;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
+use crate::movement::request_plans::NewPath;
 use crate::movement::{
-    AfterRequest, LONG_PATHER, Me, Mover, PathData, Planning, RANGE_FLOOR, ReachAsk, SHORT_PATHER,
-    SPLIT, STUCK_PAUSE, ShortAsk, TileAsk, Walker, footprint_gap_squared, owner_number,
-    short_path_including, split, tile_plan_for,
+    AfterRequest, LONG_PATHER, Me, Mover, PathData, Planning, ReachAsk, SHORT_PATHER, ShortAsk,
+    TileAsk, Walker, footprint_gap_squared, owner_number, short_path_including, split,
+    tile_plan_for,
 };
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
@@ -30,9 +31,11 @@ use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::players::NO_RELATIONS;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
+use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::generated::MovementTuning;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath, pathing::short_path};
 
@@ -47,6 +50,7 @@ impl Mover {
         found: bool,
         target: Option<&Placed>,
         to_end: Distance,
+        movement_tuning: &MovementTuning,
     ) -> Result<AfterRequest, GenieError> {
         let top_has_more = self.top_has_more();
         if target.is_some() && self.paths.walked()?.flags.contains(LevelFlags::MET_TARGET) {
@@ -62,7 +66,7 @@ impl Mover {
                 if level.continue_counter.left() {
                     // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
                     // (slot 0x5d0); the step returns 0
-                    level.pause_time = STUCK_PAUSE;
+                    level.pause_time = Seconds::new(movement_tuning.stuck_pause);
                     self.stop()?;
                     return Ok(AfterRequest::Paused);
                 }
@@ -95,13 +99,18 @@ impl Mover {
     /// midpoint each (`FUN_140f9b8f0`), linked to the walked level as found (1) or not (2).
     pub(super) fn link(
         &mut self,
-        mut new: PathData,
-        mut path: Path,
-        found: bool,
-        partial: bool,
-        planned: bool,
+        np: NewPath,
         solid: bool,
+        movement_tuning: &MovementTuning,
     ) -> Result<AfterRequest, GenieError> {
+        let NewPath {
+            mut new,
+            mut path,
+            found,
+            partial,
+            planned,
+            ..
+        } = np;
         let level = self.paths.walked_mut()?;
         level.state = PathState::Idle;
         level.continue_counter = PlanTries::FULL;
@@ -133,7 +142,7 @@ impl Mover {
             );
             let mut d = fmath::sub(a, b);
             d = d.with_height(0.0);
-            if SPLIT < d.x() * d.x() + 0.0 + d.y() * d.y() {
+            if movement_tuning.split < d.x() * d.x() + 0.0 + d.y() * d.y() {
                 split(&mut path, i - 1);
             }
             i -= 1;
@@ -182,6 +191,7 @@ impl Mover {
         line: (Point, Point),
         by_id: ObjectsRef<'_>,
     ) -> Result<Vec<ObjectId>, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let now = plan.now;
         let mut list = vec![me.id];
@@ -203,7 +213,7 @@ impl Mover {
             && !self.is_moving()
             && me.action_state.get() == 8
         {
-            let grow = self.stats.radius.x() + RANGE_FLOOR;
+            let grow = self.stats.radius.x() + movement_tuning.range_floor;
             // the query's point: slot 0x520, +0x824
             let (x, y) = (self.moved_at.x(), self.moved_at.y());
             let rect = Rect::new(x, y, x, y);

@@ -3,6 +3,7 @@
 //! and the first recorded checkpoint whose 11-word block differs; together over many recordings
 //! they rank what blocks the replays. Dev only.
 
+use crate::header_runs::{Opened, open};
 use genie_core::objects::ListIndex;
 use genie_rec::de::{self, Op};
 
@@ -114,7 +115,7 @@ pub fn census_run(
     let sections = header.players();
     let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
     let total = limit.map_or(syncs, |l| l.min(syncs));
-    let mut turns = header_slice(&header, masters);
+    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
     let mut census = Census::new(sections.len(), checkpoints);
     let mut end = if total < syncs {
@@ -277,7 +278,7 @@ pub fn header_divergences(
 ) -> Result<Vec<Followed>, Error> {
     let chapter = de::chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters);
+    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
     if let Some(&p) = players.iter().find(|&&p| turns.players.len() <= p as usize) {
         return Err(Error::NoSuchPlayer(p));
@@ -348,7 +349,7 @@ pub fn next_id_divergence(
 ) -> Result<Option<(usize, i32, i32)>, Error> {
     let chapter = de::chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters);
+    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
         run(&mut turns, &mut decoder, from_ref(frame));
@@ -384,9 +385,9 @@ pub fn header_run(
     last: usize,
     before: &mut dyn FnMut(usize),
 ) -> Result<World, Error> {
-    let chapter = de::chapters(recording)?[0];
-    let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters);
+    let Opened {
+        chapter, mut turns, ..
+    } = open(recording, masters)?;
     let mut decoder = Decoder::default();
     for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
         before(i + 1);

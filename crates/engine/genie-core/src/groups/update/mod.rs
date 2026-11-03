@@ -7,7 +7,6 @@ use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
 use crate::groups::UnitGroup;
-use crate::map::Distance;
 use crate::movement::PathFlags;
 use crate::objects::masters::ActionKind;
 use crate::world::Millis;
@@ -26,8 +25,6 @@ use crate::groups::LinePoint;
 use crate::groups::formation::top_path;
 use crate::math::image::facing::QUARTER_PI;
 use crate::math::image::group::{CLOSE as GROUP_CLOSE, FARTHEST as GROUP_FARTHEST, FRONT_SHARE};
-use crate::math::image::missile::VOLLEY_REACH_MARGIN;
-use crate::math::image::movement::LOOK_AHEAD;
 
 /// The group's current command (`mCurrentCommand`, `+0x3a8`) without one.
 const NO_COMMAND: GroupCommandKind = GroupCommandKind::NONE;
@@ -48,11 +45,6 @@ const FARTHEST: f32 = GROUP_FARTHEST;
 const FOLLOW: GroupCommandKind = GroupCommandKind::FOLLOW;
 /// A turn of the motion above this lays the formation out anew (`DAT_142eb6e44`, π/4).
 const TURN_LIMIT: f32 = QUARTER_PI;
-/// How far ahead of the group its front is looked for (`DAT_14330ebcc`).
-const FRONT_AHEAD: Distance = Distance::new(LOOK_AHEAD);
-/// A total spacing above this lays the formation out anew on a changed count
-/// (`DAT_142ec9eb4`).
-const RELAYOUT_SPACING: Distance = Distance::new(VOLLEY_REACH_MARGIN);
 /// The share of the lead's line of sight a follow keeps within (`DAT_142e7f384`).
 const FOLLOW_SHARE: f32 = FRONT_SHARE;
 /// A follow's target this near the top path's end (squared, `DAT_14330eb8c`) keeps the move.

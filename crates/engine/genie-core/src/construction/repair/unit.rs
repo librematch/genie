@@ -42,6 +42,7 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MovementTuning;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -155,7 +156,11 @@ impl Unit {
     /// waypoint outside the path is the game's static zero point): that move, the caller's
     /// ([`Unit::ai_move`]). None without a saved patrol. `mover` is the unit's (none for one
     /// that does not move).
-    pub(crate) fn restore_patrol(ai: Option<&UnitAi>, mover: Option<&mut Mover>) -> Option<AiMove> {
+    pub(crate) fn restore_patrol(
+        ai: Option<&UnitAi>,
+        mover: Option<&mut Mover>,
+        movement_tuning: &MovementTuning,
+    ) -> Option<AiMove> {
         let ai = ai?;
         let saved = ai.patrol_path.as_ref()?;
         let points = saved.path.points.clone();
@@ -168,7 +173,7 @@ impl Unit {
         if let Some(m) = mover {
             m.clear_user_waypoints();
             for p in &points {
-                m.add_user_waypoint(p.position());
+                m.add_user_waypoint(p.position(), movement_tuning);
             }
         }
         Some(AiMove {

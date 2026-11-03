@@ -4,7 +4,7 @@
 use crate::masters::MasterTable;
 use crate::{
     Dumps, Error, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump,
-    groups, loaded_slice, object, played_frames, primed, recycle_pools_from_dump, run,
+    groups, layer, loaded_slice, object, played_frames, primed, recycle_pools_from_dump, run,
     run_from_save, save_header, tech_state, tile_lists_from_dump, tile_order_differences,
     turns_from_save,
 };
@@ -110,6 +110,7 @@ pub fn old_pather_paths(
                     &turns.model.masters,
                     &turns.parts,
                     &turns.model.roles,
+                    &turns.model.tuning,
                 ),
             ),
             id,
@@ -535,6 +536,7 @@ pub(super) fn game_state(
     masters: Option<&MasterTable>,
 ) -> Result<GameState, GenieError> {
     let world = &header.world.base_world;
+    let missile_tuning = &layer()?.tuning.missile;
     let mut game = GameState {
         frame_seed: FrameSeed::of_data(world.current_frame_random_seed),
         next_reusable_id: ObjectId::try_from(world.next_reusable_object_id)?,
@@ -554,6 +556,7 @@ pub(super) fn game_state(
                         civ,
                         masters,
                         header.players().len(),
+                        missile_tuning,
                     )
                 })
                 .collect(),

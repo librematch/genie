@@ -53,7 +53,7 @@ fn same(save: &Header, turns: &World) -> SavedStep {
 #[test]
 fn the_slice_of_the_save_compares_without_differences() {
     let save = save();
-    let turns = slice(&save, None);
+    let turns = slice(&save, None).unwrap();
     let mut report = TickReport::default();
     compare_players(&turns, &same(&save, &turns), None, &mut report).unwrap();
     assert_eq!(report, TickReport::default());
@@ -63,7 +63,7 @@ fn the_slice_of_the_save_compares_without_differences() {
 #[test]
 fn player_the_game_does_not_hold_is_an_error() {
     let save = save();
-    let turns = slice(&save, None);
+    let turns = slice(&save, None).unwrap();
     let mut after = same(&save, &turns);
     let _ = after.objects.pop();
     let mut report = TickReport::default();
@@ -79,7 +79,7 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
         gaia(Vec::new()),
         human(vec![combat_object(7, 83), combat_object(8, 83)]),
     ]);
-    let mut turns = slice(&save, None);
+    let mut turns = slice(&save, None).unwrap();
     let mut after = same(&save, &turns);
     turns.game_state = PlayState::of_data(2);
     after.game.statuses = vec![(GameStatus::PLAYING, false), (GameStatus::WON, false)];
@@ -118,7 +118,7 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
 #[test]
 fn the_world_differs_by_its_game_state() {
     let save = save();
-    let turns = slice(&save, None);
+    let turns = slice(&save, None).unwrap();
     let mut after = same(&save, &turns);
     after.game.game_state = PlayState::of_data(3);
     let mut report = TickReport::default();
@@ -133,7 +133,7 @@ fn the_world_differs_by_its_game_state() {
 /// reported; the stopped and the frozen objects are left out of the comparison.
 #[test]
 fn stops_and_freezes_are_reported_by_their_update() {
-    let mut turns = slice(&save(), None);
+    let mut turns = slice(&save(), None).unwrap();
     let player = &mut turns.players[1];
     player.stopped = true;
     player.unsupported = Some((
@@ -187,7 +187,7 @@ fn stops_and_freezes_are_reported_by_their_update() {
 #[test]
 fn stopped_player_stock_is_not_compared() {
     let save = save();
-    let mut turns = slice(&save, None);
+    let mut turns = slice(&save, None).unwrap();
     let mut after = same(&save, &turns);
     after.game.resources = vec![[0.0; 4], [9.0, 0.0, 0.0, 0.0]];
     let mut report = TickReport::default();
@@ -215,7 +215,7 @@ fn stopped_player_stock_is_not_compared() {
 /// past the four resources.
 #[test]
 fn resources_and_attributes_differ_apart() {
-    let mut turns = slice(&save(), None);
+    let mut turns = slice(&save(), None).unwrap();
     let player = &mut turns.players[1];
     player.attributes = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0].map(Amount::new).to_vec();
     let game = GameState {
@@ -246,7 +246,7 @@ const MESH: &str = "mesh width 2 shapes 1 free 0x10\nshape 0 1 2 3 4\nowner 900 
 
 #[test]
 fn the_dumps_go_into_the_slice() {
-    let mut turns = slice(&save(), None);
+    let mut turns = slice(&save(), None).unwrap();
     let dumps = Dumps {
         mesh: Some(MESH),
         registry: Some("registry 2 3\n"),
@@ -269,8 +269,8 @@ fn the_dumps_go_into_the_slice() {
 /// A dump out of shape is its error.
 #[test]
 fn dump_out_of_shape_is_an_error() {
-    let mut turns = slice(&save(), None);
-    let bad = |dumps: Dumps<'_>| load_dumps(&mut slice(&save(), None), dumps);
+    let mut turns = slice(&save(), None).unwrap();
+    let bad = |dumps: Dumps<'_>| load_dumps(&mut slice(&save(), None).unwrap(), dumps);
     assert!(matches!(
         bad(Dumps {
             mesh: Some("tile 0 0 1\n"),
@@ -309,7 +309,7 @@ fn dump_out_of_shape_is_an_error() {
 #[test]
 fn priming_sets_the_update_count_and_the_last_commanded_units() {
     let save = save();
-    let mut turns = slice(&save, None);
+    let mut turns = slice(&save, None).unwrap();
     let moved = Move {
         commp_id: 1,
         tid: -1,
@@ -339,7 +339,7 @@ fn priming_sets_the_update_count_and_the_last_commanded_units() {
 #[test]
 fn frames_command_phase_moves_the_time_on() {
     let save = save();
-    let mut turns = slice(&save, None);
+    let mut turns = slice(&save, None).unwrap();
     let mut decoder = Decoder::default();
     frame_commands(&mut turns, &mut decoder, None);
     assert_eq!((turns.ticks.get(), turns.world_time), (0, WorldTime::ZERO));
@@ -360,7 +360,7 @@ fn frames_command_phase_moves_the_time_on() {
 fn save_or_recording_that_does_not_parse_is_an_error() {
     assert!(save_header(&[]).is_err());
     assert!(from_save(&[], &[], 0, 1, None, Dumps::default(), false).is_err());
-    let mut turns = slice(&save(), None);
+    let mut turns = slice(&save(), None).unwrap();
     assert!(played_frames(&mut turns, &[], 1).is_err());
 }
 

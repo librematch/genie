@@ -158,6 +158,7 @@ impl Unit {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
@@ -328,7 +329,14 @@ impl Unit {
             player: c.player,
             walks: &walks,
         };
-        if hunt.chase(chase, &engagement, arms, mover, roles)? {
+        if hunt.chase(
+            chase,
+            &engagement,
+            arms,
+            mover,
+            roles,
+            &c.w.model.tuning.attack,
+        )? {
             return Err(GenieError::unsupported(
                 "a hunt's Attack whose MoveTo starts arrived after its drop-off",
             ));
@@ -484,6 +492,7 @@ impl Unit {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             mover.reaches_object((at, &me), (spatial, by_id), &mut plan, id, range, master_id)
@@ -508,6 +517,7 @@ impl Unit {
                 farm: &farm,
             },
             roles,
+            &c.w.model.tuning.best_target,
         )?;
         // FUN_140c63e20's alert: enemies found set the alert mode and its time again
         let ai =

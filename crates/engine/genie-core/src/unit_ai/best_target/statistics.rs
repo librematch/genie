@@ -4,9 +4,7 @@
 use crate::map::Distance;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::math::image::best_target::{
-    DISTANCE_SCORE as BEST_TARGET_DISTANCE_SCORE, EPSILON as BEST_TARGET_EPSILON, FIVE,
-    NEVER as BEST_TARGET_NEVER, PER_CENT as BEST_TARGET_PER_CENT, SCORE as BEST_TARGET_SCORE,
-    TIER as BEST_TARGET_TIER,
+    EPSILON as BEST_TARGET_EPSILON, NEVER as BEST_TARGET_NEVER, PER_CENT as BEST_TARGET_PER_CENT,
 };
 use crate::movement::Speed;
 use crate::objects::HitPoints;
@@ -14,32 +12,23 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::ClassMask;
 use crate::unit_ai::OrderRecord;
-use crate::unit_ai::best_target::ORDER_WINDOW;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
 use crate::unit_ai::best_target::{EntryCount, KillTime, OrderWeight, TargetScore};
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::generated::BestTargetTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::{Percent, TargetingMode};
 
 /// The statistics' table holds at most this many objects (`FUN_140c66590`: `+0x1668` below
 /// 0x80).
 pub const STATISTICS: usize = 128;
-/// A kill time's stand-in when the unit does no damage to an object it may still work on
-/// (`DAT_14330ebb8`), and the current target's bonus.
-pub(super) const NO_DAMAGE_KILL: f32 = FIVE;
 /// The kill time of an object the unit neither damages nor works on (`DAT_14330ebf4`).
 pub(super) const NEVER: f32 = BEST_TARGET_NEVER;
 /// Damage at most this does not count (`DAT_142eb0c60`), nor a span below it.
 pub(super) const EPSILON: f32 = BEST_TARGET_EPSILON;
-/// The scores' scale (`DAT_142eb0f4c`), a distance score's top (`DAT_142efe418`) and the
-/// targeting factor's per cent (`DAT_142eb99cc`).
-pub(super) const SCORE: f32 = BEST_TARGET_SCORE;
-pub(super) const DISTANCE_SCORE: f32 = BEST_TARGET_DISTANCE_SCORE;
 pub(super) const PER_CENT: f32 = BEST_TARGET_PER_CENT;
-/// The rank's step per tier (`DAT_142eea788`).
-pub(super) const TIER: f32 = BEST_TARGET_TIER;
 /// The classes whose objects stand fixed for the rank (`FUN_140c66590`'s mask
 /// `0x12000000000008`: 3, 49, 52).
 pub(super) const FIXED_CLASSES: ClassMask = ClassMask::new(0x0012_0000_0000_0008, 0x35);
@@ -234,7 +223,7 @@ impl Statistics {
     /// a NaN damage too), else 5 for one the unit's AI could work on and the largest float for
     /// another; the kill times' bounds; the current target's bonus 5; a moving one's bounds of
     /// both.
-    pub fn add(&mut self, c: &Candidate) {
+    pub fn add(&mut self, c: &Candidate, best_target_tuning: &BestTargetTuning) {
         if STATISTICS <= self.entries.len() {
             return;
         }
@@ -268,13 +257,13 @@ impl Statistics {
         e.kill_time = KillTime::new(if below_or_unordered(EPSILON, c.damage.get()) {
             (c.hp / c.damage) / c.reload.get()
         } else if c.workable {
-            NO_DAMAGE_KILL
+            best_target_tuning.five
         } else {
             NEVER
         });
         self.kill_time.take(e.kill_time);
         e.bonus = if c.current {
-            TargetScore::new(NO_DAMAGE_KILL)
+            TargetScore::new(best_target_tuning.five)
         } else {
             TargetScore::ZERO
         };
@@ -303,6 +292,7 @@ impl Statistics {
         weights: &ByCategory<OrderWeight>,
         (mode, factor): (TargetingMode, Percent),
         armored: &mut dyn FnMut(ObjectId) -> Result<bool, crate::GenieError>,
+        best_target_tuning: &BestTargetTuning,
     ) -> Result<(), crate::GenieError> {
         let kill_span = self.kill_time.span();
         let distance_span = self.distance.span();
@@ -319,16 +309,16 @@ impl Statistics {
             } else {
                 1.0
             };
-            let mut kill = top * SCORE;
+            let mut kill = top * best_target_tuning.score;
             if e.moving {
                 if at_most_or_unordered(EPSILON, moving_kill_span) {
                     kill -= ((e.kill_time.get() - moving_kill_low) / moving_kill_span) * kill;
                 }
                 e.kill_score = TargetScore::new(kill);
-                let mut d = DISTANCE_SCORE;
+                let mut d = best_target_tuning.distance_score;
                 if at_most_or_unordered(EPSILON, moving_distance_span) {
                     d -= ((e.distance.get() - moving_distance_low) / moving_distance_span)
-                        * DISTANCE_SCORE;
+                        * best_target_tuning.distance_score;
                 }
                 e.distance_score = TargetScore::new(d);
             } else {
@@ -337,14 +327,15 @@ impl Statistics {
                 }
                 e.kill_score = TargetScore::new(kill);
                 e.distance_score = TargetScore::new(if EPSILON > distance_span {
-                    DISTANCE_SCORE
+                    best_target_tuning.distance_score
                 } else {
-                    DISTANCE_SCORE
-                        - ((e.distance.get() - distance_low) / distance_span) * DISTANCE_SCORE
+                    best_target_tuning.distance_score
+                        - ((e.distance.get() - distance_low) / distance_span)
+                            * best_target_tuning.distance_score
                 });
             }
             e.weight = e.category.map_or(TargetScore::ZERO, |k| {
-                TargetScore::new(weights[k].get() * SCORE)
+                TargetScore::new(weights[k].get() * best_target_tuning.score)
             });
             e.total = ((e.kill_score + e.distance_score) + e.weight) + e.bonus;
             if mode == TargetingMode::ARMORED && armored(e.id)? {
@@ -355,7 +346,7 @@ impl Statistics {
     }
 
     /// `bestUnitToAttack`'s ranks: each entry's order slot holds its index, and its rank is its
-    /// tier (`tier`) times [`TIER`] plus its total.
+    /// tier (`tier`) times `BestTargetTuning::tier` plus its total.
     ///
     /// # Errors
     ///
@@ -363,10 +354,11 @@ impl Statistics {
     pub fn rank(
         &mut self,
         tier: &mut dyn FnMut(&Entry) -> Result<i32, crate::GenieError>,
+        best_target_tuning: &BestTargetTuning,
     ) -> Result<(), crate::GenieError> {
         self.order = (0..self.entries.len()).collect();
         for e in &mut self.entries {
-            e.rank = TargetScore::new(tier(e)? as f32 * TIER + e.total.get());
+            e.rank = TargetScore::new(tier(e)? as f32 * best_target_tuning.tier + e.total.get());
         }
         Ok(())
     }
@@ -433,7 +425,11 @@ impl Statistics {
 /// adds the rest of the minute over 60000 (`DAT_142efe420`) to its target's category; the first
 /// older one ends the walk.
 #[must_use]
-pub fn order_weights(history: &[OrderRecord], now: WorldTime) -> ByCategory<OrderWeight> {
+pub fn order_weights(
+    history: &[OrderRecord],
+    now: WorldTime,
+    best_target_tuning: &BestTargetTuning,
+) -> ByCategory<OrderWeight> {
     let mut w = ByCategory::default();
     for r in history {
         let age = now.since(r.time);
@@ -441,7 +437,7 @@ pub fn order_weights(history: &[OrderRecord], now: WorldTime) -> ByCategory<Orde
             break;
         }
         if let Some(k) = r.category {
-            w[k] += OrderWeight::new((60000 - age.get()) as f32 / ORDER_WINDOW);
+            w[k] += OrderWeight::new((60000 - age.get()) as f32 / best_target_tuning.order_window);
         }
     }
     w

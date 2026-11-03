@@ -1,7 +1,9 @@
 //! Each saved top action the slice imports, and the saved actions it refuses.
 
 use crate::OTHER_SUB_ACTION;
-use crate::fixtures::{action_list, combat_master, combat_mut, combat_object, with_masters};
+use crate::fixtures::{
+    action_list, combat_master, combat_mut, combat_object, missile_tuning, with_masters,
+};
 use crate::saved_unit::saved_missile;
 use crate::test_ids::action_type;
 use crate::test_ids::attribute;
@@ -11,7 +13,7 @@ use crate::top_actions::saved_actions;
 use genie_core::GenieError;
 use genie_core::combat::attack::ATTACK;
 use genie_core::combat::missile::ShooterId;
-use genie_core::combat::missile::{HitMode, LANDING, MISSILE, MissileState};
+use genie_core::combat::missile::{HitMode, MISSILE, MissileState};
 use genie_core::construction::FoundationId;
 use genie_core::construction::build::BuildState;
 use genie_core::construction::build::BuildTask;
@@ -508,15 +510,16 @@ fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
 #[test]
 fn missile_flies_with_its_actions_course() {
     assert!(import(&missile(), &PlayerObjects::default()).is_ok());
-    let m = saved_missile(&missile()).unwrap();
+    let tuning = missile_tuning();
+    let m = saved_missile(&missile(), &tuning).unwrap();
     assert_eq!(
         (m.fired_from, m.max_range.get().to_bits()),
         (Some(ShooterId::new(object_id(900))), 7.0_f32.to_bits())
     );
     assert!(m.flying && !m.charge);
     // a charge projectile; one at the landing distance has landed
-    let landing = LANDING;
-    let m = saved_missile(&missile_of(landing, 1)).unwrap();
+    let landing = tuning.landing;
+    let m = saved_missile(&missile_of(landing, 1), &tuning).unwrap();
     assert!(m.charge && !m.flying);
     let action = import(&missile(), &PlayerObjects::default())
         .unwrap()

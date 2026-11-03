@@ -224,6 +224,7 @@ impl UnitView<'_, '_> {
             &self.c.w.model.masters,
             &self.c.w.parts,
             &self.c.w.model.roles,
+            &self.c.w.model.tuning,
         );
         let mut w = ResourceWorld {
             player: self.player,
@@ -323,6 +324,7 @@ impl Unit {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
         let current =

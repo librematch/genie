@@ -95,8 +95,11 @@ pub fn simulate_word9(
     recording: &[u8],
     masters: Option<&MasterTable>,
 ) -> Result<Vec<Word9>, Error> {
-    let chapter = de::chapters(recording)?[0];
-    let header = chapter.header()?;
+    let Opened {
+        chapter,
+        header,
+        mut turns,
+    } = open(recording, masters)?;
     let all = frames(&chapter, usize::MAX)?;
     let (first, checkpoint) = all
         .iter()
@@ -112,8 +115,6 @@ pub fn simulate_word9(
         })
     });
     let sections = header.players();
-    // from the recording's header: the load's run-time state too, not the bare `slice`
-    let mut turns = header_slice(&header, masters);
     run(&mut turns, &mut Decoder::default(), &all[..first]);
     checkpoint
         .lanes
@@ -212,14 +213,14 @@ pub fn word9_terms(
     ticks: usize,
     masters: Option<&MasterTable>,
 ) -> Result<Vec<Word9Terms>, Error> {
-    let chapter = de::chapters(recording)?[0];
-    let header = chapter.header()?;
-    let sections = header.players();
-    if sections.len() <= id as usize {
+    let Opened {
+        chapter,
+        header,
+        mut turns,
+    } = open(recording, masters)?;
+    if header.players().len() <= id as usize {
         return Err(Error::NoSuchPlayer(id));
     }
-    // from the recording's header: the load's run-time state too, not the bare `slice`
-    let mut turns = header_slice(&header, masters);
     run(
         &mut turns,
         &mut Decoder::default(),
@@ -267,7 +268,7 @@ pub fn blocks_per_tick(
     if let Some(&id) = ids.iter().find(|&&id| sections.len() <= id as usize) {
         return Err(Error::NoSuchPlayer(id));
     }
-    let mut turns = header_slice(&header, masters);
+    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut out = Vec::with_capacity(ticks);
     let mut decoder = Decoder::default();
     for frame in frames(&chapter, ticks)? {
@@ -292,23 +293,66 @@ pub fn blocks_per_tick(
 /// update times and history, the masters and the sight, without the run-time state a per-tick
 /// save's dumps add. For a check of a player-level update against the tick oracle's next save
 /// (the world player's, [`genie_core::players::world_player`]). Dev only.
-#[must_use]
-pub fn slice_from_header(header: &Header, masters: Option<&MasterTable>) -> World {
+///
+/// # Errors
+///
+/// The build layer does not evaluate.
+pub fn slice_from_header(
+    header: &Header,
+    masters: Option<&MasterTable>,
+) -> Result<World, GenieError> {
     slice(header, masters)
 }
 
 /// The slice as the recording's header load leaves it: [`slice`] with the objects-in-sight
 /// registry empty, every object's mask 0, as the game's load makes it, and the hunted animals'
 /// unit AI fields their load made.
-pub(super) fn header_slice(header: &Header, masters: Option<&MasterTable>) -> World {
-    let mut turns = slice(header, masters);
+///
+/// # Errors
+///
+/// The build layer does not evaluate.
+pub(super) fn header_slice(
+    header: &Header,
+    masters: Option<&MasterTable>,
+) -> Result<World, GenieError> {
+    let mut turns = slice(header, masters)?;
     if let Some(sight) = turns.spatial.sight.as_mut() {
         sight.registry = Some(Registry::new(header.players().len(), CLASSES));
     }
     // the hunted animals' origins are their places in this very save
     hunted_origins(&mut turns, header);
     watch_at_load(&mut turns);
-    turns
+    Ok(turns)
+}
+
+/// A recording opened for a run from its header: its first chapter, the chapter's header save
+/// and the slice from it as the header's load leaves it ([`header_slice`]).
+pub(super) struct Opened<'r> {
+    /// The recording's first chapter.
+    pub(super) chapter: de::Chapter<'r>,
+    /// The chapter's header save.
+    pub(super) header: Header,
+    /// The slice from the header, the load's run-time state in it, not the bare `slice`.
+    pub(super) turns: World,
+}
+
+/// The recording's first chapter, its header save and the slice from the header ([`Opened`]).
+///
+/// # Errors
+///
+/// The recording or its header does not read, or the build layer does not evaluate.
+pub(super) fn open<'r>(
+    recording: &'r [u8],
+    masters: Option<&MasterTable>,
+) -> Result<Opened<'r>, Error> {
+    let chapter = de::chapters(recording)?[0];
+    let header = chapter.header()?;
+    let turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
+    Ok(Opened {
+        chapter,
+        header,
+        turns,
+    })
 }
 
 /// The ghosts' watched lists as the game's load builds them ([`World::build_watched`]), once the
@@ -333,7 +377,7 @@ pub fn header_run(
 ) -> Result<World, Error> {
     let chapter = de::chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters);
+    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
     run(&mut turns, &mut decoder, &frames(&chapter, ticks)?);
     Ok(turns)

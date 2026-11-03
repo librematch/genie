@@ -8,7 +8,7 @@ use genie_rec::de::Op;
 #[test]
 fn each_tick_gives_the_players_blocks() {
     let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
-    let start = header_slice(&save, None);
+    let start = header_slice(&save, None).unwrap();
     let block = |p: usize| {
         lane_block(
             &save.players()[p],

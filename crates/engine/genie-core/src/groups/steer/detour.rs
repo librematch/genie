@@ -206,6 +206,7 @@ impl World {
             &self.model.masters,
             &self.parts,
             &self.model.roles,
+            &self.model.tuning,
         );
         self.spatial
             .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
@@ -383,6 +384,7 @@ impl World {
             &self.model.masters,
             &self.parts,
             &self.model.roles,
+            &self.model.tuning,
         );
         let mut plan = Planning {
             pathing: &mut self.pathing,
@@ -446,6 +448,7 @@ impl World {
                 &self.model.masters,
                 &self.parts,
                 &self.model.roles,
+                &self.model.tuning,
             ),
         )
     }

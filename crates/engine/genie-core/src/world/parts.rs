@@ -1003,6 +1003,7 @@ mod tests {
             &t.model.masters,
             &t.parts,
             &t.model.roles,
+            &t.model.tuning,
         );
         assert_eq!(by_id.unread(id), Some(&why));
         t.check_parts().unwrap();

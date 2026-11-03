@@ -830,14 +830,24 @@ pub struct ArtifactTuning {
 pub struct AttackTuning {
     /// `attack::ARRIVED`: 0.01 in build 158041.
     pub arrived: f32,
+    /// readyToAttack's leash of stance 1 lets a target this much past the range from the unit AI's `state_position` (`DAT_14330ebb8`, read by `ADDSS` at `0x140a80051`).
+    ///
     /// `attack::LEASH_SLACK`: 5 in build 158041.
     pub leash_slack: f32,
+    /// The milliseconds of a second the reload world time counts (`FUN_141089820`).
+    ///
     /// `attack::RELOAD_MS`: 1000 in build 158041.
     pub reload_ms: f32,
+    /// The least range of a unit that walks onto the point where it saw its target (`DAT_14330eb8c`, `AttackState::GotoPoint`).
+    ///
     /// `attack::SEEN_RANGE`: 1 in build 158041.
     pub seen_range: f32,
+    /// readyToAttack's gap for a range up to `NO_RANGE`: half a tile less (`DAT_142eb6e58`).
+    ///
     /// `attack::SHORT_RANGE_GAP`: -0.5 in build 158041.
     pub short_range_gap: f32,
+    /// The squared reach of an attack without a range (`DAT_142ed48e4`): `0x3c23d70b`, which is `0.1f * 0.1f`, one ULP above `0.01f`.
+    ///
     /// `attack::TOUCH`: 0.010000001 in build 158041.
     pub touch: f32,
 }
@@ -846,14 +856,24 @@ pub struct AttackTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BestTargetTuning {
+    /// The scores' scale (`DAT_142eb0f4c`), a distance score's top (`DAT_142efe418`) and the targeting factor's per cent (`DAT_142eb99cc`).
+    ///
     /// `best_target::DISTANCE_SCORE`: 75 in build 158041.
     pub distance_score: f32,
+    /// A kill time's stand-in when the unit does no damage to an object it may still work on (`DAT_14330ebb8`), and the current target's bonus.
+    ///
     /// `best_target::FIVE`: 5 in build 158041.
     pub five: f32,
+    /// The order history's window (`DAT_142efe420`, 60000 ms as a float).
+    ///
     /// `best_target::ORDER_WINDOW`: 60000 in build 158041.
     pub order_window: f32,
+    /// The scores' scale (`DAT_142eb0f4c`), a distance score's top (`DAT_142efe418`) and the targeting factor's per cent (`DAT_142eb99cc`).
+    ///
     /// `best_target::SCORE`: 10 in build 158041.
     pub score: f32,
+    /// The rank's step per tier (`DAT_142eea788`).
+    ///
     /// `best_target::TIER`: 10000 in build 158041.
     pub tier: f32,
 }
@@ -884,32 +904,60 @@ pub struct BuildTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageTuning {
+    /// A melee attacker (weapon range below 0.99, `DAT_142eb569c`) with an area effect tramples: its blast goes about itself (`FUN_1412115e0`).
+    ///
     /// `damage::BLAST_RANGE`: 0.99 in build 158041.
     pub blast_range: f32,
+    /// A cone blast (its level's bit 7) reaches objects within half a facet of where its attacker faces (`DAT_142e7f384`, `DAT_142eb6e58`), or within 1.67 facets (`DAT_142f4fea8`) for a wide one (bit 5).
+    ///
     /// `damage::CONE`: 0.5 in build 158041.
     pub cone: f32,
+    /// A special attack and a retaliation need their attacker within 1.2 facets of where the target faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66 (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2 (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
+    ///
     /// `damage::FACING`: 1.2 in build 158041.
     pub facing: f32,
+    /// Elevation: a higher attacker hits at 1.25 (`DAT_142eb56a8`), a lower one at 0.75 (`DAT_142e7f388`), each plus its player's and the target's player's attributes (211/272, 212/273).
+    ///
     /// `damage::HIGHER`: 1.25 in build 158041.
     pub higher: f32,
+    /// The least hit of the attacker classes `LEAST_HIT_CLASSES` under the game's setting `+0x680` at 1 (`DAT_142eb5690`, read into `XMM6` at `0x1411ceea4`).
+    ///
     /// `damage::LEAST_CLASS_HIT`: 0.1 in build 158041.
     pub least_class_hit: f32,
+    /// Elevation: a higher attacker hits at 1.25 (`DAT_142eb56a8`), a lower one at 0.75 (`DAT_142e7f388`), each plus its player's and the target's player's attributes (211/272, 212/273).
+    ///
     /// `damage::LOWER`: 0.75 in build 158041.
     pub lower: f32,
+    /// A cone blast (its level's bit 7) reaches objects within half a facet of where its attacker faces (`DAT_142e7f384`, `DAT_142eb6e58`), or within 1.67 facets (`DAT_142f4fea8`) for a wide one (bit 5).
+    ///
     /// `damage::MINUS_CONE`: -0.5 in build 158041.
     pub minus_cone: f32,
+    /// A special attack and a retaliation need their attacker within 1.2 facets of where the target faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66 (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2 (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
+    ///
     /// `damage::MINUS_FACING`: -1.2 in build 158041.
     pub minus_facing: f32,
+    /// A building's hits with a specific relic inside (`DAT_142ed66b4`, 1.2), and with any relic (`DAT_142e86c14`, 1.1), `building_elevation_factor`.
+    ///
     /// `damage::RELIC_BOOST`: 1.1 in build 158041.
     pub relic_boost: f32,
+    /// A special attack and a retaliation need their attacker within 1.2 facets of where the target faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66 (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2 (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
+    ///
     /// `damage::RETALIATION_RANGE`: 0.2 in build 158041.
     pub retaliation_range: f32,
+    /// A special attack and a retaliation need their attacker within 1.2 facets of where the target faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66 (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2 (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
+    ///
     /// `damage::RETALIATION_SCALE`: 4 in build 158041.
     pub retaliation_scale: f32,
+    /// A special attack and a retaliation need their attacker within 1.2 facets of where the target faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66 (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2 (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
+    ///
     /// `damage::SPECIAL`: 0.66 in build 158041.
     pub special: f32,
+    /// A building's hits with a specific relic inside (`DAT_142ed66b4`, 1.2), and with any relic (`DAT_142e86c14`, 1.1), `building_elevation_factor`.
+    ///
     /// `damage::SPECIFIC_RELIC_BOOST`: 1.2 in build 158041.
     pub specific_relic_boost: f32,
+    /// A cone blast (its level's bit 7) reaches objects within half a facet of where its attacker faces (`DAT_142e7f384`, `DAT_142eb6e58`), or within 1.67 facets (`DAT_142f4fea8`) for a wide one (bit 5).
+    ///
     /// `damage::WIDE_CONE`: 1.67 in build 158041.
     pub wide_cone: f32,
 }
@@ -1158,16 +1206,28 @@ pub struct MastersTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MissileTuning {
+    /// A missile past its reach ends this far beyond its point (`DAT_142eb5be8`).
+    ///
     /// `missile::BEYOND`: -2 in build 158041.
     pub beyond: f32,
+    /// A target's height counts a third of its master's height radius (`FUN_140a9c600`, `DAT_142eb1c98`).
+    ///
     /// `missile::HEIGHT_SHARE`: 3 in build 158041.
     pub height_share: f32,
+    /// A missile within this of its point may touch the ground (`DAT_142eb5690`, `+0x994`).
+    ///
     /// `missile::LANDING`: 0.1 in build 158041.
     pub landing: f32,
+    /// The hit query holds its ends this far inside the map's far edges (`FUN_1411570c0`, `DAT_142eb5690`).
+    ///
     /// `missile::QUERY_EDGE`: 0.1 in build 158041.
     pub query_edge: f32,
+    /// The reach adds this to the shooter's radius and range (`FUN_141081020`, `DAT_142e8c150`).
+    ///
     /// `missile::REACH_MARGIN`: 2 in build 158041.
     pub reach_margin: f32,
+    /// What a volley's extra missile's reach adds to the range (`FUN_141226690`).
+    ///
     /// `missile::VOLLEY_REACH_MARGIN`: 6 in build 158041.
     pub volley_reach_margin: f32,
 }
@@ -1188,46 +1248,88 @@ pub struct MoveToTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MovementTuning {
+    /// The pause a kept hit's ranking gives a unit the walker outranks: 0.1 for an ally (`DAT_142eb5690`), 0.5 for another (`DAT_142e7f384`).
+    ///
     /// `movement::ALLY_PAUSE`: 0.1 in build 158041.
     pub ally_pause: f32,
+    /// A waypoint or target nearer than this takes the close-in path (`DAT_14330eb8c`).
+    ///
     /// `movement::CLOSE`: 1 in build 158041.
     pub close: f32,
+    /// How far inside the map's edge a moving unit's footprint stays (`DAT_142eb99cc`), and how far below the edge a position stays (`DAT_142eb1e9c`).
+    ///
     /// `movement::EDGE_GAP`: 0.01 in build 158041.
     pub edge_gap: f32,
+    /// How far inside the map's edge a moving unit's footprint stays (`DAT_142eb99cc`), and how far below the edge a position stays (`DAT_142eb1e9c`).
+    ///
     /// `movement::EDGE_POSITION_GAP`: 0.001 in build 158041.
     pub edge_position_gap: f32,
+    /// A master whose object flags have bit 1 turns as if dt were this many times longer (`DAT_14330ebcc`).
+    ///
     /// `movement::FAST_TURN`: 100 in build 158041.
     pub fast_turn: f32,
+    /// A long path's stretch is checked for walls with the unit's radius times this (`DAT_142e85190`).
+    ///
     /// `movement::LONG_PATH_GROW`: 0.6 in build 158041.
     pub long_path_grow: f32,
+    /// How far ahead of the group its front is looked for (`DAT_14330ebcc`).
+    ///
     /// `movement::LOOK_AHEAD`: 100 in build 158041.
     pub look_ahead: f32,
+    /// The widest unit the new short pather takes (`DAT_142e7f384`, `FUN_140f9e540`'s load at 0x140f9e713).
+    ///
     /// `movement::NEW_PATHER_RADIUS`: 0.5 in build 158041.
     pub new_pather_radius: f32,
+    /// The pause a kept hit's ranking gives a unit the walker outranks: 0.1 for an ally (`DAT_142eb5690`), 0.5 for another (`DAT_142e7f384`).
+    ///
     /// `movement::OTHER_PAUSE`: 0.5 in build 158041.
     pub other_pause: f32,
+    /// A unit pushed into a met object counts beyond its radius times this (`DAT_142eb880c`).
+    ///
     /// `movement::PUSHED`: 0.25 in build 158041.
     pub pushed: f32,
+    /// What a gate's annex's gap loses against the gate's own (`XMM14`, the motion step's load at 0x1411510e7, the same as `RANGE_FLOOR`'s).
+    ///
     /// `movement::RANGE_FLOOR`: 0.1 in build 158041.
     pub range_floor: f32,
+    /// A point whose squared gap to the unit's footprint is below this is not reached when the short pather did not reach it (`FUN_140fa0370`, `DAT_14330eb8c`).
+    ///
     /// `movement::REACH_NEAR`: 1 in build 158041.
     pub reach_near: f32,
+    /// A point within this many tiles is the short pather's to reach (`FUN_140fa0370`, `DAT_142eb0f4c`).
+    ///
     /// `movement::REACH_SHORT`: 10 in build 158041.
     pub reach_short: f32,
+    /// A path shorter than this is too short (`DAT_142eb99cc`).
+    ///
     /// `movement::SHORTEST`: 0.01 in build 158041.
     pub shortest: f32,
+    /// The short pather serves a waypoint this near (`DAT_142ec9ec0`), and one this near a target before the tile pathfinder (`DAT_142eb0f4c`).
+    ///
     /// `movement::SHORT_REACH`: 16 in build 158041.
     pub short_reach: f32,
+    /// A new level's stretches longer than this squared get a midpoint (`DAT_142ed6f20`).
+    ///
     /// `movement::SPLIT`: 25 in build 158041.
     pub split: f32,
+    /// `FUN_141142750` grows the walk's query by the unit's radius times `DAT_142e7f384`.
+    ///
     /// `movement::STRAIGHT_GROW`: 0.5 in build 158041.
     pub straight_grow: f32,
+    /// The pause a level at its last waypoint without a path gives its own unit while it may still try (`DAT_142eb5690`).
+    ///
     /// `movement::STUCK_PAUSE`: 0.1 in build 158041.
     pub stuck_pause: f32,
+    /// The short pather serves a waypoint this near (`DAT_142ec9ec0`), and one this near a target before the tile pathfinder (`DAT_142eb0f4c`).
+    ///
     /// `movement::TARGET_SHORT_REACH`: 10 in build 158041.
     pub target_short_reach: f32,
+    /// The speed below which a free group member's speed is not capped by its top speed (slot 0x5e0).
+    ///
     /// `movement::UNCAPPED_SPEED`: 10 in build 158041.
     pub uncapped_speed: f32,
+    /// A unit's own waypoint on a tile's edge moves this far into the tile (`FUN_14114e920`, `DAT_142e7f384`).
+    ///
     /// `movement::USER_WAYPOINT_MIDDLE`: 0.5 in build 158041.
     pub user_waypoint_middle: f32,
     /// `movement::WIDE_RANGE`: 3 in build 158041.

@@ -263,7 +263,11 @@ impl Unit {
             ))?,
             at: spawn_point(self.position(), facing, master.weapon_offset),
             point: aimed.position,
-            reach: reach(master.radius, master.weapon_range),
+            reach: reach(
+                master.radius,
+                master.weapon_range,
+                &c.w.model.tuning.missile,
+            ),
             shooter: true,
             aimer: Aimer {
                 hit_chance: master.hit_chance,
@@ -362,7 +366,11 @@ impl Unit {
             made: made.id,
             at,
             point: spawn_point(aimed.position, facing, scatter.with_height(0.0)),
-            reach: volley_reach(master.radius, master.weapon_range),
+            reach: volley_reach(
+                master.radius,
+                master.weapon_range,
+                &c.w.model.tuning.missile,
+            ),
             shooter,
             aimer: Aimer {
                 hit_chance: aimer.hit_chance,

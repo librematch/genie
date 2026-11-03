@@ -21,6 +21,6 @@ the two equal. The module exists in test builds only.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`objects`](../objects/), [`players`](../players/), [`world`](../world/).
+- Uses: [`combat`](../combat/), [`objects`](../objects/), [`players`](../players/), [`world`](../world/).
 - Used by: [`combat`](../combat/), [`commands`](../commands/), [`construction`](../construction/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`ownership`](../ownership/), [`pathing`](../pathing/), [`players`](../players/), [`production`](../production/), [`technology`](../technology/), [`unit_ai`](../unit_ai/), [`vision`](../vision/), [`world`](../world/).
 <!-- /uses -->

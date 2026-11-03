@@ -34,6 +34,7 @@ use crate::vision::visibility::Visibility;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::BestTargetTuning;
 use genie_diff::Diff;
 use std::collections::BTreeMap;
 
@@ -643,14 +644,15 @@ impl SearchCache {
 }
 
 /// [`Spatial::closest_object`]'s per-object checks: livestock that is moving, the objects a
-/// class-10 searcher passes, what it reads of a farm, and the build's roles of the classes it
-/// meets.
+/// class-10 searcher passes, what it reads of a farm, the build's roles of the classes it
+/// meets and the target search's tuning values.
 #[derive(Clone, Copy)]
 struct ClosestChecks<'a> {
     moving: &'a dyn Fn(ObjectId) -> bool,
     shuns: &'a dyn Fn(&Placed) -> Result<bool, GenieError>,
     farm: &'a FarmLook<'a>,
     roles: &'a Roles,
+    best_target_tuning: &'a BestTargetTuning,
 }
 
 /// What `ClosestObject` reads of a farm it found: its workers (`+0x644`) and the pasture it is in

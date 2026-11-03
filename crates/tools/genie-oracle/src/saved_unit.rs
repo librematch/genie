@@ -15,7 +15,7 @@ use genie_core::combat::MissileCount;
 use genie_core::combat::abilities::Abilities;
 use genie_core::combat::damage::ArmorPair;
 use genie_core::combat::missile::ShooterId;
-use genie_core::combat::missile::{LANDING, MISSILE, Missile};
+use genie_core::combat::missile::{MISSILE, Missile};
 use genie_core::construction::Annexes;
 use genie_core::construction::BuilderCount;
 use genie_core::construction::MainBuildingId;
@@ -58,10 +58,11 @@ use genie_core::unit_ai::{AiAction, UnitAi};
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
+use genie_core::world::layer::generated::MissileTuning;
 use genie_core::world::parts::{Object, ObjectParts};
 use genie_core::world::{Gate, Unread};
 use genie_save::generated::world::TribeCombatObject;
-use genie_save::generated::world::{Path, PlayerObjects, RgeStaticObject};
+use genie_save::generated::world::{Path, PlayerObjects, RgeMissileObject, RgeStaticObject};
 
 /// The slice's view of one saved object, whole: its row ([`unit`]) and its parts (the gather
 /// point, the production lists, the missile's own fields, the town bell, the unit AI; the dead
@@ -73,6 +74,7 @@ pub(super) fn object(
     civ: CivId,
     masters: Option<&MasterTable>,
     players: usize,
+    missile_tuning: &MissileTuning,
 ) -> Object {
     let (unit, parts) = row(object, objects, paths, civ, masters, players);
     Object {
@@ -81,23 +83,31 @@ pub(super) fn object(
             dead_master: None,
             gather_point: gather_point(object).ok().flatten(),
             production: production(object).ok().flatten(),
-            missile: saved_missile(object),
+            missile: saved_missile(object, missile_tuning),
             own_master: None,
             ..parts
         },
     }
 }
 
-/// A saved missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`), its object's part:
-/// flying (`+0x994`, not saved) while its missile action's distance is past
-/// [`genie_core::combat::missile::LANDING`]; a missile without its action (one that met its
-/// target, dying) takes the 1 the load's constructor sets. None for an object that is no
-/// missile.
-pub(super) fn saved_missile(object: &genie_save::Object) -> Option<Missile> {
-    let mo = object
+/// A saved object's missile part (`RGE_Missile_Object`): None for an object that is no missile.
+pub(super) fn missile_part(object: &genie_save::Object) -> Option<&RgeMissileObject> {
+    object
         .rge_object
         .as_deref()
-        .and_then(|r| r.rge_missile_object.as_deref())?;
+        .and_then(|r| r.rge_missile_object.as_deref())
+}
+
+/// A saved missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`), its object's part:
+/// flying (`+0x994`, not saved) while its missile action's distance is past
+/// the build's landing distance (`missile` tuning's `landing`); a missile without its action (one
+/// that met its target, dying) takes the 1 the load's constructor sets. None for an object that
+/// is no missile.
+pub(super) fn saved_missile(
+    object: &genie_save::Object,
+    missile_tuning: &MissileTuning,
+) -> Option<Missile> {
+    let mo = missile_part(object)?;
     let step = object.moving_part().map_or(Offset::ZERO, |m| {
         Offset::new(m.velocity_x, m.velocity_y, m.velocity_z)
     });
@@ -112,7 +122,7 @@ pub(super) fn saved_missile(object: &genie_save::Object) -> Option<Missile> {
         max_range: Distance::new(mo.max_range),
         fired_from: ObjectId::of_field(mo.fired_from_id).map(ShooterId::new),
         charge: mo.is_charge_projectile != 0,
-        flying: distance.is_none_or(|d| LANDING < d),
+        flying: distance.is_none_or(|d| missile_tuning.landing < d),
         step,
     })
 }

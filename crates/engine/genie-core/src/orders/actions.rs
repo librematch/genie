@@ -264,6 +264,7 @@ impl World {
                     &self.model.masters,
                     &self.parts,
                     &self.model.roles,
+                    &self.model.tuning,
                 ),
             )?;
             for u in units {

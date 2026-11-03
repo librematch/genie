@@ -2,7 +2,7 @@
 
 use crate::GenieError;
 use crate::combat::abilities::Look;
-use crate::combat::attack::{Arms, RELOAD_MS};
+use crate::combat::attack::Arms;
 use crate::map::Position;
 use crate::math::rng::Well512;
 use crate::movement::Mover;
@@ -19,6 +19,7 @@ use crate::world::Millis;
 use crate::world::NO_STANDING_SPRITE;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::generated::AttackTuning;
 
 /// The sprites a swing of a unit (its terrain look `look`, its master `master`) takes before its
 /// Attack's own ([`SwingSprites`]): its look's attack sprite while it shows its look, its
@@ -54,9 +55,16 @@ pub struct SwingSprites {
 
 /// `FUN_141089820`: the attack timer of a unit's combat layer `combat` becomes `t` and its reload world time the world's
 /// time `now` plus `t` in whole milliseconds (slot 0x248).
-pub(super) fn set_attack_timer(combat: &mut Combat, now: WorldTime, t: Seconds) {
+pub(super) fn set_attack_timer(
+    combat: &mut Combat,
+    now: WorldTime,
+    t: Seconds,
+    attack_tuning: &AttackTuning,
+) {
     combat.attack_timer = t;
-    combat.reload_worldtime = now.after(Millis::new((t.get() * RELOAD_MS) as i64 as u32));
+    combat.reload_worldtime = now.after(Millis::new(
+        (t.get() * attack_tuning.reload_ms) as i64 as u32,
+    ));
 }
 
 /// `FUN_14120c0a0`'s test of `master`: it has a volley missile or a charge projectile its player

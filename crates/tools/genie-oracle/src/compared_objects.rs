@@ -11,7 +11,7 @@ use genie_save::Header;
 
 use crate::masters::MasterTable;
 use crate::saved_unit::object;
-use crate::{Error, listed};
+use crate::{Error, layer, listed};
 
 /// A player's listed objects in genie's world, in its list's order, each with its parts from the
 /// world's tables ([`World::object_view`]); none for a player it lacks.
@@ -49,9 +49,21 @@ pub(crate) fn header_objects(
     let section = sections.get(id as usize).ok_or(Error::NoSuchPlayer(id))?;
     let civ = CivId::new(section.world_player().base.civ_id);
     let paths = &header.world.base_world.path;
+    let missile_tuning = &layer().map_err(Error::Unmodelled)?.tuning.missile;
     Ok(section
         .live_objects()
-        .map(|o| object(o, section.objects(), paths, civ, masters, sections.len()))
+        .map(|o| {
+            let players = sections.len();
+            object(
+                o,
+                section.objects(),
+                paths,
+                civ,
+                masters,
+                players,
+                missile_tuning,
+            )
+        })
         .filter(|o| listed(&o.unit))
         .collect())
 }

@@ -355,6 +355,7 @@ impl World {
             arms,
             mover,
             &self.model.roles,
+            &self.model.tuning.attack,
         )? {
             if arrived {
                 show_arrived(

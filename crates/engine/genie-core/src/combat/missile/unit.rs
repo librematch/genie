@@ -1,6 +1,7 @@
 //! A missile's flight: where it ends, what it hits and where it lands.
 
 use crate::GenieError;
+use crate::combat::damage::HitLayer;
 use crate::combat::missile::MissileState;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::StrikeResult;
@@ -28,8 +29,8 @@ use genie_model::model::Model;
 
 use crate::combat::attack::{Hit, strike};
 use crate::combat::missile::{
-    HitMode, Missile, MissileAction, MissileStats, MissileTargetId, QUERY_EDGE, grounded,
-    meets_height, on_target,
+    HitMode, Missile, MissileAction, MissileStats, MissileTargetId, grounded, meets_height,
+    on_target,
 };
 use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
@@ -149,7 +150,12 @@ impl Unit {
                 ));
             }
         }
-        let (step, flying) = action.fly(c.dt.seconds(), missile.max_range, &stats)?;
+        let (step, flying) = action.fly(
+            c.dt.seconds(),
+            missile.max_range,
+            &stats,
+            &c.w.model.tuning.missile,
+        )?;
         missile.step = step;
         missile.flying = flying;
         let old = self.position();
@@ -162,7 +168,7 @@ impl Unit {
             c.w.parts
                 .mover_mut(self.id)
                 .ok_or(GenieError::unsupported("a missile without its moving part"))?;
-        let mut at = mover.set_position(to, c.w.spatial.map);
+        let mut at = mover.set_position(to, c.w.spatial.map, &c.w.model.tuning.movement);
         let ground =
             c.w.spatial
                 .terrain
@@ -291,7 +297,7 @@ impl Unit {
             if v < 0.0 {
                 0.0
             } else if size as f32 <= v {
-                size as f32 - QUERY_EDGE
+                size as f32 - c.w.model.tuning.missile.query_edge
             } else {
                 v
             }
@@ -317,6 +323,7 @@ impl Unit {
                 &c.w.model.masters,
                 &c.w.parts,
                 &c.w.model.roles,
+                &c.w.model.tuning,
             ),
         })?;
         let mut met = Vec::new();
@@ -363,6 +370,7 @@ impl Unit {
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<StrikeResult, GenieError> {
+        let damage_tuning = c.w.model.tuning.damage;
         if fired.charge {
             return Err(GenieError::unsupported("a charge projectile's own hit"));
         }
@@ -424,7 +432,18 @@ impl Unit {
             chance: master.hit_chance,
         };
         let object = streams.get(Stream::Object);
-        let struck = strike(&mut own, victim, &mut c.blasted, hit, object, roles, *slots)?;
+        let struck = strike(
+            &mut own,
+            victim,
+            &mut c.blasted,
+            hit,
+            object,
+            HitLayer {
+                roles,
+                slots: *slots,
+                damage_tuning: &damage_tuning,
+            },
+        )?;
         if let Some(target) = struck.executed {
             shooter.post_own(
                 &mut parts.unit_ai,
@@ -507,8 +526,11 @@ impl Unit {
             &mut c.blasted,
             hit,
             object,
-            roles,
-            c.w.model.slots,
+            HitLayer {
+                roles,
+                slots: c.w.model.slots,
+                damage_tuning: &c.w.model.tuning.damage,
+            },
         )?;
         if self
             .hit_back(own, c.w.parts.ai_and_combat_mut(self.id)?)?

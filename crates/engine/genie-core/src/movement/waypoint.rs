@@ -17,8 +17,7 @@ use crate::movement::Speed;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::{
-    CLOSE, EPSILON, Goal, LOOK_AHEAD, Me, Motion, Mover, Next, PathData, RANGE_FLOOR,
-    STRAIGHT_GROW, TARGET_SHORT_REACH, drop_edge_waypoints, footprint_gap, gate_gap,
+    EPSILON, Goal, Me, Motion, Mover, Next, PathData, drop_edge_waypoints, footprint_gap, gate_gap,
     point_or_zero_of, remove_point,
 };
 use crate::objects::ObjectId;
@@ -61,10 +60,11 @@ impl Mover {
         now: WorldTime,
         by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let ground_radius = self.stats.radius.ground();
         if self.paths.walked()?.flags.contains(LevelFlags::AT_WAYPOINT) {
-            self.take_waypoint_place(place, me, world, pathing, now, roles)?;
+            self.take_waypoint_place(place, me, world, pathing, now, by_id)?;
         }
         let level = self.paths.walked_mut()?;
         level.flags &= !LevelFlags::REACHED;
@@ -101,24 +101,24 @@ impl Mover {
             Footprint::new(0.0, 0.0),
         );
         let range = level.range;
-        let mut beyond =
-            goal.target
-                .map_or((back - range) - Distance::new(RANGE_FLOOR), |(id, t)| {
-                    let own =
-                        (footprint_gap(place.position(), ground_radius, t.position, t.radius)
-                            - range)
-                            - Distance::new(RANGE_FLOOR);
-                    let near = (place.position(), ground_radius);
-                    gate_gap(
-                        world,
-                        near,
-                        (id, t),
-                        own,
-                        |g| (g - range) - Distance::new(RANGE_FLOOR),
-                        by_id,
-                        roles,
-                    )
-                });
+        let mut beyond = goal.target.map_or_else(
+            || (back - range) - Distance::new(movement_tuning.range_floor),
+            |(id, t)| {
+                let own = (footprint_gap(place.position(), ground_radius, t.position, t.radius)
+                    - range)
+                    - Distance::new(movement_tuning.range_floor);
+                let near = (place.position(), ground_radius);
+                gate_gap(
+                    world,
+                    near,
+                    (id, t),
+                    own,
+                    |g| (g - range) - Distance::new(movement_tuning.range_floor),
+                    by_id,
+                    roles,
+                )
+            },
+        );
         if goal.target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
             self.clear_bit_2()?;
             beyond = Distance::ZERO;
@@ -132,7 +132,7 @@ impl Mover {
         }
         if EPSILON <= beyond.get()
             && (goal.target.is_some()
-                || CLOSE <= beyond.get()
+                || movement_tuning.close <= beyond.get()
                 || level.level == WaypointLevel::WALKED)
         {
             if EPSILON <= back.get() {
@@ -157,12 +157,14 @@ impl Mover {
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
         now: WorldTime,
-        roles: &Roles,
+        by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
+        let roles = by_id.roles();
         let level = self.paths.walked()?;
         if level.waypoint.within(level.points.len()) {
             let p = level.point(level.waypoint);
-            let at = self.set_position(p.position(), world.map);
+            let at = self.set_position(p.position(), world.map, movement_tuning);
             let at = self.grounded(at, world.terrain.as_ref());
             self.moved_to(place, me, Moved { at, now }, world, pathing, roles)?;
         }
@@ -171,7 +173,7 @@ impl Mover {
     }
 
     /// [`Mover::reached`]'s next waypoint on a level but 0: when the unit lies within
-    /// [`TARGET_SHORT_REACH`] (squared) of the one after it, the manager's point query at it
+    /// `MovementTuning::target_short_reach` (squared) of the one after it, the manager's point query at it
     /// (`FUN_141051900` with flags 0x20; its buffer and ignore list as the last
     /// `FUN_1410562d0` and `FUN_1410562e0` left them; a gate the owner may pass has no record
     /// during its owner's update, [`crate::world::World::open_gates`], so slot 0x678 passes none
@@ -186,6 +188,7 @@ impl Mover {
         world: &Spatial,
         by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let next = level.waypoint.next();
         if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
@@ -193,7 +196,9 @@ impl Mover {
         }
         let d = fmath::sub(at.vector(), *level.points.checked(next.get() as usize)?);
         // a NaN distance is not within
-        if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() < TARGET_SHORT_REACH {
+        if d.x() * d.x() + d.height() * d.height() + d.y() * d.y()
+            < movement_tuning.target_short_reach
+        {
             let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
             let ignore = world.manager_ignore();
             if world.object_holds(
@@ -258,6 +263,7 @@ impl Mover {
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let target = self.paths.walked()?.target;
         let parent = self.paths.parent()?;
         // the motion step's place of the unit: +0x824, where it last moved to
@@ -268,7 +274,7 @@ impl Mover {
         while from < k {
             let p = *parent.points.checked(k.get() as usize)?;
             let d = fmath::sub(p, at);
-            if d.x() * d.x() + 0.0 + d.y() * d.y() <= LOOK_AHEAD
+            if d.x() * d.x() + 0.0 + d.y() * d.y() <= movement_tuning.look_ahead
                 && self.straight(me, p, target, world, by_id)?
             {
                 break;
@@ -300,6 +306,7 @@ impl Mover {
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let (rx, ry, rz) = (
             self.stats.radius.x(),
             self.stats.radius.y(),
@@ -313,7 +320,7 @@ impl Mover {
         let ignore = by_id.query_ignore(&[Some(me.id), target]);
         // the query starts at +0x824, where the unit last moved to
         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
-        let grow = rx * STRAIGHT_GROW;
+        let grow = rx * movement_tuning.straight_grow;
         world.check_known_records(Rect::new(
             from.x().min(to.x()) - grow,
             from.y().min(to.y()) - grow,

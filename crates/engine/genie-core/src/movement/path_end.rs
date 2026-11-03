@@ -17,6 +17,7 @@ use crate::world::WorldTime;
 
 use crate::construction::MainBuildingId;
 use crate::groups::UnitGroups;
+use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::{Placed, RecordId, Spatial};
@@ -24,9 +25,8 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
 use crate::movement::WaypointIndex;
 use crate::movement::{
-    Avoided, EPSILON, LongWalker, Me, Mover, PUSHED, PathAsk, PathData, Planning, REACH_NEAR,
-    REACH_SHORT, ShortAsk, USER_WAYPOINT_MIDDLE, WIDE_RANGE, footprint_gap, footprint_gap_squared,
-    lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
+    Avoided, EPSILON, LongWalker, Me, Mover, PathAsk, PathData, Planning, ShortAsk, footprint_gap,
+    footprint_gap_squared, lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
 };
 use crate::objects::masters::MasterId;
 use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches};
@@ -36,6 +36,7 @@ use crate::players::PlayerSet;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::layer::generated::MovementTuning;
 use crate::{GenieError, math::fmath};
 
 /// What a reach test asks of the unit ([`Mover::reach_test`]'s arguments after the world).
@@ -75,6 +76,7 @@ impl Mover {
         ask: ReachAsk,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let ReachAsk {
             goal: to,
@@ -111,7 +113,11 @@ impl Mover {
                 from: Point::new(x, y),
                 to,
                 radii: Distance::new(radius.x() + target_radius),
-                range: if bonus { range + WIDE_RANGE } else { range },
+                range: if bonus {
+                    range + Distance::new(movement_tuning.wide_range)
+                } else {
+                    range
+                },
                 closed: Vec::new(),
                 full: false,
             };
@@ -122,7 +128,7 @@ impl Mover {
         }
         let solid = 0.0 < radius.z() && 0.0 < radius.x() && 0.0 < radius.y();
         let (dx, dy) = (to.x() - x, to.y() - y);
-        if solid && fmath::sqrt(dx * dx + 0.0 + dy * dy) <= REACH_SHORT {
+        if solid && fmath::sqrt(dx * dx + 0.0 + dy * dy) <= movement_tuning.reach_short {
             let goal = BVector::new(to.x(), 0.0, to.y());
             // FUN_140fa0370 hands the start test both vectors' first two floats: x and the
             // height, the unit's (`+0x824`) and the target's (slot 0x520), not x and y
@@ -145,7 +151,7 @@ impl Mover {
         }
         let long_target = if let Some(t) = target_placed(world, target)? {
             let gap2 = footprint_gap_squared(at, ground, t.position, t.radius);
-            if gap2 < REACH_NEAR {
+            if gap2 < DistanceSquared::new(movement_tuning.reach_near) {
                 return Ok(false);
             }
             let gap = footprint_gap(at, ground, t.position, t.radius);
@@ -158,7 +164,7 @@ impl Mover {
             // the gap from the unit's place (its decoded x and y), not +0x824
             let (px, py) = (at.x(), at.y());
             let (gx, gy) = (gap(to.x() - px, radius.x()), gap(to.y() - py, radius.y()));
-            if gx * gx + gy * gy < REACH_NEAR.get() {
+            if gx * gx + gy * gy < DistanceSquared::new(movement_tuning.reach_near).get() {
                 return Ok(false);
             }
             None
@@ -391,11 +397,11 @@ impl Mover {
     /// held as (x, height, y); an x or y less than 1e-7 above a whole number (`floorf`, `COMISS`,
     /// `JBE`: not a NaN) moves to that tile's middle. Its array's growth (5, then twice) fails only
     /// without memory.
-    pub fn add_user_waypoint(&mut self, at: Position) {
+    pub fn add_user_waypoint(&mut self, at: Position, movement_tuning: &MovementTuning) {
         let snap = |v: f32| {
             let whole = libm::floorf(v);
             if (v - whole).abs() < EPSILON {
-                whole + USER_WAYPOINT_MIDDLE
+                whole + movement_tuning.user_waypoint_middle
             } else {
                 v
             }
@@ -442,7 +448,7 @@ impl Mover {
     /// [`Mover::avoid`]'s first loop's test of the hit `id` (`other` its record): kept unless
     /// the step shrinks its overlap with the unit's box (`FUN_1411615a0`); then when the walked
     /// path ignores it and it moved before the top path was made (or the top path is this
-    /// update's and the step overlaps it more than [`PUSHED`] of the radius), or it moved after
+    /// update's and the step overlaps it more than `MovementTuning::pushed` of the radius), or it moved after
     /// the walked path was made (or at the same time and outranks the unit: a higher player, or
     /// the same and a higher id).
     pub(super) fn keeps_hit(
@@ -454,6 +460,7 @@ impl Mover {
         now: WorldTime,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let top = self.paths.last().filter(|l| !l.points.is_empty());
         let ground = self.stats.radius.ground();
@@ -464,7 +471,7 @@ impl Mover {
         let mut pushed = false;
         if let Some(top) = top.filter(|_| now_overlap <= next_overlap) {
             if top.created == now
-                && ground.x() * PUSHED < next_overlap
+                && ground.x() * movement_tuning.pushed < next_overlap
                 && level.ignored.contains(&id)
             {
                 pushed = true;

@@ -16,15 +16,15 @@ use crate::map::spatial::Spatial;
 use crate::math::fmath::BVector;
 use crate::movement::WaypointLevel;
 use crate::movement::{
-    AfterRequest, CLOSE, DETOUR, EPSILON, FAR, Goal, LONG, LONG_PATHER, LongAsk, Me, Mover,
-    PathData, Planning, RANGE_FLOOR, SHORT_PATHER, SHORT_REACH, ShortAsk, TARGET_SHORT_REACH,
-    TILE_PATHER, TileAsk, far_waypoint, footprint_gap, ground, ground_line, point_or_zero,
-    short_range, too_short,
+    AfterRequest, DETOUR, EPSILON, FAR, Goal, LONG, LONG_PATHER, LongAsk, Me, Mover, PathData,
+    Planning, SHORT_PATHER, ShortAsk, TILE_PATHER, TileAsk, far_waypoint, footprint_gap, ground,
+    ground_line, point_or_zero, short_range, too_short,
 };
 use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::{Found, Path};
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::MovementTuning;
 
 /// The new level and its path, and what the request's planners found: a path (`local_19d0`),
 /// one partway (`bVar35`), one the tile pathfinder planned (`bVar6`), a failed short path
@@ -86,6 +86,7 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         // FUN_141158210 is 1 only on an `E` tile in game type 12
         if plan.pathing.game_type == 12 {
             return Err(GenieError::unsupported(
@@ -102,7 +103,10 @@ impl Mover {
         if tail && let Some(step) = self.long_tail((at, me), world, plan, w, np, by_id)? {
             return Ok(Some(step));
         }
-        if (!np.found || too_short(&np.path)) && w.level == WaypointLevel::TOP && TILE_PATHER {
+        if (!np.found || too_short(&np.path, movement_tuning))
+            && w.level == WaypointLevel::TOP
+            && TILE_PATHER
+        {
             self.tile_again(me, world, plan, w, np, by_id)?;
         }
         if !(np.path.length <= w.distance * DETOUR || np.path.length <= LONG) {
@@ -139,7 +143,7 @@ impl Mover {
         Ok(())
     }
 
-    /// A target with the waypoint within [`TARGET_SHORT_REACH`]: the short pather's path
+    /// A target with the waypoint within `MovementTuning::target_short_reach`: the short pather's path
     /// ([`Mover::short_path_to`]). Whether it found one (result 1, longer than [`EPSILON`]);
     /// else the short path failed and empties.
     fn near_target_path(
@@ -151,13 +155,14 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         if w.goal.target.is_none()
-            || TARGET_SHORT_REACH < w.distance.get()
+            || movement_tuning.target_short_reach < w.distance.get()
             || w.distance.get().is_nan()
         {
             return Ok(false);
         }
-        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
+        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)?;
         let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
         if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
             np.failed = true;
@@ -234,11 +239,12 @@ impl Mover {
         near: bool,
         np: &mut NewPath,
     ) -> Result<ShortFound, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let line = ground_line(self.moved_at, w.waypoint);
         let ignore = self.ignore_list(me, world, plan, w.goal.target, line, by_id)?;
         let ask = ShortAsk {
             goal: w.waypoint,
-            range: short_range(near, w.range),
+            range: short_range(near, w.range, movement_tuning),
             target: w.target_id,
             ignore: &ignore,
             include: w.include,
@@ -251,8 +257,8 @@ impl Mover {
     }
 
     /// Without a path of three points: the short pather's, when it did not fail and the
-    /// waypoint is within [`SHORT_REACH`] or the goal near ([`Mover::short_try`]); still none,
-    /// a waypoint or target nearer than [`CLOSE`] takes the close-in path (the straight way,
+    /// waypoint is within `MovementTuning::short_reach` or the goal near ([`Mover::short_try`]); still none,
+    /// a waypoint or target nearer than `MovementTuning::close` takes the close-in path (the straight way,
     /// [`Mover::close_in`]). Whether the long pather follows (no path, or a blocked close-in
     /// one: `LAB_141152ec1`; a found path, when it is too short); a step where the short path
     /// ends the request.
@@ -265,21 +271,23 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> Result<ControlFlow<AfterRequest, bool>, GenieError> {
-        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end)?;
+        let movement_tuning = &by_id.tuning().movement;
+        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)?;
         if np.found && 3 <= np.path.points.len() {
-            return Ok(ControlFlow::Continue(too_short(&np.path)));
+            return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
         if SHORT_PATHER
             && !np.failed
-            && (w.distance <= Distance::new(SHORT_REACH) || near)
+            && (w.distance <= Distance::new(movement_tuning.short_reach) || near)
             && let Some(step) = self.short_try(me, (world, by_id), plan, w, near, np)?
         {
             return Ok(ControlFlow::Break(step));
         }
         if np.found {
-            return Ok(ControlFlow::Continue(too_short(&np.path)));
+            return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
-        if (w.distance < Distance::new(CLOSE) || w.goal.gap < Distance::new(CLOSE))
+        if (w.distance < Distance::new(movement_tuning.close)
+            || w.goal.gap < Distance::new(movement_tuning.close))
             && self.close_in(me, w.waypoint, w.target_id, world, by_id)?
         {
             np.path.points.clear();
@@ -305,6 +313,7 @@ impl Mover {
         near: bool,
         np: &mut NewPath,
     ) -> Result<Option<AfterRequest>, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         np.planned = false;
         np.path.points.clear();
         let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
@@ -319,7 +328,9 @@ impl Mover {
             return Ok(None);
         }
         if length <= EPSILON {
-            return self.waypoint_in_range(w, plan.now).map(Some);
+            return self
+                .waypoint_in_range(w, plan.now, movement_tuning)
+                .map(Some);
         }
         np.found = true;
         np.partial = r == ShortFound::Partial;
@@ -329,18 +340,19 @@ impl Mover {
     }
 
     /// The unit in range of its waypoint: the new level is dropped. A goal beyond the range (at
-    /// least [`RANGE_FLOOR`] for a target and no range) on the last waypoint of a path made this
+    /// least `MovementTuning::range_floor` for a target and no range) on the last waypoint of a path made this
     /// update stops the unit (slot 0x5d0), resets the level to state 6 (`FUN_140f9b4b0`) and
     /// gives up; short of it the level goes on (flag 1). Within it the level takes state 4.
     pub(super) fn waypoint_in_range(
         &mut self,
         w: &Way<'_>,
         now: WorldTime,
+        movement_tuning: &MovementTuning,
     ) -> Result<AfterRequest, GenieError> {
         let reach = if w.goal.target.is_none() || Distance::ZERO < w.range {
             w.range
         } else {
-            Distance::new(RANGE_FLOOR)
+            Distance::new(movement_tuning.range_floor)
         };
         let level = self.paths.walked_mut()?;
         if reach < w.goal.gap {
@@ -359,7 +371,7 @@ impl Mover {
     }
 
     /// `LAB_141152ec1`: a far waypoint ([`far_waypoint`]; any for a trade cart, else beyond
-    /// [`SHORT_REACH`]) takes the long pather's path ([`Mover::long_plan`]), made now: whether it
+    /// `MovementTuning::short_reach`) takes the long pather's path ([`Mover::long_plan`]), made now: whether it
     /// reached the goal, and the gap its end left. A step where the long plan stops the unit.
     fn long_tail(
         &mut self,
@@ -370,8 +382,9 @@ impl Mover {
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<AfterRequest>, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
-        if !(LONG_PATHER && (w.trade_cart || SHORT_REACH < w.distance.get())) {
+        if !(LONG_PATHER && (w.trade_cart || movement_tuning.short_reach < w.distance.get())) {
             return Ok(None);
         }
         let ground_radius = self.stats.radius.ground();
@@ -382,6 +395,7 @@ impl Mover {
                 (gap, t.master)
             }),
             roles,
+            movement_tuning,
         );
         if !far {
             return Ok(None);

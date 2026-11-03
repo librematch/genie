@@ -9,19 +9,16 @@ use crate::map::Position;
 use crate::map::spatial::Placed;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
-use crate::math::image::movement::{
-    ALLY_PAUSE as MOVEMENT_ALLY_PAUSE, FAST_TURN as MOVEMENT_FAST_TURN,
-    OTHER_PAUSE as MOVEMENT_OTHER_PAUSE, STUCK_PAUSE as MOVEMENT_STUCK_PAUSE,
-};
 use crate::math::rng::Well512;
 use crate::movement::WaypointIndex;
-use crate::movement::{EPSILON, Motion, PathData, RANGE_FLOOR, SHORTEST};
+use crate::movement::{EPSILON, Motion, PathData};
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use crate::pathing::tile_path::Path;
 use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::generated::MovementTuning;
 
 /// `FUN_140f98dd0`: the path ends before its point `i` (the points from `i` on go) and is
 /// measured again (`FUN_140f95a60`, true); an index outside the path, or an empty path, changes
@@ -81,11 +78,15 @@ pub(super) fn ground(a: BVector, b: BVector) -> Distance {
 /// goal is in reach ([`Mover::near_goal`]), at least 0; else 0.
 ///
 /// [`Mover::near_goal`]: crate::movement::Mover::near_goal
-pub(super) fn short_range(near: bool, range: Distance) -> Distance {
+pub(super) fn short_range(
+    near: bool,
+    range: Distance,
+    movement_tuning: &MovementTuning,
+) -> Distance {
     if !near {
         return Distance::ZERO;
     }
-    let r = range - Distance::new(RANGE_FLOOR);
+    let r = range - Distance::new(movement_tuning.range_floor);
     if r <= Distance::ZERO {
         Distance::ZERO
     } else {
@@ -93,16 +94,6 @@ pub(super) fn short_range(near: bool, range: Distance) -> Distance {
     }
 }
 
-/// A master whose object flags have bit 1 turns as if dt were this many times longer
-/// (`DAT_14330ebcc`).
-pub(super) const FAST_TURN: f32 = MOVEMENT_FAST_TURN;
-/// The pause a kept hit's ranking gives a unit the walker outranks: 0.1 for an ally
-/// (`DAT_142eb5690`), 0.5 for another (`DAT_142e7f384`).
-pub(super) const ALLY_PAUSE: Seconds = Seconds::new(MOVEMENT_ALLY_PAUSE);
-pub(super) const OTHER_PAUSE: Seconds = Seconds::new(MOVEMENT_OTHER_PAUSE);
-/// The pause a level at its last waypoint without a path gives its own unit while it may still
-/// try (`DAT_142eb5690`).
-pub(super) const STUCK_PAUSE: Seconds = Seconds::new(MOVEMENT_STUCK_PAUSE);
 /// What [`Mover::avoid`] makes of the walk's hits: the hits it keeps and the pauses it gives.
 ///
 /// [`Mover::avoid`]: crate::movement::Mover::avoid
@@ -114,8 +105,8 @@ pub(super) struct Avoided {
 }
 
 /// A path too short to walk: fewer than two points or shorter than 0.01.
-pub(super) fn too_short(path: &Path) -> bool {
-    path.points.len() < 2 || path.length < SHORTEST
+pub(super) fn too_short(path: &Path, movement_tuning: &MovementTuning) -> bool {
+    path.points.len() < 2 || path.length < Distance::new(movement_tuning.shortest)
 }
 
 /// `FUN_140f9b8f0`: a midpoint between points `i` and `i + 1` (from `i` half the stretch along

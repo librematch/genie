@@ -20,6 +20,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::FISH_TRAP;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::{Memory, NoAttack};
 use crate::vision::VisionBits;
 use crate::vision::own_masks;
@@ -340,6 +341,7 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
                     farm: &no_farm,
                 },
                 &roles(),
+                &tuning().best_target,
             )
             .unwrap();
         (f.enemies, f.fresh)
@@ -2281,6 +2283,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         shuns: &takes,
         farm: &farm,
         roles: &roles,
+        best_target_tuning: &tuning().best_target,
     };
     let p = villager(1.0, 1.0);
     let kept = |filter, p: &Placed, state, searcher, checks| {
@@ -2513,6 +2516,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         shuns: &takes,
         farm: &look,
         roles: &roles,
+        best_target_tuning: &tuning().best_target,
     };
     let s = seer_in(ObjectState::Alive);
     assert!(

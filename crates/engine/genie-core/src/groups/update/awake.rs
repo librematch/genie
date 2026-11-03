@@ -11,9 +11,7 @@ use crate::groups::UnitGroup;
 use crate::groups::formation::top_path;
 use crate::groups::group_list::{NO_FORMATION, member_gone};
 use crate::groups::stats::weapon_range;
-use crate::groups::update::{
-    ATTACK, DIFFERENTIATORS, FRONT_AHEAD, NO_COMMAND, OTHER_COMMANDS, RELAYOUT_SPACING, TURN_LIMIT,
-};
+use crate::groups::update::{ATTACK, DIFFERENTIATORS, NO_COMMAND, OTHER_COMMANDS, TURN_LIMIT};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{angle_between, at_most_or_unordered, scale};
@@ -284,7 +282,10 @@ impl World {
             if without_path {
                 self.front_by_centroid(group)?;
             } else {
-                self.move_position_to_front(group, FRONT_AHEAD)?;
+                self.move_position_to_front(
+                    group,
+                    Distance::new(self.model.tuning.movement.look_ahead),
+                )?;
             }
             self.update_desired_positions(group, None)?;
             if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
@@ -429,17 +430,25 @@ impl World {
                     .is_some_and(|f| f.kind == FormationKind::TYPE_6)
             {
                 refill = true;
-            } else if at_most_or_unordered(g.total_spacing.get(), RELAYOUT_SPACING.get()) {
+            } else if at_most_or_unordered(
+                g.total_spacing.get(),
+                Distance::new(self.model.tuning.missile.volley_reach_margin).get(),
+            ) {
                 g.flags |= GroupFlags::RELAYOUT_SPREAD;
             } else {
                 relayout = true;
             }
         }
-        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD) && RELAYOUT_SPACING < g.total_spacing {
+        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD)
+            && Distance::new(self.model.tuning.missile.volley_reach_margin) < g.total_spacing
+        {
             relayout = true;
             g.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
         }
-        if g.flags.contains(GroupFlags::RELAYOUT) && RELAYOUT_SPACING < g.total_spacing && idle {
+        if g.flags.contains(GroupFlags::RELAYOUT)
+            && Distance::new(self.model.tuning.missile.volley_reach_margin) < g.total_spacing
+            && idle
+        {
             g.flags &= !GroupFlags::RELAYOUT;
             relayout = true;
         }

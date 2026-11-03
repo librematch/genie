@@ -1,4 +1,4 @@
-use crate::fixtures::{combat_mut, combat_object};
+use crate::fixtures::{combat_mut, combat_object, missile_tuning};
 use crate::object_parts::unit_ai;
 use crate::saved_unit::object as saved_unit_object;
 use crate::test_ids::object_id;
@@ -161,6 +161,7 @@ fn the_saved_unit_ai_is_the_object_part() {
             CivId::GAIA,
             None,
             PLAYERS,
+            &missile_tuning(),
         )
     };
     let object = with_ai(UnitAiModule {

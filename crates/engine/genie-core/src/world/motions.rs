@@ -8,13 +8,12 @@ use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::layers::{Building, Combat};
 use crate::objects::layers::{Motion, MotionMut};
-use crate::objects::masters::{MasterTables, Masters};
+use crate::objects::masters::MasterTables;
 use crate::world::Player;
 use crate::world::index::{ObjectIndex, ObjectsRef};
-use crate::world::layer::Roles;
 use crate::world::parts::{PartTable, Parts};
+use genie_model::model::Model;
 use std::mem::replace;
-use std::sync::Arc;
 
 /// A part table read with at most one entry lent out to change ([`PartTable::lend`]): the
 /// others read as the table's, the lent one as none (its object is out for its update, as its
@@ -178,16 +177,12 @@ impl Parts {
 
     /// Object `id`'s motion layer lent out of the table to change ([`MotionMut`], none for a
     /// static object) and the world's objects by id beside it (`players`, `index` and
-    /// `masters`, the other parts' tables, the build's `roles`), which read the others' motion.
+    /// the other parts' tables and the `model`'s masters, roles and tuning), which read the
+    /// others' motion.
     pub(crate) fn lend_motion<'a>(
         &'a mut self,
         id: ObjectId,
-        (players, index, masters, roles): (
-            &'a [Player],
-            &'a ObjectIndex,
-            &'a [Arc<Masters>],
-            &'a Roles,
-        ),
+        (players, index, model): (&'a [Player], &'a ObjectIndex, &'a Model),
     ) -> (MotionMut<'a>, ObjectsRef<'a>) {
         let (motion, motions) = self.motion.lend(id);
         (
@@ -195,7 +190,7 @@ impl Parts {
             ObjectsRef::of_tables(
                 players,
                 index,
-                MasterTables::new(masters, &self.own_master),
+                MasterTables::new(&model.masters, &self.own_master),
                 (
                     &self.building,
                     &self.combat,
@@ -203,7 +198,8 @@ impl Parts {
                     &self.unread,
                     motions,
                 ),
-                roles,
+                &model.roles,
+                &model.tuning,
             ),
         )
     }
@@ -214,7 +210,7 @@ impl Parts {
     pub(crate) fn lend_mover<'a>(
         &'a mut self,
         id: ObjectId,
-        tables: (&'a [Player], &'a ObjectIndex, &'a [Arc<Masters>], &'a Roles),
+        tables: (&'a [Player], &'a ObjectIndex, &'a Model),
     ) -> (Option<&'a mut Mover>, ObjectsRef<'a>) {
         let (motion, by_id) = self.lend_motion(id, tables);
         (motion.into_mover(), by_id)

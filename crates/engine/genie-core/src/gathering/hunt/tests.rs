@@ -50,6 +50,7 @@ use crate::objects::{FacetCount, Frame};
 use crate::test_ids::task_id;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::tuning;
 use crate::unit_ai::{NotifyKind, UnitAi};
 use crate::world::World;
 
@@ -372,6 +373,7 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
         ARMS,
         &mut mover,
         &roles(),
+        &tuning().attack,
     )
     .unwrap();
     assert_eq!(hunt.state.bare(), HuntState::Attack { attack: None });
@@ -417,6 +419,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         ARMS,
         &mut mover,
         &roles(),
+        &tuning().attack,
     )
     .unwrap();
     let retarget = |hunt: &mut HuntAction, q: &Quarry, e: &Engagement, m: &mut Mover| {
@@ -431,6 +434,7 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             ARMS,
             m,
             &roles(),
+            &tuning().attack,
         )
         .unwrap()
     };
@@ -489,6 +493,7 @@ fn hunt_new_target_clears_its_lead() {
         ARMS,
         &mut mover,
         &roles(),
+        &tuning().attack,
     )
     .unwrap();
     let led = Lead {
@@ -515,6 +520,7 @@ fn hunt_new_target_clears_its_lead() {
             ARMS,
             &mut mover,
             &roles(),
+            &tuning().attack,
         )
         .unwrap();
     assert_eq!(hunt.lead, led);
@@ -530,6 +536,7 @@ fn hunt_new_target_clears_its_lead() {
             ARMS,
             &mut mover,
             &roles(),
+            &tuning().attack,
         )
         .unwrap();
     assert_eq!(
@@ -556,6 +563,7 @@ fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
             ARMS,
             &mut walker(),
             &roles(),
+            &tuning().attack,
         )
         .unwrap();
         held
@@ -685,6 +693,7 @@ fn hunt_on_live_ally_fails() {
         ARMS,
         &mut walker(),
         &roles(),
+        &tuning().attack,
     )
     .expect("a hunt");
     assert_eq!(
@@ -727,6 +736,7 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
             ARMS,
             &mut walker(),
             &roles(),
+            &tuning().attack,
         )
         .unwrap();
         // a quiet MoveTo to the target that asks again when it moves (`+0x61` 1)

@@ -11,9 +11,7 @@ use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathState;
 use crate::movement::Speed;
-use crate::movement::{
-    ALLY_PAUSE, EPSILON, FAST_TURN, Me, Motion, Mover, Next, OTHER_PAUSE, UP, Velocity,
-};
+use crate::movement::{EPSILON, Me, Motion, Mover, Next, UP, Velocity};
 use crate::objects::ObjectKey;
 use crate::objects::facing::{SpriteFacets, angle_of_facet, facet_of_forward};
 use crate::players::PlayerId;
@@ -21,6 +19,7 @@ use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::MovementTuning;
 use crate::{GenieError, math::fmath};
 
 impl Mover {
@@ -43,6 +42,7 @@ impl Mover {
         player_type: PlayerType,
         by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let player = world
             .get(me.id)
@@ -77,8 +77,7 @@ impl Mover {
             // ally flag): an ally pauses 0.1, anyone else 0.5 (Gaia counts for no one)
             let allied = world.allied_with(player, other.player);
             if outranks && by_id.gait(id).is_some_and(|g| g.pause.is_some()) {
-                let pause = if allied { ALLY_PAUSE } else { OTHER_PAUSE };
-                self.pauses.push((id, pause));
+                self.pauses.push((id, hit_pause(allied, movement_tuning)));
             }
             // a hit that neither counts the other an ally, of the walked level's target's
             // master, notifies the walker's unit AI (0x215)
@@ -130,11 +129,16 @@ impl Mover {
     /// renormalised, with [`Mover::turn_dt`]), then the yaw by the turn ([`Mover::yaw`]) unless
     /// the walked level's flags have bit 0 and the turn is 0. Returns whether the turn fell short
     /// (the angle was above the most), which brakes the unit ([`Mover::control_speed`]).
-    pub(super) fn steer(&mut self, direction: BVector, dt: Seconds) -> Result<bool, GenieError> {
+    pub(super) fn steer(
+        &mut self,
+        direction: BVector,
+        dt: Seconds,
+        movement_tuning: &MovementTuning,
+    ) -> Result<bool, GenieError> {
         let mut flat = self.forward;
         flat = flat.with_height(0.0);
         let flat = fmath::normalize(flat);
-        let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt));
+        let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt, movement_tuning));
         if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
             return Ok(clipped);
         }
@@ -147,9 +151,9 @@ impl Mover {
     /// steering (`FUN_141025fb0` at `0x141027887`) multiply it before slot 195.
     ///
     /// [`MoveStats::fast_turn`]: crate::movement::MoveStats::fast_turn
-    pub(crate) fn turn_dt(&self, dt: Seconds) -> Seconds {
+    pub(crate) fn turn_dt(&self, dt: Seconds, movement_tuning: &MovementTuning) -> Seconds {
         if self.stats.fast_turn {
-            dt * FAST_TURN
+            dt * movement_tuning.fast_turn
         } else {
             dt
         }
@@ -288,4 +292,14 @@ impl Mover {
         }
         v.acceleration = v.acceleration.with_y(f32::MAX);
     }
+}
+
+/// The pause of a walker behind a paused hit it outranks (slot 0x5f0 with the ally flag): an
+/// ally's `MovementTuning::ally_pause`, anyone else's `MovementTuning::other_pause`.
+const fn hit_pause(allied: bool, movement_tuning: &MovementTuning) -> Seconds {
+    Seconds::new(if allied {
+        movement_tuning.ally_pause
+    } else {
+        movement_tuning.other_pause
+    })
 }

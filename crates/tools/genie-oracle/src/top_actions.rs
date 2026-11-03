@@ -1,6 +1,6 @@
 //! A saved object's top action as the slice models it ([`saved_actions`]).
 
-use crate::saved_unit::saved_missile;
+use crate::saved_unit::missile_part;
 use crate::{OTHER_SUB_ACTION, combat_master, saved_attack, saved_move_wait};
 use genie_core::GenieError;
 use genie_core::combat::missile::ShooterId;
@@ -304,7 +304,7 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
             "a saved missile action without its part",
         ))?;
     // the missile's own fields are its part (saved_unit's saved_missile)
-    if saved_missile(object).is_none() {
+    if missile_part(object).is_none() {
         return Err(GenieError::unsupported(
             "a missile action of an object that is not a missile",
         ));

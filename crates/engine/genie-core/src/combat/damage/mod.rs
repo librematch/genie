@@ -54,15 +54,7 @@ use crate::map::Position;
 use crate::math::Angle;
 #[cfg(test)]
 use crate::math::fmath;
-use crate::math::image::damage::{
-    BLAST_RANGE as DAMAGE_BLAST_RANGE, CONE as DAMAGE_CONE, EPSILON as DAMAGE_EPSILON,
-    FACING as DAMAGE_FACING, HIGHER as DAMAGE_HIGHER, LEAST_CLASS_HIT as DAMAGE_LEAST_CLASS_HIT,
-    LOWER as DAMAGE_LOWER, MINUS_CONE as DAMAGE_MINUS_CONE, MINUS_FACING as DAMAGE_MINUS_FACING,
-    ONE as DAMAGE_ONE, RELIC_BOOST as DAMAGE_RELIC_BOOST,
-    RETALIATION_RANGE as DAMAGE_RETALIATION_RANGE, RETALIATION_SCALE as DAMAGE_RETALIATION_SCALE,
-    SPECIAL as DAMAGE_SPECIAL, SPECIFIC_RELIC_BOOST as DAMAGE_SPECIFIC_RELIC_BOOST,
-    WIDE_CONE as DAMAGE_WIDE_CONE,
-};
+use crate::math::image::damage::{EPSILON as DAMAGE_EPSILON, ONE as DAMAGE_ONE};
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::MasterHitPoints;
@@ -92,42 +84,24 @@ use crate::players::history::EventKind;
 use crate::world::Mode680;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::DamageTuning;
 
-/// What a hit reads of the build layer (FD-046-D45): the roles of the classes and masters it
-/// tests and the slots of the attributes it counts into, one argument of [`take`] and
-/// [`blast`].
+/// What a hit reads of the build layer (FD-046-D45, D49): the roles of the classes and masters
+/// it tests, the slots of the attributes it counts into and the damage's tuning values, one
+/// argument of [`take`] and [`blast`].
 #[derive(Clone, Copy, Debug)]
 pub struct HitLayer<'a> {
     /// The build layer's roles.
     pub roles: &'a Roles,
     /// The build layer's slots.
     pub slots: Slots,
+    /// The damage's tuning values.
+    pub damage_tuning: &'a DamageTuning,
 }
 
-/// Elevation: a higher attacker hits at 1.25 (`DAT_142eb56a8`), a lower one at 0.75
-/// (`DAT_142e7f388`), each plus its player's and the target's player's attributes (211/272,
-/// 212/273).
-const HIGHER: f32 = DAMAGE_HIGHER;
-const LOWER: f32 = DAMAGE_LOWER;
-/// A building's hits with a specific relic inside (`DAT_142ed66b4`, 1.2), and with any relic
-/// (`DAT_142e86c14`, 1.1), [`building_elevation_factor`].
-const SPECIFIC_RELIC_BOOST: f32 = DAMAGE_SPECIFIC_RELIC_BOOST;
-const RELIC_BOOST: f32 = DAMAGE_RELIC_BOOST;
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`), and the share of
 /// reflected damage above which a target reflects.
 const EPSILON: f32 = DAMAGE_EPSILON;
-/// A special attack and a retaliation need their attacker within 1.2 facets of where the target
-/// faces (`DAT_142ed66b4`, `DAT_142eb99e4`); the special attack takes the hit's damage to 0.66
-/// (`DAT_142f3855c`); a retaliation answers attackers of a weapon range below 0.2
-/// (`DAT_142eae8d0`), four times over an attacker whose charge is ready (`DAT_142eb0f48`).
-const FACING: f32 = DAMAGE_FACING;
-const MINUS_FACING: f32 = DAMAGE_MINUS_FACING;
-const SPECIAL: f32 = DAMAGE_SPECIAL;
-const RETALIATION_RANGE: f32 = DAMAGE_RETALIATION_RANGE;
-const RETALIATION_SCALE: f32 = DAMAGE_RETALIATION_SCALE;
-/// A melee attacker (weapon range below 0.99, `DAT_142eb569c`) with an area effect tramples:
-/// its blast goes about itself (`FUN_1412115e0`).
-pub const BLAST_RANGE: f32 = DAMAGE_BLAST_RANGE;
 /// What a player's attributes add to the elevation factor of a hit ([`elevation_factor`]): from
 /// higher up (attribute 211 for its own hits, 272 for the hits it takes) or from lower down (212,
 /// 273).
@@ -139,19 +113,9 @@ pub struct ElevationBonus {
     pub lower: f32,
 }
 
-/// A cone blast (its level's bit 7) reaches objects within half a facet of where its attacker
-/// faces (`DAT_142e7f384`, `DAT_142eb6e58`), or within 1.67 facets (`DAT_142f4fea8`) for a wide
-/// one (bit 5).
-const CONE: f32 = DAMAGE_CONE;
-const MINUS_CONE: f32 = DAMAGE_MINUS_CONE;
-const WIDE_CONE: f32 = DAMAGE_WIDE_CONE;
-
 /// 1 (`DAT_14330eb8c`, read into `XMM9` at `0x1411cec8e`): a building's least hit, the hit
 /// points below which a hit razes a building or kills a unit, and what each razing count adds.
 const ONE: f32 = DAMAGE_ONE;
-/// The least hit of the attacker classes [`LEAST_HIT_CLASSES`] under the game's setting `+0x680`
-/// at 1 (`DAT_142eb5690`, read into `XMM6` at `0x1411ceea4`).
-const LEAST_CLASS_HIT: f32 = DAMAGE_LEAST_CLASS_HIT;
 
 /// An object as a hit reads and changes it: the target, and the attacker as the target of a
 /// retaliation or of reflected damage.

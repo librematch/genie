@@ -51,43 +51,28 @@ pub use self::shooter_id::{Shooter, ShooterId};
 pub use self::strike_result::StrikeResult;
 use crate::combat::{AttackCount, Firepower, MissileCount};
 use crate::math::image::missile::{
-    BEYOND as MISSILE_BEYOND, DRAW_SCALE as MISSILE_DRAW_SCALE, HALF as MISSILE_HALF,
-    HEIGHT_SHARE as MISSILE_HEIGHT_SHARE, LANDING as MISSILE_LANDING,
-    QUERY_EDGE as MISSILE_QUERY_EDGE, REACH_MARGIN as MISSILE_REACH_MARGIN,
+    DRAW_SCALE as MISSILE_DRAW_SCALE, HALF as MISSILE_HALF,
     VOLLEY_EPSILON as MISSILE_VOLLEY_EPSILON, VOLLEY_HALF as MISSILE_VOLLEY_HALF,
-    VOLLEY_REACH_MARGIN as MISSILE_VOLLEY_REACH_MARGIN, VOLLEY_SCALE as MISSILE_VOLLEY_SCALE,
+    VOLLEY_SCALE as MISSILE_VOLLEY_SCALE,
 };
 use crate::movement::Acceleration;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MissileTuning;
 
 /// The missile action's type, which word 9 adds when it is the top action.
 pub const MISSILE: ActionKind = ActionKind::named(8);
 
-/// A target's height counts a third of its master's height radius (`FUN_140a9c600`,
-/// `DAT_142eb1c98`).
-const HEIGHT_SHARE: f32 = MISSILE_HEIGHT_SHARE;
 /// The hit chance's draw scale (`DAT_142eb69cc`) and a missed missile's half spread
 /// (`DAT_142e7f384`).
 const DRAW_SCALE: f32 = MISSILE_DRAW_SCALE;
 const HALF: f32 = MISSILE_HALF;
-/// A missile past its reach ends this far beyond its point (`DAT_142eb5be8`).
-const BEYOND: Distance = Distance::new(MISSILE_BEYOND);
-/// A missile within this of its point may touch the ground (`DAT_142eb5690`, `+0x994`).
-pub const LANDING: f32 = MISSILE_LANDING;
-/// The hit query holds its ends this far inside the map's far edges (`FUN_1411570c0`,
-/// `DAT_142eb5690`).
-pub const QUERY_EDGE: f32 = MISSILE_QUERY_EDGE;
-/// The reach adds this to the shooter's radius and range (`FUN_141081020`, `DAT_142e8c150`).
-const REACH_MARGIN: f32 = MISSILE_REACH_MARGIN;
 /// A volley's count takes the firepower past this hair (`FUN_141203140`).
 const VOLLEY_EPSILON: f32 = MISSILE_VOLLEY_EPSILON;
 /// A volley's scatter: the draw's scale and the half spread (`FUN_14120c0a0`).
 const VOLLEY_SCALE: f32 = MISSILE_VOLLEY_SCALE;
 const VOLLEY_HALF: f32 = MISSILE_VOLLEY_HALF;
-/// What a volley's extra missile's reach adds to the range (`FUN_141226690`).
-const VOLLEY_REACH_MARGIN: f32 = MISSILE_VOLLEY_REACH_MARGIN;
 
 /// Where a missile came from (`+0x9c`, `mProjectileData`, `FUN_140aa86e0`): the firing object's
 /// place, the missile master's radii on the ground, the firing object's master and owner (−1
@@ -174,7 +159,7 @@ pub struct Missile {
     pub fired_from: Option<ShooterId>,
     /// `+0x99c` (`mIsChargeProjectile`): a charge's projectile.
     pub charge: bool,
-    /// `+0x994`: farther than [`LANDING`] from its point; the ground does not stop it.
+    /// `+0x994`: farther than `MissileTuning::landing` from its point; the ground does not stop it.
     /// Not saved: the load's constructor sets 1.
     #[diff(unsaved)]
     pub flying: bool,
@@ -196,9 +181,11 @@ pub fn spawn_point(at: Position, angle: Angle, offset: Offset) -> Position {
 
 /// `FUN_141081020`'s reach: the firing master's radii's length plus its range plus 2.
 #[must_use]
-pub fn reach(radius: Footprint, range: Distance) -> Distance {
+pub fn reach(radius: Footprint, range: Distance, missile_tuning: &MissileTuning) -> Distance {
     Distance::new(
-        fmath::sqrt(radius.x() * radius.x() + radius.y() * radius.y()) + range.get() + REACH_MARGIN,
+        fmath::sqrt(radius.x() * radius.x() + radius.y() * radius.y())
+            + range.get()
+            + missile_tuning.reach_margin,
     )
 }
 
@@ -257,11 +244,15 @@ pub fn volley_spawn_point(
 
 /// `FUN_141226690`'s reach: the firing master's radii's length plus its range plus 6.
 #[must_use]
-pub fn volley_reach(radius: Footprint, range: Distance) -> Distance {
+pub fn volley_reach(
+    radius: Footprint,
+    range: Distance,
+    missile_tuning: &MissileTuning,
+) -> Distance {
     Distance::new(
         fmath::sqrt(radius.x() * radius.x() + radius.y() * radius.y())
             + range.get()
-            + VOLLEY_REACH_MARGIN,
+            + missile_tuning.volley_reach_margin,
     )
 }
 
@@ -309,6 +300,7 @@ pub fn aim(
     at: AimAt<'_>,
     draw: &mut dyn FnMut() -> u32,
     roles: &Roles,
+    missile_tuning: &MissileTuning,
 ) -> Result<Position, GenieError> {
     let AimAt {
         point,
@@ -321,7 +313,7 @@ pub fn aim(
     } = at;
     let (mut x, mut y, mut z) = (point.x(), point.y(), point.z());
     if let Some((radius, _)) = target {
-        z += radius.z() / HEIGHT_SHARE;
+        z += radius.z() / missile_tuning.height_share;
     }
     let dx = x - from.x();
     let mut gap = fmath::sqrt((y - from.y()) * (y - from.y()) + dx * dx);
@@ -445,6 +437,7 @@ impl MissileAction {
         dt: Seconds,
         max_range: Distance,
         stats: &MissileStats,
+        missile_tuning: &MissileTuning,
     ) -> Result<(Offset, bool), GenieError> {
         let mut step = match stats.projectile_kind {
             ProjectileKind::STRAIGHT => {
@@ -452,7 +445,7 @@ impl MissileAction {
                 let d = self.direction.scaled(way.get());
                 self.timer += way;
                 self.distance -= way;
-                if max_range <= self.timer && self.distance < BEYOND {
+                if max_range <= self.timer && self.distance < Distance::new(missile_tuning.beyond) {
                     // State 1: the missile ends.
                     self.state = MissileState::Done;
                 }
@@ -476,7 +469,7 @@ impl MissileAction {
             );
             self.ballistic_velocity += dt * self.ballistic_acceleration;
         }
-        Ok((step, LANDING < self.distance.get()))
+        Ok((step, missile_tuning.landing < self.distance.get()))
     }
 }
 
@@ -524,6 +517,7 @@ mod tests {
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
+    use crate::testing::tuning;
     #[cfg(test)]
     use std::iter::once;
 
@@ -568,7 +562,12 @@ mod tests {
         assert!((a.ballistic_velocity.get() - 4.71503).abs() < 1e-4);
         // one update of 52 ms: 0.364 of the way
         let (step, flying) = a
-            .fly(Seconds::new(0.052), Distance::new(5.282_842_6), &stats)
+            .fly(
+                Seconds::new(0.052),
+                Distance::new(5.282_842_6),
+                &stats,
+                &tuning().missile,
+            )
             .unwrap();
         assert!((a.timer.get() - 0.364).abs() < 1e-6);
         assert!((a.distance - Distance::new(2.44257)).get().abs() < 1e-5);
@@ -605,6 +604,7 @@ mod tests {
                 },
                 &mut || d.next().unwrap(),
                 &roles(),
+                &tuning().missile,
             )
         };
         // a draw of 70% or less hits: the target's height rises by 1.5 / 3
@@ -659,7 +659,8 @@ mod tests {
                     hit_mode: &mut mode
                 },
                 &mut || d.next().unwrap(),
-                &roles()
+                &roles(),
+                &tuning().missile
             ),
             Ok(point)
         );
@@ -675,7 +676,11 @@ mod tests {
         );
         assert_eq!(p, Position::new(10.5, 20.0, 1.5));
         assert_eq!(
-            reach(Footprint::new(0.2, 0.2), Distance::new(3.0)),
+            reach(
+                Footprint::new(0.2, 0.2),
+                Distance::new(3.0),
+                &tuning().missile
+            ),
             Distance::new(0.282_842_73 + 3.0 + 2.0)
         );
     }
@@ -739,7 +744,11 @@ mod tests {
         assert_eq!(scatter(0x7fff, Distance::new(0.5)), 0.25);
         // the reach adds 6 to the range
         assert_eq!(
-            volley_reach(Footprint::new(2.0, 0.0), Distance::new(6.0)),
+            volley_reach(
+                Footprint::new(2.0, 0.0),
+                Distance::new(6.0),
+                &tuning().missile
+            ),
             Distance::new(14.0)
         );
     }

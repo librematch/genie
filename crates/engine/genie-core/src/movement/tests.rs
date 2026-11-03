@@ -43,6 +43,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::ID_45;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::UnitStance;
 use crate::vision::visibility::Visibility;
 use crate::world::Millis;
@@ -596,12 +597,13 @@ fn walled(radius: Distance) -> Spatial {
 /// tile, or an unordered one, takes the old pather.
 #[test]
 fn radius_above_half_tile_or_unordered_takes_the_old_pather() {
-    assert!(!old_pather_for(Distance::new(0.2)));
-    assert!(!old_pather_for(Distance::new(0.5)));
-    assert!(old_pather_for(Distance::new(f32::from_bits(
-        0.5f32.to_bits() + 1
-    ))));
-    assert!(old_pather_for(Distance::new(f32::NAN)));
+    assert!(!old_pather_for(Distance::new(0.2), &tuning().movement));
+    assert!(!old_pather_for(Distance::new(0.5), &tuning().movement));
+    assert!(old_pather_for(
+        Distance::new(f32::from_bits(0.5f32.to_bits() + 1)),
+        &tuning().movement
+    ));
+    assert!(old_pather_for(Distance::new(f32::NAN), &tuning().movement));
 }
 
 /// `FUN_140f9e540` for a unit wider than half a tile: the path empties, then the old pather
@@ -1098,7 +1100,11 @@ fn nan_most_turns_the_whole_angle_unclipped() {
     m.right = BVector::new(0.0, 0.0, -1.0);
     m.stats.turn_rate = TurnRate::new(f32::INFINITY);
     assert_eq!(
-        m.steer(BVector::new(0.0, 0.0, 1.0), Seconds::ZERO),
+        m.steer(
+            BVector::new(0.0, 0.0, 1.0),
+            Seconds::ZERO,
+            &tuning().movement
+        ),
         Ok(false)
     );
     assert!(m.forward.get().iter().all(|c| c.is_finite()));
@@ -1107,7 +1113,11 @@ fn nan_most_turns_the_whole_angle_unclipped() {
     m.forward = BVector::new(1.0, 0.0, 0.0);
     m.stats.turn_rate = TurnRate::new(1.0);
     assert_eq!(
-        m.steer(BVector::new(0.0, 0.0, 1.0), Seconds::new(0.02)),
+        m.steer(
+            BVector::new(0.0, 0.0, 1.0),
+            Seconds::new(0.02),
+            &tuning().movement
+        ),
         Ok(true)
     );
     assert!(m.forward.y().abs() < 0.03);
@@ -1134,9 +1144,15 @@ fn turn_toward_direction_is_signed_and_clipped_by_the_turn_rate() {
     assert_eq!(turn, Angle::new(-FRAC_PI_2));
     // a NaN most turns the whole angle (JBE on unordered)
     assert!(!m.turn_toward(x, z, Seconds::new(f32::NAN)).1);
-    assert_eq!(m.turn_dt(Seconds::new(0.02)), Seconds::new(0.02));
+    assert_eq!(
+        m.turn_dt(Seconds::new(0.02), &tuning().movement),
+        Seconds::new(0.02)
+    );
     m.stats.fast_turn = true;
-    assert_eq!(m.turn_dt(Seconds::new(0.02)), Seconds::new(0.02 * 100.0));
+    assert_eq!(
+        m.turn_dt(Seconds::new(0.02), &tuning().movement),
+        Seconds::new(0.02 * 100.0)
+    );
 }
 
 /// Slot 184 (`FUN_141163140`): the yaw turns the forward vector about the up axis and
@@ -1207,28 +1223,32 @@ fn the_orientation_speed_and_pause_slots() {
 #[test]
 fn far_waypoint_or_target_of_master_45_takes_the_long_pather() {
     assert!(
-        far_waypoint(Distance::new(1.0), None, &roles())
-            && !far_waypoint(Distance::new(0.5), None, &roles())
+        far_waypoint(Distance::new(1.0), None, &roles(), &tuning().movement)
+            && !far_waypoint(Distance::new(0.5), None, &roles(), &tuning().movement)
     );
     assert!(far_waypoint(
         Distance::ZERO,
         Some((Distance::new(1.0), master_id(4))),
-        &roles()
+        &roles(),
+        &tuning().movement
     ));
     assert!(!far_waypoint(
         Distance::new(30.0),
         Some((Distance::new(0.5), master_id(4))),
-        &roles()
+        &roles(),
+        &tuning().movement
     ));
     assert!(far_waypoint(
         Distance::new(30.0),
         Some((Distance::new(0.5), ID_45)),
-        &roles()
+        &roles(),
+        &tuning().movement
     ));
     assert!(!far_waypoint(
         Distance::new(30.0),
         Some((Distance::new(f32::NAN), master_id(4))),
-        &roles()
+        &roles(),
+        &tuning().movement
     ));
 }
 
@@ -1238,14 +1258,22 @@ fn far_waypoint_or_target_of_master_45_takes_the_long_pather() {
 fn the_position_setter_holds_the_row_by_the_map_width() {
     let m = builder_9177();
     // a map 40 wide and 120 high: y 100 lies beyond the width less the radius and the gap
-    let at = m.set_position(Position::new(10.0, 100.0, 0.0), GridSize::new(40, 120));
-    assert_eq!(at.y(), (40.0f32 - 0.2) - EDGE_GAP);
+    let at = m.set_position(
+        Position::new(10.0, 100.0, 0.0),
+        GridSize::new(40, 120),
+        &tuning().movement,
+    );
+    assert_eq!(at.y(), (40.0f32 - 0.2) - tuning().movement.edge_gap);
     // a unit that does not move is not held
     let mut still = builder_9177();
     still.stats.speed = Speed::ZERO;
     assert_eq!(
         still
-            .set_position(Position::new(10.0, 100.0, 0.0), GridSize::new(40, 120))
+            .set_position(
+                Position::new(10.0, 100.0, 0.0),
+                GridSize::new(40, 120),
+                &tuning().movement
+            )
             .y(),
         100.0
     );
@@ -1401,7 +1429,11 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     // scout 7227 in update 5429 turns by π/2 there)
     let mut expect = m.clone();
     let flat = fmath::normalize(expect.forward.with_height(0.0));
-    let (turn, _) = expect.turn_toward(flat, BVector::ZERO, expect.turn_dt(Seconds::new(DT)));
+    let (turn, _) = expect.turn_toward(
+        flat,
+        BVector::ZERO,
+        expect.turn_dt(Seconds::new(DT), &tuning().movement),
+    );
     expect.yaw(turn, expect.facets()).unwrap();
     assert_ne!(turn, Angle::ZERO);
     assert_eq!(
@@ -1492,7 +1524,7 @@ fn gate_gap_is_the_least_over_it_and_its_annexes() {
         near,
         (object_id(100), &gate),
         own,
-        |g| g - ANNEX_GAP,
+        |g| g - Distance::new(tuning().movement.range_floor),
         objects.view(),
         &roles(),
     );
@@ -1503,7 +1535,7 @@ fn gate_gap_is_the_least_over_it_and_its_annexes() {
         Footprint::new(0.5, 0.5),
     );
     assert!((annex - Distance::new(0.8)).get().abs() < 1e-6);
-    assert_eq!(gap, annex - ANNEX_GAP);
+    assert_eq!(gap, annex - Distance::new(tuning().movement.range_floor));
     // not a gate: its own
     let mut post = gate;
     post.class = class::WALL;
@@ -2152,10 +2184,13 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
     let mut m = builder_9177();
     m.paths[0].flags = LevelFlags::MET_TARGET;
     assert!(matches!(
-        m.no_path(false, Some(&target), Distance::new(0.5)),
+        m.no_path(false, Some(&target), Distance::new(0.5), &tuning().movement),
         Ok(AfterRequest::Paused)
     ));
-    assert_eq!(m.paths[0].pause_time, STUCK_PAUSE);
+    assert_eq!(
+        m.paths[0].pause_time,
+        Seconds::new(tuning().movement.stuck_pause)
+    );
     assert_eq!(
         (m.paths[0].flags, m.paths[1].flags),
         (LevelFlags::NONE, LevelFlags::MET_TARGET)
@@ -2164,7 +2199,7 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
         let mut m = builder_9177();
         m.paths[0].continue_counter = PlanTries::of_data(0);
         edit(&mut m);
-        let r = m.no_path(false, None, Distance::new(0.5));
+        let r = m.no_path(false, None, Distance::new(0.5), &tuning().movement);
         (r, m)
     };
     let (r, m) = out(&|m| m.paths[1].waypoint = WaypointIndex::of_data(0));
@@ -2182,10 +2217,13 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
     assert!(matches!(r, Ok(AfterRequest::Again)));
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
     let mut m = builder_9177();
-    assert!(m.no_path(true, None, Distance::new(0.05)).is_err());
+    assert!(
+        m.no_path(true, None, Distance::new(0.05), &tuning().movement)
+            .is_err()
+    );
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
-        m.no_path(true, None, Distance::new(0.05)),
+        m.no_path(true, None, Distance::new(0.05), &tuning().movement),
         Ok(AfterRequest::Again)
     ));
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
@@ -2294,6 +2332,7 @@ fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) 
         world.map,
         None,
         (WorldTime::ZERO, None),
+        &tuning().movement,
     );
     m.new_position(&mut place, object_id(9177), at, (world, None), &roles())
         .unwrap();
@@ -2399,43 +2438,75 @@ fn the_first_step_reaches_top_speed_and_moves_along_the_saved_forward_vector() {
 fn the_speed_slot_caps_the_speed_unless_the_unit_group_steers_it() {
     let mut m = builder_9177();
     m.stats.speed = Speed::new(1.2);
-    assert_eq!(m.next_speed(Speed::new(5.0), None), Speed::new(1.2));
-    assert_eq!(m.next_speed(Speed::new(-1.0), None), Speed::new(0.0));
-    assert_eq!(m.next_speed(Speed::new(0.7), None), Speed::new(0.7));
-    assert!(m.next_speed(Speed::new(f32::NAN), None).get().is_nan());
     assert_eq!(
-        m.next_speed(Speed::new(5.0), Some(GroupSpeed::Aside)),
-        Speed::new(0.0)
-    );
-    assert_eq!(
-        m.next_speed(Speed::new(5.0), Some(GroupSpeed::Free)),
-        Speed::new(5.0)
-    );
-    assert_eq!(
-        m.next_speed(Speed::new(-1.0), Some(GroupSpeed::Free)),
-        Speed::new(0.0)
-    );
-    assert_eq!(
-        m.next_speed(Speed::new(10.0), Some(GroupSpeed::Free)),
+        m.next_speed(Speed::new(5.0), None, &tuning().movement),
         Speed::new(1.2)
     );
+    assert_eq!(
+        m.next_speed(Speed::new(-1.0), None, &tuning().movement),
+        Speed::new(0.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(0.7), None, &tuning().movement),
+        Speed::new(0.7)
+    );
     assert!(
-        m.next_speed(Speed::new(f32::NAN), Some(GroupSpeed::Free))
+        m.next_speed(Speed::new(f32::NAN), None, &tuning().movement)
             .get()
             .is_nan()
     );
+    assert_eq!(
+        m.next_speed(Speed::new(5.0), Some(GroupSpeed::Aside), &tuning().movement),
+        Speed::new(0.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(5.0), Some(GroupSpeed::Free), &tuning().movement),
+        Speed::new(5.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(-1.0), Some(GroupSpeed::Free), &tuning().movement),
+        Speed::new(0.0)
+    );
+    assert_eq!(
+        m.next_speed(Speed::new(10.0), Some(GroupSpeed::Free), &tuning().movement),
+        Speed::new(1.2)
+    );
+    assert!(
+        m.next_speed(
+            Speed::new(f32::NAN),
+            Some(GroupSpeed::Free),
+            &tuning().movement
+        )
+        .get()
+        .is_nan()
+    );
     let own = Some(GroupSpeed::OwnMove(Speed::new(1.44)));
     assert_eq!(m.paths[0].state, PathState::Walking);
-    assert_eq!(m.next_speed(Speed::new(-1.0), own), Speed::new(1.44));
+    assert_eq!(
+        m.next_speed(Speed::new(-1.0), own, &tuning().movement),
+        Speed::new(1.44)
+    );
     m.paths[0].pause_time = Seconds::new(0.028);
-    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(0.0));
+    assert_eq!(
+        m.next_speed(Speed::new(0.5), own, &tuning().movement),
+        Speed::new(0.0)
+    );
     m.paths[0].pause_time = Seconds::new(f32::NAN);
-    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(1.44));
+    assert_eq!(
+        m.next_speed(Speed::new(0.5), own, &tuning().movement),
+        Speed::new(1.44)
+    );
     m.paths[0].pause_time = Seconds::ZERO;
     m.paths[0].state = PathState::WantsPath;
-    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(0.0));
+    assert_eq!(
+        m.next_speed(Speed::new(0.5), own, &tuning().movement),
+        Speed::new(0.0)
+    );
     m.paths.clear();
-    assert_eq!(m.next_speed(Speed::new(0.5), own), Speed::new(0.0));
+    assert_eq!(
+        m.next_speed(Speed::new(0.5), own, &tuning().movement),
+        Speed::new(0.0)
+    );
 }
 
 /// The velocity step (`FUN_140f9ba80`) takes slot 0x5e0's speed: a member on an own move whose
@@ -2450,6 +2521,7 @@ fn the_velocity_step_of_paused_member_on_its_own_move_stands() {
         GridSize::new(120, 120),
         None,
         (WorldTime::ZERO, Some(GroupSpeed::OwnMove(Speed::new(1.2)))),
+        &tuning().movement,
     );
     assert_eq!(at, Position::new(28.0, 89.0, 0.0));
     assert_eq!(m.velocity.unwrap().velocity.y(), 0.0);
@@ -2472,6 +2544,7 @@ fn the_step_and_the_speed_control_start_where_the_unit_last_moved_to() {
         GridSize::new(120, 120),
         None,
         (WorldTime::ZERO, None),
+        &tuning().movement,
     );
     assert_eq!(at, Position::new(10.5, 20.0, 0.0));
     assert_eq!(m.moved_at, Position::new(10.5, 20.0, 0.0));
@@ -3204,9 +3277,9 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
 #[test]
 fn user_waypoint_on_tile_edge_moves_to_the_tile_middle() {
     let mut m = builder_9177();
-    m.add_user_waypoint(Position::new(25.0, 20.0, 1.0));
-    m.add_user_waypoint(Position::new(25.25, 20.000_000_1, 0.0));
-    m.add_user_waypoint(Position::new(f32::NAN, 7.75, 2.0));
+    m.add_user_waypoint(Position::new(25.0, 20.0, 1.0), &tuning().movement);
+    m.add_user_waypoint(Position::new(25.25, 20.000_000_1, 0.0), &tuning().movement);
+    m.add_user_waypoint(Position::new(f32::NAN, 7.75, 2.0), &tuning().movement);
     assert_eq!(m.user_waypoints[0], BVector::new(25.5, 1.0, 20.5));
     // 20.000_000_1 is 20.0 as an f32: on the edge
     assert_eq!(m.user_waypoints[1], BVector::new(25.25, 0.0, 20.5));
@@ -3357,7 +3430,8 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
     assert_eq!(
-        m.in_reach(place.position(), near, start).unwrap(),
+        m.in_reach(place.position(), near, start, &tuning().movement)
+            .unwrap(),
         Some(AfterRequest::Again)
     );
     assert_eq!(m.paths[0].state, PathState::Arrived);
@@ -3365,11 +3439,12 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     let mut m = builder_9177();
     m.paths[0].range = Distance::ZERO;
     let floor = Goal {
-        gap: Distance::new(RANGE_FLOOR),
+        gap: Distance::new(tuning().movement.range_floor),
         ..near
     };
     assert_eq!(
-        m.in_reach(place.position(), floor, start).unwrap(),
+        m.in_reach(place.position(), floor, start, &tuning().movement)
+            .unwrap(),
         Some(AfterRequest::Again)
     );
     assert_eq!(m.paths[0].state, PathState::Arrived);
@@ -3380,14 +3455,19 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
     };
     let place = Static::at(Position::new(28.0, 89.0, 0.0));
     let mut m = builder_9177();
-    assert_eq!(m.in_reach(place.position(), far, start).unwrap(), None);
+    assert_eq!(
+        m.in_reach(place.position(), far, start, &tuning().movement)
+            .unwrap(),
+        None
+    );
     assert_eq!(
         (m.paths[0].state, m.paths[0].flags),
         (PathState::Walking, LevelFlags::NONE)
     );
     let waypoint = BVector::new(30.0, 0.0, 88.0);
     assert_eq!(
-        m.in_reach(place.position(), far, waypoint).unwrap(),
+        m.in_reach(place.position(), far, waypoint, &tuning().movement)
+            .unwrap(),
         Some(AfterRequest::Again)
     );
     assert_eq!(
@@ -3401,7 +3481,8 @@ fn request_in_reach_of_its_target_or_on_its_waypoint_goes_again() {
         ..near
     };
     assert_eq!(
-        m.in_reach(place.position(), on_house, waypoint).unwrap(),
+        m.in_reach(place.position(), on_house, waypoint, &tuning().movement)
+            .unwrap(),
         Some(AfterRequest::Again)
     );
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
@@ -3483,7 +3564,8 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
     assert_eq!(
         m.waypoint_in_range(
             &way_9177(point(Distance::new(0.05)), Distance::new(0.1)),
-            WorldTime::from_millis(16360)
+            WorldTime::from_millis(16360),
+            &tuning().movement
         ),
         Ok(AfterRequest::Again)
     );
@@ -3492,7 +3574,8 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
     assert_eq!(
         m.waypoint_in_range(
             &way_9177(point(Distance::new(0.5)), Distance::new(0.1)),
-            WorldTime::from_millis(16000)
+            WorldTime::from_millis(16000),
+            &tuning().movement
         ),
         Ok(AfterRequest::Again)
     );
@@ -3504,7 +3587,8 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
     assert_eq!(
         m.waypoint_in_range(
             &way_9177(point(Distance::new(0.5)), Distance::new(0.1)),
-            WorldTime::from_millis(16360)
+            WorldTime::from_millis(16360),
+            &tuning().movement
         ),
         Ok(AfterRequest::GaveUp)
     );
@@ -3512,14 +3596,15 @@ fn waypoint_in_range_ends_the_level_or_gives_up_on_fresh_path() {
     let house = world_target();
     let target = Goal {
         target: Some((object_id(10028), &house)),
-        gap: Distance::new(RANGE_FLOOR),
+        gap: Distance::new(tuning().movement.range_floor),
         to_end: Distance::new(FAR),
     };
     let mut m = builder_9177();
     assert_eq!(
         m.waypoint_in_range(
             &way_9177(target, Distance::ZERO),
-            WorldTime::from_millis(16360)
+            WorldTime::from_millis(16360),
+            &tuning().movement
         ),
         Ok(AfterRequest::Again)
     );

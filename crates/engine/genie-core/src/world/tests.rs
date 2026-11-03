@@ -215,6 +215,7 @@ use crate::testing::ids::VILLAGER_MALE;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::static_roles;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::Attackers;
@@ -14635,7 +14636,8 @@ fn restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
         patrol_waypoint: WaypointIndex::of_data(1),
         ..UnitAi::default()
     };
-    let run = Unit::restore_patrol(Some(&ai), motion.mover_mut()).expect("the saved patrol's move");
+    let run = Unit::restore_patrol(Some(&ai), motion.mover_mut(), &tuning().movement)
+        .expect("the saved patrol's move");
     assert_eq!(
         (run.point, run.range, run.force, run.walk),
         (Position::new(30.0, 20.25, 0.5), Distance::ZERO, true, false)
@@ -19257,6 +19259,7 @@ fn drop_site_sought(
             &t.model.masters,
             &t.parts,
             &t.model.roles,
+            &t.model.tuning,
         ),
     )
 }

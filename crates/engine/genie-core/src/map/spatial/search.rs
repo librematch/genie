@@ -31,6 +31,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::BestTargetTuning;
 use std::fmt::{Debug, Error, Formatter};
 
 impl Spatial {
@@ -172,7 +173,12 @@ impl Spatial {
     /// answers for a found object whether a class-10 searcher passes it ([`Spatial::closest_object`]).
     ///
     /// [`SearchCache`]: crate::map::spatial::SearchCache
-    pub fn search(&mut self, query: SearchQuery<'_>, roles: &Roles) -> Result<Found, GenieError> {
+    pub fn search(
+        &mut self,
+        query: SearchQuery<'_>,
+        roles: &Roles,
+        best_target_tuning: &BestTargetTuning,
+    ) -> Result<Found, GenieError> {
         let SearchQuery {
             searcher: me,
             player,
@@ -199,6 +205,7 @@ impl Spatial {
                 shuns,
                 farm,
                 roles,
+                best_target_tuning,
             },
         )
     }
@@ -312,6 +319,7 @@ impl Spatial {
         checks: ClosestChecks<'_>,
     ) -> Result<Found, GenieError> {
         let roles = checks.roles;
+        let best_target_tuning = checks.best_target_tuning;
         match search.pick {
             Pick::Closest {
                 group,
@@ -356,7 +364,14 @@ impl Spatial {
                 })
             }
             Pick::Attack { ask, .. } => {
-                let choice = self.best_unit_to_attack(&ask, search.memory, attack, reach, roles)?;
+                let choice = self.best_unit_to_attack(
+                    &ask,
+                    search.memory,
+                    attack,
+                    reach,
+                    roles,
+                    best_target_tuning,
+                )?;
                 let id = choice.target;
                 let mut retries = [None; 3];
                 for (slot, r) in retries.iter_mut().zip(choice.retries) {
@@ -453,6 +468,7 @@ impl Spatial {
         attack: &mut dyn AttackPicker,
         reach: &mut Reach<'_>,
         roles: &Roles,
+        best_target_tuning: &BestTargetTuning,
     ) -> Result<Choice, GenieError> {
         let me = attack.searcher(memory)?;
         let found = self.last_found()?;
@@ -462,7 +478,14 @@ impl Spatial {
             reach,
             world: self,
         };
-        best_target_best_unit_to_attack(&me, &ask.ask(), &lists, &mut field, roles)
+        best_target_best_unit_to_attack(
+            &me,
+            &ask.ask(),
+            &lists,
+            &mut field,
+            roles,
+            best_target_tuning,
+        )
     }
 }
 
@@ -521,6 +544,7 @@ pub(super) fn closest_kept(
         shuns,
         farm,
         roles,
+        ..
     }: ClosestChecks<'_>,
 ) -> Result<bool, GenieError> {
     if filter.group.is_some_and(|g| p.class != g) {

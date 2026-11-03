@@ -130,7 +130,7 @@ impl Unit {
             in_the_way: Vec::new(),
             sprite_facets: facets,
         };
-        let mut position = mover.set_position(shot.at, c.w.spatial.map);
+        let mut position = mover.set_position(shot.at, c.w.spatial.map, &c.w.model.tuning.movement);
         if !flying {
             let ground =
                 c.w.spatial
@@ -229,6 +229,7 @@ impl Unit {
                 },
                 &mut || draws.rand15(),
                 roles,
+                &c.w.model.tuning.missile,
             )?
         };
         if let Some(a) = action.launch(position, point, &stats)? {

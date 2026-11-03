@@ -158,6 +158,7 @@ impl Unit {
             arms,
             mover,
             roles,
+            &c.w.model.tuning.attack,
         )? {
             if arrived {
                 show_arrived(

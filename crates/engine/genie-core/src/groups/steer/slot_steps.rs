@@ -127,6 +127,7 @@ impl World {
                         &self.model.masters,
                         &self.parts,
                         &self.model.roles,
+                        &self.model.tuning,
                     ),
                 ),
                 &mut plan,
@@ -163,6 +164,7 @@ impl World {
                     &self.model.masters,
                     &self.parts,
                     &self.model.roles,
+                    &self.model.tuning,
                 ),
             )?
             .0
@@ -200,7 +202,11 @@ impl World {
         let at = u.moved_vector(self.parts.mover_of(id));
         let mover = self.parts.mover_mut(id).ok_or(NO_MOVER)?;
         let direction = mover.direction_to(at, to);
-        let (turn, _) = mover.turn_toward(mover.forward, direction, mover.turn_dt(dt));
+        let (turn, _) = mover.turn_toward(
+            mover.forward,
+            direction,
+            mover.turn_dt(dt, &self.model.tuning.movement),
+        );
         let facets = facets.or_else(|| mover.facets());
         mover.yaw(turn, facets)?;
         let next = mover.projected(direction, dt);
@@ -360,7 +366,7 @@ impl World {
             return Ok(());
         };
         let map = self.spatial.map;
-        let at = mover.set_position(to.position(), map);
+        let at = mover.set_position(to.position(), map, &self.model.tuning.movement);
         let at = mover.grounded(at, self.spatial.terrain.as_ref());
         mover.mark_move(at, self.world_time);
         let (speed, radius) = (mover.stats.speed, mover.stats.radius);

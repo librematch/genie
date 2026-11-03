@@ -102,6 +102,7 @@ impl UnitSide for UnitView<'_, '_> {
             &self.c.w.model.masters,
             &self.c.w.parts,
             &self.c.w.model.roles,
+            &self.c.w.model.tuning,
         );
         self.c.w.spatial.point_clear(
             unit.id,
@@ -193,7 +194,12 @@ impl UnitSide for UnitView<'_, '_> {
 
     fn duel(&mut self, other: ObjectId) -> Result<Duel, GenieError> {
         let roles = &self.c.w.model.roles.clone();
-        self.picker(None)?.duel(&self.c.w.spatial, other, roles)
+        self.picker(None)?.duel(
+            &self.c.w.spatial,
+            other,
+            roles,
+            &self.c.w.model.tuning.damage,
+        )
     }
 
     fn harmless(&mut self, attacker: ObjectId) -> Result<bool, GenieError> {
@@ -297,6 +303,7 @@ impl UnitSide for UnitView<'_, '_> {
             &self.c.w.model.masters,
             &self.c.w.parts,
             &self.c.w.model.roles,
+            &self.c.w.model.tuning,
         );
         mover.reaches_object(
             (unit.position(), &walker),
@@ -340,6 +347,7 @@ impl UnitSide for UnitView<'_, '_> {
                 &self.c.w.model.masters,
                 &self.c.w.parts,
                 &self.c.w.model.roles,
+                &self.c.w.model.tuning,
             ),
             restriction: self
                 .unit
@@ -383,6 +391,7 @@ impl UnitSide for UnitView<'_, '_> {
             &self.c.w.model.masters,
             &self.c.w.parts,
             &self.c.w.model.roles,
+            &self.c.w.model.tuning,
         );
         let mut reach = |spatial: &mut Spatial, id: ObjectId, range: Distance| {
             let m = mover.ok_or(GenieError::unsupported(
@@ -420,6 +429,7 @@ impl UnitSide for UnitView<'_, '_> {
                 farm: &farm,
             },
             roles,
+            &self.c.w.model.tuning.best_target,
         )
     }
 

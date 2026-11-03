@@ -402,15 +402,9 @@ impl World {
         // its action layer goes out of the table with it, as the updating object's
         let mut actions = self.parts.take_actions(unit.id);
         let player = &self.players.player(p)?;
-        let (mover, by_id) = self.parts.lend_mover(
-            unit.id,
-            (
-                &self.players,
-                &self.index,
-                &self.model.masters,
-                &self.model.roles,
-            ),
-        );
+        let (mover, by_id) = self
+            .parts
+            .lend_mover(unit.id, (&self.players, &self.index, &self.model));
         let world = DropWorld {
             masters: by_id.masters().of(p),
             spatial: &mut self.spatial,

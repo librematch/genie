@@ -27,9 +27,12 @@ use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
 #[cfg(test)]
 use crate::testing::static_roles;
+#[cfg(test)]
+use crate::testing::tuning;
 use crate::world::Unread;
 use crate::world::World;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::Tuning;
 use crate::world::motions::Lent;
 use crate::world::parts::Object;
 #[cfg(test)]
@@ -295,12 +298,13 @@ pub struct ObjectsRef<'a> {
     unread: &'a PartTable<Unread>,
     motions: Lent<'a, Motion>,
     roles: &'a Roles,
+    tuning: &'a Tuning,
 }
 
 impl<'a> ObjectsRef<'a> {
     /// The objects of `players`, which the world's table `index` finds, with the players'
     /// `masters`, the objects' `parts` (their own masters, their building, combat and motion
-    /// layers) and the build's `roles`.
+    /// layers), the build's `roles` and its `tuning`.
     #[must_use]
     pub fn new(
         players: &'a [Player],
@@ -308,6 +312,7 @@ impl<'a> ObjectsRef<'a> {
         masters: &'a [Arc<Masters>],
         parts: &'a Parts,
         roles: &'a Roles,
+        tuning: &'a Tuning,
     ) -> Self {
         Self::of_tables(
             players,
@@ -321,6 +326,7 @@ impl<'a> ObjectsRef<'a> {
                 parts.motion.unlent(),
             ),
             roles,
+            tuning,
         )
     }
 
@@ -329,7 +335,7 @@ impl<'a> ObjectsRef<'a> {
     /// layers `buildings`, the combat layers `combats`, the action layers `actions`, the objects
     /// the load could not read whole `unread` and the motion layers `motions` (one of them lent
     /// out to a walk,
-    /// [`crate::world::parts::PartTable::lend`]) and the build's `roles`.
+    /// [`crate::world::parts::PartTable::lend`]), the build's `roles` and its `tuning`.
     #[must_use]
     pub const fn of_tables(
         players: &'a [Player],
@@ -337,6 +343,7 @@ impl<'a> ObjectsRef<'a> {
         masters: MasterTables<'a>,
         (buildings, combats, actions, unread, motions): PartTables<'a>,
         roles: &'a Roles,
+        tuning: &'a Tuning,
     ) -> Self {
         Self {
             players,
@@ -348,6 +355,7 @@ impl<'a> ObjectsRef<'a> {
             unread,
             motions,
             roles,
+            tuning,
         }
     }
 
@@ -378,6 +386,12 @@ impl<'a> ObjectsRef<'a> {
         self.roles
     }
 
+    /// The build's tuning values these objects' systems read (FD-046-D49).
+    #[must_use]
+    pub const fn tuning(&self) -> &'a Tuning {
+        self.tuning
+    }
+
     /// No objects: a test's walk that meets none by id.
     #[cfg(test)]
     pub(crate) fn empty() -> ObjectsRef<'static> {
@@ -387,6 +401,7 @@ impl<'a> ObjectsRef<'a> {
             &[],
             no_parts(),
             static_roles(),
+            tuning(),
         )
     }
 
@@ -562,6 +577,7 @@ impl TestObjects {
             &self.masters,
             &self.parts,
             static_roles(),
+            tuning(),
         )
     }
 }
@@ -613,6 +629,7 @@ impl World {
             &self.model.masters,
             &self.parts,
             &self.model.roles,
+            &self.model.tuning,
         )
     }
 

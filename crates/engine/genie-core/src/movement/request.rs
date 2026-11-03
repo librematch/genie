@@ -19,14 +19,15 @@ use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::movement::{
-    AfterRequest, EPSILON, Goal, LONG_PATH_GROW, LongWalker, Me, Mover, Planning, RANGE_FLOOR,
-    SHORT_REACH, cut_path, footprint_gap, ground, long_path_for, may_plan, point_or_zero,
+    AfterRequest, EPSILON, Goal, LongWalker, Me, Mover, Planning, cut_path, footprint_gap, ground,
+    long_path_for, may_plan, point_or_zero,
 };
 use crate::objects::ObjectId;
 use crate::pathing::tile_path::Path;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::layer::generated::MovementTuning;
 
 /// What the long pather is asked for a far waypoint ([`Mover::long_plan`]'s arguments after the
 /// planning state).
@@ -63,11 +64,12 @@ impl Mover {
         plans: &mut StepPlans,
         include: &[ObjectId],
     ) -> Result<AfterRequest, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         // the request measures and plans from +0x824 (`pfVar14`, `local_18c8`), where the unit
         // last moved to
         let position = self.moved_at.vector();
-        if let Some(step) = self.in_reach(at, goal, position)? {
+        if let Some(step) = self.in_reach(at, goal, position, movement_tuning)? {
             return Ok(step);
         }
         let solid = self.stats.radius.sized();
@@ -109,13 +111,18 @@ impl Mover {
             self.straight_way(position, &mut np)?;
         }
         if np.path.points.len() < 2 || np.path.length.get() < EPSILON {
-            return self.no_path(np.found, goal.target.map(|(_, t)| t), goal.to_end);
+            return self.no_path(
+                np.found,
+                goal.target.map(|(_, t)| t),
+                goal.to_end,
+                movement_tuning,
+            );
         }
-        self.link(np.new, np.path, np.found, np.partial, np.planned, solid)
+        self.link(np, solid, movement_tuning)
     }
 
     /// The request's first exits: a target within the level's range (at least
-    /// [`RANGE_FLOOR`]) puts the level in state 4; a unit on its waypoint marks the level
+    /// `MovementTuning::range_floor`) puts the level in state 4; a unit on its waypoint marks the level
     /// (flag 1, and 2 when away from the target's footprint by more than [`EPSILON`] or
     /// without one). Both go again.
     pub(super) fn in_reach(
@@ -123,12 +130,13 @@ impl Mover {
         at: Position,
         goal: Goal<'_>,
         position: BVector,
+        movement_tuning: &MovementTuning,
     ) -> Result<Option<AfterRequest>, GenieError> {
         let ground_radius = self.stats.radius.ground();
         let here = at;
         let level = self.paths.walked_mut()?;
         let reach = if level.range <= Distance::ZERO {
-            RANGE_FLOOR
+            movement_tuning.range_floor
         } else {
             level.range.get()
         };
@@ -306,7 +314,7 @@ impl Mover {
 
     /// The long path's stretches (`0x141150f00` after `FUN_140f9eb70`, for a unit with a
     /// footprint and a height, `FUN_141194060` with 1): each stretch's obstruction query
-    /// (`FUN_14114cc60` as the walk's, grown by the radius times `LONG_PATH_GROW`; the unit and
+    /// (`FUN_14114cc60` as the walk's, grown by the radius times `MovementTuning::long_path_grow`; the unit and
     /// the target ignored with their annexes, `FUN_14114e8a0`) that meets a wall, a gate, a tower
     /// or a building that does not move (classes 27, 39, 52, and 3 at top speed 0, slot 0x208:
     /// [`crate::map::spatial::Placed::moves`]) ends
@@ -320,6 +328,7 @@ impl Mover {
         path: &mut Path,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let me_at = world.get(me.id);
         if me_at.is_some_and(|p| roles.of_class(p.class).contains(ClassRoles::VILLAGER)) {
@@ -327,7 +336,7 @@ impl Mover {
         }
         let player = me_at.map(|p| p.player);
         let ignore = by_id.query_ignore(&[Some(me.id), target_id]);
-        let grow = self.stats.radius.x() * LONG_PATH_GROW;
+        let grow = self.stats.radius.x() * movement_tuning.long_path_grow;
         let stretches = path.points.iter().zip(path.points.iter().skip(1));
         for (i, (&a, &b)) in stretches.enumerate() {
             let (from, to) = self.query_ends(a, b, world.map);
@@ -380,6 +389,7 @@ impl Mover {
         way: Distance,
         gap: Distance,
         to_end: Distance,
+        movement_tuning: &MovementTuning,
     ) -> Result<bool, GenieError> {
         let level = self.paths.walked()?;
         let d = if level.target.is_none() { to_end } else { gap };
@@ -388,7 +398,7 @@ impl Mover {
         }
         Ok(level.target.is_some()
             && level.waypoint == WaypointIndex::last_of(level.points.len())
-            && way - level.range <= Distance::new(SHORT_REACH)
+            && way - level.range <= Distance::new(movement_tuning.short_reach)
             && level.level == WaypointLevel::TOP)
     }
 }

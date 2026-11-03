@@ -50,7 +50,7 @@ fn recording_without_checkpoints_runs_to_its_end_or_its_limit() {
 #[test]
 fn checkpoint_holds_or_is_the_players_mismatch() {
     let save = quiet();
-    let start = header_slice(&save, None);
+    let start = header_slice(&save, None).unwrap();
     let mut lanes = [[0; 11]; 8];
     lanes[0] = lane_block(&save.players()[1], 1, &start.players[1], &start.parts);
     let mut later = [[0; 11]; 8];

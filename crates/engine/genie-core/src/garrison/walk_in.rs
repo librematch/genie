@@ -508,6 +508,7 @@ impl EnterAction {
                     &w.model.masters,
                     &w.parts,
                     &w.model.roles,
+                    &w.model.tuning,
                 ),
             )?
         };

@@ -25,7 +25,7 @@ use std::sync::Mutex;
 
 /// Gaia and a player, without objects.
 fn world() -> World {
-    slice(&header(vec![gaia(Vec::new()), human(Vec::new())]), None)
+    slice(&header(vec![gaia(Vec::new()), human(Vec::new())]), None).unwrap()
 }
 
 /// A ghost of id `id`.

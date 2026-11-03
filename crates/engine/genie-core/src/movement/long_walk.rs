@@ -18,9 +18,7 @@ use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::map::{RestrictionId, TerrainMask};
 use crate::math::fmath::BVector;
 use crate::movement::WaitDelays;
-use crate::movement::{
-    EPSILON, INCLUDED, NEW_PATHER_RADIUS, PLANS, Planning, footprint_gap, footprint_gap_squared,
-};
+use crate::movement::{EPSILON, INCLUDED, PLANS, Planning, footprint_gap, footprint_gap_squared};
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::long_path::{LongRequest, LongTarget, path};
 use crate::pathing::short_path::{Call, Entry, Listed};
@@ -28,6 +26,7 @@ use crate::pathing::tile_path::{Found, Path, Request};
 use crate::pathing::{Pathing, PlanBudget, ShortFound};
 use crate::players::PlayerSet;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::MovementTuning;
 use crate::{GenieError, math::fmath, pathing::short_path};
 use std::iter::once;
 
@@ -330,14 +329,14 @@ pub(super) fn include_kept(
     Ok(())
 }
 
-/// `FUN_140f9e540`'s dispatch: `COMISS` [`NEW_PATHER_RADIUS`], radius; `JC` (0x140f9e71f): a
+/// `FUN_140f9e540`'s dispatch: `COMISS` `MovementTuning::new_pather_radius`, radius; `JC` (0x140f9e71f): a
 /// unit wider than half a tile, or of an unordered radius, takes the old pather. Its other
 /// condition, no new pather (`FUN_14152b6e0`: the manager's `+0` or `+8` null), never holds: the
 /// manager's setup (`FUN_141054660`) makes both when `FUN_14152bc90` answers 1, and its two
 /// switches have no writer (`DAT_1439e60e0` 1 in `.data`, `DAT_143fb54a8` 0 in `.bss`, each read
 /// by it alone).
-pub(super) fn old_pather_for(radius: Distance) -> bool {
-    fmath::below_or_unordered(NEW_PATHER_RADIUS, radius.get())
+pub(super) fn old_pather_for(radius: Distance, movement_tuning: &MovementTuning) -> bool {
+    fmath::below_or_unordered(movement_tuning.new_pather_radius, radius.get())
 }
 
 /// The short pather (`FUN_140f9e540`) for `walker` from `from` (x, y on the map) to `to` within
@@ -398,6 +397,7 @@ pub(crate) fn short_path_including(
     player: Option<PlayerId>,
     out: &mut Path,
 ) -> Result<ShortFound, GenieError> {
+    let movement_tuning = &by_id.tuning().movement;
     let ShortAsk {
         goal: to,
         range,
@@ -451,7 +451,7 @@ pub(crate) fn short_path_including(
         Entry::Search { query, ignore } => (query, ignore),
     };
     out.points.clear();
-    if old_pather_for(walker.radius) {
+    if old_pather_for(walker.radius, movement_tuning) {
         let mut pather =
             HullPather::for_list((world, by_id), ignore, walker.mask, walker.radius, player)
                 .including(include);

@@ -20,8 +20,6 @@ use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterKind;
 use crate::world::Seconds;
 use crate::world::layer::MasterRoles;
-use crate::world::layer::Roles;
-use crate::world::layer::Slots;
 use crate::{GenieError, combat::damage};
 
 /// Where a hit comes from: the place it lands (`FUN_141084230`'s x, y, z: the attacker's for a
@@ -109,9 +107,13 @@ pub(crate) fn strike(
     blasted: &mut [Victim],
     hit: Hit,
     object_rng: &mut Well512,
-    roles: &Roles,
-    slots: Slots,
+    layer: HitLayer<'_>,
 ) -> Result<Struck, GenieError> {
+    let HitLayer {
+        roles,
+        damage_tuning,
+        ..
+    } = layer;
     if victim.kind == MasterKind::COMBAT && damage::shield(victim, hit.missile) {
         let master_hp = i32::from(own.master_hp.get());
         victim
@@ -134,15 +136,7 @@ pub(crate) fn strike(
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
-        let _ = damage::blast(
-            own,
-            hit.at,
-            None,
-            Some(main),
-            &mut targets,
-            1.0,
-            HitLayer { roles, slots },
-        )?;
+        let _ = damage::blast(own, hit.at, None, Some(main), &mut targets, 1.0, layer)?;
         if a.charge_kind == ChargeKind::AREA {
             own.source.charge = Charge::ZERO;
         }
@@ -162,10 +156,10 @@ pub(crate) fn strike(
     // a building's slot 0x1f0 (FUN_1411cc890) scales the factor by its relics and a building
     // target's
     let factor = hit.from_z.map_or(1.0, |z| {
-        let f = damage::elevation_factor(z, own.attack_elevation, victim);
+        let f = damage::elevation_factor(z, own.attack_elevation, victim, damage_tuning);
         own.building.as_ref().map_or(f, |b| {
             let theirs = victim.building.as_ref().map_or(Relics::NONE, |t| t.relics);
-            damage::building_elevation_factor(f, b.relics, victim.kind, theirs)
+            damage::building_elevation_factor(f, b.relics, victim.kind, theirs, damage_tuning)
         })
     });
     let weapons = own.weapons.clone();
@@ -177,7 +171,7 @@ pub(crate) fn strike(
         &weapons,
         factor,
         HitPoints::ZERO,
-        HitLayer { roles, slots },
+        layer,
     )?;
     Ok(struck)
 }

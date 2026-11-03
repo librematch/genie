@@ -72,6 +72,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`waypoint_index.rs`](waypoint_index.rs) | A waypoint's place in a level's path. |
 | [`waypoint_level.rs`](waypoint_level.rs) | A path level's place in a unit's path data. |
 | [`move_to/`](move_to/) | The `MoveTo` action (`RGE_Action_Move_To`, type 1, vtable `0x142ed6030`): a unit walks to a target object or a point. |
+| [`step/`](step/) |  |
 <!-- /files -->
 
 ## How it connects

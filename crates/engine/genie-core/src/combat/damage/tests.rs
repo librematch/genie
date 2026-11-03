@@ -8,7 +8,8 @@ fn building_relics_scale_its_elevation_factor() {
             up,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
             MasterKind::COMBAT,
-            Relics::new(RelicCount::of_data(5), RelicCount::of_data(5))
+            Relics::new(RelicCount::of_data(5), RelicCount::of_data(5)),
+            &tuning().damage
         )
         .to_bits(),
         up.to_bits()
@@ -18,40 +19,44 @@ fn building_relics_scale_its_elevation_factor() {
             up,
             Relics::new(RelicCount::of_data(3), RelicCount::of_data(1)),
             MasterKind::COMBAT,
-            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0))
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
+            &tuning().damage
         )
         .to_bits(),
-        (up * SPECIFIC_RELIC_BOOST).to_bits()
+        (up * tuning().damage.specific_relic_boost).to_bits()
     );
     assert_eq!(
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(3), RelicCount::of_data(0)),
             MasterKind::COMBAT,
-            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0))
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
+            &tuning().damage
         )
         .to_bits(),
-        (up * RELIC_BOOST).to_bits()
+        (up * tuning().damage.relic_boost).to_bits()
     );
     assert_eq!(
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(3), RelicCount::of_data(0)),
             MasterKind::BUILDING,
-            Relics::new(RelicCount::of_data(0), RelicCount::of_data(2))
+            Relics::new(RelicCount::of_data(0), RelicCount::of_data(2)),
+            &tuning().damage
         )
         .to_bits(),
-        (up * RELIC_BOOST / SPECIFIC_RELIC_BOOST).to_bits()
+        (up * tuning().damage.relic_boost / tuning().damage.specific_relic_boost).to_bits()
     );
     assert_eq!(
         building_elevation_factor(
             up,
             Relics::new(RelicCount::of_data(0), RelicCount::of_data(0)),
             MasterKind::BUILDING,
-            Relics::new(RelicCount::of_data(1), RelicCount::of_data(-1))
+            Relics::new(RelicCount::of_data(1), RelicCount::of_data(-1)),
+            &tuning().damage
         )
         .to_bits(),
-        (up / RELIC_BOOST).to_bits()
+        (up / tuning().damage.relic_boost).to_bits()
     );
     // the counts compare signed
     assert_eq!(
@@ -59,7 +64,8 @@ fn building_relics_scale_its_elevation_factor() {
             up,
             Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1)),
             MasterKind::BUILDING,
-            Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1))
+            Relics::new(RelicCount::of_data(-1), RelicCount::of_data(-1)),
+            &tuning().damage
         )
         .to_bits(),
         up.to_bits()
@@ -86,9 +92,11 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::attribute;
 use crate::testing::class;
+use crate::testing::hit_layer;
 use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::tuning;
 use std::f32::consts::FRAC_PI_2;
 
 fn sheep() -> Victim {
@@ -265,6 +273,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -282,6 +291,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -303,6 +313,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -318,6 +329,7 @@ fn moving_object_takes_hit_as_static_one() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -342,6 +354,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -358,6 +371,7 @@ fn hunter_strikes_its_sheep_for_twelve() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -692,6 +706,7 @@ fn ready_charge_adds_to_the_first_melee_weapon_and_empties() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -849,10 +864,14 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
-    assert_eq!(sheep.hp, HitPoints::new(14.0 - 10.0 * SPECIAL));
+    assert_eq!(
+        sheep.hp,
+        HitPoints::new(14.0 - 10.0 * tuning().damage.special)
+    );
     // a busy target does not, and an unknown facing is not modelled
     let mut busy = self::sheep();
     busy.armored.as_mut().unwrap().special_attack = SpecialAttack::FRONT_DEFENCE;
@@ -867,6 +886,7 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -883,7 +903,8 @@ fn special_attack_takes_hit_from_the_front_to_two_thirds() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         )
         .is_err()
@@ -914,6 +935,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -933,6 +955,7 @@ fn retaliation_strikes_the_melee_attacker_first() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -959,6 +982,7 @@ fn reflected_damage_comes_back_at_least_one() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -976,6 +1000,7 @@ fn reflected_damage_comes_back_at_least_one() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1020,7 +1045,8 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1055,7 +1081,8 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1075,7 +1102,8 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1093,7 +1121,8 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(false)
@@ -1109,7 +1138,8 @@ fn blast_nan_paths_are_the_game_s() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1161,7 +1191,8 @@ fn blast_reaches_the_objects_about_its_attacker() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1189,7 +1220,8 @@ fn blast_reaches_the_objects_about_its_attacker() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1244,6 +1276,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1268,6 +1301,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1284,6 +1318,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1303,10 +1338,14 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
-    assert_eq!(h.hp, HitPoints::new(550.0 - LEAST_CLASS_HIT));
+    assert_eq!(
+        h.hp,
+        HitPoints::new(550.0 - tuning().damage.least_class_hit)
+    );
     // a blast's damage so far, even a NaN one, takes no least
     let mut h = house();
     h.armored.as_mut().unwrap().armors = vec![ClassAmount::new(4, 10)];
@@ -1320,6 +1359,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1334,6 +1374,7 @@ fn building_takes_its_damage_and_at_least_its_least_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1359,6 +1400,7 @@ fn building_without_hit_points_takes_no_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1378,6 +1420,7 @@ fn building_without_hit_points_takes_no_hit() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1424,6 +1467,7 @@ fn hit_on_an_annex_goes_to_its_main_building() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1450,7 +1494,8 @@ fn hit_on_an_annex_goes_to_its_main_building() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Err(NOT_HELD)
@@ -1480,6 +1525,7 @@ fn player_building_below_one_hit_point_is_razed() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1533,6 +1579,7 @@ fn player_building_below_one_hit_point_is_razed() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1556,6 +1603,7 @@ fn player_building_below_one_hit_point_is_razed() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1593,6 +1641,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1626,6 +1675,7 @@ fn trebuchet_razing_counts_kill_unless_its_damage_counted_it() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1663,7 +1713,8 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         )
         .is_err()
@@ -1682,6 +1733,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1699,6 +1751,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1718,7 +1771,8 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
             HitPoints::ZERO,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         )
         .is_err()
@@ -1738,6 +1792,7 @@ fn building_attacker_effects_and_kill_bonus_are_the_game_s() {
         HitLayer {
             roles: &roles(),
             slots: slots(),
+            damage_tuning: &tuning().damage,
         },
     )
     .unwrap();
@@ -1795,7 +1850,8 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -1851,7 +1907,8 @@ fn blast_walks_tile_objects_in_its_list_order() {
             1.0,
             HitLayer {
                 roles: &roles(),
-                slots: slots()
+                slots: slots(),
+                damage_tuning: &tuning().damage,
             },
         ),
         Ok(true)
@@ -2061,7 +2118,14 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
     };
     let d2 = 0.25;
     assert_eq!(
-        blast_falloff(&attacker, &melee, &enemy, (1.0, d2), false),
+        blast_falloff(
+            &attacker,
+            &melee,
+            &enemy,
+            (1.0, d2),
+            false,
+            &tuning().damage
+        ),
         1.0
     );
     let falling = Attacker {
@@ -2069,11 +2133,25 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
         ..melee
     };
     assert_eq!(
-        blast_falloff(&attacker, &falling, &enemy, (1.0, d2), false),
+        blast_falloff(
+            &attacker,
+            &falling,
+            &enemy,
+            (1.0, d2),
+            false,
+            &tuning().damage
+        ),
         0.5
     );
     assert_eq!(
-        blast_falloff(&attacker, &falling, &enemy, (1.0, d2), true),
+        blast_falloff(
+            &attacker,
+            &falling,
+            &enemy,
+            (1.0, d2),
+            true,
+            &tuning().damage
+        ),
         1.0
     );
     let missile = Attacker {
@@ -2081,7 +2159,14 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
         ..melee
     };
     assert_eq!(
-        blast_falloff(&attacker, &missile, &enemy, (1.0, d2), true),
+        blast_falloff(
+            &attacker,
+            &missile,
+            &enemy,
+            (1.0, d2),
+            true,
+            &tuning().damage
+        ),
         0.5
     );
     let mut main = Victim {
@@ -2089,18 +2174,39 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
         ..house()
     };
     assert_eq!(
-        blast_falloff(&attacker, &missile, &main, (1.0, d2), true),
+        blast_falloff(
+            &attacker,
+            &missile,
+            &main,
+            (1.0, d2),
+            true,
+            &tuning().damage
+        ),
         1.0
     );
     main.kind = MasterKind::BUILDING;
     assert_eq!(
-        blast_falloff(&attacker, &missile, &main, (1.0, d2), false),
+        blast_falloff(
+            &attacker,
+            &missile,
+            &main,
+            (1.0, d2),
+            false,
+            &tuning().damage
+        ),
         0.5
     );
     enemy.player = PlayerId::new(1);
     enemy.armored.as_mut().unwrap().friendly_fire = DamageShare::new(0.25);
     assert_eq!(
-        blast_falloff(&attacker, &melee, &enemy, (1.0, d2), false),
+        blast_falloff(
+            &attacker,
+            &melee,
+            &enemy,
+            (1.0, d2),
+            false,
+            &tuning().damage
+        ),
         0.25
     );
 }
@@ -2127,7 +2233,8 @@ fn cone_blast_leaves_out_what_lies_beside_its_facing() {
             &attacker,
             &level(BlastLevel::from_bits_retain(2)),
             &behind,
-            (1.0, 0.0)
+            (1.0, 0.0),
+            &tuning().damage
         ),
         Ok(false)
     );
@@ -2136,7 +2243,8 @@ fn cone_blast_leaves_out_what_lies_beside_its_facing() {
             &attacker,
             &level(BlastLevel::from_bits_retain(0x82)),
             &front,
-            (1.0, 0.0)
+            (1.0, 0.0),
+            &tuning().damage
         )
         .is_err()
     );
@@ -2146,22 +2254,28 @@ fn cone_blast_leaves_out_what_lies_beside_its_facing() {
     });
     let narrow = level(BlastLevel::from_bits_retain(0x82));
     assert_eq!(
-        outside_cone(&attacker, &narrow, &front, (1.0, 0.0)),
+        outside_cone(&attacker, &narrow, &front, (1.0, 0.0), &tuning().damage),
         Ok(false)
     );
     assert_eq!(
-        outside_cone(&attacker, &narrow, &side, (1.0, 0.0)),
+        outside_cone(&attacker, &narrow, &side, (1.0, 0.0), &tuning().damage),
         Ok(true)
     );
     assert_eq!(
-        outside_cone(&attacker, &narrow, &behind, (1.0, 0.0)),
+        outside_cone(&attacker, &narrow, &behind, (1.0, 0.0), &tuning().damage),
         Ok(true)
     );
     let wide = level(BlastLevel::from_bits_retain(0xa2));
-    assert_eq!(outside_cone(&attacker, &wide, &side, (1.0, 2.0)), Ok(false));
-    assert_eq!(outside_cone(&attacker, &wide, &side, (1.0, 0.5)), Ok(true));
     assert_eq!(
-        outside_cone(&attacker, &wide, &behind, (1.0, 2.0)),
+        outside_cone(&attacker, &wide, &side, (1.0, 2.0), &tuning().damage),
+        Ok(false)
+    );
+    assert_eq!(
+        outside_cone(&attacker, &wide, &side, (1.0, 0.5), &tuning().damage),
+        Ok(true)
+    );
+    assert_eq!(
+        outside_cone(&attacker, &wide, &behind, (1.0, 2.0), &tuning().damage),
         Ok(true)
     );
 }
@@ -2221,8 +2335,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         0,
         (&weapons, 0.5),
         (None, HitPoints::ZERO),
-        &roles(),
-        slots(),
+        hit_layer(),
     )
     .unwrap();
     assert_eq!(enemy.hp, HitPoints::new(9.0));
@@ -2242,8 +2355,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         0,
         (&weapons, 1.0),
         (Some(0), HitPoints::ZERO),
-        &roles(),
-        slots(),
+        hit_layer(),
     )
     .unwrap();
     let lost = 550.0 - all[0].hp.get();
@@ -2258,8 +2370,7 @@ fn blast_hit_adds_building_loss_to_its_ledger() {
         1,
         (&weapons, 1.0),
         (Some(0), HitPoints::ZERO),
-        &roles(),
-        slots(),
+        hit_layer(),
     )
     .unwrap();
     assert_eq!(all[1].hp, HitPoints::new(550.0));
@@ -2304,14 +2415,7 @@ fn blast_passes_over_what_it_spares_and_hits_the_rest() {
     let b = blast(elephant.source);
     let mut hit = |b: &Blast, t: Victim| {
         let mut t = t;
-        let r = blast_one(
-            &mut elephant,
-            &mut [&mut t],
-            0,
-            (b, &weapons),
-            &roles(),
-            slots(),
-        );
+        let r = blast_one(&mut elephant, &mut [&mut t], 0, (b, &weapons), hit_layer());
         r.map(|()| t.hp)
     };
     assert_eq!(hit(&b, enemy.clone()), Ok(HitPoints::new(9.0)));

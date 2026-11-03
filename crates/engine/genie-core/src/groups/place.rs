@@ -190,6 +190,7 @@ impl World {
                     &self.model.masters,
                     &self.parts,
                     &self.model.roles,
+                    &self.model.tuning,
                 ),
             )? {
                 return Ok(at);
@@ -276,6 +277,7 @@ impl World {
             &self.model.masters,
             &self.parts,
             &self.model.roles,
+            &self.model.tuning,
         );
         let Some(g) = self.groups.get(group) else {
             return Ok(());

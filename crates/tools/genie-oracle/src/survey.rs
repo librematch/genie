@@ -62,7 +62,7 @@ pub fn header_survey(
 ) -> Result<Survey, Error> {
     let chapter = de::chapters(recording)?[0];
     let header = chapter.header()?;
-    let mut turns = header_slice(&header, masters);
+    let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
     if let Some(&p) = players.iter().find(|&&p| turns.players.len() <= p as usize) {
         return Err(Error::NoSuchPlayer(p));

@@ -29,6 +29,7 @@ use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::UnitAiType;
@@ -274,7 +275,12 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
     // an object the world does not hold is not weighed
     assert!(
         picker
-            .duel(&Spatial::default(), object_id(77), &roles())
+            .duel(
+                &Spatial::default(),
+                object_id(77),
+                &roles(),
+                &tuning().damage
+            )
             .is_err()
     );
 }

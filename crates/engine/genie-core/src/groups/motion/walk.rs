@@ -330,6 +330,7 @@ impl World {
                     &self.model.masters,
                     &self.parts,
                     &self.model.roles,
+                    &self.model.tuning,
                 ),
             };
             path_step(&mut motion, &view, &lead, &mut world, budget)

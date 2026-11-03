@@ -76,6 +76,7 @@ impl Unit {
                 c.w.spatial.map,
                 c.w.spatial.terrain.as_ref(),
                 (c.w.world_time, group),
+                &c.w.model.tuning.movement,
             );
             if at != here {
                 mover.new_position(

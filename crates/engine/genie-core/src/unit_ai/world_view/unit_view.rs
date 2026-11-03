@@ -53,6 +53,7 @@ impl UnitView<'_, '_> {
                 &self.c.w.model.masters,
                 &self.c.w.parts,
                 &self.c.w.model.roles,
+                &self.c.w.model.tuning,
             ),
             restriction: None,
             unit: &*self.unit,

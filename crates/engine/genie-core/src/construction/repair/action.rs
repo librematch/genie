@@ -351,6 +351,7 @@ impl RepairAction {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let spatial = &mut c.w.spatial;
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;

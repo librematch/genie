@@ -286,6 +286,7 @@ impl World {
                 self.parts.motion.unlent(),
             ),
             &self.model.roles,
+            &self.model.tuning,
         );
         let candidate = |spatial: &Spatial, id: ObjectId| -> Result<Candidate, GenieError> {
             let (owner, u, _) = index.locate(players, id).ok_or(GenieError::unsupported(

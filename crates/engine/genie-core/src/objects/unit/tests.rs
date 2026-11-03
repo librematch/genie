@@ -237,6 +237,7 @@ fn after_its_actions_the_units_walk_met_take_their_pauses() {
                     &c.w.model.masters,
                     &c.w.parts,
                     &c.w.model.roles,
+                    &c.w.model.tuning,
                 )
                 .gait(object_id(600))
                 .and_then(|g| g.pause),

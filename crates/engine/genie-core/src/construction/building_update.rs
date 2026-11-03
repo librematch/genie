@@ -147,6 +147,7 @@ impl Unit {
             &c.w.model.masters,
             &c.w.parts,
             &c.w.model.roles,
+            &c.w.model.tuning,
         );
         let (total, allied) = self.gate_count(annexes, &mut c.w.spatial, by_id)?;
         let gate =
@@ -522,6 +523,7 @@ impl Unit {
             HitLayer {
                 roles,
                 slots: c.w.model.slots,
+                damage_tuning: &c.w.model.tuning.damage,
             },
         )?;
         let mut blasted = take(&mut c.blasted);

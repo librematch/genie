@@ -59,10 +59,11 @@ use crate::players::PlayerId;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::class;
+use crate::testing::hit_layer;
 use crate::testing::ids;
 use crate::testing::roles;
-use crate::testing::slots;
 use crate::testing::static_roles;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::BOAR_AI;
 use crate::unit_ai::Home;
@@ -795,6 +796,7 @@ impl Rig {
                     motions,
                 ),
                 static_roles(),
+                tuning(),
             ),
             map: spatial,
             sprite_rng: sprite,
@@ -960,8 +962,7 @@ fn strike_on_an_annex_hits_its_main_building() {
         &mut blasted,
         hit,
         &mut Well512::default(),
-        &roles(),
-        slots(),
+        hit_layer(),
     )
     .unwrap();
     assert_eq!(struck.result, StrikeResult::of_data(1));
@@ -1016,8 +1017,7 @@ fn building_relic_raises_its_missile_hit() {
             &mut Vec::new(),
             hit,
             &mut Well512::default(),
-            &roles(),
-            slots(),
+            hit_layer(),
         )
         .unwrap();
         target.hp
@@ -1080,8 +1080,7 @@ fn trample_hit_leaves_out_its_building_target_blast_so_far() {
         &mut blasted,
         HitChance::of_data(100),
         &mut Well512::default(),
-        &roles(),
-        slots(),
+        hit_layer(),
     )
     .unwrap();
     assert_eq!(executed, Some(object_id(21)));
@@ -1196,7 +1195,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
             target(),
         );
         let mut a = soldier_attack(7, Distance::new(4.0), 2.0, Position::from([NONE; 3]));
-        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()));
+        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         assert_eq!(
             (a.state, rig.posted()),
@@ -1216,7 +1215,7 @@ fn ready_to_attack_under_the_least_range_posts_0x1fe_and_waits_or_fails() {
     let mut a = soldier_attack(7, Distance::new(4.0), 2.0, Position::from([NONE; 3]));
     a.voice = Voice::Quiet;
     let _ = rig
-        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
+        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
         .unwrap();
     assert_eq!(rig.posted(), Vec::new());
 }
@@ -1240,7 +1239,7 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
         rig.r.can_move = can_move;
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
             .unwrap();
         assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
         assert_eq!(matches!(r, Readiness::Away(_)), follows);
@@ -1330,7 +1329,7 @@ fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
         rig.r.stance = stance;
         let mut a = soldier_attack(7, Distance::new(4.0), 0.0, at);
         a.seen = at;
-        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()));
+        let r = rig.ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false));
         assert!(matches!(r, Ok(Readiness::Waiting)));
         if fails {
             assert_eq!(a.state.bare(), AttackState::Failed);
@@ -1565,7 +1564,7 @@ fn ready_to_attack_at_once_test_and_its_nan_paths() {
         rig.combat_mut().attack_timer = Seconds::new(timer);
         let mut a = soldier_attack(7, range, 0.0, point);
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip, &roles()))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, skip))
             .unwrap();
         (r, a.point)
     };
@@ -1867,12 +1866,22 @@ fn swing_that_fails_its_interrupt_check_stays_failed() {
 #[test]
 fn rangeless_attack_reaches_tenth_squared_in_f32() {
     // the image holds 0x3c23d70b (0.1f * 0.1f), one ULP above 0.01f
-    assert_eq!(squared_reach(Distance::ZERO).get().to_bits(), 0x3c23_d70b);
     assert_eq!(
-        squared_reach(Distance::new(NO_RANGE)).get().to_bits(),
+        squared_reach(Distance::ZERO, &tuning().attack)
+            .get()
+            .to_bits(),
         0x3c23_d70b
     );
-    assert_eq!(squared_reach(Distance::new(2.0)), DistanceSquared::new(4.0));
+    assert_eq!(
+        squared_reach(Distance::new(NO_RANGE), &tuning().attack)
+            .get()
+            .to_bits(),
+        0x3c23_d70b
+    );
+    assert_eq!(
+        squared_reach(Distance::new(2.0), &tuning().attack),
+        DistanceSquared::new(4.0)
+    );
 }
 
 /// 425906646's town centre 27171 (player 6) in update 6224: its Attack lost the boar 29826
@@ -2359,7 +2368,7 @@ fn gate_reach_is_to_its_nearest_part() {
     rig.r.can_move = false;
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     let r = rig
-        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
+        .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
         .unwrap();
     assert!(matches!(r, Readiness::Ready));
     assert_eq!(a.point, gate_at);
@@ -2392,8 +2401,7 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.arms.sprite = Some(attack_sprite);
         a.state = AttackState::New;
-        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r, &roles()))
-            .unwrap();
+        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r)).unwrap();
         assert_eq!(rig.posted(), vec![]);
         (a.state, a.pending, rig.sprite())
     };
@@ -2408,8 +2416,7 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
         Victim::default(),
     );
     let mut a = soldier_attack(-1, Distance::new(1.0), 0.0, Position::from([NONE; 3]));
-    rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r, &roles()))
-        .unwrap();
+    rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r)).unwrap();
     assert_eq!(a.state, AttackState::Done);
     assert_eq!(
         rig.posted(),
@@ -2446,8 +2453,7 @@ fn swing_with_second_sprite_draws_which_one_it_shows() {
         a.arms.sprite = Some(sprite(301));
         a.arms.second_sprite = Some(sprite(302));
         a.state = AttackState::New;
-        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r, &roles()))
-            .unwrap();
+        rig.ground(|u, g, f, r| a.enter_ready(u, g, f, r)).unwrap();
         (rig.sprite(), rig.t.streams.get(Stream::Object).clone())
     };
     // two seeds whose first draw scales to 0 and to 1
@@ -2510,7 +2516,7 @@ fn ready_to_attack_leash_fails_target_too_far_from_the_unit_ai_point() {
         (rig.r.stance, rig.r.state_position) = (UnitStance::DEFENSIVE, centre);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
-            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false, &roles()))
+            .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
             .unwrap();
         assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
         assert_eq!(matches!(r, Readiness::Away(_)), follows, "{centre:?}");
@@ -2815,10 +2821,8 @@ fn swing_after_its_hit_ends_readies_or_waits_for_its_sprite() {
         let mut a = swinging_attack(AttackState::Swing, true, 3);
         (a.pending, a.target, a.swing) = (false, target, swing);
         a.arms.interrupt_frame = interrupt;
-        rig.run(100, |c, u, _, f, r| {
-            a.swing_after_hit(c, u, f, r, sprite, &roles())
-        })
-        .unwrap();
+        rig.run(100, |c, u, _, f, r| a.swing_after_hit(c, u, f, r, sprite))
+            .unwrap();
         (a.state.bare(), rig.mover().animated.speed)
     };
     assert_eq!(
@@ -3488,7 +3492,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, Voice::Loud),
     );
     a.arms.sprite = Some(STANDING);
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true, &roles()));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
         (code, a.state.bare()),
         (Ok(UpdateCode::UNDER_WAY), AttackState::Swing)
@@ -3503,9 +3507,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         true,
         (AttackState::Ready, Voice::Loud),
     );
-    let code = rig.run(20, |c, u, _, f, r| {
-        a.ready_step(c, u, f, r, false, &roles())
-    });
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, false));
     assert_eq!(
         (code, a.state.bare()),
         (Ok(UpdateCode::CODE_5), AttackState::Done)
@@ -3521,7 +3523,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, Voice::Loud),
     );
     a.point = Position::from([NONE; 3]);
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true, &roles()));
+    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
         (code, a.state.bare()),
         (

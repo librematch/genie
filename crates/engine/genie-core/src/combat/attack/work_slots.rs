@@ -88,8 +88,8 @@ impl Attack {
         g: &mut Ground<'_>,
         f: &Fight,
         r: &AttackReads,
-        roles: &Roles,
     ) -> Result<(), GenieError> {
+        let roles = g.by_id.roles();
         self.enter(AttackState::Swing, g.motion.reborrow())?;
         let alternates = g.motion.mover().is_some_and(|m| {
             m.stats

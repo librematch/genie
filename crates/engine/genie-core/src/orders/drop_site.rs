@@ -111,6 +111,7 @@ impl World {
             &self.model.masters,
             &self.parts,
             &self.model.roles,
+            &self.model.tuning,
         );
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;

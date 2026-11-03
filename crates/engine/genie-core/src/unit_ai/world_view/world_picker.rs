@@ -44,6 +44,7 @@ use crate::world::Mode680;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::DamageTuning;
 use crate::world::others::OthersRef;
 use crate::world::parts::Parts;
 use crate::world::player::AiSettings;
@@ -188,6 +189,7 @@ impl WorldPicker<'_> {
         from: ObjectId,
         to: ObjectId,
         roles: &Roles,
+        damage_tuning: &DamageTuning,
     ) -> Result<HitPoints, GenieError> {
         let (fq, f, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
         let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
@@ -224,13 +226,19 @@ impl WorldPicker<'_> {
             self.mode_680,
             roles,
         );
-        let mut factor = elevation_factor(f.position().z(), unit.attack_elevation, &target);
+        let mut factor = elevation_factor(
+            f.position().z(),
+            unit.attack_elevation,
+            &target,
+            damage_tuning,
+        );
         if fm.kind == MasterKind::BUILDING {
             factor = building_elevation_factor(
                 factor,
                 self.parts.building_of(f.id).relics,
                 tm.kind,
                 self.parts.building_of(t.id).relics,
+                damage_tuning,
             );
         }
         let bonus = bonus_damage(&unit, &target, roles);
@@ -244,13 +252,14 @@ impl WorldPicker<'_> {
         spatial: &Spatial,
         other: ObjectId,
         roles: &Roles,
+        damage_tuning: &DamageTuning,
     ) -> Result<Duel, GenieError> {
         let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
         Ok(Duel {
             converts: self.converts(other, self.me, true, roles)?,
             attacks: attacks(om),
-            harms: self.damage(spatial, other, self.me, roles)?,
-            harmed: self.damage(spatial, self.me, other, roles)?,
+            harms: self.damage(spatial, other, self.me, roles, damage_tuning)?,
+            harmed: self.damage(spatial, self.me, other, roles, damage_tuning)?,
             hp: o.life.hp,
         })
     }
@@ -416,6 +425,7 @@ impl AttackPicker for WorldPicker<'_> {
     /// ([`crate::unit_ai::attack_sight`]), its ranges and speed, its owner's walls flag and
     /// targeting, the order history's weights and the retarget entries' targets.
     fn searcher(&mut self, memory: Memory<'_>) -> Result<Searcher, GenieError> {
+        let best_target_tuning = &self.by_id.tuning().best_target;
         let seeker = self.seeker.ok_or(GenieError::unsupported(
             "an attack test outside bestUnitToAttack",
         ))?;
@@ -443,7 +453,7 @@ impl AttackPicker for WorldPicker<'_> {
                 self.ai_settings.local_targeting_mode,
                 self.ai_settings.targeting_factor_scalar,
             ),
-            weights: order_weights(memory.history, self.now),
+            weights: order_weights(memory.history, self.now, best_target_tuning),
             retries: memory.retries.iter().map(|&(id, _)| id).collect(),
             now: self.now,
         })
@@ -522,12 +532,13 @@ impl AttackPicker for WorldPicker<'_> {
         distance: Distance,
         category: Option<AttackCategory>,
     ) -> Result<Candidate, GenieError> {
+        let damage_tuning = &self.by_id.tuning().damage;
         let roles = self.by_id.roles();
         let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
             "a searching unit of a master the slice does not have",
         ))?;
-        let damage = self.damage(spatial, self.me, id, roles)?;
+        let damage = self.damage(spatial, self.me, id, roles, damage_tuning)?;
         let armed = 0.0 < attacks(m) || self.converts(id, self.me, true, roles)?;
         Ok(Candidate {
             id,

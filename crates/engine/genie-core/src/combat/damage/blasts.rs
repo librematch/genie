@@ -4,8 +4,8 @@
 use crate::combat::Charge;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::{
-    Attacker, CONE, Kill, MINUS_CONE, Victim, WIDE_CONE, armor_damage, bonus_damage, charge_hit,
-    elevation_factor, facing_offset, kill_bonus, lose, shield, take,
+    Attacker, Kill, Victim, armor_damage, bonus_damage, charge_hit, elevation_factor,
+    facing_offset, kill_bonus, lose, shield, take,
 };
 use crate::combat::missile::ShooterId;
 use crate::construction::build::NOT_HELD;
@@ -25,7 +25,7 @@ use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
-use crate::world::layer::Slots;
+use crate::world::layer::generated::DamageTuning;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 use std::mem::replace;
@@ -164,7 +164,6 @@ pub fn blast(
     factor: f32,
     layer: HitLayer<'_>,
 ) -> Result<bool, GenieError> {
-    let HitLayer { roles, slots } = layer;
     let a = attacker.source;
     let r = a.area_effect;
     if !fmath::below_or_unordered(0.0, r.get()) {
@@ -201,7 +200,7 @@ pub fn blast(
     attacker.source.charge_hit = false;
     let weapons = attacker.weapons.clone();
     for i in 0..targets.len() {
-        blast_one(attacker, targets, i, (&blast, &weapons), roles, slots)?;
+        blast_one(attacker, targets, i, (&blast, &weapons), layer)?;
     }
     Ok(true)
 }
@@ -241,9 +240,13 @@ pub(super) fn blast_one(
     targets: &mut [&mut Victim],
     i: usize,
     (b, weapons): (&Blast, &[ClassAmount]),
-    roles: &Roles,
-    slots: Slots,
+    layer: HitLayer<'_>,
 ) -> Result<(), GenieError> {
+    let HitLayer {
+        roles,
+        damage_tuning,
+        ..
+    } = layer;
     let a = &b.a;
     let t = &**targets.checked(i)?;
     if !b.on_tiles(t) {
@@ -283,9 +286,9 @@ pub(super) fn blast_one(
     if MasterKind::COMBAT <= t.kind && shield(t, false) {
         return Ok(());
     }
-    let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), is_main);
+    let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), is_main, damage_tuning);
     if !is_main {
-        if outside_cone(attacker, a, t, (d2, b.wide.get()))? {
+        if outside_cone(attacker, a, t, (d2, b.wide.get()), damage_tuning)? {
             return Ok(());
         }
         // COMISS share, 0 / JC, then COMISS 0, share / JBE: a share below 0 is a fixed
@@ -303,8 +306,7 @@ pub(super) fn blast_one(
         i,
         (weapons, f * b.factor),
         (ledger, blast_taken),
-        roles,
-        slots,
+        layer,
     )
 }
 
@@ -390,8 +392,14 @@ pub(super) fn blast_falloff(
     t: &Victim,
     (r, d2): (f32, f32),
     is_main: bool,
+    damage_tuning: &DamageTuning,
 ) -> f32 {
-    let mut f = elevation_factor(attacker.position.z(), attacker.attack_elevation, t);
+    let mut f = elevation_factor(
+        attacker.position.z(),
+        attacker.attack_elevation,
+        t,
+        damage_tuning,
+    );
     if MasterKind::COMBAT <= t.kind && (t.player == attacker.player || t.allied.by_target) {
         f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire.get());
     }
@@ -418,6 +426,7 @@ pub(super) fn outside_cone(
     a: &Attacker,
     t: &Victim,
     (d2, wide): (f32, f32),
+    damage_tuning: &DamageTuning,
 ) -> Result<bool, GenieError> {
     if !a.blast_level.contains(BlastLevel::CONE) {
         return Ok(false);
@@ -432,13 +441,13 @@ pub(super) fn outside_cone(
             ))?;
     if !a.blast_level.contains(BlastLevel::WIDE_CONE) {
         let off = facing_offset(attacker.position, facing, t.position);
-        return Ok(CONE < off || off < MINUS_CONE);
+        return Ok(damage_tuning.cone < off || off < damage_tuning.minus_cone);
     }
     if wide * wide < d2 {
         return Ok(true);
     }
     let off = facing_offset(attacker.position, facing, t.position).abs();
-    Ok(WIDE_CONE < off)
+    Ok(damage_tuning.wide_cone < off)
 }
 
 /// A fixed blast damage (an `area_damage` `share` below 0) on `t`: it loses the share's size
@@ -484,9 +493,9 @@ pub(super) fn blast_hit(
     i: usize,
     (weapons, factor): (&[ClassAmount], f32),
     (ledger, blast_taken): (Option<usize>, HitPoints),
-    roles: &Roles,
-    slots: Slots,
+    layer: HitLayer<'_>,
 ) -> Result<(), GenieError> {
+    let HitLayer { roles, .. } = layer;
     let before = targets.checked(i)?.hp;
     let mut t = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
     let hit = take(
@@ -496,7 +505,7 @@ pub(super) fn blast_hit(
         weapons,
         factor,
         blast_taken,
-        HitLayer { roles, slots },
+        layer,
     );
     if hit.is_ok() {
         if !attacker.source.charge_hit {
