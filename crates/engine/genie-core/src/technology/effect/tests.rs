@@ -57,6 +57,7 @@ use crate::players::attribute::AttributeId;
 use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::{ByPlayer, relation_row};
 use crate::production::LocationButton;
+use crate::production::Research;
 use crate::production::{MakeTech, MakeTechState, Making, Production};
 use crate::technology::CostPaid;
 use crate::technology::Effect;
@@ -1881,7 +1882,7 @@ fn research_whose_effect_needs_its_building_stops() {
     t.players[0].techs[1].effect_override = EffectId::of_data(9);
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(1), None),
-        Ok(true)
+        Ok(Research::Completed)
     );
 }
 
@@ -1923,7 +1924,7 @@ fn researches_give_their_override_effect_instead_of_their_own() {
     for tech in 0..3 {
         assert_eq!(
             t.complete_research(PlayerId::new(0), tech_id(tech), None),
-            Ok(true)
+            Ok(Research::Completed)
         );
         held.push(t.players[0].attributes[3]);
     }
@@ -1969,12 +1970,12 @@ fn an_age_adds_its_event_to_the_history() {
     ];
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(100), None),
-        Ok(true)
+        Ok(Research::Completed)
     );
     assert_eq!(t.players[0].history.events, []);
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(102), None),
-        Ok(true)
+        Ok(Research::Completed)
     );
     assert_eq!(t.players[0].techs[102].state, ResearchState::Researched);
     assert_eq!(
@@ -2021,7 +2022,7 @@ fn dependent_technology_done_already_completes_with_its_requirement() {
     t.model.techs = Arc::new(vec![def(-1, 0), def(0, 1), def(1, 1), def(0, 2)]);
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(0), None),
-        Ok(true)
+        Ok(Research::Completed)
     );
     let states: Vec<i16> = t.players[0].techs.iter().map(|s| s.state.get()).collect();
     assert_eq!(states, [3, 3, 3, 0]);
@@ -2065,7 +2066,7 @@ fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
         ]);
         assert_eq!(
             t.complete_research(PlayerId::new(0), tech_id(0), None),
-            Ok(true)
+            Ok(Research::Completed)
         );
         t.players[0]
             .techs

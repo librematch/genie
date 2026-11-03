@@ -12,6 +12,7 @@ use crate::orders::NO_QUEUE;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::production::ProductionStart;
 use crate::production::{
     MakeObj, MakeObjState, MakeTech, MakeTechState, Making, housed, population,
 };
@@ -59,26 +60,25 @@ impl World {
     }
 
     /// The building update's production step (`FUN_1411e7dc0`, after its combat update) for the
-    /// building at `i` of player `p`. A disabled queue (`+0xbf6`) or an empty one does nothing.
-    /// For a player not of type 3 a top action of the building's own (`FUN_141227a00`) that is a
-    /// make, a research or of types 0x7b to 0x7d sets `+0xc01` and nothing more happens; else
-    /// `+0xc01` clears. Without an action in its production list the first entry's comes: for a
-    /// unit the population test first ([`housed`]): a housed building waits (its reason
-    /// `+0xc02`, 0x20 or 4, and the events 0x7c and 0x7d are the interface's), a computer
-    /// player's cancels its queue ([`World::cancel_queue`]); then the make action
-    /// ([`MakeObj::for_entry`]; its constructor `FUN_140acb140` gives the building's unit AI the
-    /// action 619, `FUN_140c64b50`; the headroom's sound and event 0xa9 are the interface's), or
-    /// the research's ([`World::make_research`]). The list's add (`FUN_140a977e0`) starts it
-    /// for a building in a state below 3 (slot 0x28): a make action of a master the player has
-    /// (`FUN_140acf0a0`) adds its population to attribute 81 and takes state 6, one of a master
-    /// it lacks stays in state 0 ("Canceling Train #1a"); a building in state 3 or more deletes
-    /// it at once ([`World::end_production_action`]). Then the list's update (`FUN_140a992b0`,
-    /// the first action's slot 0x30; an empty list answers done): the make action's
-    /// ([`World::make_step`]) or the research's ([`World::research_step`]). Done (1) or failed
-    /// (2, 3): after a research of the shared kind the technology joins the building's lists
-    /// ([`crate::production::Production::note_shared_research`]); the action goes ([`World::end_production_action`])
-    /// and the first entry lets one go: a unit's population leaves attribute 80
-    /// ([`crate::production::Queue::release_first`]).
+    /// building at `i` of player `p`. A disabled queue (`+0xbf6`) or an empty one does nothing. For
+    /// a player not of type 3 a top action of the building's own (`FUN_141227a00`) that is a make,
+    /// a research or of types 0x7b to 0x7d sets `+0xc01` and nothing more happens; else `+0xc01`
+    /// clears. Without an action in its production list the first entry's comes: for a unit the
+    /// population test first ([`housed`]): a housed building waits (its reason `+0xc02`, 0x20 or 4,
+    /// and the events 0x7c and 0x7d are the interface's), a computer player's cancels its queue
+    /// ([`World::cancel_queue`]); then the make action ([`MakeObj::for_entry`]; its constructor
+    /// `FUN_140acb140` gives the building's unit AI the action 619, `FUN_140c64b50`; the headroom's
+    /// sound and event 0xa9 are the interface's), or the research's ([`World::make_research`]). The
+    /// list's add (`FUN_140a977e0`) starts it for a building in a state below 3 (slot 0x28): a make
+    /// action of a master the player has (`FUN_140acf0a0`) adds its population to attribute 81 and
+    /// takes state 6, one of a master it lacks stays in state 0 ("Canceling Train #1a"); a building
+    /// in state 3 or more deletes it at once ([`World::end_production_action`]). Then the list's
+    /// update (`FUN_140a992b0`, the first action's slot 0x30; an empty list answers done): the make
+    /// action's ([`World::make_step`]) or the research's ([`World::research_step`]). Done (1) or
+    /// failed (2, 3): after a research of the shared kind the technology joins the building's lists
+    /// ([`crate::production::Production::note_shared_research`]); the action goes
+    /// ([`World::end_production_action`]) and the first entry lets one go: a unit's population
+    /// leaves attribute 80 ([`crate::production::Queue::release_first`]).
     pub(crate) fn produce(
         &mut self,
         p: PlayerId,
@@ -113,7 +113,7 @@ impl World {
         if busy {
             return Ok(());
         }
-        if !self.begin_production(p, i)? {
+        if self.begin_production(p, i)? == ProductionStart::Stops {
             return Ok(());
         }
         let code = self.update_production_action(p, i, dt_seconds)?;
@@ -155,9 +155,13 @@ impl World {
     }
 
     /// The first queue entry's action starts when the list has none ([`World::produce`]): a unit
-    /// waits housed (a computer player's entry is cancelled), else it starts. False when the
+    /// waits housed (a computer player's entry is cancelled), else it starts. Stops when the
     /// production stops for this update.
-    fn begin_production(&mut self, p: PlayerId, i: ListIndex) -> Result<bool, GenieError> {
+    fn begin_production(
+        &mut self,
+        p: PlayerId,
+        i: ListIndex,
+    ) -> Result<ProductionStart, GenieError> {
         let production = self
             .parts
             .production
@@ -173,9 +177,9 @@ impl World {
                 if housed(&self.players.player(p)?.attributes, pop, self.model.slots)? {
                     if self.players.player(p)?.kind.is_computer() {
                         self.cancel_queue(p, i)?;
-                        return Ok(false);
+                        return Ok(ProductionStart::Stops);
                     }
-                    return Ok(false);
+                    return Ok(ProductionStart::Stops);
                 }
                 if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, i)?.id) {
                     ai.set_action(Some(AiAction::Make));
@@ -186,7 +190,7 @@ impl World {
             };
             self.start_production_action(p, i, making)?;
         }
-        Ok(true)
+        Ok(ProductionStart::Goes)
     }
 
     /// A finished shared-kind research of the building at `i` of player `p` is noted on its

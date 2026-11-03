@@ -12,6 +12,7 @@ use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
+use crate::production::Payment;
 use crate::world::Seconds;
 use crate::world::slots::CheckedIndex;
 
@@ -358,7 +359,7 @@ impl TechState {
     }
 
     /// The payment (`FUN_1413d4370` with `param_3` 1 and no location test, `param_5` −1): the
-    /// research test first (false: nothing paid); then each paid cost comes off its attribute,
+    /// research test first (unpaid: nothing paid); then each paid cost comes off its attribute,
     /// or, beyond what the attribute holds, the rest off gold and the attribute to 0. The
     /// technology takes state 4 and the building's master `building`. The game's statistics
     /// (`FUN_14097daf0`) are not held; a cost the building pays (`FUN_1411c7470`) and a
@@ -371,9 +372,9 @@ impl TechState {
         building: MasterId,
         attributes: &mut dyn Attributes,
         slots: Slots,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Payment, GenieError> {
         if !self.can_research(def, factors, repeat, &|i| attributes.get(i))? {
-            return Ok(false);
+            return Ok(Payment::Unpaid);
         }
         for j in 0..3 {
             let Some((attr, amount, paid)) = self.payment(def, j, factors) else {
@@ -403,7 +404,7 @@ impl TechState {
         }
         self.state = ResearchState::Queued;
         self.building_master = Some(building);
-        Ok(true)
+        Ok(Payment::Paid)
     }
 
     /// `FUN_1413d1050`: the technology may be queued again (not of the shared kind, multiple
@@ -542,7 +543,7 @@ mod tests {
                 &mut held,
                 slots()
             ),
-            Ok(true)
+            Ok(Payment::Paid)
         );
         assert_eq!(held.0, amounts([79.956_116, 157.05705, 200.0, 50.0]));
         assert_eq!(
@@ -559,7 +560,7 @@ mod tests {
                 &mut held,
                 slots()
             ),
-            Ok(false)
+            Ok(Payment::Unpaid)
         );
         // its queue entry records the 50 gold, which its start finds paid
         let paid = s.entry_costs(&d, (0.0, 1)).unwrap();
@@ -601,7 +602,7 @@ mod tests {
                 &mut held,
                 slots()
             ),
-            Ok(false)
+            Ok(Payment::Unpaid)
         );
         // the modifier scales the amount (truncated) before the test
         assert_eq!(
@@ -613,7 +614,7 @@ mod tests {
                 &mut held,
                 slots()
             ),
-            Ok(true)
+            Ok(Payment::Paid)
         );
         assert_eq!(held.0, amounts([0.0, 5.0, 0.0, 100.0]));
         assert_eq!(

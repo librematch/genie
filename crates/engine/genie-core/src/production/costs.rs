@@ -12,6 +12,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
+use crate::production::Payment;
 use crate::production::QueuedUnits;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
@@ -253,7 +254,7 @@ pub fn pay(
     attributes: &mut dyn Attributes,
     roles: &Roles,
     slots: Slots,
-) -> Result<bool, GenieError> {
+) -> Result<Payment, GenieError> {
     if !cost_test(
         masters,
         master,
@@ -263,11 +264,11 @@ pub fn pay(
         roles,
         slots,
     )? {
-        return Ok(false);
+        return Ok(Payment::Unpaid);
     }
     // the cost test found the master
     let Some(m) = masters.get(master) else {
-        return Ok(false);
+        return Ok(Payment::Unpaid);
     };
     for j in 0..3 {
         let Some((attribute, amount, true)) = cost_entry(m, j) else {
@@ -275,7 +276,7 @@ pub fn pay(
         };
         attributes.subtract(attribute, Amount::new(amount.as_f32() * count.get()))?;
     }
-    Ok(true)
+    Ok(Payment::Paid)
 }
 
 /// `FUN_14162ef60` (no type out, the multiplier 1.0): master `master`'s three costs as a queue

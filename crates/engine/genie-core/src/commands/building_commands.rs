@@ -17,6 +17,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
+use crate::production::QueueOutcome;
 use crate::technology::Effect;
 use crate::technology::RepeatLimit;
 use crate::technology::ResearchState;
@@ -59,11 +60,11 @@ impl World {
 
     /// SET GATHER POINT's handler ([`GatherPointCommand`], `FUN_140e7e9a0`).
     ///
-    /// The point's x and y always take the packet's; its target and master do too unless the
-    /// state is [`GatherPointState::Kept`] (a target of −1 at (−1, −1) clears the point, state 0; any
-    /// other point makes the state 1 unless it is kept). With `own` the object itself is the
-    /// target (`FUN_1411c7ff0`: its position, its id and master unless kept, state 1 even when it
-    /// was kept). The z stays what the point held, 0 for none.
+    /// The point's x and y always take the packet's; its target and master do too unless the state
+    /// is [`GatherPointState::Kept`] (a target of −1 at (−1, −1) clears the point, state 0; any
+    /// other point makes the state 1 unless it is kept). With `own` the object itself is the target
+    /// (`FUN_1411c7ff0`: its position, its id and master unless kept, state 1 even when it was
+    /// kept). The z stays what the point held, 0 for none.
     pub(crate) fn gather_point(
         &mut self,
         g: &GatherPointCommand,
@@ -293,17 +294,18 @@ impl World {
         ))
     }
 
-    /// RESEARCH (`0x140e7e270`) for `player`: a `qId` other than −1, or a technology the tree
-    /// has not got, does nothing. The costs it lists (`FUN_1413d4a00`) come off the pending
-    /// debit (`FUN_141630d10`). The building is the packet's (the least loaded of several,
-    /// `FUN_1411d0e90`, and the shared kind's every building, `FUN_1411c3fd0`, are not modelled);
-    /// a building of master type 80 alive (state 2) whose master is among the technology's
-    /// locations, with the technology in state 1 or repeatable, and without a top action of
-    /// 0x7b to 0x7d (`FUN_141227a00`), queues it ([`World::queue_research`]); queued, its unit AI
-    /// takes the action value 0x26c. A technology of `linkedTechs.json` ([`Model::linked_techs`](genie_model::model::Model::linked_techs),
-    /// the game settings' table `FUN_140f39f40` looks up) is not modelled (`FUN_140f3a0f0`,
-    /// `FUN_140f39e80`). Not held: the interface's view and selection (`FUN_140e6de20`), the
-    /// local player's statistics flag. Not modelled: the computer players' parts (`player+0x7a8`, `FUN_1411d5520`), the player's
+    /// RESEARCH (`0x140e7e270`) for `player`: a `qId` other than −1, or a technology the tree has
+    /// not got, does nothing. The costs it lists (`FUN_1413d4a00`) come off the pending debit
+    /// (`FUN_141630d10`). The building is the packet's (the least loaded of several,
+    /// `FUN_1411d0e90`, and the shared kind's every building, `FUN_1411c3fd0`, are not modelled); a
+    /// building of master type 80 alive (state 2) whose master is among the technology's locations,
+    /// with the technology in state 1 or repeatable, and without a top action of 0x7b to 0x7d
+    /// (`FUN_141227a00`), queues it ([`World::queue_research`]); queued, its unit AI takes the
+    /// action value 0x26c. A technology of `linkedTechs.json`
+    /// ([`Model::linked_techs`](genie_model::model::Model::linked_techs), the game settings' table
+    /// `FUN_140f39f40` looks up) is not modelled (`FUN_140f3a0f0`, `FUN_140f39e80`). Not held: the
+    /// interface's view and selection (`FUN_140e6de20`), the local player's statistics flag. Not
+    /// modelled: the computer players' parts (`player+0x7a8`, `FUN_1411d5520`), the player's
     /// `+0x648` (0 for every player probed), Castle Age queued in game mode 16 (the world's treaty
     /// monitor's `+0x17`; no other game mode marks it).
     pub(crate) fn research(
@@ -349,7 +351,7 @@ impl World {
         let Some(i) = self.researching_building(player, building_id, state)? else {
             return Ok(());
         };
-        if self.queue_research(player, i, tech_id, r.shift)? {
+        if self.queue_research(player, i, tech_id, r.shift)? == QueueOutcome::Queued {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
             if tech_id == TechId::CASTLE_AGE && self.settings.game_mode == GameMode::OneUnit {
@@ -418,7 +420,7 @@ impl World {
 
     /// `FUN_1411d70f0` for the building at `i` of `player`: one research, five with `shift`
     /// unless the technology allows only one at a time or its effect upgrades a unit, queued by
-    /// the building's part with no master and no button ([`World::queue_at`]). True when any
+    /// the building's part with no master and no button ([`World::queue_at`]). Queued when any
     /// was queued. The game settings' instant technologies (`FUN_140f39f40`'s `+0x20`, which
     /// `FUN_1413cdcd0` researches at once) are linked ones, which RESEARCH refuses before.
     pub(crate) fn queue_research(
@@ -427,7 +429,7 @@ impl World {
         i: ListIndex,
         tech: TechId,
         shift: bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<QueueOutcome, GenieError> {
         let t = tech.index();
         let def = self.model.techs.checked(t)?;
         let state = self.players.player(player)?.techs.checked(t)?;

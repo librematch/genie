@@ -20,7 +20,9 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
+use crate::production::Payment;
 use crate::production::QueueButton;
+use crate::production::QueueOutcome;
 use crate::production::QueuedUnits;
 use crate::production::{Making, ROOM, costed, same_costs, train_time};
 use crate::technology::TechId;
@@ -40,28 +42,28 @@ use crate::world::{COMPUTER_QUEUE_LIMIT, QUEUE_LIMIT, World, villager};
 impl World {
     /// QUEUE, the player's part (`FUN_141614450`) after the packet's check of its buildings
     /// (`do_command`'s case 0x81, [`World::command_check`]: an id the world lacks, or another
-    /// player's without cheats, goes; a human's packet left with none is refused). Nothing for
-    /// a master the player lacks (`FUN_141659d20`). Of the first 60 buildings (500 for a computer
+    /// player's without cheats, goes; a human's packet left with none is refused). Nothing for a
+    /// master the player lacks (`FUN_141659d20`). Of the first 60 buildings (500 for a computer
     /// player) those the master is available to (`+0x5f0`) or that list it themselves (`+0xd30`,
     /// `FUN_1411c8fd0`) take part, at most 60: each where the unit trains ([`World::trains_at`],
-    /// `FUN_141263610`) has its room (15, a computer player's 2, less its queued total
-    /// `+0xbf4`; the sum of those above 0 holds the amount) and its load
-    /// ([`World::production_load`]); any other has room −1 and takes none. The amount is lowered while the player cannot pay that many:
-    /// each cost entry of the costed master ([`crate::production::costed`]; an annex's paid
-    /// ones) but the population's needs its amount times the count (`COMISS`, `JA`: a NaN
-    /// passes); at one still short, or for a master below type 70, nothing is queued. In game
-    /// mode 16, while the player's attribute 6 is at most 1, a military master (its key's `+9`,
+    /// `FUN_141263610`) has its room (15, a computer player's 2, less its queued total `+0xbf4`;
+    /// the sum of those above 0 holds the amount) and its load ([`World::production_load`]); any
+    /// other has room −1 and takes none. The amount is lowered while the player cannot pay that
+    /// many: each cost entry of the costed master ([`crate::production::costed`]; an annex's paid
+    /// ones) but the population's needs its amount times the count (`COMISS`, `JA`: a NaN passes);
+    /// at one still short, or for a master below type 70, nothing is queued. In game mode 16, while
+    /// the player's attribute 6 is at most 1, a military master (its key's `+9`,
     /// [`crate::players::tracker::Key::military`]) is queued one at a time: with the player's flag
-    /// (`+0x1378`) set nothing is, else the flag sets and the amount is 1 (even with no room).
-    /// Then unit by unit the building with room and the least load takes it (the last one's
-    /// pick first, replaced by one whose load is below: `COMISS`, `JBE`, a NaN never wins; with
-    /// none at the start, the most room), its room one less and its load the unit's train time
-    /// there ([`crate::production::train_time`]); last, each building's part
-    /// ([`World::queue_at`]) with its count, the packet's master and button. The limited units'
-    /// tests before the mode 16 check (`FUN_1416116c0`, `FUN_141611520`: an amount above the
-    /// master's `+0x5f0` lowered, none at 1) read the `+0x5f1` bits 1 and 2 of the unit or its
-    /// linked master; genie's masters keep `+0x5f1` as a boolean (the `.dat` holds 0 for every
-    /// master), so they pass ([`World::trainable_count`]).
+    /// (`+0x1378`) set nothing is, else the flag sets and the amount is 1 (even with no room). Then
+    /// unit by unit the building with room and the least load takes it (the last one's pick first,
+    /// replaced by one whose load is below: `COMISS`, `JBE`, a NaN never wins; with none at the
+    /// start, the most room), its room one less and its load the unit's train time there
+    /// ([`crate::production::train_time`]); last, each building's part ([`World::queue_at`]) with
+    /// its count, the packet's master and button. The limited units' tests before the mode 16 check
+    /// (`FUN_1416116c0`, `FUN_141611520`: an amount above the master's `+0x5f0` lowered, none at 1)
+    /// read the `+0x5f1` bits 1 and 2 of the unit or its linked master; genie's masters keep
+    /// `+0x5f1` as a boolean (the `.dat` holds 0 for every master), so they pass
+    /// ([`World::trainable_count`]).
     ///
     /// # Errors
     ///
@@ -276,8 +278,8 @@ impl World {
         Ok(chosen)
     }
 
-    /// `FUN_1411d0e90`: the seconds of work `building` (live or sleeping) of player `p` has queued: each
-    /// queue entry's count times its time (a unit's master's first train time, `+0x898`, in
+    /// `FUN_1411d0e90`: the seconds of work `building` (live or sleeping) of player `p` has queued:
+    /// each queue entry's count times its time (a unit's master's first train time, `+0x898`, in
     /// integers; a research's location at the building, `FUN_1413cbd20`, its time plus its
     /// adjustment, as floats), less the work done of its production list's action (a make's
     /// `+0x6c`, a research's `+0x70`).
@@ -328,7 +330,7 @@ impl World {
     /// one by one, then this one (the last drawn is queued first). A building whose total
     /// (`+0xbf4`) is above 14 refuses (its event 0x84 is the interface's); the count is held
     /// to the room of 15. Units: [`World::queue_units`]; researches: [`World::queue_techs`].
-    /// True when any was queued.
+    /// Queued when any was.
     pub(crate) fn queue_at(
         &mut self,
         player: PlayerId,
@@ -337,7 +339,7 @@ impl World {
         count: u16,
         tech: Option<TechId>,
         button: QueueButton,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<QueueOutcome, GenieError> {
         let mut master = if self
             .model
             .roles
@@ -377,7 +379,7 @@ impl World {
             .get(self.players.live(player, i)?.id)
             .map_or(0, |p| p.queue.total.get());
         if 14 < total {
-            return Ok(false);
+            return Ok(QueueOutcome::NoneQueued);
         }
         let n = QueuedUnits::of_data(if i32::from(count as i16) + i32::from(total) < 16 {
             count as i16
@@ -411,7 +413,7 @@ impl World {
         master: MasterId,
         count: QueuedUnits,
         button: QueueButton,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<QueueOutcome, GenieError> {
         use crate::production::{as_entry_costs, master_costs, pay, population};
         let empty = Masters::default();
         let mut n = count.get();
@@ -424,11 +426,12 @@ impl World {
                 self.players.player_mut(player)?,
                 &self.model.roles,
                 self.model.slots,
-            )? {
+            )? == Payment::Paid
+            {
                 break;
             }
             if n < 2 {
-                return Ok(false);
+                return Ok(QueueOutcome::NoneQueued);
             }
             n -= 1;
         }
@@ -468,7 +471,7 @@ impl World {
             slot.count = slot.count.plus(QueuedUnits::of_data(n));
             queue.total = queue.total.plus(QueuedUnits::of_data(n));
             queue.changes = queue.changes.bumped();
-            return Ok(true);
+            return Ok(QueueOutcome::Queued);
         }
         self.new_entry(
             player,
@@ -478,7 +481,7 @@ impl World {
             button,
             time,
         )?;
-        Ok(true)
+        Ok(QueueOutcome::Queued)
     }
 
     /// `FUN_1411cbc40`'s new entry at the building at `i` of `player`: a full buffer grows by

@@ -17,6 +17,7 @@ use crate::objects::masters::Masters;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
+use crate::production::Payment;
 use crate::production::pay;
 use crate::technology::Attributes;
 use crate::world::NO_ATTRIBUTE;
@@ -174,7 +175,8 @@ pub fn repair_building(
         &mut *payer.attributes,
         roles,
         slots,
-    )? {
+    )? == Payment::Paid
+    {
         return repair_unit(set, idx, amount, payer, roles, slots);
     }
     Ok(RepairOutcome::Unpaid)
@@ -207,14 +209,15 @@ pub fn repair_unit(
             amount = most - now;
         }
         let share = CostCount::new((o.unit_repair_cost.get() * amount) / most);
-        if !pay(
+        if pay(
             payer.masters,
             o.master,
             share,
             &mut *payer.attributes,
             roles,
             slots,
-        )? {
+        )? == Payment::Unpaid
+        {
             return Ok(RepairOutcome::Unpaid);
         }
     }
@@ -226,10 +229,10 @@ pub fn repair_unit(
     })
 }
 
-/// A repairer's player's attributes as its repair pays from them ([`crate::construction::repair::Payer`]):
-/// the attributes as the repair reads them, each
-/// payment kept as an add the caller makes the owner's right after the repair's step (a
-/// subtraction, so the player's value comes out as the repair saw it).
+/// A repairer's player's attributes as its repair pays from them
+/// ([`crate::construction::repair::Payer`]): the attributes as the repair reads them, each payment
+/// kept as an add the caller makes the owner's right after the repair's step (a subtraction, so the
+/// player's value comes out as the repair saw it).
 pub(crate) struct PaidAttributes {
     pub(super) values: Vec<Amount>,
     pub(crate) adds: Vec<(AttributeId, Amount)>,

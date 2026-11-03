@@ -12,6 +12,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::LocationButton;
+use crate::production::Research;
 use crate::technology::ChangeMode;
 use crate::technology::EffectId;
 use crate::technology::ModifyLocation;
@@ -228,7 +229,11 @@ impl World {
     /// state 0 to 2 completes as [`World::complete_research`] (the civ's disabled technologies are
     /// not asked); any other gives its effect again and counts in attributes 0x15 and 0x63 (its
     /// listed costs) whatever its location, its state left.
-    pub(super) fn force_research(&mut self, p: PlayerId, t: TechId) -> Result<bool, GenieError> {
+    pub(super) fn force_research(
+        &mut self,
+        p: PlayerId,
+        t: TechId,
+    ) -> Result<Research, GenieError> {
         let (tech, t) = (t, t.index());
         if (ResearchState::Unavailable..=ResearchState::Researching)
             .contains(&self.players.player(p)?.techs.checked(t)?.state)
@@ -253,7 +258,7 @@ impl World {
             self.model.slots.attribute.research_spent,
             Amount::new(spent),
         )?;
-        Ok(true)
+        Ok(Research::Completed)
     }
 
     /// The research time modifier (`'g'`, `FUN_1413d1210`) of player `p`'s technology `tech` by

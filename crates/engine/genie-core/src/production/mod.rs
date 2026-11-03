@@ -30,6 +30,8 @@ use crate::world::WholeSeconds;
 use crate::world::slots::CheckedIndex;
 use genie_diff::Diff;
 
+mod outcomes;
+pub use self::outcomes::{EntryJoin, Payment, ProductionStart, QueueOutcome, Refund, Research};
 mod batch;
 use genie_model::production::button;
 mod cost_count;
@@ -1171,7 +1173,7 @@ mod tests {
         ])]);
         let mut h = held();
         h.0[1] = Amount::new(30.0);
-        assert!(
+        assert_eq!(
             pay(
                 &ms,
                 ids::VILLAGER_MALE,
@@ -1180,14 +1182,15 @@ mod tests {
                 &roles(),
                 slots()
             )
-            .unwrap()
+            .unwrap(),
+            Payment::Paid
         );
         assert_eq!(
             (h.0[0], h.0[1], h.0[4]),
             (Amount::ZERO, Amount::new(16.0), Amount::new(5.0))
         );
-        assert!(
-            !pay(
+        assert_eq!(
+            pay(
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
@@ -1195,7 +1198,8 @@ mod tests {
                 &roles(),
                 slots()
             )
-            .unwrap()
+            .unwrap(),
+            Payment::Unpaid
         );
         assert_eq!(h.0[0], Amount::ZERO);
     }

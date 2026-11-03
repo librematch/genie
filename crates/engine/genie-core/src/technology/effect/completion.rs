@@ -16,6 +16,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::players::history::EventKind;
 use crate::production::LocationButton;
+use crate::production::Research;
 use crate::technology::ChangeMode;
 use crate::technology::DisabledTech;
 use crate::technology::ResearchState;
@@ -39,29 +40,29 @@ const NO_MASTER: GenieError =
 
 impl World {
     /// `FUN_1413cdcd0` for player `p`'s technology `t` (`param_3` 0) researched at a building of
-    /// master `building`: a technology not in state 0 to 2 is not done (the game's overrides
-    /// are not held). Else it takes state 3, gives its effect (its override's, else its own;
+    /// master `building`: a technology not in state 0 to 2 is not done (the game's overrides are
+    /// not held). Else it takes state 3, gives its effect (its override's, else its own;
     /// [`World::do_effect`]) and updates the technologies that depend on it
     /// ([`World::update_dependents`]); researched at a location with a button, it counts in
-    /// attribute 0x15 and its listed costs (`FUN_1413d4a00`, the amounts summed) in attribute
-    /// 0x63. Last, an age (101 to 103) adds its event to the player's history (`FUN_141560ae0`
-    /// with 0, 1 or 2, [`crate::players::history::History::add_event`]), which the AI's age time reads.
-    /// Not held: the local player's statistics and achievements (`FUN_1409644a0` among them).
-    /// Not modelled: a research paid in relics (`FUN_1413d0e70`), an effect the slice cannot run without its
-    /// building ([`World::research_effect_known`]) and the civ's disabled technologies
+    /// attribute 0x15 and its listed costs (`FUN_1413d4a00`, the amounts summed) in attribute 0x63.
+    /// Last, an age (101 to 103) adds its event to the player's history (`FUN_141560ae0` with 0, 1
+    /// or 2, [`crate::players::history::History::add_event`]), which the AI's age time reads. Not
+    /// held: the local player's statistics and achievements (`FUN_1409644a0` among them). Not
+    /// modelled: a research paid in relics (`FUN_1413d0e70`), an effect the slice cannot run
+    /// without its building ([`World::research_effect_known`]) and the civ's disabled technologies
     /// (`FUN_140ea93a0`; such a technology is never available to be researched).
     pub(crate) fn complete_research(
         &mut self,
         p: PlayerId,
         t: TechId,
         building: Option<MasterId>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Research, GenieError> {
         use crate::technology::Attributes;
         let (tech, t) = (t, t.index());
         let def = self.model.techs.checked(t)?.clone();
         let state = &self.players.player(p)?.techs.checked(t)?;
         if !(ResearchState::Unavailable..=ResearchState::Researching).contains(&state.state) {
-            return Ok(false);
+            return Ok(Research::NotDone);
         }
         if self
             .model
@@ -109,7 +110,7 @@ impl World {
                 .history
                 .add_event(kind, 0.0, 0.0, 0, now);
         }
-        Ok(true)
+        Ok(Research::Completed)
     }
 
     /// Whether the effect player `p`'s technology `t` gives (`FUN_1413ce9b0`,

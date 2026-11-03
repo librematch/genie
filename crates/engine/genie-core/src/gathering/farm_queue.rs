@@ -27,7 +27,10 @@ use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::CostCount;
+use crate::production::Payment;
 use crate::production::PopulationTest;
+use crate::production::QueueOutcome;
+use crate::production::Refund;
 use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_kind;
 use crate::world::AutoQueues;
@@ -62,7 +65,7 @@ impl World {
         p: PlayerId,
         count: QueueCount,
         master: MasterId,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<QueueOutcome, GenieError> {
         self.buy_ahead(p, count, master, Queue::Farms)
     }
 
@@ -72,7 +75,7 @@ impl World {
         &mut self,
         p: PlayerId,
         count: QueueCount,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<QueueOutcome, GenieError> {
         // The fish trap (master 199, its master table's `+0x638`).
         // The farm a mill's queue buys (`0x32`, GAME 0xd and 0xe).
         self.buy_ahead(
@@ -90,7 +93,7 @@ impl World {
         p: PlayerId,
         count: QueueCount,
         master: MasterId,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Refund, GenieError> {
         self.give_back(p, count, master, Queue::Farms)
     }
 
@@ -100,7 +103,7 @@ impl World {
         &mut self,
         p: PlayerId,
         count: QueueCount,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Refund, GenieError> {
         self.give_back(
             p,
             count,
@@ -114,19 +117,19 @@ impl World {
     /// without the population's test ([`cost_test`]: a master it has of type 70 or more, an
     /// annex's costs its head's, each entry with an attribute at most what the attribute holds,
     /// `COMISS`, `JA`: a NaN passes) is paid (`FUN_14162fb60` with 1, [`pay`]) and joins the
-    /// queue, which may then pass the limit. False when none can, or the payment failed.
+    /// queue, which may then pass the limit. None queued when none can, or the payment failed.
     fn buy_ahead(
         &mut self,
         p: PlayerId,
         count: QueueCount,
         master: MasterId,
         queue: Queue,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<QueueOutcome, GenieError> {
         if !count.any() || QUEUE_LIMIT <= self.queued(p, queue)? {
-            return Ok(false);
+            return Ok(QueueOutcome::NoneQueued);
         }
         let Some(masters) = self.model.masters.of(p) else {
-            return Ok(false);
+            return Ok(QueueOutcome::NoneQueued);
         };
         let player = self.players.player_mut(p)?;
         let mut n = count;
@@ -140,24 +143,25 @@ impl World {
                 &self.model.roles,
                 self.model.slots,
             )? {
-                if !pay(
+                if pay(
                     masters,
                     master,
                     n.factor(),
                     &mut *player,
                     &self.model.roles,
                     self.model.slots,
-                )? {
-                    return Ok(false);
+                )? == Payment::Unpaid
+                {
+                    return Ok(QueueOutcome::NoneQueued);
                 }
                 match queue {
                     Queue::Farms => player.farm_queue += n,
                     Queue::FishTraps => player.fish_trap_queue += n,
                 }
-                return Ok(true);
+                return Ok(QueueOutcome::Queued);
             }
             if n <= QueueCount::ONE {
-                return Ok(false);
+                return Ok(QueueOutcome::NoneQueued);
             }
             n -= QueueCount::ONE;
         }
@@ -166,17 +170,17 @@ impl World {
     /// The return of `FUN_141630f10` and `FUN_1416308f0`: at most the queue's count; with one
     /// or more the queue loses them and the player gets their costs back (`FUN_141630770`,
     /// [`refund_master`]: each entry of a master of type 70 or more with an attribute and the
-    /// paid flag, its amount times the count). False with none.
+    /// paid flag, its amount times the count). None queued: nothing to give back.
     fn give_back(
         &mut self,
         p: PlayerId,
         count: QueueCount,
         master: MasterId,
         queue: Queue,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Refund, GenieError> {
         let n = count.min(self.queued(p, queue)?);
         if !n.any() {
-            return Ok(false);
+            return Ok(Refund::NoneQueued);
         }
         let player = self.players.player_mut(p)?;
         match queue {
@@ -188,7 +192,7 @@ impl World {
         if let Some(m) = player_master(&self.model.masters, p, master) {
             refund_master(m, n, player)?;
         }
-        Ok(true)
+        Ok(Refund::Refunded)
     }
 
     /// `FUN_141663f80`: player `p` can make master `master` (one it has): the master its base
@@ -417,14 +421,15 @@ impl World {
                 &self.model.roles,
                 self.model.slots,
             )? {
-                if !pay(
+                if pay(
                     masters,
                     master,
                     ONE_FARM,
                     self.players.player_mut(p)?,
                     &self.model.roles,
                     self.model.slots,
-                )? {
+                )? == Payment::Unpaid
+                {
                     return Ok(None);
                 }
             } else {
@@ -437,10 +442,10 @@ impl World {
         Ok(Some(from_queue))
     }
 
-    /// State 0xf2's end (`0x140a8e1d0` case 0xf1, [`crate::gathering::gather::Next::Reseed`]) of player
-    /// `p`'s gatherer at `idx`, its walk's `end`: the reseed ([`World::reseed`]);
-    /// without one (the interface's event 0x7f, 0x9c for a gatherer not a villager, aside) the
-    /// Gather is done or idles ([`crate::gathering::gather::GatherAction::after_reseed`]: standing with
+    /// State 0xf2's end (`0x140a8e1d0` case 0xf1, [`crate::gathering::gather::Next::Reseed`]) of
+    /// player `p`'s gatherer at `idx`, its walk's `end`: the reseed ([`World::reseed`]); without
+    /// one (the interface's event 0x7f, 0x9c for a gatherer not a villager, aside) the Gather is
+    /// done or idles ([`crate::gathering::gather::GatherAction::after_reseed`]: standing with
     /// `FUN_140a8b6b0`'s sprite, the targets it lets go released).
     pub(crate) fn reseed_after_walk(
         &mut self,
@@ -566,19 +571,22 @@ mod tests {
     #[test]
     fn the_mill_queue_buys_what_the_player_can_pay() {
         let mut t = world(250.0);
-        assert!(
+        assert_eq!(
             t.queue_farms(PlayerId::new(1), QueueCount::of_data(5), FARM)
-                .unwrap()
+                .unwrap(),
+            QueueOutcome::Queued
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(4));
         assert_eq!(t.players[1].attributes[1], Amount::new(10.0));
-        assert!(
-            !t.queue_farms(PlayerId::new(1), QueueCount::of_data(1), FARM)
-                .unwrap()
+        assert_eq!(
+            t.queue_farms(PlayerId::new(1), QueueCount::of_data(1), FARM)
+                .unwrap(),
+            QueueOutcome::NoneQueued
         );
-        assert!(
-            !t.queue_farms(PlayerId::new(1), QueueCount::of_data(0), FARM)
-                .unwrap()
+        assert_eq!(
+            t.queue_farms(PlayerId::new(1), QueueCount::of_data(0), FARM)
+                .unwrap(),
+            QueueOutcome::NoneQueued
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(4));
     }
@@ -589,22 +597,25 @@ mod tests {
     fn pastures_and_fish_traps_pay_their_paid_entries() {
         let mut t = world(1000.0);
         t.players[1].attributes[0] = Amount::new(99.0);
-        assert!(
+        assert_eq!(
             t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE_1889)
-                .unwrap()
+                .unwrap(),
+            QueueOutcome::Queued
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(1));
         assert_eq!(t.players[1].resources(), amounts([99.0, 900.0, 0.0, 0.0]));
         t.players[1].attributes[0] = Amount::new(100.0);
-        assert!(
+        assert_eq!(
             t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), PASTURE_1889)
-                .unwrap()
+                .unwrap(),
+            QueueOutcome::Queued
         );
         assert_eq!(t.players[1].resources(), amounts([100.0, 700.0, 0.0, 0.0]));
         t.players[1].farm_queue = QueueCount::of_data(2);
-        assert!(
+        assert_eq!(
             t.queue_fish_traps(PlayerId::new(1), QueueCount::of_data(3))
-                .unwrap()
+                .unwrap(),
+            QueueOutcome::Queued
         );
         assert_eq!(t.players[1].fish_trap_queue, QueueCount::of_data(3));
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(2));
@@ -616,14 +627,16 @@ mod tests {
     fn full_queue_takes_no_purchase() {
         let mut t = world(10_000.0);
         t.players[1].farm_queue = QueueCount::of_data(40);
-        assert!(
-            !t.queue_farms(PlayerId::new(1), QueueCount::of_data(1), FARM)
-                .unwrap()
+        assert_eq!(
+            t.queue_farms(PlayerId::new(1), QueueCount::of_data(1), FARM)
+                .unwrap(),
+            QueueOutcome::NoneQueued
         );
         t.players[1].farm_queue = QueueCount::of_data(39);
-        assert!(
+        assert_eq!(
             t.queue_farms(PlayerId::new(1), QueueCount::of_data(3), FARM)
-                .unwrap()
+                .unwrap(),
+            QueueOutcome::Queued
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(42));
     }
@@ -632,9 +645,10 @@ mod tests {
     #[test]
     fn master_the_player_lacks_buys_nothing() {
         let mut t = world(1000.0);
-        assert!(
-            !t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), ids::ID_1187)
-                .unwrap()
+        assert_eq!(
+            t.queue_farms(PlayerId::new(1), QueueCount::of_data(2), ids::ID_1187)
+                .unwrap(),
+            QueueOutcome::NoneQueued
         );
         assert_eq!(t.players[1].attributes[1], Amount::new(1000.0));
     }
@@ -787,30 +801,35 @@ mod tests {
     fn return_refunds_at_most_the_queue() {
         let mut t = world(0.0);
         t.players[1].farm_queue = QueueCount::of_data(3);
-        assert!(
+        assert_eq!(
             t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(5), FARM)
-                .unwrap()
+                .unwrap(),
+            Refund::Refunded
         );
         assert_eq!(t.players[1].farm_queue, QueueCount::of_data(0));
         assert_eq!(t.players[1].attributes[1], Amount::new(180.0));
-        assert!(
-            !t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(1), FARM)
-                .unwrap()
+        assert_eq!(
+            t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(1), FARM)
+                .unwrap(),
+            Refund::NoneQueued
         );
         t.players[1].farm_queue = QueueCount::of_data(2);
-        assert!(
+        assert_eq!(
             t.unqueue_farms(PlayerId::new(1), QueueCount::of_data(1), PASTURE_1889)
-                .unwrap()
+                .unwrap(),
+            Refund::Refunded
         );
         assert_eq!(t.players[1].resources(), amounts([0.0, 280.0, 0.0, 0.0]));
         t.players[1].fish_trap_queue = QueueCount::of_data(1);
-        assert!(
-            !t.unqueue_fish_traps(PlayerId::new(1), QueueCount::of_data(0))
-                .unwrap()
+        assert_eq!(
+            t.unqueue_fish_traps(PlayerId::new(1), QueueCount::of_data(0))
+                .unwrap(),
+            Refund::NoneQueued
         );
-        assert!(
+        assert_eq!(
             t.unqueue_fish_traps(PlayerId::new(1), QueueCount::of_data(2))
-                .unwrap()
+                .unwrap(),
+            Refund::Refunded
         );
         assert_eq!(t.players[1].fish_trap_queue, QueueCount::of_data(0));
         assert_eq!(t.players[1].attributes[1], Amount::new(380.0));
