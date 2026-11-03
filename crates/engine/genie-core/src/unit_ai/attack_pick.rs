@@ -33,9 +33,7 @@ use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::Ask;
 use crate::unit_ai::{
-    ARTIFACT_AI, BOAR_AI, BUILDING_AI, CIVILIAN, FISHING_AI, OrderRecord, SIEGE_AI, SIEGE_TOWER_AI,
-    TRADE_AI, TRANSPORT_AI, civilian_may_attack, defend_patrol_range, lion_may_attack,
-    siege_can_attack,
+    OrderRecord, civilian_may_attack, defend_patrol_range, lion_may_attack, siege_can_attack,
 };
 use crate::world::WorldTime;
 use crate::world::layer::AttributeRoles;
@@ -320,24 +318,26 @@ pub fn can_attack(
     unit_ai_tuning: &UnitAiTuning,
 ) -> Result<bool, GenieError> {
     match me.ai_kind {
-        UnitAiKind::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
-        UnitAiKind::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
-        BOAR_AI
-        | UnitAiKind::RANGED_6
-        | UnitAiKind::RANGED_7
-        | TRADE_AI
-        | TRANSPORT_AI
-        | FISHING_AI
-        | ARTIFACT_AI
-        | SIEGE_TOWER_AI
-        | UnitAiKind::LIVESTOCK => Ok(true),
-        UnitAiKind::LION => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
-        CIVILIAN => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
-        BUILDING_AI => Ok(false),
-        UnitAiKind::TOWER => tower_can_attack(me, t, roles, unit_ai_tuning),
-        UnitAiKind::SOLDIER => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
-        SIEGE_AI => siege_can_attack(me, seeker, t, TargetRules::Own, roles, unit_ai_tuning),
-        _ => Err(GenieError::unsupported(
+        UnitAiKind::Hunted => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
+        UnitAiKind::Predator => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
+        UnitAiKind::Boar
+        | UnitAiKind::Ranged
+        | UnitAiKind::Ranged2
+        | UnitAiKind::Trade
+        | UnitAiKind::Transport
+        | UnitAiKind::Fishing
+        | UnitAiKind::Artifact
+        | UnitAiKind::SiegeTower
+        | UnitAiKind::Livestock => Ok(true),
+        UnitAiKind::Lion => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
+        UnitAiKind::Civilian => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
+        UnitAiKind::Building => Ok(false),
+        UnitAiKind::Tower => tower_can_attack(me, t, roles, unit_ai_tuning),
+        UnitAiKind::Soldier => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
+        UnitAiKind::Siege => {
+            siege_can_attack(me, seeker, t, TargetRules::Own, roles, unit_ai_tuning)
+        }
+        UnitAiKind::Priest => Err(GenieError::unsupported(
             "an attack check (slot 0xa0) of a unit-AI type not modelled",
         )),
     }

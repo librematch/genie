@@ -37,10 +37,13 @@ fn history(order: i32, action: i32) -> UnitAiModuleEntry1 {
     }
 }
 
-/// A combat object whose unit AI is `ai`.
+/// A combat object whose unit AI is `ai`, a soldier's (`needUnitAI` 0xd, which the save
+/// follows with the base's module).
 fn with_ai(ai: UnitAiModule) -> genie_save::Object {
     let mut object = combat_object(5, 4);
-    combat_mut(&mut object).unit_ai_module = Some(Box::new(ai));
+    let combat = combat_mut(&mut object);
+    combat.need_unit_ai = 0xd;
+    combat.unit_ai_module_2 = Some(Box::new(ai));
     object
 }
 
@@ -51,6 +54,17 @@ fn an_object_without_unit_ai_imports_none() {
         unit_ai(&combat_object(5, 4), object_id(5), PLAYERS).map(|ai| ai.is_none()),
         Ok(true)
     );
+}
+
+/// A saved unit AI of type 1, which the load has the factory pick by class, fails the import:
+/// no constructor of the switch makes it.
+#[test]
+fn saved_unit_ai_of_kind_one_fails_the_import() {
+    let mut object = with_ai(idle());
+    combat_mut(&mut object).need_unit_ai = 1;
+    let e = unit_ai(&object, object_id(5), PLAYERS).unwrap_err();
+    assert_eq!(e.kind(), ErrorKind::InvalidInput);
+    assert!(e.to_string().contains("no constructor makes"), "{e}");
 }
 
 /// The orders and actions import as their kinds: a field's −1 as none, the history's and the
@@ -95,7 +109,9 @@ fn the_saved_orders_and_actions_import_as_their_kinds() {
 #[test]
 fn tower_saved_orders_import() {
     let mut object = combat_object(5, 4);
-    combat_mut(&mut object).tribe_tower_unit_ai_module = Some(Box::new(TribeTowerUnitAiModule {
+    let combat = combat_mut(&mut object);
+    combat.need_unit_ai = 0xf;
+    combat.tribe_tower_unit_ai_module = Some(Box::new(TribeTowerUnitAiModule {
         unit_ai_module: idle(),
         saved_order: vec![record(700)],
         ..TribeTowerUnitAiModule::default()

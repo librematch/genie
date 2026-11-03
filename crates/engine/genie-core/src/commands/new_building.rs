@@ -185,7 +185,7 @@ impl World {
         let ai = unit_ai
             .and_then(|t| Ok((t, self.new_object(player, master, &made, position)?)))
             .map(|(t, new)| {
-                t.and_then(|t| {
+                t.map(|t| {
                     UnitAi::constructed(t, &new, self.streams.get(Stream::Ai), &self.model.roles)
                 })
             });

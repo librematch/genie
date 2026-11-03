@@ -161,7 +161,7 @@ mod spatial {
     /// without its master and a ghost.
     fn placed() -> Spatial {
         let mut unit = at(combat_object(10, 83), 1.5, 1.5);
-        combat_mut(&mut unit).rge_combat_object.capture_flag = 5;
+        combat_mut(&mut unit).rge_combat_object.capture_flag = 2;
         let mut standing = at(building_object(11, 70), 2.5, 2.5);
         let b = building_mut(&mut standing);
         b.built = 1;
@@ -214,7 +214,7 @@ mod spatial {
         let seer = out.sight.as_ref().unwrap().seer(object_id(10)).unwrap();
         assert_eq!(
             (seer.kind, seer.capture, seer.umv),
-            (MasterKind::COMBAT, CaptureKind::of_data(5), 0)
+            (MasterKind::COMBAT, CaptureKind::Again, 0)
         );
         assert!(seer.explored && seer.building.is_none());
         assert_eq!(

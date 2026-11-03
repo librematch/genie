@@ -21,10 +21,9 @@ use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
-use crate::unit_ai::BOAR_AI;
-use crate::unit_ai::LION_AI;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -235,7 +234,7 @@ impl Attack {
         // The boar's unit-AI type, whose slot 0x1f0 (`FUN_140c16d50`) sends it home.
         // The lion's unit-AI type, whose slot 0x1f0 (`FUN_140c16d60`) does nothing.
         if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
-            && !matches!(r.ai_kind, Some(BOAR_AI | LION_AI) | None)
+            && !matches!(r.ai_kind, Some(UnitAiKind::Boar | UnitAiKind::Lion) | None)
         {
             return Err(GenieError::unsupported(
                 "a predator's failed Attack whose unit AI is not a boar's or a lion's (slot 0x1f0)",
@@ -249,7 +248,7 @@ impl Attack {
             forget_target(c.w.parts.unit_ai.get_mut(unit.id));
         }
         if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
-            && r.ai_kind == Some(BOAR_AI)
+            && r.ai_kind == Some(UnitAiKind::Boar)
             && let Some(home) =
                 c.w.parts
                     .unit_ai

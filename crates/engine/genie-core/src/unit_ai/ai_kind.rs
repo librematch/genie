@@ -1,73 +1,111 @@
 //! A unit AI's factory type as one type: which `Tribe…UnitAIModule` a master's unit AI is
 //! ([`crate::unit_ai::unit_ai_kind`]), the value the module's constructor takes.
 
+use crate::GenieError;
 use genie_diff::{Diff, Differ};
 use std::fmt::{Display, Error, Formatter};
 
-/// A unit AI's factory type (`UnitAi::ai_kind`), 0 to 0x13 in the game's switch
-/// (`FUN_140c5c170`'s constructor). The simulation tells some apart (the boar, the soldier, the
-/// siege unit, the civilian ...), which this module names; the others are values of the type
-/// too, so it is a newtype with named constants, as [`crate::objects::masters::ClassId`].
+/// A unit AI's factory type (`UnitAi::ai_kind`): the case of `FUN_141215560`'s switch that
+/// constructs its module, one RTTI class each. The set is closed: the switch constructs none for
+/// another value, and the factory (`FUN_141215a90`) constructs no other. The load
+/// (`FUN_14121ec90`) reads the save's type: 0 holds no unit AI, 1 has the factory pick the type
+/// by the master's class (not modelled: [`UnitAiKind::try_from`] refuses it), 2 or more is the
+/// switch's.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnitAiKind(
-    /// Its value, as the factory switch holds it.
-    u32,
-);
+#[repr(u32)]
+pub enum UnitAiKind {
+    /// 2: the hunted animal (`TribeHuntedAnimalUnitAIModule`, `FUN_140c11920`: deer, sheep
+    /// before capture).
+    Hunted = 2,
+    /// 3: the predator (`TribePreditorUnitAIModule`, `FUN_140c11da0`).
+    Predator = 3,
+    /// 4: the boar (`TribeElephantUnitAIModule`, `FUN_140c11720`).
+    Boar = 4,
+    /// 5: the lion (`TribeLionUnitAIModule`, `FUN_140c11bd0`).
+    Lion = 5,
+    /// 6: the ranged unit (`TribeRangedUnitAIModule`, `FUN_140c11f80`: the base's behaviour,
+    /// stance 3, no cared list).
+    Ranged = 6,
+    /// 7: the second ranged unit (`TribeRangedUnitAIModule2`, `FUN_140c11f50`, as
+    /// [`UnitAiKind::Ranged`]).
+    Ranged2 = 7,
+    /// 8: the civilian (`TribeCivilianUnitAIModule`, `FUN_140c115d0`: the villagers).
+    Civilian = 8,
+    /// 9: the priest (`TribePriestUnitAIModule`, `FUN_140c11e30`: classes 18, 43 and 53).
+    Priest = 9,
+    /// 0xa: the trade ship and the trade cart (`TribeTradeShipUnitAIModule`, `FUN_140c12ab0`).
+    Trade = 0xa,
+    /// 0xb: the transport ship (`TribeTransportShipUnitAIModule`, `FUN_140c12c30`).
+    Transport = 0xb,
+    /// 0xc: the fishing ship (`TribeFishingShipUnitAIModule`, `FUN_140c11860`, class 21).
+    Fishing = 0xc,
+    /// 0xd: the soldier (`TribeSoldierUnitAIModule`, `FUN_140c12300`), the factory's type for
+    /// any class it names no other for.
+    #[default]
+    Soldier = 0xd,
+    /// 0xe: the artifact (`TribeArtifactUnitAIModule`, `FUN_140c11340`, class 1's).
+    Artifact = 0xe,
+    /// 0xf: the tower (`TribeTowerUnitAIModule`, `FUN_140c12960`, the town centre's too).
+    Tower = 0xf,
+    /// 0x10: the siege unit (`TribeSiegeUnitAIModule`, `FUN_140c12040`).
+    Siege = 0x10,
+    /// 0x11: the building (`TribeBuildingUnitAIModule`, `FUN_140c11470`).
+    Building = 0x11,
+    /// 0x12: the siege tower (`TribeSiegeTowerUnitAIModule`, `FUN_140c11fb0`, master 1105's).
+    SiegeTower = 0x12,
+    /// 0x13: the livestock (`TribeLivestockUnitAIModule`, `FUN_140c11d70`).
+    Livestock = 0x13,
+}
 
 impl UnitAiKind {
     /// Its value, for the constructor's switch, a packet and the checkpoint's words.
     #[must_use]
     pub const fn get(self) -> u32 {
-        self.0
+        self as u32
     }
+}
 
-    /// The type a value names: any value is one (the game's switch takes the others as no module).
-    #[must_use]
-    pub const fn of_value(value: u32) -> Self {
-        Self(value)
+impl TryFrom<u32> for UnitAiKind {
+    type Error = GenieError;
+
+    /// The type of a saved unit AI's `need_unit_ai`.
+    ///
+    /// # Errors
+    ///
+    /// A value the switch constructs no module for.
+    fn try_from(value: u32) -> Result<Self, GenieError> {
+        Ok(match value {
+            2 => Self::Hunted,
+            3 => Self::Predator,
+            4 => Self::Boar,
+            5 => Self::Lion,
+            6 => Self::Ranged,
+            7 => Self::Ranged2,
+            8 => Self::Civilian,
+            9 => Self::Priest,
+            0xa => Self::Trade,
+            0xb => Self::Transport,
+            0xc => Self::Fishing,
+            0xd => Self::Soldier,
+            0xe => Self::Artifact,
+            0xf => Self::Tower,
+            0x10 => Self::Siege,
+            0x11 => Self::Building,
+            0x12 => Self::SiegeTower,
+            0x13 => Self::Livestock,
+            _ => {
+                return Err(
+                    GenieError::invalid_input("a unit-AI type no constructor makes")
+                        .with("ai_kind", value),
+                );
+            }
+        })
     }
-
-    /// The hunted animal's factory type (`TribeHuntedUnitAIModule`: deer, sheep before capture).
-    pub const HUNTED: Self = Self(2);
-    /// The ranged units' first factory type (6, the base's behaviour: stance 3, no cared list).
-    pub const RANGED_6: Self = Self(6);
-    /// The ranged units' second factory type (7, as [`UnitAiKind::RANGED_6`]).
-    pub const RANGED_7: Self = Self(7);
-    /// The predator's factory type (`TribePreditorUnitAIModule`, `FUN_140c11da0`).
-    pub const PREDATOR: Self = Self(3);
-    /// The boar's factory type (`TribePreditorUnitAIModule`).
-    pub const BOAR: Self = Self(4);
-    /// The lion's factory type (`TribeLionUnitAIModule`, `FUN_140c11bd0`).
-    pub const LION: Self = Self(5);
-    /// The civilian's factory type (`TribeCivilianUnitAIModule`, the villagers').
-    pub const CIVILIAN: Self = Self(8);
-    /// The priest's factory type (`TribePriestUnitAIModule`: classes 18, 43 and 53).
-    pub const PRIEST: Self = Self(9);
-    /// The trade ship's and the trade cart's factory type (`TribeTradeShipUnitAIModule`).
-    pub const TRADE: Self = Self(0xa);
-    /// The transport ship's factory type (`TribeTransportShipUnitAIModule`).
-    pub const TRANSPORT: Self = Self(11);
-    /// The fishing ship's factory type (`TribeFishingShipUnitAIModule`, class 21).
-    pub const FISHING: Self = Self(0xc);
-    /// The soldier's factory type (`TribeSoldierUnitAIModule`).
-    pub const SOLDIER: Self = Self(13);
-    /// The artifact's factory type (`TribeArtifactUnitAIModule`, class 1's).
-    pub const ARTIFACT: Self = Self(14);
-    /// The tower's factory type (`TribeTowerUnitAIModule`, the town centre's too).
-    pub const TOWER: Self = Self(15);
-    /// The siege unit's factory type (`TribeSiegeUnitAIModule`).
-    pub const SIEGE: Self = Self(0x10);
-    /// The building unit AI's factory type (`TribeBuildingUnitAIModule`).
-    pub const BUILDING: Self = Self(17);
-    /// The siege tower's factory type (`TribeSiegeTowerUnitAIModule`, master 1105's).
-    pub const SIEGE_TOWER: Self = Self(0x12);
-    /// The livestock's factory type (`TribeLivestockUnitAIModule`, `FUN_140c11d70`).
-    pub const LIVESTOCK: Self = Self(0x13);
 }
 
 impl Display for UnitAiKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.0.fmt(f)
+        self.get().fmt(f)
     }
 }
 
@@ -81,11 +119,16 @@ impl Diff for UnitAiKind {
 mod tests {
     use crate::unit_ai::UnitAiKind;
 
-    /// Any value is a type, and the named ones keep the game's values.
+    /// Each of the switch's 2 to 0x13 is its variant and back; the switch's others are refused.
     #[test]
-    fn kind_is_any_value_and_the_named_ones_keep_the_games() {
-        assert_eq!(UnitAiKind::of_value(13), UnitAiKind::SOLDIER);
-        assert_eq!(UnitAiKind::BOAR.get(), 4);
-        assert_eq!(UnitAiKind::of_value(99).get(), 99);
+    fn every_constructed_kind_maps_to_its_variant_and_back() {
+        for value in 2..=0x13 {
+            assert_eq!(UnitAiKind::try_from(value).map(UnitAiKind::get), Ok(value));
+        }
+        assert_eq!(UnitAiKind::try_from(13), Ok(UnitAiKind::Soldier));
+        for value in [0, 1, 0x14, 99] {
+            let e = UnitAiKind::try_from(value).unwrap_err();
+            assert!(e.to_string().contains("no constructor makes"), "{e}");
+        }
     }
 }

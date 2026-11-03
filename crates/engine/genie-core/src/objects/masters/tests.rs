@@ -1810,7 +1810,7 @@ fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
             ids::HOUSE,
             &roles()
         ),
-        Some(UnitAiKind::BUILDING)
+        Some(UnitAiKind::Building)
     );
     assert_eq!(
         unit_ai_kind(
@@ -1818,7 +1818,7 @@ fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
             master_id(79),
             &roles(),
         ),
-        Some(UnitAiKind::TOWER)
+        Some(UnitAiKind::Tower)
     );
     assert_eq!(
         unit_ai_kind(
@@ -1826,7 +1826,7 @@ fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
             master_id(48),
             &roles()
         ),
-        Some(UnitAiKind::BOAR)
+        Some(UnitAiKind::Boar)
     );
     assert_eq!(
         unit_ai_kind(
@@ -1834,7 +1834,7 @@ fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
             master_id(126),
             &roles()
         ),
-        Some(UnitAiKind::LION)
+        Some(UnitAiKind::Lion)
     );
     // the factory's own ids first
     assert_eq!(
@@ -1843,7 +1843,7 @@ fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
             ids::ID_1105,
             &roles()
         ),
-        Some(UnitAiKind::SIEGE_TOWER)
+        Some(UnitAiKind::SiegeTower)
     );
 }
 

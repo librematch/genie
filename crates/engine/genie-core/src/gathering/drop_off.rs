@@ -32,8 +32,9 @@ use crate::objects::{Graphics, WorkerCount};
 use crate::pathing::zones::UNKNOWN_RESTRICTION;
 use crate::players::Amount;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::UnitAiKind;
+use crate::unit_ai::civilian_kind;
 use crate::unit_ai::world_view::DropWorld;
-use crate::unit_ai::{CIVILIAN, civilian_kind};
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
@@ -115,7 +116,7 @@ impl Unit {
             return Ok(None);
         };
         let class = ai.target_class.or(gather.target_class);
-        if ai.ai_kind != CIVILIAN {
+        if ai.ai_kind != UnitAiKind::Civilian {
             return Err(GenieError::unsupported(
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));

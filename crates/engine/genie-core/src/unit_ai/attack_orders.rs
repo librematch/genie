@@ -22,8 +22,7 @@ use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
-    ARTIFACT_AI, CIVILIAN, Notify, QueuedOrder, SIEGE_AI, SIEGE_TOWER_AI, Surroundings, UnitAi,
-    UnitSide, civilian_may_attack, lion_may_attack,
+    Notify, QueuedOrder, Surroundings, UnitAi, UnitSide, civilian_may_attack, lion_may_attack,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -159,7 +158,7 @@ impl UnitAi {
         let roles = &at.roles;
         if matches!(
             self.ai_kind,
-            UnitAiKind::SOLDIER | UnitAiKind::TOWER | SIEGE_AI
+            UnitAiKind::Soldier | UnitAiKind::Tower | UnitAiKind::Siege
         ) {
             return side.may_attack(target, &self.seeker(at));
         }
@@ -170,21 +169,21 @@ impl UnitAi {
             // FUN_140c48400, the base's: the boar's, the ranged units' (6, 7), the trade
             // ship's, the transport ship's, the fishing ship's, the artifact's, the siege
             // tower's and the livestock's
-            UnitAiKind::BOAR
-            | UnitAiKind::RANGED_6
-            | UnitAiKind::RANGED_7
-            | UnitAiKind::TRADE
-            | UnitAiKind::TRANSPORT
-            | UnitAiKind::FISHING
-            | ARTIFACT_AI
-            | SIEGE_TOWER_AI
-            | UnitAiKind::LIVESTOCK => true,
-            UnitAiKind::LION => {
+            UnitAiKind::Boar
+            | UnitAiKind::Ranged
+            | UnitAiKind::Ranged2
+            | UnitAiKind::Trade
+            | UnitAiKind::Transport
+            | UnitAiKind::Fishing
+            | UnitAiKind::Artifact
+            | UnitAiKind::SiegeTower
+            | UnitAiKind::Livestock => true,
+            UnitAiKind::Lion => {
                 rules == TargetRules::Any || lion_may_attack(at.attack_priority, t.class, roles)
             }
-            CIVILIAN => civilian_may_attack(at.attack_priority, t.class, roles),
+            UnitAiKind::Civilian => civilian_may_attack(at.attack_priority, t.class, roles),
             // FUN_140c18b60
-            UnitAiKind::BUILDING => false,
+            UnitAiKind::Building => false,
             _ => {
                 return Err(GenieError::unsupported(
                     "AttackObject's slot 0xa0 of a unit AI type not modelled",

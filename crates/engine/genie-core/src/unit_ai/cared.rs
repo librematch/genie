@@ -1,7 +1,6 @@
 //! What each unit-AI type cares for: the classes its searches look for, their radii and its
 //! idle timeout.
 
-use crate::GenieError;
 use crate::map::Distance;
 use crate::math::image::unit_ai::{
     RUN_DRAW_SCALE as UNIT_AI_RUN_DRAW_SCALE, RUN_EPSILON as UNIT_AI_RUN_EPSILON,
@@ -13,10 +12,7 @@ use crate::objects::masters::GatherGroup;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::UnitAiKind;
-use crate::unit_ai::{
-    BOAR_AI, FISHING_AI, HUNTED_SIGHT_GROWTH, LION_AI, LIVESTOCK_AI, PREDATOR_AI, PRIEST_AI,
-    SIEGE_AI, SIEGE_TOWER_AI, SOLDIER_AI, Surroundings, TOWER_AI, TRADE_AI,
-};
+use crate::unit_ai::{HUNTED_SIGHT_GROWTH, Surroundings};
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -49,9 +45,6 @@ pub const PRIEST_CARED: [ClassId; 30] = classes([
     3, 0, 4, 26, 24, 6, 25, 17, 10, 12, 35, 23, 36, 28, 18, 13, 44, 46, 43, 45, 47, 50, 51, 54, 55,
     56, 57, 19, 52, 42,
 ]);
-
-/// The civilian's factory type (`TribeCivilianUnitAIModule`, the villagers').
-pub const CIVILIAN: UnitAiKind = UnitAiKind::CIVILIAN;
 
 /// The classes a civilian cares about (`+0x190`, `TribeCivilianUnitAIModule`'s constructor
 /// `FUN_140c115d0`).
@@ -122,11 +115,6 @@ pub const BUILDING_CARED: [ClassId; 39] = classes([
     50, 51, 53, 54, 55, 56, 57, 19, 59, 52, 49, 39, 42, 61,
 ]);
 
-/// The artifact's factory type (`TribeArtifactUnitAIModule`, class 1's: relic carts, the
-/// monument, the torches, the rock church, the emperor in a litter, the treasure chest); its
-/// slot 0x1e0 (`FUN_140c16de0`) answers it.
-pub const ARTIFACT_AI: UnitAiKind = UnitAiKind::ARTIFACT;
-
 /// The classes an artifact cares about (`+0x190`, `TribeArtifactUnitAIModule`'s constructor
 /// `FUN_140c11340`: the 0x84 bytes it copies from `DAT_142ef90f0` on, then 61).
 pub const ARTIFACT_CARED: [ClassId; 33] = classes([
@@ -161,59 +149,48 @@ pub const TRADE_CART_CARED: [ClassId; 5] = classes([3, 17, 18, 52, 19]);
 /// `DAT_142ef9020`, `DAT_142ef9130` and `DAT_142ef9160`, then 49).
 pub const FISHING_CARED: [ClassId; 13] = classes([3, 22, 20, 2, 21, 5, 31, 33, 53, 52, 27, 39, 49]);
 
-/// The classes a unit AI of factory type `ai_type` cares about (its constructor's `+0x190` list),
+/// The classes a unit AI of factory type `ai_kind` cares about (its constructor's `+0x190` list),
 /// which its searches read: the trade AI's by its unit's `class` (a boat's or a cart's), the
 /// soldier's with 10 for a computer player's (`FUN_140c12300` asks the owner when the AI is made;
 /// taken as its owner now), the lion's without the four the world's `+0x6b4` of 1 adds.
-///
-/// # Errors
-///
-/// Another type, whose list is not held here.
 pub(crate) fn cared_classes(
     ai_kind: UnitAiKind,
     class: Option<ClassId>,
     player_kind: PlayerKind,
     roles: &Roles,
-) -> Result<&'static [ClassId], GenieError> {
+) -> &'static [ClassId] {
     match ai_kind {
-        UnitAiKind::HUNTED => Ok(&HUNTED_CARED),
-        PREDATOR_AI => Ok(&PREDATOR_CARED),
+        UnitAiKind::Hunted => &HUNTED_CARED,
+        UnitAiKind::Predator => &PREDATOR_CARED,
         // the boar's (`FUN_140c11720`), the ranged units' (`FUN_140c11f80`, `FUN_140c11f50`) and
         // the livestock's (`FUN_140c11d70`) constructors give none: the base's (`FUN_140c2e080`
         // with 0) alone
-        BOAR_AI | UnitAiKind::RANGED_6 | UnitAiKind::RANGED_7 | LIVESTOCK_AI => Ok(&[]),
-        LION_AI => Ok(&LION_CARED),
-        PRIEST_AI => Ok(&PRIEST_CARED),
-        CIVILIAN => Ok(&CIVILIAN_CARED),
-        BUILDING_AI => Ok(&BUILDING_CARED),
-        TRANSPORT_AI => Ok(&TRANSPORT_CARED),
-        SIEGE_TOWER_AI => Ok(&SIEGE_TOWER_CARED),
+        UnitAiKind::Boar | UnitAiKind::Ranged | UnitAiKind::Ranged2 | UnitAiKind::Livestock => &[],
+        UnitAiKind::Lion => &LION_CARED,
+        UnitAiKind::Priest => &PRIEST_CARED,
+        UnitAiKind::Civilian => &CIVILIAN_CARED,
+        UnitAiKind::Building => &BUILDING_CARED,
+        UnitAiKind::Transport => &TRANSPORT_CARED,
+        UnitAiKind::SiegeTower => &SIEGE_TOWER_CARED,
         // The trade boat's class (`-0xeaa` raw): its cared classes and its trade partner are not the
         // trade cart's.
-        TRADE_AI if roles.of_some_class(class).contains(ClassRoles::TRADE_BOAT) => {
-            Ok(&TRADE_SHIP_CARED)
+        UnitAiKind::Trade if roles.of_some_class(class).contains(ClassRoles::TRADE_BOAT) => {
+            &TRADE_SHIP_CARED
         }
-        TRADE_AI => Ok(&TRADE_CART_CARED),
-        FISHING_AI => Ok(&FISHING_CARED),
-        ARTIFACT_AI => Ok(&ARTIFACT_CARED),
-        TOWER_AI => Ok(&TOWER_CARED),
-        SOLDIER_AI if player_kind.is_computer() => Ok(&SOLDIER_CARED_COMPUTER),
-        SOLDIER_AI => Ok(&SOLDIER_CARED),
-        SIEGE_AI => Ok(&SIEGE_CARED),
-        _ => Err(GenieError::unsupported(
-            "a retarget search of a unit-AI type whose classes are not held",
-        )),
+        UnitAiKind::Trade => &TRADE_CART_CARED,
+        UnitAiKind::Fishing => &FISHING_CARED,
+        UnitAiKind::Artifact => &ARTIFACT_CARED,
+        UnitAiKind::Tower => &TOWER_CARED,
+        UnitAiKind::Soldier if player_kind.is_computer() => &SOLDIER_CARED_COMPUTER,
+        UnitAiKind::Soldier => &SOLDIER_CARED,
+        UnitAiKind::Siege => &SIEGE_CARED,
     }
 }
 
-/// What a search of a unit AI of `ai_type` covers (`FUN_140c63e20`), its unit of `class`, line
+/// What a search of a unit AI of `ai_kind` covers (`FUN_140c63e20`), its unit of `class`, line
 /// of sight `los` and search radius (slot 0x2c8): its type's [`cared_classes`] and its radius
 /// ([`search_radius`]), the civilian's and the fishing ship's grown by their `+0x1e8`
 /// ([`civilian_search_radius`]).
-///
-/// # Errors
-///
-/// A unit AI type whose classes are not held.
 pub(crate) fn search_area(
     ai_kind: UnitAiKind,
     class: Option<ClassId>,
@@ -221,14 +198,14 @@ pub(crate) fn search_area(
     radius: Distance,
     player_kind: PlayerKind,
     roles: &Roles,
-) -> Result<(&'static [ClassId], Distance), GenieError> {
-    let classes = cared_classes(ai_kind, class, player_kind, roles)?;
-    let radius = if matches!(ai_kind, CIVILIAN | FISHING_AI) {
+) -> (&'static [ClassId], Distance) {
+    let classes = cared_classes(ai_kind, class, player_kind, roles);
+    let radius = if matches!(ai_kind, UnitAiKind::Civilian | UnitAiKind::Fishing) {
         civilian_search_radius(los, radius)
     } else {
         search_radius(los, radius)
     };
-    Ok((classes, radius))
+    (classes, radius)
 }
 
 /// The action values that need a live target (the target block's mask `0x4002080d` over the
@@ -273,12 +250,6 @@ pub const TRANSPORT_CARED: [ClassId; 10] = classes([3, 22, 20, 2, 21, 53, 52, 27
 /// The classes a siege tower cares about (`+0x190`, `TribeSiegeTowerUnitAIModule`'s constructor
 /// `FUN_140c11fb0`).
 pub const SIEGE_TOWER_CARED: [ClassId; 2] = classes([27, 39]);
-
-/// The building unit AI's factory type (`TribeBuildingUnitAIModule`).
-pub(super) const BUILDING_AI: UnitAiKind = UnitAiKind::BUILDING;
-
-/// The transport ship's factory type (`TribeTransportShipUnitAIModule`).
-pub(super) const TRANSPORT_AI: UnitAiKind = UnitAiKind::TRANSPORT;
 
 /// A table of classes from the game's numbers, in the order its search takes them (a unit AI's
 /// cared list, the fishing ship's foundations).

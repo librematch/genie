@@ -20,10 +20,7 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
-use crate::unit_ai::{
-    ARTIFACT_AI, AiAction, AiMove, BOAR_AI, CIVILIAN, FISHING_AI, PRIEST_AI, QueuedOrder, SIEGE_AI,
-    SIEGE_TOWER_AI, SOLDIER_AI, Surroundings, TOWER_AI, TRADE_AI,
-};
+use crate::unit_ai::{AiAction, AiMove, QueuedOrder, Surroundings};
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
@@ -55,28 +52,30 @@ pub(super) enum Retarget {
 pub(super) const fn retarget_kind(ai_kind: UnitAiKind) -> Result<Retarget, GenieError> {
     match ai_kind {
         // villagers (0x140c21da0) and livestock (0x140c21f20) return 9 from slot 73
-        UnitAiKind::CIVILIAN => Ok(Retarget::Civilian),
-        UnitAiKind::LIVESTOCK => Ok(Retarget::Never),
-        ARTIFACT_AI => Ok(Retarget::Artifact),
-        PRIEST_AI => Ok(Retarget::Priest),
+        UnitAiKind::Civilian => Ok(Retarget::Civilian),
+        UnitAiKind::Livestock => Ok(Retarget::Never),
+        UnitAiKind::Artifact => Ok(Retarget::Artifact),
+        UnitAiKind::Priest => Ok(Retarget::Priest),
         // hunted animal (2, slot 72 FUN_140c1eea0), boar (4, slot 72 FUN_140c1e630), lion (5,
         // slot 72 FUN_140c1fb70), trade ship (0xa, slot 72 FUN_140c21930), transport ship (11,
         // slot 72 0x140c21d20), fishing ship (0xc, slot 72 FUN_140c1eab0), soldier (13, slot 72
         // FUN_140c20db0), tower (15, the base's slot 72 FUN_140c564c0), building (17, slot 72
         // 0x140c1e600, which does nothing), siege unit (0x10, slot 72 FUN_140c206b0), siege tower
         // (0x12, slot 72 FUN_140c20690)
-        UnitAiKind::HUNTED
-        | UnitAiKind::BOAR
-        | UnitAiKind::LION
-        | TRADE_AI
-        | UnitAiKind::TRANSPORT
-        | FISHING_AI
-        | UnitAiKind::SOLDIER
-        | UnitAiKind::TOWER
-        | SIEGE_AI
-        | UnitAiKind::BUILDING
-        | SIEGE_TOWER_AI => Ok(Retarget::Base),
-        _ => Err(GenieError::unsupported("unit-AI type not modelled")),
+        UnitAiKind::Hunted
+        | UnitAiKind::Boar
+        | UnitAiKind::Lion
+        | UnitAiKind::Trade
+        | UnitAiKind::Transport
+        | UnitAiKind::Fishing
+        | UnitAiKind::Soldier
+        | UnitAiKind::Tower
+        | UnitAiKind::Siege
+        | UnitAiKind::Building
+        | UnitAiKind::SiegeTower => Ok(Retarget::Base),
+        UnitAiKind::Predator | UnitAiKind::Ranged | UnitAiKind::Ranged2 => {
+            Err(GenieError::unsupported("unit-AI type not modelled"))
+        }
     }
 }
 
@@ -214,9 +213,9 @@ pub fn factory_kind(
     {
         let held = roles.of_master(master);
         if held.contains(MasterRoles::SIEGE_TOWER) {
-            return Some(UnitAiKind::SIEGE_TOWER);
+            return Some(UnitAiKind::SiegeTower);
         } else if held.intersects(MasterRoles::ARMORED_ELEPHANT | MasterRoles::SIEGE_ELEPHANT) {
-            return Some(UnitAiKind::SIEGE);
+            return Some(UnitAiKind::Siege);
         }
     }
     Some({
@@ -241,9 +240,9 @@ pub fn factory_kind(
         ) {
             return None;
         } else if held.contains(ClassRoles::ARTIFACT) {
-            UnitAiKind::ARTIFACT
+            UnitAiKind::Artifact
         } else if held.intersects(ClassRoles::TRADE_BOAT | ClassRoles::TRADE_CART) {
-            UnitAiKind::TRADE
+            UnitAiKind::Trade
         } else if held.intersects(
             ClassRoles::BUILDING
                 | ClassRoles::WALL
@@ -252,7 +251,7 @@ pub fn factory_kind(
                 | ClassRoles::MISC_BUILDING,
         ) && (missile.is_none())
         {
-            UnitAiKind::BUILDING
+            UnitAiKind::Building
         } else if held.intersects(
             ClassRoles::BUILDING
                 | ClassRoles::WALL
@@ -261,36 +260,36 @@ pub fn factory_kind(
                 | ClassRoles::TOWER
                 | ClassRoles::MISC_BUILDING,
         ) {
-            TOWER_AI
+            UnitAiKind::Tower
         } else if held.contains(ClassRoles::VILLAGER) {
-            CIVILIAN
+            UnitAiKind::Civilian
         } else if held.intersects(ClassRoles::PREY | ClassRoles::KING) {
-            UnitAiKind::HUNTED
+            UnitAiKind::Hunted
         } else if held.contains(ClassRoles::PREDATOR)
             && (combat_level.get() == CombatLevel::ANIMAL.get())
         {
-            BOAR_AI
+            UnitAiKind::Boar
         } else if held.contains(ClassRoles::PREDATOR) {
-            UnitAiKind::LION
+            UnitAiKind::Lion
         } else if held.intersects(
             ClassRoles::SIEGE
                 | ClassRoles::PACKED_TREBUCHET
                 | ClassRoles::UNPACKED_TREBUCHET
                 | ClassRoles::SCORPION,
         ) {
-            UnitAiKind::SIEGE
+            UnitAiKind::Siege
         } else if held
             .intersects(ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC | ClassRoles::BOARDING_SHIP)
         {
-            UnitAiKind::PRIEST
+            UnitAiKind::Priest
         } else if held.contains(ClassRoles::TRANSPORT) {
-            UnitAiKind::TRANSPORT
+            UnitAiKind::Transport
         } else if held.contains(ClassRoles::FISHING_SHIP) {
-            UnitAiKind::FISHING
+            UnitAiKind::Fishing
         } else if held.intersects(ClassRoles::DOMESTIC_ANIMAL | ClassRoles::LIVESTOCK) {
-            UnitAiKind::LIVESTOCK
+            UnitAiKind::Livestock
         } else {
-            SOLDIER_AI
+            UnitAiKind::Soldier
         }
     })
 }

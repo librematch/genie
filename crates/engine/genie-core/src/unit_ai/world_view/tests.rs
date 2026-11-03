@@ -102,7 +102,7 @@ fn harmless(master: Master) -> bool {
     .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
     let attacker = Attacker {
-        ai_kind: UnitAiKind::CIVILIAN,
+        ai_kind: UnitAiKind::Civilian,
         player: PlayerId::new(1),
         player_kind: PlayerKind::Human,
         state: ObjectState::Alive,
@@ -214,7 +214,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
     ]
     .map(Arc::new);
     let attacker = Attacker {
-        ai_kind: UnitAiKind::SOLDIER,
+        ai_kind: UnitAiKind::Soldier,
         player: PlayerId::new(1),
         player_kind: PlayerKind::Human,
         state: ObjectState::Alive,
@@ -408,7 +408,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
     let attacker = Attacker {
-        ai_kind: UnitAiKind::SOLDIER,
+        ai_kind: UnitAiKind::Soldier,
         player: PlayerId::new(1),
         player_kind: PlayerKind::Human,
         state: ObjectState::Alive,

@@ -1103,7 +1103,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
     t.parts.set_unit_ai(
         unit.id,
         Some(UnitAi {
-            ai_kind: UnitAiKind::RANGED_6,
+            ai_kind: UnitAiKind::Ranged,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -4200,7 +4200,7 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         t.parts.set_unit_ai(
             u.id,
             Some(UnitAi {
-                ai_kind: UnitAiKind::SOLDIER,
+                ai_kind: UnitAiKind::Soldier,
                 current_order: None,
                 current_action: None,
                 current_target: None,

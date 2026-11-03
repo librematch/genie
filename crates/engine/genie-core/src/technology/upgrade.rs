@@ -472,7 +472,7 @@ impl World {
     fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> Result<(), GenieError> {
         let position = self.object_at(place)?.position();
         let made = self.new_object(p, new.id, new, position)?;
-        let ai = unit_ai_kind(new, new.id, &self.model.roles).and_then(|t| {
+        let ai = unit_ai_kind(new, new.id, &self.model.roles).map(|t| {
             UnitAi::constructed(t, &made, self.streams.get(Stream::Ai), &self.model.roles)
         });
         let id = self.object_at(place)?.id;

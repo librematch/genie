@@ -33,14 +33,15 @@ use crate::players::Relations;
 use crate::unit_ai::AttackTargetFlags;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::TargetRules;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::best_target::ThingFlags;
 use crate::unit_ai::best_target::{AttackCategory, Candidate, Searcher, Thing, order_weights};
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::Foreign;
 use crate::unit_ai::{
-    AttackPicker, Attacker, Convertee, Converter, Duel, Memory, PRIEST_AI, PatrolPath, Seeker,
-    Target, attack_sight, attacks_neutral as unit_ai_attacks_neutral,
-    can_attack as unit_ai_can_attack, can_convert, spares_friends as unit_ai_spares_friends,
+    AttackPicker, Attacker, Convertee, Converter, Duel, Memory, PatrolPath, Seeker, Target,
+    attack_sight, attacks_neutral as unit_ai_attacks_neutral, can_attack as unit_ai_can_attack,
+    can_convert, spares_friends as unit_ai_spares_friends,
 };
 use crate::world::AiSwitches;
 use crate::world::Mode680;
@@ -160,7 +161,7 @@ impl WorldPicker<'_> {
             .parts
             .unit_ai
             .get(p.id)
-            .is_none_or(|a| a.ai_kind != PRIEST_AI)
+            .is_none_or(|a| a.ai_kind != UnitAiKind::Priest)
         {
             return Ok(false);
         }

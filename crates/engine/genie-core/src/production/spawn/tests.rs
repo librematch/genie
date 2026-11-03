@@ -539,7 +539,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         t.parts.set_unit_ai(
             p.objects[ListIndex::new(2)].id,
             Some(UnitAi {
-                ai_kind: UnitAiKind::PREDATOR,
+                ai_kind: UnitAiKind::Predator,
                 current_order: None,
                 current_action: None,
                 current_target: None,
@@ -726,7 +726,7 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
         t.parts.set_unit_ai(
             p.objects[ListIndex::new(2)].id,
             Some(UnitAi {
-                ai_kind: UnitAiKind::PREDATOR,
+                ai_kind: UnitAiKind::Predator,
                 current_order: None,
                 current_action: None,
                 current_target: None,

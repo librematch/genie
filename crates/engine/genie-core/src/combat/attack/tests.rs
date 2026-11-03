@@ -74,9 +74,7 @@ use crate::testing::roles;
 use crate::testing::static_roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::BOAR_AI;
 use crate::unit_ai::Home;
-use crate::unit_ai::LION_AI;
 use crate::unit_ai::NotifyKind;
 use crate::vision::VisionBits;
 use crate::vision::visibility::Visibility;
@@ -977,7 +975,7 @@ fn strike_on_an_annex_hits_its_main_building() {
         hit_layer(),
     )
     .unwrap();
-    assert_eq!(struck.result, StrikeResult::of_data(1));
+    assert_eq!(struck.result, StrikeResult::Hit);
     assert_eq!(
         (blasted[0].hp, annex.hp),
         (HitPoints::new(96.0), HitPoints::new(96.0))
@@ -1293,13 +1291,13 @@ fn an_attack_on_target_out_of_sight_fails() {
         a
     };
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
-    let got = run(&mut a, class::CLASS_6, Some(UnitAiKind::SOLDIER), true);
+    let got = run(&mut a, class::CLASS_6, Some(UnitAiKind::Soldier), true);
     assert_eq!(got, (Ok(UpdateCode::Failed), true, true, false, failed));
     assert_eq!((a.target, a.state), (None, AttackState::Failed));
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
-    assert!(run(&mut a, class::PREDATOR, Some(BOAR_AI), false).3);
+    assert!(run(&mut a, class::PREDATOR, Some(UnitAiKind::Boar), false).3);
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
-    let lion = run(&mut a, class::PREDATOR, Some(LION_AI), false);
+    let lion = run(&mut a, class::PREDATOR, Some(UnitAiKind::Lion), false);
     assert_eq!((lion.2, lion.3, lion.4), (true, false, vec![]));
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     let alone = run(&mut a, class::PREDATOR, None, true);
@@ -1309,12 +1307,12 @@ fn an_attack_on_target_out_of_sight_fails() {
         ..own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0))
     };
     assert_eq!(
-        run(&mut a, class::CLASS_6, Some(UnitAiKind::SOLDIER), true),
+        run(&mut a, class::CLASS_6, Some(UnitAiKind::Soldier), true),
         (Ok(UpdateCode::Failed), false, false, false, vec![])
     );
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     assert!(
-        run(&mut a, class::PREDATOR, Some(UnitAiKind::SOLDIER), true)
+        run(&mut a, class::PREDATOR, Some(UnitAiKind::Soldier), true)
             .0
             .is_err()
     );

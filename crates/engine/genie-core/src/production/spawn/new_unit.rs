@@ -508,7 +508,7 @@ impl World {
                 },
                 ..Default::default()
             },
-            unit_ai: ai,
+            unit_ai: Some(ai),
             combat,
             // FUN_1411580a0: facing x (an immediate 1.0), its right -z, not waiting; the animated
             // object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0

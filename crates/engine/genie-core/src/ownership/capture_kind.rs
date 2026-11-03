@@ -1,74 +1,64 @@
 //! How another player takes an object over.
 
+use crate::GenieError;
+
 /// An object's `capture_flag` (`+0x924`), which a combat object's setup sets
 /// ([`crate::vision::visibility::capture_kind`]): none (0), taken over by sight (1), taken more
-/// than once (2) or livestock (3).
+/// than once (2) or livestock (3). The set is closed: the game's byte stores write 0 (the
+/// constructor `FUN_141072ad0`, `FUN_14107dfb0`, `FUN_14108bf30`), 1 and 3 (the setup,
+/// `FUN_14121df60`), and the save holds what they wrote.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum CaptureKind {
     /// 0: no player takes it over.
     #[default]
-    None,
+    None = 0,
     /// 1: another player takes it over by seeing it.
-    BySight,
+    BySight = 1,
     /// 2: another player can take it more than once ("an object which can be captured
-    /// multiple times").
-    Again,
+    /// multiple times"); no store of the build writes it.
+    Again = 2,
     /// 3: livestock (classes 58 and 1).
-    Livestock,
-    /// A value the game names nowhere, as the save or the game holds it.
-    Other(Unnamed),
+    Livestock = 3,
 }
 
-/// A raw value of [`CaptureKind`] that names none of its variants: only the set's own
-/// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Unnamed(u8);
-
 impl CaptureKind {
-    /// The value of raw `value`: its variant, else `Other`.
-    const fn of_raw(value: u8) -> Self {
-        match value {
-            0 => Self::None,
-            1 => Self::BySight,
-            2 => Self::Again,
-            3 => Self::Livestock,
-            other => Self::Other(Unnamed(other)),
-        }
-    }
-
-    /// Its raw value.
-    const fn raw(self) -> u8 {
-        match self {
-            Self::None => 0,
-            Self::BySight => 1,
-            Self::Again => 2,
-            Self::Livestock => 3,
-            Self::Other(Unnamed(value)) => value,
-        }
-    }
-
-    /// The kind of the save's byte `value`.
-    #[must_use]
-    pub const fn of_data(value: u8) -> Self {
-        Self::of_raw(value)
-    }
-
     /// The byte.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.raw()
+        self as u8
     }
 
     /// Whether another player takes it over at all (not 0).
     #[must_use]
     pub const fn any(self) -> bool {
-        self.raw() != 0
+        !matches!(self, Self::None)
+    }
+}
+
+impl TryFrom<u8> for CaptureKind {
+    type Error = GenieError;
+
+    /// The kind of the save's byte `value`.
+    ///
+    /// # Errors
+    ///
+    /// A byte no store of the game writes.
+    fn try_from(value: u8) -> Result<Self, GenieError> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::BySight),
+            2 => Ok(Self::Again),
+            3 => Ok(Self::Livestock),
+            _ => Err(GenieError::invalid_input("a capture flag no store writes")
+                .with("capture_flag", value)),
+        }
     }
 }
 
 impl genie_diff::Diff for CaptureKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+        self.get().diff(&other.get(), d);
     }
 }
 
@@ -87,16 +77,21 @@ mod tests {
         ] {
             assert!(k.any());
         }
-        assert_eq!(CaptureKind::of_data(5).get(), 5);
         assert_eq!(CaptureKind::default(), CaptureKind::None);
     }
 
-    /// Each named value and one the set names nowhere go to their variant and back.
+    /// Each named byte goes to its variant and back; a byte no store writes is refused.
     #[test]
-    fn every_capture_kind_value_maps_to_its_variant_and_back() {
-        for value in [0, 1, 2, 3, 4] {
-            assert_eq!(CaptureKind::of_raw(value).raw(), value);
+    fn every_capture_kind_byte_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3] {
+            assert_eq!(
+                CaptureKind::try_from(value).map(CaptureKind::get),
+                Ok(value)
+            );
         }
-        assert!(matches!(CaptureKind::of_raw(4), CaptureKind::Other(_)));
+        for value in [4, 0xff] {
+            let e = CaptureKind::try_from(value).unwrap_err();
+            assert!(e.to_string().contains("no store writes"), "{e}");
+        }
     }
 }

@@ -31,12 +31,12 @@ use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, GO_ON, Memory,
-    NO_ANIM_SPEED, Notify, Pick, QueuedOrder, SIEGE_TOWER_AI, Search, Surroundings, UnitAi,
-    UnitSeen, UnitSide, alert_owner, civilian_search_radius, closest_undiscovered_tile,
-    held_action_state,
+    NO_ANIM_SPEED, Notify, Pick, QueuedOrder, Search, Surroundings, UnitAi, UnitSeen, UnitSide,
+    alert_owner, civilian_search_radius, closest_undiscovered_tile, held_action_state,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -209,7 +209,7 @@ impl UnitAi {
         }
         let held_by_group =
             at.group.is_some_and(|g| !g.contains(GroupState::IDLE)) && !player_kind.is_computer();
-        if self.ai_kind == SIEGE_TOWER_AI && held_by_group {
+        if self.ai_kind == UnitAiKind::SiegeTower && held_by_group {
             return Ok(GO_ON);
         }
         if !at.flags.contains(SurroundingFlags::BUSY)

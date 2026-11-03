@@ -186,7 +186,7 @@ impl UnitAi {
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let from = current.map_or(at.position, |t| t.position);
-        let (classes, radius) = self.search_area(at, player_kind)?;
+        let (classes, radius) = self.search_area(at, player_kind);
         let found = side.closest(&Search {
             at: from.ground(),
             radius,

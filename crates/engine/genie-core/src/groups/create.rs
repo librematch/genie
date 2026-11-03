@@ -472,6 +472,7 @@ mod tests {
     use crate::players::PlayerId;
     use crate::testing::ids;
     use crate::testing::tuning;
+    use crate::unit_ai::UnitAiKind;
     use crate::world::Millis;
     use crate::world::Seconds;
     use crate::world::WorldTime;
@@ -493,7 +494,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     #[cfg(test)]
-    use crate::unit_ai::{SOLDIER_AI, UnitAi};
+    use crate::unit_ai::UnitAi;
     #[cfg(test)]
     use crate::vision::registry::Registry;
     #[cfg(test)]
@@ -763,7 +764,7 @@ mod tests {
             t.parts.set_unit_ai(
                 u.id,
                 Some(UnitAi {
-                    ai_kind: SOLDIER_AI,
+                    ai_kind: UnitAiKind::Soldier,
                     ..UnitAi::default()
                 }),
             );

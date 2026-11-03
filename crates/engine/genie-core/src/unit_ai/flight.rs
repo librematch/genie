@@ -19,10 +19,11 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, BREAK, DEAD, Effect, GO_ON, Memory, Notify, Pick, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE,
-    SIEGE_AI, Search, Surroundings, UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner,
+    Search, Surroundings, UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner,
     closest_undiscovered_tile, search_area,
 };
 use crate::world::Millis;
@@ -99,7 +100,7 @@ impl UnitAi {
         // the siege unit's slot 0x160 (FUN_140c2a8f0): with a top action's target or of class 54
         // it does not run; a computer player's first lets the units inside it go
         // (FUN_141225c40 with −1, −1)
-        if self.ai_kind == SIEGE_AI {
+        if self.ai_kind == UnitAiKind::Siege {
             if roles
                 .of_some_class(at.class)
                 .contains(ClassRoles::UNPACKED_TREBUCHET)
@@ -317,7 +318,7 @@ impl UnitAi {
         if side.seen_unit(attacker)?.is_none() {
             return Ok(());
         }
-        let (classes, radius) = self.search_area(at, player_kind)?;
+        let (classes, radius) = self.search_area(at, player_kind);
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius,
@@ -335,16 +336,12 @@ impl UnitAi {
     /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
     /// and the fishing ship, 0 for the others).
     ///
-    /// # Errors
-    ///
-    /// A unit AI type whose classes are not held.
-    ///
     /// [`cared_classes`]: crate::unit_ai::cared::cared_classes
     pub(super) fn search_area(
         &self,
         at: &Surroundings,
         player_kind: PlayerKind,
-    ) -> Result<(&'static [ClassId], Distance), GenieError> {
+    ) -> (&'static [ClassId], Distance) {
         let roles = &at.roles;
         search_area(
             self.ai_kind,

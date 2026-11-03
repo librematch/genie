@@ -23,9 +23,8 @@ use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::{
-    ARTIFACT_AI, AttackAsk, BOAR_AI, CIVILIAN, FISHING_AI, FISHING_CARED, Found, Memory, Pick,
-    SIEGE_AI, SIEGE_CARED, SIEGE_TOWER_AI, SOLDIER_AI, SOLDIER_CARED, Search, Seeker, Surroundings,
-    TOWER_AI, TOWER_CARED, TRADE_AI, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, UnitSide,
+    AttackAsk, FISHING_CARED, Found, Memory, Pick, SIEGE_CARED, SOLDIER_CARED, Search, Seeker,
+    Surroundings, TOWER_CARED, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, UnitSide,
     attack_search_radius, civilian_search_radius, computer_idle_check, search_radius,
 };
 use crate::world::Seconds;
@@ -52,22 +51,25 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<IdleOutcome, GenieError> {
         match self.ai_kind {
-            UnitAiKind::HUNTED => self.hunted_idle(at, player_kind, ai, side),
-            BOAR_AI => Ok(self.boar_idle(at, ai, side)?),
-            UnitAiKind::LION => self.lion_idle(at, ai, side),
+            UnitAiKind::Hunted => self.hunted_idle(at, player_kind, ai, side),
+            UnitAiKind::Boar => Ok(self.boar_idle(at, ai, side)?),
+            UnitAiKind::Lion => self.lion_idle(at, ai, side),
             // the civilian's (FUN_140c1e610), the transport ship's (0x140c21d20) and the siege
             // tower's (FUN_140c20690): the cap, then 5
-            CIVILIAN | UnitAiKind::TRANSPORT | SIEGE_TOWER_AI => {
+            UnitAiKind::Civilian | UnitAiKind::Transport | UnitAiKind::SiegeTower => {
                 self.cap_human_order(side, ai)?;
                 Ok(IdleOutcome::Idle)
             }
-            SOLDIER_AI => self.soldier_idle(at, player_kind, ai, side),
-            TRADE_AI | FISHING_AI => self.ship_idle(at, player_kind, ai, side),
-            SIEGE_AI => self.siege_idle(at, player_kind, ai, side),
-            TOWER_AI => self.tower_idle(at, player_kind, side, ai),
-            ARTIFACT_AI => self.artifact_idle(at, side, ai),
-            UnitAiKind::BUILDING | UnitAiKind::LIVESTOCK => Ok(IdleOutcome::Idle),
-            _ => Err(GenieError::unsupported(
+            UnitAiKind::Soldier => self.soldier_idle(at, player_kind, ai, side),
+            UnitAiKind::Trade | UnitAiKind::Fishing => self.ship_idle(at, player_kind, ai, side),
+            UnitAiKind::Siege => self.siege_idle(at, player_kind, ai, side),
+            UnitAiKind::Tower => self.tower_idle(at, player_kind, side, ai),
+            UnitAiKind::Artifact => self.artifact_idle(at, side, ai),
+            UnitAiKind::Building | UnitAiKind::Livestock => Ok(IdleOutcome::Idle),
+            UnitAiKind::Predator
+            | UnitAiKind::Ranged
+            | UnitAiKind::Ranged2
+            | UnitAiKind::Priest => Err(GenieError::unsupported(
                 "processIdle (slot 0x240) of a unit-AI type not modelled",
             )),
         }
@@ -94,7 +96,7 @@ impl UnitAi {
         if !player_kind.is_computer() || at.flags.contains(SurroundingFlags::GARRISONED) {
             return Ok(IdleOutcome::Idle);
         }
-        let (classes, radius): (&[ClassId], f32) = if self.ai_kind == FISHING_AI {
+        let (classes, radius): (&[ClassId], f32) = if self.ai_kind == UnitAiKind::Fishing {
             (
                 &FISHING_CARED,
                 civilian_search_radius(at.los, at.search_radius).get(),

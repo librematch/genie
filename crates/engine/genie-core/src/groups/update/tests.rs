@@ -83,8 +83,9 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::UnitAi;
-use crate::unit_ai::{QueuedOrder, SOLDIER_AI};
+use crate::unit_ai::UnitAiKind;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
 use crate::vision::visibility::Visibility;
@@ -1822,7 +1823,7 @@ fn grounded() -> World {
     t.spatial.sight.as_mut().unwrap().registry = Some(Registry::new(4, 65));
     for p in PlayerId::each(4).skip(1) {
         for u in &mut t.players[p.index()].objects {
-            t.parts.unit_ai.get_mut(u.id).unwrap().ai_kind = SOLDIER_AI;
+            t.parts.unit_ai.get_mut(u.id).unwrap().ai_kind = UnitAiKind::Soldier;
             t.parts.put_mover(
                 u.id,
                 Some(Mover {

@@ -819,11 +819,11 @@ mod stack_tests {
         // the tower's unit AI for the town centre, the building's for the annexes
         assert_eq!(
             t.parts.unit_ai.get(object_id(8768)).map(|ai| ai.ai_kind),
-            Some(UnitAiKind::TOWER)
+            Some(UnitAiKind::Tower)
         );
         assert_eq!(
             t.parts.unit_ai.get(object_id(8769)).map(|ai| ai.ai_kind),
-            Some(UnitAiKind::BUILDING)
+            Some(UnitAiKind::Building)
         );
         // the foundation lacked 0.84 of its 2400 hit points after its last work: the town
         // centre lacks them too

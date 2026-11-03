@@ -332,7 +332,7 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
         ballistic_acceleration: Acceleration::new(ma.ballistic_acceleration),
         distance: Distance::new(ma.distance),
         hit_mode,
-        result: StrikeResult::of_data(ma.interacted_with_agility),
+        result: StrikeResult::try_from(ma.interacted_with_agility)?,
         origin: Origin::from_bytes(&ma.projectile_data),
         met: Vec::new(),
     }));
@@ -488,7 +488,7 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(
             sub.map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
                 .transpose()?,
         )?,
-        mode: TransportMode::of_data(base.target2_id),
+        mode: TransportMode::try_from(base.target2_id)?,
         point: saved.point(),
         retarget: false,
         // the save writes the task's id, −1 for none

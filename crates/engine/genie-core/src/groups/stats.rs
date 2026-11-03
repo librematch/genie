@@ -303,8 +303,8 @@ impl World {
     ///
     /// # Errors
     ///
-    /// A member without a unit AI (the game calls through its null pointer), of a unit-AI type
-    /// whose classes are not held or of a computer player (its notify), and the search's.
+    /// A member without a unit AI (the game calls through its null pointer) or of a computer
+    /// player (its notify), and the search's.
     fn member_objects(
         &mut self,
         id: ObjectId,
@@ -338,7 +338,7 @@ impl World {
             master.action_part().search_radius,
             player_kind,
             &self.model.roles,
-        )?;
+        );
         let search = Search {
             at: u.position().ground(),
             radius,
@@ -652,9 +652,9 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::object_id_list;
-    use crate::unit_ai::UnitAiKind;
     #[cfg(test)]
-    use crate::unit_ai::{CIVILIAN, SOLDIER_AI, UnitAi};
+    use crate::unit_ai::UnitAi;
+    use crate::unit_ai::UnitAiKind;
     #[cfg(test)]
     use crate::vision::registry::Registry;
     use crate::vision::registry::UnitUpdate;
@@ -723,7 +723,7 @@ mod tests {
         };
         let soldier = unit(10, master_id(4), 5.0, 5.0);
         let soldier_ai = UnitAi {
-            ai_kind: SOLDIER_AI,
+            ai_kind: UnitAiKind::Soldier,
             ..UnitAi::default()
         };
         let mut dying = unit(21, master_id(4), 5.0, 6.0);
@@ -922,13 +922,13 @@ mod tests {
                     .alert_mode,
             )
         };
-        assert_eq!(found(UnitAiKind::TRANSPORT), (vec![], AlertMode::Calm));
+        assert_eq!(found(UnitAiKind::Transport), (vec![], AlertMode::Calm));
         assert_eq!(
-            found(CIVILIAN),
+            found(UnitAiKind::Civilian),
             (vec![object_id(20), object_id(22)], AlertMode::Alert)
         );
         assert_eq!(
-            found(SOLDIER_AI),
+            found(UnitAiKind::Soldier),
             (vec![object_id(20), object_id(30)], AlertMode::Alert)
         );
     }

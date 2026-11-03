@@ -26,7 +26,6 @@ use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::SurroundingFlags;
-use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
@@ -512,12 +511,12 @@ impl Unit {
             ai.time_since_enemy += c.dt.seconds();
         }
         let runs = turn.is_some() || self.life.inside.is_none();
-        let Some(orders) =
+        let Some((orders, ai_kind)) =
             c.w.parts
                 .unit_ai
                 .get(self.id)
                 .filter(|_| self.life.is_alive() && runs)
-                .map(|ai| !ai.orders.is_empty())
+                .map(|ai| (!ai.orders.is_empty(), ai.ai_kind))
         else {
             return Ok(None);
         };
@@ -536,11 +535,6 @@ impl Unit {
         )?;
         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
         let world_time = c.w.world_time;
-        let ai_kind =
-            c.w.parts
-                .unit_ai
-                .get(self.id)
-                .map_or(UnitAiKind::of_value(0), |ai| ai.ai_kind);
         let attacker = self.attacker_of(
             actions,
             ai_kind,

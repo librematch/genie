@@ -2159,7 +2159,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
     walker.stats = standing();
     t.parts.put_mover(v.id, Some(walker));
     let villager_ai = UnitAi {
-        ai_kind: UnitAiKind::CIVILIAN,
+        ai_kind: UnitAiKind::Civilian,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -2482,7 +2482,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
     let mut v = unit(id, m, HitPoints::new(25.0));
     v.place_for_test(at.with_height(0.0));
     let villager_ai = UnitAi {
-        ai_kind: UnitAiKind::CIVILIAN,
+        ai_kind: UnitAiKind::Civilian,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -3143,7 +3143,7 @@ fn coast_world(ship: Point) -> World {
     t.parts.set_unit_ai(
         object_id(200),
         Some(UnitAi {
-            ai_kind: UnitAiKind::TRANSPORT,
+            ai_kind: UnitAiKind::Transport,
             current_order: None,
             current_action: None,
             current_target: None,

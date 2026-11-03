@@ -25,10 +25,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
-use crate::unit_ai::{
-    Attacker, BUILDING_AI, CIVILIAN, LION_AI, PREDATOR_AI, PRIEST_AI, SIEGE_AI, SOLDIER_AI, Seeker,
-    TOWER_AI, Target,
-};
+use crate::unit_ai::{Attacker, Seeker, Target};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
@@ -187,7 +184,7 @@ pub fn attacks_neutral(me: &Attacker, class: ClassId, roles: &Roles) -> bool {
     kind_attacks_neutral(me.ai_kind, me.attack_priority, class, roles)
 }
 
-/// Slot 0xa8 of the unit AI of factory type `ai_type` (`FUN_141215560`'s modules), whether it
+/// Slot 0xa8 of the unit AI of factory type `ai_kind` (`FUN_141215560`'s modules), whether it
 /// attacks a neutral object of `class`, its unit's master of `attack_priority`: the civilian's
 /// (`FUN_140c1acf0`) and the building's (`FUN_140c1ace0`) never; the predator's (`FUN_140c1ad60`)
 /// and the lion's (`FUN_140c1ad00`) not classes 13, 22, 52, 54 and 55; the priest's
@@ -204,8 +201,8 @@ pub fn kind_attacks_neutral(
     roles: &Roles,
 ) -> bool {
     match ai_kind {
-        CIVILIAN | BUILDING_AI => false,
-        PREDATOR_AI | LION_AI => {
+        UnitAiKind::Civilian | UnitAiKind::Building => false,
+        UnitAiKind::Predator | UnitAiKind::Lion => {
             !roles.of_class(class).intersects(
                 ClassRoles::SIEGE
                     | ClassRoles::WARSHIP
@@ -217,9 +214,11 @@ pub fn kind_attacks_neutral(
                     .of_class(class)
                     .contains(ClassRoles::PRIORITY_3_TARGET))
         }
-        PRIEST_AI => priest_attacks_neutral(attack_priority, class, roles),
-        SOLDIER_AI | TOWER_AI => soldier_attacks_neutral(attack_priority, class, roles),
-        SIEGE_AI => siege_attacks_neutral(attack_priority, class, roles),
+        UnitAiKind::Priest => priest_attacks_neutral(attack_priority, class, roles),
+        UnitAiKind::Soldier | UnitAiKind::Tower => {
+            soldier_attacks_neutral(attack_priority, class, roles)
+        }
+        UnitAiKind::Siege => siege_attacks_neutral(attack_priority, class, roles),
         _ => true,
     }
 }

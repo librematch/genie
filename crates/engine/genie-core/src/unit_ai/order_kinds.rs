@@ -26,8 +26,8 @@ use crate::unit_ai::TakenAs;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
-    AiMove, CIVILIAN, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
-    Surroundings, UnitAi, UnitCommand, UnitSide, civilian_kind,
+    AiMove, Effect, Gatherable, QueuedOrder, ResourceSearch, Seen, Surroundings, UnitAi,
+    UnitCommand, UnitSide, civilian_kind,
 };
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -244,7 +244,7 @@ impl UnitAi {
         (at, side): (&Surroundings, &mut dyn UnitSide),
     ) -> Result<Answer, GenieError> {
         let held = Self::world_object(target, at, side)?;
-        if self.ai_kind == CIVILIAN && held.is_none() {
+        if self.ai_kind == UnitAiKind::Civilian && held.is_none() {
             return Ok(Answer::NotTaken);
         }
         if force == OrderForce::Unforced && self.current_action.is_some() {
@@ -445,8 +445,8 @@ impl UnitAi {
     /// gold for 63; the base's (`FUN_140c4cc00`) none. None for the byte 0xff.
     pub(super) fn resource_kind(&self, class: ClassId, roles: &Roles) -> Option<GatherGroup> {
         match self.ai_kind {
-            CIVILIAN | UnitAiKind::BUILDING => civilian_kind(class, roles),
-            FISHING_AI => {
+            UnitAiKind::Civilian | UnitAiKind::Building => civilian_kind(class, roles),
+            UnitAiKind::Fishing => {
                 let held = roles.of_class(class);
                 if held.intersects(
                     ClassRoles::OCEAN_FISH | ClassRoles::DEEP_SEA_FISH | ClassRoles::SHORE_FISH,

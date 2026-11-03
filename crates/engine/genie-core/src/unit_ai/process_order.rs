@@ -18,9 +18,10 @@ use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
-    CIVILIAN, Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, SOLDIER_AI, Surroundings, UnitAi,
-    UnitCommand, UnitSeen, UnitSide, order_move,
+    Effect, LiveTop, OUTSIDE_ORDER, QueuedOrder, Surroundings, UnitAi, UnitCommand, UnitSeen,
+    UnitSide, order_move,
 };
 use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::ClassRoles;
@@ -466,8 +467,8 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> Result<Answer, GenieError> {
         match self.ai_kind {
-            CIVILIAN => self.civilian_attack(target, at, side, rng),
-            SOLDIER_AI => {
+            UnitAiKind::Civilian => self.civilian_attack(target, at, side, rng),
+            UnitAiKind::Soldier => {
                 if self.attack_object(target, OrderForce::Forced, rules, at, side)?
                     == Answer::NotTaken
                 {

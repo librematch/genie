@@ -390,7 +390,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
                 .parts
                 .unit_ai
                 .get_mut(unit.id)
-                .filter(|ai| ai.ai_kind == UnitAiKind::HUNTED)
+                .filter(|ai| ai.ai_kind == UnitAiKind::Hunted)
             else {
                 continue;
             };

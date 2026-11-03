@@ -31,9 +31,10 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::Search;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{
-    CIVILIAN, CIVILIAN_CARED, Memory, NoAttack, Pick, civilian_kind, civilian_search_radius,
+    CIVILIAN_CARED, Memory, NoAttack, Pick, civilian_kind, civilian_search_radius,
 };
 use crate::world::HUNTER_UNMOVING;
 use crate::world::SEARCH_AGAIN;
@@ -416,7 +417,7 @@ impl Unit {
                     "a hunt without a unit AI after its drop-off",
                 ))?;
         let class = ai.target_class.or(hunt.target_class);
-        if ai.ai_kind != CIVILIAN {
+        if ai.ai_kind != UnitAiKind::Civilian {
             return Err(GenieError::unsupported(
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));

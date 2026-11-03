@@ -22,12 +22,11 @@ use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    ARTIFACT_AI, ARTIFACT_IDLE_TIMEOUT, AiMove, BOAR_AI, COMPUTER_SOLDIER_IDLE_TIMEOUT,
-    DESIRED_DISTANCE, Effect, Found, HUMAN_ORDER_CAP, HUNTED_IDLE_TIMEOUT, Home, Hunted,
-    IDLE_TIMEOUT, LION_IDLE_TIMEOUT, Memory, NewObject, ORDER_HISTORY, OrderRecord,
-    PRIEST_IDLE_TIMEOUT, SIEGE_IDLE_TIMEOUT, SOLDIER_AI, SOLDIER_IDLE_TIMEOUT, Surroundings,
-    TOWER_AI, TOWER_IDLE_TIMEOUT, UnitAi, UnitSeen, UnitSide, adjusted_idle_timeout,
-    notify_capacity, siege_stance, soldier_stance,
+    ARTIFACT_IDLE_TIMEOUT, AiMove, COMPUTER_SOLDIER_IDLE_TIMEOUT, DESIRED_DISTANCE, Effect, Found,
+    HUMAN_ORDER_CAP, HUNTED_IDLE_TIMEOUT, Home, Hunted, IDLE_TIMEOUT, LION_IDLE_TIMEOUT, Memory,
+    NewObject, ORDER_HISTORY, OrderRecord, PRIEST_IDLE_TIMEOUT, SIEGE_IDLE_TIMEOUT,
+    SOLDIER_IDLE_TIMEOUT, Surroundings, TOWER_IDLE_TIMEOUT, UnitAi, UnitSeen, UnitSide,
+    adjusted_idle_timeout, notify_capacity, siege_stance, soldier_stance,
 };
 use crate::world::Millis;
 use crate::world::Seconds;
@@ -59,9 +58,9 @@ pub enum Notifies {
 }
 
 impl UnitAi {
-    /// The unit AI of `ai_type` a new object gets, as `FUN_141215560`'s constructors make it
-    /// (the factory `FUN_141215a90` picks among them; the types 3, 6 and 7 only a load makes);
-    /// None for any other type, which gets none. `UnitAIModule`'s constructor (`0x140c2e080`)
+    /// The unit AI of `ai_kind` a new object gets, as `FUN_141215560`'s constructors make it
+    /// (the factory `FUN_141215a90` picks among them; the types 3, 6 and 7 only a load makes).
+    /// `UnitAIModule`'s constructor (`0x140c2e080`)
     /// draws three AI-stream values, in this order: the last retarget time `r % 500`, the
     /// adjusted idle timeout `r % 1500 + 2250` and the retarget timer `750 + r % 500`; it sets
     /// the stance (`+0x1a9`) to 3 and the state position to the object's place. Then each
@@ -106,13 +105,10 @@ impl UnitAi {
         new: &NewObject,
         ai: &mut Well512,
         roles: &Roles,
-    ) -> Option<Self> {
-        if !matches!(ai_kind.get(), 2..=0x13) {
-            return None;
-        }
+    ) -> Self {
         let mut made = Self::base_constructed(ai_kind, new.position, ai);
         match ai_kind {
-            UnitAiKind::HUNTED => {
+            UnitAiKind::Hunted => {
                 made.set_idle_timeout(HUNTED_IDLE_TIMEOUT, ai);
                 made.hunted = Some(Hunted {
                     origin: new.position,
@@ -122,7 +118,7 @@ impl UnitAi {
                     made.stance = UnitStance::Aggressive;
                 }
             }
-            BOAR_AI => {
+            UnitAiKind::Boar => {
                 made.stance = UnitStance::Aggressive;
                 made.home = Some(Home {
                     origin: new.position,
@@ -130,17 +126,17 @@ impl UnitAi {
                     go_home: false,
                 });
             }
-            UnitAiKind::LION => {
+            UnitAiKind::Lion => {
                 made.stance = UnitStance::Aggressive;
                 made.set_idle_timeout(LION_IDLE_TIMEOUT, ai);
             }
             // the base's stance 3
-            UnitAiKind::RANGED_6 | UnitAiKind::RANGED_7 => {}
-            UnitAiKind::PRIEST => {
+            UnitAiKind::Ranged | UnitAiKind::Ranged2 => {}
+            UnitAiKind::Priest => {
                 made.stance = UnitStance::Defensive;
                 made.set_idle_timeout(PRIEST_IDLE_TIMEOUT, ai);
             }
-            SOLDIER_AI => {
+            UnitAiKind::Soldier => {
                 let timeout = if new.player_kind.is_computer() {
                     COMPUTER_SOLDIER_IDLE_TIMEOUT
                 } else {
@@ -149,23 +145,23 @@ impl UnitAi {
                 made.set_idle_timeout(timeout, ai);
                 made.stance = soldier_stance(new, roles);
             }
-            ARTIFACT_AI => {
+            UnitAiKind::Artifact => {
                 made.stance = UnitStance::Aggressive;
                 made.set_idle_timeout(ARTIFACT_IDLE_TIMEOUT, ai);
             }
-            TOWER_AI => {
+            UnitAiKind::Tower => {
                 made.stance = UnitStance::Aggressive;
                 made.set_idle_timeout(TOWER_IDLE_TIMEOUT, ai);
             }
-            UnitAiKind::SIEGE => {
+            UnitAiKind::Siege => {
                 made.stance = siege_stance(new, roles);
                 made.set_idle_timeout(SIEGE_IDLE_TIMEOUT, ai);
             }
-            UnitAiKind::LIVESTOCK => made.stance = UnitStance::Defensive,
+            UnitAiKind::Livestock => made.stance = UnitStance::Defensive,
             // 3, 8, 0xa, 0xb, 0xc, 0x11 and 0x12
             _ => made.stance = UnitStance::Aggressive,
         }
-        Some(made)
+        made
     }
 
     /// `UnitAIModule`'s constructor (`0x140c2e080`): its three draws, the base's fields, the
@@ -398,7 +394,7 @@ impl UnitAi {
     /// `UpdateAdjustedIdleTimeout` (slot 0x1a8): the base draws around the idle timeout
     /// (`0x140c41e00`); a deer's or fox's (factory type 2, `FUN_140c17170`) is 5/4 of it.
     pub(super) fn update_adjusted_idle_timeout(&mut self, ai: &mut Well512) {
-        self.adjusted_idle_timeout = if self.ai_kind == UnitAiKind::HUNTED {
+        self.adjusted_idle_timeout = if self.ai_kind == UnitAiKind::Hunted {
             Millis::new(self.idle_timeout.get().wrapping_mul(5) >> 2)
         } else {
             adjusted_idle_timeout(self.idle_timeout, ai)

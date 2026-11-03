@@ -27,6 +27,7 @@ use crate::players::relation_row;
 use crate::test_ids::carrying;
 use crate::testing::attribute;
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::UnitAiKind;
 use crate::vision::VisionBits;
 use crate::world::Millis;
 use crate::world::WorldTime;
@@ -62,7 +63,6 @@ use crate::testing::ids;
 use crate::testing::ids::PASTURE_1889;
 use crate::testing::roles;
 use crate::testing::tuning;
-use crate::unit_ai::CIVILIAN;
 use crate::unit_ai::task_finder::{DropSite, DropTarget};
 use crate::unit_ai::{AiAction, OrderKind, QueuedOrder, UnitAi};
 use crate::vision::visibility::Visibility;
@@ -234,7 +234,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     .with_ais([(
         BUILDER,
         UnitAi {
-            ai_kind: CIVILIAN,
+            ai_kind: UnitAiKind::Civilian,
             current_target: None,
             last_target: None,
             ..UnitAi::default()

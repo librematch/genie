@@ -129,8 +129,9 @@ pub(super) fn unit_ai(
     let Some((combat, ai)) = object.combat().and_then(|c| Some((c, c.unit_ai()?))) else {
         return Ok(None);
     };
+    let ai_kind = UnitAiKind::try_from(combat.need_unit_ai as u32)?;
     Ok(Some(UnitAi {
-        ai_kind: UnitAiKind::of_value(combat.need_unit_ai as u32),
+        ai_kind,
         current_order: OrderKind::of_field(ai.current_order_value)?,
         order_priority: OrderPriority::of_data(ai.current_order_priority_value),
         current_action: AiAction::of_field(ai.current_action_value)?,
@@ -188,10 +189,7 @@ pub(super) fn unit_ai(
             .map(Notify::from_bytes)
             .collect::<Result<_, _>>()?,
         // the load's factory capacity, doubled for what it reads
-        notify_capacity: notify_capacity(
-            UnitAiKind::of_value(combat.need_unit_ai as u32),
-            ai.temp_notify.len(),
-        ),
+        notify_capacity: notify_capacity(ai_kind, ai.temp_notify.len()),
         processing: false,
         buffered: Vec::new(),
         ordered_on_target: false,

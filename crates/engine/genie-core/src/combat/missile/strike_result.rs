@@ -1,62 +1,55 @@
 //! What a missile's last hit did.
 
+use crate::GenieError;
+
 /// What a hit did (`+0x98` of a missile, its last hit's): none yet, a hit, or a hit a shield
-/// blocked (`FUN_141084230`).
+/// blocked (`FUN_141084230`). The set is closed: the missile action (`FUN_140a9e6e0`) stores the
+/// byte its target's hit (slot 0x860: `FUN_141084230`, `FUN_1412115e0`) or blast (slot 0x848,
+/// `FUN_14107f690`) answers, and those answer 0, 1 or 2; the save holds what they wrote.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
 pub enum StrikeResult {
     /// No hit yet (0).
     #[default]
-    None,
+    None = 0,
     /// A hit (1).
-    Hit,
+    Hit = 1,
     /// A hit a shield blocked (2).
-    Shielded,
-    /// A value the game names nowhere, as the save or the game holds it.
-    Other(Unnamed),
+    Shielded = 2,
 }
 
-/// A raw value of [`StrikeResult`] that names none of its variants: only the set's own
-/// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Unnamed(u8);
-
 impl StrikeResult {
-    /// The value of raw `value`: its variant, else `Other`.
-    const fn of_raw(value: u8) -> Self {
-        match value {
-            0 => Self::None,
-            1 => Self::Hit,
-            2 => Self::Shielded,
-            other => Self::Other(Unnamed(other)),
-        }
-    }
-
-    /// Its raw value.
-    const fn raw(self) -> u8 {
-        match self {
-            Self::None => 0,
-            Self::Hit => 1,
-            Self::Shielded => 2,
-            Self::Other(Unnamed(value)) => value,
-        }
-    }
-
-    /// The result of the save's byte `value`: every byte is one.
-    #[must_use]
-    pub const fn of_data(value: u8) -> Self {
-        Self::of_raw(value)
-    }
-
     /// The byte.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.raw()
+        self as u8
+    }
+}
+
+impl TryFrom<u8> for StrikeResult {
+    type Error = GenieError;
+
+    /// The result of the save's byte `value`.
+    ///
+    /// # Errors
+    ///
+    /// A byte no hit answers.
+    fn try_from(value: u8) -> Result<Self, GenieError> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Hit),
+            2 => Ok(Self::Shielded),
+            _ => {
+                Err(GenieError::invalid_input("a strike result no hit answers")
+                    .with("result", value))
+            }
+        }
     }
 }
 
 impl genie_diff::Diff for StrikeResult {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+        self.get().diff(&other.get(), d);
     }
 }
 
@@ -68,16 +61,19 @@ mod tests {
     #[test]
     fn strike_results_are_the_game_bytes() {
         assert_eq!(StrikeResult::default(), StrikeResult::None);
-        assert_eq!(StrikeResult::of_data(2), StrikeResult::Shielded);
         assert_eq!(StrikeResult::Hit.get(), 1);
     }
 
-    /// Each named value and one the set names nowhere go to their variant and back.
+    /// Each named byte goes to its variant and back; a byte no hit answers is refused.
     #[test]
-    fn every_strike_result_value_maps_to_its_variant_and_back() {
-        for value in [0, 1, 2, 3] {
-            assert_eq!(StrikeResult::of_raw(value).raw(), value);
+    fn every_strike_result_byte_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2] {
+            assert_eq!(
+                StrikeResult::try_from(value).map(StrikeResult::get),
+                Ok(value)
+            );
         }
-        assert!(matches!(StrikeResult::of_raw(3), StrikeResult::Other(_)));
+        let e = StrikeResult::try_from(3).unwrap_err();
+        assert!(e.to_string().contains("no hit answers"), "{e}");
     }
 }

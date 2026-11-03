@@ -191,6 +191,14 @@ fn row(
         Err(e) => (BuildingLists::default(), Err(e)),
     };
     let gather_read = gather_point(object).map(|_| ());
+    // a capture flag no store of the game writes: the object's unmodelled part
+    let capture = object.combat().map_or(Ok(CaptureKind::None), |c| {
+        CaptureKind::try_from(c.rge_combat_object.capture_flag)
+    });
+    let (capture_flag, capture_read) = match capture {
+        Ok(k) => (k, Ok(())),
+        Err(e) => (CaptureKind::None, Err(e)),
+    };
     let (construction, construction_read) = match construction(object, s, objects) {
         Ok(c) => (c, Ok(())),
         Err(e) => (None, Err(e)),
@@ -244,9 +252,7 @@ fn row(
         work_rate_powerup: object
             .combat()
             .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
-        capture_flag: object.combat().map_or(CaptureKind::None, |c| {
-            CaptureKind::of_data(c.rge_combat_object.capture_flag)
-        }),
+        capture_flag,
         hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {
             taken: HitPoints::new(c.hitpoints_powerup),
             max: HitPoints::new(c.hitpoints_max_powerup),
@@ -416,6 +422,7 @@ fn row(
         .and(lists_read)
         .and(construction_read)
         .and(gather_read)
+        .and(capture_read)
         .and(imported)
         .and(production)
         .and(moving)

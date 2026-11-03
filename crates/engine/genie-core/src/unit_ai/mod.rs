@@ -83,14 +83,14 @@ pub use self::attackers::Attackers;
 #[cfg(test)]
 pub(crate) use self::cared::cared_classes;
 pub use self::cared::{
-    ARTIFACT_AI, ARTIFACT_CARED, BUILDING_CARED, CIVILIAN, CIVILIAN_CARED, CIVILIAN_SEARCH_GROWTH,
-    FISHING_CARED, HUNTED_CARED, LION_CARED, PREDATOR_CARED, PRIEST_CARED, SIEGE_CARED,
-    SIEGE_TOWER_CARED, SOLDIER_CARED, SOLDIER_CARED_COMPUTER, TOWER_CARED, TRADE_CART_CARED,
-    TRADE_SHIP_CARED, TRANSPORT_CARED, civilian_kind, civilian_search_radius,
+    ARTIFACT_CARED, BUILDING_CARED, CIVILIAN_CARED, CIVILIAN_SEARCH_GROWTH, FISHING_CARED,
+    HUNTED_CARED, LION_CARED, PREDATOR_CARED, PRIEST_CARED, SIEGE_CARED, SIEGE_TOWER_CARED,
+    SOLDIER_CARED, SOLDIER_CARED_COMPUTER, TOWER_CARED, TRADE_CART_CARED, TRADE_SHIP_CARED,
+    TRANSPORT_CARED, civilian_kind, civilian_search_radius,
 };
 use self::cared::{
-    BUILDING_AI, LIVE_TARGET_ACTIONS, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE, TRANSPORT_AI,
-    adjusted_idle_timeout, attack_search_radius,
+    LIVE_TARGET_ACTIONS, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE, adjusted_idle_timeout,
+    attack_search_radius,
 };
 pub(crate) use self::cared::{search_area, search_radius};
 use self::ids::{
@@ -197,32 +197,6 @@ const BREAK: u32 = 3;
 const DEAD: u32 = 4;
 /// "`ProcessIdle` produced an action."
 const PRODUCED: u32 = 0xd;
-/// The boar's unit-AI type (`TribePreditorUnitAIModule`).
-pub(crate) const BOAR_AI: UnitAiKind = UnitAiKind::BOAR;
-/// The soldier's factory type (`TribeSoldierUnitAIModule`).
-pub(crate) const SOLDIER_AI: UnitAiKind = UnitAiKind::SOLDIER;
-/// The tower's factory type (`TribeTowerUnitAIModule`, the town centre's too).
-const TOWER_AI: UnitAiKind = UnitAiKind::TOWER;
-/// The siege tower's factory type (`TribeSiegeTowerUnitAIModule`, master 1105's).
-const SIEGE_TOWER_AI: UnitAiKind = UnitAiKind::SIEGE_TOWER;
-/// The priest's factory type (`TribePriestUnitAIModule`: classes 18, 43 and 53), whose slot 72,
-/// notify handler and attack checks (its conversions and heals, `FUN_140c1feb0`,
-/// `FUN_140c26f60`, `FUN_140c19020`, `FUN_140c1af00`) are not modelled.
-pub(crate) const PRIEST_AI: UnitAiKind = UnitAiKind::PRIEST;
-/// The siege unit's factory type (`TribeSiegeUnitAIModule`: classes 13, 51, 54, 55, masters 1744
-/// and 1746).
-const SIEGE_AI: UnitAiKind = UnitAiKind::SIEGE;
-/// The predator's factory type (`TribePreditorUnitAIModule`, `FUN_140c11da0`).
-const PREDATOR_AI: UnitAiKind = UnitAiKind::PREDATOR;
-/// The lion's factory type (`TribeLionUnitAIModule`, `FUN_140c11bd0`).
-pub(crate) const LION_AI: UnitAiKind = UnitAiKind::LION;
-/// The livestock's factory type (`TribeLivestockUnitAIModule`, `FUN_140c11d70`).
-const LIVESTOCK_AI: UnitAiKind = UnitAiKind::LIVESTOCK;
-/// The trade ship's and the trade cart's factory type (`TribeTradeShipUnitAIModule`, classes 2
-/// and 19).
-const TRADE_AI: UnitAiKind = UnitAiKind::TRADE;
-/// The fishing ship's factory type (`TribeFishingShipUnitAIModule`, class 21).
-const FISHING_AI: UnitAiKind = UnitAiKind::FISHING;
 /// The classes of the foundations a fishing ship's builder looks for (`FUN_140c25ca0`, in its
 /// order): buildings, walls, gates, towers and farms.
 const FISHING_BUILDS: [ClassId; 5] = classes([3, 27, 39, 52, 49]);
@@ -230,12 +204,12 @@ const FISHING_BUILDS: [ClassId; 5] = classes([3, 27, 39, 52, 49]);
 /// 9999).
 const FISHING_BUILD_FAR: WholeDistance = WholeDistance::of_data(9999);
 
-/// The notify queue's capacity of a unit AI of `ai_type` holding `count` notifies: the
+/// The notify queue's capacity of a unit AI of `ai_kind` holding `count` notifies: the
 /// factory's (`FUN_141215560`: 5 for the artifact's and the livestock's, types 14 and 19; 10
 /// for the others), doubled until they fit.
 #[must_use]
 pub const fn notify_capacity(ai_kind: UnitAiKind, count: usize) -> usize {
-    let mut c = if matches!(ai_kind, UnitAiKind::ARTIFACT | UnitAiKind::LIVESTOCK) {
+    let mut c = if matches!(ai_kind, UnitAiKind::Artifact | UnitAiKind::Livestock) {
         5
     } else {
         10

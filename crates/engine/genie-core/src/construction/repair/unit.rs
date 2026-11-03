@@ -122,7 +122,7 @@ impl Unit {
     }
 
     /// What the attack tests read of the unit as an attacker ([`crate::unit_ai::Attacker`]) with
-    /// a unit AI of type `ai_type`, its master `master`, its owner and the owner's type, the game
+    /// a unit AI of type `ai_kind`, its master `master`, its owner and the owner's type, the game
     /// mode (a scenario's), its `+0x924`, its missiles per volley (`+0xa00`) and its top speed
     /// (its mover's, 0 for an object that does not move).
     pub(crate) fn attacker_of(

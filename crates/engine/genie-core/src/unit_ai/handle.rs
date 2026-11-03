@@ -14,8 +14,8 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
-    ARTIFACT_AI, ARTIFACT_CARED, Effect, FISHING_AI, GO_ON, Memory, Notify, Pick, SIEGE_AI,
-    SIEGE_TOWER_AI, Search, Surroundings, TRADE_AI, UnitAi, UnitSide, search_radius,
+    ARTIFACT_CARED, Effect, GO_ON, Memory, Notify, Pick, Search, Surroundings, UnitAi, UnitSide,
+    search_radius,
 };
 use crate::world::Millis;
 
@@ -32,22 +32,25 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         match self.ai_kind {
-            UnitAiKind::HUNTED => self.hunted_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::BOAR => self.boar_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::LION => self.lion_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::CIVILIAN => self.villager_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::TRANSPORT | SIEGE_TOWER_AI => {
+            UnitAiKind::Hunted => self.hunted_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Boar => self.boar_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Lion => self.lion_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Civilian => self.villager_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Transport | UnitAiKind::SiegeTower => {
                 self.transport_notify(n, time, at, player_kind, ai_rng, side)
             }
-            TRADE_AI => self.trader_notify(n, time, at, player_kind, ai_rng, side),
-            FISHING_AI => self.fishing_notify(n, time, at, player_kind, ai_rng, side),
-            SIEGE_AI => self.siege_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::SOLDIER => self.soldier_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::TOWER => self.tower_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::BUILDING => self.building_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::LIVESTOCK => self.livestock_notify(n, time, at, player_kind, ai_rng, side),
-            ARTIFACT_AI => self.artifact_notify(n, time, at, player_kind, ai_rng, side),
-            _ => Err(GenieError::unsupported(
+            UnitAiKind::Trade => self.trader_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Fishing => self.fishing_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Siege => self.siege_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Soldier => self.soldier_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Tower => self.tower_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Building => self.building_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Livestock => self.livestock_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Artifact => self.artifact_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Predator
+            | UnitAiKind::Ranged
+            | UnitAiKind::Ranged2
+            | UnitAiKind::Priest => Err(GenieError::unsupported(
                 "the notify handler of a unit-AI type not modelled",
             )),
         }

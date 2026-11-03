@@ -224,7 +224,7 @@ impl UnitAi {
                 checks.set(AttackChecks::WORK_STATE, search.work_state);
                 (t.position, unit_ai_tuning.retarget_reach, checks)
             });
-        let (classes, radius) = self.search_area(at, player_kind)?;
+        let (classes, radius) = self.search_area(at, player_kind);
         let found = side.closest(&Search {
             at: from.ground(),
             radius,
