@@ -11,7 +11,7 @@ use genie_diff::{Diff, Differ};
 
 /// What an object's default task starts once its action list is empty in state 2: one value
 /// per object, from its master's default task (the load's, a constructor's).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum DefaultTask {
     /// Nothing: no default task, one of a type the action factory makes no action of (a wild
     /// animal's Explore), a saved object's Fly (it never ends) or a Make that started.
@@ -31,7 +31,7 @@ pub enum DefaultTask {
 }
 
 /// A default task the slice cannot start.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Unstartable {
     /// One of an action type the factory makes that the slice does not start.
     Unported(ActionKind),
@@ -40,7 +40,7 @@ pub enum Unstartable {
 }
 
 /// Why the load could not read an object's default task.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum UnreadDefault {
     /// The object's own master holds a default task: the load reads no own master's tasks.
     OwnMaster,

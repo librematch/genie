@@ -14,8 +14,8 @@ use crate::groups::layout::{clear_line, reset_line};
 use crate::groups::{Formation, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
+use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
-use crate::math::fmath::{BVector, add, scale, sub};
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::layer::generated::GroupTuning;
@@ -27,7 +27,7 @@ const CATEGORY_COUNT: usize = CATEGORIES as usize;
 /// The formation createColumnLine (`FUN_141012280`) lays out: a column (type 1, the column
 /// ratio 2 and the line ratio -1), else a line (ratios -1 and 2): plain (type 2), staggered
 /// (7) or flanked (8).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum LineKind {
     /// A column.
     Column,
@@ -334,7 +334,7 @@ fn lay_category(
         next: if cat.kinds == 1 { -1 } else { 0 },
         used: [0u32; 50],
     };
-    let mut single: BVector = scale(cat.spacing.get(), BVector::new(0.0, 0.0, -1.0));
+    let mut single: BVector = cat.spacing.get() * BVector::new(0.0, 0.0, -1.0);
     if style.kind == LineKind::Staggered {
         single = BVector::new(
             single.x() * group_tuning.spacing_factor,
@@ -389,8 +389,8 @@ fn line_start(
     kind: LineKind,
     group_tuning: &GroupTuning,
 ) -> BVector {
-    let half = scale((actual / 2) as f32, single);
-    let total = add(half, BVector::ZERO);
+    let half = (actual / 2) as f32 * single;
+    let total = half + BVector::ZERO;
     if kind == LineKind::Staggered {
         let quarter = BVector::new(
             single.x() / group_tuning.stagger_share,
@@ -398,7 +398,7 @@ fn line_start(
             single.y() / group_tuning.stagger_share,
         );
         if line_index & 1 == 0 {
-            sub(total, quarter)
+            total - quarter
         } else {
             BVector::new(
                 total.x() + quarter.x(),
@@ -412,7 +412,7 @@ fn line_start(
             single.height() / group_tuning.spacing_factor,
             single.y() / group_tuning.spacing_factor,
         );
-        sub(total, half_step)
+        total - half_step
     } else {
         total
     }
@@ -456,7 +456,7 @@ fn lay_line(
         if (col as usize) < line.indices.len() {
             *line.indices.checked_mut(col as usize)? = at.slot_index as u32;
         }
-        total = sub(total, single);
+        total = total - single;
         at.slot_index += 1;
         if 0 <= subs.next {
             subs.advance(cat, col, actual)?;

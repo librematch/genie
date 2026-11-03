@@ -59,7 +59,7 @@ const GROUPS: [GatherGroup; 5] = [
 const NO_DISTANCE: i32 = 99;
 
 /// What the pass gives an object.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Start {
     /// A villager's or fishing ship's work on its farm or its closest resource.
     Work,
@@ -68,7 +68,7 @@ enum Start {
 }
 
 /// Whether a master has a task of action type 0x99 (`FUN_1415c60b0`), a mule cart's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum CartTask {
     /// It has one.
     Held,

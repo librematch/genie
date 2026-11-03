@@ -62,7 +62,7 @@ pub struct MeetingTarget {
 
 /// Where `FUN_140a85f30` meets an Enter's target, by the target alone ([`meet_at`]); the
 /// shore's search and the beach test are [`meeting_point`]'s.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MeetAt {
     /// At its place (code 0).
     Place,
@@ -137,7 +137,7 @@ impl Iterator for LandingWalk {
     fn next(&mut self) -> Option<Self::Item> {
         while 0 < self.left {
             self.left -= 1;
-            self.at = self.at.moved(self.step);
+            self.at += self.step;
             let tile = self.at.tile();
             if tile != self.last {
                 self.last = tile;

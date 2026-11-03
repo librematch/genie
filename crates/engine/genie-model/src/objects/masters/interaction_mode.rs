@@ -7,7 +7,9 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's interaction mode (`select_level`, `+0x62d`; the `.dat`'s `interaction_mode`,
 /// openage's names): whether a player may select its objects and give them orders. The simulation
 /// only keeps it; every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InteractionMode(u8);
 

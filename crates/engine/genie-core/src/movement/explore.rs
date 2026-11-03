@@ -63,7 +63,7 @@ const WALK_WITHOUT_READS: GenieError =
 const NO_POINT: f32 = EXPLORE_NO_POINT;
 
 /// What an Explore's `set_state` asks of its owner besides its own fields.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Owner {
     /// Nothing.
     Nothing,

@@ -17,7 +17,7 @@
 
 use crate::map::Distance;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{at_most_or_unordered, sqrt, sub};
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use genie_diff::Diff;
 
 mod cell;
@@ -52,7 +52,7 @@ const HALF: f32 = 0.5;
 const ONE: f32 = TILE_PATH_ONE;
 
 /// What a search returns (its result byte).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Found {
     /// 0: the start or the goal lies off the map.
     OffMap,
@@ -125,7 +125,7 @@ impl Path {
             let [a, b] = w else {
                 continue;
             };
-            let d = sub(*b, *a);
+            let d = *b - *a;
             total += sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
         }
         self.length = Distance::new(total);

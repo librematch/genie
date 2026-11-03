@@ -36,7 +36,7 @@ pub(super) struct Goal {
 
 /// Whether a planner's pass sets a cell's mark (the goal's, [`CellKind::GOAL`], or a closed
 /// rectangle's, [`CellEdges::CLOSED`]) or clears it (the routines' flag 1 or 0).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Mark {
     /// The mark goes on.
     Set,

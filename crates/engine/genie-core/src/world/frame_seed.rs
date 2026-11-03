@@ -2,7 +2,7 @@
 
 /// The world's frame seed (`world+0x7d0`): a draw of the world's stream each update, which seeds
 /// the update's other streams.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FrameSeed(u32);
 
 impl FrameSeed {

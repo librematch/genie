@@ -38,7 +38,7 @@ use crate::world::slots::CheckedIndex;
 
 /// Whether the order setter ([`UnitAi::set_order_with`]) keeps the order before as the last
 /// (1) or leaves the last as it is (0).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OrderHistory {
     /// The order before becomes the last.
     Recorded,
@@ -49,7 +49,7 @@ pub enum OrderHistory {
 /// Whether a work command's notify of the unit AI ([`UnitAi::notify_work`]) clears its notifies
 /// (`FUN_140c64e50`): a unit of a type below 70 always, another only with a direct order
 /// ([`crate::orders::OrderSource::notifies`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Notifies {
     /// They are cleared with time 0.
     Cleared,

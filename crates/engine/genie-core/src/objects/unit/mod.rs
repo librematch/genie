@@ -188,7 +188,7 @@ impl Unit {
 }
 
 /// Whether the world's table (`FUN_1415417a0`) holds an object.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Presence {
     /// It holds it.
     Held,
@@ -286,7 +286,7 @@ pub(crate) fn missed_passes(
 }
 
 /// What an object's update leaves of it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Outcome {
     Stay,
     /// It leaves its list for good (`RGE_Object_List::update` deletes it).

@@ -10,7 +10,7 @@ use serde::Serialize;
 /// A master id as a master's data holds it (`missile_unit_id`, a trail's unit): a short the
 /// effects set, add to and scale (`PROJECTILE_UNIT`), so every value is kept, −1 and any other
 /// negative one alike; it names a master when 0 or more ([`MasterField::master`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterField(i16);
 
@@ -66,7 +66,9 @@ impl genie_diff::Diff for MasterField {
 /// short the effects set, add to and scale (`TERRAIN_DEFENSE_BONUS`), every value kept; it names
 /// a restriction when 0 or more ([`RestrictionField::restriction`]).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 pub struct RestrictionField(i16);
 
 impl RestrictionField {

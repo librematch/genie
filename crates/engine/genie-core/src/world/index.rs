@@ -45,7 +45,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 /// Which of a player's object lists: the live one or the sleeping one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ListKind {
     /// The live list (`+0x30`).
     Live,
@@ -54,7 +54,7 @@ pub(crate) enum ListKind {
 }
 
 /// Where an object is: its player and its index in the live or the sleeping list.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Place {
     Live(PlayerId, ListIndex),
     Sleeping(PlayerId, ListIndex),

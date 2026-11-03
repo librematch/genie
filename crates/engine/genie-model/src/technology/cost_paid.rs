@@ -7,7 +7,9 @@ use std::fmt::{Display, Error, Formatter};
 /// How a technology's cost entry is paid (the `.dat`'s paid flag): 0 not at all, 1 from the
 /// player's attribute, 2 from the building (`FUN_141204310`). Every byte is kept; any but 0 is
 /// paid.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostPaid(u8);
 

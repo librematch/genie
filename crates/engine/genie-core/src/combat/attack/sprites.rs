@@ -92,7 +92,7 @@ pub(crate) fn show_arrived(
 }
 
 /// Whether a sprite instance went back to its first frame ([`reset_sprite`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum SpriteReset {
     /// It did.
@@ -102,7 +102,7 @@ pub(crate) enum SpriteReset {
 }
 
 /// Whether a unit faces its target after its turn ([`face_target`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum Aim {
     /// It faces the target.

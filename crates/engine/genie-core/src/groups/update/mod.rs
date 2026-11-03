@@ -56,7 +56,7 @@ const TRADE_CART_SPRITES: GenieError =
     GenieError::unsupported("a trade cart's standing or walking sprite (its goods, FUN_14106a940)");
 
 /// The sprites slots 0x660, 0x658 and 0x650 show.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Shown {
     /// Slot 0x660's standing sprite.
     Standing,

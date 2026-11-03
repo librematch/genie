@@ -5,7 +5,7 @@ use crate::fmath::{acos, cos, sin, sqrt};
 use crate::geometry::Point;
 use crate::geometry::Position;
 use std::f32::consts::{FRAC_PI_2, PI};
-use std::ops::Neg;
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// A vector in the game's order (`BVector`): x, height, y. The map's y is the third component,
 /// so a place on the map (x, y, z) is the vector (x, z, y) ([`Position::vector`],
@@ -105,25 +105,35 @@ impl genie_diff::Diff for BVector {
     }
 }
 
-/// `a - b` (`FUN_14087e560`).
-#[must_use]
-pub fn sub(a: BVector, b: BVector) -> BVector {
-    let ([a0, a1, a2], [b0, b1, b2]) = (a.0, b.0);
-    BVector([a0 - b0, a1 - b1, a2 - b2])
+impl Sub for BVector {
+    type Output = Self;
+
+    /// `a - b` (`FUN_14087e560`), component by component.
+    fn sub(self, b: Self) -> Self {
+        let ([a0, a1, a2], [b0, b1, b2]) = (self.0, b.0);
+        Self([a0 - b0, a1 - b1, a2 - b2])
+    }
 }
 
-/// `a + b` (`FUN_14087e5e0`).
-#[must_use]
-pub fn add(a: BVector, b: BVector) -> BVector {
-    let ([a0, a1, a2], [b0, b1, b2]) = (a.0, b.0);
-    BVector([b0 + a0, b1 + a1, b2 + a2])
+impl Add for BVector {
+    type Output = Self;
+
+    /// `a + b` (`FUN_14087e5e0`): each component `b + a`, in the game's operand order (`ADDSS`
+    /// gives its first operand's NaN when both are NaNs).
+    fn add(self, b: Self) -> Self {
+        let ([a0, a1, a2], [b0, b1, b2]) = (self.0, b.0);
+        Self([b0 + a0, b1 + a1, b2 + a2])
+    }
 }
 
-/// `s * v` (`FUN_14087e4a0`).
-#[must_use]
-pub fn scale(s: f32, v: BVector) -> BVector {
-    let [v0, v1, v2] = v.0;
-    BVector([s * v0, s * v1, s * v2])
+impl Mul<BVector> for f32 {
+    type Output = BVector;
+
+    /// `s * v` (`FUN_14087e4a0`): each component times the factor, the factor first.
+    fn mul(self, v: BVector) -> BVector {
+        let [v0, v1, v2] = v.0;
+        BVector([self * v0, self * v1, self * v2])
+    }
 }
 
 /// `a · b`, summed left to right.

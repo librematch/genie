@@ -38,7 +38,7 @@ pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
 }
 
 /// Which copy of the garrison types' switch [`garrison_kind_takes`] runs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GarrisonSwitch {
     /// The garrison's (`FUN_14120eb10`), which takes the relics (class 42) in.
     Garrison,

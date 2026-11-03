@@ -381,7 +381,7 @@ const SPLIT_BY_PATH: bool = true;
 
 /// What [`splits_together`] tests for: the count of the units that join each, or the chosen
 /// unit's group.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum JoinTest {
     /// The count: who joins whom.
     Count,

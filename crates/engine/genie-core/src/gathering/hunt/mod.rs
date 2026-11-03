@@ -179,7 +179,7 @@ pub struct HuntTask {
 
 /// Whether a hunter's decay task stops its target's decay (`FUN_140ac44b0`, the player's
 /// attribute 292 at 1) or lets it run.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DecayRule {
     /// It stops it.
     Stops,
@@ -223,7 +223,7 @@ pub(crate) struct HuntReads {
 
 /// What follows the hunt's update once the hunt is back in its unit's list
 /// ([`HuntAction::update`]): the parts of the unit's own that read the hunt there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum HuntNext {
     /// Nothing more.
     Stay,

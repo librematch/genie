@@ -5,7 +5,7 @@ use crate::players::attribute::AttributeId;
 
 /// A command's queue id (the formatter's `qId`, an int): −1 runs the command now; any other
 /// value the commands that read it leave alone or queue.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct QueueId(i32);
 
 impl QueueId {
@@ -52,7 +52,7 @@ impl TradeLots {
 
 /// The sprite a BUILD packet asks its foundation to show (`+0x18`, an int): −1 for none; the
 /// handler keeps 0x2c9 to 0x2ce for a house of civ 12 ([`crate::commands::BuildCommand`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SpriteOverride(i32);
 
 impl SpriteOverride {
@@ -86,7 +86,7 @@ impl SpriteOverride {
 
 /// A packet's resource word (TRIBUTE's attributes `+0x24`.., a trade's commodity `+0x4`): an
 /// attribute id its handler checks, which a recording can hold out of range.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ResourceWord(u16);
 
 impl ResourceWord {

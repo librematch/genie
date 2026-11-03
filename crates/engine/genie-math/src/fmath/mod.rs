@@ -34,8 +34,8 @@ pub use self::sin_cos::{cos, sin};
 #[cfg(test)]
 use self::sin_cos::{kernel_cos, kernel_sin};
 pub use self::vectors::{
-    BVector, Rotation, add, angle_between, cross, dot, length, line_distance, normalize, rotate,
-    rotation, scale, sub,
+    BVector, Rotation, angle_between, cross, dot, length, line_distance, normalize, rotate,
+    rotation,
 };
 
 /// 1 (`DAT_14330eb8c`).

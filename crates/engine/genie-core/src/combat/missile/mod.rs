@@ -439,7 +439,7 @@ impl MissileAction {
         let mut step = match stats.projectile_kind {
             ProjectileKind::STRAIGHT => {
                 let way = stats.speed * dt;
-                let d = self.direction.scaled(way.get());
+                let d = way.get() * self.direction;
                 self.timer += way;
                 self.distance -= way;
                 if max_range <= self.timer && self.distance < Distance::new(missile_tuning.beyond) {

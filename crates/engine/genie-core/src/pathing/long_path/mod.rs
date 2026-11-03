@@ -284,7 +284,7 @@ fn trace(
         }
         // back along the step it was entered by (the game's 0xff indexes past the table)
         let step = came?.offset()?;
-        at = at.stepped_back(step);
+        at -= step;
         before = came;
         came = direction(at);
     }
@@ -579,7 +579,7 @@ fn search(
         let back = StepDir::behind(came);
         let here = *front.cost.checked(cell(map, c))?;
         for (dir, step) in StepDir::ALL.into_iter().zip(STEPS) {
-            let n = c.stepped(step);
+            let n = c + step;
             if back.holds(dir) || !map.holds(n) || n == req.from {
                 continue;
             }

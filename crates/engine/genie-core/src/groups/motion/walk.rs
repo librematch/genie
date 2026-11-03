@@ -16,7 +16,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, scale, sqrt, sub};
+use crate::math::fmath::sqrt;
 use crate::math::rng::Stream;
 use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
@@ -57,12 +57,12 @@ pub(super) fn steer(
         return Ok(Pass::Reached);
     }
     // FUN_141046080: the direction on the ground
-    let mut direction = sub(waypoint, at);
+    let mut direction = waypoint - at;
     direction = direction.with_height(0.0);
     let l = sqrt(direction.x() * direction.x() + 0.0 + direction.y() * direction.y());
     direction = BVector::new(direction.x() / l, direction.height() / l, direction.y() / l);
     let step = (dt.get() * motion.acceleration.y() + motion.velocity.y()) * dt.get();
-    let next = add(at, scale(step, direction));
+    let next = at + step * direction;
     match passes_waypoint(waypoint, at, next, group_tuning) {
         Passing::Passes => {
             set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, FlagChange::Set);
@@ -211,7 +211,7 @@ fn walk_ends(
                 && let Some(top) = top
             {
                 let end = point(top, WaypointIndex::last_of(top.points.len()));
-                let d = sub(at, end);
+                let d = at - end;
                 let gap = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
                 if gap - level.range.get() < EPSILON {
                     reset_level(&mut motion.paths)?;
@@ -272,12 +272,10 @@ fn pull_to_members(motion: &mut Motion, group: &GroupView, group_tuning: &GroupT
     }
     let c = centre.with_height(0.0);
     let here = motion.position[0].with_height(0.0);
-    let d = sub(here, c);
+    let d = here - c;
     if group_tuning.pull_distance <= d.x() * d.x() + d.height() * d.height() + d.y() * d.y() {
-        motion.new_position[0] = add(
-            scale(group_tuning.pull_share, c),
-            scale(group_tuning.pull_keep, motion.new_position[0]),
-        );
+        motion.new_position[0] =
+            group_tuning.pull_share * c + group_tuning.pull_keep * motion.new_position[0];
     }
 }
 

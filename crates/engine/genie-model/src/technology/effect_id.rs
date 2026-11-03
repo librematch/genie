@@ -7,7 +7,9 @@ use std::fmt::{Display, Error, Formatter};
 /// An effect's id: its place in the world's effect table (`+0x128`), as a technology (`+0x3a`) and
 /// a player's effect override (`+0x62`) hold it, −1 for none. Every short is kept.
 /// The default is 0, as a zeroed record holds it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EffectId(i16);
 

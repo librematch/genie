@@ -12,7 +12,7 @@ use crate::production::UnitIndex;
 use crate::world::World;
 
 /// `UNIT_ORDER`'s action (`+0x1c`, the switch of `FUN_14161e370`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum UnitOrderAction {
     /// 1: an offboard trade (`FUN_140ad4ff0`), not modelled.
     OffboardTrade,

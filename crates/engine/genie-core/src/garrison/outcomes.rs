@@ -2,7 +2,7 @@
 //! way back to work after the town bell ([`WorkReturn`]) answer.
 
 /// Whether a unit left the building it was in ([`crate::world::World::let_out`], `FUN_1411e7220`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum LetOut {
     /// It stands on the spot beside the building.
@@ -12,7 +12,7 @@ pub enum LetOut {
 }
 
 /// Whether a unit got into a building ([`crate::objects::unit::Unit::enter_building`], `FUN_140a867b0`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum EnterOutcome {
     /// The building took it in.
@@ -22,7 +22,7 @@ pub enum EnterOutcome {
 }
 
 /// Whether a unit went back to work after the town bell ([`crate::world::World::back_to_work`], `FUN_1412081e0`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum WorkReturn {
     /// It left the building, or went to its point outside.

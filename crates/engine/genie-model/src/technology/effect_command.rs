@@ -50,7 +50,7 @@ const COST_ATTRIBUTES: RangeInclusive<i16> = 103..=106;
 const CLASS_UNITS: Range<i16> = 900..1000;
 
 /// Which players a block of the base's kinds reaches.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Party {
     /// The player itself (0 to 8).
@@ -81,7 +81,7 @@ impl Party {
 
 /// The masters a cost command changes (`FUN_1415c1f70`'s `unit`): a master by its id, or every
 /// master of a class (a `unit` of 900 to 999 names class `unit − 900`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CostUnits {
     /// The master of this id.
@@ -104,7 +104,7 @@ impl CostUnits {
 
 /// What a cost command does with the cost slot of its resource (`FUN_1415c1f70`'s `how`, the
 /// amount as CVTTSS2SI gives it).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CostEdit {
     /// −2: the first slot that takes the resource empties in its place.
@@ -127,7 +127,7 @@ impl CostEdit {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 /// How a resource command changes the resource (its second argument's low byte: 0 sets, any
 /// other adds).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ResourceChange {
     /// The resource takes the amount.
     Set,
@@ -138,7 +138,7 @@ pub enum ResourceChange {
 /// The objects' kinds (200 to 206), which the slice does not run but for the masters of their
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 /// own it holds none of.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ObjectsKind {
     /// 200 to 202: the objects with masters of their own of a master or class.
     OwnMasters(Change),

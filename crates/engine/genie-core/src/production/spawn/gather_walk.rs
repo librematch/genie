@@ -33,7 +33,7 @@ const FORCED_ENTRY_BELOW: InsideCount = InsideCount::new(10);
 
 /// Whether a gather point's walk asks the unit's garrison finder first (a new unit's) or goes to
 /// slot 0x128 at once (an unloaded unit's).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum FinderUse {
     /// It asks the finder.
     Asks,

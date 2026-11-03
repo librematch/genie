@@ -18,7 +18,7 @@ pub struct TownBellCommand {
 }
 
 /// What `TOWN_BELL` does with the bell (its `activate` byte).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Bell {
     /// It rings (any byte but 0; the codec writes 1).
     Ring,

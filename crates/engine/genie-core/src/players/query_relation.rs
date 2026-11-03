@@ -5,7 +5,7 @@ use crate::players::UnitRelation;
 /// A relation number of `ClosestObject`'s arguments (`FUN_140c488b0`: its filter `param_3` and
 /// the relation it passes over, argument 9): 0 the friends, 1 the neutrals, 2 the enemies, 3
 /// itself. Any other number (the callers' −1) is none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum QueryRelation {
     /// 0: the friends.
     Friends,

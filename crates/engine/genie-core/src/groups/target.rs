@@ -10,7 +10,7 @@ const OBJECT: i32 = 1;
 /// object names, none (both −1, what forgetting the target writes), or a target of another
 /// kind. The attack's target object (`FUN_14103f4e0`) reads another kind's target as a group's
 /// id; every other reader looks the integer up as an object, whatever the kind.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum GroupTarget {
     /// No target.
     #[default]

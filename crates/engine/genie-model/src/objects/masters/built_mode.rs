@@ -5,7 +5,9 @@ use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's `disappears_when_built` (`+0x984`, the `.dat`'s byte): whether a building of it goes once it is built. Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuiltMode(u8);
 

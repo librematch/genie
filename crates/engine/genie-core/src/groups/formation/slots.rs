@@ -15,8 +15,8 @@ use crate::world::slots::CheckedIndex;
 const NO_PLACE_IN_ORDER: GenieError =
     GenieError::unreachable("a line order that lacks a place up to the list's length");
 use crate::groups::WorldObject;
+use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
-use crate::math::fmath::{BVector, sub};
 use crate::math::image::group::FARTHEST;
 use crate::world::World;
 
@@ -36,7 +36,7 @@ pub(super) const ASSIGNMENT_MARKS: usize = 80;
 /// createColumnLine's column-to-line flag): a line laid out after a column keeps the column's
 /// order ([`World::from_previous_column`]), any other takes the closest units
 /// ([`World::populate_slots`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SlotOrder {
     /// The previous column's order.
     PreviousColumn,
@@ -45,7 +45,7 @@ pub enum SlotOrder {
 }
 
 /// Whether a formation's slots took their units anew ([`World::formation_transform`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum SlotFill {
     /// They did (`*param_3`).
@@ -138,7 +138,7 @@ impl World {
     /// zeroed, `sqrt(x² + 0 + y²)`), None for a unit the world does not hold.
     pub(super) fn slot_distance(&self, at: BVector, id: ObjectId) -> Option<Distance> {
         let object = self.world_object(id)?;
-        let mut d = sub(at, object.moved_vector());
+        let mut d = at - object.moved_vector();
         d = d.with_height(0.0);
         Some(Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())))
     }
@@ -299,7 +299,7 @@ impl World {
                 *costs.checked_mut(i * n + j)? = if other_master || skip {
                     FARTHEST
                 } else {
-                    let d = sub(at, slot.transform_position);
+                    let d = at - slot.transform_position;
                     d.x() * d.x() + d.height() * d.height() + d.y() * d.y()
                 };
             }

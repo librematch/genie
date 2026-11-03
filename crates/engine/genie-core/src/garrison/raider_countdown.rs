@@ -2,7 +2,7 @@
 
 /// A combat object's `raider_build_countdown` (`+0x9a0`, an int, saved): the seconds it may stay
 /// inside a building. A unit let out of its container has none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RaiderCountdown(i32);
 
 impl RaiderCountdown {

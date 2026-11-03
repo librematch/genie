@@ -55,7 +55,7 @@ const NONE: f32 = SPAWN_NONE;
 /// How a new plain object ([`World::plain_object`]) that moves faces.
 ///
 /// [`World::plain_object`]: crate::world::World::plain_object
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Facing {
     /// Its drawn angle (the moving setup's, `FUN_141141640`).
     Drawn,
@@ -80,7 +80,7 @@ pub struct Site {
 }
 
 /// What the placement test found at a candidate.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Tested {
     /// Free: the unit may stand there.
     Free,

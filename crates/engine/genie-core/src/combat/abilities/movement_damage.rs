@@ -155,7 +155,7 @@ pub fn finish(v: &mut Victim) -> HitEnd {
 }
 
 /// Whether a hit left its object below 1 hit point ([`finish`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum HitEnd {
     /// It was: it has 0 hit points and holds 0.

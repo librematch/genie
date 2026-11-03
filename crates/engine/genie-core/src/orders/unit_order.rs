@@ -455,7 +455,7 @@ impl World {
 }
 
 /// The top action a drop-off order asks ([`World::drop_off_ask`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum DropOffBy {
     /// A Gather (5).
     Gather,

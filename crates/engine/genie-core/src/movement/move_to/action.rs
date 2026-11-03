@@ -85,7 +85,7 @@ pub fn holds_object(livestock: bool, master: MasterId, state: ObjectState, roles
 }
 
 /// How one update of a [`MoveToAction`] ended.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum StepEnd {
     /// It goes on.
     #[default]

@@ -9,7 +9,9 @@ use std::fmt::{Display, Error, Formatter};
 /// class; an obstruction record's class): the kind of thing its record blocks as. The game's
 /// tests name 0 (no record) and 5 (a gate, whose tile marks carry bit `0x8000`); the `.dat`'s
 /// other classes are named by the masters that hold them.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ObstructionClass(u8);
 

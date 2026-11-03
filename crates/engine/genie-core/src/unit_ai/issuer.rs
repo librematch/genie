@@ -3,6 +3,7 @@
 
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
+use std::hash::{Hash, Hasher};
 
 /// A queued order's issuer (`+0x0`): the player whose command gave the order (a move, an
 /// unload, a drop site's order) or the object that queued it (a unit's current order kept or
@@ -65,6 +66,13 @@ impl PartialEq for Issuer {
 
 impl Eq for Issuer {}
 
+impl Hash for Issuer {
+    /// By value, as [`PartialEq`] compares.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value().hash(state);
+    }
+}
+
 impl PartialEq<ObjectId> for Issuer {
     fn eq(&self, other: &ObjectId) -> bool {
         self.value() == other.get()
@@ -83,6 +91,7 @@ mod tests {
     use crate::players::PlayerId;
     use crate::test_ids::object_id;
     use crate::unit_ai::Issuer;
+    use std::collections::HashSet;
 
     /// A saved issuer is the queue's own object at its id, a player at a player's number and
     /// another object at any other value; −1 names none.
@@ -113,5 +122,19 @@ mod tests {
         assert_eq!(player, object_id(5));
         assert_ne!(player, Issuer::from(object_id(6)));
         assert_eq!(Issuer::from(object_id(7)).value(), 7);
+    }
+
+    /// An issuer hashes by its value, as it compares: a player and the object of its number
+    /// are one entry of a set.
+    #[test]
+    fn issuers_hash_by_their_values() {
+        let set: HashSet<Issuer> = [
+            Issuer::from(PlayerId::new(5)),
+            Issuer::from(object_id(5)),
+            Issuer::from(object_id(6)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(set.len(), 2);
     }
 }

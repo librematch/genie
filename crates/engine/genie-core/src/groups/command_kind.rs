@@ -8,7 +8,7 @@ use crate::objects::masters::ActionKind;
 /// `mCurrentCommand` at `+0x3a8`): a move (1), a follow (2), or the action type of the task the
 /// members carry out on a target; −1 for none. The game keeps any value it is given, so this
 /// keeps every `i32`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GroupCommandKind(i32);
 
 impl GroupCommandKind {

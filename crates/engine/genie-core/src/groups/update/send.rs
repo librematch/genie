@@ -39,7 +39,7 @@ const STANDING_SPAN: Millis = Millis::new(1000);
 const CHARGER: MasterKind = MasterKind::COMBAT;
 
 /// What a unit sent at a target draws its retarget timer for ([`World::set_travel_timer`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(in crate::groups) enum Travel {
     /// Only a speed above [`EPSILON`] draws (a computer player's units and the special ones).
     Fast,

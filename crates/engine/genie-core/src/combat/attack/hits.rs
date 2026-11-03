@@ -46,7 +46,7 @@ pub(crate) struct Hit {
 
 /// What the swing does after its hit, before it waits for its sprite's loop (`FUN_140a82ae0`
 /// case 6, `+0x9e` clear).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum AfterHit {
     /// A ranged unit without a target (and no indirect fire, `+0xa0`, which the slice's attacks
     /// never have): `set_state(2)`.

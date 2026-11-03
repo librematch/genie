@@ -39,7 +39,7 @@ use std::fmt::{Debug, Error, Formatter};
 
 /// Whether a unit AI's search queried afresh or read the cache's last answer
 /// ([`Spatial::search_query`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum SearchLists {
     /// The registry's query ran: the lists are this search's.

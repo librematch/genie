@@ -16,7 +16,7 @@ use crate::groups::{Formation, FormationLine, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, below_or_unordered, maxss, scale, sqrt, sub};
+use crate::math::fmath::{below_or_unordered, maxss, sqrt};
 use crate::math::image::group::{BOX_HALF as GROUP_BOX_HALF, EPSILON};
 use crate::objects::ObjectId;
 use crate::world::World;
@@ -51,7 +51,7 @@ fn length(v: BVector) -> f32 {
 
 /// The formation the slots by place ([`slots_by_place`]) lay out: a horde (`createHorde`) or a
 /// user defined one (`createUDF`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum PlaceLayout {
     /// A horde (type 0, the transform type 3).
     Horde,
@@ -107,7 +107,7 @@ pub(crate) fn slots_by_place(
         };
         let s = formation.slot_mut(i)?;
         s.unit_id = Some(m.id);
-        s.offset = sub(m.at, position);
+        s.offset = m.at - position;
         s.desired_transform_position = m.at;
         s.transform_position = m.at;
         s.transformed = 1;
@@ -233,7 +233,7 @@ pub(crate) fn phalanx_slots(
     formation.maximum_width = lines;
     formation.maximum_depth = lines;
     formation.number_lines = lines;
-    let single = scale(group.desired_spacing.get(), BVector::new(0.0, 0.0, -1.0));
+    let single = group.desired_spacing.get() * BVector::new(0.0, 0.0, -1.0);
     let mut slot = 0usize;
     let mut statistic = None;
     let mut placed = 0usize;
@@ -245,7 +245,7 @@ pub(crate) fn phalanx_slots(
         let l = formation.lines.checked_mut(line as usize)?;
         clear_line(l);
         let _ = reset_line(l, width, line);
-        let mut at = add(scale((width / 2) as f32, single), BVector::ZERO);
+        let mut at = (width / 2) as f32 * single + BVector::ZERO;
         if width & 1 == 0 {
             let half = [
                 single.x() / group_tuning.spacing_factor,
@@ -278,7 +278,7 @@ pub(crate) fn phalanx_slots(
                 *l.indices.checked_mut(k)? = slot as u32;
             }
             placed += 1;
-            at = sub(at, single);
+            at = at - single;
             slot += 1;
         }
     }

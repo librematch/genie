@@ -20,7 +20,7 @@ const NO_NEAREST_SLOT: GenieError =
     GenieError::unreachable("no active slot lies nearer than f32::MAX");
 use crate::map::TerrainMask;
 use crate::math::conversions::cvttss2si;
-use crate::math::fmath::{BVector, scale, sub};
+use crate::math::fmath::BVector;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, rotation};
 use crate::math::image::group::FARTHEST;
 use crate::math::image::group::{PASS_HALF as GROUP_PASS_HALF, PASS_ONE as GROUP_PASS_ONE};
@@ -120,7 +120,7 @@ impl World {
                         }
                     }
                     let point = find_point_from_front(&g.stored_positions, Distance::new(back))
-                        .unwrap_or_else(|| sub(position, scale(back, forward)));
+                        .unwrap_or_else(|| position - back * forward);
                     let indices = line.indices.clone();
                     let width = indices.len() as i32;
                     for k in indices {
@@ -617,7 +617,7 @@ pub(super) fn passability_box(
         if t.active == 0 {
             continue;
         }
-        let d3 = sub(t.transform_position, position);
+        let d3 = t.transform_position - position;
         let d = d3.x() * d3.x() + d3.height() * d3.height() + d3.y() * d3.y();
         let earlier = best;
         if d < best {

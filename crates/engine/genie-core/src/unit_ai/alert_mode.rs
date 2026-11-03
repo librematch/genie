@@ -1,7 +1,7 @@
 //! The unit AI's alert mode ([`AlertMode`]).
 
 /// The unit AI's alert mode (`+0x1b8`, `alertModeValue`): whether its last search found enemies.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum AlertMode {
     /// 0: the last search found none.
     #[default]

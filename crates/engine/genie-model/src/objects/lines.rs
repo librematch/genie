@@ -18,7 +18,7 @@ use serde::Serialize;
 pub const LINES: usize = 200;
 
 /// A unit line's id (`LineID`, an int): −399 and the 199 after it index table 2.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LineId(i32);
 

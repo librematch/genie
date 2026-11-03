@@ -17,8 +17,8 @@ use crate::groups::{GroupTarget, UnitKindStatistic, WorldObject};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
+use crate::math::fmath::sqrt;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-use crate::math::fmath::{sqrt, sub};
 use crate::math::image::group::FARTHEST;
 use crate::movement::Mover;
 use crate::objects::ObjectId;
@@ -306,7 +306,7 @@ impl World {
             .ok_or_else(|| member_gone(target))?;
         let at = t.moved_vector();
         let from = g.current_target.original_position;
-        let d = sub(at, from);
+        let d = at - from;
         if at_most_or_unordered(
             sqrt(d.y() * d.y() + d.x() * d.x()),
             self.model.tuning.group.close,

@@ -70,7 +70,7 @@ fn attack_on(top: Option<ActionKind>, a: &Attack, target: Option<ObjectId>) -> b
 /// Whether a unit changes its master to the one whose task it found (1) or keeps its own (0):
 /// the task search's ([`World::find_work_task`]), and the work command's before it retakes the
 /// task ([`World::retake_task`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MasterSwap {
     /// The unit takes the master.
     Change,

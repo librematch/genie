@@ -556,7 +556,7 @@ impl Unit {
 }
 
 /// Whether the unit AI's move goes by sea or on foot ([`Unit::ai_move_with`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum MoveWith {
     /// A Transport on top takes the point: the caller sails there.
@@ -566,7 +566,7 @@ pub(crate) enum MoveWith {
 }
 
 /// What the head action's slot 0x40 did with a move to a point ([`Unit::head_takes_point`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum PointMove {
     /// It answered 0 (an empty list, the base slot, a Hunt whose task has a work range): the
     /// caller's `MoveTo` replaces the actions.

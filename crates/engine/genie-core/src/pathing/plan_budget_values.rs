@@ -2,7 +2,7 @@
 
 /// A path budget's cap (`pathingAttemptCapValue` `+0x674`, `pathingDelayCapValue` `+0x678`,
 /// saved ints): −1 for none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PlanCap(i32);
 
 impl PlanCap {

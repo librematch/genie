@@ -9,7 +9,7 @@ use crate::map::Rect;
 use crate::map::spatial::Movers;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
-use crate::math::fmath::{sqrt, sub};
+use crate::math::fmath::sqrt;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::LinkedPathKind;
@@ -42,7 +42,7 @@ pub(super) struct Moved {
 }
 
 /// Whether level 0's look ahead moved its parent's waypoint ahead (`LAB_14115136c`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum LookAhead {
     /// The parent's waypoint moved ahead, level 0 went and the parent asks for a path.
@@ -217,7 +217,7 @@ impl Mover {
         if level.level == WaypointLevel::Walked || !next.within(level.points.len()) {
             return Ok(());
         }
-        let d = sub(at.vector(), *level.points.checked(next.get() as usize)?);
+        let d = at.vector() - *level.points.checked(next.get() as usize)?;
         // a NaN distance is not within
         if d.x() * d.x() + d.height() * d.height() + d.y() * d.y()
             < movement_tuning.target_short_reach
@@ -296,7 +296,7 @@ impl Mover {
         let mut k = from.ahead(5).min(last);
         while from < k {
             let p = *parent.points.checked(k.get() as usize)?;
-            let d = sub(p, at);
+            let d = p - at;
             if d.x() * d.x() + 0.0 + d.y() * d.y() <= movement_tuning.look_ahead
                 && self.straight(me, p, target, world, by_id)?
             {

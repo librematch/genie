@@ -6,6 +6,7 @@
 use crate::geometry::{Point, Position};
 use serde::Deserialize;
 use serde::Serialize;
+use std::ops::{Add, AddAssign, Mul};
 
 /// A displacement on the map in the map's order: x and y in tiles, z the height. A missile's
 /// direction (`+0x68`..`+0x70`) and its step of an update (`+0x7dc`..`+0x7e4`), a master's
@@ -68,13 +69,6 @@ impl Offset {
     pub const fn with_z(self, z: f32) -> Self {
         Self([self.0[0], self.0[1], z])
     }
-
-    /// `s` times each component, `s` first (`s * x`, as the game multiplies a step).
-    #[must_use]
-    pub fn scaled(self, s: f32) -> Self {
-        let [x, y, z] = self.0;
-        Self([s * x, s * y, s * z])
-    }
 }
 
 impl From<[f32; 3]> for Offset {
@@ -90,12 +84,31 @@ impl genie_diff::Diff for Offset {
     }
 }
 
-impl Position {
+impl Mul<Offset> for f32 {
+    type Output = Offset;
+
+    /// The factor times each component, the factor first (`s * x`, as the game multiplies a
+    /// step).
+    fn mul(self, o: Offset) -> Offset {
+        let [x, y, z] = o.0;
+        Offset([self * x, self * y, self * z])
+    }
+}
+
+impl Add<Offset> for Position {
+    type Output = Self;
+
     /// The place `by` moves this one to: each of its components plus the displacement's, the
     /// place's first (`x + dx`, as the game adds a step).
-    #[must_use]
-    pub fn moved(self, by: Offset) -> Self {
+    fn add(self, by: Offset) -> Self {
         Self::new(self.x() + by.x(), self.y() + by.y(), self.z() + by.z())
+    }
+}
+
+impl AddAssign<Offset> for Position {
+    /// The place moves by `by` (`+`, the place's components first).
+    fn add_assign(&mut self, by: Offset) {
+        *self = *self + by;
     }
 }
 
@@ -169,12 +182,20 @@ impl genie_diff::Diff for GroundOffset {
     }
 }
 
-impl Point {
+impl Add<GroundOffset> for Point {
+    type Output = Self;
+
     /// The point `by` moves this one to: each of its components plus the displacement's, the
     /// point's first (`x + dx`, as the game adds a step).
-    #[must_use]
-    pub fn moved(self, by: GroundOffset) -> Self {
+    fn add(self, by: GroundOffset) -> Self {
         Self::new(self.x() + by.x(), self.y() + by.y())
+    }
+}
+
+impl AddAssign<GroundOffset> for Point {
+    /// The point moves by `by` (`+`, the point's components first).
+    fn add_assign(&mut self, by: GroundOffset) {
+        *self = *self + by;
     }
 }
 
@@ -183,7 +204,7 @@ mod tests {
     use crate::geometry::{GroundOffset, Offset, Point, Position};
 
     /// An offset keeps its components' bits in the map's order, scales each by the factor
-    /// first and moves a place by its components.
+    /// first (`*`) and moves a place by its components (`+`, `+=`).
     #[test]
     fn an_offset_keeps_its_bits_scales_and_moves_place() {
         let o = Offset::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
@@ -201,16 +222,18 @@ mod tests {
             Offset::new(1.0, 2.0, 3.0)
         );
         assert_eq!(
-            Offset::new(1.0, -2.0, 0.5).scaled(2.0),
+            2.0 * Offset::new(1.0, -2.0, 0.5),
             Offset::new(2.0, -4.0, 1.0)
         );
         // -0 + 0 is +0: the place's component comes first
-        let moved = Position::new(-0.0, 10.0, 1.0).moved(Offset::new(0.0, 0.5, -1.0));
+        let mut moved = Position::new(-0.0, 10.0, 1.0) + Offset::new(0.0, 0.5, -1.0);
         assert_eq!((moved.x().to_bits(), moved.y(), moved.z()), (0, 10.5, 0.0));
+        moved += Offset::new(1.0, 0.5, 2.0);
+        assert_eq!(moved, Position::new(1.0, 11.0, 2.0));
     }
 
     /// A ground offset keeps its components' bits in the map's order, makes a table in its
-    /// order, takes a height and moves a point by its components.
+    /// order, takes a height and moves a point by its components (`+`, `+=`).
     #[test]
     fn ground_offset_keeps_its_bits_takes_height_and_moves_point() {
         let o = GroundOffset::new(-0.0, f32::from_bits(0x7fc0_0001));
@@ -229,7 +252,9 @@ mod tests {
             GroundOffset::new(1.0, 2.0).with_height(3.0),
             Offset::new(1.0, 2.0, 3.0)
         );
-        let moved = Point::new(-1.0, 10.0).moved(GroundOffset::new(0.5, 0.5));
+        let mut moved = Point::new(-1.0, 10.0) + GroundOffset::new(0.5, 0.5);
         assert_eq!(moved, Point::new(-0.5, 10.5));
+        moved += GroundOffset::new(0.5, -0.5);
+        assert_eq!(moved, Point::new(0.0, 10.0));
     }
 }

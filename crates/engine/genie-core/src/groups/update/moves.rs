@@ -21,7 +21,7 @@ use crate::groups::update::{ATTACK, FOLLOW, IDLE_LIMIT, IDLE_SPAN, NO_COMMAND, O
 use crate::groups::{SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{below_or_unordered, sqrt, sub};
+use crate::math::fmath::{below_or_unordered, sqrt};
 use crate::math::rng::Stream;
 use crate::movement::PathFlags;
 use crate::objects::{ObjectId, ObjectKey};
@@ -78,7 +78,7 @@ impl World {
                             .master(leader.player(), leader.master_id(self.model.slots))?
                             .line_of_sight;
                         let range = sight * self.model.tuning.group.front_share;
-                        let d = sub(from, moved);
+                        let d = from - moved;
                         let squared = d.x() * d.x() + 0.0 + d.y() * d.y();
                         if !below_or_unordered(squared, range.squared().get()) {
                             let _ = self.command_move_to(
@@ -241,7 +241,7 @@ impl World {
                     // DAT_143f0dc78, zero-initialised (.bss) and written by nothing
                     _ => BVector::ZERO,
                 };
-                let d = sub(end, target.moved_vector());
+                let d = end - target.moved_vector();
                 let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
                 if !below_or_unordered(squared, self.model.tuning.group.close) {
                     self.groups.held_mut(group)?.current_command = FOLLOW;
@@ -380,7 +380,7 @@ impl World {
                     .members
                     .checked_mut(i - 1)?
                     .specific_move;
-                let mut d = sub(at, own.last_position);
+                let mut d = at - own.last_position;
                 d = d.with_height(0.0);
                 own.distance -= Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()));
                 own.last_position = at;

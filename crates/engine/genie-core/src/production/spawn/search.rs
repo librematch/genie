@@ -90,7 +90,7 @@ enum Side {
 }
 
 /// Which way a run's coordinate goes: up while below its end, or down while above it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Course {
     Rising,
     Falling,
@@ -129,7 +129,7 @@ struct Frame {
 
 /// A pass of the spawn search's frame: the first (each side toward the gather point), or the
 /// second (every open side).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum SearchPass {
     /// The first pass.
     First,

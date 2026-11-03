@@ -4,7 +4,7 @@
 /// at 1 a boar does not wander, a hit may do no damage and a terrain's smoothing differs; the
 /// full tech tree's fallback civilisation is 18 at 1 and 59 at 2. Its writer is not located and
 /// the save does not hold it; genie-oracle leaves it at 0.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Mode680(i32);
 
 impl Mode680 {

@@ -91,7 +91,7 @@ pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d:
 
 /// How a ray meets a segment or a shape's side (the non-zero results of [`segment_hit`], the
 /// ray's side tests and [`ray_rect`]; the game's 0 for none is `None`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Meet {
     /// 1: a proper crossing.
     Cross,
@@ -103,7 +103,7 @@ pub(super) enum Meet {
 
 /// A place along a ray in fixed point, `ONE` its end (the raycast's `t`): a hit lowers it to
 /// the hit's place.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct RayFraction(i32);
 
 impl RayFraction {

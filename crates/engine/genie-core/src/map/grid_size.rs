@@ -5,7 +5,7 @@ use crate::map::Tile;
 
 /// The size of a grid of tiles, its width (along x) and its height (along y), in tiles: the map's
 /// (the obstruction manager's `+0xa8`, the pathing's), or an influence map's.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct GridSize(
     /// Its width and height.
     [i32; 2],

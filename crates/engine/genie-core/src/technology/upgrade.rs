@@ -81,7 +81,7 @@ fn keeps_unit_ai(roles: &Roles, new: ClassId, old: ClassId) -> bool {
 
 /// Whether an upgraded object keeps its master (the upgrade's modes −1 and 3, whose master then
 /// copies the new one) or takes the new master.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum UpgradeMaster {
     /// Its master stays.
     Kept,

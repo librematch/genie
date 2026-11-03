@@ -30,7 +30,7 @@ use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 
 /// What `evasiveMoveTo` (`FUN_140c4d140`'s `tries`) does with a point the unit could not stand at.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum BadPoint {
     /// It moves, five times at most (1).
     Moves,

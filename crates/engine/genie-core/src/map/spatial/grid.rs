@@ -41,7 +41,7 @@ pub struct WalkQuery<'a> {
 }
 
 /// Whether a line query ([`Spatial::line_hits`]) meets the temporary tile records too.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TileRecords {
     /// With them.
     Met,

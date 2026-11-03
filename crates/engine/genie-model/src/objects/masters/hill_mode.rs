@@ -7,7 +7,9 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's hill mode (`+0x604`, the `.dat`'s `hill_mode`): which tiles a site of it may stand on
 /// in the placement test (`genie_core::production::spawn`'s hill test, `FUN_141123f80`). Every byte
 /// is kept; one not named takes any tile.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HillMode(u8);
 

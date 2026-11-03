@@ -14,7 +14,7 @@ use crate::groups::group_list::NO_FORMATION;
 use crate::groups::{Formation, UnitGroup};
 use crate::map::Distance;
 use crate::map::GridSize;
-use crate::math::fmath::{BVector, Rotation, add, sub};
+use crate::math::fmath::{BVector, Rotation};
 use crate::math::fmath::{dot, rotate, sqrt};
 use crate::math::image::group::RIGHT_ANGLE as GROUP_RIGHT_ANGLE;
 use crate::movement::PathData;
@@ -87,7 +87,7 @@ impl World {
             } else {
                 BVector::ZERO
             };
-            let mut d = sub(end, g.motion.position[0]);
+            let mut d = end - g.motion.position[0];
             d = d.with_height(0.0);
             let formations = g
                 .owner
@@ -285,7 +285,7 @@ pub(super) fn transform_slot(
         } else {
             rotate(rotation, slot.offset)
         };
-        let at = add(point, offset);
+        let at = point + offset;
         slot.desired_transform_position = on_map(at, map, group_tuning);
         slot.transform_position = on_map(at, map, group_tuning);
         slot.transformed = 1;
@@ -307,7 +307,7 @@ pub fn find_point_from_front(line: &PointLine, distance: Distance) -> Option<BVe
         return None;
     }
     let ground = |i: usize| {
-        let mut d = sub(line.points.get(i + 1)?.point, line.points.get(i)?.point);
+        let mut d = line.points.get(i + 1)?.point - line.points.get(i)?.point;
         d = d.with_height(0.0);
         Some(d)
     };

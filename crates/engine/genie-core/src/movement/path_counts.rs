@@ -23,7 +23,7 @@ pub enum LinkedPathKind {
 
 /// A raw value of [`LinkedPathKind`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(i32);
 
 impl LinkedPathKind {

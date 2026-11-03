@@ -6,7 +6,7 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{at_most_or_unordered, sqrt, sub};
+use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::movement::LevelFlags;
 use crate::movement::PathData;
 use crate::movement::WaypointIndex;
@@ -15,7 +15,7 @@ use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
 /// What `FUN_140f9b4d0` does to the walked level's flag: its `on` argument.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum FlagChange {
     /// The flag goes on (1).
     Set,
@@ -65,13 +65,13 @@ pub(super) fn point(level: &PathData, index: WaypointIndex) -> BVector {
 
 /// The length on the ground from `a` to `b` (`FUN_14087e560`, the height zeroed).
 pub(super) fn ground(a: BVector, b: BVector) -> Distance {
-    let mut d = sub(a, b);
+    let mut d = a - b;
     d = d.with_height(0.0);
     Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
 
 /// Where a step toward a waypoint ends against it (`FUN_141046130`'s answer).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(in crate::groups) enum Passing {
     /// 0: short of it (`COMISS` then `JBE`: a NaN step or distance is short).
     Short = 0,
@@ -88,9 +88,9 @@ pub(in crate::groups) fn passes_waypoint(
     next: BVector,
     group_tuning: &GroupTuning,
 ) -> Passing {
-    let mut a = sub(waypoint, at);
-    let mut b = sub(waypoint, next);
-    let c = sub(next, at);
+    let mut a = waypoint - at;
+    let mut b = waypoint - next;
+    let c = next - at;
     a = a.with_height(0.0);
     b = b.with_height(0.0);
     let to_waypoint = sqrt(a.x() * a.x() + 0.0 + a.y() * a.y());

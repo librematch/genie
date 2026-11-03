@@ -8,7 +8,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Placed;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, sqrt, sub};
+use crate::math::fmath::sqrt;
 use crate::math::rng::Well512;
 use crate::movement::WaypointIndex;
 use crate::movement::{EPSILON, Motion, PathData};
@@ -69,7 +69,7 @@ pub(super) const fn ground_line(at: Position, waypoint: BVector) -> (Point, Poin
 
 /// The length on the ground from `a` to `b`.
 pub(super) fn ground(a: BVector, b: BVector) -> Distance {
-    let mut d = sub(a, b);
+    let mut d = a - b;
     d = d.with_height(0.0);
     Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
@@ -77,7 +77,7 @@ pub(super) fn ground(a: BVector, b: BVector) -> Distance {
 /// Whether a walk's goal is in the short pather's reach ([`Mover::near_goal`]).
 ///
 /// [`Mover::near_goal`]: crate::movement::Mover::near_goal
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum GoalReach {
     /// In reach.
     Near,
@@ -130,7 +130,7 @@ pub(super) fn split(path: &mut Path, i: i32) {
     let Some(&[a, b]) = path.points.get(at..at + 2) else {
         return;
     };
-    let d = sub(b, a);
+    let d = b - a;
     let length = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
     if length < EPSILON {
         return;
@@ -142,7 +142,7 @@ pub(super) fn split(path: &mut Path, i: i32) {
         (d.height() / again) * half,
         (d.y() / again) * half,
     );
-    let _ = path.insert(at + 1, add(a, step));
+    let _ = path.insert(at + 1, a + step);
 }
 
 /// What the motion step knows of where the walked level goes: its target, the gap to it
@@ -201,7 +201,7 @@ pub(super) enum Next {
 }
 
 /// Where the motion step goes on after a level's path request.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum AfterRequest {
     /// Back to the top of the step (`LAB_141151124`) for the level now walked.
     Again,

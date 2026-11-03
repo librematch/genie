@@ -179,7 +179,7 @@ impl UnitGroup {
 }
 
 /// What a unit that leaves its group (`removeUnit`'s `param_4`) does with its walk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LeavingWalk {
     /// It stands (0).
     Stands,

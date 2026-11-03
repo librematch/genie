@@ -49,7 +49,7 @@ const NO_FARM: f32 = FARM_QUEUE_NO_FARM;
 const ONE_FARM: CostCount = CostCount::new(FARM_QUEUE_ONE_FARM);
 
 /// Which of a player's queues.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Queue {
     /// `+0x141c`: farms and pastures.
     Farms,
@@ -58,7 +58,7 @@ enum Queue {
 }
 
 /// Whether a farmer's reseed made a farm's foundation ([`World::reseed`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum Reseed {
     /// The foundation was made: the farmer builds it.

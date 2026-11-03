@@ -36,7 +36,7 @@ pub(super) struct Traced {
 }
 
 /// How an outline's trace ended (`FUN_140fa8fa0`'s result).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Outline {
     /// 0: the outline closed.
     Closed,
@@ -46,7 +46,7 @@ pub(super) enum Outline {
 
 /// Whether a traced vertex closed the polygon's outline or joined it (`FUN_140fa2fa0`'s 1
 /// or 0).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum VertexTrace {
     /// The outline closes: the vertex is not added.

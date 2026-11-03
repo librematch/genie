@@ -3,7 +3,7 @@
 /// What a player knows of a tile (`FUN_141663500`, a byte): 0xf when it sees it, 0x80 when it
 /// explored it, else 0; a building's slot 0x1e0 answers the same bytes. The set is closed: the
 /// routine answers no other byte.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum TileSight {
     /// Neither seen nor explored (0).

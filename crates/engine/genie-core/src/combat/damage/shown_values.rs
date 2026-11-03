@@ -22,7 +22,7 @@ use crate::world::layer::Roles;
 pub const BONUS_DAMAGE: ActionKind = ActionKind::named(0xa0);
 
 /// Which share of its hit points `FUN_141188880` gives.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HpPart {
     /// The share it has.
     Held,
@@ -157,7 +157,7 @@ pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>, roles: &Roles) -
 
 /// Which weapons the shown attack's best ([`best_attack`]) reads: the fighting classes' (melee,
 /// pierce, class 31) or any.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Weapons {
     /// Melee, pierce and class 31.
     Fighting,

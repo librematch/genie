@@ -7,7 +7,7 @@ use genie_diff::Diff;
 /// How a research uses its cost override (`+0x4e`, a short): −2 the `.dat`'s entry where it is
 /// paid, 0 none, 1 the override (any other value counts as the override where the listed
 /// costs read it, and as none where the payment does).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OverrideUse(i16);
 
 impl OverrideUse {

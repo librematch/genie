@@ -57,7 +57,7 @@ const CLASS_KEY: i32 = 900;
 /// A list's key in the tracker (`FUN_141658430`'s integers): a key master's id, a class + 900,
 /// each + 90000 while pending. The game keeps them as one integer, so a key master of 900 to
 /// 999 shares a class's list (the game logs it), and a master the player lacks files under −1.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ListKey(i32);
 
 impl ListKey {

@@ -341,7 +341,7 @@ impl Fly {
 }
 
 /// Whether the Fly's `set_state` dropped its `MoveTo` (`0x140a84a50`'s answer).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 enum MoveToDrop {
     /// States 2 and 3 dropped it: the caller stops the bird.

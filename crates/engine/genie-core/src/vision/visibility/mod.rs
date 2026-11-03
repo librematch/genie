@@ -81,7 +81,7 @@ pub struct VisibleMap {
 /// A building's sight state (`TRIBE_Building_Object`: its slots 0x1d0 `FUN_1411d0190` and 0x1d8
 /// `FUN_1411e6f60`), by its construction's stage: `built` (`+0xca1`) first, then whether its
 /// `build_pts` (`+0xc50`) are 0. The slots read the build points only of a building not built.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BuildingSight {
     /// A foundation whose construction has not started (`built` 0, no build points): it sees
     /// nothing.

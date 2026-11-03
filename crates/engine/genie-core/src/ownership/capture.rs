@@ -32,7 +32,7 @@ use crate::world::parts::Part;
 use crate::world::step::Step;
 
 /// Whether a unit changed hands ([`Unit::change_owner`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum OwnerChange {
     /// The new owner has its master: the unit is theirs.
@@ -365,7 +365,7 @@ fn take_livestock(
 /// with them.
 ///
 /// [`Outcome::Captured`]: crate::objects::unit::Outcome::Captured
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct Captured {
     pub(crate) new: PlayerId,
     pub(crate) main: bool,

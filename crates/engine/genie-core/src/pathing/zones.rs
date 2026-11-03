@@ -209,7 +209,7 @@ impl ZoneMap {
         let mut stack = vec![from];
         while let Some(t) = stack.pop() {
             for step in FLOOD_STEPS {
-                let n = t.stepped(step);
+                let n = t + step;
                 let Some(j) = self.size.index(n) else {
                     continue;
                 };
@@ -377,7 +377,7 @@ pub struct Zones {
 }
 
 /// Whether the zone maps' lookup ([`Zones::find`]) labels a found map again from the terrain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Relabel {
     /// It labels it again (`FUN_141413190`).
     Again,

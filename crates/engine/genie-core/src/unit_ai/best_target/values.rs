@@ -62,7 +62,7 @@ impl MulAssign<f32> for TargetScore {
 
 /// A count of the table's entries (`+0x20`..`+0x5c`): the others, the moving and armed ones,
 /// those within reach, and those per attack category.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EntryCount(i32);
 
 impl EntryCount {

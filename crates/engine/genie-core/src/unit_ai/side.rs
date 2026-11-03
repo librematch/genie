@@ -389,7 +389,7 @@ pub(super) const WITHOUT_UNIT: GenieError =
 
 /// What a defend target's unit AI names as its nearest attacker ([`UnitSide::defended_attacker`]):
 /// the defender attacks it, or with none runs its idle check.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NearestAttacker {
     /// The world does not hold the target, or it has no unit AI: no slot 0x78 to ask.
     NoUnitAi,

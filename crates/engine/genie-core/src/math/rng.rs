@@ -172,7 +172,7 @@ const fn jenkins(a: u32) -> u32 {
 }
 
 /// The streams in registry order. The names come from the constructors' strings.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Stream {
     /// The Action stream.
     Action,

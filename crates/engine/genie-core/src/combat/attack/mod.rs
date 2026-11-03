@@ -220,7 +220,7 @@ pub(crate) struct ReadyReads {
 
 /// readyToAttack's answer to the start ([`Attack::begin`]), which the start's end follows
 /// ([`Attack::command`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Begun {
     /// The unit can move: its `MoveTo` started.
     Moves {
@@ -404,7 +404,7 @@ impl AttackReads {
 }
 
 /// The unit AI's order as the Attack reads it (`+0x3c`, `FUN_140c4cc20`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum AiOrder {
     /// The unit has no unit AI.
     Absent,

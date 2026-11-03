@@ -24,7 +24,7 @@ use crate::map::Position;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, at_most_or_unordered, below_or_unordered, scale, sqrt, sub};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
 use crate::movement::WaypointIndex;
 use crate::movement::{
     Avoided, EPSILON, LongWalker, Me, Mover, PathAsk, PathData, Planning, ShortAsk, footprint_gap,
@@ -354,7 +354,7 @@ impl Mover {
         if ask.resume == WaypointIndex::NONE {
             let end = goal.vector();
             let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
-            let mut d = sub(end, last);
+            let mut d = end - last;
             d = d.with_height(0.0);
             if EPSILON < sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()) {
                 let _ = path.push(end);
@@ -448,11 +448,11 @@ impl Mover {
         let Some(v) = &self.velocity else {
             return position;
         };
-        let mut next = add(v.velocity, scale(dt.get(), v.acceleration));
+        let mut next = v.velocity + dt.get() * v.acceleration;
         if self.stats.speed < Speed::new(next.y()) || next.y() <= 0.0 {
             next = next.with_y(self.stats.speed.get());
         }
-        add(position, scale(dt.get() * next.y(), direction))
+        position + dt.get() * next.y() * direction
     }
 
     /// [`Mover::avoid`]'s first loop's test of the hit `id` (`other` its record): kept unless

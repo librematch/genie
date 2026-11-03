@@ -23,7 +23,7 @@ use crate::world::index::ObjectsRef;
 
 /// Whether the obstruction manager's point query counts a moving object's record (its flag
 /// 0x40, [`Spatial::point_hit`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Movers {
     /// It counts (no flag).
     Counted,
@@ -33,7 +33,7 @@ pub enum Movers {
 
 /// Which tile beside a footprint the spot search ([`Spatial::spot_off`]) takes: the nearest
 /// (`param_7` 0) or the farthest (1), an empty one first.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SpotPick {
     /// The nearest.
     Nearest,

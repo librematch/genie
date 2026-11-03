@@ -18,7 +18,7 @@ use crate::map::spatial::SmoothingWalls;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::map::{RestrictionId, TerrainMask};
 use crate::math::fmath::BVector;
-use crate::math::fmath::{at_most_or_unordered, below_or_unordered, length, sub};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, length};
 use crate::movement::WaitDelays;
 use crate::movement::{EPSILON, INCLUDED, PLANS, Planning, footprint_gap, footprint_gap_squared};
 use crate::pathing::hull_path::HullPather;
@@ -34,7 +34,7 @@ use crate::{GenieError, pathing::short_path};
 use std::iter::once;
 
 /// How a step relates to its waypoint (slot 196, `0x14114f400`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Reach {
     /// 0: the step ends short of it.
     Short,
@@ -47,9 +47,9 @@ pub(super) enum Reach {
 /// Compare the distances on the ground: waypoint to position, waypoint to the step's end, and the
 /// step's own length.
 pub(super) fn reach(waypoint: BVector, position: BVector, projected: BVector) -> Reach {
-    let mut now = sub(waypoint, position);
-    let mut after = sub(waypoint, projected);
-    let step = sub(projected, position);
+    let mut now = waypoint - position;
+    let mut after = waypoint - projected;
+    let step = projected - position;
     now = now.with_height(0.0);
     after = after.with_height(0.0);
     let (now, after, step) = (length(now), length(after), length(step));

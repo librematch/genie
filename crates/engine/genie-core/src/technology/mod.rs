@@ -424,7 +424,7 @@ impl TechState {
 /// Whether the research test lets a technology not in state 1 pass again (`FUN_1413cd600`'s
 /// `param_6`, `FUN_14162fd90`'s and `FUN_1413d1740`'s repeat flag): a repeatable one
 /// ([`TechState::repeatable`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Repeat {
     /// It may pass again.
     Allowed,
@@ -434,7 +434,7 @@ pub enum Repeat {
 
 /// The researches [`TechState::repeatable`] allows: below the technology's own cap with its
 /// `stack`, or also below 0x100 (the player's `+0x648` set, which genie's player does not hold).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RepeatLimit {
     /// Its own cap.
     Own,

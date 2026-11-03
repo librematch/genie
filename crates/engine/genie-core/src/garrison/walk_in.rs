@@ -90,7 +90,7 @@ pub struct EnterAction {
 }
 
 /// What an Enter goes into: a building (type 80) or a transport.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EnterKind {
     /// A building.
     Building,
@@ -152,7 +152,7 @@ pub enum Walking {
 }
 
 /// Whether the Enter's walk again put the unit inside ([`EnterAction::again`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum EnterAgain {
     /// The unit was in reach and entered.

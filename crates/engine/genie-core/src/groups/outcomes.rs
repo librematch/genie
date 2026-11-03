@@ -7,7 +7,7 @@
 
 /// Whether a group's move began (`commandMoveTo`'s, `commandAttack`'s and `BUnitGroup::command`'s
 /// 1 or 0).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum GroupMove {
     /// 1: the group moves.
@@ -17,7 +17,7 @@ pub enum GroupMove {
 }
 
 /// What `BUnitGroup::update` leaves of the group: 1 keeps it, 0 has the world delete it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum GroupFate {
     /// 1: the group stays.
@@ -27,7 +27,7 @@ pub enum GroupFate {
 }
 
 /// Whether a group's current command (its move, its follow, its attack) finished.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum Progress {
     /// The command finished.
@@ -37,7 +37,7 @@ pub enum Progress {
 }
 
 /// Whether a queued command ends the queue's run (`check_queued_orders`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum QueueRun {
     /// The command is the group's now: the run ends.
@@ -48,7 +48,7 @@ pub enum QueueRun {
 
 /// Whether a formation's layout (its slots, a line, a box's places) was made: the builders' 1
 /// or 0.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum Layout {
     /// 1: made.
@@ -59,7 +59,7 @@ pub enum Layout {
 
 /// Whether an object shows the sprite it is asked for (slots 0x650, 0x658, 0x660): 0 when it
 /// has none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum SpriteShow {
     /// It shows the sprite.
@@ -69,7 +69,7 @@ pub enum SpriteShow {
 }
 
 /// Whether a group's motion took a new orientation (`FUN_141049e10`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum Orientation {
     /// The motion faces the new direction.
@@ -79,7 +79,7 @@ pub enum Orientation {
 }
 
 /// Whether the members' arrays grew (`FUN_14102d710`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum Resize {
     /// The arrays hold the new capacity.
@@ -89,7 +89,7 @@ pub enum Resize {
 }
 
 /// Whether `AddUnit` took the unit into the group.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum Join {
     /// The unit is a member now (or was one).
@@ -99,7 +99,7 @@ pub enum Join {
 }
 
 /// Whether a member reached its due slot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum SlotTry {
     /// It has a way there and stands on it.
@@ -109,7 +109,7 @@ pub enum SlotTry {
 }
 
 /// Whether a member's own move was set (`FUN_141039f60`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum MemberMove {
     /// The move is set (or ended).

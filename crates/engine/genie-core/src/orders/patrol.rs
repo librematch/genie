@@ -10,7 +10,6 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::BVector;
-use crate::math::fmath::sub;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
@@ -37,7 +36,7 @@ use crate::world::slots::PlayerSlots;
 
 /// What PATROL's and `ATTACK_MOVE`'s flag `+0x8` (`FUN_14161b970`'s `param_6`) does to the listed
 /// units' AIs' saved patrols (`zeroPatrolInformation`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SavedPatrols {
     /// They go (1).
     Dropped,
@@ -331,7 +330,7 @@ impl World {
                 }
             }
             // slot 0x520: +0x824 as the game holds it (x, height, y)
-            let d = sub(BVector::new(moved.x(), moved.z(), moved.y()), at);
+            let d = BVector::new(moved.x(), moved.z(), moved.y()) - at;
             let influence = self.players.player(p)?.formations.influence.get();
             if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() <= influence * influence {
                 let _ = split.loose.remove(i);

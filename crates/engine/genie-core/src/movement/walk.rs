@@ -9,7 +9,7 @@ use crate::map::spatial::{RecordId, Spatial};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{
-    angle_between, at_most_or_unordered, cross, length, normalize, rotate, rotation, sqrt, sub,
+    angle_between, at_most_or_unordered, cross, length, normalize, rotate, rotation, sqrt,
 };
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
@@ -27,7 +27,7 @@ use crate::world::layer::generated::MovementTuning;
 
 /// Whether slot 195's turn ([`Mover::turn_toward`]) took the whole angle or fell short of it (the
 /// angle above the most, clipped), which brakes the unit ([`Mover::control_speed`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Turn {
     /// The whole angle.
     Whole,
@@ -279,7 +279,7 @@ impl Mover {
             v.velocity = v.velocity.with_y(0.0);
             return;
         }
-        let d = sub(waypoint, position);
+        let d = waypoint - position;
         let distance = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
         let toward = BVector::new(d.x() / distance, d.height() / distance, d.y() / distance);
         let angle = angle_between(self.forward, toward);
@@ -295,7 +295,7 @@ impl Mover {
                 side.height() * radius + position.height(),
                 side.y() * radius + position.y(),
             );
-            if length(sub(waypoint, centre)) < radius {
+            if length(waypoint - centre) < radius {
                 v.acceleration = v.acceleration.with_y(-f32::MAX);
                 return;
             }

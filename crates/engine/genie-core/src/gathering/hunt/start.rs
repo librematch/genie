@@ -48,7 +48,7 @@ pub struct PointWalker {
 }
 
 /// What a hunt's walk to its point did in an update ([`HuntAction::update_point_walk`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PointWalk {
     /// It walks on, or waits to ask again.
     Walking,

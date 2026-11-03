@@ -21,7 +21,9 @@ pub struct DamageGraphic {
 
 /// A hit point share in whole per cent (a byte): a damage sprite's `damage_percent` (`+0x8`),
 /// below which share it shows, and an object's damage share (`+0xd`) the sprites follow.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HpPercent(u8);
 
@@ -50,7 +52,9 @@ impl HpPercent {
 
 /// How a damage sprite is applied (its `flag`, `+0x9`, the `.dat`'s `apply_mode`): placed,
 /// scattered (two Object-stream draws) or shown as the object's sprite.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord, Hash,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageSpriteMode(u8);
 

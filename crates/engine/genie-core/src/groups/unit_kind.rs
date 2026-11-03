@@ -6,7 +6,7 @@ use crate::objects::masters::MasterId;
 /// word, −1 for none. The statistic's 50 words are the shared scratch array's
 /// ([`crate::groups::UnitGroups::unit_kinds_scratch`]), so the words past its types are an
 /// earlier count's types, or the 0 the array starts with; every word is kept as it is.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnitKind(i32);
 
 impl UnitKind {

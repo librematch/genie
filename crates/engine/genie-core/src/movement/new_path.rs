@@ -9,7 +9,6 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::conversions::cvttss2si_64;
-use crate::math::fmath::sub;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::LinkedPathKind;
@@ -145,7 +144,7 @@ impl Mover {
                 *path.points.checked(i as usize)?,
                 *path.points.checked(i as usize - 1)?,
             );
-            let mut d = sub(a, b);
+            let mut d = a - b;
             d = d.with_height(0.0);
             if movement_tuning.split < d.x() * d.x() + 0.0 + d.y() * d.y() {
                 split(&mut path, i - 1);

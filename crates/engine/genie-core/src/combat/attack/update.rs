@@ -47,7 +47,7 @@ use crate::world::lets::release;
 use crate::world::step::Step;
 
 /// Whether a unit can attack (`FUN_14120ea30`): a building without it ends its Attack.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Armament {
     /// It can.
     Armed,

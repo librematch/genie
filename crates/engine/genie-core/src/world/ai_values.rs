@@ -2,7 +2,7 @@
 
 /// A whole per cent a setting holds: the easiest and the easier reaction percentages and the
 /// targeting factor, which the target scores take times 0.01.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Percent(i32);
 
 impl Percent {
@@ -28,7 +28,7 @@ impl Percent {
 /// A player's local targeting mode (`local_targeting_mode`, setting 9): which target scores
 /// its targeting factor scales. Mode 1 scales the kill-time score's top, mode 2 an armored
 /// entry's total; another mode scales none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TargetingMode {
     /// Mode 1: the kill-time score's top.
     KillTime,
@@ -40,7 +40,7 @@ pub enum TargetingMode {
 
 /// A raw value of [`TargetingMode`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(i32);
 
 impl TargetingMode {
@@ -84,7 +84,7 @@ impl Default for TargetingMode {
 
 /// A player's boar lure destination (`boarLureDestination`, setting 0xc): the byte its AI's
 /// script sets, which no modelled routine reads.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LureDestination(u8);
 
 impl LureDestination {
@@ -103,7 +103,7 @@ impl LureDestination {
 
 /// A player's villager garrison setting (`mDisableVillagerGarrison`, setting 0x11): the int its
 /// AI's script sets, which no modelled routine reads.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VillagerGarrison(i32);
 
 impl VillagerGarrison {

@@ -17,7 +17,7 @@ pub(super) const STEPS: [TileOffset; 8] = TileOffset::table([
 
 /// A step's direction (`FUN_140f9eb70`'s switch): 0 to 7, the place of its tile in [`STEPS`],
 /// the order the search tries the eight tiles around one; the even ones are diagonal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct StepDir(u8);
 
 impl StepDir {
@@ -60,7 +60,7 @@ impl StepDir {
 }
 
 /// A set of step directions, a bit each ([`StepDir::behind`], the table at `DAT_142f43a28`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct StepDirs(u8);
 
 impl StepDirs {

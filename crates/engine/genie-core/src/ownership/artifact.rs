@@ -57,7 +57,7 @@ pub(crate) struct ArtifactReads {
 }
 
 /// What the Artifact's state step asks of its unit ([`Artifact::step`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Handover {
     /// The check found player `new` to take the animal over (the caller's conversion,
     /// `FUN_140aab570`), its sub-actions gone ([`Artifact::drop_sub_actions`]).
@@ -74,7 +74,7 @@ pub enum Handover {
 
 /// What the deletion of the Artifact's sub-actions (`FUN_140a98620`) leaves to the caller
 /// ([`Artifact::drop_sub_actions`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct SubActionsGone {
     /// A walking `MoveTo` went, the Artifact's own or the Enter's: its teardown (`0x140aa1f30`)
     /// stops the unit (slot 0x5d0).

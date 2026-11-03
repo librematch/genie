@@ -45,7 +45,7 @@ pub struct ClearingSite {
 }
 
 /// Who calls the footprint clearing (`FUN_1415c3620`'s `param_6`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Clearer {
     /// The builder (1: the Build's `set_state(7)`) or a new object with its flag
     /// (`FUN_14162ce00`): the trees go too.

@@ -7,7 +7,9 @@ use serde::Serialize;
 /// A master's charge event (`mChargeEvent`, `+0x920`): the tiles a ready charge of type 6 or 7
 /// ([`crate::objects::masters::ChargeKind::ranged`]) adds to the range (slot 0x2f8). Every short
 /// the data or an effect leaves is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ChargeEvent(i16);
 

@@ -28,7 +28,7 @@ pub use self::object_state::ObjectState;
 
 /// Whether an object's current sprite still animates (the sprite list's slot 0x20,
 /// `FUN_1413b8790` -> `FUN_1413b38a0`: its animate flag on and the graphic animated).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SpritePlay {
     /// It animates.
     Animating,
@@ -41,7 +41,7 @@ use crate::world::player::Player;
 
 /// Which update chain the object runs. `RGE_Animated_Object::update` and everything derived from
 /// it (types 20 and up) adds a step after the static update's.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff, Hash)]
 pub enum Class {
     /// Type 10, `RGE_Static_Object`.
     #[default]

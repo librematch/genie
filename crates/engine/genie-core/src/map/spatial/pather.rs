@@ -33,7 +33,7 @@ pub const fn tile_record_id(tile: Tile) -> RecordId {
 
 /// Where the old short pather's query stops: at its first hit (`FUN_141052350`) or at the 25th
 /// (`FUN_141051900`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum HitLimit {
     /// The first hit.
     First,

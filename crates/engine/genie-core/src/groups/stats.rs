@@ -18,7 +18,7 @@ use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::map::spatial::SearchLists;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
@@ -59,7 +59,7 @@ struct MemberView {
 
 /// What the group statistics (`FUN_14100bcb0`'s `param_2`) do with a member far from its slot
 /// ([`World::group_statistics`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FarMembers {
     /// It leaves the group (1).
     Leave,
@@ -483,7 +483,7 @@ impl World {
         let Some(slot) = f.slots.iter().find(|s| s.unit_id == Some(view.id)) else {
             return Ok(false);
         };
-        let mut d = sub(view.at, slot.transform_position);
+        let mut d = view.at - slot.transform_position;
         d = d.with_height(0.0);
         let limit = if f.kind == FormationKind::Staggered
             || !below_or_unordered(largest, self.model.tuning.group.wide_radius)

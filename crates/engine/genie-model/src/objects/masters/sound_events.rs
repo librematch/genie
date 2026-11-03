@@ -6,7 +6,9 @@ use serde::Serialize;
 
 /// A sound event by its id (`mEventId`, the audio engine's event): what a task's sounds name
 /// (`+0x60`, `+0x78`). The `.dat`'s event 0 with sound files is the default event.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Diff, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Diff, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SoundEventId(i32);
 

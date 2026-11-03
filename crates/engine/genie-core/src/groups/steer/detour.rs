@@ -17,8 +17,8 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::{RestrictionId, TerrainMask};
+use crate::math::fmath::sqrt;
 use crate::math::fmath::{BVector, at_most_or_unordered};
-use crate::math::fmath::{add, scale, sqrt, sub};
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::{LongWalker, OUTSIDE_PATH, Planning, Walker, long_path_for, short_path_for};
@@ -545,7 +545,7 @@ pub(super) fn one_step_toward(
     forward: BVector,
     map: GridSize,
 ) -> BVector {
-    let d = sub(to, r.at);
+    let d = to - r.at;
     let mut dir = if d.x().abs() <= ROUND_STILL && d.y().abs() <= ROUND_STILL {
         forward
     } else {
@@ -554,7 +554,7 @@ pub(super) fn one_step_toward(
     dir = dir.with_height(0.0);
     let len = sqrt(dir.x() * dir.x() + 0.0 + dir.y() * dir.y());
     let dir = BVector::new(dir.x() / len, dir.height() / len, dir.y() / len);
-    let mut step = add(r.at, scale(1.0, dir));
+    let mut step = r.at + 1.0 * dir;
     let (w, h) = (map.width(), map.height());
     let (top_x, top_y) = (w as f32 - r.radius.x(), h as f32 - r.height.get());
     if r.radius.x() > step.x() {
@@ -574,7 +574,7 @@ pub(super) fn one_step_toward(
 /// from the slot `to` on the ground.
 pub(super) fn ends_farther(record: &Path, to: BVector, gap: Distance) -> bool {
     let end = record.points.last().copied().unwrap_or(OUTSIDE_PATH);
-    let mut d = sub(to, end);
+    let mut d = to - end;
     d = d.with_height(0.0);
     gap < Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }

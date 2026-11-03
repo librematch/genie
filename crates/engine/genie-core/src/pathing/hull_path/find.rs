@@ -18,7 +18,7 @@ use crate::world::slots::CheckedIndex;
 
 /// Whether a search keeps the area and the hulls of the pather's last one (`FindShortPath`'s
 /// argument 11, when the pather has an area) or makes a new area and builds them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Hulls {
     /// The last search's stay.
     Kept,
@@ -28,7 +28,7 @@ pub(crate) enum Hulls {
 
 /// Whether a search tries the quick path first (`FindShortPath`'s argument 15 0) or the quick
 /// path alone (1, slot 0x3e0's).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum QuickPath {
     /// The quick path, then the hull search.
     First,

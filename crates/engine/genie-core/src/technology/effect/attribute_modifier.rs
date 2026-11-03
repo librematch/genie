@@ -35,7 +35,7 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 /// Which side of a player's change a hook runs on (`FUN_141614f40`'s flag): before it (0: the
 /// volleys lose the shares of the units inside, `FUN_141217ac0`) or after it (1: they take
 /// them again, `FUN_14120b910`, and a changed sprite shows).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum EffectHook {
     /// Before the change.
     Before,

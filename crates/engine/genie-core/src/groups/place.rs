@@ -18,8 +18,8 @@ use crate::map::spatial::Movers;
 use crate::map::spatial::RecordId;
 use crate::map::{GroundOffset, Point};
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, line_distance, scale, sqrt, sub};
 use crate::math::fmath::{cross, normalize};
+use crate::math::fmath::{line_distance, sqrt};
 use crate::math::image::group::{FARTHEST as GROUP_FARTHEST, SPIRAL_FIRST, SPIRAL_LAST};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
@@ -64,7 +64,7 @@ impl Spiral {
     /// One step in the direction; it turns when the count divides by the leg's length, and the
     /// leg grows on a turn to y (an even direction).
     fn step(&mut self) -> Result<(), GenieError> {
-        self.at = self.at.moved(*SPIRAL.checked(self.direction)?);
+        self.at += *SPIRAL.checked(self.direction)?;
         if self.count % self.leg == 0 {
             self.direction = (self.direction + 1) % SPIRAL.len();
             if self.direction.is_multiple_of(2) {
@@ -78,7 +78,7 @@ impl Spiral {
 
 /// Which of a group's motion's places an orientation (`FUN_141049e10`) sets: the new position
 /// only (`param_4` 0) or the position too (1).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Orient {
     /// The new position and the position.
     Both,
@@ -299,7 +299,7 @@ impl World {
         };
         let m = &g.motion;
         let forward = m.position[1];
-        let front = add(scale(ahead.get(), forward), m.position[0]);
+        let front = ahead.get() * forward + m.position[0];
         let held: Vec<(ObjectId, BVector)> = g
             .members
             .iter()
@@ -437,7 +437,7 @@ const FARTHEST: f32 = GROUP_FARTHEST;
 /// `p − q` squared on the ground, the height difference zeroed (`FUN_14087e560`, then
 /// `x² + 0 + y²`).
 fn ground_squared(p: BVector, q: BVector) -> DistanceSquared {
-    let d = sub(p, q);
+    let d = p - q;
     DistanceSquared::new(d.x() * d.x() + 0.0 + d.y() * d.y())
 }
 

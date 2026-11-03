@@ -6,7 +6,9 @@ use std::fmt::{Display, Error, Formatter};
 
 /// A master's occlusion mode (`occlusion_flag`, `+0x650`; the `.dat`'s `occlusion_mode`): how the
 /// renderer shows its objects behind others. The simulation only keeps it; every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Occlusion(u8);
 

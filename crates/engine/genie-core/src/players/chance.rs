@@ -4,7 +4,7 @@
 /// (`chance_to_dodge_missiles`, `+0xe10`) and the siege's keep-distance
 /// (`chance_for_archers_to_maintain_distance`, `+0xe11`), a percent a unit AI's 15-bit draw is
 /// held against.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Chance(u8);
 
 impl Chance {

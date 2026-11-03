@@ -145,7 +145,7 @@ struct Hull {
 /// A hull's place in the pather's hulls: the order the building made them in, where a merge
 /// moves the last hull into the place of the one it absorbed (`addShapeToHulls`). A node of the
 /// A* holds it in its `+0x28` ([`HullIndex::slot`]), −1 for none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct HullIndex(usize);
 
 impl HullIndex {
@@ -167,18 +167,18 @@ impl HullIndex {
 
 /// An entrance path's place in the pather's entrance paths (`+0x110`, at most [`PATHS`]): a
 /// point of the goal's hull holds the one ending at it (the game's −1 for none).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct EntranceIndex(usize);
 
 /// A node's place in the pather's nodes (`PathingNode`s in the order made; the two lists'
 /// heads first).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct NodeIndex(usize);
 
 /// One of the pather's two node lists, each an open list headed by its own node and a closed
 /// list: the search's (0, `+0x20` and `+0x90`) and the walks' in and out of a hull (1, `+0x58`
 /// and `+0xa0`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct NodeList(usize);
 
 impl NodeList {
@@ -367,7 +367,7 @@ struct Within {
 }
 
 /// How a walk within a hull ended: `pathWithinHull`'s result, each variant's number given.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum WalkResult {
     /// A node saw the goal, or was within range of it or of the target (0).
     Reached,

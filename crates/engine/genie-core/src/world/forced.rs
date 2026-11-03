@@ -71,7 +71,7 @@ pub struct GameState {
 }
 
 /// Whether a forced player ran again ([`World::force_player_values`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 enum Restart {
     /// It had stopped: it took the game's values and runs again.

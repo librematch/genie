@@ -7,7 +7,9 @@ use serde::Serialize;
 /// missile's copy `+0x80`): which objects on its way it hits. Mode 0 hits its target alone; a
 /// miss turns it into mode 1, which hits another player's objects too. Mode 2 strikes its
 /// target on landing as mode 0 does; its hits on the way are not modelled.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord, Hash,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitMode(u8);
 
@@ -50,7 +52,7 @@ impl genie_diff::Diff for HitMode {
 }
 
 /// Whose a landing missile's target is: the missile's player's, or another player's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TargetOwner {
     /// The missile's player's.
     Own,

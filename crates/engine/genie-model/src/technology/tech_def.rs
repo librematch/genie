@@ -15,7 +15,7 @@ use serde::Serialize;
 
 /// How a group of the game's `linkedTechs.json` links its technologies: the `+4` byte of the
 /// record the game settings' table (`FUN_140f39f40`) holds for each of them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Linked {
     /// `MutuallyExclusive` (0).

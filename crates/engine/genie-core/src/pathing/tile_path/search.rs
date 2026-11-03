@@ -21,7 +21,7 @@ const STEPS: [(CellEdges, i16, i16, CellEdges); 4] = [
 ];
 
 /// A node's place in the planner's pool (`+0x428`, `FUN_140f79c90` hands them out in order).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(super) struct NodeIndex(usize);
 
 /// The planner's node pool, read and changed by [`NodeIndex`]; a search's nodes in the order

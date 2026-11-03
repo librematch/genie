@@ -2,7 +2,7 @@
 
 /// An order's priority (an order's `+0x8`, the unit AI's `+0x40`): below 100 a queued order
 /// waits while the unit AI has an action; a command's orders take 100, and −1 is none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OrderPriority(i32);
 
 impl OrderPriority {

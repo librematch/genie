@@ -28,7 +28,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
 /// What slot 73 does for a factory type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Retarget {
     /// The base slot 73: the retarget check.
     Base,

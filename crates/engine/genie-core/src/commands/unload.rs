@@ -27,7 +27,7 @@ pub struct UnloadCommand {
 
 /// Which units an UNLOAD lets out (`FUN_14118a610`'s switch on the packet's flag, `+0x14`): the
 /// flag decides what its value (`+0x10`) names, a player, a group of classes or an object.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum UnloadPick {
     /// Flag 0: every unit but class 42, with the value it does not read (the packet's, kept).
     All(i32),

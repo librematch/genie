@@ -412,7 +412,7 @@ pub struct Seen {
 /// The game's `force` argument of a unit AI's order, its attack command and its move
 /// ([`AiMove::force`]): forced, the order replaces what the AI or the unit does; else each
 /// order's own test decides (most fail while the AI has an action value).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OrderForce {
     /// Forced (1).
     Forced,
@@ -436,7 +436,7 @@ pub struct AiMove {
 
 /// How an [`AiMove`]'s unit goes (its seventh argument): it walks (1, its master's walking
 /// sprite, `+0x748`) or runs (0, its running sprite, `+0x750`, when it has one).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Pace {
     /// It walks.
     Walk,

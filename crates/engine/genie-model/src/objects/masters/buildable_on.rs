@@ -6,7 +6,9 @@ use serde::Serialize;
 /// A master's `can_be_built_on` (`+0x5e9`): 0 for most masters, 1 for others (the dead
 /// units' among them), 2 for one master of build 158041's `.dat`. A foundation clears an
 /// object of any but 0 off its footprint; a placement passes over one of 1 only.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuildableOn(u8);
 

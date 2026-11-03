@@ -11,7 +11,7 @@ use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
-use crate::math::fmath::{length, sub};
+use crate::math::fmath::length;
 use crate::movement::LevelFlags;
 use crate::movement::LinkedPathKind;
 use crate::movement::PathFlags;
@@ -216,7 +216,7 @@ pub(super) fn reached(
         level.state = PathState::WantsPath;
         return Ok(());
     }
-    let d = length(sub(at, point(level, left)));
+    let d = length(at - point(level, left));
     let mut beyond = match target {
         None => (d - level.range.get()) - group_tuning.near,
         Some(t) => {

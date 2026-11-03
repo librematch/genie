@@ -337,7 +337,7 @@ pub fn trade_sprite(master: &Master, roles: &Roles) -> Option<SpriteId> {
 
 /// Whether an object carries goods (`FUN_141188160`: an amount above 0 in its resource store,
 /// `+0x7a0`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Cargo {
     /// It does.
     Goods,

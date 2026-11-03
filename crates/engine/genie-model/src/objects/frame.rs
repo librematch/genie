@@ -130,7 +130,7 @@ pub enum AnimateState {
 
 /// A raw value of [`AnimateState`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(u8);
 
 impl AnimateState {

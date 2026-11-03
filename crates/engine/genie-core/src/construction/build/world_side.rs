@@ -39,7 +39,7 @@ use crate::world::{Player, World};
 
 /// How the player's slot 0x1c0 (`FUN_14162ce00`) makes an object: finished (its flag: the
 /// footprint cleared, a building worked at once) or plain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MakeMode {
     /// Finished.
     Finished,

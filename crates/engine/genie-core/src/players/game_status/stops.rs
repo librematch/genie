@@ -43,7 +43,7 @@ const NO_TOP_ACTION: GenieError =
 
 /// Whether the stop keeps the unit's action list (its top action's slot 0x38,
 /// [`World::halt_top_action`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum StopList {
     /// The slot answered 1: the list stays.

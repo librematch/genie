@@ -138,7 +138,7 @@ fn kill_counts(
 
 /// How a hit reaches a building's slot 0xe8 (`FUN_1411cea90`): as dealt (its flag set, which
 /// every caller sets) or forwarded by an annex to its main building (the flag clear).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum HitRoute {
     /// As dealt.
     Dealt,
@@ -263,7 +263,7 @@ pub(super) fn take_building(
 }
 
 /// Whether a building's hit got past its hit point test ([`take_building`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum BuildingHit {
     /// It did: the building took it.

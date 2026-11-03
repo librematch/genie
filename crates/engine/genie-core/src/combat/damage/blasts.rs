@@ -389,7 +389,7 @@ pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f3
 }
 
 /// Whom a blast hits: its main target (the missile's or the attack's) or another in its radius.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum BlastHit {
     /// The main target.
     Main,

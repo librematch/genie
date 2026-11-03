@@ -5,7 +5,7 @@ use crate::players::PlayerId;
 use crate::world::World;
 
 /// How a player leaves the game by RESIGN: it resigns, or it drops (the packet's `dropped`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Departure {
     /// It resigns (0).
     Resigned,

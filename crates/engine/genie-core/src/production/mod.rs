@@ -166,7 +166,7 @@ pub fn same_costs(
 /// The kind of entry a production queue closes ([`Queue::close`]): a unit's, whose train time
 /// moves down with the later entries, or a research's (`FUN_1411d61e0`'s research branch), whose
 /// does not.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum QueueEntry {
     /// A unit's entry.
     Train,

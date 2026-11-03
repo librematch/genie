@@ -65,7 +65,7 @@ pub struct Convertee {
 
 /// Which targets a unit AI's attack check (slot 0xa0) and the priest's conversion test (slot
 /// 0x1b8) let through: their `any` argument.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TargetRules {
     /// Any target the type may take at all (1): the lion's any, the priest's without its full
     /// faith, the siege unit's without its own choice.

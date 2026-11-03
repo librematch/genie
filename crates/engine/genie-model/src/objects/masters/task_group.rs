@@ -7,7 +7,9 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's task swap group (`+0x7b8`, the `.dat`'s `TaskSwapGroup`; the save does not carry it):
 /// a unit of a master of a group switches to another master of the same group whose task list has a
 /// task for the target. 0 is none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskGroup(u8);
 

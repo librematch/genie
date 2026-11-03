@@ -12,7 +12,7 @@ use crate::map::spatial::{Placed, RecordId, Spatial, WalkQuery};
 use crate::map::terrain::Terrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, at_most_or_unordered, scale};
+use crate::math::fmath::at_most_or_unordered;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::MoveState;
@@ -243,7 +243,7 @@ impl Mover {
         if d.get().abs() < EPSILON {
             return None;
         }
-        let to = add(self.moved_at.vector(), scale(d.get(), self.forward));
+        let to = self.moved_at.vector() + d.get() * self.forward;
         Some(self.set_position(to.position(), map, movement_tuning))
     }
 

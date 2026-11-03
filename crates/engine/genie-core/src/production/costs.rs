@@ -177,7 +177,7 @@ pub fn costed<'m>(masters: &'m Masters, m: &'m Master) -> (&'m Master, bool) {
 }
 
 /// Whether [`cost_test`] tests the population's cost entry (`FUN_141618db0`'s `param_5`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PopulationTest {
     /// The population's entry is tested (`param_5` 0).
     Tested,

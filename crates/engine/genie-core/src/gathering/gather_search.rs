@@ -138,10 +138,9 @@ pub fn more_work(
     }
     let (w, h) = (i32::from(x1 - x0) + 1, i32::from(y1 - y0) + 1);
     let corner = TileOffset::new(i32::from(x0), i32::from(y0));
-    let start =
-        Tile::new(builder.position.x() as i32, builder.position.y() as i32).stepped_back(corner);
+    let start = Tile::new(builder.position.x() as i32, builder.position.y() as i32) - corner;
     let grid = match blocked {
-        Some(b) => reached(start, GridSize::new(w, h), &|t| b(t.stepped(corner)))?,
+        Some(b) => reached(start, GridSize::new(w, h), &|t| b(t + corner))?,
         None => None,
     };
     // gold, stone, food, wood: (the object, its workers, the group's least distance)

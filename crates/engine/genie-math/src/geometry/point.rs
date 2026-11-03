@@ -6,7 +6,7 @@ use crate::geometry::Position;
 use crate::geometry::Tile;
 
 /// An axis of the ground: a routine that runs along either one names it, not a number.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Axis {
     /// The map's x.
     X,

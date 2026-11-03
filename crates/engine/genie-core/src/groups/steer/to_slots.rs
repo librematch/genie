@@ -13,8 +13,8 @@ use crate::groups::motion::hold;
 use crate::groups::steer::{EPSILON, KEEPS_MOVING, MOST_FAILURES, MOVE_TO};
 use crate::map::Distance;
 use crate::map::spatial::RecordId;
+use crate::math::fmath::sqrt;
 use crate::math::fmath::{BVector, below_or_unordered};
-use crate::math::fmath::{sqrt, sub};
 use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
@@ -295,7 +295,7 @@ impl World {
         let to = s.transform_position;
         let late = s.time < self.world_time;
         let at = u.moved_vector(self.parts.mover_of(u.id));
-        let mut d = sub(to, at);
+        let mut d = to - at;
         d = d.with_height(0.0);
         let gap = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
         if !below_or_unordered(EPSILON, gap) && s.state == SlotState::InPlace {

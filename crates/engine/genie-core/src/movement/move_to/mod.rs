@@ -54,7 +54,7 @@ use crate::world::layer::generated::SpriteTuning;
 pub const MOVE_TO: ActionKind = ActionKind::named(1);
 
 /// The `MoveTo`'s state (`+0x18`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Diff, Hash)]
 pub enum MoveTo {
     /// 1: at the target when it started.
     Arrived,
@@ -95,7 +95,7 @@ impl Default for MoveWait {
 /// What a `MoveTo` does when the motion step gives up ([`MoveWait::give_up`]): a human player's
 /// villager (`LAB_140aa320c`: `FUN_141659cf0` 0, the master's class 4) waits once before it asks
 /// again, any other fails.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Patience {
     /// It waits once, then asks again.
     WaitsOnce,
@@ -155,7 +155,7 @@ impl MoveTo {
 
 /// `+0x61` (`mTargetMovedState`, the save's `target_moved_state`): what a moving `MoveTo` does
 /// when its target object left its point (`0x140aa2a70` in state 4, [`target_left`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Diff, Hash)]
 pub enum TargetMoved {
     /// 0, the base constructor's (`FUN_140a73e90`): the path's end follows the target when the
     /// unit walks to it and the line to the target is clear; else the `MoveTo` tells the unit

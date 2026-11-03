@@ -11,7 +11,7 @@ use crate::map::Position;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{
-    angle_between, at_most_or_unordered, cross, minss, normalize, rotate, rotation, scale, sqrt,
+    angle_between, at_most_or_unordered, cross, minss, normalize, rotate, rotation, sqrt,
 };
 use crate::movement::PathState;
 use crate::movement::Speed;
@@ -27,7 +27,7 @@ use crate::world::slots::CheckedIndex;
 
 /// Whether `BMotion`'s path step tests the player's path budget before a plan (its `param_2`;
 /// only a computer player's counts).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PathBudget {
     /// The budget is tested.
     Tested,
@@ -102,7 +102,7 @@ pub(crate) struct LeadGroup {
 }
 
 /// Whether `calculateYawAngle` (`param_5`) holds the turn to the yaw per second.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum YawLimit {
     /// At most the yaw per second (`+0xa0`) times the update's time (1).
     Clamped,
@@ -246,7 +246,7 @@ impl Motion {
         ] {
             let d = dt.get() * speed;
             if EPSILON < d.abs() {
-                let v = scale(d, *self.new_position.checked(along)?);
+                let v = d * *self.new_position.checked(along)?;
                 let p = &mut self.new_position[0];
                 *p = BVector::new(p.x() + v.x(), v.height() + p.height(), v.y() + p.y());
                 self.flags |= MotionFlags::MOVED;

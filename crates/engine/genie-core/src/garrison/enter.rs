@@ -46,7 +46,7 @@ use crate::world::slots::PlayerSlots;
 
 /// Where a unit's new Enter goes: its own action list, or under the Artifact on top as its
 /// sub-action (`FUN_1410847e0`; the top action read before the task search).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum EnterSlot {
     /// The unit's own action.
     Own,

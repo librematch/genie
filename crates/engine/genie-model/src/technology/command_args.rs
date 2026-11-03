@@ -26,7 +26,7 @@ pub enum ChangeMode {
 
 /// A raw value of [`ChangeMode`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnnamedChangeMode(u8);
 
 impl ChangeMode {
@@ -102,7 +102,7 @@ pub enum ModifyMode {
 
 /// A raw value of [`ModifyMode`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnnamedModifyMode(i16);
 
 impl ModifyMode {
@@ -170,7 +170,9 @@ impl From<ModifyMode> for i16 {
 /// location, else the entry at that index (past the technology's locations a new one, a copy of
 /// the last with no building). Every short is kept.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 pub struct ModifyLocation(i16);
 
 impl ModifyLocation {
@@ -197,7 +199,7 @@ impl ModifyLocation {
 /// none; the shared kind's test (`FUN_1413d1020`) reads the whole number, the disabling
 /// (`FUN_1413cdb00`) its low 16 bits, a negative one every technology.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct DisabledTech(i32);
 
 impl DisabledTech {

@@ -20,7 +20,7 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::map::WholeDistance;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
 use crate::math::image::group::EPSILON as GROUP_EPSILON;
 use crate::movement::PathData;
 use crate::movement::PathFlags;
@@ -126,7 +126,7 @@ impl UnitGroup {
 
 /// Which members `stopAllUnits` ([`World::stop_all_units`]) stops: those with an action (slot
 /// 0x530 not -1), or every one (its flag).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum StopScope {
     /// The members with an action.
     Busy,
@@ -641,7 +641,7 @@ impl World {
 /// [`PathFlags::LOOPS`] and sets [`PathFlags::BACK_AND_FORTH`].
 fn move_path_flags(from: BVector, to: BVector, leg: bool, group_tuning: &GroupTuning) -> PathFlags {
     if leg {
-        let mut d = sub(from, to);
+        let mut d = from - to;
         d = d.with_height(0.0);
         let length = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
         if at_most_or_unordered(group_tuning.patrol_leg_reach, length) {

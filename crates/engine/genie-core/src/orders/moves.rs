@@ -46,7 +46,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// What a work order leaves of the pasture its unit tends ([`World::work_pasture`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum PastureAfter {
     /// The order ends there: no livestock was given.
     Ends,

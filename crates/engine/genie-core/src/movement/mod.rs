@@ -276,7 +276,7 @@ pub struct Me {
 }
 
 /// What the motion step returns to the `MoveTo` action.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Motion {
     /// 0: still on the way.
     Moving,
@@ -288,7 +288,7 @@ pub enum Motion {
 
 /// Whether an object moves (object slot 185, [`Mover::is_moving`]): the mesh holds the shape
 /// only of one that stands.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MoveState {
     /// Its velocity is longer than 0.
     Moving,

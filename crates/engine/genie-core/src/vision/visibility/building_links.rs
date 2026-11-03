@@ -31,7 +31,7 @@ impl Visibility {
                 *STEP.get(usize::from(byte & 0xf))?,
                 *STEP.get(usize::from(byte >> 4))?,
             );
-            tile = tile.stepped_back(TileOffset::new(sx, sy));
+            tile -= TileOffset::new(sx, sy);
             if sx == 0 && sy == 0 {
                 return None;
             }
@@ -78,7 +78,7 @@ impl Visibility {
                 *STEP.get(usize::from(byte & 0xf))?,
                 *STEP.get(usize::from(byte >> 4))?,
             );
-            tile = tile.stepped_back(TileOffset::new(sx, sy));
+            tile -= TileOffset::new(sx, sy);
             if sx == 0 && sy == 0 {
                 return None;
             }

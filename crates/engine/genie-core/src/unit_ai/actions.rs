@@ -35,7 +35,7 @@ use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
 /// Which units [`UnitAi::can_order`] lets take orders (`FUN_140c4eea0`'s second argument).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OrderTest {
     /// Any that passes the test (0).
     Any,

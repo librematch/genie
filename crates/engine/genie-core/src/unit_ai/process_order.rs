@@ -31,7 +31,7 @@ use crate::world::layer::Roles;
 /// How [`UnitAi::process_order`]'s case took its order: as the order itself, or as an attack
 /// (`bVar2`: the attack move's attack), which the tail ([`UnitAi::order_tail`]) makes the
 /// attack order (700).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TakenAs {
     /// As the order.
     Order,

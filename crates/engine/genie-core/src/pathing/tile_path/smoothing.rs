@@ -4,7 +4,7 @@
 use crate::map::Point;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{add, scale, sqrt, sub};
+use crate::math::fmath::sqrt;
 use crate::pathing::tile_path::Path;
 use crate::world::layer::generated::TilePathTuning;
 
@@ -46,7 +46,7 @@ pub(super) fn straighten(
         return 0;
     }
     let a = point_at(path, first);
-    let d = sub(point_at(path, last), a);
+    let d = point_at(path, last) - a;
     let length = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
     let steps = cvttss2si(length / tile_path_tuning.smooth_step);
     let fewer = between - steps;
@@ -64,8 +64,8 @@ pub(super) fn straighten(
     }
     let direction = BVector::new(d.x() / length, d.height() / length, d.y() / length);
     for t in 1..=steps {
-        let step = scale(length / (steps + 1) as f32, direction);
-        let p = add(a, scale(t as f32, step));
+        let step = length / (steps + 1) as f32 * direction;
+        let p = a + t as f32 * step;
         if let Some(slot) = usize::try_from(first + t)
             .ok()
             .and_then(|i| path.points.get_mut(i))

@@ -13,7 +13,7 @@ use crate::world::slots::CheckedIndex;
 
 /// Whether a hull's meeting at the walk's start counts (`getHullIntersection`'s flag): a walk
 /// from a hull's vertex leaves it out.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum AtStart {
     /// It counts.
     Counts,

@@ -24,7 +24,7 @@ pub enum Relation {
 }
 
 /// Which relations the alliance test (`FUN_141663dc0`'s `with_ally` flag) counts as allied.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AllyTest {
     /// An ally's and relation 4 (the flag set).
     WithRelation4,
@@ -34,7 +34,7 @@ pub enum AllyTest {
 
 /// A raw value of [`Relation`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(u8);
 
 impl Relation {

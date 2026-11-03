@@ -29,7 +29,7 @@ use crate::world::slots::CheckedIndex;
 use std::fmt::{Debug, Error, Formatter};
 
 /// What a repair's slot 0x8c8 answers (the game's 0, 1 and 2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RepairOutcome {
     /// 0: it healed, the target short of its most hit points.
     Healed,
@@ -97,7 +97,7 @@ pub(super) fn find(set: &[Repaired], id: ObjectId) -> Result<usize, GenieError> 
 
 /// Who asks a building's repair (slot 0x8c8's flag): its repairer (1), or its main building for
 /// each of its annexes (0).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RepairFrom {
     /// The repairer.
     Repairer,

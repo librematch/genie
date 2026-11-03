@@ -16,7 +16,7 @@ use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
-use crate::math::fmath::{maxss, sub};
+use crate::math::fmath::maxss;
 use crate::math::rng::Stream;
 use crate::movement::{
     Mover, footprint_gap as movement_footprint_gap,
@@ -602,7 +602,7 @@ impl World {
                 continue;
             };
             // slot 0x520: the game's vector of where it last moved to
-            let d = sub(moved_place(u, self.parts.mover_of(u.id)), to);
+            let d = moved_place(u, self.parts.mover_of(u.id)) - to;
             let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
             if squared < best {
                 lead = Some(m.id);

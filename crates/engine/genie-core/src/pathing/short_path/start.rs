@@ -44,7 +44,7 @@ fn float_distance(p: FixedPoint, a: FixedPoint) -> FixedDistance {
 }
 
 /// What the search's start found (`FUN_140fa4410`'s result).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Started {
     /// 0: the start is free; its node is open.
     Free,

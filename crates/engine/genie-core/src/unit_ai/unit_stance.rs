@@ -23,7 +23,7 @@ pub enum UnitStance {
 
 /// A raw value of [`UnitStance`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(u8);
 
 impl UnitStance {

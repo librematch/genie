@@ -9,7 +9,7 @@ use crate::world::{
 };
 
 /// How farmers work a farm: the walkable farms option (`mWalkableFarms`, `+0x69`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum FarmMode {
     /// One stop (0): a Gather's `set_state(7)` takes where the gathering started.
     #[default]

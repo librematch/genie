@@ -6,7 +6,7 @@ use crate::GenieError;
 /// blocked (`FUN_141084230`). The set is closed: the missile action (`FUN_140a9e6e0`) stores the
 /// byte its target's hit (slot 0x860: `FUN_141084230`, `FUN_1412115e0`) or blast (slot 0x848,
 /// `FUN_14107f690`) answers, and those answer 0, 1 or 2; the save holds what they wrote.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum StrikeResult {
     /// No hit yet (0).

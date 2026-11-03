@@ -2,7 +2,7 @@
 
 /// The builders on a foundation or the repairers on a combat object (`num_builders`, `+0x9e8`, a
 /// byte). A builder's join adds one and its leave takes one, wrapping as the game's byte.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BuilderCount(u8);
 
 impl BuilderCount {

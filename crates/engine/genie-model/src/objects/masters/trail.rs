@@ -20,7 +20,9 @@ pub struct Trail {
 }
 
 /// A trail's mode (`obj_trail_options`, `+0x760`, a byte), which no modelled routine reads.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord, Hash,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TrailMode(u8);
 

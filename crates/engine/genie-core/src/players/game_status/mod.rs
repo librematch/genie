@@ -37,7 +37,7 @@ pub enum GameStatus {
 
 /// A raw value of [`GameStatus`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(u8);
 
 impl GameStatus {
@@ -88,7 +88,7 @@ impl genie_diff::Diff for GameStatus {
 
 /// The state of a player's victory conditions (`player+0x68`'s `+0x20`, the save's `victory`):
 /// [`VictoryState::MET`] once they are met (`FUN_1414f35d0`). Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct VictoryState(u8);
 
 impl VictoryState {
@@ -110,7 +110,7 @@ impl VictoryState {
 
 /// A player's fealty (`fealty`, `+0x12f8`, saved): the player a defeated player's resources and
 /// units would go to, when above 0. Every short is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Fealty(i16);
 
 impl Fealty {

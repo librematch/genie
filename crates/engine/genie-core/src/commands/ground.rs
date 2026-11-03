@@ -44,7 +44,7 @@ use crate::world::layer::ClassRoles;
 
 /// Whether a footprint clearing's object lost its record already: the builder's clearing in the
 /// Build's update drops it (`FUN_141189670`), and the object then has `+0x686` set.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum RecordDrop {
     /// The builder dropped it.
     Dropped,

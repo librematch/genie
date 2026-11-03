@@ -48,7 +48,7 @@ pub(crate) struct Seeker<'a, 'b> {
 }
 
 /// How a drop-site search (`FUN_1411671e0`'s argument 9) measures the nearest.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DropMeasure {
     /// By path (1): the path's length, of the objects the planner reaches.
     ByPath,
@@ -57,7 +57,7 @@ pub(crate) enum DropMeasure {
 }
 
 /// Which drop sites a search counts (`FUN_1411671e0`'s argument 10).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SitePlace {
     /// Only those not inside another object (1).
     Outside,

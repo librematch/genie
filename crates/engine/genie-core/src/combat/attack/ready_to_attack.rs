@@ -36,7 +36,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::SpriteTuning;
 
 /// Whether readyToAttack (`FUN_140a7f9d0`'s third argument) tests the ready-at-once case.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AtOnce {
     /// It does (0).
     Tested,

@@ -6,7 +6,9 @@ use std::fmt::{Display, Error, Formatter};
 
 /// A master's run pattern (`run_pattern`, `+0x7b9`): the effects set and add to it, and the
 /// simulation only keeps it; every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunPattern(u8);
 

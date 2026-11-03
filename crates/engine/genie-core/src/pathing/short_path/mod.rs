@@ -136,7 +136,7 @@ impl Sweep {
 }
 
 /// The raycast's callbacks (`FUN_140fa1f60`, `FUN_140fa2180`, `FUN_140fa2850`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Callback {
     /// A: a touch at the corner the ray starts from on the token's side (or of the token's shape)
     /// is ignored; the token becomes the shape's of each touch ignored. The game keeps the token
@@ -238,7 +238,7 @@ impl Goal {
 }
 
 /// A node's payload (`+0x18..+0x30`, a `std::variant`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Kind {
     /// 0: the start. Its shape field is always none: `FUN_140fa4410`, the only maker of a type-0
     /// node, writes -1 there (`local_178`), so the expansion's branch for a type-0 node on a
@@ -259,7 +259,7 @@ enum Kind {
 }
 
 /// A polygon's place in the search's list (a corner node's `+0x28`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct PolyIndex(u32);
 
 impl PolyIndex {
@@ -277,7 +277,7 @@ impl PolyIndex {
 /// The run of a polygon's vertices a corner node or a goal candidate was walked over: the
 /// polygon, the walk's direction round it and the run's first and last vertex, which the path
 /// back reads (a node's `+0x1c..+0x2c`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct Run {
     poly: PolyIndex,
     dir: WalkDir,
@@ -287,7 +287,7 @@ struct Run {
 
 /// A vertex's place in its polygon's columns (the vertices, their sides, shapes and costs):
 /// a run's ends, a held edge's start, a walk's corner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct VertexIndex(u32);
 
 impl VertexIndex {
@@ -327,7 +327,7 @@ impl VertexIndex {
 
 /// The direction of a walk round a polygon's vertices (a corner node's, a goal candidate's):
 /// forward (0) or backward (1), the way the path back reads the vertices it covers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum WalkDir {
     /// 0: forward, to the higher vertices.
     Forward,
@@ -337,7 +337,7 @@ enum WalkDir {
 
 /// What an open corner node emits its ray with (`FUN_140fa3bc0`): the token the ray ignores
 /// and the sides around the corner, before and after it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct Emit {
     token: Token,
     prev: ShapeSide,
@@ -346,7 +346,7 @@ struct Emit {
 
 /// A node's place in the search's arena (a node's `+0x0c`, its parent's at `+0x10`; the game's
 /// −1 for none, a root's parent, is `None`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct NodeIndex(u32);
 
 impl NodeIndex {

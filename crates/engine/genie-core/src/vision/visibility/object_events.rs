@@ -59,7 +59,7 @@ pub fn sight_taker(
 
 /// Whether an object sees (state 2, not inside another): an ownership change moves only a seeing
 /// object's sight.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Seeing {
     /// It sees.
     Sees,

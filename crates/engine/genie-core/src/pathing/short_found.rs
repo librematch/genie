@@ -3,7 +3,7 @@
 /// What a short path search returns (its result byte): the old pather's (`FindShortPath`,
 /// `FUN_140f85580`), the new one's (`FUN_140fa53d0`) and the movement's around them
 /// (`FUN_140f9e540`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShortFound {
     /// 0: the start lies within range of the goal already; no path.
     InRange,

@@ -4,7 +4,7 @@ use crate::pathing::ShapeSide;
 
 /// The direction of an axis ray or sweep (`FUN_140fa2d00`, `FUN_140fa8930`): toward side d of a
 /// box, so 0 −y, 1 +x, 2 +y, 3 −x.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum AxisDir {
     /// 0: toward the low y.
     MinusY = 0,

@@ -38,7 +38,7 @@ use std::collections::HashMap;
 const MASKED_KIND: MasterKind = MasterKind::RGE_COMBAT;
 
 /// What an entry of a watched list follows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Cell {
     /// A tile of the unified map (its index).
     Tile(usize),
@@ -60,7 +60,7 @@ pub struct Watched {
 }
 
 /// Whether a player's watched list took an object ([`World::watch`], `FUN_141090430`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum GhostWatch {
     /// The list holds it now.
@@ -113,7 +113,7 @@ pub struct Ghost {
 }
 
 /// Whether a building's annex link is made, or not yet (during a load, before the rehook).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum AnnexLink {
     /// It is made.
     Made,

@@ -31,7 +31,7 @@ const EARLY: WorldTime = WorldTime::from_millis(300_000);
 const WAIT_SLOT: u32 = 0x100;
 
 /// What the AI decided of its explorer.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Heard {
     /// Nothing: the action is not an explore, or the unit is not the explorer's to task.
     Nothing,

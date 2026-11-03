@@ -7,7 +7,9 @@ use serde::Serialize;
 /// its units take (`genie_core::groups::sub_formation`: 1 to 4 their own, 0 and 5 the protected one,
 /// 6 the first). 0 keeps a unit out of the groups an order's splitter forms (`FUN_140fd76d0`).
 /// Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FormationClass(u8);
 

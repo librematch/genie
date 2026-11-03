@@ -19,7 +19,7 @@ pub enum MoveReason {
 
 /// A raw value of [`MoveReason`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(i32);
 
 impl MoveReason {
@@ -59,7 +59,7 @@ impl MoveReason {
 /// A group member's own move's path (`mPathID`), −1 for none: the two callers of the move's
 /// setter (`FUN_141039f60`) give −1, and nothing reads it.
 /// The default is 0, as a zeroed member holds it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MovePath(i32);
 
 impl MovePath {

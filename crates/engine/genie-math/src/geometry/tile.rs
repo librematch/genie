@@ -2,6 +2,7 @@
 //! ground ([`Point`]) and a step from one tile to another ([`TileOffset`]).
 
 use crate::geometry::Point;
+use std::ops::{Add, Sub, SubAssign};
 
 /// A tile of the map, x and y in whole tiles: the tile a place's x and y fall in (each cut to a
 /// whole number the way its routine cuts it), a search's or a path's tile, a landing's.
@@ -49,12 +50,6 @@ impl Tile {
         ]
     }
 
-    /// The tile `by` steps this one to: its x plus the step's, its y plus the step's.
-    #[must_use]
-    pub const fn stepped(self, by: TileOffset) -> Self {
-        Self([self.0[0] + by.dx(), self.0[1] + by.dy()])
-    }
-
     /// The point at its low corner: x and y as floats.
     #[must_use]
     pub const fn corner(self) -> Point {
@@ -67,17 +62,11 @@ impl Tile {
     pub const fn short(self) -> Self {
         Self([self.0[0] as i16 as i32, self.0[1] as i16 as i32])
     }
-
-    /// The tile `by` stepped to this one from: its x less the step's, its y less the step's.
-    #[must_use]
-    pub const fn stepped_back(self, by: TileOffset) -> Self {
-        Self([self.0[0] - by.dx(), self.0[1] - by.dy()])
-    }
 }
 
 /// A box of whole tiles from x0, y0 to x1, y1, both corners included: a target's footprint's
 /// tiles, a query's cells.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct TileRect(
     /// Its x0, y0, x1 and y1.
     [i32; 4],
@@ -147,6 +136,31 @@ impl From<[i32; 2]> for Tile {
     }
 }
 
+impl Add<TileOffset> for Tile {
+    type Output = Self;
+
+    /// The tile `by` steps this one to: its x plus the step's, its y plus the step's.
+    fn add(self, by: TileOffset) -> Self {
+        Self([self.0[0] + by.dx(), self.0[1] + by.dy()])
+    }
+}
+
+impl Sub<TileOffset> for Tile {
+    type Output = Self;
+
+    /// The tile `by` stepped to this one from: its x less the step's, its y less the step's.
+    fn sub(self, by: TileOffset) -> Self {
+        Self([self.0[0] - by.dx(), self.0[1] - by.dy()])
+    }
+}
+
+impl SubAssign<TileOffset> for Tile {
+    /// The tile steps back by `by` (`-`).
+    fn sub_assign(&mut self, by: TileOffset) {
+        *self = *self - by;
+    }
+}
+
 impl genie_diff::Diff for Tile {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
@@ -198,15 +212,18 @@ mod tests {
     use crate::geometry::Point;
     use crate::geometry::{Tile, TileOffset, TileRect};
 
-    /// A tile keeps its x and y, orders by x then y, and steps by an offset.
+    /// A tile keeps its x and y, orders by x then y, and steps by an offset (`+`, `-`, `-=`).
     #[test]
     fn tile_keeps_its_place_orders_by_column_then_row_and_steps() {
         let t = Tile::new(3, -4);
         assert_eq!((t.x(), t.y(), t.get()), (3, -4, [3, -4]));
         assert_eq!(Tile::from([3, -4]), t);
         assert!(Tile::new(2, 9) < Tile::new(3, 0) && Tile::new(3, 0) < Tile::new(3, 1));
-        assert_eq!(t.stepped(TileOffset::new(-1, 1)), Tile::new(2, -3));
-        assert_eq!(t.stepped_back(TileOffset::new(-1, 1)), Tile::new(4, -5));
+        assert_eq!(t + TileOffset::new(-1, 1), Tile::new(2, -3));
+        assert_eq!(t - TileOffset::new(-1, 1), Tile::new(4, -5));
+        let mut back = t;
+        back -= TileOffset::new(-1, 1);
+        assert_eq!(back, Tile::new(4, -5));
         assert_eq!(
             t.beside(),
             [

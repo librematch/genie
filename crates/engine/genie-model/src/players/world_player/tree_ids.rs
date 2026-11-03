@@ -8,7 +8,9 @@ use serde::Serialize;
 /// A master the tech tree names (a building, a unit, a link: an int of the tree's JSON). A
 /// lookup answers 0 out of the ages or without the civilisation, −1 without the building or
 /// the unit.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TreeMaster(i32);
 
@@ -44,7 +46,9 @@ impl TreeMaster {
 /// A technology the tech tree names (an int of the tree's JSON; a lookup answers 0 or −1 as for
 /// [`TreeMaster`]).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 pub struct TreeTech(i32);
 
 impl TreeTech {

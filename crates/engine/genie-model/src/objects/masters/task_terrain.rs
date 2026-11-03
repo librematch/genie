@@ -8,7 +8,7 @@ use serde::Serialize;
 /// A task's terrain (`+0x16`), every short of the data kept, −1 for none. A task finder's task
 /// is for the terrain its low 16 bits equal ([`TaskTerrain::is`]); a terrain look task reads it as
 /// a flag mask (`genie_core::combat::abilities::terrain_mask`), a negative one too.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskTerrain(i16);
 

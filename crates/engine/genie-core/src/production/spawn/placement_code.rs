@@ -2,7 +2,7 @@
 
 /// A building placement test's answer (`FUN_14123aee0`'s code): 0 lets the building go there,
 /// any other says why not.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlacementCode {
     /// 0: the building may go there.
     Allowed = 0,

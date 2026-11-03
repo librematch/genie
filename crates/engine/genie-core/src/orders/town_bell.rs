@@ -74,7 +74,7 @@ impl BackToWork {
 /// `mTownBellFlag` (`+0x9dc`): whether the town bell's shelter holds an object. The bell's
 /// ring sets it on a building that takes villagers, a garrison order into such a building on
 /// the villager; the bell's end and the villager's next orders clear it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BellShelter {
     /// The flag is 0.
     #[default]

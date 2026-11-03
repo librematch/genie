@@ -126,7 +126,7 @@ pub struct MoveOrder {
 }
 
 /// MOVE's Ctrl key (`+0x12`, `cade_api`'s `controlHeld`): held or not.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum ControlKey {
     /// Not held (0).
     #[default]
@@ -164,7 +164,7 @@ impl ControlKey {
 /// queue (`FUN_140c5e010`), and the new action's notify of a unit of type 70 and up clears the
 /// unit AI's notifies (`FUN_140c64e50`); a queued one (0: the unit AI's queued order on a
 /// target, an unloaded unit's gather point) does neither.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OrderSource {
     /// A direct order (1).
     Direct,
@@ -451,7 +451,7 @@ impl World {
 /// What the readiness pass of a unit AI's queue ([`readiness`]) does with an order already
 /// ready: it leaves the queue (1: after MOVE's and INTERACT's order that is neither queued nor
 /// direct), or it stays (0: BUILD's and `BUILD_WALL`'s).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ReadyOrders {
     /// It leaves the queue.
     Drop,

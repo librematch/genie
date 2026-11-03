@@ -19,7 +19,7 @@ use crate::groups::stats::weapon_range;
 use crate::groups::update::{ATTACK, DIFFERENTIATORS, NO_COMMAND, OTHER_COMMANDS, TURN_LIMIT};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
-use crate::math::fmath::{angle_between, at_most_or_unordered, scale};
+use crate::math::fmath::{angle_between, at_most_or_unordered};
 use crate::movement::PathFlags;
 use crate::objects::ObjectId;
 use crate::world::Millis;
@@ -366,7 +366,7 @@ impl World {
             sum = BVector::new(sum.x() + v.x(), sum.height() + v.height(), sum.y() + v.y());
         }
         let n = g.members.len() as i32 as f32;
-        let ahead = scale(0.0, g.motion.position[1]);
+        let ahead = 0.0 * g.motion.position[1];
         let point = BVector::new(
             sum.x() / n + ahead.x(),
             sum.height() / n + ahead.height(),

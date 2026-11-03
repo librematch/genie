@@ -8,7 +8,7 @@ use std::cmp::Ordering;
 /// A game mode (`mGameMode`, the options' `+0x34`), named by aoc-mgz's game types; mode 9 and
 /// 14 have no name there, and 16 is the mode whose QUEUE trains one military unit at a time
 /// early on.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum GameMode {
     /// Random Map (0).
     #[default]
@@ -48,7 +48,7 @@ pub enum GameMode {
 
 /// A raw value of [`GameMode`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnnamedGameMode(i32);
 
 impl GameMode {
@@ -125,7 +125,7 @@ impl GameMode {
 
 /// An age option (`mStartingAge`, `+0x3c`, and `mEndingAge`, `+0x40`), and a tech tree unit's
 /// age: 0 the mode's default, 2 Feudal, 3 Castle, 4 Imperial, 5 post-Imperial, 6.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(from = "i32", into = "i32")]
 pub enum Age {
@@ -146,7 +146,7 @@ pub enum Age {
 
 /// A raw value of [`Age`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnnamedAge(i32);
 
 impl Age {
@@ -221,7 +221,7 @@ impl Ord for Age {
 }
 
 /// The visibility option (`mVisibilityType`, `+0x48`): normal, explored or all visible.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Visibility {
     /// Normal (0).
     #[default]
@@ -236,7 +236,7 @@ pub enum Visibility {
 
 /// A raw value of [`Visibility`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UnnamedVisibility(i32);
 
 impl Visibility {
@@ -281,7 +281,7 @@ impl Visibility {
 
 /// The resource level option (`mResourceLevel`, `+0x54`), which the technology modes 19 to 25
 /// test for 0 to 6.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ResourceLevel(i32);
 
 impl ResourceLevel {
@@ -314,7 +314,7 @@ bitflags::bitflags! {
 }
 
 /// The content mode option (`mSelectedContentMode`, `+0x98`) as the load reads it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ContentMode(i32);
 
 impl ContentMode {
@@ -336,7 +336,7 @@ impl ContentMode {
 }
 
 /// The treaty's length in minutes (`mTreatyLength`), 0 for none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TreatyLength(u32);
 
 impl TreatyLength {

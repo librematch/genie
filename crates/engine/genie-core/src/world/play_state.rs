@@ -2,7 +2,7 @@
 
 /// The world's game state (`+0x88`, the save's `tempGameState`): 0 while the game is played, 1
 /// once it is over; in state 2 a death leaves no ghosts.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum PlayState {
     /// The game is played (0).
     #[default]
@@ -15,7 +15,7 @@ pub enum PlayState {
 
 /// A raw value of [`PlayState`] that names none of its variants: only the set's own
 /// constructors make one.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Unnamed(u32);
 
 impl PlayState {

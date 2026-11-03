@@ -245,7 +245,7 @@ pub(crate) struct GatherReads {
 }
 
 /// What an update asks of the caller.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Next {
     /// Nothing.
     Stay,
@@ -277,7 +277,7 @@ pub enum Next {
 }
 
 /// How State 0xf2's walk ([`Next::Reseed`]) ended: it arrived (codes 1, 2 and 5) or failed (3).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WalkEnd {
     /// It arrived.
     Arrived,

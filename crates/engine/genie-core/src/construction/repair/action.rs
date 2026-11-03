@@ -108,7 +108,7 @@ fn show(
 }
 
 /// Whether a halted Repair counted among its target's repairers ([`RepairAction::halt`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum RepairerCount {
     /// It did: the caller lets it leave them.

@@ -272,7 +272,7 @@ const MOST_ON_TILE: usize = 0xfa;
 /// (level `k`'s cells are `top >> k` tiles wide, its cell shift `levels - k + 2`), down to cells
 /// of 8 tiles. Records are filed in one cell each ([`Spatial::filed`]); a query visits on every
 /// level the cells its tile range covers (`FUN_141051900`, `FUN_141052350`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Grid {
     /// How many levels (`+0x1ac`).
     levels: i32,

@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 use std::mem::take;
 
 /// Which frozen objects have a say in [`Spatial::check_known`]'s check.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum KnownScope<'a> {
     /// Every one.
     All,

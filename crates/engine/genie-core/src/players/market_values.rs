@@ -53,7 +53,7 @@ impl PriceSwing {
 }
 
 /// A commodity's purchases less its sales (the save's `*_price_delta`, an int).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NetTrades(i32);
 
 impl NetTrades {
@@ -84,7 +84,7 @@ impl NetTrades {
 
 /// A trade at the market: a purchase (`TRIBE_COMMAND_BUY_COMMODITY`, the price rises) or a sale
 /// (`TRIBE_COMMAND_SELL_COMMODITY`, it falls).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MarketTrade {
     /// A purchase (`FUN_1415cd6a0`).
     Buy,

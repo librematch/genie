@@ -7,7 +7,9 @@ use std::fmt::{Display, Error, Formatter};
 /// A master's fly mode (`+0x608`, the `.dat`'s `fly_mode`): where an object's height goes against
 /// the ground's (`FUN_141193a10`, `genie_core::combat::missile::grounded`). Every byte is kept; one
 /// not named keeps its height.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlyMode(u8);
 

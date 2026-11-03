@@ -15,7 +15,7 @@ pub(super) const SENTINEL: LongCost = LongCost(0x88ca_6c00_u32 as i32);
 /// game's wrapping `i32` arithmetic. The start costs its gap to the goal ([`LongCost::of_gap`]);
 /// a step adds its length over 4 and moves the estimate to the goal along ([`step_cost`]), a
 /// turn 1 more ([`LongCost::turned`]); the goal's tile costs 0.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct LongCost(i32);
 
 impl LongCost {

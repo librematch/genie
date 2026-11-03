@@ -23,7 +23,7 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// Whether a resource add (slot 0xf8's fifth argument) goes on to the players its player
 /// shares its gathered resources with.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ResourceShare {
     /// It does (1).
     Shared,

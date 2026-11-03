@@ -72,7 +72,7 @@ pub const STACK_PLACE: GenieError =
 
 /// Who calls a Transport's start (slot 5, [`TransportAction::start`]): the action list's add,
 /// which passes 1, or another caller (0).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum StartCall {
     /// The action list's add.
     Added,
@@ -83,7 +83,7 @@ pub enum StartCall {
 /// What a Transport's work order (slot 9, [`TransportAction::work`]) names: the ship itself,
 /// as the unload command's does (out of reach it sails to unload), or another object or none
 /// (it sails).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TransportTarget {
     /// The ship itself.
     Ship,
@@ -153,7 +153,7 @@ pub(crate) struct TransportReads {
 }
 
 /// What a state of the update asks of its caller ([`TransportAction::state_update`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Updated {
     /// The update's code: 1 done, 3 failed (the action list removes it), else 0.
     Code(UpdateCode),

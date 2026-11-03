@@ -1,7 +1,7 @@
 //! A technology's research counts and their cap.
 
 /// How often a technology was researched or is queued (`+0xc`, `+0x58`, shorts).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ResearchCount(i16);
 
 impl ResearchCount {
@@ -41,7 +41,7 @@ impl genie_diff::Diff for ResearchCount {
 
 /// The cap of a technology's researches queued and done (`+0x56`, a short): below 0 (as an
 /// unsigned short above 0x7fff) it is 0x100.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ResearchCap(i16);
 
 impl ResearchCap {

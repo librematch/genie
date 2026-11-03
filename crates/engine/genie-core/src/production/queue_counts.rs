@@ -139,7 +139,7 @@ impl genie_diff::Diff for EntrySerial {
 
 /// The changes of a queue's entries (`+0xc00`, a byte that grows by one with each, wrapping).
 /// Not saved.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QueueChanges(u8);
 
 impl QueueChanges {

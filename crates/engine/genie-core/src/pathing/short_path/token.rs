@@ -6,7 +6,7 @@ use crate::pathing::{ShapeId, ShapeSide};
 /// one integer: a side (0 to 3, a touch on that side of the box at the corner), a shape (its
 /// id plus 4, a touch at its corner) or none (0xff). Tokens compare by that integer, so shape
 /// 251's token is the none token, as in the game.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct Token(u32);
 
 impl Token {

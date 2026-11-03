@@ -110,7 +110,7 @@ impl World {
 }
 
 /// Whether a technology's change of an object ran ([`World::change_object`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum ObjectChange {
     /// Its type's slot ran.

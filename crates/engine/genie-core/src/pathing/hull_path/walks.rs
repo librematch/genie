@@ -48,7 +48,7 @@ enum WalkEnd {
 
 /// Whether a node's rays left the hull's boxes ([`HullPather::cast_rays`],
 /// [`HullPather::cast_into`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum Rays {
     /// A ray left the boxes.
@@ -59,7 +59,7 @@ pub(super) enum Rays {
 
 /// Whether a walk's first steps or a box's side points made a node ([`HullPather::first_steps`],
 /// [`HullPather::side_points`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum Steps {
     /// One or more were made.

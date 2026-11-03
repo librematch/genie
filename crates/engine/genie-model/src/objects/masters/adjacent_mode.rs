@@ -6,7 +6,9 @@ use std::fmt::{Display, Error, Formatter};
 
 /// A building master's adjacent mode (`+0x980`, `adjacent_mode`): walls and gates join their
 /// neighbours (`FUN_1411ce890`). Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdjacentMode(u8);
 

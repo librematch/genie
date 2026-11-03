@@ -21,7 +21,7 @@ use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
 /// Whether the object list's loop counts on past the object it filed ([`World::file_step`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum ListCount {
     /// Past it: the slot holds the next object, or the object waits for the next tick.

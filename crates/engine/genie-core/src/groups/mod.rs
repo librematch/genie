@@ -70,7 +70,7 @@ pub use self::command::StopScope;
 mod create;
 pub use self::create::LeavingWalk;
 
-use crate::math::fmath::{sqrt, sub};
+use crate::math::fmath::sqrt;
 pub use command::MoveFlags;
 pub use command::MoveTo as CommandMoveTo;
 /// What `commandMoveTo` is told besides the target and the point
@@ -299,7 +299,7 @@ impl PointLine {
 
 /// The 3D distance between two stored points (`FUN_14087e560`, `FUN_14099ef70`).
 fn stretch(a: &LinePoint, b: &LinePoint) -> Distance {
-    let d = sub(a.point, b.point);
+    let d = a.point - b.point;
     Distance::new(sqrt(
         d.x() * d.x() + d.height() * d.height() + d.y() * d.y(),
     ))

@@ -148,7 +148,7 @@ impl Action {
 /// The head's update code as `RGE_Action_Object::update` (`0x14106ac90`) reads it from the list's
 /// update (`FUN_140a992b0`): 1 (done) and 3 (failed) delete the head
 /// ([`ActionList::delete_head`]), any other keeps it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(crate) enum HeadCode {
     /// The head stays for the next update.

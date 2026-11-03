@@ -90,7 +90,7 @@ pub(super) fn class_armor(
 }
 
 /// The two armor classes with their own slots (0x868 and 0x870, [`class_armor`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum OwnSlot {
     /// Melee (class 4), slot 0x868.
     Melee,

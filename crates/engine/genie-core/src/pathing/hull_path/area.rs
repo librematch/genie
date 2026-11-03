@@ -17,7 +17,7 @@ use crate::pathing::hull_path::{
 use crate::world::slots::CheckedIndex;
 
 /// Whether the hull search's area grew ([`HullPather::grow_area`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub(super) enum AreaGrowth {
     /// It grew by two tiles each way.

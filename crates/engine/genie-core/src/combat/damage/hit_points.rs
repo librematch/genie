@@ -12,7 +12,7 @@ use crate::objects::masters::MasterKind;
 
 /// What lands a hit: a swing, or a missile (a shield of charge type 5 blocks the first, 4 the
 /// second: [`shield`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HitKind {
     /// A melee swing.
     Melee,
@@ -21,7 +21,7 @@ pub enum HitKind {
 }
 
 /// Whether a shield blocked a hit ([`shield`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum ShieldBlock {
     /// It spent a charge on the hit.
@@ -117,7 +117,7 @@ pub fn gain_hp(
 }
 
 /// Whether a heal left its object at its full hit points ([`heal_hp`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[must_use]
 pub enum Heal {
     /// It holds exactly its master's hit points.

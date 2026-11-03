@@ -7,7 +7,7 @@ use crate::world::layer::generated::HistoryTuning;
 
 /// An entry's kind (`add_new_history_entry`'s first argument): the update's population entry
 /// is kind 0; an entry of any other kind keeps its slot zero.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntryKind(u8);
 
 impl EntryKind {
@@ -29,7 +29,7 @@ impl EntryKind {
 
 /// A population an entry holds (`history[i]`, a short): the civilian or the military
 /// population at a period's end, through `CVTTSS2SI` and its low 16 bits.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Population(i16);
 
 impl Population {

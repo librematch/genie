@@ -131,7 +131,7 @@ impl Cell {
 
 /// A cell's place in a planner's grid: the levels one after another, the tiles first, each
 /// row by row (`+0x3d8`'s index, a node's `+0`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(super) struct CellIndex(
     /// The place.
     usize,
