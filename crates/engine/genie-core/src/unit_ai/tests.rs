@@ -20,6 +20,7 @@ use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::math::rng::Stream;
 use crate::movement::MoveStats;
+use crate::movement::PathData;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, MoveToAction};
@@ -41,6 +42,7 @@ use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
+use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
@@ -96,6 +98,7 @@ use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
 use crate::vision::VisionBits;
 use crate::world::World;
+use std::slice::from_ref;
 
 /// Surroundings with nothing in them but build 158041's roles and slots.
 fn no_surroundings() -> Surroundings {
@@ -2168,61 +2171,6 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
     );
 }
 
-/// A soldier's world: what its `bestUnitToAttack` finds and the attack commands it gave.
-struct SoldierSide {
-    found: i32,
-    attacks: Vec<(ObjectId, OrderForce)>,
-    patrol: Option<(PatrolPath, WaypointIndex)>,
-    /// Slot 0xa0 refuses every target.
-    refuses: bool,
-}
-
-impl UnitSide for SoldierSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        self.patrol.clone()
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        Ok(Found {
-            id: ObjectId::of_field(self.found),
-            enemies: self.found != -1,
-            position: Some(Position::new(10.0, 11.0, 0.0)),
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    }
-    fn attack(
-        &mut self,
-        target: ObjectId,
-        force: OrderForce,
-        _: &UnitAi,
-    ) -> Result<Attacked, GenieError> {
-        self.attacks.push((target, force));
-        Ok(Attacked {
-            attacks: true,
-            posted: Vec::new(),
-        })
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Ok((!self.refuses).then_some((class::LIVESTOCK, Position::new(10.0, 11.0, 0.0))))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-}
-
 /// A side for the base handler's damage case: the objects it holds, the attack search's
 /// answer, the reach, the duels, and what the case asked of it.
 #[derive(Default)]
@@ -3795,68 +3743,62 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
 }
 
 /// A scout (master 448) in stand ground whose sheep died (census v4's blocker): its
-/// processIdle with 0 (`FUN_140c20db0`) attacks the next sheep `bestUnitToAttack` finds,
-/// forced, and its order goes; finding none, it moves to the dead sheep's point.
+/// processIdle with 0 (`FUN_140c20db0`) attacks what `bestUnitToAttack` finds next, forced
+/// (its Attack at once: player 2's villager 26000 beside its state position; a sheep is none of
+/// the soldier's cared classes), and its order goes; finding none, it moves to the dead sheep's
+/// point.
 #[test]
 fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
-    let run = |found: i32| {
-        let mut scout = UnitAi {
-            current_order: Some(OrderKind::Attack),
-            current_action: Some(AiAction::Attack),
-            current_target: Some(object_id(25954)),
-            target_class: class_of(58),
-            target_point: Position::new(5.0, 6.0, 0.0),
-            stance: UnitStance::StandGround,
-            ..idle(UnitAiKind::Soldier)
-        };
-        let at = Surroundings {
-            player: PlayerId::new(1),
-            kind: MasterKind::COMBAT,
-            master: ids::ID_448,
-            class: Some(class::CLASS_47),
-            weapon_range: Distance::ZERO,
-            action_state: Some(ActionState::NO_ACTION),
-            roles: roles(),
-            slots: slots(),
-            unit_ai_tuning: tuning().unit_ai,
-            ..Surroundings::default()
-        };
-        let mut side = SoldierSide {
-            found,
-            attacks: Vec::new(),
-            patrol: None,
-            refuses: false,
-        };
-        let mut fx = Vec::new();
-        scout
-            .next_after_kill(
-                &at,
-                PlayerKind::Human,
-                &mut rng(),
-                &mut With::new(&mut side, &mut fx),
-            )
-            .unwrap();
-        (scout, side.attacks, fx)
+    let scout = UnitAi {
+        current_order: Some(OrderKind::Attack),
+        current_action: Some(AiAction::Attack),
+        current_target: Some(object_id(25954)),
+        target_class: class_of(58),
+        target_point: Position::new(5.0, 6.0, 0.0),
+        stance: UnitStance::StandGround,
+        state_position: Point::new(20.0, 20.0),
+        ..idle(UnitAiKind::Soldier)
     };
-    let (scout, attacks, _) = run(26000);
-    assert_eq!(attacks, vec![(object_id(26000), OrderForce::Forced)]);
+    let master = Master {
+        line_of_sight: Distance::new(4.0),
+        standing_sprite: Some(STANDING.id),
+        combat: Some(CombatPart::default()),
+        ..walker(448, class::CLASS_47)
+    };
+    let villager = SceneThing {
+        ai: Some(idle(UnitAiKind::Civilian)),
+        ..SceneThing::new(
+            26000,
+            player_id(2),
+            villager_master(),
+            Position::new(20.3, 20.0, 0.0),
+        )
+    };
+    let run = |others: &[SceneThing]| {
+        let mut w = soldier_world((master.clone(), scout.clone()), None, others);
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
+        );
+        (r, w)
+    };
+    let (r, w) = run(&[villager]);
+    assert_eq!(r, Ok(()));
+    assert_eq!(attacks_500(&w), Some(object_id(26000)));
+    let u = ai_500(&w);
     assert_eq!(
-        (
-            scout.current_action,
-            scout.current_target,
-            scout.current_order
-        ),
+        (u.current_action, u.current_target, u.current_order),
         (Some(AiAction::Attack), Some(object_id(26000)), None)
     );
-    assert_eq!((scout.last_order, scout.order_priority.get()), (None, -1));
-    let (scout, attacks, fx) = run(-1);
-    assert_eq!(attacks, vec![]);
-    assert!(
-        fx.iter()
-            .any(|e| matches!(e, Effect::Move(m) if m.point == Position::new(5.0, 6.0, 0.0)))
-    );
+    assert_eq!((u.last_order, u.order_priority.get()), (None, -1));
+    let (r, w) = run(&[]);
+    assert_eq!(r, Ok(()));
+    assert_eq!(attacks_500(&w), None);
+    assert_eq!(walks_to(&w), Some(Position::new(5.0, 6.0, 0.0)));
+    let u = ai_500(&w);
     assert_eq!(
-        (scout.current_order, scout.last_order),
+        (u.current_order, u.last_order),
         (None, Some(OrderKind::Attack))
     );
 }
@@ -3865,7 +3807,7 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
 /// timers reset (an adjusted idle timeout of 750 redrawn, the secondary timer capped).
 #[test]
 fn patrol_kill_ends_the_patrol_order_with_its_timers() {
-    let mut scout = UnitAi {
+    let scout = UnitAi {
         current_order: Some(OrderKind::Patrol),
         current_action: Some(AiAction::Attack),
         current_target: Some(object_id(25954)),
@@ -3875,34 +3817,19 @@ fn patrol_kill_ends_the_patrol_order_with_its_timers() {
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Soldier)
     };
-    let at = Surroundings {
-        player: PlayerId::new(1),
-        kind: MasterKind::COMBAT,
-        action_state: Some(ActionState::NO_ACTION),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let mut side = SoldierSide {
-        found: -1,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
-    };
-    scout
-        .next_after_kill(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new()),
-        )
-        .unwrap();
+    let mut w = soldier_world((soldier_master(), scout), None, &[]);
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
+    );
+    assert_eq!(r, Ok(()));
+    let u = ai_500(&w);
     assert_eq!(
-        (scout.current_order, scout.last_order, scout.secondary_timer),
+        (u.current_order, u.last_order, u.secondary_timer),
         (None, Some(OrderKind::Patrol), Millis::new(750))
     );
-    assert_ne!(scout.adjusted_idle_timeout, Millis::new(750));
+    assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
 }
 
 /// processMisc's retarget check past its timer (`0x140c567c0`): a scout on the attack order
@@ -8388,44 +8315,61 @@ fn no_attack_tower_only_searches() {
 }
 
 /// The tower's processIdle in the idle part (`FUN_140c564c0` with 1): what
-/// `bestUnitToAttack` found it attacks (slot 0xb8 forced); the idle part reads no result.
+/// `bestUnitToAttack` found it attacks (slot 0xb8 forced: player 1's villager 9731 in its
+/// range, its Attack at once; the tower is armed, its missile 363, and a moving object of
+/// speed 0, as a building's master is); the idle part reads no result.
 #[test]
 fn an_idle_tower_attacks_what_its_search_found() {
-    let mut u = UnitAi {
+    let u = UnitAi {
         idle_timer: Millis::new(504),
         adjusted_idle_timeout: Millis::new(503),
         ..idle(UnitAiKind::Tower)
     };
-    let at = Surroundings {
-        position: Position::new(29.0, 94.0, 0.0),
-        player: PlayerId::new(2),
-        size: Footprint::new(2.0, 2.0),
-        los: Distance::new(8.0),
-        state: ObjectState::Alive,
+    let tower = Master {
+        id: master_id(79),
         kind: MasterKind::BUILDING,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+        class: class::TOWER,
+        radius: Footprint::new(1.0, 1.0),
+        height: Distance::new(3.0),
+        hit_points: MasterHitPoints::of_data(1020),
+        line_of_sight: Distance::new(8.0),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::ZERO)),
+        standing_sprite: Some(STANDING.id),
+        combat: Some(CombatPart {
+            weapon_range: Distance::new(8.0),
+            missile: MasterField::of_data(363),
+            ..CombatPart::default()
+        }),
+        ..Master::default()
     };
-    let mut side = SoldierSide {
-        found: 9731,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
-    };
-    let fx = u
-        .update_fx(
-            Millis::new(28),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
-    assert_eq!(side.attacks, vec![(object_id(9731), OrderForce::Forced)]);
+    let mut w = Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .graphic(STANDING)
+        .thing(SceneThing {
+            ai: Some(u),
+            sprite: Some(STANDING.id),
+            ..SceneThing::new(500, player_id(2), tower, Position::new(30.0, 30.0, 0.0))
+        })
+        .thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(2))),
+            ai: Some(idle(UnitAiKind::Civilian)),
+            ..SceneThing::new(
+                9731,
+                player_id(1),
+                villager_master(),
+                Position::new(34.0, 30.0, 0.0),
+            )
+        })
+        .build();
+    let r = run_ai(
+        &mut w,
+        (player_id(2), object_id(500)),
+        |ai, at, side, kind, rng| ai.update(Millis::new(28), WorldTime::ZERO, kind, at, rng, side),
+    );
+    assert_eq!(r.map(|_| ()), Ok(()));
+    assert_eq!(attacks_500(&w), Some(object_id(9731)));
+    let u = ai_500(&w);
     assert_eq!(
         (u.current_action, u.current_target),
         (Some(AiAction::Attack), Some(object_id(9731)))
@@ -9768,132 +9712,217 @@ fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
     assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (None, 0));
 }
 
-/// A human player's soldier walking its patrol (711 with the move action, its `MoveTo` the
-/// top action) as the full update finds it, its secondary timer `secondary`.
-fn patroller(secondary: u32) -> (UnitAi, Surroundings) {
-    let u = UnitAi {
+/// The soldier of the patrol tests: master 4 of class 6, a walker of line of sight 4 and
+/// weapon range 1, standing on [`STANDING`].
+fn soldier_master() -> Master {
+    Master {
+        line_of_sight: Distance::new(4.0),
+        standing_sprite: Some(STANDING.id),
+        combat: Some(CombatPart {
+            weapon_range: Distance::new(1.0),
+            ..CombatPart::default()
+        }),
+        ..walker(4, class::CLASS_6)
+    }
+}
+
+/// A human player's soldier walking its patrol (711 with the move action) as the full update
+/// finds it, its secondary timer `secondary`.
+fn patroller(secondary: u32) -> UnitAi {
+    UnitAi {
         current_order: Some(OrderKind::Patrol),
         current_action: Some(AiAction::Move),
         idle_timeout: Millis::new(3000),
         adjusted_idle_timeout: Millis::new(750),
         secondary_timer: Millis::new(secondary),
         ..idle(UnitAiKind::Soldier)
-    };
-    let at = Surroundings {
-        position: Position::new(20.0, 20.0, 0.0),
-        player: PlayerId::new(1),
-        kind: MasterKind::COMBAT,
-        state: ObjectState::Alive,
-        size: Footprint::new(0.2, 0.2),
-        los: Distance::new(4.0),
-        weapon_range: Distance::new(1.0),
-        flags: SurroundingFlags::BUSY,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    (u, at)
+    }
+}
+
+/// Player 1's soldier 500 of master `soldier` at (20, 20) on a map of 64 by 64, on its
+/// sprite, its unit AI `ai`, its top action a `MoveTo` to `walk` (its point and target), none
+/// without one; the `others`, each in player 1's lists. The AI stream is seeded with 0, as
+/// [`rng`] is.
+fn soldier_world(
+    (soldier, ai): (Master, UnitAi),
+    walk: Option<(Point, Option<i32>)>,
+    others: &[SceneThing],
+) -> World {
+    let actions = walk.map(|(to, target)| Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            target: target.map(object_id),
+            point: Position::new(to.x(), to.y(), 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
+    });
+    let mut scene = Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .graphic(STANDING)
+        .thing(SceneThing {
+            ai: Some(ai),
+            actions,
+            sprite: Some(STANDING.id),
+            ..SceneThing::new(500, player_id(1), soldier, Position::new(20.0, 20.0, 0.0))
+        });
+    for thing in others {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(1))),
+            ..thing.clone()
+        });
+    }
+    let mut w = scene.build();
+    w.streams.get(Stream::Ai).set_seed(0);
+    w
+}
+
+/// Player 2's villager 77 at `at`, idle, for [`soldier_world`]'s others.
+fn enemy_villager(at: Point) -> SceneThing {
+    SceneThing {
+        ai: Some(idle(UnitAiKind::Civilian)),
+        ..SceneThing::new(
+            77,
+            player_id(2),
+            villager_master(),
+            Position::new(at.x(), at.y(), 0.0),
+        )
+    }
+}
+
+/// Object `id` of `owner` at `at`, a walker of master 5 and class 6, for [`soldier_world`]'s
+/// others.
+fn walker_thing(id: i32, owner: PlayerId, at: Point) -> SceneThing {
+    SceneThing::new(
+        id,
+        owner,
+        walker(5, class::CLASS_6),
+        Position::new(at.x(), at.y(), 0.0),
+    )
+}
+
+/// Unit 500's unit AI in `w`.
+fn ai_500(w: &World) -> &UnitAi {
+    w.parts.unit_ai.get(object_id(500)).unwrap()
+}
+
+/// The target of unit 500's Attack in `w`, none without one.
+fn attacks_500(w: &World) -> Option<ObjectId> {
+    w.parts
+        .actions
+        .of(object_id(500))
+        .list
+        .attack()
+        .and_then(|a| a.target)
+        .map(AttackTargetId::id)
+}
+
+/// Unit 500's full update in `w` ([`UnitAi::update`], 28 ms at time 0).
+fn update_500(w: &mut World) -> Result<Option<AfterOrder>, GenieError> {
+    run_ai(
+        w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, kind, rng| ai.update(Millis::new(28), WorldTime::ZERO, kind, at, rng, side),
+    )
+}
+
+/// Unit 500's idle check in `w` ([`UnitAi::soldier_idle`]).
+fn soldier_idle_500(w: &mut World) -> Result<IdleOutcome, GenieError> {
+    run_ai(
+        w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, kind, rng| ai.soldier_idle(at, kind, rng, side),
+    )
 }
 
 /// The idle part's patrol branch (`0x140c67f0b`) while the secondary timer runs: nothing
 /// but the timer's count down; the busy check lets the walking patrol through.
 #[test]
 fn patrol_waits_for_its_secondary_timer() {
-    let (mut u, at) = patroller(300);
-    let mut side = SoldierSide {
-        found: 77,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
-    };
-    let fx = u
-        .update_fx(
-            Millis::new(28),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(fx, vec![]);
+    let mut w = soldier_world(
+        (soldier_master(), patroller(300)),
+        Some((Point::new(30.0, 20.0), None)),
+        &[enemy_villager(Point::new(22.0, 20.0))],
+    );
+    assert!(update_500(&mut w).is_ok());
+    let u = ai_500(&w);
     assert_eq!(
         (u.secondary_timer, u.current_order),
         (Millis::new(272), Some(OrderKind::Patrol))
     );
-    assert_eq!(side.attacks, Vec::new());
+    assert_eq!(attacks_500(&w), None);
 }
 
 /// The patrol branch with its secondary timer run out: it restarts at 750 (the adjusted
 /// idle timeout of 750 redrawn), processIdle's search finds 77: the patrol is saved (the
-/// unit's slot 0x468), the attack command given, and the order goes without its history
-/// (`FUN_140c64b60` with -1 and 0).
+/// unit's slot 0x468: its top path level's points, flags and waypoint), the attack command
+/// given (its Attack at once), and the order goes without its history (`FUN_140c64b60` with
+/// -1 and 0).
 #[test]
 fn patrol_saves_itself_and_attacks_what_it_finds() {
-    let (mut u, at) = patroller(0);
-    u.last_order = Some(OrderKind::Wait);
-    let saved = PatrolPath {
-        flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
-        ..PatrolPath::default()
+    let u = UnitAi {
+        last_order: Some(OrderKind::Wait),
+        ..patroller(0)
     };
-    let mut side = SoldierSide {
-        found: 77,
-        attacks: Vec::new(),
-        patrol: Some((saved.clone(), WaypointIndex::of_data(2))),
-        refuses: false,
-    };
-    let mut r = rng();
-    let _ = u
-        .update_fx(
-            Millis::new(28),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at,
-            &mut r,
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
+    let mut w = soldier_world(
+        (soldier_master(), u),
+        Some((Point::new(30.0, 20.0), None)),
+        &[enemy_villager(Point::new(22.0, 20.0))],
+    );
+    let points = vec![
+        BVector::new(20.0, 0.0, 20.0),
+        BVector::new(30.0, 0.0, 20.0),
+        BVector::new(30.0, 0.0, 30.0),
+    ];
+    let flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH;
+    w.parts.mover_mut(object_id(500)).unwrap().paths = vec![PathData {
+        points: points.clone(),
+        has_path: true,
+        path_flags: flags,
+        waypoint: WaypointIndex::of_data(2),
+        ..PathData::without_path()
+    }];
+    let before = w.streams.get(Stream::Ai).draws;
+    assert!(update_500(&mut w).is_ok());
+    assert_eq!(attacks_500(&w), Some(object_id(77)));
+    let u = ai_500(&w);
     assert_eq!(
         (u.current_order, u.last_order),
         (None, Some(OrderKind::Wait))
     );
-    assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (Some(saved), 2));
+    let saved = u
+        .patrol_path
+        .as_ref()
+        .map(|p| (p.path.points.clone(), p.flags));
+    assert_eq!((saved, u.patrol_waypoint.get()), (Some((points, flags)), 2));
     assert_eq!(u.secondary_timer, Millis::new(750));
     assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
-    assert!(0 < r.draws);
+    assert!(before < w.streams.get(Stream::Ai).draws);
 }
 
 /// The patrol branch passes over processIdle while the top action's target is a building
-/// (slot 400); a unit target it does not.
+/// (slot 400: its walk to player 2's house 50); a unit target it does not.
 #[test]
 fn patrol_attacking_building_keeps_at_it() {
-    let (mut u, mut at) = patroller(0);
-    at.top_target = Some(TopTarget {
-        id: object_id(50),
+    let house = Master {
+        id: master_id(70),
         kind: MasterKind::BUILDING,
-        position: Position::new(30.0, 30.0, 0.0),
+        class: class::BUILDING,
         radius: Footprint::new(1.0, 1.0),
-    });
-    let mut side = SoldierSide {
-        found: 77,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
+        height: Distance::new(2.0),
+        hit_points: MasterHitPoints::of_data(550),
+        ..Master::default()
     };
-    let _ = u
-        .update_fx(
-            Millis::new(28),
-            WorldTime::ZERO,
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(side.attacks, Vec::new());
-    assert_eq!(u.secondary_timer, Millis::new(750));
+    let mut w = soldier_world(
+        (soldier_master(), patroller(0)),
+        Some((Point::new(30.0, 30.0), Some(50))),
+        &[
+            SceneThing::new(50, player_id(2), house, Position::new(30.0, 30.0, 0.0)),
+            enemy_villager(Point::new(22.0, 20.0)),
+        ],
+    );
+    assert!(update_500(&mut w).is_ok());
+    assert_eq!(attacks_500(&w), None);
+    assert_eq!(ai_500(&w).secondary_timer, Millis::new(750));
 }
 
 /// The soldier's idle check (`FUN_140c20db0`) takes its top action's target within its
@@ -9901,206 +9930,193 @@ fn patrol_attacking_building_keeps_at_it() {
 /// weapon range squared) without a search; out of range it searches.
 #[test]
 fn soldier_idle_check_attacks_its_top_action_target_in_range() {
-    let (mut u, mut at) = patroller(0);
-    u.current_order = None;
-    let near = TopTarget {
-        id: object_id(50),
-        kind: MasterKind::COMBAT,
-        position: Position::new(21.0, 20.0, 0.0),
-        radius: Footprint::new(0.2, 0.2),
+    let u = UnitAi {
+        current_order: None,
+        ..patroller(0)
     };
-    at.top_target = Some(near);
-    let mut side = SoldierSide {
-        found: 77,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
+    let world = |soldier: Master, x: f32| {
+        soldier_world(
+            (soldier, u.clone()),
+            Some((Point::new(x, 20.0), Some(50))),
+            &[
+                walker_thing(50, player_id(2), Point::new(x, 20.0)),
+                enemy_villager(Point::new(20.0, 22.0)),
+            ],
+        )
     };
-    let in_range = |at: &Surroundings, side: &mut SoldierSide| {
-        UnitAi::top_target_in_range(at, &mut With::at(side, &mut Vec::new(), at))
+    let in_range = |w: &mut World| {
+        run_ai(w, (player_id(1), object_id(500)), |_, at, side, _, _| {
+            UnitAi::top_target_in_range(at, side)
+        })
     };
-    assert_eq!(in_range(&at, &mut side), Ok(Some(object_id(50))));
-    at.min_range = Distance::new(1.0);
-    assert_eq!(in_range(&at, &mut side), Ok(None));
-    at.min_range = Distance::ZERO;
-    let mut fx = Vec::new();
     assert_eq!(
-        u.soldier_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::at(&mut side, &mut fx, &at)
-        ),
-        Ok(IdleOutcome::Acted)
+        in_range(&mut world(soldier_master(), 21.0)),
+        Ok(Some(object_id(50)))
     );
-    assert_eq!(side.attacks, vec![(object_id(50), OrderForce::Forced)]);
+    let least = Master {
+        combat: Some(CombatPart {
+            weapon_range: Distance::new(1.0),
+            min_range: Distance::new(1.0),
+            ..CombatPart::default()
+        }),
+        ..soldier_master()
+    };
+    assert_eq!(in_range(&mut world(least, 21.0)), Ok(None));
+    let mut w = world(soldier_master(), 21.0);
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
+    assert_eq!(attacks_500(&w), Some(object_id(50)));
     // too far: the search's 77
-    let (mut u, mut at) = patroller(0);
-    u.current_order = None;
-    at.top_target = Some(TopTarget {
-        position: Position::new(25.0, 20.0, 0.0),
-        ..near
-    });
-    side.attacks.clear();
-    assert_eq!(
-        u.soldier_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::at(&mut side, &mut Vec::new(), &at)
-        ),
-        Ok(IdleOutcome::Acted)
-    );
-    assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
+    let mut w = world(soldier_master(), 25.0);
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
+    assert_eq!(attacks_500(&w), Some(object_id(77)));
 }
 
 /// The soldier's idle check's other ways (`FUN_140c20db0`): master 706 checks nothing; with
 /// retargeting off a current target the world holds is attacked without a search, the
-/// order kept; a failed attack on a patrol drops the saved patrol and stops on the order (an
-/// attack on its own current target with an action takes nothing); a computer player's
+/// order kept; a failed attack on a patrol drops the saved patrol and stops on the order (its
+/// held current target, untargetable (`+0x689` off), refused by slot 0xa0); a computer player's
 /// check and a healer's ally search are not modelled.
 #[test]
 fn soldier_idle_check_holds_its_target_with_retargeting_off() {
-    let side = |found| SoldierSide {
-        found,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
+    let villager = enemy_villager(Point::new(22.0, 20.0));
+    let walk = Some((Point::new(30.0, 20.0), None));
+    let saboteur = Master {
+        id: ids::SABOTEUR,
+        ..soldier_master()
     };
-    let idle = |u: &mut UnitAi, at: &Surroundings, side: &mut SoldierSide, computer| {
-        u.soldier_idle(
-            at,
-            computer,
-            &mut rng(),
-            &mut With::new(side, &mut Vec::new()),
-        )
+    let mut w = soldier_world((saboteur, patroller(0)), walk, from_ref(&villager));
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Idle));
+    assert_eq!(attacks_500(&w), None);
+    let holding = |target: i32| UnitAi {
+        current_order: None,
+        retarget_disabled: 1,
+        current_target: Some(object_id(target)),
+        ..patroller(0)
     };
-    let (mut u, mut at) = patroller(0);
-    at.master = ids::SABOTEUR;
-    let mut s = side(77);
-    assert_eq!(
-        idle(&mut u, &at, &mut s, PlayerKind::Human),
-        Ok(IdleOutcome::Idle)
+    let sixty = walker_thing(60, player_id(2), Point::new(23.0, 20.0));
+    let mut w = soldier_world(
+        (soldier_master(), holding(60)),
+        walk,
+        &[sixty, villager.clone()],
     );
-    assert_eq!(s.attacks, []);
-    let (mut u, mut at) = patroller(0);
-    (u.current_order, u.retarget_disabled, u.current_target) = (None, 1, Some(object_id(60)));
-    at.target = Some(Seen::default());
-    let mut s = side(77);
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
     assert_eq!(
-        idle(&mut u, &at, &mut s, PlayerKind::Human),
-        Ok(IdleOutcome::Acted)
+        (attacks_500(&w), ai_500(&w).current_order),
+        (Some(object_id(60)), None)
     );
-    assert_eq!(
-        (s.attacks, u.current_order),
-        (vec![(object_id(60), OrderForce::Forced)], None)
-    );
-    let (mut u, at) = patroller(0);
-    assert!(idle(&mut u, &at, &mut side(77), PlayerKind::Computer).is_err());
-    let (mut u, at) = patroller(0);
-    let mut s = SoldierSide {
-        refuses: true,
-        patrol: Some((PatrolPath::default(), WaypointIndex::of_data(3))),
-        ..side(77)
+    let mut w = soldier_world((soldier_master(), patroller(0)), walk, &[villager]);
+    w.players[1].kind = PlayerKind::Computer;
+    assert!(soldier_idle_500(&mut w).is_err());
+    // the untargetable 61 held: refused, the patrol saved from its path goes
+    let own = SceneThing {
+        flags: UnitFlags::ATTACKABLE | UnitFlags::UNTARGETABLE,
+        ..walker_thing(61, player_id(2), Point::new(21.0, 20.0))
     };
-    assert_eq!(
-        idle(&mut u, &at, &mut s, PlayerKind::Human),
-        Ok(IdleOutcome::Idle)
-    );
+    let refused = UnitAi {
+        current_order: Some(OrderKind::Patrol),
+        ..holding(61)
+    };
+    let mut w = soldier_world((soldier_master(), refused), walk, &[own]);
+    w.parts.mover_mut(object_id(500)).unwrap().paths = vec![PathData {
+        points: vec![BVector::new(20.0, 0.0, 20.0), BVector::new(30.0, 0.0, 20.0)],
+        has_path: true,
+        waypoint: WaypointIndex::of_data(1),
+        ..PathData::without_path()
+    }];
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Idle));
+    let u = ai_500(&w);
     assert_eq!((&u.patrol_path, u.patrol_waypoint.get()), (&None, 0));
-    let (mut u, mut at) = patroller(0);
-    u.current_order = None;
-    at.flags.set(SurroundingFlags::TASK_0X69, true);
-    assert!(idle(&mut u, &at, &mut side(-1), PlayerKind::Human).is_err());
+    assert_eq!(attacks_500(&w), None);
+    let healer = Master {
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                action_kind: ActionKind::HEAL,
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
+        ..soldier_master()
+    };
+    let u = UnitAi {
+        current_order: None,
+        ..patroller(0)
+    };
+    let mut w = soldier_world((healer, u), walk, &[]);
+    assert!(soldier_idle_500(&mut w).is_err());
 }
 
-/// A stop earlier in the update (a failed Enter's notify, slot 0xb0) emptied the action list
-/// at once: the soldier's idle check finds no top action's target, in range as it was at
-/// the update's start, and searches (426750657's scout inside its transport, update 467);
+/// A stop earlier in the update (a failed Enter's notify, slot 0xb0) empties the action list
+/// at once: the soldier's idle check then finds no top action's target, in range as it was
+/// at the update's start, and searches (426750657's scout inside its transport, update 467);
 /// an effect that leaves the actions does not change it.
 #[test]
 fn soldier_stopped_in_the_update_finds_no_top_action_target() {
-    let (mut u, mut at) = patroller(0);
-    u.current_order = None;
-    at.top_target = Some(TopTarget {
-        id: object_id(50),
-        kind: MasterKind::COMBAT,
-        position: Position::new(21.0, 20.0, 0.0),
-        radius: Footprint::new(0.2, 0.2),
-    });
-    let mut side = SoldierSide {
-        found: 77,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
+    let u = UnitAi {
+        current_order: None,
+        ..patroller(0)
     };
-    let mut read = |fx: &[Effect]| {
-        UnitAi::top_target_in_range(&at, &mut With::at(&mut side, &mut fx.to_vec(), &at))
-    };
-    assert_eq!(read(&[]), Ok(Some(object_id(50))));
-    assert_eq!(
-        read(&[Effect::CapHumanOrder(WorldTime::from_millis(5000))]),
-        Ok(Some(object_id(50)))
+    let mut w = soldier_world(
+        (soldier_master(), u),
+        Some((Point::new(21.0, 20.0), Some(50))),
+        &[walker_thing(50, player_id(2), Point::new(21.0, 20.0))],
     );
-    assert_eq!(read(&[Effect::Stop]), Ok(None));
-    assert_eq!(
-        read(&[
-            Effect::Stop,
-            Effect::CapHumanOrder(WorldTime::from_millis(5000))
-        ]),
-        Ok(None)
+    let read = run_ai(
+        &mut w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, _, rng| {
+            let first = UnitAi::top_target_in_range(at, side)?;
+            side.effect_now(Effect::CapHumanOrder(WorldTime::from_millis(5000)), ai, rng)?;
+            let capped = UnitAi::top_target_in_range(at, side)?;
+            side.effect_now(Effect::Stop, ai, rng)?;
+            let stopped = UnitAi::top_target_in_range(at, side)?;
+            side.effect_now(Effect::CapHumanOrder(WorldTime::from_millis(5000)), ai, rng)?;
+            Ok((
+                first,
+                capped,
+                stopped,
+                UnitAi::top_target_in_range(at, side)?,
+            ))
+        },
     );
+    let fifty = Some(object_id(50));
+    assert_eq!(read, Ok((fifty, fifty, None, None)));
 }
 
 /// The soldier's idle check with nothing to attack and a saved patrol, in no group:
-/// `restorePatrolInformation` gives the unit its walk back onto the patrol, the order 711
-/// (733 for a unit that attack-moves) and a secondary timer of 750; processIdle produced.
+/// `restorePatrolInformation` gives the unit its walk back onto the patrol (to its saved
+/// waypoint), the order 711 (733 for a unit that attack-moves) and a secondary timer of 750;
+/// processIdle produced.
 #[test]
 fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
-    let (mut u, mut at) = patroller(0);
-    u.current_order = None;
-    u.current_action = None;
-    u.patrol_path = Some(PatrolPath::default());
-    at.flags.set(SurroundingFlags::BUSY, false);
-    let mut side = SoldierSide {
-        found: -1,
-        attacks: Vec::new(),
-        patrol: None,
-        refuses: false,
+    let mut path = Path::default();
+    let _ = path.push(BVector::new(20.0, 0.0, 20.0));
+    let _ = path.push(BVector::new(30.0, 0.0, 20.0));
+    let u = UnitAi {
+        current_order: None,
+        current_action: None,
+        patrol_path: Some(PatrolPath {
+            path,
+            ..PatrolPath::default()
+        }),
+        patrol_waypoint: WaypointIndex::of_data(1),
+        ..patroller(0)
     };
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.soldier_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(IdleOutcome::Acted)
-    );
-    assert_eq!(
-        fx,
-        vec![
-            Effect::CapHumanOrder(HUMAN_ORDER_CAP),
-            Effect::RestorePatrol
-        ]
-    );
+    let mut w = soldier_world((soldier_master(), u), None, &[]);
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
+    assert_eq!(walks_to(&w), Some(Position::new(30.0, 20.0, 0.0)));
+    let u = ai_500(&w);
     assert_eq!(
         (u.current_order, u.secondary_timer),
         (Some(OrderKind::Patrol), Millis::new(750))
     );
-    u.current_order = None;
-    at.flags.set(SurroundingFlags::ATTACK_MOVING, true);
-    assert_eq!(
-        u.soldier_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(IdleOutcome::Acted)
-    );
-    assert_eq!(u.current_order, Some(OrderKind::AttackMove));
+    w.parts
+        .unit_ai
+        .get_mut(object_id(500))
+        .unwrap()
+        .current_order = None;
+    w.parts.mover_mut(object_id(500)).unwrap().attack_moving = true;
+    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
+    assert_eq!(ai_500(&w).current_order, Some(OrderKind::AttackMove));
 }
 
 /// The order check of a unit no longer busy: the attack move (733) ends, its timers reset
@@ -13824,22 +13840,19 @@ fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
     );
 }
 
-/// A soldier's world for its retarget search: what `bestUnitToAttack` finds, and each search's
-/// place, reference distance, `any_class` and work state.
+/// A soldier's world for its retarget search: what `bestUnitToAttack` finds, the attack
+/// commands it gave, and each search's place, reference distance, `any_class` and work state.
 struct RetargetSide {
-    soldier: SoldierSide,
+    found: i32,
+    attacks: Vec<(ObjectId, OrderForce)>,
     searched: Vec<(Point, f32, bool, bool)>,
 }
 
 impl RetargetSide {
     const fn finding(found: i32) -> Self {
         Self {
-            soldier: SoldierSide {
-                found,
-                attacks: Vec::new(),
-                patrol: None,
-                refuses: false,
-            },
+            found,
+            attacks: Vec::new(),
             searched: Vec::new(),
         }
     }
@@ -13847,7 +13860,7 @@ impl RetargetSide {
 
 impl UnitSide for RetargetSide {
     fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        self.soldier.patrol_information()
+        None
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
         if let Pick::Attack { ask, .. } = &search.pick {
@@ -13858,38 +13871,44 @@ impl UnitSide for RetargetSide {
                 ask.checks.contains(AttackChecks::WORK_STATE),
             ));
         }
-        self.soldier.closest(search)
+        Ok(Found {
+            id: ObjectId::of_field(self.found),
+            enemies: self.found != -1,
+            position: Some(Position::new(10.0, 11.0, 0.0)),
+            fresh: true,
+            players: 0,
+            distance: WholeDistance::of_data(-1),
+            retries: [None; 3],
+        })
     }
     fn attack(
         &mut self,
         target: ObjectId,
         force: OrderForce,
-        ai: &UnitAi,
+        _: &UnitAi,
     ) -> Result<Attacked, GenieError> {
-        self.soldier.attack(target, force, ai)
+        self.attacks.push((target, force));
+        Ok(Attacked {
+            attacks: true,
+            posted: Vec::new(),
+        })
     }
-    fn set_under_attack(&mut self, under: bool) {
-        self.soldier.set_under_attack(under);
-    }
+    fn set_under_attack(&mut self, _: bool) {}
     fn may_attack(
         &mut self,
-        id: ObjectId,
-        s: &Seeker,
+        _: ObjectId,
+        _: &Seeker,
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        self.soldier.may_attack(id, s)
+        Ok(Some((class::LIVESTOCK, Position::new(10.0, 11.0, 0.0))))
     }
-    fn seek_unexplored(
-        &mut self,
-        ai: &UnitAi,
-        rng: &mut Well512,
-    ) -> Result<Option<Tile>, GenieError> {
-        self.soldier.seek_unexplored(ai, rng)
+    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
+        Err(GenieError::unsupported("no search here"))
     }
-    fn seek_beyond_sight(&mut self, rng: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        self.soldier.seek_beyond_sight(rng)
+    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
+        Err(GenieError::unsupported("no search here"))
     }
     fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        self.soldier.make_scout_map()
+        Err(GenieError::unsupported("no world here"))
     }
 }
 
@@ -13974,7 +13993,7 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
             true
         )]
     );
-    assert_eq!((side.soldier.attacks.len(), fx.len()), (0, 0));
+    assert_eq!((side.attacks.len(), fx.len()), (0, 0));
     // the same category: no building target, so nothing more either
     let mut side = RetargetSide::finding(25954);
     assert_eq!(
@@ -14024,7 +14043,7 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
             &mut With::new(&mut side, &mut Vec::new()),
             &mut rng(),
         );
-        (r, side.soldier.attacks)
+        (r, side.attacks)
     };
     assert_eq!(
         attacked(40, 30, PlayerKind::Human),
@@ -14054,7 +14073,7 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
         &mut rng(),
     );
     assert_eq!(
-        (r, side.soldier.attacks),
+        (r, side.attacks),
         (Ok(10), vec![(object_id(30), OrderForce::Forced)])
     );
 }
