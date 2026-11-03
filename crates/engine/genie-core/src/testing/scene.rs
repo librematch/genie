@@ -8,6 +8,7 @@
 
 use crate::construction::BuilderCount;
 use crate::construction::build::Construction;
+use crate::garrison::ContainerId;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -49,11 +50,15 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
 use crate::pathing::Pathing;
+use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::players::Relation;
 use crate::testing::class;
+use crate::unit_ai::UnitAi;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::{CLASSES, Entry, Registry, UnitUpdate};
@@ -84,7 +89,8 @@ pub fn scout_id() -> ObjectId {
 /// The scout's master in a scene's world.
 pub const SCOUT_MASTER: MasterId = MasterId::named(448);
 
-/// Land's terrain, which every restriction passes.
+/// Land's terrain (its flags [`TerrainFlags::LAND`], the land class of the restrictions' masks),
+/// which every restriction passes.
 pub const LAND: TerrainId = TerrainId::named(0);
 /// Water's terrain in the scene's own table ([`Scene::terrains`] replaces it), which no
 /// restriction passes.
@@ -130,11 +136,18 @@ pub struct Thing {
     pub seen_by: Option<VisionBits>,
     /// A foundation no builder has started: desolid, without its obstruction record.
     pub desolid: bool,
+    /// Its unit AI, none for an object without one.
+    pub ai: Option<UnitAi>,
+    /// Its flag bytes (`+0x685`).
+    pub flags: UnitFlags,
+    /// The object it is inside.
+    pub inside: Option<ContainerId>,
 }
 
 impl Thing {
     /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points,
-    /// outside the sight registry, not a foundation.
+    /// outside the sight registry, not a foundation, without a unit AI or flags, on the map.
+    /// A moving master's object stands with its movement state ([`Mover`]) at its place.
     ///
     /// # Panics
     ///
@@ -150,6 +163,9 @@ impl Thing {
             state: ObjectState::Alive,
             seen_by: None,
             desolid: false,
+            ai: None,
+            flags: UnitFlags::empty(),
+            inside: None,
         }
     }
 }
@@ -170,6 +186,8 @@ pub struct Scene {
     scout: Option<Scout>,
     /// The players past Gaia.
     players: u8,
+    /// The relations [`Scene::relation`] set, from each player to another.
+    relations: Vec<(PlayerId, PlayerId, Relation)>,
     things: Vec<Thing>,
 }
 
@@ -182,12 +200,13 @@ impl Scene {
         Self {
             size,
             terrain: vec![LAND; n],
-            terrains: vec![TerrainFlags::NONE, TerrainFlags::WATER],
+            terrains: vec![TerrainFlags::LAND, TerrainFlags::WATER],
             elevation: vec![0; n],
             rocks: Vec::new(),
             sight: vec![TileSight::Seen; n],
             scout: None,
             players: 1,
+            relations: Vec::new(),
             things: Vec::new(),
         }
     }
@@ -292,10 +311,18 @@ impl Scene {
         self
     }
 
-    /// The world holds `players` players past Gaia, of no relation to each other.
+    /// The world holds `players` players past Gaia: each its own ally and every other's enemy
+    /// ([`Scene::relation`] sets another relation).
     #[must_use]
     pub const fn players(mut self, players: u8) -> Self {
         self.players = players;
+        self
+    }
+
+    /// Player `from`'s relation to player `to` (`player+0x260`) is `relation`.
+    #[must_use]
+    pub fn relation(mut self, from: PlayerId, to: PlayerId, relation: Relation) -> Self {
+        self.relations.push((from, to, relation));
         self
     }
 
@@ -322,7 +349,9 @@ impl Scene {
             FrameSeed::of_data(0),
             PLAYER,
             vec![Millis::ZERO; players],
-            vec![Player::default(); players],
+            (0..players)
+                .map(|p| player(p, players, &self.relations))
+                .collect(),
         );
         let wet = |t: &TerrainId| {
             self.terrains
@@ -392,6 +421,28 @@ impl Scene {
     /// The tile's index in the scene's rows.
     fn index(&self, t: Tile) -> usize {
         self.size.index(t).expect("a tile of the scene")
+    }
+}
+
+/// Player `p` of `players`: its own ally and every other's enemy, but for `relations`.
+fn player(p: usize, players: usize, relations: &[(PlayerId, PlayerId, Relation)]) -> Player {
+    let mut row: Vec<Relation> = (0..players)
+        .map(|q| {
+            if q == p {
+                Relation::Ally
+            } else {
+                Relation::Enemy
+            }
+        })
+        .collect();
+    for &(from, to, relation) in relations {
+        if from.index() == p {
+            row[to.index()] = relation;
+        }
+    }
+    Player {
+        relations: ByPlayer::new(row),
+        ..Player::default()
     }
 }
 
@@ -493,18 +544,28 @@ fn place_scout(w: &mut World, scout: Scout) {
         },
         ..Unit::default()
     };
-    let mover = Mover {
+    let _ = w
+        .push_live(
+            PLAYER,
+            Object::moving(unit, standing(walk_stats(), scout.at)),
+        )
+        .expect("the scout joins its player");
+}
+
+/// The movement state of a unit of `stats` standing at `at`, facing east, last moved there.
+fn standing(stats: MoveStats, at: Position) -> Mover {
+    Mover {
         forward: BVector::new(1.0, 0.0, 0.0),
         right: BVector::new(0.0, 0.0, -1.0),
         velocity: None,
         paths: Vec::new(),
         factor: 1.0,
-        stats: walk_stats(),
+        stats,
         waiting: 0,
         wait_delays: WaitDelays::of_data(0),
         attack_moving: false,
         last_move: WorldTime::ZERO,
-        moved_at: scout.at,
+        moved_at: at,
         substitute_count: SubstituteCount::of_data(0),
         ignore_units: Vec::new(),
         user_waypoints: Vec::new(),
@@ -514,10 +575,7 @@ fn place_scout(w: &mut World, scout: Scout) {
         pauses: Vec::new(),
         in_the_way: Vec::new(),
         sprite_facets: None,
-    };
-    let _ = w
-        .push_live(PLAYER, Object::moving(unit, mover))
-        .expect("the scout joins its player");
+    }
 }
 
 /// The object as the make action's spawn files a new one (`FUN_140ad0240`): its row in its
@@ -534,6 +592,9 @@ fn place_thing(w: &mut World, thing: Thing) {
         hp,
         seen_by,
         desolid,
+        ref ai,
+        flags,
+        inside,
     } = thing;
     let unit = Unit {
         id,
@@ -542,15 +603,23 @@ fn place_thing(w: &mut World, thing: Thing) {
             state,
             hp,
             master_id: master.id,
+            inside,
             ..Lifecycle::default()
         },
+        flags,
         ..Unit::default()
     };
-    let object = if desolid {
+    let mut object = if desolid {
         Object::with_building(unit, foundation(master))
     } else {
         Object::from(unit)
     };
+    if let Some(stats) = master.move_stats {
+        object = Object::moving(object, standing(stats, at));
+    }
+    if let Some(ai) = ai {
+        object = Object::with_ai(object, ai.clone());
+    }
     let _ = w
         .push_live(player, object)
         .expect("the object joins its player");

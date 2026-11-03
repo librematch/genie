@@ -66,8 +66,6 @@ use crate::movement::explore::InfluenceMap;
 use crate::objects::unit::TAKEN_OUT;
 use crate::objects::{IdTable, WorkerCount};
 use crate::players::{ByPlayer, Relations, UnitRelations};
-use crate::unit_ai::AttackPicker;
-use crate::unit_ai::best_target::{AttackCategory, Battlefield, Candidate, Thing};
 use crate::vision::VisionMasks;
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
@@ -76,66 +74,6 @@ use std::ops::RangeInclusive;
 /// the spatial index the search reads, which the check's queries write, so the search hands it
 /// over for each call.
 pub type Reach<'a> = dyn FnMut(&mut Spatial, ObjectId, Distance) -> Result<bool, GenieError> + 'a;
-
-/// `bestUnitToAttack`'s world ([`crate::unit_ai::best_target::Battlefield`]): the unit AI's picker for its
-/// reads and tests, the search's reachability for its paths (slot 0x3d0).
-struct AttackField<'p, 'r> {
-    picker: &'p mut dyn AttackPicker,
-    reach: &'p mut Reach<'r>,
-    /// The spatial index the search and the picker's reads go through.
-    world: &'p mut Spatial,
-}
-
-impl Battlefield for AttackField<'_, '_> {
-    fn thing(&mut self, id: ObjectId) -> Result<Option<Thing>, GenieError> {
-        self.picker.thing(self.world, id)
-    }
-
-    fn can_attack(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        self.picker.can_attack(self.world, id)
-    }
-
-    fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
-        self.picker.attacks_neutral(class)
-    }
-
-    fn spares_friends(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        self.picker.spares_friends(self.world, id)
-    }
-
-    fn shuns(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        self.picker.shuns(id)
-    }
-
-    fn candidate(
-        &mut self,
-        id: ObjectId,
-        distance: Distance,
-        category: Option<AttackCategory>,
-    ) -> Result<Candidate, GenieError> {
-        self.picker.candidate(self.world, id, distance, category)
-    }
-
-    fn armored(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        self.picker.armored(id)
-    }
-
-    fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError> {
-        self.picker.weapon_range(id)
-    }
-
-    fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError> {
-        self.picker.engages(id)
-    }
-
-    fn quick_path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
-        self.picker.quick_path(self.world, id, range)
-    }
-
-    fn path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
-        (self.reach)(self.world, id, range)
-    }
-}
 
 /// What `ClosestObject` keeps of the objects found (its arguments 2 to 6; each −1 for any): the
 /// master class, the relation (0 itself or friends, 1 neutrals, 2 enemies, 3 itself), the state,

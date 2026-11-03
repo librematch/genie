@@ -21,42 +21,43 @@ pub trait AttackPicker {
     /// A unit the reads do not model (a computer player's).
     fn searcher(&mut self, memory: Memory<'_>) -> Result<Searcher, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::thing`].
+    /// The object `id` as the world holds it, None for one it does not.
     ///
     /// # Errors
     ///
     /// An object the slice does not hold.
     fn thing(&mut self, world: &Spatial, id: ObjectId) -> Result<Option<Thing>, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::can_attack`].
+    /// The unit AI's attack check (slot 0xa0 with 0) on object `id`.
     ///
     /// # Errors
     ///
     /// What the attack check does not model.
     fn can_attack(&mut self, world: &Spatial, id: ObjectId) -> Result<bool, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::attacks_neutral`].
+    /// The unit AI's neutral test (slot 0xa8) of an object of `class`.
     ///
     /// # Errors
     ///
     /// A unit-AI type whose test is not modelled.
     fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::spares_friends`].
+    /// `FUN_14120e4e0` of a unit of the combat type on object `id`: it spares its friends.
     ///
     /// # Errors
     ///
     /// What the scan does not model.
     fn spares_friends(&mut self, world: &Spatial, id: ObjectId) -> Result<bool, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::shuns`].
+    /// `FUN_140c41690`: a computer player's unit passes object `id` over.
     ///
     /// # Errors
     ///
     /// What the test does not model.
     fn shuns(&mut self, id: ObjectId) -> Result<bool, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::candidate`].
+    /// What the statistics read of object `id` at `distance` of `category`
+    /// ([`Candidate`]).
     ///
     /// # Errors
     ///
@@ -69,28 +70,29 @@ pub trait AttackPicker {
         category: Option<AttackCategory>,
     ) -> Result<Candidate, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::armored`].
+    /// The shown armor of object `id` is at least 100 (slot 0x870's first).
     ///
     /// # Errors
     ///
     /// What the read does not model.
     fn armored(&mut self, id: ObjectId) -> Result<bool, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::weapon_range`].
+    /// Object `id`'s weapon range (slot 0x230).
     ///
     /// # Errors
     ///
     /// What the read does not model.
     fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::engages`].
+    /// The current target `id` engages: its attacks sum above 0 (slot 0x228) or its unit AI
+    /// could work on the unit (slot 0x1b8 with 1).
     ///
     /// # Errors
     ///
     /// What the reads do not model.
     fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError>;
 
-    /// [`crate::unit_ai::best_target::Battlefield::quick_path`].
+    /// The unit's quick path to object `id` within `range` (slot 0x3e0).
     ///
     /// # Errors
     ///

@@ -8,8 +8,8 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::{
-    AttackField, ClosestChecks, FarmLook, Filter, Placed, QUERY_HITS, Reach, RecordId, Spatial,
-    players_seen, record_meets_segment, tile_record_id,
+    ClosestChecks, FarmLook, Filter, Placed, QUERY_HITS, Reach, RecordId, Spatial, players_seen,
+    record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::math::conversions::cvttss2si;
@@ -20,6 +20,7 @@ use crate::objects::masters::ObstructionKind;
 use crate::players::PlayerId;
 use crate::players::UnitRelations;
 use crate::players::{ByRelation, QueryRelation, UnitRelation};
+use crate::unit_ai::best_target::AttackField;
 use crate::unit_ai::best_target::{Choice, best_unit_to_attack as best_target_best_unit_to_attack};
 use crate::unit_ai::{AttackAsk, AttackPicker, Memory};
 use crate::unit_ai::{Found, Pick, Search};

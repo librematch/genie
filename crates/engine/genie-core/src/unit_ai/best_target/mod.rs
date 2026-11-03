@@ -8,13 +8,15 @@ mod values;
 mod world_view;
 
 pub use self::attack_category::{AttackCategory, ByCategory};
-pub use self::choice::{Choice, best_unit_to_attack};
+pub use self::choice::Choice;
+pub(crate) use self::choice::best_unit_to_attack;
 use self::statistics::EPSILON;
 pub use self::statistics::{
     Bounded, Bounds, Candidate, Entry, STATISTICS, Statistics, order_weights,
 };
 pub use self::values::{EntryCount, KillTime, OrderWeight, TargetScore};
-pub use self::world_view::{Ask, Battlefield, Searcher, Thing, ThingFlags};
+pub(crate) use self::world_view::AttackField;
+pub use self::world_view::{Ask, Searcher, Thing, ThingFlags};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::world::layer::ClassRoles;

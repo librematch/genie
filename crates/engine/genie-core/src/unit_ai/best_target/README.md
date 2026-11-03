@@ -22,7 +22,7 @@ candidate by its attack category, its range and the unit AI's order history, the
 | [`statistics.rs`](statistics.rs) | `bestUnitToAttack`'s statistics (`Statistics`): the entries, an object's add, the scores, the ranks and the sort, and the order history's weights. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`values.rs`](values.rs) | The statistics' values: an entry's kill time and scores, the table's counts and the order history's weights. |
-| [`world_view.rs`](world_view.rs) | What `bestUnitToAttack` reads of the unit whose AI searches, of its arguments and of the world (`Battlefield`). |
+| [`world_view.rs`](world_view.rs) | What `bestUnitToAttack` reads of the unit whose AI searches, of its arguments and of the world (`AttackField`). |
 <!-- /files -->
 
 ## How it connects

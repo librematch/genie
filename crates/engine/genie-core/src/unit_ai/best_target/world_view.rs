@@ -1,7 +1,9 @@
 //! What `bestUnitToAttack` reads of the unit whose AI searches, of its arguments and of the
-//! world ([`Battlefield`]).
+//! world ([`AttackField`]).
 
+use crate::GenieError;
 use crate::map::Distance;
+use crate::map::spatial::{Reach, Spatial};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -13,6 +15,7 @@ use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::AttackPicker;
 use crate::unit_ai::best_target::Candidate;
 use crate::unit_ai::best_target::OrderWeight;
 use crate::unit_ai::best_target::{AttackCategory, ByCategory};
@@ -130,42 +133,62 @@ pub struct Thing {
     pub speed: Speed,
 }
 
-/// What `bestUnitToAttack` asks of the world while its unit AI runs.
-pub trait Battlefield {
+/// What `bestUnitToAttack` asks of the world while its unit AI runs: the unit AI's picker for
+/// its reads and tests, the search's reachability for its paths (slot 0x3d0).
+pub(crate) struct AttackField<'p, 'r> {
+    /// The unit AI's reads and tests of the unit and the objects.
+    pub(crate) picker: &'p mut dyn AttackPicker,
+    /// The unit's path to an object (slot 0x3d0).
+    pub(crate) reach: &'p mut Reach<'r>,
+    /// The spatial index the search and the picker's reads go through.
+    pub(crate) world: &'p mut Spatial,
+}
+
+impl AttackField<'_, '_> {
     /// The object `id` as the world holds it, None for one it does not.
     ///
     /// # Errors
     ///
     /// An object the slice does not hold.
-    fn thing(&mut self, id: ObjectId) -> Result<Option<Thing>, crate::GenieError>;
+    pub(crate) fn thing(&mut self, id: ObjectId) -> Result<Option<Thing>, GenieError> {
+        self.picker.thing(self.world, id)
+    }
 
     /// The unit AI's attack check (slot 0xa0 with 0) on object `id`.
     ///
     /// # Errors
     ///
     /// What the check does not model.
-    fn can_attack(&mut self, id: ObjectId) -> Result<bool, crate::GenieError>;
+    pub(crate) fn can_attack(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+        self.picker.can_attack(self.world, id)
+    }
 
     /// The unit AI's neutral test (slot 0xa8) of an object of `class`.
     ///
     /// # Errors
     ///
     /// What the test does not model.
-    fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, crate::GenieError>;
+    pub(crate) fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
+        self.picker.attacks_neutral(class)
+    }
 
     /// `FUN_14120e4e0` of a unit of the combat type on object `id`: it spares its friends.
     ///
     /// # Errors
     ///
     /// What the test does not model.
-    fn spares_friends(&mut self, id: ObjectId) -> Result<bool, crate::GenieError>;
+    pub(crate) fn spares_friends(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+        self.picker.spares_friends(self.world, id)
+    }
 
     /// `FUN_140c41690`: a computer player's unit passes object `id` over.
     ///
     /// # Errors
     ///
     /// What the test does not model.
-    fn shuns(&mut self, id: ObjectId) -> Result<bool, crate::GenieError>;
+    pub(crate) fn shuns(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+        self.picker.shuns(id)
+    }
 
     /// What the statistics read of object `id` at `distance` of `category`
     /// ([`Candidate`]).
@@ -173,26 +196,32 @@ pub trait Battlefield {
     /// # Errors
     ///
     /// What the reads do not model.
-    fn candidate(
+    pub(crate) fn candidate(
         &mut self,
         id: ObjectId,
         distance: Distance,
         category: Option<AttackCategory>,
-    ) -> Result<Candidate, crate::GenieError>;
+    ) -> Result<Candidate, GenieError> {
+        self.picker.candidate(self.world, id, distance, category)
+    }
 
     /// The shown armor of object `id` is at least 100 (slot 0x870's first).
     ///
     /// # Errors
     ///
     /// What the read does not model.
-    fn armored(&mut self, id: ObjectId) -> Result<bool, crate::GenieError>;
+    pub(crate) fn armored(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+        self.picker.armored(id)
+    }
 
     /// Object `id`'s weapon range (slot 0x230).
     ///
     /// # Errors
     ///
     /// What the read does not model.
-    fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, crate::GenieError>;
+    pub(crate) fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError> {
+        self.picker.weapon_range(id)
+    }
 
     /// The current target `id` engages: its attacks sum above 0 (slot 0x228) or its unit AI
     /// could work on the unit (slot 0x1b8 with 1).
@@ -200,19 +229,25 @@ pub trait Battlefield {
     /// # Errors
     ///
     /// What the reads do not model.
-    fn engages(&mut self, id: ObjectId) -> Result<bool, crate::GenieError>;
+    pub(crate) fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+        self.picker.engages(id)
+    }
 
     /// The unit's quick path to object `id` within `range` (slot 0x3e0).
     ///
     /// # Errors
     ///
     /// What the path does not model.
-    fn quick_path(&mut self, id: ObjectId, range: Distance) -> Result<bool, crate::GenieError>;
+    pub(crate) fn quick_path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
+        self.picker.quick_path(self.world, id, range)
+    }
 
     /// The unit's path to object `id` within `range` (slot 0x3d0).
     ///
     /// # Errors
     ///
     /// What the path does not model.
-    fn path(&mut self, id: ObjectId, range: Distance) -> Result<bool, crate::GenieError>;
+    pub(crate) fn path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
+        (self.reach)(self.world, id, range)
+    }
 }

@@ -1,17 +1,28 @@
 use super::*;
+use crate::garrison::ContainerId;
 use crate::map::Distance;
+use crate::map::Footprint;
+use crate::map::GridSize;
+use crate::map::Position;
+use crate::map::RestrictionId;
+use crate::map::Tile;
+use crate::map::spatial::Spatial;
 use crate::movement::Speed;
 use crate::objects::HitPoints;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::{ClassAmount, CombatPart, Master};
+use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::players::Relation;
 use crate::players::UnitRelation;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -19,15 +30,20 @@ use crate::test_ids::object_id_list;
 use crate::test_ids::{attack_category, category_of};
 use crate::testing::class;
 use crate::testing::ids;
+use crate::testing::picker::with_picker;
 use crate::testing::roles;
+use crate::testing::scene::Thing as SceneThing;
+use crate::testing::scene::{Scene, walking};
 use crate::testing::tuning;
 use crate::unit_ai::OrderRecord;
+use crate::unit_ai::UnitAi;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::best_target::ThingFlags;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
 use crate::world::Seconds;
+use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::{Percent, TargetingMode};
-use std::collections::BTreeMap;
 
 fn candidate(id: i32, distance: Distance, speed: f32) -> Candidate {
     Candidate {
@@ -194,74 +210,178 @@ fn the_order_history_weighs_the_last_minute_categories() {
     assert_eq!(w[category_of(2)], OrderWeight::ZERO);
 }
 
-/// A world of objects by id: each a [`Thing`] and its candidate's values; the paths that
-/// succeed and the calls made; the object checks it refuses (`'a'` the attack check, `'f'`
-/// the friends' scan, `'n'` the neutral test) and the ones made, in order.
-#[derive(Default)]
-struct Field {
-    things: BTreeMap<ObjectId, (Thing, Candidate)>,
-    quick: Vec<ObjectId>,
-    paths: Vec<ObjectId>,
-    asked: Vec<(char, ObjectId)>,
-    refused: Vec<char>,
-    checked: Vec<char>,
-}
-
-impl Field {
-    /// Check `c` is made: it passes unless refused.
-    fn check(&mut self, c: char) -> bool {
-        self.checked.push(c);
-        !self.refused.contains(&c)
+/// The soldier's master (74): a walking melee unit of class 6 and radius 0.25 on land
+/// (restriction 7) that hits 4 every 2 s within 0.5, or within `range` and a blast of
+/// `blast` (a ranged one's).
+fn soldier_master(range: f32, blast: f32) -> Master {
+    Master {
+        id: master_id(74),
+        kind: MasterKind::COMBAT,
+        class: class::CLASS_6,
+        radius: Footprint::new(0.25, 0.25),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(40),
+        line_of_sight: Distance::new(6.0),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::new(1.0))),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 4)],
+            reload: Seconds::new(2.0),
+            weapon_range: Distance::new(range),
+            area_effect: Distance::new(blast),
+            ..CombatPart::default()
+        }),
+        ..Master::default()
     }
 }
 
-impl Battlefield for Field {
-    fn thing(&mut self, id: ObjectId) -> Result<Option<Thing>, crate::GenieError> {
-        Ok(self.things.get(&id).map(|t| t.0))
+/// An enemy's master `id` of `class`: a unit of radius 0.25 and 40 hit points that hits 1 (an
+/// armed one), walking at 1 or (`walks` false) still.
+fn enemy_master(id: i16, class: ClassId, walks: bool) -> Master {
+    Master {
+        id: master_id(id),
+        kind: MasterKind::COMBAT,
+        class,
+        radius: Footprint::new(0.25, 0.25),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(40),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: walks.then(|| walking(Speed::new(1.0))),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 1)],
+            ..CombatPart::default()
+        }),
+        ..Master::default()
     }
-    fn can_attack(&mut self, _: ObjectId) -> Result<bool, crate::GenieError> {
-        Ok(self.check('a'))
+}
+
+/// The walking enemies' master (4, class 0).
+fn walker() -> Master {
+    enemy_master(4, class::CLASS_0, true)
+}
+
+/// Where an enemy stands from the soldier: the side of its footprint.
+#[derive(Clone, Copy)]
+enum Side {
+    East,
+    West,
+    North,
+    South,
+}
+
+/// The soldier stands at (20.5, 20.5); a footprint of radius 0.25 `gap` from its own toward
+/// `side` stands here.
+fn beside(side: Side, gap: f32) -> Position {
+    let (near, far) = (20.0 - gap, 21.0 + gap);
+    match side {
+        Side::East => Position::new(far, 20.5, 0.0),
+        Side::West => Position::new(near, 20.5, 0.0),
+        Side::North => Position::new(20.5, far, 0.0),
+        Side::South => Position::new(20.5, near, 0.0),
     }
-    fn attacks_neutral(&mut self, _: ClassId) -> Result<bool, crate::GenieError> {
-        Ok(self.check('n'))
+}
+
+/// Enemy `id` of player 2 and `master`, attackable and with a unit AI, `gap` from the soldier
+/// toward `side`.
+fn enemy(id: i32, master: Master, (side, gap): (Side, f32)) -> SceneThing {
+    SceneThing {
+        ai: Some(UnitAi::default()),
+        flags: UnitFlags::ATTACKABLE,
+        ..SceneThing::new(id, PlayerId::new(2), master, beside(side, gap))
     }
-    fn spares_friends(&mut self, _: ObjectId) -> Result<bool, crate::GenieError> {
-        Ok(self.check('f'))
+}
+
+/// The battlefield: a 40 by 40 map of land and three players; player 1's soldier (object 1 of
+/// `master`, its soldier's unit AI targeting `target`) and the `enemies`, those of `walled` in
+/// rocks (the eight tiles around theirs: no quick path reaches them); player 3 is player 1's
+/// ally.
+fn battle(
+    (master, target): (Master, Option<i32>),
+    enemies: Vec<SceneThing>,
+    walled: &[i32],
+) -> World {
+    let soldier = SceneThing {
+        ai: Some(UnitAi {
+            ai_kind: UnitAiKind::Soldier,
+            current_target: target.map(object_id),
+            ..UnitAi::default()
+        }),
+        ..SceneThing::new(1, PlayerId::new(1), master, Position::new(20.5, 20.5, 0.0))
+    };
+    let mut scene = Scene::open(GridSize::new(40, 40))
+        .players(3)
+        .relation(PlayerId::new(1), PlayerId::new(3), Relation::Ally)
+        .thing(soldier);
+    for e in enemies {
+        if walled.contains(&e.id.get()) {
+            let tile = e.at.tile();
+            let ring = (-1..=1)
+                .flat_map(|dy| (-1..=1).map(move |dx| (dx, dy)))
+                .filter(|&d| d != (0, 0))
+                .map(|(dx, dy)| Tile::new(tile.x() + dx, tile.y() + dy));
+            scene = scene.rocks(ring);
+        }
+        scene = scene.thing(e);
     }
-    fn shuns(&mut self, _: ObjectId) -> Result<bool, crate::GenieError> {
-        Ok(false)
-    }
-    fn candidate(
-        &mut self,
-        id: ObjectId,
-        distance: Distance,
-        category: Option<AttackCategory>,
-    ) -> Result<Candidate, crate::GenieError> {
-        Ok(Candidate {
-            distance,
-            category,
-            ..self.things[&id].1
+    scene.build()
+}
+
+/// Runs `f` on the soldier's field over `w`: its picker ([`with_picker`]) and its paths (slot
+/// 0x3d0), answered by whether `open` holds their objects and logged in order; `f`'s answer
+/// and the paths asked.
+fn fielded<R>(
+    w: &mut World,
+    open: &[i32],
+    f: impl FnOnce(&mut AttackField<'_, '_>) -> R,
+) -> (R, Vec<ObjectId>) {
+    let mut asked = Vec::new();
+    let answer = with_picker(w, (PlayerId::new(1), object_id(1)), |picker, world| {
+        let mut reach = |_: &mut Spatial, id: ObjectId, _: Distance| {
+            asked.push(id);
+            Ok(open.contains(&id.get()))
+        };
+        f(&mut AttackField {
+            picker,
+            reach: &mut reach,
+            world,
         })
-    }
-    fn armored(&mut self, _: ObjectId) -> Result<bool, crate::GenieError> {
-        Ok(false)
-    }
-    fn weapon_range(&mut self, _: ObjectId) -> Result<Distance, crate::GenieError> {
-        Ok(Distance::ZERO)
-    }
-    fn engages(&mut self, _: ObjectId) -> Result<bool, crate::GenieError> {
-        Ok(true)
-    }
-    fn quick_path(&mut self, id: ObjectId, _: Distance) -> Result<bool, crate::GenieError> {
-        self.asked.push(('q', id));
-        Ok(self.quick.contains(&id))
-    }
-    fn path(&mut self, id: ObjectId, _: Distance) -> Result<bool, crate::GenieError> {
-        self.asked.push(('p', id));
-        Ok(self.paths.contains(&id))
+    });
+    (answer, asked)
+}
+
+/// `bestUnitToAttack` of searcher `me` over `w`'s soldier's field ([`fielded`]) and the lists
+/// of relation 4 (enemies) `enemies`: the choice and the paths asked.
+fn best(
+    w: &mut World,
+    me: &Searcher,
+    ask: &Ask,
+    enemies: &[i32],
+    open: &[i32],
+) -> (Choice, Vec<ObjectId>) {
+    let lists = ByRelation::new([
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        object_id_list(enemies.iter().copied()),
+    ]);
+    let (c, asked) = fielded(w, open, |field| {
+        best_unit_to_attack(me, ask, &lists, field, &roles(), &tuning().best_target)
+    });
+    (c.unwrap(), asked)
+}
+
+/// An idle check with path checks over every class.
+fn idle_ask() -> Ask {
+    Ask {
+        idle: true,
+        paths: 1,
+        any_class: true,
+        ..Ask::default()
     }
 }
 
+/// What `bestUnitToAttack` reads of the soldier's AI and master as its search hands them in.
 fn soldier() -> Searcher {
     Searcher {
         id: object_id(1),
@@ -283,123 +403,65 @@ fn soldier() -> Searcher {
     }
 }
 
-fn enemy(id: i32, class: ClassId, distance: Distance, hp: HitPoints) -> (Thing, Candidate) {
-    (
-        Thing {
-            owner: PlayerId::new(2),
-            state: ObjectState::Alive,
-            flags: ThingFlags::HAS_AI | ThingFlags::TARGETABLE | ThingFlags::ATTACKABLE,
-            master: master_id(4),
-            class,
-            kind: MasterKind::COMBAT,
-            distance,
-            speed: Speed::new(1.0),
-            ..Thing::default()
+/// The melee soldier's master and target.
+fn melee(target: Option<i32>) -> (Master, Option<i32>) {
+    (soldier_master(0.5, 0.0), target)
+}
+
+/// Three walking enemies 3 (7, east), 9 (8, west) and 5 (9, north, of 10 hit points) away.
+fn three_enemies() -> Vec<SceneThing> {
+    vec![
+        enemy(7, walker(), (Side::East, 3.0)),
+        enemy(8, walker(), (Side::West, 9.0)),
+        SceneThing {
+            hp: HitPoints::new(10.0),
+            ..enemy(9, walker(), (Side::North, 5.0))
         },
-        Candidate {
-            speed: Speed::new(1.0),
-            hp,
-            ..candidate(id, distance, 1.0)
-        },
-    )
+    ]
 }
 
 /// `bestUnitToAttack` over three enemies (an idle check, path checks on): the statistics
 /// rank them (the nearest's distance score outweighs the weakest's kill score: 7, 9, 8); the
-/// quick paths of the first three (moving objects) are asked, 9's answers.
+/// quick paths of the first three (moving objects) are asked: 7's and 8's are walled in, 9's
+/// answers without a path asked.
 #[test]
 fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
-    let mut field = Field::default();
-    let _ = field.things.insert(
-        object_id(7),
-        enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0)),
-    );
-    let _ = field.things.insert(
-        object_id(8),
-        enemy(8, class::CLASS_0, Distance::new(9.0), HitPoints::new(40.0)),
-    );
-    let _ = field.things.insert(
-        object_id(9),
-        enemy(9, class::CLASS_0, Distance::new(5.0), HitPoints::new(10.0)),
-    );
-    field.quick = vec![object_id(9)];
-    let lists = ByRelation::new([vec![], vec![], vec![], vec![], object_id_list([8, 7, 9])]);
-    let ask = Ask {
-        idle: true,
-        paths: 1,
-        any_class: true,
-        ..Ask::default()
-    };
-    let c = best_unit_to_attack(
-        &soldier(),
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(c.target, Some(object_id(9)));
-    assert_eq!(field.asked, [('q', object_id(7)), ('q', object_id(9))]);
-    assert_eq!(c.retries, []);
-    // without a quick path the paths follow; 7's fails (a moving object: ignored for 1 s)
-    field.quick.clear();
-    field.paths = vec![object_id(9)];
-    field.asked.clear();
-    let c = best_unit_to_attack(
-        &soldier(),
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(c.target, Some(object_id(9)));
+    let mut w = battle(melee(None), three_enemies(), &[7, 8]);
+    let (c, asked) = best(&mut w, &soldier(), &idle_ask(), &[8, 7, 9], &[]);
     assert_eq!(
-        field.asked,
-        [
-            ('q', object_id(7)),
-            ('q', object_id(9)),
-            ('q', object_id(8)),
-            ('p', object_id(7)),
-            ('p', object_id(9))
-        ]
+        (c.target, asked, c.retries),
+        (Some(object_id(9)), vec![], vec![])
     );
+    // without a quick path the paths follow; 7's fails (a moving object: ignored for 1 s)
+    let mut w = battle(melee(None), three_enemies(), &[7, 8, 9]);
+    let (c, asked) = best(&mut w, &soldier(), &idle_ask(), &[8, 7, 9], &[9]);
+    assert_eq!(c.target, Some(object_id(9)));
+    assert_eq!(asked, [object_id(7), object_id(9)]);
     assert_eq!(c.retries, [(object_id(7), WorldTime::from_millis(11_000))]);
 }
 
 /// Each of the first three whose path fails is ignored for 1 s (a moving object) or 2 s
-/// (a still one), and nothing found answers −1. A retarget entry's target waits for the
-/// retry walk, which runs only without other statistics.
+/// (a still one), and nothing found answers −1; a still one's quick path is not asked while
+/// another moves. A retarget entry's target waits for the retry walk, which runs only without
+/// other statistics.
 #[test]
 fn failed_paths_become_retarget_entries() {
-    let mut field = Field::default();
-    let _ = field.things.insert(
-        object_id(7),
-        enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0)),
-    );
-    let mut still = enemy(9, class::CLASS_0, Distance::new(5.0), HitPoints::new(10.0));
-    still.0.speed = Speed::ZERO;
-    still.1.speed = Speed::ZERO;
-    let _ = field.things.insert(object_id(9), still);
-    let lists = ByRelation::new([vec![], vec![], vec![], vec![], object_id_list([7, 9])]);
-    let ask = Ask {
-        idle: true,
-        paths: 1,
-        any_class: true,
-        ..Ask::default()
+    let still = SceneThing {
+        hp: HitPoints::new(10.0),
+        ..enemy(
+            9,
+            enemy_master(5, class::CLASS_0, false),
+            (Side::North, 5.0),
+        )
     };
-    let c = best_unit_to_attack(
-        &soldier(),
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
+    let mut w = battle(
+        melee(None),
+        vec![enemy(7, walker(), (Side::East, 3.0)), still],
+        &[7],
+    );
+    let (c, asked) = best(&mut w, &soldier(), &idle_ask(), &[7, 9], &[]);
     assert_eq!(c.target, None);
+    assert_eq!(asked, [object_id(7), object_id(9)]);
     let mut retries = c.retries;
     retries.sort_unstable();
     assert_eq!(
@@ -413,148 +475,81 @@ fn failed_paths_become_retarget_entries() {
         retries: vec![object_id(9)],
         ..soldier()
     };
-    field.asked.clear();
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(c.target, None);
-    assert_eq!(field.asked, [('q', object_id(7)), ('p', object_id(7))]);
+    let (c, asked) = best(&mut w, &me, &idle_ask(), &[7, 9], &[]);
+    assert_eq!((c.target, asked), (None, vec![object_id(7)]));
     // with 7 a retarget entry too, the retry walk takes both
     let me = Searcher {
         retries: vec![object_id(9), object_id(7)],
         ..soldier()
     };
-    field.paths = vec![object_id(9)];
-    field.asked.clear();
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
+    let (c, _) = best(&mut w, &me, &idle_ask(), &[7, 9], &[9]);
     assert_eq!(c.target, Some(object_id(9)));
 }
 
-/// The lists' records pass the objects without a unit AI, inside another, dead or allied,
-/// and those beyond the sight (twice the line of sight: 12) or under the least range; the
-/// one left answers.
+/// The lists' records pass the objects without a unit AI, inside another, dead or allied
+/// (player 3's), and those beyond the sight (twice the line of sight: 12) or under the least
+/// range; the one left answers by its quick path.
 #[test]
 fn the_lists_pass_over_what_the_unit_may_not_attack() {
-    let mut field = Field::default();
-    let mut no_ai = enemy(30, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    no_ai.0.flags.set(ThingFlags::HAS_AI, false);
-    let mut inside = enemy(31, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    inside.0.flags.set(ThingFlags::INSIDE, true);
-    let mut dead = enemy(32, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    dead.0.state = ObjectState::Dying;
-    let mut ally = enemy(33, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    ally.0.flags.set(ThingFlags::ALLIED, true);
-    for (id, t) in [(30, no_ai), (31, inside), (32, dead), (33, ally)] {
-        let _ = field.things.insert(object_id(id), t);
-    }
-    let _ = field.things.insert(
-        object_id(34),
-        enemy(
-            34,
-            class::CLASS_0,
-            Distance::new(12.5),
-            HitPoints::new(40.0),
-        ),
-    );
-    let _ = field.things.insert(
-        object_id(35),
-        enemy(35, class::CLASS_0, Distance::new(0.1), HitPoints::new(40.0)),
-    );
-    let _ = field.things.insert(
-        object_id(36),
-        enemy(
-            36,
-            class::CLASS_0,
-            Distance::new(11.9),
-            HitPoints::new(40.0),
-        ),
-    );
-    field.quick = object_id_list(30..=36);
-    let lists = ByRelation::new([vec![], vec![], vec![], vec![], object_id_list(30..=36)]);
-    let ask = Ask {
-        idle: true,
-        paths: 1,
-        any_class: true,
-        ..Ask::default()
-    };
+    let enemies = vec![
+        SceneThing {
+            ai: None,
+            ..enemy(30, walker(), (Side::West, 3.0))
+        },
+        SceneThing {
+            inside: Some(ContainerId::new(object_id(36))),
+            ..enemy(31, walker(), (Side::North, 3.0))
+        },
+        SceneThing {
+            state: ObjectState::Dying,
+            ..enemy(32, walker(), (Side::South, 3.0))
+        },
+        SceneThing {
+            player: PlayerId::new(3),
+            ..enemy(33, walker(), (Side::South, 6.0))
+        },
+        enemy(34, walker(), (Side::North, 12.5)),
+        enemy(35, walker(), (Side::West, 0.125)),
+        enemy(36, walker(), (Side::East, 11.875)),
+    ];
+    let mut w = battle(melee(None), enemies, &[]);
     let me = Searcher {
         min_range: Distance::new(0.2),
         ..soldier()
     };
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(c.target, Some(object_id(36)));
-    assert_eq!(field.asked, [('q', object_id(36))]);
+    let ids: Vec<i32> = (30..=36).collect();
+    let (c, asked) = best(&mut w, &me, &idle_ask(), &ids, &[]);
+    assert_eq!((c.target, asked), (Some(object_id(36)), vec![]));
+}
+
+/// Walls (class 27) and gates (class 39): still objects of 100 hit points.
+fn wall(id: i32, master: i16, class: ClassId, (side, gap): (Side, f32)) -> SceneThing {
+    SceneThing {
+        hp: HitPoints::new(100.0),
+        ..enemy(id, enemy_master(master, class, false), (side, gap))
+    }
 }
 
 /// A unit that attacks walls (its last target a wall) and finds only walls and gates takes
 /// the closest gate; one that does not passes them over.
 #[test]
 fn walls_and_gates_count_for_unit_that_attacks_walls() {
-    let mut field = Field::default();
-    let _ = field.things.insert(
-        object_id(20),
-        enemy(20, class::WALL, Distance::new(2.0), HitPoints::new(100.0)),
+    let mut w = battle(
+        melee(None),
+        vec![
+            wall(20, 27, class::WALL, (Side::East, 2.0)),
+            wall(21, 39, class::GATE, (Side::West, 4.0)),
+            wall(22, 39, class::GATE, (Side::North, 3.0)),
+        ],
+        &[],
     );
-    let _ = field.things.insert(
-        object_id(21),
-        enemy(21, class::GATE, Distance::new(4.0), HitPoints::new(100.0)),
-    );
-    let _ = field.things.insert(
-        object_id(22),
-        enemy(22, class::GATE, Distance::new(3.0), HitPoints::new(100.0)),
-    );
-    let lists = ByRelation::new([vec![], vec![], vec![], vec![], object_id_list([20, 21, 22])]);
-    let ask = Ask {
-        idle: true,
-        paths: 1,
-        any_class: true,
-        ..Ask::default()
-    };
     let me = Searcher {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
+    let (c, _) = best(&mut w, &me, &idle_ask(), &[20, 21, 22], &[]);
     assert_eq!(c.target, Some(object_id(22)));
-    let c = best_unit_to_attack(
-        &soldier(),
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
+    let (c, _) = best(&mut w, &soldier(), &idle_ask(), &[20, 21, 22], &[]);
     assert_eq!(c.target, None);
 }
 
@@ -618,15 +613,17 @@ fn the_categories_follow_the_classes_and_their_exceptions() {
 /// not move.
 #[test]
 fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
-    let mut field = Field::default();
-    for (id, d) in [(40, 3.0), (41, 0.1), (42, 4.0)] {
-        let _ = field.things.insert(
-            object_id(id),
-            enemy(id, class::CLASS_0, Distance::new(d), HitPoints::new(40.0)),
-        );
-    }
+    let mut w = battle(
+        melee(Some(42)),
+        vec![
+            enemy(40, walker(), (Side::East, 3.0)),
+            enemy(41, walker(), (Side::West, 0.125)),
+            enemy(42, walker(), (Side::North, 4.0)),
+        ],
+        &[],
+    );
     let ask = Ask {
-        extra: vec![object_id(40), object_id(41), object_id(42), object_id(43)],
+        extra: object_id_list([40, 41, 42, 43]),
         ..Ask::default()
     };
     let me = Searcher {
@@ -634,83 +631,63 @@ fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
         min_range: Distance::new(0.2),
         ..soldier()
     };
-    let counted = |me: &Searcher, field: &mut Field| {
+    let mut counted = |me: &Searcher| {
         let mut st = Statistics::default();
-        add_extra(me, &ask, &mut st, field, &roles(), &tuning().best_target).unwrap();
+        fielded(&mut w, &[], |field| {
+            add_extra(me, &ask, &mut st, field, &roles(), &tuning().best_target)
+        })
+        .0
+        .unwrap();
         st.entries
             .iter()
             .map(|e| (e.id, e.distance.get()))
             .collect::<Vec<_>>()
     };
     assert_eq!(
-        counted(&me, &mut field),
-        [(object_id(40), 3.0), (object_id(41), 0.1_f32 + 0.5 + 1.0)]
+        counted(&me),
+        [(object_id(40), 3.0), (object_id(41), 0.125_f32 + 0.5 + 1.0)]
     );
     let still = Searcher {
         speed: Speed::ZERO,
         ..me
     };
-    assert_eq!(counted(&still, &mut field), [(object_id(40), 3.0)]);
+    assert_eq!(counted(&still), [(object_id(40), 3.0)]);
 }
 
 /// A gate answers at once only when nothing but walls and gates counts: with an enemy among
-/// them the choice goes on to the quick paths.
+/// them the choice goes on to the quick paths, which take the moving enemy.
 #[test]
 fn gate_answers_at_once_only_among_walls() {
-    let mut field = Field::default();
-    let _ = field.things.insert(
-        object_id(20),
-        enemy(20, class::WALL, Distance::new(2.0), HitPoints::new(100.0)),
+    let mut w = battle(
+        melee(None),
+        vec![
+            wall(20, 27, class::WALL, (Side::East, 2.0)),
+            wall(22, 39, class::GATE, (Side::West, 3.0)),
+            enemy(7, walker(), (Side::North, 5.0)),
+        ],
+        &[],
     );
-    let _ = field.things.insert(
-        object_id(22),
-        enemy(22, class::GATE, Distance::new(3.0), HitPoints::new(100.0)),
-    );
-    let _ = field.things.insert(
-        object_id(7),
-        enemy(7, class::CLASS_0, Distance::new(5.0), HitPoints::new(40.0)),
-    );
-    field.quick = vec![object_id(7)];
-    let lists = ByRelation::new([vec![], vec![], vec![], vec![], object_id_list([20, 22, 7])]);
-    let ask = Ask {
-        idle: true,
-        paths: 1,
-        any_class: true,
-        ..Ask::default()
-    };
     let me = Searcher {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(c.target, Some(object_id(7)));
-    assert!(field.asked.contains(&('q', object_id(7))));
+    let (c, asked) = best(&mut w, &me, &idle_ask(), &[20, 22, 7], &[]);
+    assert_eq!((c.target, asked), (Some(object_id(7)), vec![]));
 }
 
 /// Outside an idle check the current target answers by its path when it moves and engages
-/// (without path checks at once); its path failing, the quick paths follow. An idle check
-/// takes no such shortcut.
+/// (without path checks at once); its path failing, the quick paths follow (the target's is
+/// walled in, 9's answers). An idle check takes no such shortcut.
 #[test]
 fn the_current_target_answers_by_its_path_outside_an_idle_check() {
-    let mut field = Field::default();
-    let _ = field.things.insert(
-        object_id(7),
-        enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0)),
+    let mut w = battle(
+        melee(Some(7)),
+        vec![
+            enemy(7, walker(), (Side::East, 3.0)),
+            enemy(9, walker(), (Side::West, 5.0)),
+        ],
+        &[7],
     );
-    let _ = field.things.insert(
-        object_id(9),
-        enemy(9, class::CLASS_0, Distance::new(5.0), HitPoints::new(40.0)),
-    );
-    field.paths = vec![object_id(7)];
-    let lists = ByRelation::new([vec![], vec![], vec![], vec![], object_id_list([7, 9])]);
     let ask = Ask {
         paths: 1,
         any_class: true,
@@ -720,126 +697,111 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
         target: Some(object_id(7)),
         ..soldier()
     };
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(
-        (c.target, &field.asked[..]),
-        (Some(object_id(7)), &[('p', object_id(7))][..])
-    );
-    field.asked.clear();
+    let (c, asked) = best(&mut w, &me, &ask, &[7, 9], &[7]);
+    assert_eq!((c.target, asked), (Some(object_id(7)), vec![object_id(7)]));
     let at_once = Ask {
         paths: 0,
         ..ask.clone()
     };
-    let c = best_unit_to_attack(
-        &me,
-        &at_once,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!((c.target, field.asked.len()), (Some(object_id(7)), 0));
-    field.paths.clear();
-    field.quick = vec![object_id(9)];
-    let c = best_unit_to_attack(
-        &me,
-        &ask,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
-    assert_eq!(c.target, Some(object_id(9)));
-    assert_eq!(field.asked[0], ('p', object_id(7)));
-    field.asked.clear();
+    let (c, asked) = best(&mut w, &me, &at_once, &[7, 9], &[]);
+    assert_eq!((c.target, asked), (Some(object_id(7)), vec![]));
+    let (c, asked) = best(&mut w, &me, &ask, &[7, 9], &[]);
+    assert_eq!((c.target, asked[0]), (Some(object_id(9)), object_id(7)));
     let idle = Ask { idle: true, ..ask };
-    field.paths = vec![object_id(7)];
-    let c = best_unit_to_attack(
-        &me,
-        &idle,
-        &lists,
-        &mut field,
-        &roles(),
-        &tuning().best_target,
-    )
-    .unwrap();
+    let (c, asked) = best(&mut w, &me, &idle, &[7, 9], &[7]);
     assert_eq!(c.target, Some(object_id(9)));
-    assert!(!field.asked.contains(&('p', object_id(7))));
+    assert!(!asked.contains(&object_id(7)));
 }
 
-/// The world's checks of a candidate ([`may_attack`]), in the game's order: one without a unit
-/// AI, dead, allied or inside another fails before any; then the attack check, a combat unit's
-/// friends' scan (a unit of another type skips it) and the neutral test of list 3 alone, each
-/// failing it.
+/// The world's checks of a candidate ([`may_attack`]) in the game's order. One without a unit
+/// AI, dead, allied or inside another fails before any; the attack check (an untargetable
+/// enemy fails it); a combat unit's friends' scan, which a ranged soldier with a blast reaches
+/// (the scan of the tiles around the target is not modelled: its error shows it ran) and a
+/// unit of another type skips; and the neutral test of list 3 alone (a wall is spared).
 #[test]
 fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_order() {
-    let (thing, _) = enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    let checked = |me: &Searcher, t: &Thing, kind, refused: &[char]| {
-        let mut field = Field {
-            refused: refused.to_vec(),
-            ..Field::default()
-        };
-        let pass = may_attack(me, (object_id(7), t), kind, &mut field).unwrap();
-        (pass, field.checked)
+    let enemies = || {
+        vec![
+            enemy(7, walker(), (Side::East, 3.0)),
+            SceneThing {
+                flags: UnitFlags::ATTACKABLE | UnitFlags::UNTARGETABLE,
+                ..enemy(8, walker(), (Side::West, 3.0))
+            },
+            wall(10, 27, class::WALL, (Side::North, 3.0)),
+            SceneThing {
+                ai: None,
+                ..enemy(11, walker(), (Side::South, 3.0))
+            },
+            SceneThing {
+                state: ObjectState::Dying,
+                ..enemy(12, walker(), (Side::South, 5.0))
+            },
+            SceneThing {
+                player: PlayerId::new(3),
+                ..enemy(13, walker(), (Side::South, 7.0))
+            },
+            SceneThing {
+                inside: Some(ContainerId::new(object_id(7))),
+                ..enemy(14, walker(), (Side::South, 9.0))
+            },
+        ]
+    };
+    let checked = |w: &mut World, me: &Searcher, id: i32, relation| {
+        fielded(w, &[], |field| {
+            let t = field.thing(object_id(id))?.expect("a held object");
+            may_attack(me, (object_id(id), &t), relation, field)
+        })
+        .0
     };
     let me = soldier();
-    assert_eq!(
-        checked(&me, &thing, UnitRelation::Enemy, &[]),
-        (true, vec!['a', 'f'])
-    );
-    assert_eq!(
-        checked(&me, &thing, UnitRelation::Neutral, &[]),
-        (true, vec!['a', 'f', 'n'])
-    );
-    assert_eq!(
-        checked(&me, &thing, UnitRelation::Neutral, &['a']),
-        (false, vec!['a'])
-    );
-    assert_eq!(
-        checked(&me, &thing, UnitRelation::Neutral, &['f']),
-        (false, vec!['a', 'f'])
-    );
-    assert_eq!(
-        checked(&me, &thing, UnitRelation::Neutral, &['n']),
-        (false, vec!['a', 'f', 'n'])
-    );
+    let mut w = battle(melee(None), enemies(), &[]);
+    for (id, relation, pass) in [
+        (7, UnitRelation::Enemy, true),
+        (7, UnitRelation::Neutral, true),
+        (10, UnitRelation::Enemy, true),
+        (10, UnitRelation::Neutral, false),
+        (8, UnitRelation::Enemy, false),
+    ] {
+        assert_eq!(checked(&mut w, &me, id, relation), Ok(pass), "{id}");
+    }
+    let mut w = battle((soldier_master(4.0, 1.0), None), enemies(), &[]);
+    assert!(checked(&mut w, &me, 7, UnitRelation::Enemy).is_err());
+    assert!(checked(&mut w, &me, 10, UnitRelation::Neutral).is_err());
+    assert_eq!(checked(&mut w, &me, 8, UnitRelation::Enemy), Ok(false));
+    for id in 11..=14 {
+        assert_eq!(
+            checked(&mut w, &me, id, UnitRelation::Enemy),
+            Ok(false),
+            "{id}"
+        );
+    }
     let building = Searcher {
         kind: MasterKind::BUILDING,
         ..soldier()
     };
     assert_eq!(
-        checked(&building, &thing, UnitRelation::Enemy, &[]),
-        (true, vec!['a'])
+        checked(&mut w, &building, 7, UnitRelation::Neutral),
+        Ok(true)
     );
-    for t in [
-        Thing {
-            flags: ThingFlags::empty(),
-            ..thing
-        },
-        Thing {
-            state: ObjectState::Dying,
-            ..thing
-        },
-        Thing {
-            flags: ThingFlags::ALLIED,
-            ..thing
-        },
-        Thing {
-            flags: ThingFlags::INSIDE,
-            ..thing
-        },
-    ] {
-        assert_eq!(checked(&me, &t, UnitRelation::Enemy, &[]), (false, vec![]));
+    assert_eq!(
+        checked(&mut w, &building, 10, UnitRelation::Neutral),
+        Ok(false)
+    );
+}
+
+/// An enemy as the owner and class rules read it: player 2's armed walking unit of class 0,
+/// 3 away.
+fn seen_enemy() -> Thing {
+    Thing {
+        owner: PlayerId::new(2),
+        state: ObjectState::Alive,
+        flags: ThingFlags::HAS_AI | ThingFlags::TARGETABLE | ThingFlags::ATTACKABLE,
+        master: master_id(4),
+        class: class::CLASS_0,
+        kind: MasterKind::COMBAT,
+        distance: Distance::new(3.0),
+        speed: Speed::new(1.0),
+        ..Thing::default()
     }
 }
 
@@ -849,7 +811,7 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
 /// castle); a human player's unit keeps them all.
 #[test]
 fn computer_unit_passes_over_gaia_holdings_and_boats() {
-    let (thing, _) = enemy(7, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
+    let thing = seen_enemy();
     let any = Ask {
         any_class: true,
         ..Ask::default()

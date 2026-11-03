@@ -6,6 +6,7 @@ pub mod attribute;
 pub mod build_158041;
 pub mod class;
 pub mod ids;
+pub mod picker;
 pub mod scene;
 
 use crate::combat::damage::HitLayer;
